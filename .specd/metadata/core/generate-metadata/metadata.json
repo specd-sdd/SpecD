@@ -38,13 +38,13 @@
     {
       "requirement": "Metadata extraction",
       "rules": [
-        "The use case calls `extractMetadata()` with:\n\n- The schema's `metadataExtraction` declarations\n- Parsed ASTs keyed by artifact type ID\n- Renderers from the artifact parsers\n- A transform map (see resolveSpecPath transform)\n\nThe extraction engine produces fields including `title`, `description`, `dependsOn`, `keywords`, `rules`, `constraints`, `scenarios`, and `context`."
+        "The use case calls `extractMetadata()` with:\n\n- The schema's `metadataExtraction` declarations\n- Parsed ASTs keyed by artifact type ID\n- Renderers from the artifact parsers\n- The shared extractor-transform registry assembled by kernel composition\n- Caller-owned origin context for each extracted artifact, including the values needed by transforms such as `resolveSpecPath`\n\nThe extraction engine produces fields including `title`, `description`, `dependsOn`, `keywords`, `rules`, `constraints`, `scenarios`, and `context`.\n\nWhen the schema declares transforms for those fields, the extracted metadata returned from `extractMetadata()` is already normalized by that runtime transform path."
       ]
     },
     {
       "requirement": "dependsOn resolution",
       "rules": [
-        "After extraction, if `dependsOn` contains raw relative paths (e.g. `../storage/spec.md`), the use case resolves each entry via `SpecRepository.resolveFromPath(rawPath, specPath)`. The repository handles anchor stripping, pattern matching, and workspace-qualified spec ID construction. Entries that the repository cannot resolve are filtered out."
+        "`GenerateSpecMetadata` does not perform any field-specific postprocessing for `dependsOn` after extraction.\n\nIf `dependsOn` entries require normalization from artifact-local strings (for example relative spec links) to canonical spec IDs, that behavior must be declared through the schema's extractor transform model and executed during `extractMetadata()`.\n\nThe use case supplies the origin context needed by those registered transforms and accepts the transformed extraction output as final. It does not re-run `SpecRepository.resolveFromPath(...)` as a separate ad hoc repair step.\n\nIf extraction finds dependency values but transform execution cannot normalize them, metadata generation fails explicitly. It does not silently drop those found values and continue with an incomplete `dependsOn` set."
       ]
     },
     {
@@ -123,27 +123,50 @@
       ]
     },
     {
-      "requirement": "dependsOn resolution",
-      "name": "Relative spec path resolved to qualified spec ID",
+      "requirement": "Metadata extraction",
+      "name": "Extraction uses shared transform registry with origin context",
       "given": [
-        "the current spec is in workspace core with capability path core/change and extraction yields dependsOn: ['../storage/spec.md']"
+        "a metadata extractor declares transform: resolveSpecPath",
+        "AND the current spec origin is available to the use case"
       ],
-      "when": ["the use case resolves dependsOn via SpecRepository.resolveFromPath"],
-      "then": ["the value is resolved to core:core/storage"]
+      "when": ["GenerateSpecMetadata executes extraction"],
+      "then": [
+        "it supplies the shared extractor-transform registry and origin context to extractMetadata"
+      ]
     },
     {
       "requirement": "dependsOn resolution",
-      "name": "Path with anchor fragment",
-      "given": ["extraction yields dependsOn: ['../storage/spec.md#some-section']"],
-      "when": ["the use case resolves dependsOn via SpecRepository.resolveFromPath"],
-      "then": ["the anchor is stripped and the value resolves to core:core/storage"]
+      "name": "Relative spec path resolved during extraction",
+      "given": [
+        "the current spec origin is workspace core and capability path core/change",
+        "AND extraction yields the relative link ../storage/spec.md",
+        "AND the schema declares transform: resolveSpecPath"
+      ],
+      "when": ["GenerateSpecMetadata executes extraction"],
+      "then": [
+        "the transformed dependsOn value is core:core/storage",
+        "AND no separate post-extraction repair step runs afterward"
+      ]
     },
     {
       "requirement": "dependsOn resolution",
-      "name": "Non-matching pattern filtered out",
-      "given": ["extraction yields a dependsOn value like https://example.com or ./local-file.md"],
-      "when": ["the use case resolves dependsOn via SpecRepository.resolveFromPath"],
-      "then": ["the value is filtered out (repository returns null)"]
+      "name": "Unresolvable dependency value fails extraction instead of being omitted",
+      "given": [
+        "extraction yields a dependsOn value like https://example.com",
+        "AND the registered transform cannot normalize that value"
+      ],
+      "when": ["GenerateSpecMetadata executes extraction"],
+      "then": ["extraction fails explicitly instead of silently omitting that dependency"]
+    },
+    {
+      "requirement": "dependsOn resolution",
+      "name": "Canonical spec ID may pass through resolveSpecPath when enabled by args",
+      "given": [
+        "extraction yields the canonical spec ID core:core/storage",
+        "AND the schema declares transform: { name: \"resolveSpecPath\", args: [\"true\"] }"
+      ],
+      "when": ["GenerateSpecMetadata executes extraction"],
+      "then": ["the final dependsOn value remains core:core/storage"]
     },
     {
       "requirement": "Content hashes",
@@ -176,8 +199,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:7d106e48928584ab94d46e9b028cdb33f16f87e3043589a9dfcee145ebc21fcf",
-    "verify.md": "sha256:c986b8c3b6036ac0feb553545baa984948b3b1c64c25204242fd47c7fdc506ad"
+    "spec.md": "sha256:805b81bc79f4cc4c0c06b7f6586fb2792289ccc3ebb1a1994c3db6795b03a6a2",
+    "verify.md": "sha256:0e80578ab820342324de579a97c4d0131bd5d6c86cf8ff7cd59eebe4c58c1cdd"
   },
   "generatedBy": "core"
 }

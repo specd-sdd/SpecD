@@ -7,6 +7,7 @@ import { type SpecRepository } from '../ports/spec-repository.js'
 import { type SchemaProvider } from '../ports/schema-provider.js'
 import { type FileReader } from '../ports/file-reader.js'
 import { type ArtifactParserRegistry } from '../ports/artifact-parser.js'
+import { type ExtractorTransformRegistry } from '../../domain/services/content-extraction.js'
 import { Spec } from '../../domain/entities/spec.js'
 import { SpecPath } from '../../domain/value-objects/spec-path.js'
 import { inferFormat } from '../../domain/services/format-inference.js'
@@ -20,6 +21,7 @@ import { type SelectorNode } from '../../domain/services/selector-matching.js'
 import { listMatchingSpecs, type ResolvedSpec } from './_shared/spec-pattern-matching.js'
 import { traverseDependsOn, type DependsOnFallback } from './_shared/depends-on-traversal.js'
 import { compileContextFingerprint } from './_shared/compile-context-fingerprint.js'
+import { createExtractorTransformContext } from './_shared/extractor-transform-context.js'
 
 export { type ContextWarning } from './_shared/context-warning.js'
 
@@ -168,6 +170,7 @@ export class CompileContext {
   private readonly _parsers: ArtifactParserRegistry
   private readonly _hasher: ContentHasher
   private readonly _previewSpec: PreviewSpec
+  private readonly _extractorTransforms: ExtractorTransformRegistry
 
   /**
    * Creates a new `CompileContext` use case instance.
@@ -179,6 +182,7 @@ export class CompileContext {
    * @param parsers - Registry of artifact format parsers
    * @param hasher - Content hasher for metadata freshness checks
    * @param previewSpec - Use case for merging deltas into spec content
+   * @param extractorTransforms - Shared extractor transform registry
    */
   constructor(
     changes: ChangeRepository,
@@ -188,6 +192,7 @@ export class CompileContext {
     parsers: ArtifactParserRegistry,
     hasher: ContentHasher,
     previewSpec: PreviewSpec,
+    extractorTransforms: ExtractorTransformRegistry = new Map(),
   ) {
     this._changes = changes
     this._specs = specs
@@ -196,6 +201,7 @@ export class CompileContext {
     this._parsers = parsers
     this._hasher = hasher
     this._previewSpec = previewSpec
+    this._extractorTransforms = extractorTransforms
   }
 
   /**
@@ -288,7 +294,12 @@ export class CompileContext {
       const extraction = schema.metadataExtraction()
       const depFallback: DependsOnFallback | undefined =
         extraction !== undefined
-          ? { extraction, schemaArtifacts: schema.artifacts(), parsers: this._parsers }
+          ? {
+              extraction,
+              schemaArtifacts: schema.artifacts(),
+              parsers: this._parsers,
+              extractorTransforms: this._extractorTransforms,
+            }
           : undefined
 
       const depSeen = new Set<string>()
@@ -649,6 +660,7 @@ export class CompileContext {
   ): Promise<string[] | undefined> {
     const astsByArtifact = new Map<string, { root: SelectorNode }>()
     const renderers = new Map<string, SubtreeRenderer>()
+    const transformContexts = new Map<string, ReturnType<typeof createExtractorTransformContext>>()
 
     for (const artifactType of fallback.schemaArtifacts) {
       if (artifactType.scope !== 'spec') continue
@@ -663,11 +675,26 @@ export class CompileContext {
       const ast = parser.parse(artifactFile.content)
       astsByArtifact.set(artifactType.id, ast)
       renderers.set(artifactType.id, parser as SubtreeRenderer)
+      transformContexts.set(
+        artifactType.id,
+        createExtractorTransformContext(
+          spec.workspace,
+          spec.name.toString(),
+          artifactType.id,
+          filename,
+        ),
+      )
     }
 
     if (astsByArtifact.size === 0) return undefined
 
-    const extracted = extractMetadata(fallback.extraction, astsByArtifact, renderers)
+    const extracted = extractMetadata(
+      fallback.extraction,
+      astsByArtifact,
+      renderers,
+      this._extractorTransforms,
+      transformContexts,
+    )
     return extracted.dependsOn
   }
 
@@ -694,6 +721,7 @@ export class CompileContext {
   ): Promise<string[]> {
     const astsByArtifact = new Map<string, { root: SelectorNode }>()
     const renderers = new Map<string, SubtreeRenderer>()
+    const transformContexts = new Map<string, ReturnType<typeof createExtractorTransformContext>>()
 
     for (const artifactType of schema.artifacts()) {
       if (artifactType.scope !== 'spec') continue
@@ -708,9 +736,24 @@ export class CompileContext {
       const ast = parser.parse(artifactFile.content)
       astsByArtifact.set(artifactType.id, ast)
       renderers.set(artifactType.id, parser as SubtreeRenderer)
+      transformContexts.set(
+        artifactType.id,
+        createExtractorTransformContext(
+          spec.workspace,
+          spec.name.toString(),
+          artifactType.id,
+          filename,
+        ),
+      )
     }
 
-    const extracted = extractMetadata(extraction, astsByArtifact, renderers)
+    const extracted = extractMetadata(
+      extraction,
+      astsByArtifact,
+      renderers,
+      this._extractorTransforms,
+      transformContexts,
+    )
     const metaParts: string[] = []
 
     if (showAll && extracted.description !== undefined) {

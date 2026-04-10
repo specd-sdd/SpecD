@@ -13,6 +13,7 @@ import { ResolveSchema } from '../../application/use-cases/resolve-schema.js'
 import { LazySchemaProvider } from '../lazy-schema-provider.js'
 import { createVcsActorResolver } from '../actor-resolver.js'
 import { NodeContentHasher } from '../../infrastructure/node/content-hasher.js'
+import { createBuiltinExtractorTransforms } from '../extractor-transforms/index.js'
 
 /**
  * Domain context for the primary (default) workspace used by `ValidateArtifacts`.
@@ -159,5 +160,6 @@ export function createValidateArtifacts(
     parsers,
     actor,
     hasher,
+    createBuiltinExtractorTransforms(),
   )
 }

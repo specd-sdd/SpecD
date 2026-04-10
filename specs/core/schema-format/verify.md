@@ -349,11 +349,30 @@
 - **THEN** the extraction engine runs the declared extractors against parsed artifact ASTs
 - **AND** the extracted content is included in the compiled context
 
-#### Scenario: Extractor selector matches no node
+#### Scenario: Extractor transform shorthand accepted
 
-- **GIVEN** a `metadataExtraction` entry declares a selector that matches no node in the artifact
-- **WHEN** the extraction engine processes that entry
-- **THEN** no content is produced for that field — no error is thrown
+- **GIVEN** a metadata extractor declares `transform: resolveSpecPath`
+- **WHEN** `SchemaRegistry.resolve()` loads the schema
+- **THEN** the schema is accepted and the transform declaration is preserved in the resolved extractor
+
+#### Scenario: FieldMapping transform object with args accepted
+
+- **GIVEN** a metadata extractor field mapping declares `transform: { name: "join", args: ["$2", "/", "$1"] }`
+- **WHEN** `SchemaRegistry.resolve()` loads the schema
+- **THEN** the schema is accepted and the transform declaration is preserved in the resolved field mapping
+
+#### Scenario: Transform declarations do not imply silent omission semantics
+
+- **GIVEN** a metadata extractor declares a transform on an extracted field
+- **WHEN** the schema is resolved
+- **THEN** the declaration means the runtime transform must either return a non-null normalized value or fail explicitly
+
+#### Scenario: dependsOn extractor supports canonical labels with or without links
+
+- **GIVEN** a metadata extractor for `dependsOn` captures a canonical dependency label as `value`
+- **AND** the same capture also preserves an optional relative `href` as a transform arg when a link exists
+- **WHEN** `SchemaRegistry.resolve()` loads the schema
+- **THEN** the schema is accepted for both linked entries like ``[`core:core/config`](../config/spec.md)`` and unlinked entries like `` `core:core/config` ``
 
 #### Scenario: GenerateSpecMetadata produces deterministic output
 

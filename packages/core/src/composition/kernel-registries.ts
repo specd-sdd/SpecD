@@ -10,6 +10,10 @@ import { type ExternalHookRunner } from '../application/ports/external-hook-runn
 import { type SchemaRepository } from '../application/ports/schema-repository.js'
 import { type SpecRepository } from '../application/ports/spec-repository.js'
 import { type VcsAdapter } from '../application/ports/vcs-adapter.js'
+import {
+  type ExtractorTransform,
+  type ExtractorTransformRegistry,
+} from '../domain/services/content-extraction.js'
 import { type ArchiveRepositoryContext } from './archive-repository.js'
 import { type ChangeRepositoryContext } from './change-repository.js'
 import { type SchemaRepositoryContext } from './schema-repository.js'
@@ -145,6 +149,10 @@ export interface KernelRegistryInput {
   readonly graphStoreFactories?: Readonly<Record<string, GraphStoreFactory>>
   /** Additional artifact parsers keyed by format name. */
   readonly parsers?: Readonly<Record<string, ArtifactParser>> | ArtifactParserRegistry
+  /** Additional extractor transforms keyed by registered transform name. */
+  readonly extractorTransforms?:
+    | Readonly<Record<string, ExtractorTransform>>
+    | ExtractorTransformRegistry
   /** Additional VCS providers tried before built-in probes. */
   readonly vcsProviders?: readonly VcsProvider[]
   /** Additional actor providers tried before built-in probes. */
@@ -172,6 +180,8 @@ export interface KernelRegistryView {
   readonly graphStores: ReadonlyMap<string, GraphStoreFactory>
   /** Artifact parsers keyed by format name. */
   readonly parsers: ArtifactParserRegistry
+  /** Extractor transforms keyed by registered transform name. */
+  readonly extractorTransforms: ExtractorTransformRegistry
   /** External-first VCS providers in dispatch order. */
   readonly vcsProviders: readonly VcsProvider[]
   /** External-first actor providers in dispatch order. */
@@ -267,6 +277,11 @@ export function createKernelRegistryView(
       extra?.graphStoreFactories,
     ),
     parsers: mergeNamedRegistry('parsers', base.parsers ?? new Map(), extra?.parsers),
+    extractorTransforms: mergeNamedRegistry(
+      'extractorTransforms',
+      base.extractorTransforms ?? new Map(),
+      extra?.extractorTransforms,
+    ),
     vcsProviders: [...(extra?.vcsProviders ?? []), ...(base.vcsProviders ?? [])],
     actorProviders: [...(extra?.actorProviders ?? []), ...(base.actorProviders ?? [])],
     externalHookRunners: indexExternalHookRunners([

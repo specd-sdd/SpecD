@@ -19,6 +19,7 @@ import { RunStepHooks } from '../../application/use-cases/run-step-hooks.js'
 import { NodeContentHasher } from '../../infrastructure/node/content-hasher.js'
 import { GenerateSpecMetadata } from '../../application/use-cases/generate-spec-metadata.js'
 import { SaveSpecMetadata } from '../../application/use-cases/save-spec-metadata.js'
+import { createBuiltinExtractorTransforms } from '../extractor-transforms/index.js'
 
 /**
  * Domain context for the primary (default) workspace used by `ArchiveChange`.
@@ -190,6 +191,7 @@ export function createArchiveChange(
     schemaProvider,
     parsers,
     hasher,
+    createBuiltinExtractorTransforms(),
   )
   const saveMetadata = new SaveSpecMetadata(opts.specRepositories)
   const runStepHooks = new RunStepHooks(changeRepo, archiveRepo, hooks, new Map(), schemaProvider)

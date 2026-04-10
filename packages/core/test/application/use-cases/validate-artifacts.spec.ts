@@ -253,7 +253,14 @@ describe('ValidateArtifacts', () => {
       const specsArtifact = new ChangeArtifact({
         type: 'specs',
         files: new Map([
-          ['specs', new ArtifactFile({ key: 'specs', filename: 'spec.md', status: 'in-progress' })],
+          [
+            'specs',
+            new ArtifactFile({
+              key: 'specs',
+              filename: 'spec.md',
+              status: 'in-progress',
+            }),
+          ],
         ]),
       })
       const change = makeChangeWithArtifacts('c', [proposalArtifact, specsArtifact])
@@ -311,7 +318,14 @@ describe('ValidateArtifacts', () => {
       const specsArtifact = new ChangeArtifact({
         type: 'specs',
         files: new Map([
-          ['specs', new ArtifactFile({ key: 'specs', filename: 'spec.md', status: 'in-progress' })],
+          [
+            'specs',
+            new ArtifactFile({
+              key: 'specs',
+              filename: 'spec.md',
+              status: 'in-progress',
+            }),
+          ],
         ]),
       })
       const change = makeChangeWithArtifacts('c', [proposalArtifact, specsArtifact])
@@ -417,7 +431,14 @@ describe('ValidateArtifacts', () => {
       const specsArtifact = new ChangeArtifact({
         type: 'specs',
         files: new Map([
-          ['specs', new ArtifactFile({ key: 'specs', filename: 'spec.md', status: 'in-progress' })],
+          [
+            'specs',
+            new ArtifactFile({
+              key: 'specs',
+              filename: 'spec.md',
+              status: 'in-progress',
+            }),
+          ],
         ]),
       })
       const history: import('../../../src/domain/entities/change.js').ChangeEvent[] = [
@@ -625,7 +646,14 @@ describe('ValidateArtifacts', () => {
       const specsArtifact = new ChangeArtifact({
         type: 'specs',
         files: new Map([
-          ['specs', new ArtifactFile({ key: 'specs', filename: 'spec.md', status: 'in-progress' })],
+          [
+            'specs',
+            new ArtifactFile({
+              key: 'specs',
+              filename: 'spec.md',
+              status: 'in-progress',
+            }),
+          ],
         ]),
       })
       const history: import('../../../src/domain/entities/change.js').ChangeEvent[] = [
@@ -676,7 +704,14 @@ describe('ValidateArtifacts', () => {
       const specsArtifact = new ChangeArtifact({
         type: 'specs',
         files: new Map([
-          ['specs', new ArtifactFile({ key: 'specs', filename: 'spec.md', status: 'in-progress' })],
+          [
+            'specs',
+            new ArtifactFile({
+              key: 'specs',
+              filename: 'spec.md',
+              status: 'in-progress',
+            }),
+          ],
         ]),
       })
       const change = makeChangeWithArtifacts('c', [specsArtifact])
@@ -716,7 +751,14 @@ describe('ValidateArtifacts', () => {
       const specsArtifact = new ChangeArtifact({
         type: 'specs',
         files: new Map([
-          ['specs', new ArtifactFile({ key: 'specs', filename: 'spec.md', status: 'in-progress' })],
+          [
+            'specs',
+            new ArtifactFile({
+              key: 'specs',
+              filename: 'spec.md',
+              status: 'in-progress',
+            }),
+          ],
         ]),
       })
       const change = makeChangeWithArtifacts('c', [specsArtifact])
@@ -1693,6 +1735,245 @@ describe('ValidateArtifacts', () => {
       })
 
       expect(result.failures.some((f) => f.artifactId === 'design')).toBe(false)
+    })
+  })
+
+  describe('transform-backed metadata extraction', () => {
+    it('stores transform-normalized specDependsOn values during validation', async () => {
+      const extractorTransforms = new Map([
+        [
+          'normalizeDep',
+          (value: string) => (value === '../shared/spec.md' ? 'default:auth/shared' : value),
+        ],
+      ])
+      const schema = makeSchema({
+        artifacts: [
+          makeArtifactType('specs', {
+            scope: 'spec',
+            output: 'spec.md',
+            format: 'markdown',
+          }),
+        ],
+        metadataExtraction: {
+          title: {
+            artifact: 'specs',
+            extractor: {
+              selector: { type: 'section', level: 1 },
+              extract: 'label',
+            },
+          },
+          description: {
+            artifact: 'specs',
+            extractor: {
+              selector: { type: 'section', matches: '^Overview$' },
+              extract: 'content',
+            },
+          },
+          dependsOn: {
+            artifact: 'specs',
+            extractor: {
+              selector: { type: 'section', matches: '^Spec Dependencies$' },
+              extract: 'content',
+              capture: '\\[.*?\\]\\(([^)]+)\\)',
+              transform: { name: 'normalizeDep' },
+            },
+          },
+        },
+      })
+
+      const specsArtifact = new ChangeArtifact({
+        type: 'specs',
+        files: new Map([
+          [
+            'default:auth/login',
+            new ArtifactFile({
+              key: 'default:auth/login',
+              filename: 'spec.md',
+              status: 'in-progress',
+            }),
+          ],
+        ]),
+      })
+      const change = makeChangeWithArtifacts('c', [specsArtifact], {
+        specIds: ['default:auth/login'],
+      })
+
+      const repo = makeChangeRepository([change])
+      Object.assign(repo, {
+        async artifact(_change: Change, filename: string): Promise<SpecArtifact | null> {
+          if (filename !== 'spec.md') return null
+          return new SpecArtifact(
+            'spec.md',
+            '# Auth Login\n\n## Overview\n\nHandles login.\n\n## Spec Dependencies\n\n- [Shared](../shared/spec.md)\n',
+          )
+        },
+      })
+
+      const markdownParser = makeParser({
+        parse: () => ({
+          root: {
+            type: 'document',
+            children: [
+              {
+                type: 'section',
+                label: 'Auth Login',
+                level: 1,
+                children: [],
+              },
+              {
+                type: 'section',
+                label: 'Overview',
+                children: [{ type: 'paragraph', value: 'Handles login.' }],
+              },
+              {
+                type: 'section',
+                label: 'Spec Dependencies',
+                children: [{ type: 'paragraph', value: '- [Shared](../shared/spec.md)' }],
+              },
+            ],
+          },
+        }),
+        renderSubtree: (node) =>
+          (node.value as string | undefined) ??
+          (node.children ?? [])
+            .map((child) => ((child as { value?: unknown }).value as string | undefined) ?? '')
+            .join('\n'),
+      })
+
+      const uc = new ValidateArtifacts(
+        repo,
+        new Map(),
+        makeSchemaProvider(schema),
+        makeParsers(markdownParser),
+        makeActorResolver(),
+        makeContentHasher(),
+        extractorTransforms,
+      )
+
+      const result = await uc.execute({
+        name: 'c',
+        specPath: 'default:auth/login',
+      })
+
+      expect(result.passed).toBe(true)
+      expect(repo.store.get('c')?.specDependsOn.get('default:auth/login')).toEqual([
+        'default:auth/shared',
+      ])
+    })
+
+    it('fails validation instead of silently dropping found dependsOn values when the transform rejects them', async () => {
+      const extractorTransforms = new Map([
+        [
+          'normalizeDep',
+          (value: string, args: readonly (string | undefined)[]) => {
+            const candidates = [value, ...args].filter(
+              (candidate): candidate is string =>
+                typeof candidate === 'string' && candidate.length > 0,
+            )
+            if (!candidates.some((candidate) => candidate === 'default:auth/shared')) {
+              throw new Error(
+                `could not resolve dependency from candidates ${JSON.stringify(candidates)}`,
+              )
+            }
+            return 'default:auth/shared'
+          },
+        ],
+      ])
+      const schema = makeSchema({
+        artifacts: [
+          makeArtifactType('specs', {
+            scope: 'spec',
+            output: 'spec.md',
+            format: 'markdown',
+          }),
+        ],
+        metadataExtraction: {
+          dependsOn: {
+            artifact: 'specs',
+            extractor: {
+              selector: { type: 'section', matches: '^Spec Dependencies$' },
+              extract: 'content',
+              capture:
+                '(?:^|\\n)\\s*-\\s+(?:\\[`?|`)?([^`\\]\\n]+?)(?:(?:`?\\]\\(([^)]+)\\)|`)|(?=\\s*(?:—|$)))',
+              transform: { name: 'normalizeDep', args: ['$2'] },
+            },
+          },
+        },
+      })
+
+      const specsArtifact = new ChangeArtifact({
+        type: 'specs',
+        files: new Map([
+          [
+            'default:auth/login',
+            new ArtifactFile({
+              key: 'default:auth/login',
+              filename: 'spec.md',
+              status: 'in-progress',
+            }),
+          ],
+        ]),
+      })
+      const change = makeChangeWithArtifacts('c', [specsArtifact], {
+        specIds: ['default:auth/login'],
+      })
+
+      const repo = makeChangeRepository([change])
+      Object.assign(repo, {
+        async artifact(_change: Change, filename: string): Promise<SpecArtifact | null> {
+          if (filename !== 'spec.md') return null
+          return new SpecArtifact(
+            'spec.md',
+            '# Auth Login\n\n## Spec Dependencies\n\n- [`Shared`](not-a-spec)\n',
+          )
+        },
+      })
+
+      const markdownParser = makeParser({
+        parse: () => ({
+          root: {
+            type: 'document',
+            children: [
+              {
+                type: 'section',
+                label: 'Spec Dependencies',
+                children: [{ type: 'paragraph', value: '- [`Shared`](not-a-spec)' }],
+              },
+            ],
+          },
+        }),
+        renderSubtree: (node) =>
+          (node.value as string | undefined) ??
+          (node.children ?? [])
+            .map((child) => ((child as { value?: unknown }).value as string | undefined) ?? '')
+            .join('\n'),
+      })
+
+      const uc = new ValidateArtifacts(
+        repo,
+        new Map(),
+        makeSchemaProvider(schema),
+        makeParsers(markdownParser),
+        makeActorResolver(),
+        makeContentHasher(),
+        extractorTransforms,
+      )
+
+      const result = await uc.execute({
+        name: 'c',
+        specPath: 'default:auth/login',
+      })
+
+      expect(result.passed).toBe(false)
+      expect(result.failures).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            artifactId: 'specs',
+            description: expect.stringContaining('could not resolve dependency from candidates'),
+          }),
+        ]),
+      )
+      expect(repo.store.get('c')?.specDependsOn.get('default:auth/login')).toBeUndefined()
     })
   })
 })

@@ -215,6 +215,33 @@ import { WorkspaceNotFoundError } from '@specd/core'
 
 ---
 
+### ExtractorTransformError
+
+**Code:** `'EXTRACTOR_TRANSFORM_ERROR'`
+
+Thrown when extractor transform lookup or execution fails during content extraction.
+
+```typescript
+import { ExtractorTransformError } from '@specd/core'
+
+// Message examples:
+// "extractor transform 'resolveSpecPath' is not registered"
+// "extractor transform 'resolveSpecPath' failed"
+// "extractor transform 'resolveSpecPath' failed: could not resolve a canonical spec id from candidates [\"Shared\",\"not-a-spec\"] (...)"
+```
+
+Transforms are strict once invoked: if a callback receives an extracted value, it must return a normalized string. Returning a non-string value (including `null` or `undefined`) is treated as a failure and is wrapped as `ExtractorTransformError`.
+
+Carries:
+
+- `transformName` — the registered transform name
+- `extractorOwner` — `'extractor'` or `'field'`
+- `fieldName` — present when the failure came from `FieldMapping.transform`
+
+**Thrown by:** `extractContent`, `extractMetadata`, and use cases that enable transform-backed extraction such as `GenerateSpecMetadata`, `ValidateArtifacts`, `CompileContext`, and `GetProjectContext`.
+
+---
+
 ## Domain errors
 
 These are thrown by entities and domain services. Use cases may propagate them to the caller.

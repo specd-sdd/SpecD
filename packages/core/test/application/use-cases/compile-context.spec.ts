@@ -18,6 +18,7 @@ import {
   type ArtifactTypeProps,
 } from '../../../src/domain/value-objects/artifact-type.js'
 import { Spec } from '../../../src/domain/entities/spec.js'
+import { ExtractorTransformError } from '../../../src/domain/errors/extractor-transform-error.js'
 import { SpecPath } from '../../../src/domain/value-objects/spec-path.js'
 import { type ChangeRepository } from '../../../src/application/ports/change-repository.js'
 import { type SpecRepository } from '../../../src/application/ports/spec-repository.js'
@@ -27,7 +28,9 @@ import {
   type ArtifactParserRegistry,
   type ArtifactParser,
 } from '../../../src/application/ports/artifact-parser.js'
+import { type ExtractorTransformRegistry } from '../../../src/domain/services/content-extraction.js'
 import { type WorkflowStep } from '../../../src/domain/value-objects/workflow-step.js'
+import { createBuiltinExtractorTransforms } from '../../../src/composition/extractor-transforms/index.js'
 import {
   makeChangeRepository,
   makeSpecRepository,
@@ -218,12 +221,13 @@ function makeSut(opts: {
   fileReader?: FileReader
   parsers?: ArtifactParserRegistry
   previewSpec?: PreviewSpec
+  extractorTransforms?: ExtractorTransformRegistry
 }): {
   sut: CompileContext
   changeRepo: ChangeRepository
   schemaProvider: SchemaProvider
 } {
-  const { change, schema, specRepos, fileReader, parsers, previewSpec } = opts
+  const { change, schema, specRepos, fileReader, parsers, previewSpec, extractorTransforms } = opts
   const changeRepo = makeStubChangeRepo(change)
   const schemaProvider = makeStubSchemaProvider(schema ?? null)
 
@@ -235,6 +239,7 @@ function makeSut(opts: {
     parsers ?? (new Map() as ArtifactParserRegistry),
     makeContentHasher(),
     previewSpec ?? makeStubPreviewSpec(),
+    extractorTransforms ?? new Map(),
   )
 
   return { sut, changeRepo, schemaProvider }
@@ -342,6 +347,154 @@ describe('CompileContext', () => {
           config: noOp,
         }),
       ).rejects.toThrow(SchemaMismatchError)
+    })
+  })
+
+  describe('Requirement: Falls back to extraction when metadata is stale or absent', () => {
+    it('uses resolveSpecPath during fallback dependsOn traversal', async () => {
+      const specType = makeArtifactType('specs', {
+        scope: 'spec',
+        output: 'spec.md',
+        format: 'markdown',
+      })
+      const schema = makeSchema({
+        artifacts: [specType],
+        metadataExtraction: {
+          dependsOn: {
+            artifact: 'specs',
+            extractor: {
+              selector: { type: 'section', matches: '^Spec Dependencies$' },
+              extract: 'content',
+              capture:
+                '(?:^|\\n)\\s*-\\s+(?:\\[`?|`)?([^`\\]\\n]+?)(?:(?:`?\\]\\(([^)]+)\\)|`)|(?=\\s*(?:—|$)))',
+              transform: { name: 'resolveSpecPath', args: ['$2'] },
+            },
+          },
+        },
+      })
+
+      const login = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
+      const shared = new Spec('default', SpecPath.parse('auth/shared'), ['spec.md'])
+      const sharedContent = '# Shared'
+      const repos = new Map([
+        [
+          'default',
+          makeSpecRepo([login, shared], {
+            'auth/login/spec.md':
+              '# Auth Login\n\n## Spec Dependencies\n\n- [`default:auth/shared`](../shared/spec.md)\n',
+            'auth/shared/spec.md': sharedContent,
+            'auth/shared/.specd-metadata.yaml': freshMetadata(sharedContent, {
+              description: 'Shared auth helpers.',
+            }),
+          }),
+        ],
+      ])
+
+      const markdownParser: ArtifactParser = {
+        ...stubParser,
+        parse: () => ({
+          root: {
+            type: 'document',
+            children: [
+              {
+                type: 'section',
+                label: 'Spec Dependencies',
+                children: [
+                  { type: 'paragraph', value: '- [`default:auth/shared`](../shared/spec.md)' },
+                ],
+              },
+            ],
+          },
+        }),
+        renderSubtree: renderSubtreeRecursive,
+      }
+
+      const { sut } = makeSut({
+        change: makeChange('dep-fallback', { specIds: ['default:auth/login'] }),
+        schema,
+        specRepos: repos,
+        parsers: new Map([['markdown', markdownParser]]) as ArtifactParserRegistry,
+        extractorTransforms: createBuiltinExtractorTransforms(),
+      })
+
+      const result = await sut.execute({
+        name: 'dep-fallback',
+        step: 'implementing',
+        config: noOp,
+        followDeps: true,
+      })
+
+      expect(result.specs.some((spec) => spec.specId === 'default:auth/shared')).toBe(true)
+      expect(result.warnings.some((warning) => warning.type === 'missing-metadata')).toBe(true)
+    })
+
+    it('fails fallback dependsOn traversal when no dependency candidate is resolvable', async () => {
+      const specType = makeArtifactType('specs', {
+        scope: 'spec',
+        output: 'spec.md',
+        format: 'markdown',
+      })
+      const schema = makeSchema({
+        artifacts: [specType],
+        metadataExtraction: {
+          dependsOn: {
+            artifact: 'specs',
+            extractor: {
+              selector: { type: 'section', matches: '^Spec Dependencies$' },
+              extract: 'content',
+              capture:
+                '(?:^|\\n)\\s*-\\s+(?:\\[`?|`)?([^`\\]\\n]+?)(?:(?:`?\\]\\(([^)]+)\\)|`)|(?=\\s*(?:—|$)))',
+              transform: { name: 'resolveSpecPath', args: ['$2'] },
+            },
+          },
+        },
+      })
+
+      const login = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
+      const shared = new Spec('default', SpecPath.parse('auth/shared'), ['spec.md'])
+      const repos = new Map([
+        [
+          'default',
+          makeSpecRepo([login, shared], {
+            'auth/login/spec.md':
+              '# Auth Login\n\n## Spec Dependencies\n\n- [`Shared`](not-a-spec)\n',
+          }),
+        ],
+      ])
+
+      const markdownParser: ArtifactParser = {
+        ...stubParser,
+        parse: () => ({
+          root: {
+            type: 'document',
+            children: [
+              {
+                type: 'section',
+                label: 'Spec Dependencies',
+                children: [{ type: 'paragraph', value: '- [`Shared`](not-a-spec)' }],
+              },
+            ],
+          },
+        }),
+        renderSubtree: renderSubtreeRecursive,
+      }
+
+      const { sut } = makeSut({
+        change: makeChange('dep-fallback', { specIds: ['default:auth/login'] }),
+        schema,
+        specRepos: repos,
+        parsers: new Map([['markdown', markdownParser]]) as ArtifactParserRegistry,
+        extractorTransforms: createBuiltinExtractorTransforms(),
+      })
+
+      await expect(
+        sut.execute({
+          name: 'dep-fallback',
+          step: 'implementing',
+          config: noOp,
+          followDeps: true,
+        }),
+      ).rejects.toThrow(ExtractorTransformError)
     })
   })
 

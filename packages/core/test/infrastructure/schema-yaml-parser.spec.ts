@@ -238,6 +238,60 @@ workflow:
   })
 })
 
+describe('parseSchemaYaml — transform declarations', () => {
+  it('normalizes extractor transform shorthand strings', () => {
+    const yaml = `
+kind: schema
+name: test
+version: 1
+artifacts:
+  - id: specs
+    scope: spec
+    output: spec.md
+metadataExtraction:
+  dependsOn:
+    artifact: specs
+    extractor:
+      selector: { type: section, matches: '^Spec Dependencies$' }
+      extract: content
+      transform: resolveSpecPath
+`
+    const data = parseSchemaYaml('#test', yaml)
+    expect(data.metadataExtraction?.dependsOn?.extractor.transform).toEqual({
+      name: 'resolveSpecPath',
+    })
+  })
+
+  it('normalizes object transform syntax on field mappings', () => {
+    const yaml = `
+kind: schema
+name: test
+version: 1
+artifacts:
+  - id: verify
+    scope: spec
+    output: verify.md
+metadataExtraction:
+  scenarios:
+    - id: verify-scenarios
+      artifact: verify
+      extractor:
+        selector: { type: section, matches: '^Scenario:' }
+        fields:
+          when:
+            childSelector: { type: list-item, matches: '^WHEN' }
+            transform:
+              name: join
+              args: ['$1', ' => ', '$2']
+`
+    const data = parseSchemaYaml('#test', yaml)
+    expect(data.metadataExtraction?.scenarios?.[0]?.extractor.fields?.when?.transform).toEqual({
+      name: 'join',
+      args: ['$1', ' => ', '$2'],
+    })
+  })
+})
+
 describe('parseSchemaYaml — id on preHashCleanup', () => {
   it('requires id on preHashCleanup entries', () => {
     const yaml = `

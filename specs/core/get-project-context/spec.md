@@ -48,7 +48,11 @@ The use case MUST NOT apply workspace-level `contextIncludeSpecs` or `contextExc
 
 ### Requirement: Supports dependsOn traversal when followDeps is true
 
-When `input.followDeps` is `true`, the use case MUST traverse `dependsOn` links starting from each included spec, using the schema's `metadataExtraction` declarations as a fallback when `.specd-metadata.yaml` is absent. Newly discovered specs MUST be added to the included set. Traversal MUST respect `input.depth` when provided.
+When `input.followDeps` is `true`, the use case MUST traverse `dependsOn` links starting from each included spec, using persisted metadata when it is fresh and the schema's `metadataExtraction` declarations as a fallback when metadata is absent or stale.
+
+That fallback extraction MUST use the same shared extractor-transform registry and caller-owned origin context bag used by the other metadata-extraction consumers. Newly discovered specs MUST be added to the included set. Traversal MUST respect `input.depth` when provided.
+
+If fallback extraction finds dependency values but transform execution cannot normalize them, the use case MUST fail explicitly rather than silently treating those dependencies as absent.
 
 ### Requirement: Renders spec content from metadata when fresh
 
@@ -59,9 +63,11 @@ For each included spec, if `.specd-metadata.yaml` exists and its content hashes 
 When metadata is stale or absent, the use case MUST:
 
 1. Emit a `stale-metadata` warning identifying the spec.
-2. Attempt live extraction using the schema's `metadataExtraction` engine and `ArtifactParserRegistry`.
+2. Attempt live extraction using the schema's `metadataExtraction` engine, the shared extractor-transform registry, and caller-owned origin context for each artifact.
 3. If extraction yields content, render it with the same section filtering as fresh metadata.
 4. If the schema has no `metadataExtraction` declarations, render an empty spec heading.
+
+If extraction finds values for transformed fields but transform execution cannot normalize them, the use case MUST fail explicitly instead of silently omitting those found values from the rendered fallback content.
 
 ### Requirement: Construction dependencies
 
@@ -87,8 +93,8 @@ All dependencies are injected at construction time. The schema is resolved lazil
 
 ## Spec Dependencies
 
-- [`specs/core/config/spec.md`](../config/spec.md) — context entry format, include/exclude pattern semantics, `CompileContextConfig` structure, `contextMode`
-- [`specs/core/compile-context/spec.md`](../compile-context/spec.md) — shared pattern matching, rendering logic, `ContextSpecEntry` type definition
-- [`specs/core/spec-metadata/spec.md`](../spec-metadata/spec.md) — `.specd-metadata.yaml` format and content hash freshness model
-- [`specs/core/schema-format/spec.md`](../schema-format/spec.md) — `metadataExtraction` declarations and schema artifacts
-- [`specs/_global/architecture/spec.md`](../../_global/architecture/spec.md) — port/adapter design constraints
+- [`core:core/config`](../config/spec.md) — context entry format, include/exclude pattern semantics, `CompileContextConfig` structure, `contextMode`
+- [`core:core/compile-context`](../compile-context/spec.md) — shared pattern matching, rendering logic, `ContextSpecEntry` type definition
+- [`core:core/spec-metadata`](../spec-metadata/spec.md) — `.specd-metadata.yaml` format and content hash freshness model
+- [`core:core/schema-format`](../schema-format/spec.md) — `metadataExtraction` declarations and schema artifacts
+- `default:_global/architecture` — port/adapter design constraints

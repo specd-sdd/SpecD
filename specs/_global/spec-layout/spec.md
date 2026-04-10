@@ -92,6 +92,13 @@ Only scenarios that add information beyond what the requirement prose already st
 
 Every `spec.md` must include a `## Spec Dependencies` section listing other specs it depends on or that provide context for it. If there are none, the section must say `_none_`. Global specs with no dependencies use the form `_none — this is a global constraint spec_`.
 
+The canonical dependency entry format is:
+
+- ``[`<workspace>:<capability-path>`](../relative/path/spec.md)`` when the dependency can be linked through a relative path
+- `` `<workspace>:<capability-path>` `` when the dependency should be listed without a link
+
+The visible dependency label is the canonical spec ID. When a link is present, the `href` is a relative path to the depended-on spec artifact. Specs MAY continue to include older dependency labels while the repo is migrating, but new and modified specs SHOULD use the canonical spec-ID label format.
+
 ## Constraints
 
 - `specs/_global/` is for cross-cutting constraints only — not for any single package's implementation details
@@ -104,7 +111,9 @@ Every `spec.md` must include a `## Spec Dependencies` section listing other spec
 
 ## Spec Dependencies
 
-_none — this is a global constraint spec_
+- [`core:core/schema-format`](../../../core/schema-format/spec.md) — schema-level metadata extraction declarations and dependency extraction shape
+- [`core:core/content-extraction`](../../../core/content-extraction/spec.md) — extractor capture semantics and transform runtime for dependency extraction
+- [`core:core/spec-id-format`](../../../core/spec-id-format/spec.md) — canonical `workspace:capabilityPath` format used in dependency labels
 
 ## ADRs
 

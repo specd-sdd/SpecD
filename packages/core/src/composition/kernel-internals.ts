@@ -30,6 +30,7 @@ import { BUILTIN_ACTOR_PROVIDERS, createVcsActorResolver } from './actor-resolve
 import { BUILTIN_VCS_PROVIDERS, createVcsAdapter } from './vcs-adapter.js'
 import { getDefaultWorkspace } from './get-default-workspace.js'
 import { type KernelOptions } from './kernel.js'
+import { createBuiltinExtractorTransforms } from './extractor-transforms/index.js'
 import {
   type ArchiveStorageFactory,
   type ChangeStorageFactory,
@@ -195,6 +196,7 @@ export function createBuiltinKernelRegistry(): KernelRegistryInput {
       sqlite: SQLITE_GRAPH_STORE_FACTORY,
     },
     parsers: createArtifactParserRegistry(),
+    extractorTransforms: createBuiltinExtractorTransforms(),
     vcsProviders: BUILTIN_VCS_PROVIDERS,
     actorProviders: BUILTIN_ACTOR_PROVIDERS,
     externalHookRunners: [],

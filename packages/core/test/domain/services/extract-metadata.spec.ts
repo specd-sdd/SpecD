@@ -1,11 +1,13 @@
 import { describe, it, expect } from 'vitest'
 import {
   extractContent,
+  type ExtractorTransform,
   type SubtreeRenderer,
   type GroupedExtraction,
   type StructuredExtraction,
 } from '../../../src/domain/services/content-extraction.js'
 import { extractMetadata } from '../../../src/domain/services/extract-metadata.js'
+import { ExtractorTransformError } from '../../../src/domain/errors/extractor-transform-error.js'
 import { type SelectorNode } from '../../../src/domain/services/selector-matching.js'
 import { type Extractor } from '../../../src/domain/value-objects/extractor.js'
 import { type MetadataExtraction } from '../../../src/domain/value-objects/metadata-extraction.js'
@@ -129,16 +131,67 @@ describe('extractContent', () => {
     const extractor: Extractor = {
       selector: { type: 'section', matches: '^Deps$' },
       extract: 'content',
-      transform: 'resolveSpecPath',
+      transform: { name: 'resolveSpecPath' },
     }
-    const transforms = new Map([
-      [
-        'resolveSpecPath',
-        (vals: string[]) => vals.map((v) => v.replace('../', '').replace('/spec.md', '')),
-      ],
+    const transforms = new Map<string, ExtractorTransform>([
+      ['resolveSpecPath', (value: string) => value.replace('../', '').replace('/spec.md', '')],
     ])
     const result = extractContent(root, extractor, renderer, transforms)
     expect(result).toEqual(['a'])
+  })
+
+  it('interpolates capture placeholders before invoking extractor transforms', () => {
+    const root: SelectorNode = {
+      type: 'document',
+      children: [section('Release Date', [paragraph('2026-04-09')])],
+    }
+    const extractor: Extractor = {
+      selector: { type: 'section', matches: '^Release Date$' },
+      extract: 'content',
+      capture: '^(\\d{4})-(\\d{2})-(\\d{2})$',
+      transform: {
+        name: 'reorderDate',
+        args: ['$3', '/', '$2', '/', '$1', '/', '$9'],
+      },
+    }
+    const transforms = new Map([
+      [
+        'reorderDate',
+        (value: string, args: readonly (string | undefined)[]) =>
+          `${value}|${args[0] ?? ''}${args[1] ?? ''}${args[2] ?? ''}${args[3] ?? ''}${
+            args[4] ?? ''
+          }|${String(args[6])}`,
+      ],
+    ])
+
+    const result = extractContent(root, extractor, renderer, transforms)
+    expect(result).toEqual(['2026|09/04/2026|undefined'])
+  })
+
+  it('throws ExtractorTransformError when a transform returns a non-string', () => {
+    const root: SelectorNode = {
+      type: 'document',
+      children: [section('Deps', [paragraph('../a/spec.md')])],
+    }
+    const extractor: Extractor = {
+      selector: { type: 'section', matches: '^Deps$' },
+      extract: 'content',
+      transform: { name: 'badTransform' },
+    }
+    const transforms = new Map<string, ExtractorTransform>([
+      ['badTransform', (() => null) as unknown as ExtractorTransform],
+    ])
+
+    expect(() => extractContent(root, extractor, renderer, transforms)).toThrow(
+      ExtractorTransformError,
+    )
+
+    try {
+      extractContent(root, extractor, renderer, transforms)
+    } catch (error) {
+      expect(error).toBeInstanceOf(ExtractorTransformError)
+      expect((error as Error).message).toContain('must return a string')
+    }
   })
 
   // groupBy: label
@@ -221,6 +274,97 @@ describe('extractContent', () => {
       when: ['the token is validated'],
       then: ['access is granted'],
     })
+  })
+
+  it('applies field-level transforms after capture in structured extraction', () => {
+    const root: SelectorNode = {
+      type: 'document',
+      children: [
+        section('Requirement: Auth', [
+          section('Scenario: Token Valid', [
+            listItem('GIVEN a valid token', '**GIVEN** a valid token'),
+            listItem('THEN access granted', '**THEN** access is granted'),
+          ]),
+        ]),
+      ],
+    }
+    const extractor: Extractor = {
+      selector: {
+        type: 'section',
+        matches: '^Scenario:',
+        parent: { type: 'section', matches: '^Requirement:' },
+      },
+      fields: {
+        name: { from: 'label', strip: '^Scenario:\\s*' },
+        given: {
+          childSelector: { type: 'list-item', contains: 'GIVEN' },
+          capture: '\\*\\*GIVEN\\*\\*\\s*(.+)',
+          transform: {
+            name: 'prefix',
+            args: ['Given: ', '$1'],
+          },
+        },
+        then: {
+          childSelector: { type: 'list-item', contains: 'THEN' },
+          capture: '\\*\\*THEN\\*\\*\\s*(.+)',
+        },
+      },
+    }
+    const transforms = new Map([
+      [
+        'prefix',
+        (_value: string, args: readonly (string | undefined)[]) =>
+          `${args[0] ?? ''}${args[1] ?? ''}`,
+      ],
+    ])
+
+    const result = extractContent(root, extractor, renderer, transforms) as StructuredExtraction[]
+    expect(result).toEqual([
+      {
+        name: 'Token Valid',
+        given: ['Given: a valid token'],
+        then: ['access is granted'],
+      },
+    ])
+  })
+
+  it('throws ExtractorTransformError with field metadata for missing field transforms', () => {
+    const root: SelectorNode = {
+      type: 'document',
+      children: [
+        section('Requirement: Auth', [
+          section('Scenario: Token Valid', [
+            listItem('GIVEN a valid token', '**GIVEN** a valid token'),
+          ]),
+        ]),
+      ],
+    }
+    const extractor: Extractor = {
+      selector: {
+        type: 'section',
+        matches: '^Scenario:',
+        parent: { type: 'section', matches: '^Requirement:' },
+      },
+      fields: {
+        given: {
+          childSelector: { type: 'list-item', contains: 'GIVEN' },
+          capture: '\\*\\*GIVEN\\*\\*\\s*(.+)',
+          transform: 'missingTransform' as never,
+        },
+      },
+    }
+
+    expect(() => extractContent(root, extractor, renderer, new Map())).toThrow(
+      ExtractorTransformError,
+    )
+
+    try {
+      extractContent(root, extractor, renderer, new Map())
+    } catch (error) {
+      expect(error).toBeInstanceOf(ExtractorTransformError)
+      expect((error as ExtractorTransformError).transformName).toBe('missingTransform')
+      expect((error as ExtractorTransformError).fieldName).toBe('given')
+    }
   })
 
   // followSiblings — sequential AND grouping
@@ -376,21 +520,20 @@ describe('extractMetadata', () => {
           selector: { type: 'section', matches: '^Spec Dependencies$' },
           extract: 'content',
           capture: '\\[.*?\\]\\(([^)]+)\\)',
-          transform: 'resolveSpecPath',
+          transform: { name: 'resolveSpecPath' },
         },
       },
     }
 
     const asts = new Map([['specs', specAst]])
     const renderers = new Map([['specs', renderer]])
-    const transforms = new Map([
+    const transforms = new Map<string, ExtractorTransform>([
       [
         'resolveSpecPath',
-        (vals: string[]) =>
-          vals.map((v) => {
-            const match = v.match(/\.\.\/([^/]+)\/spec\.md/)
-            return match ? `core/${match[1]}` : v
-          }),
+        (value: string) => {
+          const match = value.match(/\.\.\/([^/]+)\/spec\.md/)
+          return match ? `core/${match[1]}` : value
+        },
       ],
     ])
 

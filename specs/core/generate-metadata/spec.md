@@ -36,13 +36,22 @@ The use case calls `extractMetadata()` with:
 - The schema's `metadataExtraction` declarations
 - Parsed ASTs keyed by artifact type ID
 - Renderers from the artifact parsers
-- A transform map (see resolveSpecPath transform)
+- The shared extractor-transform registry assembled by kernel composition
+- Caller-owned origin context for each extracted artifact, including the values needed by transforms such as `resolveSpecPath`
 
 The extraction engine produces fields including `title`, `description`, `dependsOn`, `keywords`, `rules`, `constraints`, `scenarios`, and `context`.
 
+When the schema declares transforms for those fields, the extracted metadata returned from `extractMetadata()` is already normalized by that runtime transform path.
+
 ### Requirement: dependsOn resolution
 
-After extraction, if `dependsOn` contains raw relative paths (e.g. `../storage/spec.md`), the use case resolves each entry via `SpecRepository.resolveFromPath(rawPath, specPath)`. The repository handles anchor stripping, pattern matching, and workspace-qualified spec ID construction. Entries that the repository cannot resolve are filtered out.
+`GenerateSpecMetadata` does not perform any field-specific postprocessing for `dependsOn` after extraction.
+
+If `dependsOn` entries require normalization from artifact-local strings (for example relative spec links) to canonical spec IDs, that behavior must be declared through the schema's extractor transform model and executed during `extractMetadata()`.
+
+The use case supplies the origin context needed by those registered transforms and accepts the transformed extraction output as final. It does not re-run `SpecRepository.resolveFromPath(...)` as a separate ad hoc repair step.
+
+If extraction finds dependency values but transform execution cannot normalize them, metadata generation fails explicitly. It does not silently drop those found values and continue with an incomplete `dependsOn` set.
 
 ### Requirement: Content hashes
 
@@ -67,7 +76,7 @@ The result is returned with `hasExtraction: true`.
 
 ## Spec Dependencies
 
-- [`specs/core/spec-metadata/spec.md`](../spec-metadata/spec.md) — metadata format, fields, validation
-- [`specs/core/content-extraction/spec.md`](../content-extraction/spec.md) — the `extractMetadata()` domain service
-- [`specs/core/schema-format/spec.md`](../schema-format/spec.md) — `metadataExtraction` declarations, artifact type definitions
-- [`specs/core/spec-id-format/spec.md`](../spec-id-format/spec.md) — `parseSpecId()` resolution
+- [`core:core/spec-metadata`](../spec-metadata/spec.md) — metadata format, fields, validation
+- [`core:core/content-extraction`](../content-extraction/spec.md) — the `extractMetadata()` domain service
+- [`core:core/schema-format`](../schema-format/spec.md) — `metadataExtraction` declarations and artifact type definitions
+- [`core:core/spec-id-format`](../spec-id-format/spec.md) — `parseSpecId()` resolution

@@ -8,7 +8,7 @@ AI agents entering a lifecycle step need relevant spec content and project conte
 
 ### Requirement: Ports and constructor
 
-`CompileContext` receives at construction time: `ChangeRepository`, a map of `SpecRepository` instances (one per configured workspace), `SchemaProvider`, `FileReader`, and `ArtifactParserRegistry`.
+`CompileContext` receives at construction time: `ChangeRepository`, a map of `SpecRepository` instances (one per configured workspace), `SchemaProvider`, `FileReader`, `ArtifactParserRegistry`, `ContentHasher`, and `PreviewSpec`.
 
 ```typescript
 class CompileContext {
@@ -18,11 +18,15 @@ class CompileContext {
     schemaProvider: SchemaProvider,
     files: FileReader,
     parsers: ArtifactParserRegistry,
+    hasher: ContentHasher,
+    previewSpec: PreviewSpec,
   )
 }
 ```
 
 `SchemaProvider` is a lazy, caching port that returns the fully-resolved schema (with plugins and overrides applied). It replaces the previous `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths` triple. All are injected at kernel composition time, not passed per invocation.
+
+`PreviewSpec` is the use case `CompileContext` delegates to when it needs a materialized merged view of a spec with validated deltas applied. `ContentHasher` is used for metadata freshness checks and context fingerprint inputs.
 
 ### Requirement: Input
 
@@ -91,7 +95,7 @@ For each spec in Step 5, `dependsOn` is resolved using a three-tier fallback:
 
 1. `change.specDependsOn[specId]` — per-spec dependencies declared in the change manifest (highest priority)
 2. Metadata `dependsOn` field — the persisted metadata loaded via `SpecRepository.metadata()`
-3. Schema `metadataExtraction` engine — extracts `dependsOn` from spec content when metadata is absent
+3. Schema `metadataExtraction` engine — extracts `dependsOn` from spec content when metadata is absent or stale, using the shared extractor-transform registry and caller-owned origin context bag
 
 The first tier that returns a non-empty result is used. If all tiers return empty, the spec is treated as having no dependencies.
 
@@ -104,27 +108,9 @@ During step 5, if `CompileContext` detects a cycle in the `dependsOn` graph (spe
 For every spec in the collected context set, `CompileContext` must check whether the spec's metadata exists (via `SpecRepository.metadata()`) and whether its `contentHashes` are fresh (all required artifact file hashes match the recorded values).
 
 - **Fresh metadata** — use the structured content from metadata (`rules`, `constraints`, `scenarios`, `description`).
-- **Stale or absent metadata** — fall back to the full raw content of the spec's artifact files. Emit a warning identifying the spec path so the caller knows metadata should be regenerated.
+- **Stale or absent metadata** — fall back to live extraction from the spec's artifact files using the schema's `metadataExtraction` declarations, the shared extractor-transform registry, and caller-owned origin context for each artifact. Emit a warning identifying the spec path so the caller knows metadata should be regenerated.
 
 Staleness is advisory — it never blocks context compilation. The fallback ensures the context is always assembled, even for specs whose metadata has not yet been generated.
-
-### Requirement: Ports and constructor — PreviewSpec
-
-`CompileContext` MUST receive a `PreviewSpec` instance at construction time, in addition to its existing ports. This is the use case it delegates to for merging deltas into spec content.
-
-```typescript
-class CompileContext {
-  constructor(
-    changes: ChangeRepository,
-    specs: ReadonlyMap<string, SpecRepository>,
-    schemaProvider: SchemaProvider,
-    files: FileReader,
-    parsers: ArtifactParserRegistry,
-    hasher: ContentHasher,
-    previewSpec: PreviewSpec,
-  )
-}
-```
 
 ### Requirement: Step availability
 
@@ -248,14 +234,14 @@ const result = await compileContext.execute({
 
 ## Spec Dependencies
 
-- [`specs/core/change/spec.md`](../change/spec.md) — Change entity, `effectiveStatus`, active workspaces
-- [`specs/core/config/spec.md`](../config/spec.md) — 5-step context spec resolution, include/exclude patterns, workspace-level patterns
-- [`specs/core/spec-metadata/spec.md`](../spec-metadata/spec.md) — `.specd-metadata.yaml` format, `dependsOn` traversal, staleness detection
-- [`specs/core/schema-format/spec.md`](../schema-format/spec.md) — `metadataExtraction` (fallback path), `workflow`
-- [`specs/core/delta-format/spec.md`](../delta-format/spec.md) — `ArtifactParser` port (for metadataExtraction fallback)
-- [`specs/core/selector-model/spec.md`](../selector-model/spec.md) — selector fields used in `metadataExtraction` extractors
-- [`specs/core/spec-id-format/spec.md`](../spec-id-format/spec.md) — canonical `workspace:capabilityPath` format, parsing rules for `specIds`
-- [`specs/core/workspace/spec.md`](../workspace/spec.md) — active workspace determination, workspace-level context patterns, port-per-workspace pattern
-- [`specs/core/get-artifact-instruction/spec.md`](../get-artifact-instruction/spec.md) — artifact instructions (separate concern)
-- [`specs/core/get-hook-instructions/spec.md`](../get-hook-instructions/spec.md) — step hook instructions (separate concern)
-- [`specs/core/preview-spec/spec.md`](../preview-spec/spec.md) — delta merge for materialized spec views in context
+- [`core:core/change`](../change/spec.md) — Change entity, `effectiveStatus`, active workspaces
+- [`core:core/config`](../config/spec.md) — 5-step context spec resolution, include/exclude patterns, workspace-level patterns
+- [`core:core/spec-metadata`](../spec-metadata/spec.md) — `.specd-metadata.yaml` format, `dependsOn` traversal, staleness detection
+- [`core:core/schema-format`](../schema-format/spec.md) — `metadataExtraction` (fallback path), `workflow`
+- [`core:core/delta-format`](../delta-format/spec.md) — `ArtifactParser` port (for metadataExtraction fallback)
+- [`core:core/selector-model`](../selector-model/spec.md) — selector fields used in `metadataExtraction` extractors
+- [`core:core/spec-id-format`](../spec-id-format/spec.md) — canonical `workspace:capabilityPath` format, parsing rules for `specIds`
+- [`core:core/workspace`](../workspace/spec.md) — active workspace determination, workspace-level context patterns, port-per-workspace pattern
+- [`core:core/get-artifact-instruction`](../get-artifact-instruction/spec.md) — artifact instructions (separate concern)
+- [`core:core/get-hook-instructions`](../get-hook-instructions/spec.md) — step hook instructions (separate concern)
+- [`core:core/preview-spec`](../preview-spec/spec.md) — delta merge for materialized spec views in context

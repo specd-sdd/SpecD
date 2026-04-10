@@ -13,7 +13,11 @@ import {
   type TaskCompletionCheck,
 } from '../value-objects/validation-rule.js'
 import { type Selector } from '../value-objects/selector.js'
-import { type Extractor, type FieldMapping } from '../value-objects/extractor.js'
+import {
+  type Extractor,
+  type ExtractorTransformDeclaration,
+  type FieldMapping,
+} from '../value-objects/extractor.js'
 import {
   type MetadataExtraction,
   type MetadataExtractorEntry,
@@ -58,6 +62,7 @@ export interface FieldMappingRaw {
   capture?: string | undefined
   strip?: string | undefined
   followSiblings?: string | undefined
+  transform?: ExtractorTransformDeclaration | undefined
 }
 
 /** Raw extractor shape. */
@@ -67,7 +72,7 @@ export interface ExtractorRaw {
   capture?: string | undefined
   strip?: string | undefined
   groupBy?: 'label' | undefined
-  transform?: string | undefined
+  transform?: ExtractorTransformDeclaration | undefined
   fields?: Record<string, FieldMappingRaw> | undefined
 }
 
@@ -224,6 +229,7 @@ function buildFieldMapping(raw: FieldMappingRaw): FieldMapping {
     ...(raw.capture !== undefined ? { capture: raw.capture } : {}),
     ...(raw.strip !== undefined ? { strip: raw.strip } : {}),
     ...(raw.followSiblings !== undefined ? { followSiblings: raw.followSiblings } : {}),
+    ...(raw.transform !== undefined ? { transform: raw.transform } : {}),
   }
 }
 

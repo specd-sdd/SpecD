@@ -22,4 +22,11 @@
 
 ## Spec Dependencies
 
-<!-- List other specs that this spec depends on, or delete this section. -->
+<!-- This section is mandatory.
+     List other specs that this spec depends on.
+     Preferred format:
+     - [`<workspace>:<capability-path>`](../relative/path/spec.md) — brief reason
+     Compatible fallback when no link is available:
+     - `<workspace>:<capability-path>` — brief reason
+     If there are no dependencies, write `_none_`.
+     Global constraint specs with no dependencies use `_none — this is a global constraint spec_`. -->

@@ -50,25 +50,37 @@
 - **WHEN** `GenerateSpecMetadata` is executed
 - **THEN** the result metadata contains extracted fields such as `title`, `description`, `dependsOn`, `keywords`, `rules`, `constraints`, and `scenarios`
 
+#### Scenario: Extraction uses shared transform registry with origin context
+
+- **GIVEN** a metadata extractor declares `transform: resolveSpecPath`
+- **AND** the current spec origin is available to the use case
+- **WHEN** `GenerateSpecMetadata` executes extraction
+- **THEN** it supplies the shared extractor-transform registry and origin context to `extractMetadata`
+
 ### Requirement: dependsOn resolution
 
-#### Scenario: Relative spec path resolved to qualified spec ID
+#### Scenario: Relative spec path resolved during extraction
 
-- **GIVEN** the current spec is in workspace `core` with capability path `core/change` and extraction yields `dependsOn: ['../storage/spec.md']`
-- **WHEN** the use case resolves dependsOn via `SpecRepository.resolveFromPath`
-- **THEN** the value is resolved to `core:core/storage`
+- **GIVEN** the current spec origin is workspace `core` and capability path `core/change`
+- **AND** extraction yields the relative link `../storage/spec.md`
+- **AND** the schema declares `transform: resolveSpecPath`
+- **WHEN** `GenerateSpecMetadata` executes extraction
+- **THEN** the transformed `dependsOn` value is `core:core/storage`
+- **AND** no separate post-extraction repair step runs afterward
 
-#### Scenario: Path with anchor fragment
+#### Scenario: Unresolvable dependency value fails extraction instead of being omitted
 
-- **GIVEN** extraction yields `dependsOn: ['../storage/spec.md#some-section']`
-- **WHEN** the use case resolves dependsOn via `SpecRepository.resolveFromPath`
-- **THEN** the anchor is stripped and the value resolves to `core:core/storage`
+- **GIVEN** extraction yields a `dependsOn` value like `https://example.com`
+- **AND** the registered transform cannot normalize that value
+- **WHEN** `GenerateSpecMetadata` executes extraction
+- **THEN** extraction fails explicitly instead of silently omitting that dependency
 
-#### Scenario: Non-matching pattern filtered out
+#### Scenario: Canonical spec ID may pass through resolveSpecPath when enabled by args
 
-- **GIVEN** extraction yields a `dependsOn` value like `https://example.com` or `./local-file.md`
-- **WHEN** the use case resolves dependsOn via `SpecRepository.resolveFromPath`
-- **THEN** the value is filtered out (repository returns null)
+- **GIVEN** extraction yields the canonical spec ID `core:core/storage`
+- **AND** the schema declares `transform: { name: "resolveSpecPath", args: ["true"] }`
+- **WHEN** `GenerateSpecMetadata` executes extraction
+- **THEN** the final `dependsOn` value remains `core:core/storage`
 
 ### Requirement: Content hashes
 

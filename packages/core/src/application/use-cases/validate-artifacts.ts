@@ -7,6 +7,7 @@ import { type SchemaProvider } from '../ports/schema-provider.js'
 import { type ArtifactParserRegistry } from '../ports/artifact-parser.js'
 import { DeltaApplicationError } from '../../domain/errors/delta-application-error.js'
 import { type ActorResolver } from '../ports/actor-resolver.js'
+import { type ExtractorTransformRegistry } from '../../domain/services/content-extraction.js'
 import {
   type ActorIdentity,
   type SpecApprovedEvent,
@@ -24,6 +25,7 @@ import { SpecArtifact } from '../../domain/value-objects/spec-artifact.js'
 import { extractMetadata, type SubtreeRenderer } from '../../domain/services/extract-metadata.js'
 import { type SelectorNode } from '../../domain/services/selector-matching.js'
 import * as path from 'node:path'
+import { createExtractorTransformContext } from './_shared/extractor-transform-context.js'
 
 /** Input for the {@link ValidateArtifacts} use case. */
 export interface ValidateArtifactsInput {
@@ -85,6 +87,7 @@ export class ValidateArtifacts {
   private readonly _parsers: ArtifactParserRegistry
   private readonly _actor: ActorResolver
   private readonly _hasher: ContentHasher
+  private readonly _extractorTransforms: ExtractorTransformRegistry
 
   /**
    * Creates a new `ValidateArtifacts` use case instance.
@@ -95,6 +98,7 @@ export class ValidateArtifacts {
    * @param parsers - Registry of artifact format parsers
    * @param actor - Resolver for the actor identity
    * @param hasher - Content hasher for computing artifact hashes
+   * @param extractorTransforms - Shared extractor transform registry
    */
   constructor(
     changes: ChangeRepository,
@@ -103,6 +107,7 @@ export class ValidateArtifacts {
     parsers: ArtifactParserRegistry,
     actor: ActorResolver,
     hasher: ContentHasher,
+    extractorTransforms: ExtractorTransformRegistry = new Map(),
   ) {
     this._changes = changes
     this._specs = specs
@@ -110,6 +115,7 @@ export class ValidateArtifacts {
     this._parsers = parsers
     this._actor = actor
     this._hasher = hasher
+    this._extractorTransforms = extractorTransforms
   }
 
   /**
@@ -253,6 +259,7 @@ export class ValidateArtifacts {
 
       let validationContent: string | null = null
       let artifactFailed = false
+      let extractedMetadataForArtifact: ReturnType<typeof extractMetadata> | undefined
 
       // --- Delta processing ---
       if (artifactType.delta) {
@@ -374,20 +381,32 @@ export class ValidateArtifacts {
             try {
               const astsByArtifact = new Map<string, { root: SelectorNode }>()
               const renderers = new Map<string, SubtreeRenderer>()
+              const transformContexts = new Map()
               const ast = parser.parse(validationContent)
               astsByArtifact.set(artifactType.id, ast)
               renderers.set(artifactType.id, parser as SubtreeRenderer)
+              transformContexts.set(
+                artifactType.id,
+                createExtractorTransformContext(
+                  input.specPath.split(':')[0] ?? 'default',
+                  input.specPath.includes(':')
+                    ? input.specPath.slice(input.specPath.indexOf(':') + 1)
+                    : input.specPath,
+                  artifactType.id,
+                  path.basename(file.filename),
+                ),
+              )
 
-              // Extract metadata - this validates extraction rules work
               const extracted = extractMetadata(
                 extraction,
                 astsByArtifact,
                 renderers,
-                undefined,
+                this._extractorTransforms,
+                transformContexts,
                 artifactType.id,
               )
+              extractedMetadataForArtifact = extracted
 
-              // Validate extracted fields against permissive schema
               const { permissiveSpecMetadataSchema } =
                 await import('../../domain/services/parse-metadata.js')
               const validationResult = permissiveSpecMetadataSchema.safeParse(extracted)
@@ -423,23 +442,9 @@ export class ValidateArtifacts {
           validatedHash: this._sha256(cleanedContent),
         })
 
-        // --- Extract dependsOn from validated content ---
-        if (artifactType.scope === 'spec') {
-          const extraction = schema.metadataExtraction()
-          if (
-            extraction?.dependsOn !== undefined &&
-            extraction.dependsOn.artifact === artifactType.id
-          ) {
-            const deps = await this._extractDependsOn(
-              validationContent,
-              artifactType,
-              extraction,
-              input.specPath,
-            )
-            if (deps !== undefined && deps.length > 0) {
-              specDependsOnUpdates.set(input.specPath, deps)
-            }
-          }
+        const deps = extractedMetadataForArtifact?.dependsOn
+        if (deps !== undefined && deps.length > 0) {
+          specDependsOnUpdates.set(input.specPath, deps)
         }
       }
     }
@@ -475,68 +480,6 @@ export class ValidateArtifacts {
    */
   private _resolveFilePath(filename: string): string {
     return filename
-  }
-
-  /**
-   * Extracts `dependsOn` spec IDs from validated artifact content using
-   * the schema's `metadataExtraction` declarations.
-   *
-   * The content is already merged (base + delta) for delta artifacts, so
-   * dependencies from both the original spec and the delta are captured.
-   *
-   * @param content - The validated (possibly merged) artifact content
-   * @param artifactType - The artifact type being validated
-   * @param artifactType.id - The artifact type identifier
-   * @param artifactType.format - The declared file format, or undefined
-   * @param extraction - The schema's metadataExtraction declarations
-   * @param specPath - The specId being validated (for path resolution)
-   * @returns Resolved spec IDs, or undefined if extraction yields nothing
-   */
-  private async _extractDependsOn(
-    content: string,
-    artifactType: { id: string; format?: string | undefined },
-    extraction: import('../../domain/value-objects/metadata-extraction.js').MetadataExtraction,
-    specPath: string,
-  ): Promise<string[] | undefined> {
-    const format = artifactType.format ?? inferFormat(path.basename(artifactType.id)) ?? 'plaintext'
-    const parser = this._parsers.get(format)
-    if (parser === undefined) return undefined
-
-    const ast = parser.parse(content)
-    const astsByArtifact = new Map<string, { root: SelectorNode }>([[artifactType.id, ast]])
-    const renderers = new Map<string, SubtreeRenderer>([
-      [artifactType.id, parser as SubtreeRenderer],
-    ])
-
-    const extracted = extractMetadata(extraction, astsByArtifact, renderers)
-    if (extracted.dependsOn === undefined || extracted.dependsOn.length === 0) return undefined
-
-    // Resolve raw paths (e.g. relative markdown links) to full specIds
-    const { workspace, capPath } = parseSpecId(specPath)
-    const specRepo = this._specs.get(workspace)
-    if (specRepo === undefined) return extracted.dependsOn
-
-    const resolved: string[] = []
-    for (const raw of extracted.dependsOn) {
-      const result = await specRepo.resolveFromPath(raw, SpecPath.parse(capPath))
-      if (result === null) continue
-      if ('specId' in result) {
-        resolved.push(result.specId)
-      } else {
-        // Cross-workspace hint — try other repos
-        const hint = result.crossWorkspaceHint.join('/')
-        for (const [, otherRepo] of this._specs) {
-          if (otherRepo === specRepo) continue
-          const found = await otherRepo.get(SpecPath.parse(hint))
-          if (found !== null) {
-            resolved.push(otherRepo.workspace() + ':' + hint)
-            break
-          }
-        }
-      }
-    }
-
-    return resolved.length > 0 ? resolved : undefined
   }
 
   /**

@@ -11,6 +11,7 @@ import { ResolveSchema } from '../../application/use-cases/resolve-schema.js'
 import { LazySchemaProvider } from '../lazy-schema-provider.js'
 import { FsFileReader } from '../../infrastructure/fs/file-reader.js'
 import { NodeContentHasher } from '../../infrastructure/node/content-hasher.js'
+import { createBuiltinExtractorTransforms } from '../extractor-transforms/index.js'
 
 /** Filesystem adapter options for `createGetProjectContext(options)`. */
 export interface FsGetProjectContextOptions {
@@ -108,5 +109,12 @@ export function createGetProjectContext(
   const files = new FsFileReader()
   const parsers = createArtifactParserRegistry()
   const hasher = new NodeContentHasher()
-  return new GetProjectContext(opts.specRepositories, schemaProvider, files, parsers, hasher)
+  return new GetProjectContext(
+    opts.specRepositories,
+    schemaProvider,
+    files,
+    parsers,
+    hasher,
+    createBuiltinExtractorTransforms(),
+  )
 }

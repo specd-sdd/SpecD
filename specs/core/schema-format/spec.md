@@ -188,17 +188,27 @@ A spec created by an `added` operation also requires approval: someone must take
 
 Each metadata field maps to one or more `MetadataExtractorEntry` objects with:
 
-- `artifact` (string, required) — the artifact ID whose content to extract from (e.g. `specs`, `verify`)
+- `artifact` (string, required) — the artifact ID whose content to extract from (for example `specs`, `verify`)
 - `extractor` (object, required) — an `Extractor` declaring how to extract content:
   - `selector` (selector, required) — identifies which node(s) to extract, using the selector model defined in [`specs/core/selector-model/spec.md`](../selector-model/spec.md)
   - `extract` (`content` | `label` | `both`, optional, default `content`) — what to extract for each matched node
-  - `capture` (string, optional) — regex with capture group applied to extracted text
-  - `strip` (string, optional) — regex removed from labels/values
+  - `capture` (string, optional) — regex applied to the extracted text. When present, the main extracted `value` becomes the first capture group (`$1`), while `$0` remains available as the full match and higher groups remain available for placeholder interpolation. This allows one extractor to capture a canonical dependency label as `value` while also exposing an optional relative `href` as an arg.
+  - `strip` (string, optional) — regex removed from labels or values
   - `groupBy` (`label`, optional) — group matched nodes by their label
-  - `transform` (string, optional) — named post-processing callback (e.g. `resolveSpecPath`)
-  - `fields` (object, optional) — structured field mapping for complex objects (e.g. scenarios)
+  - `transform` (string or object, optional) — named extractor transform declaration. The shorthand string form is the transform name. The object form is `{ name: string, args?: string[] }`, where args are declarative strings that may reference placeholders such as `$0`, `$1`, `$2`, and so on.
+  - `fields` (object, optional) — structured field mapping for complex objects (for example scenarios). Each `FieldMapping` may also declare its own `transform` using the same shorthand and object forms as `Extractor.transform`.
 
-Supported metadata fields: `title`, `description`, `dependsOn`, `keywords` (single-entry), `rules`, `constraints`, `scenarios`, `context` (array-entry).
+Transform execution uses a runtime registry assembled during kernel composition. Schemas declare only the transform name and optional args; callers provide the runtime context bag required by the registered transform implementation.
+
+For `dependsOn`, schemas SHOULD use one extractor that captures the visible dependency label as `value` and any optional link target as an interpolated arg. The standard runtime transform then tries the captured `value` first and falls back to interpolated args in order, so the same extractor supports:
+
+- linked canonical entries such as ``[`core:core/config`](../config/spec.md)``
+- unlinked canonical entries such as `` `core:core/config` ``
+- legacy labels where only the `href` is resolvable
+
+Once a transform receives an extracted value, it must return a non-null normalized string. A transform that cannot normalize the value must fail explicitly instead of silently omitting the metadata field entry.
+
+Supported metadata fields: `title`, `description`, `dependsOn`, `keywords` (single-entry), `rules`, `constraints`, `scenarios`, and `context` (array-entry).
 
 ### Requirement: Artifact scope
 
@@ -530,10 +540,10 @@ metadataExtraction:
 
 ## Spec Dependencies
 
-- [`specs/core/delta-format/spec.md`](../delta-format/spec.md) — delta file format, ArtifactParser port, and structural validation rules
-- [`specs/core/selector-model/spec.md`](../selector-model/spec.md) — selector fields used in `validations`, `deltaValidations`, and `metadataExtraction`
-- [`specs/core/content-extraction/spec.md`](../content-extraction/spec.md) — `Extractor` and `FieldMapping` value objects used in `metadataExtraction` declarations
-- [`specs/core/schema-merge/spec.md`](../schema-merge/spec.md) — merge engine for `extends`, plugins, and overrides
+- [`core:core/delta-format`](../delta-format/spec.md) — delta file format, ArtifactParser port, and structural validation rules
+- [`core:core/selector-model`](../selector-model/spec.md) — selector fields used in `validations`, `deltaValidations`, and `metadataExtraction`
+- [`core:core/content-extraction`](../content-extraction/spec.md) — `Extractor` and `FieldMapping` value objects used in `metadataExtraction` declarations
+- [`core:core/schema-merge`](../schema-merge/spec.md) — merge engine for `extends`, plugins, and overrides
 
 ## ADRs
 
