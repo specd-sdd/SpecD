@@ -329,9 +329,16 @@ export class IndexCodeGraph {
         }
       }
 
-      const filesToProcess = [...newFiles, ...changedFiles]
+      const hierarchyDependentFiles = await this.collectHierarchyDependentFiles(changedFiles)
+      const filesToReprocess = [...hierarchyDependentFiles].filter(
+        (filePath) =>
+          !newFiles.includes(filePath) &&
+          !changedFiles.includes(filePath) &&
+          !deletedFiles.includes(filePath),
+      )
+      const filesToProcess = [...newFiles, ...changedFiles, ...filesToReprocess]
       // ── Cleanup (6%) ──
-      const toRemove = [...deletedFiles, ...changedFiles]
+      const toRemove = [...deletedFiles, ...changedFiles, ...filesToReprocess]
       const deletedSet = new Set(deletedFiles)
       progress(6, 'Cleaning up', `${String(toRemove.length)} to remove`)
       let filesRemoved = 0
@@ -877,14 +884,14 @@ export class IndexCodeGraph {
     const derived: Relation[] = []
 
     for (const typeId of changedTypeIds) {
-      const relatedTypeIds = new Set<string>([
-        ...(await this.collectHierarchyTargets(typeId)),
-        ...(await this.collectHierarchyDependents(typeId)),
-      ])
+      const targetTypeIds = await this.collectExtendedTargets(typeId)
+      for (const targetTypeId of targetTypeIds) {
+        this.addCrossFileOverridePairs(typeId, targetTypeId, ownershipIndex, seen, derived)
+      }
 
-      for (const relatedTypeId of relatedTypeIds) {
-        this.addCrossFileOverridePairs(typeId, relatedTypeId, ownershipIndex, seen, derived)
-        this.addCrossFileOverridePairs(relatedTypeId, typeId, ownershipIndex, seen, derived)
+      const dependentTypeIds = await this.collectExtendingDependents(typeId)
+      for (const dependentTypeId of dependentTypeIds) {
+        this.addCrossFileOverridePairs(dependentTypeId, typeId, ownershipIndex, seen, derived)
       }
     }
 
@@ -909,6 +916,37 @@ export class IndexCodeGraph {
         ...(await this.store.getExtendedTargets(current)),
         ...(await this.store.getImplementedTargets(current)),
       ]
+
+      for (const relation of relations) {
+        if (targets.has(relation.target)) continue
+        targets.add(relation.target)
+        if (!visited.has(relation.target)) {
+          visited.add(relation.target)
+          queue.push(relation.target)
+        }
+      }
+    }
+
+    return targets
+  }
+
+  /**
+   * Collects transitive extended targets for a given type symbol.
+   * Cross-file override derivation only follows concrete inheritance, not interface
+   * implementation, so `IMPLEMENTS` edges are intentionally excluded here.
+   * @param typeId - Type symbol id.
+   * @returns Reachable ancestor type ids.
+   */
+  private async collectExtendedTargets(typeId: string): Promise<Set<string>> {
+    const targets = new Set<string>()
+    const queue = [typeId]
+    const visited = new Set(queue)
+
+    while (queue.length > 0) {
+      const current = queue.shift()
+      if (!current) continue
+
+      const relations = await this.store.getExtendedTargets(current)
 
       for (const relation of relations) {
         if (targets.has(relation.target)) continue
@@ -953,6 +991,70 @@ export class IndexCodeGraph {
     }
 
     return dependents
+  }
+
+  /**
+   * Collects transitive extending dependents for a given type symbol.
+   * Cross-file override derivation only follows class inheritance, not interface
+   * implementation, so `IMPLEMENTS` edges are intentionally excluded here.
+   * @param typeId - Type symbol id.
+   * @returns Reachable child type ids.
+   */
+  private async collectExtendingDependents(typeId: string): Promise<Set<string>> {
+    const dependents = new Set<string>()
+    const queue = [typeId]
+    const visited = new Set(queue)
+
+    while (queue.length > 0) {
+      const current = queue.shift()
+      if (!current) continue
+
+      const relations = await this.store.getExtenders(current)
+
+      for (const relation of relations) {
+        if (dependents.has(relation.source)) continue
+        dependents.add(relation.source)
+        if (!visited.has(relation.source)) {
+          visited.add(relation.source)
+          queue.push(relation.source)
+        }
+      }
+    }
+
+    return dependents
+  }
+
+  /**
+   * Finds unchanged files whose hierarchy relations must be recomputed because one
+   * of their base classes or implemented contracts changed in this run.
+   * @param changedFiles - Workspace-prefixed files whose content changed.
+   * @returns Workspace-prefixed dependent file paths to reprocess.
+   */
+  private async collectHierarchyDependentFiles(
+    changedFiles: readonly string[],
+  ): Promise<Set<string>> {
+    const dependentFiles = new Set<string>()
+
+    for (const filePath of changedFiles) {
+      const symbols = await this.store.findSymbols({ filePath })
+      for (const symbol of symbols) {
+        if (symbol.kind !== 'class' && symbol.kind !== 'interface') continue
+
+        const relations = [
+          ...(await this.store.getExtenders(symbol.id)),
+          ...(await this.store.getImplementors(symbol.id)),
+        ]
+
+        for (const relation of relations) {
+          const dependent = await this.store.getSymbol(relation.source)
+          if (dependent) {
+            dependentFiles.add(dependent.filePath)
+          }
+        }
+      }
+    }
+
+    return dependentFiles
   }
 
   /**
