@@ -835,8 +835,8 @@ export class FsChangeRepository extends ChangeRepository {
   /**
    * Reconstructs a `Change` domain entity from a persisted manifest.
    *
-   * Artifact status is derived by comparing the current file hash on disk
-   * against the stored `validatedHash` — it is never stored directly.
+   * Artifact/file state is primarily rehydrated from the manifest. When older
+   * manifests omit `state`, the repository falls back to deriving it from disk.
    *
    * @param manifest - The parsed manifest data
    * @param dir - Absolute path to the change directory (used for artifact status derivation)
@@ -852,7 +852,14 @@ export class FsChangeRepository extends ChangeRepository {
       const filesMap = new Map<string, ArtifactFile>()
       for (const rawFile of raw.files) {
         const cleanup = artType?.preHashCleanup ?? []
-        let status = await this._deriveFileStatus(rawFile, dir, raw.optional, cleanup)
+        let status =
+          rawFile.state ?? (await this._deriveFileStatus(rawFile, dir, raw.optional, cleanup))
+        if (rawFile.validatedHash === SKIPPED_SENTINEL && !raw.optional) {
+          status = 'in-progress'
+        }
+        if (rawFile.validatedHash === null && (status === 'missing' || status === 'in-progress')) {
+          status = await this._deriveFileStatus(rawFile, dir, raw.optional, cleanup)
+        }
         let resolvedFilename = rawFile.filename
 
         // For delta-capable spec-scoped artifacts, check the delta file if the primary is missing
@@ -864,7 +871,12 @@ export class FsChangeRepository extends ChangeRepository {
               ? `deltas/${ws}/${cp}/${basename}.delta.yaml`
               : `deltas/${ws}/${basename}.delta.yaml`
           const deltaStatus = await this._deriveFileStatus(
-            { key: rawFile.key, filename: deltaPath, validatedHash: rawFile.validatedHash },
+            {
+              key: rawFile.key,
+              filename: deltaPath,
+              ...(rawFile.state !== undefined ? { state: rawFile.state } : {}),
+              validatedHash: rawFile.validatedHash,
+            },
             dir,
             raw.optional,
             cleanup,
@@ -890,6 +902,7 @@ export class FsChangeRepository extends ChangeRepository {
         type: raw.type,
         optional: raw.optional,
         requires: raw.requires,
+        status: raw.state ?? 'missing',
         files: filesMap,
       })
       artifactMap.set(artifact.type, artifact)
@@ -984,32 +997,44 @@ export class FsChangeRepository extends ChangeRepository {
       }
     }
 
-    // Auto-invalidate if any previously-validated artifact drifted (content
-    // changed or file deleted). Applies when:
-    // - There are active approvals (spec or signoff) → invalidate approvals
-    // - The change is beyond 'designing' state → revert to designing
-    const hasDriftableState = change.state !== 'drafting' && change.state !== 'designing'
-    const hasActiveApprovals =
-      change.activeSpecApproval !== undefined || change.activeSignoff !== undefined
-
-    if (hasDriftableState || hasActiveApprovals) {
-      const driftedIds = new Set<string>()
-      for (const [, artifact] of change.artifacts) {
-        for (const [, file] of artifact.files) {
-          // File had a valid hash but is now missing or in-progress → drifted
-          if (
-            file.validatedHash !== undefined &&
-            (file.status === 'in-progress' || file.status === 'missing')
-          ) {
-            driftedIds.add(artifact.type)
-            break
-          }
+    // Auto-invalidate if any previously validated file drifted from its stored hash.
+    const driftedFilesByArtifact = new Map<string, Set<string>>()
+    for (const [, artifact] of change.artifacts) {
+      for (const [, file] of artifact.files) {
+        if (file.status !== 'complete') continue
+        if (file.validatedHash === undefined || file.validatedHash === SKIPPED_SENTINEL) continue
+        const derivedStatus = await this._deriveFileStatus(
+          {
+            key: file.key,
+            filename: file.filename,
+            state: file.status,
+            validatedHash: file.validatedHash,
+          },
+          dir,
+          artifact.optional,
+          artifactTypeMap.get(artifact.type)?.preHashCleanup ?? [],
+        )
+        if (derivedStatus === 'in-progress' || derivedStatus === 'missing') {
+          const keys = driftedFilesByArtifact.get(artifact.type) ?? new Set<string>()
+          keys.add(file.key)
+          driftedFilesByArtifact.set(artifact.type, keys)
         }
       }
-      if (driftedIds.size > 0) {
-        change.invalidate('artifact-change', SYSTEM_ACTOR, driftedIds)
-        await this._writeManifestAtomic(dir, changeToManifest(change))
-      }
+    }
+    if (driftedFilesByArtifact.size > 0) {
+      const affectedArtifacts = [...driftedFilesByArtifact.entries()].map(([type, files]) => ({
+        type,
+        files: [...files].sort(),
+      }))
+      change.invalidate(
+        'artifact-drift',
+        SYSTEM_ACTOR,
+        `Invalidated because validated artifacts drifted: ${affectedArtifacts
+          .map((artifact) => `${artifact.type} [${artifact.files.join(', ')}]`)
+          .join('; ')}`,
+        affectedArtifacts,
+      )
+      await this._writeManifestAtomic(dir, changeToManifest(change))
     }
 
     return change
@@ -1092,9 +1117,16 @@ function changeToManifest(change: Change): ChangeManifest {
 function serializeArtifact(artifact: ChangeArtifact): ManifestArtifact {
   const files: ManifestArtifactFile[] = []
   for (const file of artifact.files.values()) {
+    const state =
+      file.status === 'missing' && file.validatedHash === SKIPPED_SENTINEL
+        ? 'skipped'
+        : file.status === 'missing' && file.validatedHash !== undefined
+          ? 'complete'
+          : file.status
     files.push({
       key: file.key,
       filename: file.filename,
+      state,
       validatedHash: file.validatedHash ?? null,
     })
   }
@@ -1102,6 +1134,7 @@ function serializeArtifact(artifact: ChangeArtifact): ManifestArtifact {
     type: artifact.type,
     optional: artifact.optional,
     requires: [...artifact.requires],
+    state: artifact.status,
     files,
   }
 }
@@ -1153,6 +1186,11 @@ function serializeEvent(event: ChangeEvent): RawChangeEvent {
         at: event.at.toISOString(),
         by: event.by,
         cause: event.cause,
+        message: event.message,
+        affectedArtifacts: event.affectedArtifacts.map((artifact) => ({
+          type: artifact.type,
+          files: [...artifact.files],
+        })),
       }
     case 'drafted':
       return event.reason !== undefined
@@ -1202,7 +1240,9 @@ function serializeEvent(event: ChangeEvent): RawChangeEvent {
 const CHANGE_STATES = Object.keys(VALID_TRANSITIONS) as ChangeState[]
 
 /** All valid `InvalidatedEvent` cause values. */
-const INVALIDATED_CAUSES = ['spec-change', 'artifact-change'] as const
+const INVALIDATED_CAUSES = ['spec-change', 'artifact-drift', 'artifact-review-required'] as const
+/** Historical persisted cause kept readable for archived/discarded manifests. */
+const LEGACY_INVALIDATED_CAUSE = 'artifact-change' as const
 /** Union of valid `InvalidatedEvent` cause strings. */
 type InvalidatedCause = (typeof INVALIDATED_CAUSES)[number]
 
@@ -1220,14 +1260,16 @@ function assertChangeState(value: string, field: string): ChangeState {
 }
 
 /**
- * Asserts that a string value is a valid `InvalidatedEvent` cause.
+ * Normalizes a raw manifest invalidation cause into the canonical domain cause.
  *
  * @param value - The raw string to validate
- * @returns The validated cause
+ * @returns The validated canonical cause
  * @throws {Error} If the value is not a valid cause
  */
-function assertInvalidatedCause(value: string): InvalidatedCause {
+function normalizeInvalidatedCause(value: string): InvalidatedCause {
   if ((INVALIDATED_CAUSES as readonly string[]).includes(value)) return value as InvalidatedCause
+  // Historical manifests persisted `artifact-change`; keep reads compatible.
+  if (value === LEGACY_INVALIDATED_CAUSE) return 'artifact-drift'
   throw new CorruptedManifestError(`invalid invalidated cause in manifest: '${value}'`)
 }
 
@@ -1277,7 +1319,12 @@ function deserializeEvent(raw: RawChangeEvent): ChangeEvent {
         type: 'invalidated',
         at: new Date(raw.at),
         by: raw.by,
-        cause: assertInvalidatedCause(raw.cause),
+        cause: normalizeInvalidatedCause(raw.cause),
+        message: raw.message,
+        affectedArtifacts: (raw.affectedArtifacts ?? []).map((artifact) => ({
+          type: artifact.type,
+          files: artifact.files,
+        })),
       }
     case 'drafted':
       return raw.reason !== undefined

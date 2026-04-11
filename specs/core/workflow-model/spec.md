@@ -17,17 +17,23 @@ If a schema declares a `step` value that does not correspond to a valid Change l
 Each workflow step has a defined semantic role in the change lifecycle:
 
 - **Designing** (`designing`) — the agent creates or modifies spec artifacts (proposal, specs, verify, design, tasks). This step iterates over the artifact DAG: `CompileContext` is called once per artifact being authored. The step is typically always available (empty `requires`).
-- **Implementing** (`implementing`) — the agent writes code and completes tasks. All working artifacts (tasks, specs) must be complete. The step runs once (not per-artifact).
-- **Verifying** (`verifying`) — the agent confirms the implementation satisfies verify.md scenarios. The step runs once. May loop back to implementing if verification fails.
+- **Implementing** (`implementing`) — the agent writes code and completes tasks. All working artifacts must already be in a review-complete state before implementation proceeds. The step runs once (not per-artifact).
+- **Verifying** (`verifying`) — the agent confirms the implementation satisfies verify.md scenarios. Verification has two semantic outcomes:
+  - `implementation-failure` — artifacts remain correct and the fix fits within the already-defined tasks; route back to `implementing`
+  - `artifact-review-required` — artifacts must be revised, or new tasks are required before implementation can continue; route back to `designing`
 - **Archiving** (`archiving`) — deterministic finalization: delta merge, spec sync, metadata generation, archive move. Executed atomically by the `ArchiveChange` use case, not by an agent interactively.
+
+Any file already marked `drifted-pending-review` also forces the workflow back to `designing`; drift is never treated as an implementation-only retry.
 
 ### Requirement: Requires-based gating
 
-Each workflow step declares a `requires` array of artifact IDs. `TransitionChange` enforces this at transition time: before allowing a transition to a state that has a workflow step, it checks `change.effectiveStatus(artifactId)` for each artifact ID in `requires`. If any required artifact has an effective status other than `complete` or `skipped`, the transition is rejected with `InvalidStateTransitionError`.
+Each workflow step declares a `requires` array of artifact IDs. `TransitionChange` enforces this at transition time: before allowing a transition to a state that has a workflow step, it checks the persisted artifact `state` for each required artifact ID. If any required artifact has a state other than `complete` or `skipped`, the transition is rejected with `InvalidStateTransitionError`.
 
 An empty or omitted `requires` means the step has no gating — the transition proceeds without artifact checks.
 
 A skipped optional artifact satisfies the requirement identically to a completed one.
+
+Artifacts in `missing`, `in-progress`, `pending-review`, or `drifted-pending-review` do not satisfy `requires`.
 
 ### Requirement: Task completion gating
 
@@ -52,7 +58,7 @@ Step availability MUST be evaluated consistently by all consumers that need it. 
 
 ```
 stepAvailable(step, change) =
-  step.requires.every(id => change.effectiveStatus(id) ∈ { complete, skipped })
+  step.requires.every(id => artifact(id).state ∈ { complete, skipped })
 ```
 
 This evaluation is performed dynamically on each invocation — it is not cached or snapshotted.
@@ -88,11 +94,11 @@ A workflow step's `requires` array contains **artifact IDs** (e.g. `specs`, `tas
 
 ## Spec Dependencies
 
-- [`core:core/change`](../change/spec.md) — Change entity, `effectiveStatus()`, lifecycle states
-- [`core:core/schema-format`](../schema-format/spec.md) — `workflow[]` array structure, `step`, `requires`, `hooks`
-- [`core:core/build-schema`](../build-schema/spec.md) — artifact DAG cycle detection at schema build time
-- [`core:core/compile-context`](../compile-context/spec.md) — step availability evaluation, context compilation per step
-- [`core:core/get-status`](../get-status/spec.md) — reports current change state (= active workflow step)
-- [`core:core/transition-change`](../transition-change/spec.md) — requires enforcement and hook execution at transitions
-- [`core:core/archive-change`](../archive-change/spec.md) — deterministic execution of the archiving step
-- [`core:core/hook-execution-model`](../hook-execution-model/spec.md) — hook types, execution semantics
+- [`core:core/change`](../change/spec.md) — change lifecycle states and artifact state lookup
+- [`core:core/schema-format`](../schema-format/spec.md) — workflow array structure and artifact definitions
+- [`core:core/build-schema`](../build-schema/spec.md) — DAG cycle detection at schema build time
+- [`core:core/compile-context`](../compile-context/spec.md) — step availability during context assembly
+- [`core:core/get-status`](../get-status/spec.md) — status reporting of the active workflow step
+- [`core:core/transition-change`](../transition-change/spec.md) — runtime transition enforcement
+- [`core:core/archive-change`](../archive-change/spec.md) — deterministic archiving step behavior
+- [`core:core/hook-execution-model`](../hook-execution-model/spec.md) — hook execution semantics

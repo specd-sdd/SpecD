@@ -68,6 +68,22 @@ specd change status <name> [options]
 
 Show the full status of a change: associated specs, artifact file statuses, current lifecycle state, available transitions, and any blockers preventing progression.
 
+`change status` now exposes both the aggregate state of each artifact and the
+state of each tracked file inside that artifact. Structured output also includes
+a `review` block so agents can route back to designing without reading the
+manifest directly. Within that block, `affectedArtifacts[].files[]` is projected
+as concrete file entries with `filename`, absolute `path`, and optional
+supplemental `key`; consumers should treat the path as the primary jump target.
+
+Artifact and file states:
+
+- `missing`
+- `in-progress`
+- `complete`
+- `skipped`
+- `pending-review`
+- `drifted-pending-review`
+
 | Option                      | Description       |
 | --------------------------- | ----------------- |
 | `--format text\|json\|toon` | Output format.    |
@@ -221,6 +237,16 @@ specd change artifacts <name> [options]
 ```
 
 Show the artifact files table for a change with columns: `ID`, `FILENAME`, `STATUS`, `EXISTS`. Useful for a quick check on what has been produced and whether files are present on disk.
+
+`change artifacts` emits one row per tracked file. Structured output includes:
+
+- `changeDir` — absolute path to the change directory
+- `artifactState` — aggregate parent artifact state
+- `fileState` — persisted state of the individual file
+- `path` — absolute path to the file row
+
+Delta rows are emitted as supplemental entries with `kind: "delta"` when the
+active schema declares `delta: true`.
 
 | Option                      | Description       |
 | --------------------------- | ----------------- |

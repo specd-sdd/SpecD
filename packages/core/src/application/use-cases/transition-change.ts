@@ -223,24 +223,20 @@ export class TransitionChange {
       await this._executeHooks(input.name, effectiveTarget, 'pre', onProgress)
     }
 
-    const implementingStep = schema.workflowStep('implementing')
     const persistedChange = await this._changes.mutate(input.name, (freshChange) => {
       let invalidated = false
 
-      if (freshChange.state === 'verifying' && effectiveTarget === 'implementing') {
-        if (implementingStep !== null) {
-          freshChange.clearArtifactValidations(implementingStep.requires)
-        }
-      }
-
       if (effectiveTarget === 'designing' && freshChange.state !== 'drafting') {
-        if (
-          freshChange.activeSpecApproval !== undefined ||
-          freshChange.activeSignoff !== undefined
-        ) {
-          freshChange.invalidate('redesign', actor)
-          invalidated = true
-        }
+        freshChange.invalidate(
+          'artifact-review-required',
+          actor,
+          'Invalidated because the change returned to designing and all artifacts require review.',
+          [...freshChange.artifacts.values()].map((artifact) => ({
+            type: artifact.type,
+            files: [...artifact.files.keys()],
+          })),
+        )
+        invalidated = true
       }
 
       if (!invalidated) {

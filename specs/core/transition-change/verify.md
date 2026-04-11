@@ -116,19 +116,19 @@
 
 ### Requirement: Artifact validation clearing on verifying to implementing
 
-#### Scenario: Artifact validations are cleared using schema requires
+#### Scenario: Implementation-only retry preserves validated artifacts
 
 - **GIVEN** a change in `verifying` state with validated artifacts
-- **AND** the schema's `implementing` step declares `requires: ['specs', 'tasks']`
+- **AND** verification fails for implementation-only reasons
 - **WHEN** `execute` is called with `to: 'implementing'`
-- **THEN** `change.clearArtifactValidations` is called with `['specs', 'tasks']` from the schema
+- **THEN** unchanged validated artifacts are not cleared
 
-#### Scenario: No implementing step in schema defaults to no clearing
+#### Scenario: Artifact review required does not route through implementing
 
 - **GIVEN** a change in `verifying` state
-- **AND** the schema does not declare an `implementing` workflow step
-- **WHEN** `execute` is called with `to: 'implementing'`
-- **THEN** `change.clearArtifactValidations` is not called
+- **AND** the required fix needs new tasks or revised artifacts
+- **WHEN** lifecycle routing is resolved
+- **THEN** the caller must transition to `designing`, not `implementing`
 
 ### Requirement: Transition to designing from any state
 
@@ -138,32 +138,19 @@
 - **WHEN** `execute` is called with `to: 'designing'`
 - **THEN** the change transitions to `designing`
 
-#### Scenario: Transition from implementing to designing
+#### Scenario: Transition to designing downgrades files to pending-review
 
-- **GIVEN** a change in `implementing` state
+- **GIVEN** a change with validated artifacts
+- **AND** one file is already `drifted-pending-review`
 - **WHEN** `execute` is called with `to: 'designing'`
-- **THEN** the change transitions to `designing`
+- **THEN** every other tracked file becomes `pending-review`
+- **AND** the drifted file remains `drifted-pending-review`
 
 #### Scenario: Transition to designing invalidates active approvals
 
 - **GIVEN** a change in `implementing` state with an active spec approval
 - **WHEN** `execute` is called with `to: 'designing'`
-- **THEN** `change.invalidate` is called before the transition
-- **AND** the spec approval is cleared
-- **AND** the change transitions to `designing`
-
-#### Scenario: Transition to designing without active approvals skips invalidation
-
-- **GIVEN** a change in `implementing` state with no active approvals
-- **WHEN** `execute` is called with `to: 'designing'`
-- **THEN** `change.invalidate` is not called
-- **AND** the change transitions to `designing`
-
-#### Scenario: Transition to designing from drafting is not a special case
-
-- **GIVEN** a change in `drafting` state
-- **WHEN** `execute` is called with `to: 'designing'`
-- **THEN** the change transitions to `designing` via the normal transition path (no approval invalidation logic)
+- **THEN** the approval is invalidated before the transition
 
 ### Requirement: Post-hook execution
 

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { Change } from '../../../src/domain/entities/change.js'
-import { ChangeArtifact } from '../../../src/domain/entities/change-artifact.js'
+import { ChangeArtifact, SKIPPED_SENTINEL } from '../../../src/domain/entities/change-artifact.js'
 import { ArtifactFile } from '../../../src/domain/value-objects/artifact-file.js'
 import { InvalidStateTransitionError } from '../../../src/domain/errors/invalid-state-transition-error.js'
 import { InvalidChangeError } from '../../../src/domain/errors/invalid-change-error.js'
@@ -9,6 +9,7 @@ import type { ArtifactStatus } from '../../../src/domain/value-objects/artifact-
 
 const actor: ActorIdentity = { name: 'Alice', email: 'alice@example.com' }
 const otherActor: ActorIdentity = { name: 'Bob', email: 'bob@example.com' }
+const allArtifactsMessage = 'Invalidated because artifacts require review.'
 
 function makeChange(history: ChangeEvent[] = []) {
   return new Change({
@@ -206,7 +207,7 @@ describe('Change', () => {
       const c = makeChange()
       c.transition('designing', actor)
       c.transition('ready', actor)
-      c.invalidate('spec-change', actor)
+      c.invalidate('spec-change', actor, allArtifactsMessage)
 
       const history = c.history
       const last = history[history.length - 1]
@@ -222,30 +223,32 @@ describe('Change', () => {
       const c = makeChange()
       c.transition('designing', actor)
       c.transition('ready', actor)
-      c.invalidate('spec-change', actor)
+      c.invalidate('spec-change', actor, allArtifactsMessage)
       expect(c.state).toBe('designing')
     })
 
     it('records the cause on the invalidated event', () => {
       const c = makeChange()
       c.transition('designing', actor)
-      c.invalidate('artifact-change', actor)
+      c.invalidate('artifact-drift', actor, 'Invalidated because validated artifacts drifted', [
+        { type: 'proposal', files: ['proposal'] },
+      ])
 
       const evt = c.history.find((e) => e.type === 'invalidated')
-      expect(evt?.type === 'invalidated' && evt.cause).toBe('artifact-change')
+      expect(evt?.type === 'invalidated' && evt.cause).toBe('artifact-drift')
     })
 
     it('records the pre-invalidation state as from on the transitioned event', () => {
       const c = makeChange()
       c.transition('designing', actor)
       c.transition('ready', actor)
-      c.invalidate('spec-change', actor)
+      c.invalidate('spec-change', actor, allArtifactsMessage)
 
       const transitioned = [...c.history].reverse().find((e) => e.type === 'transitioned')
       expect(transitioned?.type === 'transitioned' && transitioned.from).toBe('ready')
     })
 
-    it('clears validatedHash and resets complete artifacts to in-progress', () => {
+    it('marks complete artifacts pending-review while preserving hashes', () => {
       const c = makeChange()
       c.transition('designing', actor)
       const file = new ArtifactFile({ key: 'proposal', filename: 'proposal.md' })
@@ -256,13 +259,13 @@ describe('Change', () => {
       proposal.markComplete('proposal', 'sha256:abc')
       c.setArtifact(proposal)
 
-      c.invalidate('spec-change', actor)
+      c.invalidate('spec-change', actor, allArtifactsMessage)
 
-      expect(proposal.getFile('proposal')?.validatedHash).toBeUndefined()
-      expect(proposal.status).toBe('in-progress')
+      expect(proposal.getFile('proposal')?.validatedHash).toBe('sha256:abc')
+      expect(proposal.status).toBe('pending-review')
     })
 
-    it('clears validatedHash and resets skipped artifacts to missing', () => {
+    it('marks skipped artifacts pending-review while preserving hashes', () => {
       const c = makeChange()
       const file = new ArtifactFile({ key: 'adr', filename: 'adr.md' })
       const adr = new ChangeArtifact({
@@ -273,13 +276,13 @@ describe('Change', () => {
       adr.markSkipped()
       c.setArtifact(adr)
 
-      c.invalidate('spec-change', actor)
+      c.invalidate('spec-change', actor, allArtifactsMessage)
 
-      expect(adr.getFile('adr')?.validatedHash).toBeUndefined()
-      expect(adr.status).toBe('missing')
+      expect(adr.getFile('adr')?.validatedHash).toBe(SKIPPED_SENTINEL)
+      expect(adr.status).toBe('pending-review')
     })
 
-    it('clears hashes on all artifacts when invalidated', () => {
+    it('marks all artifacts pending-review when invalidated without a focused payload', () => {
       const c = makeChange()
       const pFile = new ArtifactFile({ key: 'proposal', filename: 'proposal.md' })
       const proposal = new ChangeArtifact({
@@ -293,10 +296,12 @@ describe('Change', () => {
       c.setArtifact(proposal)
       c.setArtifact(design)
 
-      c.invalidate('artifact-change', actor)
+      c.invalidate('artifact-review-required', actor, allArtifactsMessage)
 
-      expect(proposal.getFile('proposal')?.validatedHash).toBeUndefined()
-      expect(design.getFile('design')?.validatedHash).toBeUndefined()
+      expect(proposal.getFile('proposal')?.validatedHash).toBe('sha256:111')
+      expect(proposal.status).toBe('pending-review')
+      expect(design.getFile('design')?.validatedHash).toBe('sha256:222')
+      expect(design.status).toBe('pending-review')
     })
 
     it('succeeds from archivable state', () => {
@@ -309,11 +314,11 @@ describe('Change', () => {
       c.transition('archivable', actor)
       expect(c.state).toBe('archivable')
 
-      c.invalidate('redesign', actor)
+      c.invalidate('artifact-review-required', actor, allArtifactsMessage)
       expect(c.state).toBe('designing')
     })
 
-    it('with driftedArtifactIds resets only specified and downstream artifacts', () => {
+    it('with drift payload marks only specified and downstream artifacts for review', () => {
       // DAG: proposal → specs → verify, proposal → design, specs + design → tasks
       const c = makeChange()
       const proposal = new ChangeArtifact({
@@ -354,18 +359,24 @@ describe('Change', () => {
       c.setArtifact(design)
       c.setArtifact(tasks)
 
-      c.invalidate('artifact-change', actor, new Set(['tasks']))
+      c.invalidate('artifact-drift', actor, 'Invalidated because validated artifacts drifted', [
+        { type: 'tasks', files: ['tasks'] },
+      ])
 
-      // Only tasks should be reset — no downstream dependents
-      expect(tasks.getFile('tasks')?.validatedHash).toBeUndefined()
-      // Upstream artifacts remain complete
+      expect(tasks.getFile('tasks')?.validatedHash).toBe('sha256:t')
+      expect(tasks.status).toBe('drifted-pending-review')
+      // All other artifacts require review once the change returns to designing
       expect(proposal.getFile('proposal')?.validatedHash).toBe('sha256:p')
+      expect(proposal.status).toBe('pending-review')
       expect(specs.getFile('specs')?.validatedHash).toBe('sha256:s')
+      expect(specs.status).toBe('pending-review')
       expect(verify.getFile('verify')?.validatedHash).toBe('sha256:v')
+      expect(verify.status).toBe('pending-review')
       expect(design.getFile('design')?.validatedHash).toBe('sha256:d')
+      expect(design.status).toBe('pending-review')
     })
 
-    it('with driftedArtifactIds cascades downstream through the DAG', () => {
+    it('with drift payload marks all non-drifted artifacts pending-review', () => {
       // DAG: proposal → specs → verify, proposal → design, specs + design → tasks
       const c = makeChange()
       const proposal = new ChangeArtifact({
@@ -406,40 +417,20 @@ describe('Change', () => {
       c.setArtifact(design)
       c.setArtifact(tasks)
 
-      c.invalidate('artifact-change', actor, new Set(['specs']))
+      c.invalidate('artifact-drift', actor, 'Invalidated because validated artifacts drifted', [
+        { type: 'specs', files: ['specs'] },
+      ])
 
-      // specs + downstream (verify, tasks) should be reset
-      expect(specs.getFile('specs')?.validatedHash).toBeUndefined()
-      expect(verify.getFile('verify')?.validatedHash).toBeUndefined()
-      expect(tasks.getFile('tasks')?.validatedHash).toBeUndefined()
-      // Upstream artifacts remain complete
+      expect(specs.getFile('specs')?.validatedHash).toBe('sha256:s')
+      expect(specs.status).toBe('drifted-pending-review')
+      expect(verify.getFile('verify')?.validatedHash).toBe('sha256:v')
+      expect(verify.status).toBe('pending-review')
+      expect(tasks.getFile('tasks')?.validatedHash).toBe('sha256:t')
+      expect(tasks.status).toBe('pending-review')
+      expect(proposal.status).toBe('pending-review')
       expect(proposal.getFile('proposal')?.validatedHash).toBe('sha256:p')
+      expect(design.status).toBe('pending-review')
       expect(design.getFile('design')?.validatedHash).toBe('sha256:d')
-    })
-
-    it('without driftedArtifactIds resets all artifacts (backward compat)', () => {
-      const c = makeChange()
-      const proposal = new ChangeArtifact({
-        type: 'proposal',
-        requires: [],
-        files: new Map([
-          ['proposal', new ArtifactFile({ key: 'proposal', filename: 'proposal.md' })],
-        ]),
-      })
-      proposal.markComplete('proposal', 'sha256:p')
-      const design = new ChangeArtifact({
-        type: 'design',
-        requires: ['proposal'],
-        files: new Map([['design', new ArtifactFile({ key: 'design', filename: 'design.md' })]]),
-      })
-      design.markComplete('design', 'sha256:d')
-      c.setArtifact(proposal)
-      c.setArtifact(design)
-
-      c.invalidate('artifact-change', actor)
-
-      expect(proposal.getFile('proposal')?.validatedHash).toBeUndefined()
-      expect(design.getFile('design')?.validatedHash).toBeUndefined()
     })
   })
 
@@ -485,7 +476,7 @@ describe('Change', () => {
       const c = makeChange()
       c.transition('designing', actor)
       c.recordSpecApproval('LGTM', {}, actor)
-      c.invalidate('spec-change', actor)
+      c.invalidate('spec-change', actor, allArtifactsMessage)
       expect(c.activeSpecApproval).toBeUndefined()
     })
 
@@ -493,7 +484,7 @@ describe('Change', () => {
       const c = makeChange()
       c.transition('designing', actor)
       c.recordSpecApproval('First approval', {}, actor)
-      c.invalidate('spec-change', actor)
+      c.invalidate('spec-change', actor, allArtifactsMessage)
       c.recordSpecApproval('Second approval', {}, otherActor)
       expect(c.activeSpecApproval?.reason).toBe('Second approval')
     })
@@ -513,7 +504,7 @@ describe('Change', () => {
     it('returns undefined after invalidation supersedes signoff', () => {
       const c = makeChange()
       c.recordSignoff('Ship it', {}, actor)
-      c.invalidate('artifact-change', actor)
+      c.invalidate('artifact-review-required', actor, allArtifactsMessage)
       expect(c.activeSignoff).toBeUndefined()
     })
   })
@@ -785,50 +776,6 @@ describe('Change', () => {
       c.setArtifact(makeArtifact('design', 'complete', ['adr']))
       c.setArtifact(makeArtifact('tasks', 'complete', ['design']))
       expect(c.effectiveStatus('tasks')).toBe('complete')
-    })
-  })
-
-  describe('clearArtifactValidations', () => {
-    it('clears only the specified artifacts', () => {
-      const c = makeChange()
-      const pFile = new ArtifactFile({ key: 'proposal', filename: 'proposal.md' })
-      const proposal = new ChangeArtifact({
-        type: 'proposal',
-        files: new Map([['proposal', pFile]]),
-      })
-      proposal.markComplete('proposal', 'sha256:abc')
-      const tFile = new ArtifactFile({ key: 'tasks', filename: 'tasks.md' })
-      const tasks = new ChangeArtifact({ type: 'tasks', files: new Map([['tasks', tFile]]) })
-      tasks.markComplete('tasks', 'sha256:def')
-      c.setArtifact(proposal)
-      c.setArtifact(tasks)
-
-      c.clearArtifactValidations(['proposal'])
-
-      expect(proposal.getFile('proposal')?.validatedHash).toBeUndefined()
-      expect(proposal.status).toBe('in-progress')
-      expect(tasks.getFile('tasks')?.validatedHash).toBe('sha256:def')
-      expect(tasks.status).toBe('complete')
-    })
-
-    it('silently skips unknown artifact IDs', () => {
-      const c = makeChange()
-      expect(() => c.clearArtifactValidations(['unknown'])).not.toThrow()
-    })
-
-    it('does nothing when the list is empty', () => {
-      const c = makeChange()
-      const pFile = new ArtifactFile({ key: 'proposal', filename: 'proposal.md' })
-      const proposal = new ChangeArtifact({
-        type: 'proposal',
-        files: new Map([['proposal', pFile]]),
-      })
-      proposal.markComplete('proposal', 'sha256:abc')
-      c.setArtifact(proposal)
-
-      c.clearArtifactValidations([])
-
-      expect(proposal.getFile('proposal')?.validatedHash).toBe('sha256:abc')
     })
   })
 

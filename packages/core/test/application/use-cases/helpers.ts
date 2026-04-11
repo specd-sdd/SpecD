@@ -242,6 +242,11 @@ function cloneChangeEvent(event: Change['history'][number]): Change['history'][n
         at: new Date(event.at),
         by: { ...event.by },
         cause: event.cause,
+        message: event.message,
+        affectedArtifacts: event.affectedArtifacts.map((artifact) => ({
+          type: artifact.type,
+          files: [...artifact.files],
+        })),
       }
     case 'drafted':
       return event.reason !== undefined

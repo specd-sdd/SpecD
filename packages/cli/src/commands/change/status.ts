@@ -27,16 +27,32 @@ JSON/TOON output schema:
     specIds: string[]
     schema: { name: string, version: number }
     description?: string
-    artifacts: Array<{ type: string, effectiveStatus: string }>
+    artifacts: Array<{
+      type: string
+      state: string
+      effectiveStatus: string
+      files: Array<{ key: string, filename: string, state: string, validatedHash?: string }>
+    }>
+    review: {
+      required: boolean
+      route: string | null
+      reason: string | null
+      affectedArtifacts: Array<{
+        type: string
+        files: Array<{ key: string, filename: string, path: string }>
+      }>
+    }
   }
 `,
     )
     .action(async (name: string, opts: { format: string; config?: string }) => {
       try {
         const { kernel } = await resolveCliContext({ configPath: opts.config })
-        const { change, artifactStatuses, lifecycle } = await kernel.changes.status.execute({
-          name,
-        })
+        const { change, artifactStatuses, lifecycle, review } = await kernel.changes.status.execute(
+          {
+            name,
+          },
+        )
 
         // Schema version warning (using lifecycle.schemaInfo instead of independent resolution)
         if (lifecycle.schemaInfo !== null) {
@@ -63,7 +79,25 @@ JSON/TOON output schema:
           lines.push('')
           lines.push('artifacts:')
           for (const a of artifactStatuses) {
-            lines.push(`  ${a.type}  ${a.effectiveStatus}`)
+            lines.push(`  ${a.type}  ${a.state}  (effective: ${a.effectiveStatus})`)
+            for (const file of a.files) {
+              const hash = file.validatedHash !== undefined ? `  ${file.validatedHash}` : ''
+              lines.push(`    - ${file.key}  ${file.state}  ${file.filename}${hash}`)
+            }
+          }
+
+          if (review?.required === true) {
+            lines.push('')
+            lines.push('review:')
+            lines.push(`  required: ${review.required ? 'yes' : 'no'}`)
+            lines.push(`  route:    ${review.route}`)
+            lines.push(`  reason:   ${review.reason}`)
+            for (const artifact of review.affectedArtifacts) {
+              lines.push(`  ${artifact.type}:`)
+              for (const file of artifact.files) {
+                lines.push(`    - ${file.path}`)
+              }
+            }
           }
 
           // Lifecycle section
@@ -99,8 +133,30 @@ JSON/TOON output schema:
               ...(change.description !== undefined ? { description: change.description } : {}),
               artifacts: artifactStatuses.map((a) => ({
                 type: a.type,
+                state: a.state,
                 effectiveStatus: a.effectiveStatus,
+                files: a.files.map((file) => ({
+                  key: file.key,
+                  filename: file.filename,
+                  state: file.state,
+                  ...(file.validatedHash !== undefined
+                    ? { validatedHash: file.validatedHash }
+                    : {}),
+                })),
               })),
+              review: {
+                required: review?.required ?? false,
+                route: review?.route ?? null,
+                reason: review?.reason ?? null,
+                affectedArtifacts: (review?.affectedArtifacts ?? []).map((artifact) => ({
+                  type: artifact.type,
+                  files: artifact.files.map((file) => ({
+                    key: file.key,
+                    filename: file.filename,
+                    path: file.path,
+                  })),
+                })),
+              },
               lifecycle: {
                 validTransitions: [...lifecycle.validTransitions],
                 availableTransitions: [...lifecycle.availableTransitions],

@@ -591,7 +591,14 @@ describe('ValidateArtifacts', () => {
       ])
       const repo = makeChangeRepository([change])
       let invalidateCall:
-        | [cause: string, actor: unknown, driftedIds: Set<string> | undefined]
+        | [
+            cause: string,
+            actor: unknown,
+            invalidation: {
+              message: string
+              affectedArtifacts: Array<{ type: string; files: string[] }>
+            },
+          ]
         | undefined
       const originalMutate = repo.mutate.bind(repo)
       vi.spyOn(repo, 'mutate').mockImplementation(async (name, fn) => {
@@ -599,12 +606,13 @@ describe('ValidateArtifacts', () => {
           const invalidateSpy = vi.spyOn(freshChange, 'invalidate')
           const result = await fn(freshChange)
           if (invalidateSpy.mock.calls.length > 0) {
-            const [cause, actor, driftedIds] = invalidateSpy.mock.calls[0] as [
+            const [cause, actor, message, affectedArtifacts] = invalidateSpy.mock.calls[0] as [
               string,
               unknown,
-              Set<string> | undefined,
+              string,
+              Array<{ type: string; files: string[] }>,
             ]
-            invalidateCall = [cause, actor, driftedIds]
+            invalidateCall = [cause, actor, { message, affectedArtifacts }]
           }
           return result
         })
@@ -631,10 +639,14 @@ describe('ValidateArtifacts', () => {
       })
 
       expect(invalidateCall).toBeDefined()
-      const [cause, , driftedIds] = invalidateCall!
-      expect(cause).toBe('artifact-change')
-      expect(driftedIds).toBeInstanceOf(Set)
-      expect(driftedIds).toEqual(new Set(['design']))
+      const [cause, , invalidation] = invalidateCall! as [
+        string,
+        unknown,
+        { message: string; affectedArtifacts: Array<{ type: string; files: string[] }> },
+      ]
+      expect(cause).toBe('artifact-drift')
+      expect(invalidation.message).toContain('validated artifacts drifted')
+      expect(invalidation.affectedArtifacts).toEqual([{ type: 'design', files: ['design'] }])
     })
 
     it('does not call invalidate when hashes match', async () => {

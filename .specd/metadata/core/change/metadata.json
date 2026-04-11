@@ -2,15 +2,11 @@
   "title": "Change",
   "description": "Without a single entity that owns spec work end-to-end, lifecycle state, approval gates, and artifact tracking would scatter across uncoordinated subsystems. A Change is the central domain entity in specd — a discrete, named unit of in-progress spec work covering one or more workspaces that moves from drafting through implementation and into the archive. Every specd operation targets a Change, and the Change enforces its own lifecycle and invariants; no external code may bypass them.",
   "dependsOn": [
-    "core:core/config",
-    "core:core/schema-format",
-    "core:core/workflow-model",
     "core:core/change-manifest",
-    "core:core/storage",
-    "core:core/delta-format",
+    "core:core/workflow-model",
     "core:core/spec-metadata",
     "core:core/spec-id-format",
-    "core:core/workspace"
+    "default:_global/architecture"
   ],
   "context": [
     "Without a single entity that owns spec work end-to-end, lifecycle state, approval gates, and artifact tracking would scatter across uncoordinated subsystems. A Change is the central domain entity in specd — a discrete, named unit of in-progress spec work covering one or more workspaces that moves from drafting through implementation and into the archive. Every specd operation targets a Change, and the Change enforces its own lifecycle and invariants; no external code may bypass them."
@@ -31,13 +27,13 @@
     {
       "requirement": "Lifecycle",
       "rules": [
-        "A Change progresses through the following states. Two approval gates are configurable in `specd.yaml` (`approvals.spec` and `approvals.signoff`, both default `false`); the dashed paths are only active when the corresponding gate is enabled:\n\n```\ndrafting → designing → ready ──────────────────────────────────────── → implementing ⇄ verifying → done ──────────────────── → archivable\n                             ╌→ pending-spec-approval → spec-approved ┘                            ╌→ pending-signoff → signed-off ┘\n                               (if approvals.spec: true)                                              (if approvals.signoff: true)\n```\n\n| State                   | Meaning                                                                                       |\n| ----------------------- | --------------------------------------------------------------------------------------------- |\n| `drafting`              | Initial state; the change has been created but no design work has started                     |\n| `designing`             | The agent is elaborating the spec content                                                     |\n| `ready`                 | The spec is complete; awaiting implementation (or spec approval if gate is enabled)           |\n| `pending-spec-approval` | Waiting for human approval of the spec before implementation may begin                        |\n| `spec-approved`         | Spec has been approved; implementation may begin                                              |\n| `implementing`          | Code is being written against the spec; all tasks must be complete to transition to verifying |\n| `verifying`             | The implementation is being verified against the spec scenarios                               |\n| `done`                  | Verification is complete; the change is ready to archive                                      |\n| `pending-signoff`       | Waiting for human sign-off on the completed work before archiving                             |\n| `signed-off`            | Work has been signed off; the change may be archived                                          |\n| `archivable`            | Terminal state; the change may be moved to the archive                                        |\n\nOnly the transitions shown above are valid. Any attempt to transition to a state not reachable from the current state throws `InvalidStateTransitionError`. `archivable` is terminal — no further transitions are possible.\n\nThe `implementing ↔ verifying` loop may repeat any number of times. The transition `implementing → verifying` is only valid when all tasks in the `tasks` artifact are complete. The transition `verifying → implementing` is taken when verification fails and changes are required — the tasks artifact is reset to `in-progress` to allow new tasks to be added before the next implementation round begins."
+        "A Change progresses through the following states. Two approval gates are configurable in `specd.yaml` (`approvals.spec` and `approvals.signoff`, both default `false`); the dashed paths are only active when the corresponding gate is enabled:\n\n```\ndrafting → designing → ready ──────────────────────────────────────── → implementing ⇄ verifying → done ──────────────────── → archivable\n                             ╌→ pending-spec-approval → spec-approved ┘                            ╌→ pending-signoff → signed-off ┘\n                               (if approvals.spec: true)                                              (if approvals.signoff: true)\n```\n\n| State                   | Meaning                                                                                                                     |\n| ----------------------- | --------------------------------------------------------------------------------------------------------------------------- |\n| `drafting`              | Initial state; the change has been created but no design work has started                                                   |\n| `designing`             | The agent is elaborating or revising the change artifacts                                                                   |\n| `ready`                 | The design artifact set is complete; awaiting implementation (or spec approval if gate is enabled)                         |\n| `pending-spec-approval` | Waiting for human approval of the spec before implementation may begin                                                      |\n| `spec-approved`         | Spec has been approved; implementation may begin                                                                            |\n| `implementing`          | Code is being written against the current artifacts and task set                                                            |\n| `verifying`             | The implementation is being verified against the current verify scenarios                                                   |\n| `done`                  | Verification is complete; the change is ready to archive                                                                    |\n| `pending-signoff`       | Waiting for human sign-off on the completed work before archiving                                                           |\n| `signed-off`            | Work has been signed off; the change may be archived                                                                        |\n| `archivable`            | Final archival checks have passed and the change may be moved to the archive                                                |\n\nOnly the transitions shown above are valid. Any attempt to transition to a state not reachable from the current state throws `InvalidStateTransitionError`.\n\nThe `implementing ↔ verifying` loop may repeat any number of times. The transition `implementing → verifying` is only valid when all tasks in the `tasks` artifact are complete. The transition `verifying → implementing` is valid only for implementation-only failures: the current artifacts still describe the intended behavior and the required fix fits within the already-defined tasks. If verification concludes that the artifacts themselves must be revised, or that new tasks are required before implementation can resume, the change returns to `designing` instead.\n\nEvery state except `drafting` may return to `designing`. Returning to `designing` does not imply that artifacts drifted; it means the artifact set must be reviewed again before work can proceed."
       ]
     },
     {
       "requirement": "Implementation and verification loop",
       "rules": [
-        "The `implementing` and `verifying` states form a loop that repeats until verification passes.\n\nThe transition `implementing → verifying` is gated by the workflow model's task completion gating rule (see [`specs/core/workflow-model/spec.md` — Requirement: Task completion gating](../workflow-model/spec.md)). Because the `verifying` step's `requires` includes `tasks` (which declares `taskCompletionCheck`), the transition is automatically blocked when incomplete task items remain. This is a content-level check on the artifact files, not a check on `effectiveStatus`.\n\nThe transition `verifying → implementing` is taken when verification fails and changes are required. No approval invalidation is triggered by this transition; the spec has not changed, only the implementation work has been found insufficient.\n\nThe loop may repeat any number of times. History records each round in full."
+        "The `implementing` and `verifying` states form a loop that repeats until verification passes.\n\nThe transition `implementing → verifying` is gated by the workflow model's task completion gating rule (see [`specs/core/workflow-model/spec.md` — Requirement: Task completion gating](../workflow-model/spec.md)). Because the `verifying` step's `requires` includes `tasks` (which declares `taskCompletionCheck`), the transition is automatically blocked when incomplete task items remain. This is a content-level check on the artifact files, not a check on approval state.\n\nVerification has two distinct outcomes:\n\n- **`implementation-failure`** — the code does not satisfy the current artifacts, but the artifacts still correctly describe the intended behavior and the required fix fits within the existing task set. This outcome returns the change to `implementing` without invalidating or downgrading unchanged artifacts.\n- **`artifact-review-required`** — the desired behavior has changed, the current artifacts are no longer sufficient, or the required fix would introduce tasks not already defined. This outcome returns the change to `designing`, where the artifacts are reviewed and updated.\n\nActual artifact drift is handled separately from verification outcomes. If any validated artifact file changes on disk and enters `drifted-pending-review`, the change is invalidated back to `designing` regardless of the current lifecycle state.\n\nThe loop may repeat any number of times. History records each round in full."
       ]
     },
     {
@@ -55,7 +51,7 @@
     {
       "requirement": "Artifacts",
       "rules": [
-        "A Change holds a set of artifacts — typed files whose types and dependency graph are declared by the active schema. Each artifact is a `ChangeArtifact` that contains zero or more `ArtifactFile` entries — one per file the artifact produces.\n\nA `ChangeArtifact` has:\n\n- **`type`** — the artifact type ID from the schema (e.g. `proposal`, `specs`, `design`, `tasks`)\n- **`optional`** — whether the artifact is required for archiving\n- **`requires`** — ordered list of artifact type IDs that must be complete before this artifact can be validated\n- **`files`** — a `Map<string, ArtifactFile>` of tracked files, keyed by file key\n\nFor `scope: change` artifacts there is typically one file keyed by the artifact type id. For `scope: spec` artifacts there is one file per spec ID in `change.specIds`.\n\nEach `ArtifactFile` value object has:\n\n- **`key`** — identifier for this file within the artifact (artifact type id for `scope: change`, spec ID for `scope: spec`)\n- **`filename`** — the file path within the change directory\n- **`status`** — derived at load time: `missing` | `in-progress` | `complete` | `skipped`\n- **`validatedHash`** — the hash recorded when the file was last validated, computed after applying `preHashCleanup` if declared in the schema. The sentinel value `\"__skipped__\"` is used when an optional artifact is explicitly marked as not produced.\n\n`ArtifactStatus` is never stored directly on the file — it is always derived on load from `validatedHash` and file presence:\n\n1. `validatedHash === \"__skipped__\"` → `skipped` (only valid for `optional: true` artifacts)\n2. File absent (and no sentinel) → `missing`\n3. File present and cleaned hash matches `validatedHash` → `complete`\n4. File present but hash differs or `validatedHash` is unset → `in-progress`\n\nThe aggregated `status` getter on `ChangeArtifact` derives its value from all files:\n\n- `complete` — all files are complete or skipped (and at least one file exists)\n- `skipped` — all files are skipped (and at least one file exists)\n- `missing` — all files are missing or there are no files\n- `in-progress` — some files exist but not all are complete/skipped\n\n`skipped` is only valid for `optional: true` artifacts. Attempting to skip a non-optional artifact throws an error.\n\nThe `skipped` state must be set explicitly by an actor — human or agent via a CLI command. The agent must be instructed (via the schema `instruction` or skill definition) to call that command when it decides not to produce an optional artifact. The specific CLI command is defined in the CLI spec.\n\n`ChangeArtifact.markComplete(key, hash)` takes two arguments — the file key and the content hash — and delegates to the corresponding `ArtifactFile.markComplete(hash)`. `ChangeArtifact.markSkipped()` marks ALL files in the artifact as skipped. These may only be called by the `ValidateArtifacts` and skip use cases respectively. No other code path may set these values.\n\n**Rollback:** `invalidate()` accepts an optional `driftedArtifactIds` parameter — a set of artifact type IDs whose content has actually changed. When provided, only the drifted artifacts and their downstream dependents (artifacts whose `requires` chain includes a drifted artifact) have their `validatedHash` cleared via `resetValidation()`. Upstream artifacts that the drifted artifacts depend on are left intact. When `driftedArtifactIds` is not provided, all artifacts are reset (backward-compatible fallback). For the `verifying → implementing` transition, only artifacts in the `implementing` step's `requires` list are reset.\n\nEffective status cascades: an artifact is `in-progress` if any artifact in its `requires` chain is neither `complete` nor `skipped`, even if its own aggregated status matches. A `skipped` optional artifact satisfies the dependency — downstream artifacts and workflow steps treat it as resolved."
+        "A Change holds a set of artifacts — typed files whose types and dependency graph are declared by the active schema. Each artifact is a `ChangeArtifact` that contains zero or more `ArtifactFile` entries — one per file the artifact produces.\n\nA `ChangeArtifact` has:\n\n- **`type`** — the artifact type ID from the schema (e.g. `proposal`, `specs`, `design`, `tasks`)\n- **`optional`** — whether the artifact is required for archiving\n- **`requires`** — ordered list of artifact type IDs that must be complete before this artifact can satisfy downstream dependencies\n- **`state`** — the persisted aggregate state of the artifact\n- **`files`** — a `Map<string, ArtifactFile>` of tracked files, keyed by file key\n\nFor `scope: change` artifacts there is typically one file keyed by the artifact type id. For `scope: spec` artifacts there is one file per spec ID in `change.specIds`.\n\nEach `ArtifactFile` value object has:\n\n- **`key`** — identifier for this file within the artifact (artifact type id for `scope: change`, spec ID for `scope: spec`)\n- **`filename`** — the file path within the change directory\n- **`state`** — the persisted file state; this is the source of truth at file level\n- **`validatedHash`** — the hash recorded when the file was last validated, computed after applying `preHashCleanup` if declared in the schema. The sentinel value `\"__skipped__\"` is used when an optional artifact is explicitly marked as not produced.\n\nAllowed `state` values for both artifacts and files are:\n\n- `missing`\n- `in-progress`\n- `complete`\n- `skipped`\n- `pending-review`\n- `drifted-pending-review`\n\nState semantics are:\n\n- `missing` — the expected file is absent or, for backward-compatible loads, no explicit state was persisted\n- `in-progress` — the file exists and is being authored or revised, but has not yet been revalidated\n- `complete` — the file has been validated and remains accepted as the current source of truth\n- `skipped` — the optional file was explicitly marked as not produced\n- `pending-review` — the file was previously validated, but the change returned to `designing` and the file must be reviewed again against the current change intent\n- `drifted-pending-review` — the file was previously validated, later changed on disk, and now requires explicit review\n\n`validatedHash` still participates in drift detection and approval signatures, but it is no longer the source of truth for artifact status. A file's current state is read from its persisted `state`, and hash comparison is one of the mechanisms that may change that state.\n\nThe aggregated `state` on `ChangeArtifact` is materialized from file states and is also persisted:\n\n- `drifted-pending-review` — at least one file is `drifted-pending-review`\n- `pending-review` — no file is `drifted-pending-review`, and at least one file is `pending-review`\n- `complete` — all files are `complete` or `skipped`, and at least one file exists\n- `skipped` — all files are `skipped`, and at least one file exists\n- `missing` — all files are `missing`, or the artifact has no files\n- `in-progress` — any remaining mixed or partially-authored state\n\n`skipped` is only valid for `optional: true` artifacts. Attempting to skip a non-optional artifact throws an error.\n\nThe `skipped` state must be set explicitly by an actor — human or agent via a CLI command. The agent must be instructed (via the schema `instruction` or skill definition) to call that command when it decides not to produce an optional artifact. The specific CLI command is defined in the CLI spec.\n\n`ChangeArtifact.markComplete(key, hash)` takes two arguments — the file key and the content hash — and delegates to the corresponding `ArtifactFile.markComplete(hash)`. A successful completion sets the file state to `complete`, updates `validatedHash`, and recomputes the parent artifact state. `ChangeArtifact.markSkipped()` marks ALL files in the artifact as `skipped`. These may only be called by the `ValidateArtifacts` and skip use cases respectively. No other code path may set these values.\n\nReturning to `designing` changes review state at file level. Every file in every artifact moves to `pending-review`, except files already marked `drifted-pending-review`, which keep that more specific state. The same downgrade applies when scope changes while the change already remains in `designing`: previously validated files are no longer treated as complete until they are reviewed again.\n\nDependency satisfaction is driven by the persisted artifact `state`. Only artifacts in `complete` or `skipped` satisfy `requires`. Artifacts in `missing`, `in-progress`, `pending-review`, or `drifted-pending-review` block dependents.\n\n**Rollback:** `invalidate()` accepts affected artifact/file detail for the files whose validated content actually drifted. When drift is reported, those files are set to `drifted-pending-review`, their parent artifacts are recomputed, and all other files are downgraded to `pending-review` as part of the return to `designing`. Upstream files are not marked drifted unless their own validated content changed."
       ]
     },
     {
@@ -67,13 +63,13 @@
     {
       "requirement": "History and event sourcing",
       "rules": [
-        "The change manifest contains an **append-only `history` array** of typed events. Every significant operation appends one or more events. Events are never modified or removed.\n\nThe **current lifecycle state** of a Change is derived entirely from its history: the `to` field of the most recent `transitioned` event. If no `transitioned` event exists, the state is `drafting`. No separate state snapshot is stored. The JSON serialization of these events in `manifest.json` is defined in [`specs/core/change-manifest/spec.md` — Requirement: Manifest structure](../change-manifest/spec.md).\n\nThe **current draft/active status** is derived from history: if the most recent `drafted` or `restored` event is of type `drafted`, the change is currently shelved in `drafts/`; otherwise it is active in `changes/`.\n\nThe **active approval** for each gate is the most recent `spec-approved` or `signed-off` event that has not been superseded by a subsequent `invalidated` event.\n\nAll events share common fields:\n\n- **`type`** — identifies the event kind\n- **`at`** — ISO 8601 timestamp\n- **`by`** — git identity (`name` + `email`) of the actor, mandatory on all events\n\nEvent types:\n\n| Type               | Additional fields                                          | When appended                                                  |\n| ------------------ | ---------------------------------------------------------- | -------------------------------------------------------------- |\n| `created`          | `specIds`, `schemaName`, `schemaVersion`                   | Once, when the change is first created                         |\n| `transitioned`     | `from: ChangeState`, `to: ChangeState`                     | Each lifecycle state transition                                |\n| `spec-approved`    | `reason: string`, `artifactHashes: Record<string, string>` | When the spec approval gate is passed                          |\n| `signed-off`       | `reason: string`, `artifactHashes: Record<string, string>` | When the signoff gate is passed                                |\n| `invalidated`      | `cause: 'spec-change' \\| 'artifact-change'`                | When specIds or artifacts change, superseding approvals        |\n| `drafted`          | `reason?: string`                                          | When a change is shelved to `drafts/`                          |\n| `restored`         | *(none beyond common fields)*                              | When a drafted change is moved back to `changes/`              |\n| `artifact-skipped` | `artifactId: string`, `reason?: string`                    | When an optional artifact is explicitly marked as not produced |\n| `artifacts-synced` | `typesAdded`, `typesRemoved`, `filesAdded`, `filesRemoved` | When artifact sync reconciles the artifact map against schema  |\n| `discarded`        | `reason: string`, `supersededBy?: string[]`                | When a change is permanently abandoned                         |\n\n**Approval invalidation:** when the spec list or any artifact content changes, specd appends an `invalidated` event (with the appropriate `cause`) followed immediately by a `transitioned` event rolling back to `designing`. The invalidated approvals remain in history for audit purposes and are identified as superseded by the presence of the subsequent `invalidated` event. Invalidation can be triggered by use cases explicitly or by the repository layer automatically — `FsChangeRepository.get()` calls `invalidate('artifact-change', SYSTEM_ACTOR)` when it detects artifact file drift on disk (see [`specs/core/change-repository-port/spec.md`](../change-repository-port/spec.md)).\n\n**Multiple approval cycles:** if a change is approved, then invalidated, then approved again, the history records all events. The active approval is the last `spec-approved` / `signed-off` event with no subsequent `invalidated` event."
+        "The change manifest contains an **append-only `history` array** of typed events. Every significant operation appends one or more events. Events are never modified or removed.\n\nThe **current lifecycle state** of a Change is derived entirely from its history: the `to` field of the most recent `transitioned` event. If no `transitioned` event exists, the state is `drafting`. No separate state snapshot is stored. The JSON serialization of these events in `manifest.json` is defined in [`specs/core/change-manifest/spec.md` — Requirement: Manifest structure](../change-manifest/spec.md).\n\nThe **current draft/active status** is derived from history: if the most recent `drafted` or `restored` event is of type `drafted`, the change is currently shelved in `drafts/`; otherwise it is active in `changes/`.\n\nThe **active approval** for each gate is the most recent `spec-approved` or `signed-off` event that has not been superseded by a subsequent `invalidated` event.\n\nAll events share common fields:\n\n- **`type`** — identifies the event kind\n- **`at`** — ISO 8601 timestamp\n- **`by`** — git identity (`name` + `email`) of the actor, mandatory on all events\n\nEvent types:\n\n| Type               | Additional fields                                                                 | When appended                                                  |\n| ------------------ | --------------------------------------------------------------------------------- | -------------------------------------------------------------- |\n| `created`          | `specIds`, `schemaName`, `schemaVersion`                                          | Once, when the change is first created                         |\n| `transitioned`     | `from: ChangeState`, `to: ChangeState`                                            | Each lifecycle state transition                                |\n| `spec-approved`    | `reason: string`, `artifactHashes: Record<string, string>`                        | When the spec approval gate is passed                          |\n| `signed-off`       | `reason: string`, `artifactHashes: Record<string, string>`                        | When the signoff gate is passed                                |\n| `invalidated`      | `cause`, `message`, `affectedArtifacts`                                           | When scope or artifact review invalidates prior approvals      |\n| `drafted`          | `reason?: string`                                                                 | When a change is shelved to `drafts/`                          |\n| `restored`         | *(none beyond common fields)*                                                     | When a drafted change is moved back to `changes/`              |\n| `artifact-skipped` | `artifactId: string`, `reason?: string`                                           | When an optional artifact is explicitly marked as not produced |\n| `artifacts-synced` | `typesAdded`, `typesRemoved`, `filesAdded`, `filesRemoved`                        | When artifact sync reconciles the artifact map against schema  |\n| `discarded`        | `reason: string`, `supersededBy?: string[]`                                       | When a change is permanently abandoned                         |\n\n`invalidated.cause` is explicit and machine-readable:\n\n- `spec-change` — the change scope changed (for example, `specIds` were edited)\n- `artifact-drift` — one or more validated artifact files changed on disk\n- `artifact-review-required` — the change returned to `designing` because the artifacts must be revised even though no drifted file was detected\n\n`invalidated.message` is a clear human-readable explanation, not a one-word label. `invalidated.affectedArtifacts` is a structured list of the affected artifact types and file keys so callers can explain exactly what triggered the review:\n\n- `type` — artifact type ID\n- `files` — list of file keys, using the artifact file key for `scope: change` and the spec ID for `scope: spec`\n\nApproval invalidation caused by artifact drift MUST capture the full set of affected files before the event is appended. If multiple files drift in the same invalidation pass, they are recorded in the same `invalidated` event."
       ]
     },
     {
       "requirement": "Schema version",
       "rules": [
-        "The `created` event records the `schemaName` and `schemaVersion` of the schema active at creation time.\n\nA **`schemaName` mismatch** (e.g. `schema-std` → `schema-openspec`) indicates structural incompatibility — different artifact types, formats, delta rules, and validations. When a use case (`ArchiveChange`, `ValidateArtifacts`, `CompileContext`) detects that `schema.name() !== change.schemaName`, it must throw `SchemaMismatchError` before performing any work. This is an error, not a warning.\n\nA **`schemaVersion` mismatch** within the same schema name is advisory. A warning is emitted but the change remains fully usable. Archiving with a `schemaVersion` mismatch is allowed; a `schemaName` mismatch throws `SchemaMismatchError`."
+        "The `created` event records the `schemaName` and `schemaVersion` of the schema active at creation time.\n\nA **`schemaName` mismatch** (e.g. `schema-std` → `custom-schema`) indicates structural incompatibility — different artifact types, formats, delta rules, and validations. When a use case (`ArchiveChange`, `ValidateArtifacts`, `CompileContext`) detects that `schema.name() !== change.schemaName`, it must throw `SchemaMismatchError` before performing any work. This is an error, not a warning.\n\nA **`schemaVersion` mismatch** within the same schema name is advisory. A warning is emitted but the change remains fully usable. Archiving with a `schemaVersion` mismatch is allowed; a `schemaName` mismatch throws `SchemaMismatchError`."
       ]
     },
     {
@@ -178,118 +174,69 @@
     },
     {
       "requirement": "Lifecycle",
-      "name": "Invalid transition — drafting to implementing (skip designing)",
-      "when": ["a Change in drafting state is transitioned to implementing"],
-      "then": [
-        "InvalidStateTransitionError is thrown, no event is appended, and the state remains drafting"
-      ]
-    },
-    {
-      "requirement": "Lifecycle",
-      "name": "Invalid transition — drafting to archivable (skip everything)",
-      "when": ["a Change in drafting state is transitioned to archivable"],
-      "then": [
-        "InvalidStateTransitionError is thrown, no event is appended, and the state remains drafting"
-      ]
-    },
-    {
-      "requirement": "Lifecycle",
-      "name": "archivable is terminal",
-      "when": ["a Change in archivable state is transitioned to any other state"],
-      "then": ["InvalidStateTransitionError is thrown"]
-    },
-    {
-      "requirement": "Lifecycle",
-      "name": "State derived from history — no snapshot",
-      "when": [
-        "a Change has a history containing two transitioned events ending with to: 'implementing'"
-      ],
-      "then": [
-        "deriving state from history returns implementing without reading any separate state field"
-      ]
-    },
-    {
-      "requirement": "Lifecycle",
-      "name": "Valid transition — implementing to verifying when all task items complete",
+      "name": "Valid transition — verifying back to implementing for implementation-only failure",
       "given": [
-        "a Change in implementing state",
-        "AND the verifying step requires an artifact with taskCompletionCheck and all items are complete"
-      ],
-      "when": ["the change is transitioned to verifying"],
-      "then": [
-        "a transitioned event with from: 'implementing' and to: 'verifying' is appended and deriving state returns verifying"
-      ]
-    },
-    {
-      "requirement": "Lifecycle",
-      "name": "Task completion gating applies generically",
-      "given": [
-        "a Change in a state transitioning to a step that requires an artifact with taskCompletionCheck",
-        "AND incomplete items remain in the artifact"
-      ],
-      "when": ["the transition is attempted"],
-      "then": [
-        "InvalidStateTransitionError is thrown — this is not specific to implementing → verifying"
-      ]
-    },
-    {
-      "requirement": "Lifecycle",
-      "name": "Default incompletePattern matches markdown unchecked checkboxes",
-      "given": [
-        "an artifact with no taskCompletionCheck declared",
-        "AND its file contains - [ ] implement login and - [x] implement logout"
-      ],
-      "when": ["a transition to a step requiring that artifact is attempted"],
-      "then": [
-        "the default pattern ^\\s*-\\s+\\[ \\] matches - [ ] implement login and the transition is blocked"
-      ]
-    },
-    {
-      "requirement": "Lifecycle",
-      "name": "Custom incompletePattern blocks transition",
-      "given": [
-        "an artifact declares taskCompletionCheck.incompletePattern: '^\\s*TODO:'",
-        "AND its file contains TODO: implement login and DONE: implement logout"
-      ],
-      "when": ["a transition to a step requiring that artifact is attempted"],
-      "then": ["the custom pattern matches TODO: implement login and the transition is blocked"]
-    },
-    {
-      "requirement": "Lifecycle",
-      "name": "Invalid transition — implementing to verifying when a task item is incomplete",
-      "given": [
-        "a Change in implementing state",
-        "AND the verifying step requires an artifact with taskCompletionCheck and incomplete items remain"
-      ],
-      "when": ["the change is transitioned to verifying"],
-      "then": ["InvalidStateTransitionError is thrown and the state remains implementing"]
-    },
-    {
-      "requirement": "Lifecycle",
-      "name": "Progress reported from both patterns",
-      "given": [
-        "an artifact with taskCompletionCheck.completePattern and taskCompletionCheck.incompletePattern both declared",
-        "AND the artifact file contains 3 complete items and 2 incomplete items"
-      ],
-      "when": ["the CLI reports task progress"],
-      "then": ["it reports 3/5 tasks complete"]
-    },
-    {
-      "requirement": "Lifecycle",
-      "name": "Invalid transition — implementing to done (skipping verifying)",
-      "when": ["a Change in implementing state is transitioned directly to done"],
-      "then": ["InvalidStateTransitionError is thrown and the state remains implementing"]
-    },
-    {
-      "requirement": "Lifecycle",
-      "name": "Valid transition — verifying back to implementing when verification fails",
-      "given": [
-        "a Change in verifying state where verification has failed and changes are required"
+        "a Change in verifying state",
+        "AND the current artifacts still describe the intended behavior",
+        "AND the required fix fits within the already-defined tasks"
       ],
       "when": ["the change is transitioned back to implementing"],
       "then": [
         "a transitioned event with from: 'verifying' and to: 'implementing' is appended",
         "AND no approval invalidation is triggered"
+      ]
+    },
+    {
+      "requirement": "Lifecycle",
+      "name": "Verification requiring new tasks returns to designing",
+      "given": [
+        "a Change in verifying state",
+        "AND the required fix would introduce tasks not already defined"
+      ],
+      "when": ["verification routes the change out of verifying"],
+      "then": ["the change transitions to designing, not implementing"]
+    },
+    {
+      "requirement": "Lifecycle",
+      "name": "archivable can return to designing",
+      "given": ["a Change in archivable state"],
+      "when": ["it is transitioned to designing"],
+      "then": ["the transition succeeds"]
+    },
+    {
+      "requirement": "Implementation and verification loop",
+      "name": "implementation-failure returns to implementing without downgrading unchanged artifacts",
+      "given": [
+        "a Change in verifying state with validated artifacts",
+        "AND verification concludes that only the implementation is wrong"
+      ],
+      "when": ["the change returns to implementing"],
+      "then": [
+        "unchanged validated artifacts remain complete",
+        "AND no file is moved to pending-review"
+      ]
+    },
+    {
+      "requirement": "Implementation and verification loop",
+      "name": "artifact-review-required returns to designing",
+      "given": [
+        "a Change in verifying state",
+        "AND verification concludes that the desired behavior has changed"
+      ],
+      "when": ["the verification outcome is artifact-review-required"],
+      "then": ["the change returns to designing"]
+    },
+    {
+      "requirement": "Implementation and verification loop",
+      "name": "drift during verification is not treated as implementation-only failure",
+      "given": [
+        "a Change in verifying state",
+        "AND a previously validated artifact file changes on disk"
+      ],
+      "when": ["drift is detected"],
+      "then": [
+        "the change is invalidated to designing",
+        "AND the drifted file is marked drifted-pending-review"
       ]
     },
     {
@@ -342,119 +289,51 @@
     },
     {
       "requirement": "Artifacts",
-      "name": "Status derived — complete",
-      "when": ["the cleaned hash of an artifact's current file matches its validatedHash"],
-      "then": ["effectiveStatus returns complete"]
+      "name": "File state is persisted explicitly",
+      "given": ["an artifact file stored in the manifest with state: 'pending-review'"],
+      "when": ["the Change is loaded"],
+      "then": [
+        "the file state is pending-review",
+        "AND it is not recomputed from validatedHash alone"
+      ]
     },
     {
       "requirement": "Artifacts",
-      "name": "Status derived — missing",
-      "when": ["an artifact's file does not exist"],
-      "then": ["effectiveStatus returns missing"]
-    },
-    {
-      "requirement": "Artifacts",
-      "name": "Status derived — in-progress",
-      "when": ["an artifact's cleaned file hash differs from validatedHash"],
-      "then": ["effectiveStatus returns in-progress"]
-    },
-    {
-      "requirement": "Artifacts",
-      "name": "preHashCleanup applied before status comparison",
-      "when": [
-        "an artifact has preHashCleanup defined and a progress marker changes (e.g. a checkbox is checked)"
-      ],
-      "then": ["effectiveStatus remains complete — the cleaned hash is unchanged"]
-    },
-    {
-      "requirement": "Artifacts",
-      "name": "Status derived — skipped",
+      "name": "Artifact aggregates to drifted-pending-review when any file drifted",
       "given": [
-        "an optional: true artifact with no file on disk",
-        "AND its validatedHash is \"__skipped__\""
+        "an artifact with two files",
+        "AND one file is complete",
+        "AND one file is drifted-pending-review"
       ],
-      "when": ["effectiveStatus is derived"],
-      "then": ["it returns skipped"]
+      "when": ["the artifact aggregate state is computed"],
+      "then": ["the artifact state is drifted-pending-review"]
     },
     {
       "requirement": "Artifacts",
-      "name": "skipped persists across calls",
+      "name": "Returning to designing downgrades files to pending-review",
       "given": [
-        "an optional: true artifact with validatedHash === \"__skipped__\" persisted in the manifest"
+        "a change with validated artifacts",
+        "AND one file is already drifted-pending-review"
       ],
-      "when": ["effectiveStatus is derived in a subsequent CLI invocation"],
-      "then": ["it returns skipped — the sentinel in the manifest is the source of truth"]
-    },
-    {
-      "requirement": "Artifacts",
-      "name": "skipping a non-optional artifact fails",
-      "when": ["an attempt is made to skip an artifact with optional: false"],
-      "then": ["the operation fails with an error and validatedHash is not modified"]
-    },
-    {
-      "requirement": "Artifacts",
-      "name": "invalidated event with driftedArtifactIds clears only downstream",
-      "given": [
-        "a DAG: proposal → specs → verify, proposal → design, specs + design → tasks",
-        "AND all artifacts are complete"
-      ],
-      "when": ["invalidate('artifact-change', actor, ['tasks']) is called"],
+      "when": ["the change returns to designing"],
       "then": [
-        "only tasks.validatedHash is cleared (no downstream dependents)",
-        "AND proposal, specs, verify, and design remain complete"
+        "every other file becomes pending-review",
+        "AND the drifted file remains drifted-pending-review"
       ]
     },
     {
       "requirement": "Artifacts",
-      "name": "invalidated event with driftedArtifactIds cascades downstream",
-      "given": [
-        "a DAG: proposal → specs → verify, proposal → design, specs + design → tasks",
-        "AND all artifacts are complete"
-      ],
-      "when": ["invalidate('artifact-change', actor, ['specs']) is called"],
-      "then": [
-        "specs, verify, and tasks are cleared (specs + its downstream)",
-        "AND proposal and design remain complete"
-      ]
+      "name": "Requires satisfied only by complete or skipped",
+      "given": ["artifact B requires artifact A", "AND artifact A is pending-review"],
+      "when": ["dependency satisfaction is evaluated"],
+      "then": ["artifact A does not satisfy the requirement"]
     },
     {
       "requirement": "Artifacts",
-      "name": "invalidated event without driftedArtifactIds clears all",
-      "given": ["a change with one complete artifact and one skipped artifact"],
-      "when": ["invalidate('artifact-change', actor) is called without driftedArtifactIds"],
-      "then": [
-        "all validatedHash values are cleared — the complete artifact becomes in-progress and the skipped artifact becomes missing"
-      ]
-    },
-    {
-      "requirement": "Artifacts",
-      "name": "verifying → implementing clears only implementing.requires artifacts",
-      "given": ["a change with implementing.requires: [tasks] and tasks is complete"],
-      "when": ["the change transitions verifying → implementing"],
-      "then": ["only tasks.validatedHash is cleared — other artifacts retain their status"]
-    },
-    {
-      "requirement": "Artifacts",
-      "name": "Dependency cascade — skipped optional satisfies dependency",
-      "given": ["artifact B requires artifact A, and artifact A is optional: true and skipped"],
-      "when": ["effectiveStatus for artifact B is derived"],
-      "then": ["it is not blocked by A — skipped is treated as resolved"]
-    },
-    {
-      "requirement": "Artifacts",
-      "name": "Dependency cascade — incomplete dependency",
-      "when": ["artifact B requires artifact A, and artifact A is in-progress"],
-      "then": [
-        "effectiveStatus for artifact B returns in-progress even if B's own cleaned hash matches its validatedHash"
-      ]
-    },
-    {
-      "requirement": "Artifacts",
-      "name": "markComplete only from ValidateArtifacts",
-      "when": ["any code path other than ValidateArtifacts calls Artifact.markComplete(hash)"],
-      "then": [
-        "this is a violation of the domain contract — no other use case may set an artifact to complete"
-      ]
+      "name": "markComplete sets file and artifact state to complete",
+      "given": ["an artifact file in in-progress"],
+      "when": ["markComplete(key, hash) is called through validation"],
+      "then": ["the file state becomes complete", "AND the parent artifact state is recomputed"]
     },
     {
       "requirement": "History and event sourcing",
@@ -464,65 +343,27 @@
     },
     {
       "requirement": "History and event sourcing",
-      "name": "State derived from last transitioned event",
-      "when": [
-        "history contains transitioned events with to values of designing, ready, implementing, verifying"
-      ],
-      "then": ["deriving state returns verifying (the most recent to value)"]
-    },
-    {
-      "requirement": "History and event sourcing",
-      "name": "Draft status derived from history",
-      "when": ["history contains a drafted event followed by no restored event"],
-      "then": ["the change is considered currently shelved in drafts/"]
-    },
-    {
-      "requirement": "History and event sourcing",
-      "name": "Draft/restore cycle tracked",
-      "when": ["a Change is drafted, then restored, then drafted again"],
+      "name": "Invalidated event records artifact drift details",
+      "given": ["two validated spec files drift in the same invalidation pass"],
+      "when": ["the change is invalidated for artifact drift"],
       "then": [
-        "history contains two drafted events and one restored event, and the change is currently shelved"
+        "the invalidated event contains cause: 'artifact-drift'",
+        "AND it includes a human-readable message",
+        "AND affectedArtifacts records the artifact type and both file keys"
       ]
     },
     {
       "requirement": "History and event sourcing",
-      "name": "Active approval derived from history",
-      "when": [
-        "a spec-approved event exists in history and no subsequent invalidated event exists"
-      ],
-      "then": [
-        "that approval is the active spec approval and its artifactHashes represent the current approved signature"
-      ]
+      "name": "Scope change invalidation records spec-change cause",
+      "when": ["specIds are edited after prior validation"],
+      "then": ["the appended invalidated event uses cause: 'spec-change'"]
     },
     {
       "requirement": "History and event sourcing",
-      "name": "Approval superseded by subsequent invalidated event",
-      "when": ["a spec-approved event exists in history followed by an invalidated event"],
-      "then": ["the prior spec-approved event is superseded — there is no active spec approval"]
-    },
-    {
-      "requirement": "History and event sourcing",
-      "name": "Multiple approval cycles in history",
-      "when": ["a Change is spec-approved, then invalidated, then spec-approved again"],
-      "then": [
-        "history contains two spec-approved events; the first is superseded by the invalidated event; the second is the active approval"
-      ]
-    },
-    {
-      "requirement": "History and event sourcing",
-      "name": "Approval events never modified",
-      "when": ["a Change already has spec-approved or signed-off events in history"],
-      "then": ["no operation may overwrite or modify those events — only new events are appended"]
-    },
-    {
-      "requirement": "History and event sourcing",
-      "name": "Artifact change triggers invalidation",
-      "when": [
-        "an artifact's validatedHash is updated (i.e. its content changed after a prior approval)"
-      ],
-      "then": [
-        "an invalidated event with cause: 'artifact-change' is appended and a transitioned event back to designing is appended"
-      ]
+      "name": "Review-required invalidation remains distinguishable from drift",
+      "given": ["a change returns to designing because verification requires artifact review"],
+      "when": ["the invalidation event is appended"],
+      "then": ["its cause is artifact-review-required", "AND it is distinct from artifact-drift"]
     },
     {
       "requirement": "Schema version",
@@ -602,8 +443,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:709e1f60c72d1c0cbee159c61de41b34b7f28d278288930005f48617fa463768",
-    "verify.md": "sha256:297a4de390bedcabb9ccc1713a5dfff919510270532cb31b437c860a3d7945ab"
+    "spec.md": "sha256:98561485da6cd23c1836e67318a33e3dd58016cbbe2747c72cf00db1a16d69a7",
+    "verify.md": "sha256:f3e4af937e0c6721885d2912e6c8edbc72fb81331dc721f72b7ac048584e6d6b"
   },
   "generatedBy": "core"
 }

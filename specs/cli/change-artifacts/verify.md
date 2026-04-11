@@ -11,39 +11,27 @@
 
 ### Requirement: Output format
 
-#### Scenario: Text output includes all fields
+#### Scenario: Text output includes artifact state and file state
 
-- **GIVEN** a change `my-change` with artifact `proposal` (complete, file exists) and `tasks` (missing, file absent)
-- **WHEN** `specd change artifacts my-change` is run
-- **THEN** the `proposal` line shows `complete`, `yes`, and an absolute path
-- **AND** the `tasks` line shows `missing`, `no`, and an absolute path
-- **AND** the process exits with code 0
+- **GIVEN** a change with `specs` in `drifted-pending-review`
+- **AND** one tracked file is `drifted-pending-review`
+- **WHEN** `specd change artifacts <name>` is run
+- **THEN** the line includes both the artifact state and the file state
+- **AND** it includes the absolute path
 
-#### Scenario: All schema artifacts listed regardless of existence
+#### Scenario: JSON output exposes both state levels
 
-- **GIVEN** the schema declares three artifacts and none of the files exist on disk
-- **WHEN** `specd change artifacts my-change` is run
-- **THEN** three lines are printed, all showing `missing` and `no`
+- **GIVEN** a change with one tracked artifact file
+- **WHEN** `specd change artifacts <name> --format json` is run
+- **THEN** each JSON row includes `artifactState`
+- **AND** it includes `fileState`
+- **AND** it includes the absolute `path`
 
-#### Scenario: Artifacts in schema-declared order
+#### Scenario: Artifacts still listed in schema-declared order
 
-- **GIVEN** the schema declares artifacts in order: `proposal`, `spec`, `tasks`
-- **WHEN** `specd change artifacts my-change` is run
-- **THEN** the lines appear in that order
-
-#### Scenario: JSON output structure
-
-- **GIVEN** a change `my-change` with one artifact `proposal` that exists on disk
-- **WHEN** `specd change artifacts my-change --format json` is run
-- **THEN** stdout is valid JSON with `name`, `changeDir`, and `artifacts`
-- **AND** `artifacts[0]` has `id`, `filename`, `path`, `effectiveStatus`, and `exists`
-- **AND** `path` is an absolute filesystem path
-- **AND** `changeDir` is the absolute path to the change directory
-
-#### Scenario: Paths are absolute
-
-- **WHEN** `specd change artifacts my-change` is run from any working directory
-- **THEN** all paths in the output are absolute and do not depend on CWD
+- **GIVEN** the schema declares three artifacts
+- **WHEN** `specd change artifacts <name>` is run
+- **THEN** rows are grouped and emitted in schema-declared order
 
 ### Requirement: Error cases
 

@@ -4,62 +4,43 @@
 
 ### Requirement: Manifest structure
 
-#### Scenario: Manifest written on creation
+#### Scenario: Manifest stores artifact and file state explicitly
 
-- **WHEN** a new change `add-auth-flow` is created
-- **THEN** a `manifest.json` is written containing `name`, `createdAt`, `schema`, `specIds`, `artifacts`, and a `history` array with a single `created` event
+- **WHEN** a change manifest is written
+- **THEN** each persisted artifact entry includes `state`
+- **AND** each persisted file entry includes `state`
 
-#### Scenario: No state field in manifest
+#### Scenario: Missing state defaults to missing on load
 
-- **WHEN** a manifest is read from disk
-- **THEN** there is no top-level `state` field; the current state is derived by reading the `to` field of the last `transitioned` event in `history`
+- **GIVEN** a manifest entry without a `state` field
+- **WHEN** the manifest is loaded
+- **THEN** the missing state is treated as `missing`
 
-#### Scenario: History never shrinks
+#### Scenario: Invalidated event stores message and affectedArtifacts
 
-- **WHEN** a manifest is loaded, modified (e.g. workspace added), and saved
-- **THEN** the `history` array on disk has more entries than before — no existing events are missing or reordered
+- **WHEN** a change is invalidated because validated files drifted
+- **THEN** the `invalidated` event includes `cause`
+- **AND** it includes a human-readable `message`
+- **AND** it includes `affectedArtifacts` with artifact types and file keys
 
-#### Scenario: Artifact validated hash stored
+#### Scenario: Legacy artifact-change invalidation cause remains readable
 
-- **WHEN** `ValidateArtifacts` marks an artifact complete with hash `sha256:abc`
-- **THEN** the manifest's `artifacts` entry for that type has `validatedHash: "sha256:abc"` and no `status` field
+- **GIVEN** a historical manifest whose `invalidated` event persisted `cause: "artifact-change"`
+- **WHEN** the manifest is loaded
+- **THEN** loading succeeds without reporting corruption
+- **AND** the event is normalized to the current artifact-drift semantics
 
-#### Scenario: validatedHash is null for unvalidated artifact
+#### Scenario: validatedHash and state coexist
 
-- **WHEN** an artifact exists in `artifacts` but has never been validated
-- **THEN** its `validatedHash` is `null` in the manifest
+- **WHEN** `ValidateArtifacts` marks a file complete with hash `sha256:abc`
+- **THEN** the manifest stores `validatedHash: "sha256:abc"`
+- **AND** the file state is `complete`
 
-#### Scenario: validatedHash is sentinel for skipped artifact
+#### Scenario: Drifted and pending-review states round-trip
 
-- **WHEN** an optional artifact is explicitly marked as not produced
-- **THEN** its `validatedHash` is `"__skipped__"` in the manifest and no `status` field is stored
-
-#### Scenario: artifact-skipped event serialized in history
-
-- **WHEN** an optional artifact is skipped with reason `"not needed for this change"`
-- **THEN** the history contains `{ "type": "artifact-skipped", "artifactId": "design", "reason": "not needed for this change", "at": "...", "by": { ... } }`
-
-#### Scenario: validatedHash cleared on invalidation
-
-- **GIVEN** one artifact with `validatedHash: "sha256:abc"` and one with `validatedHash: "__skipped__"`
-- **WHEN** an `invalidated` event is appended
-- **THEN** both `validatedHash` values are set to `null` in the manifest — rollback is uniform
-
-#### Scenario: specDependsOn does not invalidate approvals
-
-- **WHEN** `specDependsOn` is updated on a change that has an active `spec-approved` event
-- **THEN** no `invalidated` event is appended and the approval remains active
-
-#### Scenario: Manifest with specDependsOn round-trips correctly
-
-- **WHEN** a manifest is saved with `specDependsOn: { "auth/login": ["auth/shared", "auth/jwt"] }`
-- **AND** the manifest is loaded back
-- **THEN** `change.specDependsOn.get("auth/login")` returns `["auth/shared", "auth/jwt"]`
-
-#### Scenario: Manifest without specDependsOn loads with empty dependencies
-
-- **WHEN** a manifest is loaded that has no `specDependsOn` field
-- **THEN** `change.specDependsOn` is an empty map
+- **GIVEN** a manifest with one file in `drifted-pending-review` and one file in `pending-review`
+- **WHEN** the manifest is loaded and saved again
+- **THEN** both states are preserved
 
 ### Requirement: Schema version
 

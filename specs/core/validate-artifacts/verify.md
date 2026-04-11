@@ -95,24 +95,28 @@
 
 ### Requirement: Approval invalidation on content change
 
-#### Scenario: Approval invalidation resets only drifted artifacts and downstream
+#### Scenario: Drift collection records all file keys in one invalidation
 
 - **GIVEN** a change with an active spec approval
-- **AND** the DAG is: proposal → specs → verify, proposal → design, specs + design → tasks
-- **AND** only `design.md` has changed since approval (hash mismatch)
-- **WHEN** `ValidateArtifacts.execute` detects the hash mismatch
-- **THEN** `change.invalidate('artifact-change', actor, ['design'])` is called
-- **AND** `design` and `tasks` are reset (design + its downstream)
-- **AND** `proposal`, `specs`, and `verify` remain `complete`
-
-#### Scenario: Multiple artifacts drift — all drifted IDs collected in single call
-
-- **GIVEN** a change with an active spec approval
-- **AND** both `specs` and `design` have changed since approval
+- **AND** two validated files under `specs` have changed since approval
 - **WHEN** `ValidateArtifacts.execute` detects the mismatches
-- **THEN** a single `change.invalidate('artifact-change', actor, ['specs', 'design'])` is called
-- **AND** `specs`, `verify`, `design`, and `tasks` are reset
-- **AND** `proposal` remains `complete`
+- **THEN** a single invalidation is performed
+- **AND** both file keys are included in the grouped affected artifact detail
+
+#### Scenario: Drifted files become drifted-pending-review
+
+- **GIVEN** a change with an active approval
+- **AND** one validated file has changed since approval
+- **WHEN** `ValidateArtifacts.execute` invalidates the change
+- **THEN** that file becomes `drifted-pending-review`
+- **AND** unaffected validated files become `pending-review`
+
+#### Scenario: Drift invalidation is shared across spec approval and signoff
+
+- **GIVEN** a change with an active signoff
+- **AND** a validated artifact file has changed
+- **WHEN** `ValidateArtifacts.execute` detects the mismatch
+- **THEN** the same grouped invalidation behavior is applied
 
 ### Requirement: Delta validation
 
@@ -240,18 +244,20 @@
 
 ### Requirement: Hash computation and markComplete
 
-#### Scenario: All validations pass — markComplete called with cleaned hash
+#### Scenario: All validations pass — markComplete sets complete state
 
-- **GIVEN** all validations pass for artifact `specs`
-- **AND** `preHashCleanup` normalises checked checkboxes before hashing
-- **WHEN** `ValidateArtifacts.execute` is called
-- **THEN** `markComplete` is called with the SHA-256 of the cleaned content
+- **GIVEN** all validations pass for a file within artifact `specs`
+- **WHEN** `ValidateArtifacts.execute` marks that file complete
+- **THEN** the file state becomes `complete`
+- **AND** the parent artifact state is recomputed
 
-#### Scenario: Any validation failure — markComplete not called
+#### Scenario: Validation failure preserves non-complete state
 
-- **GIVEN** at least one `required: true` validation rule fails for an artifact
-- **WHEN** `ValidateArtifacts.execute` is called
-- **THEN** `markComplete` is not called for that artifact
+- **GIVEN** a file currently in `pending-review`
+- **AND** at least one required validation rule fails
+- **WHEN** `ValidateArtifacts.execute` runs
+- **THEN** `markComplete` is not called
+- **AND** the file does not become `complete`
 
 ### Requirement: Result shape
 

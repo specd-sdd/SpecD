@@ -305,25 +305,29 @@ describe('ChangeArtifact', () => {
     })
   })
 
-  describe('resetValidation', () => {
-    it('resets complete files to in-progress and clears hashes', () => {
+  describe('review downgrades', () => {
+    it('marks complete files as pending-review while preserving hashes', () => {
       const a = makeArtifactWithFile('proposal', 'proposal.md', {
         status: 'complete',
         validatedHash: 'sha256:abc',
       })
-      a.resetValidation()
-      expect(a.getFile('proposal')?.status).toBe('in-progress')
-      expect(a.getFile('proposal')?.validatedHash).toBeUndefined()
+      a.markPendingReview()
+      expect(a.getFile('proposal')?.status).toBe('pending-review')
+      expect(a.getFile('proposal')?.validatedHash).toBe('sha256:abc')
     })
 
-    it('resets skipped files to missing and clears hashes', () => {
-      const a = makeArtifactWithFile('adr', 'adr.md', { optional: true, status: 'skipped' })
-      a.resetValidation()
-      expect(a.getFile('adr')?.status).toBe('missing')
-      expect(a.getFile('adr')?.validatedHash).toBeUndefined()
+    it('marks skipped files as pending-review while preserving the sentinel hash', () => {
+      const a = makeArtifactWithFile('adr', 'adr.md', {
+        optional: true,
+        status: 'skipped',
+        validatedHash: SKIPPED_SENTINEL,
+      })
+      a.markPendingReview()
+      expect(a.getFile('adr')?.status).toBe('pending-review')
+      expect(a.getFile('adr')?.validatedHash).toBe(SKIPPED_SENTINEL)
     })
 
-    it('does not change missing or in-progress files', () => {
+    it('does not change missing files and marks in-progress files as pending-review', () => {
       const f1 = new ArtifactFile({ key: 'a', filename: 'a.md', status: 'missing' })
       const f2 = new ArtifactFile({ key: 'b', filename: 'b.md', status: 'in-progress' })
       const a = new ChangeArtifact({
@@ -333,12 +337,12 @@ describe('ChangeArtifact', () => {
           ['b', f2],
         ]),
       })
-      a.resetValidation()
+      a.markPendingReview()
       expect(a.getFile('a')?.status).toBe('missing')
-      expect(a.getFile('b')?.status).toBe('in-progress')
+      expect(a.getFile('b')?.status).toBe('pending-review')
     })
 
-    it('resets all files in a multi-file artifact', () => {
+    it('marks selected files drifted-pending-review and aggregates drift precedence', () => {
       const f1 = new ArtifactFile({
         key: 'a',
         filename: 'a.md',
@@ -358,10 +362,13 @@ describe('ChangeArtifact', () => {
           ['b', f2],
         ]),
       })
-      a.resetValidation()
-      expect(a.getFile('a')?.validatedHash).toBeUndefined()
-      expect(a.getFile('b')?.validatedHash).toBeUndefined()
-      expect(a.status).toBe('in-progress')
+      a.markPendingReview()
+      a.markDriftedPendingReview(['b'])
+      expect(a.getFile('a')?.status).toBe('pending-review')
+      expect(a.getFile('a')?.validatedHash).toBe('sha256:aaa')
+      expect(a.getFile('b')?.status).toBe('drifted-pending-review')
+      expect(a.getFile('b')?.validatedHash).toBe('sha256:bbb')
+      expect(a.status).toBe('drifted-pending-review')
     })
   })
 

@@ -21,7 +21,7 @@
     {
       "requirement": "get returns a Change or null",
       "rules": [
-        "`get(name)` MUST accept a change name string and return the `Change` with that name, or `null` if no change with that name exists. The returned `Change` MUST have its artifact statuses derived at load time by comparing the current file hash against the stored `validatedHash` (see `specs/core/change/spec.md` — Requirement: Artifacts). A hash mismatch MUST reset the artifact status to `in-progress`.\n\n`get()` is a snapshot read for callers. It MAY auto-invalidate and persist drifted artifacts before returning (see Requirement: Auto-invalidation on get when artifact files drift), but it MUST NOT be the repository's serialized mutation primitive. Callers that need a coordinated read-modify-write section for an existing persisted change MUST use `mutate(name, fn)` instead of relying on a later `save()` against a stale snapshot."
+        "`get(name)` MUST accept a change name string and return the `Change` with that name, or `null` if no change with that name exists. The returned `Change` MUST load artifact and file states from the persisted manifest. If an artifact or file entry omits `state`, the repository defaults that missing value to `missing` while loading.\n\n`validatedHash` is still loaded with the artifact data, but hash comparison is not the sole source of truth for steady-state status. The repository MAY detect drift and persist updated file and artifact states before returning (see Requirement: Auto-invalidation on get when artifact files drift).\n\n`get()` is a snapshot read for callers. It MAY auto-invalidate and persist drifted artifacts before returning, but it MUST NOT be the repository's serialized mutation primitive. Callers that need a coordinated read-modify-write section for an existing persisted change MUST use `mutate(name, fn)` instead of relying on a later `save()` against a stale snapshot."
       ]
     },
     {
@@ -33,7 +33,7 @@
     {
       "requirement": "Auto-invalidation on get when artifact files drift",
       "rules": [
-        "The `FsChangeRepository` implementation of `get()` MUST detect artifact file drift and auto-invalidate the change when appropriate. After loading a change and deriving artifact statuses, the repository checks whether any previously-validated artifact file has drifted — that is, the file's `validatedHash` was set (indicating a prior validation) but the derived status is now `missing` or `in-progress` (indicating the file was deleted or modified on disk).\n\nIf drift is detected AND either of the following conditions is true, the repository MUST collect the artifact type IDs of all drifted artifacts and call `change.invalidate('artifact-change', SYSTEM_ACTOR, driftedArtifactIds)` and persist the updated manifest before returning:\n\n1. The change is beyond `designing` state (i.e. has progressed past the initial design phase), OR\n2. The change has an active approval (spec approval or signoff) that has not been superseded by a subsequent `invalidated` event.\n\nWhen `driftedArtifactIds` is provided, `invalidate()` only resets the drifted artifacts and their downstream dependents in the artifact DAG — upstream artifacts that the drifted artifacts depend on are left intact. Approval revocation and state transition to `designing` still happen globally.\n\nThis ensures that approval drift and state-inconsistent artifact changes are detected eagerly on any change load, not only during explicit validation. The `SYSTEM_ACTOR` constant (`{ name: 'specd', email: 'system@specd.dev' }`) is used as the actor for these automated invalidations."
+        "The `FsChangeRepository` implementation of `get()` MUST detect artifact file drift and auto-invalidate the change when appropriate. After loading a change, the repository compares the current cleaned file hash against each file's stored `validatedHash` for files that were previously validated.\n\nA file is drifted when:\n\n- `validatedHash` is a SHA-256 value recorded by prior validation, and\n- the current cleaned content hash no longer matches that `validatedHash`\n\nWhen drift is detected, the repository MUST:\n\n1. Scan the full affected artifact set first, collecting every drifted file key grouped by artifact type. It MUST NOT stop at the first mismatch.\n2. Mark each drifted file as `drifted-pending-review`.\n3. Recompute every affected artifact's aggregate `state`.\n4. Invalidate the change back to `designing` using the domain invalidation mechanism, preserving `drifted-pending-review` on the drifted files and downgrading the remaining files to `pending-review`.\n5. Persist the updated manifest before returning.\n\nThis invalidation is lifecycle-independent: if a validated file drifts, the change is invalidated back to `designing` regardless of whether the current lifecycle state is `designing`, `ready`, `implementing`, `verifying`, `done`, or `archivable`.\n\nThe invalidation history entry MUST record:\n\n- `cause: \"artifact-drift\"`\n- a clear `message`\n- `affectedArtifacts`, including each affected artifact type and the full list of drifted file keys captured in step 1\n\nThe `SYSTEM_ACTOR` constant (`{ name: 'specd', email: 'system@specd.dev' }`) is used as the actor for these automated invalidations."
       ]
     },
     {
@@ -133,21 +133,15 @@
       "name": "Change exists",
       "when": ["get(\"add-oauth-login\") is called and a change with that name exists"],
       "then": [
-        "a Change is returned with artifact statuses derived from current file hashes vs stored validatedHash"
+        "a Change is returned with persisted artifact and file state loaded from the manifest"
       ]
     },
     {
       "requirement": "get returns a Change or null",
-      "name": "Change does not exist",
-      "when": ["get(\"nonexistent-change\") is called and no change with that name exists"],
-      "then": ["null is returned"]
-    },
-    {
-      "requirement": "get returns a Change or null",
-      "name": "Hash mismatch resets artifact status",
-      "given": ["a change whose artifact file has been modified since the last validation"],
+      "name": "Missing state defaults to missing on load",
+      "given": ["a manifest entry without a state field"],
       "when": ["get() loads that change"],
-      "then": ["the artifact whose hash differs from validatedHash has status in-progress"]
+      "then": ["the missing artifact or file state defaults to missing"]
     },
     {
       "requirement": "get returns a Change or null",
@@ -196,45 +190,43 @@
     },
     {
       "requirement": "Auto-invalidation on get when artifact files drift",
-      "name": "Single artifact drifts — only it and downstream are reset",
+      "name": "Repository collects all drifted files before invalidating",
       "given": [
-        "a change in implementing state with all artifacts complete",
-        "AND the DAG is: proposal → specs → verify, proposal → design, specs + design → tasks"
+        "a change with two validated spec files under the same artifact",
+        "AND both files have changed on disk"
       ],
-      "when": [
-        "tasks.md is modified on disk (hash changes)",
-        "AND FsChangeRepository.get() is called"
+      "when": ["FsChangeRepository.get() is called"],
+      "then": ["the invalidation captures both file keys in a single grouped invalidation"]
+    },
+    {
+      "requirement": "Auto-invalidation on get when artifact files drift",
+      "name": "Drift invalidates even while already designing",
+      "given": [
+        "a change already in designing",
+        "AND a previously validated artifact file drifts on disk"
       ],
+      "when": ["FsChangeRepository.get() is called"],
       "then": [
-        "change.invalidate('artifact-change', SYSTEM_ACTOR, ['tasks']) is called",
-        "AND only tasks has its validatedHash cleared",
-        "AND proposal, specs, verify, and design remain complete",
-        "AND the change transitions to designing"
+        "the change remains in designing",
+        "AND the drifted file becomes drifted-pending-review"
       ]
     },
     {
       "requirement": "Auto-invalidation on get when artifact files drift",
-      "name": "Upstream artifact drifts — it and all downstream are reset",
-      "given": [
-        "a change in implementing state with all artifacts complete",
-        "AND the DAG is: proposal → specs → verify, proposal → design, specs + design → tasks"
-      ],
-      "when": [
-        "spec.md is modified on disk (specs artifact drifts)",
-        "AND FsChangeRepository.get() is called"
-      ],
+      "name": "Drift preserves drifted files and downgrades others to pending review",
+      "given": ["a change with validated artifacts", "AND one file drifts on disk"],
+      "when": ["FsChangeRepository.get() auto-invalidates the change"],
       "then": [
-        "change.invalidate('artifact-change', SYSTEM_ACTOR, ['specs']) is called",
-        "AND specs, verify, and tasks are cleared",
-        "AND proposal and design remain complete"
+        "the drifted file is drifted-pending-review",
+        "AND other previously validated files become pending-review"
       ]
     },
     {
       "requirement": "Auto-invalidation on get when artifact files drift",
       "name": "No drift — no invalidation",
-      "given": ["a change in implementing state with all artifacts complete"],
-      "when": ["no file has changed on disk", "AND FsChangeRepository.get() is called"],
-      "then": ["no invalidation occurs and all artifacts remain complete"]
+      "given": ["a change whose validated files still match their stored hashes"],
+      "when": ["FsChangeRepository.get() is called"],
+      "then": ["no invalidation occurs"]
     },
     {
       "requirement": "list returns active changes in creation order",
@@ -385,8 +377,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:daf3c9fe873bda73c1e81f4a87008d6ff52c22bb8e78c42df7c840cae70eb6d3",
-    "verify.md": "sha256:fc7f38f342bc9dd7264b7ca5de6165ae4b6c1e7a12c83b72b1cce79a72d87a16"
+    "spec.md": "sha256:1b149253f9864f4eca83c7ccd981b5a6264ff04b68bb27b8dc224c09ba000ef1",
+    "verify.md": "sha256:b45e7a7e29a6a6d6570a9019167bcd0c6a2f083add37f2ff40cad9f60dc144cb"
   },
   "generatedBy": "core"
 }

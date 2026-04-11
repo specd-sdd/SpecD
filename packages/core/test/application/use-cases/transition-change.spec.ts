@@ -298,7 +298,7 @@ describe('TransitionChange', () => {
       ])
     }
 
-    it('clears validatedHash for artifacts in the implementing step requires from schema', async () => {
+    it('preserves artifact validation state for artifacts in the implementing step requires from schema', async () => {
       const change = makeVerifyingChange('my-change')
       const specFile = new ArtifactFile({ key: 'spec', filename: 'spec.md', status: 'in-progress' })
       const spec = new ChangeArtifact({ type: 'spec', files: new Map([['spec', specFile]]) })
@@ -336,8 +336,8 @@ describe('TransitionChange', () => {
       const saved = repo.store.get('my-change')
       const savedSpec = saved?.getArtifact('spec')
       const savedTasks = saved?.getArtifact('tasks')
-      expect(savedSpec?.getFile('spec')?.validatedHash).toBeUndefined()
-      expect(savedSpec?.status).toBe('in-progress')
+      expect(savedSpec?.getFile('spec')?.validatedHash).toBe('sha256:abc')
+      expect(savedSpec?.status).toBe('complete')
       expect(savedTasks?.getFile('tasks')?.validatedHash).toBe('sha256:def')
       expect(savedTasks?.status).toBe('complete')
     })

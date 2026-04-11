@@ -7,6 +7,7 @@
  */
 
 import { z } from 'zod'
+import { type ArtifactStatus } from '../../domain/value-objects/artifact-status.js'
 
 /** Actor identity as stored in the manifest JSON. */
 export interface ManifestActorIdentity {
@@ -22,6 +23,8 @@ export interface ManifestArtifactFile {
   readonly key: string
   /** Relative filename within the change directory. */
   readonly filename: string
+  /** Persisted file state. Optional only for defensive loading of old manifests. */
+  readonly state?: ArtifactStatus
   /**
    * The hash recorded at last validation.
    *
@@ -40,9 +43,24 @@ export interface ManifestArtifact {
   readonly optional: boolean
   /** Artifact type IDs that must be complete before this one can be validated. */
   readonly requires: string[]
+  /** Persisted aggregate artifact state. Optional only for defensive loading of old manifests. */
+  readonly state?: ArtifactStatus
   /** Per-file tracking entries. */
   readonly files: ManifestArtifactFile[]
 }
+
+/** Raw JSON shape for artifact/file payloads attached to invalidation events. */
+export interface RawInvalidatedArtifactEntry {
+  readonly type: string
+  readonly files: string[]
+}
+
+/** Raw persisted invalidation causes accepted by the fs manifest reader. */
+export type RawInvalidatedCause =
+  | 'spec-change'
+  | 'artifact-drift'
+  | 'artifact-review-required'
+  | 'artifact-change'
 
 /** Raw JSON shape of a `created` event. */
 export interface RawCreatedEvent {
@@ -111,7 +129,11 @@ export interface RawInvalidatedEvent {
   /** Actor who triggered the invalidation. */
   readonly by: ManifestActorIdentity
   /** The reason the approval was invalidated. */
-  readonly cause: string
+  readonly cause: RawInvalidatedCause
+  /** Human-readable invalidation summary. */
+  readonly message: string
+  /** Artifact/file payload that triggered the invalidation. */
+  readonly affectedArtifacts: RawInvalidatedArtifactEntry[]
 }
 
 /** Raw JSON shape of a `drafted` event. */
@@ -202,9 +224,19 @@ export const actorIdentitySchema = z.object({
   email: z.string(),
 })
 
+const artifactStatusSchema = z.enum([
+  'missing',
+  'in-progress',
+  'complete',
+  'skipped',
+  'pending-review',
+  'drifted-pending-review',
+])
+
 export const manifestArtifactFileSchema = z.object({
   key: z.string(),
   filename: z.string(),
+  state: artifactStatusSchema.optional(),
   validatedHash: z.string().nullable(),
 })
 
@@ -212,6 +244,7 @@ export const manifestArtifactSchema = z.object({
   type: z.string(),
   optional: z.boolean(),
   requires: z.array(z.string()),
+  state: artifactStatusSchema.optional(),
   files: z.array(manifestArtifactFileSchema),
 })
 

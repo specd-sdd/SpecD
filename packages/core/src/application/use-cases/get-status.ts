@@ -1,3 +1,4 @@
+import * as path from 'node:path'
 import { type Change } from '../../domain/entities/change.js'
 import { type ArtifactStatus } from '../../domain/value-objects/artifact-status.js'
 import { type ChangeState, VALID_TRANSITIONS } from '../../domain/value-objects/change-state.js'
@@ -5,6 +6,7 @@ import { type ChangeRepository } from '../ports/change-repository.js'
 import { type SchemaProvider } from '../ports/schema-provider.js'
 import { type Schema } from '../../domain/value-objects/schema.js'
 import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
+import { type InvalidatedEvent } from '../../domain/entities/change.js'
 
 /** Input for the {@link GetStatus} use case. */
 export interface GetStatusInput {
@@ -18,18 +20,52 @@ export interface ArtifactFileStatus {
   readonly key: string
   /** Filename (basename). */
   readonly filename: string
-  /** Status of this individual file. */
-  readonly status: ArtifactStatus
+  /** Persisted state of this individual file. */
+  readonly state: ArtifactStatus
+  /** Last validated hash for this file, when present. */
+  readonly validatedHash?: string
 }
 
-/** Effective status of a single artifact, after dependency cascade. */
+/** Status of a single artifact with file detail and dependency-aware effective status. */
 export interface ArtifactStatusEntry {
   /** Artifact type identifier (e.g. `'proposal'`, `'spec'`). */
   readonly type: string
+  /** Persisted aggregate artifact state. */
+  readonly state: ArtifactStatus
   /** Effective status after cascading through required dependencies. */
   readonly effectiveStatus: ArtifactStatus
   /** Per-file status details. */
   readonly files: ArtifactFileStatus[]
+}
+
+/** Review routing summary for agents and operators. */
+export interface ReviewArtifactFileSummary {
+  /** Supplemental file key used internally for manifest/history matching. */
+  readonly key: string
+  /** Relative filename within the change directory. */
+  readonly filename: string
+  /** Absolute filesystem path to the affected file. */
+  readonly path: string
+}
+
+/** Review routing summary for one affected artifact. */
+export interface ReviewArtifactSummary {
+  /** Artifact type identifier. */
+  readonly type: string
+  /** Concrete affected files within that artifact. */
+  readonly files: readonly ReviewArtifactFileSummary[]
+}
+
+/** Review routing summary for agents and operators. */
+export interface ReviewSummary {
+  /** Whether the change currently requires artifact review. */
+  readonly required: boolean
+  /** Recommended workflow route when review is required. */
+  readonly route: 'designing' | null
+  /** Primary review reason derived from current file states. */
+  readonly reason: 'artifact-drift' | 'artifact-review-required' | null
+  /** Affected artifacts and their concrete file paths. */
+  readonly affectedArtifacts: readonly ReviewArtifactSummary[]
 }
 
 /** Describes why a structurally valid transition is not currently available. */
@@ -38,7 +74,7 @@ export interface TransitionBlocker {
   readonly transition: ChangeState
   /** Why the transition is blocked. */
   readonly reason: 'requires' | 'tasks-incomplete'
-  /** Artifact IDs whose effective status is neither complete nor skipped. */
+  /** Artifact IDs whose persisted state is neither complete nor skipped. */
   readonly blocking: readonly string[]
 }
 
@@ -68,14 +104,15 @@ export interface GetStatusResult {
   readonly artifactStatuses: ArtifactStatusEntry[]
   /** Pre-computed lifecycle context. */
   readonly lifecycle: LifecycleContext
+  /** Whether validated artifacts require review before continuing. */
+  readonly review: ReviewSummary
 }
 
 /**
  * Loads a change and reports its current lifecycle state and artifact statuses.
  *
- * Artifact statuses are computed via {@link Change.effectiveStatus}, which
- * cascades through artifact dependency chains — an artifact with all hashes
- * matching is still `in-progress` if any of its dependencies are not `complete`.
+ * The result exposes both the persisted artifact/file state and the
+ * dependency-aware effective status used for legacy lifecycle explanations.
  */
 export class GetStatus {
   private readonly _changes: ChangeRepository
@@ -118,10 +155,23 @@ export class GetStatus {
     for (const [type, artifact] of change.artifacts) {
       const files: ArtifactFileStatus[] = []
       for (const [key, file] of artifact.files) {
-        files.push({ key, filename: file.filename, status: file.status })
+        files.push({
+          key,
+          filename: file.filename,
+          state: file.status,
+          ...(file.validatedHash !== undefined ? { validatedHash: file.validatedHash } : {}),
+        })
       }
-      artifactStatuses.push({ type, effectiveStatus: change.effectiveStatus(type), files })
+      artifactStatuses.push({
+        type,
+        state: artifact.status,
+        effectiveStatus: change.effectiveStatus(type),
+        files,
+      })
     }
+
+    const changePath = this._changes.changePath(change)
+    const review = this._deriveReview(change, artifactStatuses, changePath)
 
     // --- Lifecycle computation ---
 
@@ -151,7 +201,7 @@ export class GetStatus {
         }
         const blocking: string[] = []
         for (const artifactId of workflowStep.requires) {
-          const status = change.effectiveStatus(artifactId)
+          const status = change.getArtifact(artifactId)?.status
           if (status !== 'complete' && status !== 'skipped') {
             blocking.push(artifactId)
           }
@@ -168,12 +218,12 @@ export class GetStatus {
     let nextArtifact: string | null = null
     if (schema !== null) {
       for (const artifactType of schema.artifacts()) {
-        const ownStatus = change.effectiveStatus(artifactType.id)
+        const ownStatus = change.getArtifact(artifactType.id)?.status ?? 'missing'
         if (ownStatus === 'complete' || ownStatus === 'skipped') {
           continue
         }
         const requiresSatisfied = artifactType.requires.every((reqId) => {
-          const reqStatus = change.effectiveStatus(reqId)
+          const reqStatus = change.getArtifact(reqId)?.status
           return reqStatus === 'complete' || reqStatus === 'skipped'
         })
         if (requiresSatisfied) {
@@ -182,9 +232,6 @@ export class GetStatus {
         }
       }
     }
-
-    // 5. Change path
-    const changePath = this._changes.changePath(change)
 
     const lifecycle: LifecycleContext = {
       validTransitions,
@@ -196,6 +243,83 @@ export class GetStatus {
       schemaInfo,
     }
 
-    return { change, artifactStatuses, lifecycle }
+    return { change, artifactStatuses, lifecycle, review }
+  }
+
+  /**
+   * Derives the outward-facing review summary from current artifact/file states.
+   *
+   * @param change - Change whose history may refine the affected-file ordering
+   * @param artifactStatuses - Current persisted artifact/file states
+   * @param changePath - Absolute path to the change directory
+   * @returns A stable review summary for CLI and skills
+   */
+  private _deriveReview(
+    change: Change,
+    artifactStatuses: ArtifactStatusEntry[],
+    changePath: string,
+  ): ReviewSummary {
+    const outstandingFilesByArtifact = new Map<string, Map<string, ReviewArtifactFileSummary>>()
+    for (const artifact of artifactStatuses) {
+      const files = artifact.files
+        .filter(
+          (file) => file.state === 'pending-review' || file.state === 'drifted-pending-review',
+        )
+        .map((file) => ({
+          key: file.key,
+          filename: file.filename,
+          path: path.resolve(changePath, file.filename),
+        }))
+
+      if (files.length === 0) continue
+      outstandingFilesByArtifact.set(artifact.type, new Map(files.map((file) => [file.key, file])))
+    }
+
+    if (outstandingFilesByArtifact.size === 0) {
+      return {
+        required: false,
+        route: null,
+        reason: null,
+        affectedArtifacts: [],
+      }
+    }
+
+    const latestInvalidated = [...change.history]
+      .reverse()
+      .find((event): event is InvalidatedEvent => event.type === 'invalidated')
+    const hasDrift = artifactStatuses.some((artifact) =>
+      artifact.files.some((file) => file.state === 'drifted-pending-review'),
+    )
+
+    const projectedLatestAffectedArtifacts =
+      latestInvalidated === undefined
+        ? []
+        : latestInvalidated.affectedArtifacts
+            .map((artifact): ReviewArtifactSummary | null => {
+              const currentFiles = outstandingFilesByArtifact.get(artifact.type)
+              if (currentFiles === undefined) return null
+              const files = artifact.files
+                .map((fileKey) => currentFiles.get(fileKey))
+                .filter((file): file is ReviewArtifactFileSummary => file !== undefined)
+              return files.length === 0 ? null : { type: artifact.type, files }
+            })
+            .filter((artifact): artifact is ReviewArtifactSummary => artifact !== null)
+
+    const fallbackAffectedArtifacts: ReviewArtifactSummary[] = [
+      ...outstandingFilesByArtifact.entries(),
+    ].map(([type, files]) => ({
+      type,
+      files: [...files.values()],
+    }))
+
+    return {
+      required: true,
+      route: 'designing',
+      reason: hasDrift ? 'artifact-drift' : 'artifact-review-required',
+      affectedArtifacts:
+        projectedLatestAffectedArtifacts.length > 0
+          ? projectedLatestAffectedArtifacts
+          : fallbackAffectedArtifacts,
+    }
   }
 }
