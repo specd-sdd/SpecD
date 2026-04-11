@@ -71,19 +71,18 @@ SpecD follows [Conventional Commits](https://www.conventionalcommits.org/). Ever
 
 **Scope** must be the short package name (without the `@specd/` prefix):
 
-| Scope             | Package                      |
-| ----------------- | ---------------------------- |
-| `core`            | `@specd/core`                |
-| `cli`             | `@specd/cli`                 |
-| `mcp`             | `@specd/mcp`                 |
-| `skills`          | `@specd/skills`              |
-| `schema-std`      | `@specd/schema-std`          |
-| `schema-openspec` | `@specd/schema-openspec`     |
-| `plugin-claude`   | `@specd/plugin-claude`       |
-| `plugin-copilot`  | `@specd/plugin-copilot`      |
-| `plugin-codex`    | `@specd/plugin-codex`        |
-| `root`            | monorepo root                |
-| `all`             | all packages (use sparingly) |
+| Scope            | Package                      |
+| ---------------- | ---------------------------- |
+| `core`           | `@specd/core`                |
+| `cli`            | `@specd/cli`                 |
+| `mcp`            | `@specd/mcp`                 |
+| `skills`         | `@specd/skills`              |
+| `schema-std`     | `@specd/schema-std`          |
+| `plugin-claude`  | `@specd/plugin-claude`       |
+| `plugin-copilot` | `@specd/plugin-copilot`      |
+| `plugin-codex`   | `@specd/plugin-codex`        |
+| `root`           | monorepo root                |
+| `all`            | all packages (use sparingly) |
 
 **Rules enforced by commitlint:**
 

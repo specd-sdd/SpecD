@@ -102,7 +102,7 @@ The visible dependency label is the canonical spec ID. When a link is present, t
 ## Constraints
 
 - `specs/_global/` is for cross-cutting constraints only — not for any single package's implementation details
-- Package spec directories use the short package name: `core`, `cli`, `mcp`, `skills`, `schema-std`, `schema-openspec`
+- Package spec directories use the short package name: `core`, `cli`, `mcp`, `skills`, `schema-std`
 - Every spec subdirectory contains exactly two authored files: `spec.md` and `verify.md`
 - Delta files (`spec.md.delta.yaml`, `verify.md.delta.yaml`, etc.) are change artifacts — they live in the change directory alongside the artifact and are never synced to the permanent `specs/` directories
 - `spec.md` contains no WHEN/THEN scenarios; `verify.md` contains no requirement prose

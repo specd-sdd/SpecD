@@ -11,7 +11,6 @@ export default {
         'mcp',
         'skills',
         'schema-std',
-        'schema-openspec',
         'plugin-claude',
         'plugin-copilot',
         'plugin-codex',

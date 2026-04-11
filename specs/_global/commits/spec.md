@@ -81,7 +81,7 @@ Commit conventions must be automatically enforced by commitlint via a husky `com
 commitlint configuration must:
 
 - Extend `@commitlint/config-conventional` as the base
-- Restrict `scope-enum` to the known specd package names: `core`, `cli`, `mcp`, `skills`, `schema-std`, `schema-openspec`, `plugin-claude`, `plugin-copilot`, `plugin-codex`, `code-graph`, `root`, `all`
+- Restrict `scope-enum` to the known specd package names: `core`, `cli`, `mcp`, `skills`, `schema-std`, `plugin-claude`, `plugin-copilot`, `plugin-codex`, `code-graph`, `root`, `all`
 - Enforce `subject-case: lower-case`
 - Enforce `header-max-length: 72`
 - Enforce `body-max-line-length: 100`

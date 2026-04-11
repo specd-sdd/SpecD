@@ -1,1 +1,0 @@
-// @specd/schema-openspec

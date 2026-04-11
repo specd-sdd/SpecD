@@ -258,8 +258,6 @@ importers:
         specifier: workspace:*
         version: link:../../skills
 
-  packages/schema-openspec: {}
-
   packages/schema-std: {}
 
   packages/skills:

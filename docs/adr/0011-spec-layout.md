@@ -29,7 +29,7 @@ Chosen option: "Scoped by package", because the directory path alone signals the
 Specs are scoped by their audience:
 
 - `specs/_global/<topic>/spec.md` — binding on **all** packages in the monorepo. Reserved for cross-cutting concerns: architecture, coding conventions, commit format, testing rules, storage design, schema format.
-- `specs/<package>/<topic>/spec.md` — binding only on that package. `<package>` is the short package name: `core`, `cli`, `mcp`, `skills`, `schema-std`, `schema-openspec`.
+- `specs/<package>/<topic>/spec.md` — binding only on that package. `<package>` is the short package name: `core`, `cli`, `mcp`, `skills`, `schema-std`.
 
 Every spec file is named `spec.md` and lives in a named kebab-case subdirectory. A spec in `specs/<package>/` does not constrain any other package. All `spec.md` files follow a standard structure (mandatory sections: `## Overview`, `## Requirements`, `## Spec Dependencies`; optional sections: `## Constraints`, `## Examples`, `## ADRs`) to enable consistent tooling. `## Overview` serves as a human and machine-readable summary for listing and context injection. `## Spec Dependencies` makes the dependency graph between specs explicit and traversable. Scenarios use WHEN/THEN format; GIVEN is optional and used when the precondition is not obvious from the requirement context.
 
