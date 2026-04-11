@@ -142,6 +142,13 @@ schemaOverrides:
               run: 'pnpm test'
             - id: implementing-run-lint
               run: 'pnpm lint'
+      - step: verifying
+        hooks:
+          pre:
+            - id: verifying-run-tests
+              run: 'pnpm test'
+            - id: verifying-run-lint
+              run: 'pnpm lint'
       - step: archiving
         hooks:
           pre:
