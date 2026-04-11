@@ -3,6 +3,11 @@ packages:
   - packages/*
   - packages/plugins/*
 onlyBuiltDependencies:
+  - '@ast-grep/lang-go'
+  - '@ast-grep/lang-php'
+  - '@ast-grep/lang-python'
+  - better-sqlite3
+  - core-js
+  - core-js-pure
   - esbuild
   - lbug
-  - better-sqlite3

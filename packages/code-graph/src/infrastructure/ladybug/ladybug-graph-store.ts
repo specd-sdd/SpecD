@@ -846,9 +846,24 @@ export class LadybugGraphStore extends GraphStore {
       try {
         const rows = await exec(
           conn,
-          `MATCH (a)-[r:${type}]->(b) RETURN count(DISTINCT [id(a), id(b)]) AS c`,
+          `MATCH (a)-[r:${type}]->(b) RETURN a.id AS sourceId, a.path AS sourcePath, a.specId AS sourceSpecId, b.id AS targetId, b.path AS targetPath, b.specId AS targetSpecId`,
         )
-        relationCounts[type] = Number(rows[0]?.['c'] ?? 0)
+        const distinctPairs = new Set(
+          rows.map((row) => {
+            const source =
+              (row['sourceId'] as string | undefined) ??
+              (row['sourcePath'] as string | undefined) ??
+              (row['sourceSpecId'] as string | undefined) ??
+              ''
+            const target =
+              (row['targetId'] as string | undefined) ??
+              (row['targetPath'] as string | undefined) ??
+              (row['targetSpecId'] as string | undefined) ??
+              ''
+            return `${source}\u001f${target}\u001f${type}`
+          }),
+        )
+        relationCounts[type] = distinctPairs.size
       } catch {
         relationCounts[type] = 0
       }
