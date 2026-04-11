@@ -10,6 +10,7 @@ import {
   makeSchemaProvider,
   makeSchema,
   makeArtifactType,
+  testActor,
 } from './helpers.js'
 
 const defaultApprovals = { spec: false, signoff: false }
@@ -198,6 +199,57 @@ describe('GetStatus', () => {
 
       const specEntry = result.artifactStatuses.find((e) => e.type === 'spec')
       expect(specEntry?.effectiveStatus).toBe('in-progress')
+    })
+
+    it('projects review entries using filename and absolute path', async () => {
+      const change = makeChange('review-paths')
+      change.transition('designing', testActor)
+      change.setArtifact(
+        new ChangeArtifact({
+          type: 'tasks',
+          requires: [],
+          files: new Map([
+            [
+              'tasks',
+              new ArtifactFile({
+                key: 'tasks',
+                filename: 'tasks.md',
+                status: 'complete',
+                validatedHash: 'hash-tasks',
+              }),
+            ],
+          ]),
+        }),
+      )
+      change.invalidate(
+        'artifact-drift',
+        testActor,
+        'Invalidated because validated artifacts drifted: tasks (tasks)',
+        [{ type: 'tasks', files: ['tasks'] }],
+      )
+
+      const repo = makeChangeRepository([change])
+      const uc = makeGetStatus(repo)
+
+      const result = await uc.execute({ name: 'review-paths' })
+
+      expect(result.review).toEqual({
+        required: true,
+        route: 'designing',
+        reason: 'artifact-drift',
+        affectedArtifacts: [
+          {
+            type: 'tasks',
+            files: [
+              {
+                key: 'tasks',
+                filename: 'tasks.md',
+                path: '/test/changes/review-paths/tasks.md',
+              },
+            ],
+          },
+        ],
+      })
     })
   })
 

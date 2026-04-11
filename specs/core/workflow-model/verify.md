@@ -10,37 +10,55 @@
 - **WHEN** an agent attempts to transition a change to `reviewing`
 - **THEN** `TransitionChange` throws `InvalidStateTransitionError` because `reviewing` is not a valid Change lifecycle state
 
+### Requirement: Step semantics
+
+#### Scenario: implementation-failure returns to implementing
+
+- **GIVEN** a verifying step where artifacts remain correct
+- **AND** the required fix fits within the existing task set
+- **WHEN** verification concludes with `implementation-failure`
+- **THEN** the workflow routes back to `implementing`
+
+#### Scenario: artifact-review-required returns to designing
+
+- **GIVEN** a verifying step where artifacts must be revised
+- **WHEN** verification concludes with `artifact-review-required`
+- **THEN** the workflow routes back to `designing`
+
+#### Scenario: drifted file forces redesign
+
+- **GIVEN** at least one file is `drifted-pending-review`
+- **WHEN** workflow routing is evaluated after verification
+- **THEN** the change must return to `designing`
+
 ### Requirement: Requires-based gating
 
 #### Scenario: Step with all requires complete is available
 
 - **GIVEN** a workflow step with `requires: [specs, tasks]`
-- **AND** `change.effectiveStatus('specs')` returns `complete`
-- **AND** `change.effectiveStatus('tasks')` returns `complete`
+- **AND** both artifacts have persisted `state: 'complete'`
 - **WHEN** step availability is evaluated
 - **THEN** the step is available
 
-#### Scenario: Step blocked by incomplete artifact
+#### Scenario: pending-review blocks requires
 
-- **GIVEN** a workflow step with `requires: [specs, tasks]`
-- **AND** `change.effectiveStatus('specs')` returns `complete`
-- **AND** `change.effectiveStatus('tasks')` returns `in-progress`
+- **GIVEN** a workflow step with `requires: [specs]`
+- **AND** `specs` has persisted `state: 'pending-review'`
 - **WHEN** step availability is evaluated
 - **THEN** the step is not available
-- **AND** `tasks` is reported as a blocking artifact
+
+#### Scenario: drifted-pending-review blocks requires
+
+- **GIVEN** a workflow step with `requires: [specs]`
+- **AND** `specs` has persisted `state: 'drifted-pending-review'`
+- **WHEN** step availability is evaluated
+- **THEN** the step is not available
 
 #### Scenario: Skipped optional artifact satisfies requires
 
 - **GIVEN** a workflow step with `requires: [design, tasks]`
-- **AND** `design` is `optional: true` with effective status `skipped`
-- **AND** `tasks` has effective status `complete`
-- **WHEN** step availability is evaluated
-- **THEN** the step is available
-
-#### Scenario: Empty requires means always available
-
-- **GIVEN** a workflow step with `requires: []`
-- **AND** the change is in any state
+- **AND** `design` is `skipped`
+- **AND** `tasks` is `complete`
 - **WHEN** step availability is evaluated
 - **THEN** the step is available
 
@@ -90,6 +108,22 @@
 - **AND** the tasks file contains 3 complete items and 2 incomplete items
 - **WHEN** the transition fails
 - **THEN** the error reason includes `incomplete: 2`, `complete: 3`, `total: 5`
+
+### Requirement: Step availability evaluation
+
+#### Scenario: Availability reads persisted artifact state
+
+- **GIVEN** a workflow step with `requires: [specs]`
+- **AND** the `specs` artifact has persisted `state: 'complete'`
+- **WHEN** step availability is evaluated
+- **THEN** the step is available
+
+#### Scenario: Availability is recomputed on each invocation
+
+- **GIVEN** a workflow step with `requires: [specs]`
+- **AND** `specs` changes from `complete` to `pending-review`
+- **WHEN** step availability is evaluated again
+- **THEN** the step is no longer available
 
 ### Requirement: Workflow array order is display order
 

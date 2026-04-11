@@ -22,6 +22,16 @@ Works through tasks one by one and marks them done.
 specd change status <name> --format json
 ```
 
+Store `lifecycle.changePath`, `specIds`, and `review` from the response.
+
+If `review.required` is `true`, this change has artifacts that require review
+before implementation can continue. Summarize `review.reason` and
+`review.affectedArtifacts`, then tell the user:
+
+> Artifacts need review before implementation can continue. Run `/specd-design <name>`.
+
+**Stop — do not continue.**
+
 If not in `ready` or `implementing` or `spec-approved`, this is the wrong skill. Suggest based on state:
 
 - `drafting` / `designing` → `/specd-design <name>`
@@ -33,8 +43,6 @@ If not in `ready` or `implementing` or `spec-approved`, this is the wrong skill.
 - `pending-spec-approval` → "Approval pending. Run: `specd change approve spec <name> --reason ...`"
 
 **Stop — do not continue.**
-
-Store `lifecycle.changePath` and `specIds` from the response.
 
 If in `ready` or `spec-approved`, run pre-hooks and transition:
 
@@ -309,3 +317,5 @@ specd change transition <name> designing --skip-hooks all
 - The change artifacts are the source of truth for implementation approach
 - If you touch code outside the change's spec scope, surface it to the user
 - Never skip the pre-hook — it tells you what to read
+- Any time a fresh `change status` shows `review.required = true`, stop
+  implementation and redirect to `/specd-design <name>`

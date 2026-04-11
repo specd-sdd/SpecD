@@ -24,13 +24,13 @@
     {
       "requirement": "Step semantics",
       "rules": [
-        "Each workflow step has a defined semantic role in the change lifecycle:\n\n- **Designing** (`designing`) — the agent creates or modifies spec artifacts (proposal, specs, verify, design, tasks). This step iterates over the artifact DAG: `CompileContext` is called once per artifact being authored. The step is typically always available (empty `requires`).\n- **Implementing** (`implementing`) — the agent writes code and completes tasks. All working artifacts (tasks, specs) must be complete. The step runs once (not per-artifact).\n- **Verifying** (`verifying`) — the agent confirms the implementation satisfies verify.md scenarios. The step runs once. May loop back to implementing if verification fails.\n- **Archiving** (`archiving`) — deterministic finalization: delta merge, spec sync, metadata generation, archive move. Executed atomically by the `ArchiveChange` use case, not by an agent interactively."
+        "Each workflow step has a defined semantic role in the change lifecycle:\n\n- **Designing** (`designing`) — the agent creates or modifies spec artifacts (proposal, specs, verify, design, tasks). This step iterates over the artifact DAG: `CompileContext` is called once per artifact being authored. The step is typically always available (empty `requires`).\n- **Implementing** (`implementing`) — the agent writes code and completes tasks. All working artifacts must already be in a review-complete state before implementation proceeds. The step runs once (not per-artifact).\n- **Verifying** (`verifying`) — the agent confirms the implementation satisfies verify.md scenarios. Verification has two semantic outcomes:\n  - `implementation-failure` — artifacts remain correct and the fix fits within the already-defined tasks; route back to `implementing`\n  - `artifact-review-required` — artifacts must be revised, or new tasks are required before implementation can continue; route back to `designing`\n- **Archiving** (`archiving`) — deterministic finalization: delta merge, spec sync, metadata generation, archive move. Executed atomically by the `ArchiveChange` use case, not by an agent interactively.\n\nAny file already marked `drifted-pending-review` also forces the workflow back to `designing`; drift is never treated as an implementation-only retry."
       ]
     },
     {
       "requirement": "Requires-based gating",
       "rules": [
-        "Each workflow step declares a `requires` array of artifact IDs. `TransitionChange` enforces this at transition time: before allowing a transition to a state that has a workflow step, it checks `change.effectiveStatus(artifactId)` for each artifact ID in `requires`. If any required artifact has an effective status other than `complete` or `skipped`, the transition is rejected with `InvalidStateTransitionError`.\n\nAn empty or omitted `requires` means the step has no gating — the transition proceeds without artifact checks.\n\nA skipped optional artifact satisfies the requirement identically to a completed one."
+        "Each workflow step declares a `requires` array of artifact IDs. `TransitionChange` enforces this at transition time: before allowing a transition to a state that has a workflow step, it checks the persisted artifact `state` for each required artifact ID. If any required artifact has a state other than `complete` or `skipped`, the transition is rejected with `InvalidStateTransitionError`.\n\nAn empty or omitted `requires` means the step has no gating — the transition proceeds without artifact checks.\n\nA skipped optional artifact satisfies the requirement identically to a completed one.\n\nArtifacts in `missing`, `in-progress`, `pending-review`, or `drifted-pending-review` do not satisfy `requires`."
       ]
     },
     {
@@ -42,7 +42,7 @@
     {
       "requirement": "Step availability evaluation",
       "rules": [
-        "Step availability MUST be evaluated consistently by all consumers that need it. `CompileContext` evaluates step availability during context assembly. `GetStatus` reports the current change state, which corresponds directly to the active workflow step (since step name = state name). The evaluation is:\n\n```\nstepAvailable(step, change) =\n  step.requires.every(id => change.effectiveStatus(id) ∈ { complete, skipped })\n```\n\nThis evaluation is performed dynamically on each invocation — it is not cached or snapshotted."
+        "Step availability MUST be evaluated consistently by all consumers that need it. `CompileContext` evaluates step availability during context assembly. `GetStatus` reports the current change state, which corresponds directly to the active workflow step (since step name = state name). The evaluation is:\n\n```\nstepAvailable(step, change) =\n  step.requires.every(id => artifact(id).state ∈ { complete, skipped })\n```\n\nThis evaluation is performed dynamically on each invocation — it is not cached or snapshotted."
       ]
     },
     {
@@ -93,42 +93,67 @@
       ]
     },
     {
+      "requirement": "Step semantics",
+      "name": "implementation-failure returns to implementing",
+      "given": [
+        "a verifying step where artifacts remain correct",
+        "AND the required fix fits within the existing task set"
+      ],
+      "when": ["verification concludes with implementation-failure"],
+      "then": ["the workflow routes back to implementing"]
+    },
+    {
+      "requirement": "Step semantics",
+      "name": "artifact-review-required returns to designing",
+      "given": ["a verifying step where artifacts must be revised"],
+      "when": ["verification concludes with artifact-review-required"],
+      "then": ["the workflow routes back to designing"]
+    },
+    {
+      "requirement": "Step semantics",
+      "name": "drifted file forces redesign",
+      "given": ["at least one file is drifted-pending-review"],
+      "when": ["workflow routing is evaluated after verification"],
+      "then": ["the change must return to designing"]
+    },
+    {
       "requirement": "Requires-based gating",
       "name": "Step with all requires complete is available",
       "given": [
         "a workflow step with requires: [specs, tasks]",
-        "AND change.effectiveStatus('specs') returns complete",
-        "AND change.effectiveStatus('tasks') returns complete"
+        "AND both artifacts have persisted state: 'complete'"
       ],
       "when": ["step availability is evaluated"],
       "then": ["the step is available"]
     },
     {
       "requirement": "Requires-based gating",
-      "name": "Step blocked by incomplete artifact",
+      "name": "pending-review blocks requires",
       "given": [
-        "a workflow step with requires: [specs, tasks]",
-        "AND change.effectiveStatus('specs') returns complete",
-        "AND change.effectiveStatus('tasks') returns in-progress"
+        "a workflow step with requires: [specs]",
+        "AND specs has persisted state: 'pending-review'"
       ],
       "when": ["step availability is evaluated"],
-      "then": ["the step is not available", "AND tasks is reported as a blocking artifact"]
+      "then": ["the step is not available"]
+    },
+    {
+      "requirement": "Requires-based gating",
+      "name": "drifted-pending-review blocks requires",
+      "given": [
+        "a workflow step with requires: [specs]",
+        "AND specs has persisted state: 'drifted-pending-review'"
+      ],
+      "when": ["step availability is evaluated"],
+      "then": ["the step is not available"]
     },
     {
       "requirement": "Requires-based gating",
       "name": "Skipped optional artifact satisfies requires",
       "given": [
         "a workflow step with requires: [design, tasks]",
-        "AND design is optional: true with effective status skipped",
-        "AND tasks has effective status complete"
+        "AND design is skipped",
+        "AND tasks is complete"
       ],
-      "when": ["step availability is evaluated"],
-      "then": ["the step is available"]
-    },
-    {
-      "requirement": "Requires-based gating",
-      "name": "Empty requires means always available",
-      "given": ["a workflow step with requires: []", "AND the change is in any state"],
       "when": ["step availability is evaluated"],
       "then": ["the step is available"]
     },
@@ -198,6 +223,26 @@
       "then": ["the error reason includes incomplete: 2, complete: 3, total: 5"]
     },
     {
+      "requirement": "Step availability evaluation",
+      "name": "Availability reads persisted artifact state",
+      "given": [
+        "a workflow step with requires: [specs]",
+        "AND the specs artifact has persisted state: 'complete'"
+      ],
+      "when": ["step availability is evaluated"],
+      "then": ["the step is available"]
+    },
+    {
+      "requirement": "Step availability evaluation",
+      "name": "Availability is recomputed on each invocation",
+      "given": [
+        "a workflow step with requires: [specs]",
+        "AND specs changes from complete to pending-review"
+      ],
+      "when": ["step availability is evaluated again"],
+      "then": ["the step is no longer available"]
+    },
+    {
       "requirement": "Workflow array order is display order",
       "name": "Later step available before earlier step",
       "given": [
@@ -230,8 +275,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:0623884d8e4f83f2387e08bde8d347e1e04d0696fc80374b45039182d6e4e6d9",
-    "verify.md": "sha256:d0fe615d69d902a15b68e0094981267da86ffd8cd1369c495d15581df3f19d2e"
+    "spec.md": "sha256:a57d29d0ec5a85711e1842d3094ecdb12a136b0e86221005e0935cb44a38e4fc",
+    "verify.md": "sha256:0e3ee73db1e729b84cbc96731e49114422016519d41b39fbf679d5c2f7f39f2f"
   },
   "generatedBy": "core"
 }

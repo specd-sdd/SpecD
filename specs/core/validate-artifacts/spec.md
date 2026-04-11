@@ -51,13 +51,20 @@ Before validating an artifact, `ValidateArtifacts` must check that all artifact 
 
 ### Requirement: Approval invalidation on content change
 
-If the change has an active spec approval (`change.activeSpecApproval` is defined) and any artifact file's current content hash (after `preHashCleanup`) differs from the hash recorded in that approval's `artifactHashes`, `ValidateArtifacts` must collect the artifact type IDs of all drifted artifacts and call `change.invalidate('artifact-change', actor, driftedArtifactIds)` before proceeding with validation. This rolls the change back to `designing`, records the invalidation in history, and selectively resets only the drifted artifacts and their downstream dependents — upstream artifacts remain validated.
+If the change has an active spec approval (`change.activeSpecApproval` is defined) and any artifact file's current content hash (after `preHashCleanup`) differs from the hash recorded in that approval's `artifactHashes`, `ValidateArtifacts` must collect the full set of drifted files before proceeding.
 
 Approval hash keys use the `type:key` format (e.g. `"proposal:proposal"`, `"specs:default:auth/login"`), where `type` is the artifact type ID and `key` is the file key within that artifact.
 
-The same check applies to active signoff (`change.activeSignoff`): if any artifact's current hash differs from what was recorded in `activeSignoff.artifactHashes`, `change.invalidate('artifact-change', actor, driftedArtifactIds)` must be called.
+The same check applies to active signoff (`change.activeSignoff`): if any artifact file's current hash differs from what was recorded in `activeSignoff.artifactHashes`, the validation pass identifies that file as drifted.
 
-A single invalidation call is made per `execute` invocation even if multiple artifacts have changed — all drifted artifact IDs are collected first, then a single `invalidate()` call is made with the full set of drifted IDs.
+A single invalidation call is made per `execute` invocation even if multiple files drift. Before that call, `ValidateArtifacts` MUST:
+
+1. Scan every candidate file and collect all drifted file keys grouped by artifact type.
+2. Mark each drifted file as `drifted-pending-review`.
+3. Recompute the affected parent artifact states.
+4. Invalidate the change with a single structured invalidation covering the full grouped set.
+
+That invalidation rolls the change back to `designing`, preserves `drifted-pending-review` on the drifted files, and downgrades the remaining files to `pending-review` as part of the redesign pass.
 
 ### Requirement: Per-file validation
 
@@ -131,7 +138,9 @@ If all delta validations, conflict detection, and structural validations pass fo
 1. Compute the cleaned hash: apply each `preHashCleanup` substitution in declaration order to the raw file content (not the merged content), then compute SHA-256 of the result.
 2. Call `change.getArtifact(type).markComplete(key, cleanedHash)` on the corresponding `ChangeArtifact`, where `key` is the file key (artifact type id for `scope: change`, spec ID for `scope: spec`).
 
-If any validation step fails, `markComplete` must not be called for that file.
+A successful completion sets the file state to `complete`, updates `validatedHash`, and recomputes the persisted aggregate artifact state.
+
+If any validation step fails, `markComplete` must not be called for that file, and the file keeps its current non-complete state.
 
 ### Requirement: Result shape
 
@@ -181,10 +190,10 @@ This removes the need for agents or users to manually call `change deps --add` a
 
 ## Spec Dependencies
 
-- [`core:core/change`](../change/spec.md) — Change entity, artifact model, approval invalidation, `effectiveStatus`
-- [`core:core/schema-format`](../schema-format/spec.md) — artifact definition, `validations[]`, `deltaValidations[]`, `delta`, `format`, `preHashCleanup`
-- [`core:core/delta-format`](../delta-format/spec.md) — `ArtifactParser` port, `apply()`, `DeltaApplicationError`, delta file location
-- [`core:core/selector-model`](../selector-model/spec.md) — selector fields used in `validations[]` and `deltaValidations[]`
-- [`core:core/storage`](../storage/spec.md) — `ValidateArtifacts` is the sole path to `complete`; artifact status derivation
-- `default:_global/architecture` — port-per-workspace pattern; manual DI at entry points
-- [`core:core/spec-id-format`](../spec-id-format/spec.md) — canonical `workspace:capabilityPath` format for spec IDs
+- [`core:core/change`](../change/spec.md) — change entity, approval invalidation, and artifact state
+- [`core:core/schema-format`](../schema-format/spec.md) — artifact definition, validations, delta behavior, and pre-hash cleanup
+- [`core:core/delta-format`](../delta-format/spec.md) — parser contract and delta application errors
+- [`core:core/selector-model`](../selector-model/spec.md) — selector rules for validations and delta validations
+- [`core:core/storage`](../storage/spec.md) — validation as the only path to `complete`
+- [`default:_global/architecture`](../../_global/architecture/spec.md) — port-per-workspace and manual DI constraints
+- [`core:core/spec-id-format`](../spec-id-format/spec.md) — canonical spec ID format for spec-scoped artifacts

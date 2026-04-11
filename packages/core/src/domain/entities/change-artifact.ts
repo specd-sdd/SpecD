@@ -14,6 +14,8 @@ export interface ChangeArtifactProps {
   readonly optional?: boolean
   /** Artifact type IDs that must be `complete` before this one can be validated. */
   readonly requires?: readonly string[]
+  /** Persisted aggregate state. Recomputed from `files` on construction. */
+  readonly status?: ArtifactStatus
   /** Pre-populated files map. */
   readonly files?: ReadonlyMap<string, ArtifactFile>
 }
@@ -35,6 +37,7 @@ export class ChangeArtifact {
   private readonly _type: string
   private readonly _optional: boolean
   private readonly _requires: readonly string[]
+  private _status: ArtifactStatus
   private _files: Map<string, ArtifactFile>
 
   /**
@@ -46,10 +49,12 @@ export class ChangeArtifact {
     this._type = props.type
     this._optional = props.optional ?? false
     this._requires = [...(props.requires ?? [])]
+    this._status = props.status ?? 'missing'
     this._files =
       props.files !== undefined
         ? new Map<string, ArtifactFile>(props.files)
         : new Map<string, ArtifactFile>()
+    this._recomputeStatus()
   }
 
   /** The artifact type identifier (matches the schema's `artifacts[].id`). */
@@ -83,22 +88,7 @@ export class ChangeArtifact {
    * @returns The aggregated artifact status
    */
   get status(): ArtifactStatus {
-    if (this._files.size === 0) return 'missing'
-
-    let allComplete = true
-    let allMissing = true
-    let allSkipped = true
-
-    for (const file of this._files.values()) {
-      if (file.status !== 'complete' && file.status !== 'skipped') allComplete = false
-      if (file.status !== 'skipped') allSkipped = false
-      if (file.status !== 'missing') allMissing = false
-    }
-
-    if (allSkipped) return 'skipped'
-    if (allComplete) return 'complete'
-    if (allMissing) return 'missing'
-    return 'in-progress'
+    return this._status
   }
 
   /** Whether all files in this artifact have been validated or skipped. */
@@ -124,6 +114,7 @@ export class ChangeArtifact {
    */
   setFile(file: ArtifactFile): void {
     this._files.set(file.key, file)
+    this._recomputeStatus()
   }
 
   /**
@@ -133,6 +124,7 @@ export class ChangeArtifact {
    */
   removeFile(key: string): void {
     this._files.delete(key)
+    this._recomputeStatus()
   }
 
   /**
@@ -146,6 +138,7 @@ export class ChangeArtifact {
     const file = this._files.get(key)
     if (file !== undefined) {
       file.markComplete(hash)
+      this._recomputeStatus()
     }
   }
 
@@ -164,18 +157,86 @@ export class ChangeArtifact {
     for (const file of this._files.values()) {
       file.markSkipped()
     }
+    this._recomputeStatus()
   }
 
   /**
-   * Resets the validation state for all files.
-   *
-   * - `complete` -> `in-progress`
-   * - `skipped` -> `missing`
-   * - `in-progress` / `missing` -- no status change
+   * Marks all files in this artifact as pending review, preserving any more
+   * specific `drifted-pending-review` file states.
    */
-  resetValidation(): void {
+  markPendingReview(): void {
     for (const file of this._files.values()) {
-      file.resetValidation()
+      file.markPendingReview()
     }
+    this._recomputeStatus()
+  }
+
+  /**
+   * Marks only the selected files as drifted pending review.
+   *
+   * @param keys - File keys to downgrade
+   */
+  markDriftedPendingReview(keys: readonly string[]): void {
+    for (const key of keys) {
+      this._files.get(key)?.markDriftedPendingReview()
+    }
+    this._recomputeStatus()
+  }
+
+  /**
+   * Materializes an unvalidated file state discovered from the filesystem.
+   *
+   * Intended for repository hydration of `missing` / `in-progress` entries whose
+   * file presence changed outside explicit validation flows.
+   *
+   * @param key - File key to update
+   * @param status - Newly observed state
+   */
+  setFileStatus(key: string, status: Extract<ArtifactStatus, 'missing' | 'in-progress'>): void {
+    const file = this._files.get(key)
+    if (file === undefined) return
+    if (status === 'in-progress') {
+      file.markInProgress()
+    } else {
+      file.markMissing()
+    }
+    this._recomputeStatus()
+  }
+
+  /**
+   * Recomputes the aggregate artifact status from the tracked file states.
+   *
+   * `drifted-pending-review` takes precedence over `pending-review`, followed
+   * by the steady-state aggregation for skipped, complete, missing, and
+   * in-progress files.
+   */
+  private _recomputeStatus(): void {
+    if (this._files.size === 0) {
+      this._status = 'missing'
+      return
+    }
+
+    const states = [...this._files.values()].map((file) => file.status)
+    if (states.some((state) => state === 'drifted-pending-review')) {
+      this._status = 'drifted-pending-review'
+      return
+    }
+    if (states.some((state) => state === 'pending-review')) {
+      this._status = 'pending-review'
+      return
+    }
+    if (states.every((state) => state === 'skipped')) {
+      this._status = 'skipped'
+      return
+    }
+    if (states.every((state) => state === 'complete' || state === 'skipped')) {
+      this._status = 'complete'
+      return
+    }
+    if (states.every((state) => state === 'missing')) {
+      this._status = 'missing'
+      return
+    }
+    this._status = 'in-progress'
   }
 }

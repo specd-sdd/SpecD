@@ -54,12 +54,14 @@ This ensures specd works correctly in git, Mercurial, Subversion, and non-VCS en
 
 ### Requirement: Auto-invalidation on get when artifact files drift
 
-When `ChangeRepository.get()` loads a change, the `FsChangeRepository` implementation must check whether any previously-validated artifact file has drifted — i.e. the file had a `validatedHash` set but now has a derived status of `missing` or `in-progress`. If drift is detected AND either of the following conditions holds, the repository must call `change.invalidate('artifact-change', SYSTEM_ACTOR)` to roll the change back to `designing` and persist the updated state:
+When `ChangeRepository.get()` loads a change, the `FsChangeRepository` implementation must check whether any previously-validated artifact file has drifted — i.e. the file had a `validatedHash` set but now has a persisted or derived non-complete state caused by content drift. If drift is detected AND either of the following conditions holds, the repository must collect the full set of affected files per artifact, call `change.invalidate('artifact-drift', SYSTEM_ACTOR, ...)`, and persist the updated state before returning:
 
 1. The change is beyond `designing` state (has progressed past the initial design phase), OR
 2. The change has an active approval (spec approval or signoff) not superseded by a subsequent `invalidated` event.
 
-This ensures that both state-inconsistent artifact changes and approval drift are detected eagerly on any change load, not only during explicit validation. See [`specs/core/change-repository-port/spec.md`](../change-repository-port/spec.md) for the full port-level contract.
+The invalidation payload must preserve every drifted file key for every affected artifact before the rollback is recorded. This ensures that both state-inconsistent artifact changes and approval drift are detected eagerly on any change load, not only during explicit validation. See [`specs/core/change-repository-port/spec.md`](../change-repository-port/spec.md) for the full port-level contract.
+
+Historical manifests may still contain `invalidated` events whose persisted cause is `"artifact-change"`. The fs read path must accept that legacy value as backward-compatible history and normalize it to the current artifact-drift semantics when the raw manifest is deserialized.
 
 ### Requirement: Kernel exposes repository instances for adapter access
 

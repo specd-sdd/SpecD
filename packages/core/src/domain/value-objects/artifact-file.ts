@@ -25,8 +25,8 @@ export const SKIPPED_SENTINEL = '__skipped__'
  *
  * Status is maintained in a mutable `_status` field, initialised from
  * {@link ArtifactFileProps.status} (defaulting to `"missing"`). Use
- * {@link markComplete}, {@link markSkipped}, and {@link resetValidation} to
- * transition state, or read {@link status} to observe the current value.
+ * the explicit transition methods to mutate it, or read {@link status} to
+ * observe the current value.
  *
  * @see ChangeArtifact
  */
@@ -94,16 +94,39 @@ export class ArtifactFile {
   }
 
   /**
-   * Resets the validation state by clearing `validatedHash` and rolling the
-   * status back to its unvalidated equivalent.
+   * Marks this file as requiring review while preserving the last validated hash.
    *
-   * - `complete` -> `in-progress` (file still present, hash no longer valid)
-   * - `skipped` -> `missing` (sentinel cleared, file treated as absent)
-   * - `in-progress` / `missing` -- no status change, hash already unset
+   * Drift is sticky: once a file is `drifted-pending-review`, downgrading it to
+   * the broader review state is ignored until it is revalidated.
    */
-  resetValidation(): void {
-    if (this._status === 'complete') this._status = 'in-progress'
-    else if (this._status === 'skipped') this._status = 'missing'
-    this._validatedHash = undefined
+  markPendingReview(): void {
+    if (this._status === 'drifted-pending-review') return
+    if (this._status === 'missing') return
+    this._status = 'pending-review'
+  }
+
+  /**
+   * Marks this file as drifted from its validated content while preserving the
+   * last validated hash for diagnostics and future revalidation.
+   */
+  markDriftedPendingReview(): void {
+    if (this._status === 'missing') return
+    this._status = 'drifted-pending-review'
+  }
+
+  /**
+   * Marks this file as present but not yet validated.
+   */
+  markInProgress(): void {
+    if (this._status === 'drifted-pending-review') return
+    this._status = 'in-progress'
+  }
+
+  /**
+   * Marks this file as absent and not yet validated.
+   */
+  markMissing(): void {
+    if (this._status === 'drifted-pending-review') return
+    this._status = 'missing'
   }
 }

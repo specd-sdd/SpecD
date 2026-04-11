@@ -49,15 +49,18 @@ describe('change artifacts', () => {
       artifactStatuses: [
         {
           type: 'proposal',
+          state: 'complete',
           effectiveStatus: 'complete',
-          files: [{ key: 'proposal', filename: 'proposal.md', status: 'complete' }],
+          files: [{ key: 'proposal', filename: 'proposal.md', state: 'complete' }],
         },
         {
           type: 'spec',
+          state: 'missing',
           effectiveStatus: 'missing',
-          files: [{ key: 'spec', filename: 'spec.md', status: 'missing' }],
+          files: [{ key: 'spec', filename: 'spec.md', state: 'missing' }],
         },
       ],
+      lifecycle: { changePath: '/project/.specd/changes/my-change' },
     })
     vi.mocked(kernel.changes.repo.artifactExists)
       .mockResolvedValueOnce(true)
@@ -83,20 +86,24 @@ describe('change artifacts', () => {
       artifactStatuses: [
         {
           type: 'proposal',
+          state: 'missing',
           effectiveStatus: 'missing',
-          files: [{ key: 'proposal', filename: 'proposal.md', status: 'missing' }],
+          files: [{ key: 'proposal', filename: 'proposal.md', state: 'missing' }],
         },
         {
           type: 'spec',
+          state: 'missing',
           effectiveStatus: 'missing',
-          files: [{ key: 'spec', filename: 'spec.md', status: 'missing' }],
+          files: [{ key: 'spec', filename: 'spec.md', state: 'missing' }],
         },
         {
           type: 'tasks',
+          state: 'missing',
           effectiveStatus: 'missing',
-          files: [{ key: 'tasks', filename: 'tasks.md', status: 'missing' }],
+          files: [{ key: 'tasks', filename: 'tasks.md', state: 'missing' }],
         },
       ],
+      lifecycle: { changePath: '/project/.specd/changes/my-change' },
     })
     vi.mocked(kernel.changes.repo.artifactExists).mockResolvedValue(false)
 
@@ -117,10 +124,12 @@ describe('change artifacts', () => {
       artifactStatuses: [
         {
           type: 'proposal',
+          state: 'complete',
           effectiveStatus: 'complete',
-          files: [{ key: 'proposal', filename: 'proposal.md', status: 'complete' }],
+          files: [{ key: 'proposal', filename: 'proposal.md', state: 'complete' }],
         },
       ],
+      lifecycle: { changePath: '/project/.specd/changes/my-change' },
     })
     vi.mocked(kernel.changes.repo.artifactExists).mockResolvedValue(true)
 
@@ -140,7 +149,8 @@ describe('change artifacts', () => {
     expect(parsed.name).toBe('my-change')
     expect(Array.isArray(parsed.artifacts)).toBe(true)
     expect(parsed.artifacts[0].id).toBe('proposal')
-    expect(parsed.artifacts[0].effectiveStatus).toBe('complete')
+    expect(parsed.artifacts[0].artifactState).toBe('complete')
+    expect(parsed.artifacts[0].fileState).toBe('complete')
     expect(parsed.artifacts[0].exists).toBe(true)
   })
 
@@ -159,10 +169,12 @@ describe('change artifacts', () => {
       artifactStatuses: [
         {
           type: 'proposal',
+          state: 'complete',
           effectiveStatus: 'complete',
-          files: [{ key: 'proposal', filename: 'proposal.md', status: 'complete' }],
+          files: [{ key: 'proposal', filename: 'proposal.md', state: 'complete' }],
         },
       ],
+      lifecycle: { changePath: '/project/.specd/changes/my-change' },
     })
     vi.mocked(kernel.changes.repo.artifactExists).mockResolvedValue(true)
 

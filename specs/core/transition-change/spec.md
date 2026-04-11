@@ -68,9 +68,15 @@ Only artifacts listed in `requiresTaskCompletion` are content-checked. Other art
 
 ### Requirement: Artifact validation clearing on verifying to implementing
 
-When the current state is `verifying` and the effective target is `implementing`, the use case MUST look up the `implementing` workflow step from the schema and call `change.clearArtifactValidations` with its `requires` list before performing the transition. This resets validation state for the specified artifacts.
+When the current state is `verifying` and the effective target is `implementing`, the use case MUST treat that path as an implementation-only retry.
 
-If no `implementing` workflow step exists in the schema, the clearing is skipped.
+The transition is valid only when the current artifacts still correctly describe the intended behavior and the required fix fits within the already-defined tasks. In that case:
+
+- the use case transitions back to `implementing`
+- it MUST NOT clear unchanged validated artifacts
+- it MUST NOT downgrade artifact or file states merely because verification failed
+
+If verification concludes that the artifacts must change, or that new tasks are required before implementation can resume, callers must route to `designing` instead of `implementing`.
 
 ### Requirement: Transition to designing from any state
 
@@ -78,13 +84,13 @@ Every state except `drafting` SHALL include `designing` as a valid transition ta
 
 When the effective target is `designing`, the use case MUST:
 
-1. Invalidate the active spec approval if one exists — call `change.invalidate('redesign', actor)`.
-2. Invalidate the active signoff if one exists — the invalidation in step 1 already clears both.
-3. Proceed with the transition via `change.transition('designing', actor)`.
+1. Invalidate the active spec approval if one exists.
+2. Invalidate the active signoff if one exists — the first invalidation already clears both.
+3. Downgrade every artifact file to `pending-review`, except files already marked `drifted-pending-review`, which keep that more specific state.
+4. Recompute every artifact's aggregate persisted `state`.
+5. Proceed with the transition via `change.transition('designing', actor)`.
 
-If no active approvals exist, the transition proceeds directly without invalidation.
-
-The `archivable` state is no longer terminal — it can transition to `designing` like any other state.
+This downgrade applies both to explicit redesign transitions and to scope changes that keep the lifecycle in `designing` while invalidating previously validated work.
 
 ### Requirement: Pre-hook execution
 
@@ -159,8 +165,8 @@ The previous `postHookFailures` field is removed because both hook phases are no
 
 ## Spec Dependencies
 
-- [`core:core/change`](../change/spec.md)
-- [`core:core/run-step-hooks`](../run-step-hooks/spec.md)
-- [`core:core/hook-execution-model`](../hook-execution-model/spec.md)
-- [`core:core/workflow-model`](../workflow-model/spec.md)
-- [`default:_global/architecture`](../../_global/architecture/spec.md)
+- [`core:core/change`](../change/spec.md) — lifecycle state machine and artifact review downgrade semantics
+- [`core:core/run-step-hooks`](../run-step-hooks/spec.md) — hook execution entry point
+- [`core:core/hook-execution-model`](../hook-execution-model/spec.md) — hook ordering and failure semantics
+- [`core:core/workflow-model`](../workflow-model/spec.md) — workflow `requires` and verification routing
+- [`default:_global/architecture`](../../_global/architecture/spec.md) — application ownership and port boundaries

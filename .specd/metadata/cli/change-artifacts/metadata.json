@@ -15,7 +15,7 @@
     {
       "requirement": "Output format",
       "rules": [
-        "Artifacts are listed per-file. Multi-file artifacts (e.g. `scope: spec` with multiple\nspecIds) produce one row per file. Single-file artifacts produce one row.\n\nIn `text` mode (default), each file is listed on one line:\n\n```\n<id>  <effectiveStatus>  <exists>\n```\n\nFor multi-file artifacts, `<id>` includes the file key: `<artifact-id> [<file-key>]`.\nFor single-file artifacts, `<id>` is just the artifact type id.\n\nWhen an artifact has no files yet (not synced), a summary row is shown with the\nartifact-level `effectiveStatus`.\n\nIn `json` or `toon` mode, the output is (encoded in the respective format):\n\n```json\n{\n  \"name\": \"<change-name>\",\n  \"artifacts\": [\n    {\n      \"id\": \"proposal\",\n      \"filename\": \"proposal.md\",\n      \"effectiveStatus\": \"complete\",\n      \"exists\": true\n    },\n    {\n      \"id\": \"specs [default:auth/login]\",\n      \"filename\": \"specs/default/auth/login/spec.md\",\n      \"effectiveStatus\": \"in-progress\",\n      \"exists\": true\n    }\n  ]\n}\n```\n\nArtifacts are listed in schema-declared order, with per-file entries within each\nartifact."
+        "Artifacts are listed per-file. Multi-file artifacts (e.g. `scope: spec` with multiple\nspecIds) produce one row per file. Single-file artifacts produce one row.\n\nIn `text` mode (default), each file is listed on one line:\n\n```\n<id>  <artifact-state>  <file-state>  <exists>  <absolute-path>\n```\n\nFor multi-file artifacts, `<id>` includes the file key: `<artifact-id> [<file-key>]`.\nFor single-file artifacts, `<id>` is just the artifact type id.\n\nWhen an artifact has no files yet (not synced), a summary row is shown with the\nartifact-level `state`.\n\nIn `json` or `toon` mode, the output is (encoded in the respective format):\n\n```json\n{\n  \"name\": \"<change-name>\",\n  \"changeDir\": \"<absolute-change-dir>\",\n  \"artifacts\": [\n    {\n      \"artifactType\": \"proposal\",\n      \"artifactState\": \"complete\",\n      \"fileKey\": \"proposal\",\n      \"filename\": \"proposal.md\",\n      \"path\": \"/abs/path/proposal.md\",\n      \"fileState\": \"complete\",\n      \"exists\": true\n    },\n    {\n      \"artifactType\": \"specs\",\n      \"artifactState\": \"drifted-pending-review\",\n      \"fileKey\": \"default:auth/login\",\n      \"filename\": \"specs/default/auth/login/spec.md\",\n      \"path\": \"/abs/path/specs/default/auth/login/spec.md\",\n      \"fileState\": \"drifted-pending-review\",\n      \"exists\": true\n    }\n  ]\n}\n```\n\nArtifacts are listed in schema-declared order, with per-file entries within each\nartifact."
       ]
     },
     {
@@ -37,48 +37,34 @@
     },
     {
       "requirement": "Output format",
-      "name": "Text output includes all fields",
+      "name": "Text output includes artifact state and file state",
       "given": [
-        "a change my-change with artifact proposal (complete, file exists) and tasks (missing, file absent)"
+        "a change with specs in drifted-pending-review",
+        "AND one tracked file is drifted-pending-review"
       ],
-      "when": ["specd change artifacts my-change is run"],
+      "when": ["specd change artifacts <name> is run"],
       "then": [
-        "the proposal line shows complete, yes, and an absolute path",
-        "AND the tasks line shows missing, no, and an absolute path",
-        "AND the process exits with code 0"
+        "the line includes both the artifact state and the file state",
+        "AND it includes the absolute path"
       ]
     },
     {
       "requirement": "Output format",
-      "name": "All schema artifacts listed regardless of existence",
-      "given": ["the schema declares three artifacts and none of the files exist on disk"],
-      "when": ["specd change artifacts my-change is run"],
-      "then": ["three lines are printed, all showing missing and no"]
-    },
-    {
-      "requirement": "Output format",
-      "name": "Artifacts in schema-declared order",
-      "given": ["the schema declares artifacts in order: proposal, spec, tasks"],
-      "when": ["specd change artifacts my-change is run"],
-      "then": ["the lines appear in that order"]
-    },
-    {
-      "requirement": "Output format",
-      "name": "JSON output structure",
-      "given": ["a change my-change with one artifact proposal that exists on disk"],
-      "when": ["specd change artifacts my-change --format json is run"],
+      "name": "JSON output exposes both state levels",
+      "given": ["a change with one tracked artifact file"],
+      "when": ["specd change artifacts <name> --format json is run"],
       "then": [
-        "stdout is valid JSON with name, changeDir, and artifacts",
-        "AND artifacts[0] has id, filename, path, effectiveStatus, and exists",
-        "AND path is an absolute filesystem path",
-        "AND changeDir is the absolute path to the change directory"
+        "each JSON row includes artifactState",
+        "AND it includes fileState",
+        "AND it includes the absolute path"
       ]
     },
     {
       "requirement": "Output format",
-      "name": "Paths are absolute",
-      "when": ["specd change artifacts my-change is run from any working directory"],
-      "then": ["all paths in the output are absolute and do not depend on CWD"]
+      "name": "Artifacts still listed in schema-declared order",
+      "given": ["the schema declares three artifacts"],
+      "when": ["specd change artifacts <name> is run"],
+      "then": ["rows are grouped and emitted in schema-declared order"]
     },
     {
       "requirement": "Error cases",
@@ -88,8 +74,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:6a2390fae770db3dba7dc98b8849c1427f441ed76eacfb9b649c159e38492f5d",
-    "verify.md": "sha256:e9a857428358ecc5fbf562cca125fb94077c481f69ca312e84cfd3abb7fcac03"
+    "spec.md": "sha256:096073036ee8364f24e86cfd38ca7da1779e11b9be4ea7dfbf9edef0b7d28b7f",
+    "verify.md": "sha256:daf454ae8c7d681d876adf9e2ee4028fd04f362da5c89af0b52a084b96414dd8"
   },
   "generatedBy": "core"
 }

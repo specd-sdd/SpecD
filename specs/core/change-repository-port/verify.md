@@ -7,18 +7,13 @@
 #### Scenario: Change exists
 
 - **WHEN** `get("add-oauth-login")` is called and a change with that name exists
-- **THEN** a `Change` is returned with artifact statuses derived from current file hashes vs stored `validatedHash`
+- **THEN** a `Change` is returned with persisted artifact and file state loaded from the manifest
 
-#### Scenario: Change does not exist
+#### Scenario: Missing state defaults to missing on load
 
-- **WHEN** `get("nonexistent-change")` is called and no change with that name exists
-- **THEN** `null` is returned
-
-#### Scenario: Hash mismatch resets artifact status
-
-- **GIVEN** a change whose artifact file has been modified since the last validation
+- **GIVEN** a manifest entry without a `state` field
 - **WHEN** `get()` loads that change
-- **THEN** the artifact whose hash differs from `validatedHash` has status `in-progress`
+- **THEN** the missing artifact or file state defaults to `missing`
 
 #### Scenario: get returns a snapshot, not a serialized mutation context
 
@@ -56,33 +51,34 @@
 
 ### Requirement: Auto-invalidation on get when artifact files drift
 
-#### Scenario: Single artifact drifts — only it and downstream are reset
+#### Scenario: Repository collects all drifted files before invalidating
 
-- **GIVEN** a change in `implementing` state with all artifacts `complete`
-- **AND** the DAG is: proposal → specs → verify, proposal → design, specs + design → tasks
-- **WHEN** `tasks.md` is modified on disk (hash changes)
-- **AND** `FsChangeRepository.get()` is called
-- **THEN** `change.invalidate('artifact-change', SYSTEM_ACTOR, ['tasks'])` is called
-- **AND** only `tasks` has its `validatedHash` cleared
-- **AND** `proposal`, `specs`, `verify`, and `design` remain `complete`
-- **AND** the change transitions to `designing`
+- **GIVEN** a change with two validated spec files under the same artifact
+- **AND** both files have changed on disk
+- **WHEN** `FsChangeRepository.get()` is called
+- **THEN** the invalidation captures both file keys in a single grouped invalidation
 
-#### Scenario: Upstream artifact drifts — it and all downstream are reset
+#### Scenario: Drift invalidates even while already designing
 
-- **GIVEN** a change in `implementing` state with all artifacts `complete`
-- **AND** the DAG is: proposal → specs → verify, proposal → design, specs + design → tasks
-- **WHEN** `spec.md` is modified on disk (specs artifact drifts)
-- **AND** `FsChangeRepository.get()` is called
-- **THEN** `change.invalidate('artifact-change', SYSTEM_ACTOR, ['specs'])` is called
-- **AND** `specs`, `verify`, and `tasks` are cleared
-- **AND** `proposal` and `design` remain `complete`
+- **GIVEN** a change already in `designing`
+- **AND** a previously validated artifact file drifts on disk
+- **WHEN** `FsChangeRepository.get()` is called
+- **THEN** the change remains in `designing`
+- **AND** the drifted file becomes `drifted-pending-review`
+
+#### Scenario: Drift preserves drifted files and downgrades others to pending review
+
+- **GIVEN** a change with validated artifacts
+- **AND** one file drifts on disk
+- **WHEN** `FsChangeRepository.get()` auto-invalidates the change
+- **THEN** the drifted file is `drifted-pending-review`
+- **AND** other previously validated files become `pending-review`
 
 #### Scenario: No drift — no invalidation
 
-- **GIVEN** a change in `implementing` state with all artifacts `complete`
-- **WHEN** no file has changed on disk
-- **AND** `FsChangeRepository.get()` is called
-- **THEN** no invalidation occurs and all artifacts remain `complete`
+- **GIVEN** a change whose validated files still match their stored hashes
+- **WHEN** `FsChangeRepository.get()` is called
+- **THEN** no invalidation occurs
 
 ### Requirement: list returns active changes in creation order
 

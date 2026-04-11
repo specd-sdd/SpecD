@@ -47,7 +47,7 @@
     {
       "requirement": "Approval invalidation on content change",
       "rules": [
-        "If the change has an active spec approval (`change.activeSpecApproval` is defined) and any artifact file's current content hash (after `preHashCleanup`) differs from the hash recorded in that approval's `artifactHashes`, `ValidateArtifacts` must collect the artifact type IDs of all drifted artifacts and call `change.invalidate('artifact-change', actor, driftedArtifactIds)` before proceeding with validation. This rolls the change back to `designing`, records the invalidation in history, and selectively resets only the drifted artifacts and their downstream dependents — upstream artifacts remain validated.\n\nApproval hash keys use the `type:key` format (e.g. `\"proposal:proposal\"`, `\"specs:default:auth/login\"`), where `type` is the artifact type ID and `key` is the file key within that artifact.\n\nThe same check applies to active signoff (`change.activeSignoff`): if any artifact's current hash differs from what was recorded in `activeSignoff.artifactHashes`, `change.invalidate('artifact-change', actor, driftedArtifactIds)` must be called.\n\nA single invalidation call is made per `execute` invocation even if multiple artifacts have changed — all drifted artifact IDs are collected first, then a single `invalidate()` call is made with the full set of drifted IDs."
+        "If the change has an active spec approval (`change.activeSpecApproval` is defined) and any artifact file's current content hash (after `preHashCleanup`) differs from the hash recorded in that approval's `artifactHashes`, `ValidateArtifacts` must collect the full set of drifted files before proceeding.\n\nApproval hash keys use the `type:key` format (e.g. `\"proposal:proposal\"`, `\"specs:default:auth/login\"`), where `type` is the artifact type ID and `key` is the file key within that artifact.\n\nThe same check applies to active signoff (`change.activeSignoff`): if any artifact file's current hash differs from what was recorded in `activeSignoff.artifactHashes`, the validation pass identifies that file as drifted.\n\nA single invalidation call is made per `execute` invocation even if multiple files drift. Before that call, `ValidateArtifacts` MUST:\n\n1. Scan every candidate file and collect all drifted file keys grouped by artifact type.\n2. Mark each drifted file as `drifted-pending-review`.\n3. Recompute the affected parent artifact states.\n4. Invalidate the change with a single structured invalidation covering the full grouped set.\n\nThat invalidation rolls the change back to `designing`, preserves `drifted-pending-review` on the drifted files, and downgrades the remaining files to `pending-review` as part of the redesign pass."
       ]
     },
     {
@@ -83,7 +83,7 @@
     {
       "requirement": "Hash computation and markComplete",
       "rules": [
-        "If all delta validations, conflict detection, and structural validations pass for a file within an artifact, `ValidateArtifacts` must:\n\n1. Compute the cleaned hash: apply each `preHashCleanup` substitution in declaration order to the raw file content (not the merged content), then compute SHA-256 of the result.\n2. Call `change.getArtifact(type).markComplete(key, cleanedHash)` on the corresponding `ChangeArtifact`, where `key` is the file key (artifact type id for `scope: change`, spec ID for `scope: spec`).\n\nIf any validation step fails, `markComplete` must not be called for that file."
+        "If all delta validations, conflict detection, and structural validations pass for a file within an artifact, `ValidateArtifacts` must:\n\n1. Compute the cleaned hash: apply each `preHashCleanup` substitution in declaration order to the raw file content (not the merged content), then compute SHA-256 of the result.\n2. Call `change.getArtifact(type).markComplete(key, cleanedHash)` on the corresponding `ChangeArtifact`, where `key` is the file key (artifact type id for `scope: change`, spec ID for `scope: spec`).\n\nA successful completion sets the file state to `complete`, updates `validatedHash`, and recomputes the persisted aggregate artifact state.\n\nIf any validation step fails, `markComplete` must not be called for that file, and the file keeps its current non-complete state."
       ]
     },
     {
@@ -242,32 +242,36 @@
     },
     {
       "requirement": "Approval invalidation on content change",
-      "name": "Approval invalidation resets only drifted artifacts and downstream",
+      "name": "Drift collection records all file keys in one invalidation",
       "given": [
         "a change with an active spec approval",
-        "AND the DAG is: proposal → specs → verify, proposal → design, specs + design → tasks",
-        "AND only design.md has changed since approval (hash mismatch)"
+        "AND two validated files under specs have changed since approval"
       ],
-      "when": ["ValidateArtifacts.execute detects the hash mismatch"],
+      "when": ["ValidateArtifacts.execute detects the mismatches"],
       "then": [
-        "change.invalidate('artifact-change', actor, ['design']) is called",
-        "AND design and tasks are reset (design + its downstream)",
-        "AND proposal, specs, and verify remain complete"
+        "a single invalidation is performed",
+        "AND both file keys are included in the grouped affected artifact detail"
       ]
     },
     {
       "requirement": "Approval invalidation on content change",
-      "name": "Multiple artifacts drift — all drifted IDs collected in single call",
+      "name": "Drifted files become drifted-pending-review",
       "given": [
-        "a change with an active spec approval",
-        "AND both specs and design have changed since approval"
+        "a change with an active approval",
+        "AND one validated file has changed since approval"
       ],
-      "when": ["ValidateArtifacts.execute detects the mismatches"],
+      "when": ["ValidateArtifacts.execute invalidates the change"],
       "then": [
-        "a single change.invalidate('artifact-change', actor, ['specs', 'design']) is called",
-        "AND specs, verify, design, and tasks are reset",
-        "AND proposal remains complete"
+        "that file becomes drifted-pending-review",
+        "AND unaffected validated files become pending-review"
       ]
+    },
+    {
+      "requirement": "Approval invalidation on content change",
+      "name": "Drift invalidation is shared across spec approval and signoff",
+      "given": ["a change with an active signoff", "AND a validated artifact file has changed"],
+      "when": ["ValidateArtifacts.execute detects the mismatch"],
+      "then": ["the same grouped invalidation behavior is applied"]
     },
     {
       "requirement": "Delta validation",
@@ -446,20 +450,20 @@
     },
     {
       "requirement": "Hash computation and markComplete",
-      "name": "All validations pass — markComplete called with cleaned hash",
-      "given": [
-        "all validations pass for artifact specs",
-        "AND preHashCleanup normalises checked checkboxes before hashing"
-      ],
-      "when": ["ValidateArtifacts.execute is called"],
-      "then": ["markComplete is called with the SHA-256 of the cleaned content"]
+      "name": "All validations pass — markComplete sets complete state",
+      "given": ["all validations pass for a file within artifact specs"],
+      "when": ["ValidateArtifacts.execute marks that file complete"],
+      "then": ["the file state becomes complete", "AND the parent artifact state is recomputed"]
     },
     {
       "requirement": "Hash computation and markComplete",
-      "name": "Any validation failure — markComplete not called",
-      "given": ["at least one required: true validation rule fails for an artifact"],
-      "when": ["ValidateArtifacts.execute is called"],
-      "then": ["markComplete is not called for that artifact"]
+      "name": "Validation failure preserves non-complete state",
+      "given": [
+        "a file currently in pending-review",
+        "AND at least one required validation rule fails"
+      ],
+      "when": ["ValidateArtifacts.execute runs"],
+      "then": ["markComplete is not called", "AND the file does not become complete"]
     },
     {
       "requirement": "Result shape",
@@ -528,8 +532,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:9127ac8de74259eb7a009b83d3e348205ae5ad8a7123a68c56b915e328c0edf6",
-    "verify.md": "sha256:93f48aa50fda15f8da07d1f0fbd57a03a457c497cb9154e503fcb95b01b99a5b"
+    "spec.md": "sha256:9b44f46e8101dc310e7a188f5cc42206e74dceb516351924a5133ee4a232c0f8",
+    "verify.md": "sha256:08522a1111cdcf5ec48d127b29ec709ee8ff4bc671fbf2c4a30d0bc63ded7223"
   },
   "generatedBy": "core"
 }

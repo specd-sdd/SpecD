@@ -118,6 +118,22 @@
 - **AND** the `actor` field is a `NullActorResolver` (or the detected actor resolver)
 - **AND** no git-specific errors are thrown
 
+### Requirement: Auto-invalidation on get when artifact files drift
+
+#### Scenario: Kernel-triggered load invalidates drift with artifact-drift
+
+- **GIVEN** a persisted change beyond `designing` with a previously validated artifact file that has drifted
+- **WHEN** a kernel use case loads that change through `ChangeRepository.get()`
+- **THEN** the repository records an `invalidated` event using `cause: 'artifact-drift'`
+- **AND** the payload includes the affected artifact and drifted file keys before the change is returned
+
+#### Scenario: Historical artifact-change events remain readable through kernel loads
+
+- **GIVEN** a historical manifest already stored in the repository with an `invalidated` event whose persisted `cause` is `"artifact-change"`
+- **WHEN** a kernel use case loads that change
+- **THEN** loading succeeds without treating the manifest as corrupt
+- **AND** the historical event is interpreted with the current artifact-drift semantics
+
 ### Requirement: Kernel exposes repository instances for adapter access
 
 #### Scenario: ChangeRepository accessible via kernel

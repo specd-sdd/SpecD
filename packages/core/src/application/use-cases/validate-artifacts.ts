@@ -186,7 +186,7 @@ export class ValidateArtifacts {
     // --- Approval invalidation check ---
     const approval: SpecApprovedEvent | undefined = change.activeSpecApproval
     const signoff: SignedOffEvent | undefined = change.activeSignoff
-    const driftedIds = new Set<string>()
+    const driftedFilesByArtifact = new Map<string, Set<string>>()
     if (approval !== undefined || signoff !== undefined) {
       for (const artifactType of schema.artifacts()) {
         const changeArtifact = change.getArtifact(artifactType.id)
@@ -214,8 +214,9 @@ export class ValidateArtifacts {
             (approvalHash !== undefined && approvalHash !== cleanedHash) ||
             (signoffHash !== undefined && signoffHash !== cleanedHash)
           ) {
-            driftedIds.add(artifactType.id)
-            break
+            const keys = driftedFilesByArtifact.get(artifactType.id) ?? new Set<string>()
+            keys.add(fileKey)
+            driftedFilesByArtifact.set(artifactType.id, keys)
           }
         }
       }
@@ -449,10 +450,25 @@ export class ValidateArtifacts {
       }
     }
 
-    if (driftedIds.size > 0 || completedValidations.length > 0 || specDependsOnUpdates.size > 0) {
+    if (
+      driftedFilesByArtifact.size > 0 ||
+      completedValidations.length > 0 ||
+      specDependsOnUpdates.size > 0
+    ) {
       await this._changes.mutate(input.name, (freshChange) => {
-        if (driftedIds.size > 0) {
-          freshChange.invalidate('artifact-change', actor, driftedIds)
+        if (driftedFilesByArtifact.size > 0) {
+          const affectedArtifacts = [...driftedFilesByArtifact.entries()].map(([type, files]) => ({
+            type,
+            files: [...files].sort(),
+          }))
+          freshChange.invalidate(
+            'artifact-drift',
+            actor,
+            `Invalidated because validated artifacts drifted: ${affectedArtifacts
+              .map((artifact) => `${artifact.type} [${artifact.files.join(', ')}]`)
+              .join('; ')}`,
+            affectedArtifacts,
+          )
         }
 
         for (const completed of completedValidations) {

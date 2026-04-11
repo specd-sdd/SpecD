@@ -4,20 +4,36 @@
 
 ### Requirement: Returns the change and its artifact statuses
 
-#### Scenario: Change with multiple artifacts
+#### Scenario: Result includes artifact state, effective status, and file state
 
-- **GIVEN** a change `add-login` exists with artifacts `proposal` (complete) and `spec` (in-progress)
+- **GIVEN** a change with one artifact in `pending-review`
 - **WHEN** `execute({ name: 'add-login' })` is called
-- **THEN** the result contains the `Change` entity for `add-login`
-- **AND** `artifactStatuses` has two entries: one for `proposal` and one for `spec`
-- **AND** each entry's `effectiveStatus` reflects the value returned by `Change.effectiveStatus(type)`
+- **THEN** the artifact entry includes its persisted `state`
+- **AND** it includes `effectiveStatus`
+- **AND** each file entry includes its own persisted `state`
 
-#### Scenario: Change with no artifacts
+#### Scenario: review.required becomes true when any file is pending review
 
-- **GIVEN** a change `empty-change` exists with an empty artifact map
-- **WHEN** `execute({ name: 'empty-change' })` is called
-- **THEN** the result contains the `Change` entity
-- **AND** `artifactStatuses` is an empty array
+- **GIVEN** a change with one file in `pending-review`
+- **WHEN** `execute()` is called
+- **THEN** `review.required` is `true`
+- **AND** `review.route` is `'designing'`
+- **AND** `review.reason` is `'artifact-review-required'`
+
+#### Scenario: review.reason prefers artifact-drift when any file drifted
+
+- **GIVEN** a change with one file in `drifted-pending-review`
+- **WHEN** `execute()` is called
+- **THEN** `review.required` is `true`
+- **AND** `review.reason` is `'artifact-drift'`
+- **AND** `review.affectedArtifacts` includes that artifact with the affected file's `filename` and absolute `path`
+
+#### Scenario: review.required is false when no file needs review
+
+- **GIVEN** a change whose files are all `complete`, `skipped`, `missing`, or `in-progress`
+- **WHEN** `execute()` is called
+- **THEN** `review.required` is `false`
+- **AND** `review.route` is `null`
 
 ### Requirement: Throws ChangeNotFoundError for unknown changes
 
@@ -49,72 +65,24 @@
 
 ### Requirement: Returns lifecycle context
 
-#### Scenario: Valid transitions from designing state
+#### Scenario: Available transitions require persisted complete or skipped state
 
 - **GIVEN** a change in `designing` state
-- **WHEN** `execute()` is called
-- **THEN** `lifecycle.validTransitions` contains exactly the states defined in `VALID_TRANSITIONS['designing']`
-
-#### Scenario: Available transitions when all requires are satisfied
-
-- **GIVEN** a change in `designing` state
-- **AND** all artifacts required by the `ready` workflow step have effective status `complete`
-- **WHEN** `execute()` is called
-- **THEN** `lifecycle.availableTransitions` includes `ready`
-
-#### Scenario: Blocked transition with unsatisfied requires
-
-- **GIVEN** a change in `designing` state
-- **AND** artifact `specs` has effective status `missing`
-- **AND** the `ready` workflow step requires `specs`
+- **AND** an artifact required by `ready` is `pending-review`
 - **WHEN** `execute()` is called
 - **THEN** `lifecycle.availableTransitions` does not include `ready`
-- **AND** `lifecycle.blockers` contains an entry with `transition: 'ready'`, `reason: 'requires'`, and `blocking` including `'specs'`
 
-#### Scenario: Approvals reflect injected config
+#### Scenario: Next artifact resolves from persisted state
 
-- **GIVEN** `GetStatus` was constructed with `approvals: { spec: true, signoff: false }`
+- **GIVEN** a change with `proposal` in `complete`, `specs` in `complete`, and `verify` in `missing`
 - **WHEN** `execute()` is called
-- **THEN** `lifecycle.approvals` is `{ spec: true, signoff: false }`
+- **THEN** `lifecycle.nextArtifact` is `'verify'`
 
-#### Scenario: Next artifact resolves first unsatisfied artifact with met requires
+#### Scenario: Skipped artifacts still satisfy lifecycle gating
 
-- **GIVEN** a change with artifacts `proposal` (complete), `specs` (missing), `verify` (missing)
-- **AND** `specs` requires `proposal`
-- **AND** `verify` requires `specs`
+- **GIVEN** a change whose required optional artifact is `skipped`
 - **WHEN** `execute()` is called
-- **THEN** `lifecycle.nextArtifact` is `'specs'`
-
-#### Scenario: Next artifact is null when all artifacts are complete
-
-- **GIVEN** all artifacts have effective status `complete`
-- **WHEN** `execute()` is called
-- **THEN** `lifecycle.nextArtifact` is `null`
-
-#### Scenario: Next artifact skips artifacts whose requires are not met
-
-- **GIVEN** artifacts `proposal` (missing), `specs` (missing), `design` (missing)
-- **AND** `specs` requires `proposal`, `design` requires `proposal` and `specs`
-- **WHEN** `execute()` is called
-- **THEN** `lifecycle.nextArtifact` is `'proposal'` (the only artifact with all requires satisfied)
-
-#### Scenario: Change path is included
-
-- **WHEN** `execute()` is called for an existing change
-- **THEN** `lifecycle.changePath` equals the value returned by `ChangeRepository.changePath(change)`
-
-#### Scenario: Schema info is included when resolution succeeds
-
-- **GIVEN** schema resolution succeeds with name `schema-std` and version `1`
-- **WHEN** `execute()` is called
-- **THEN** `lifecycle.schemaInfo` is `{ name: 'schema-std', version: 1 }`
-
-#### Scenario: Skipped artifacts count as satisfied requires for available transitions
-
-- **GIVEN** a change in `designing` state
-- **AND** all artifacts required by `ready` have effective status `complete` or `skipped`
-- **WHEN** `execute()` is called
-- **THEN** `lifecycle.availableTransitions` includes `ready`
+- **THEN** that artifact does not block `availableTransitions`
 
 ### Requirement: Graceful degradation when schema resolution fails
 

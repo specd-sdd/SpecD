@@ -359,7 +359,9 @@ describe('change status', () => {
     const { kernel, stdout } = setup()
     kernel.changes.status.execute.mockResolvedValue({
       change: makeMockChange({ name: 'feat', state: 'designing', specIds: ['auth/login'] }),
-      artifactStatuses: [{ type: 'spec', effectiveStatus: 'pending' }],
+      artifactStatuses: [
+        { type: 'spec', state: 'in-progress', effectiveStatus: 'in-progress', files: [] },
+      ],
       lifecycle: {
         validTransitions: [],
         availableTransitions: [],
@@ -386,7 +388,9 @@ describe('change status', () => {
     const { kernel, stdout } = setup()
     kernel.changes.status.execute.mockResolvedValue({
       change: makeMockChange({ name: 'feat', state: 'designing' }),
-      artifactStatuses: [{ type: 'spec', effectiveStatus: 'pending' }],
+      artifactStatuses: [
+        { type: 'spec', state: 'in-progress', effectiveStatus: 'in-progress', files: [] },
+      ],
       lifecycle: {
         validTransitions: [],
         availableTransitions: [],
@@ -430,7 +434,9 @@ describe('change status', () => {
         schemaName: 'std',
         schemaVersion: 1,
       }),
-      artifactStatuses: [{ type: 'proposal', effectiveStatus: 'complete' }],
+      artifactStatuses: [
+        { type: 'proposal', state: 'complete', effectiveStatus: 'complete', files: [] },
+      ],
       lifecycle: {
         validTransitions: [],
         availableTransitions: [],
@@ -448,7 +454,123 @@ describe('change status', () => {
 
     const parsed = JSON.parse(stdout())
     expect(parsed.schema).toEqual({ name: 'std', version: 1 })
-    expect(parsed.artifacts).toEqual([{ type: 'proposal', effectiveStatus: 'complete' }])
+    expect(parsed.artifacts).toEqual([
+      { type: 'proposal', state: 'complete', effectiveStatus: 'complete', files: [] },
+    ])
+  })
+
+  it('renders review output with absolute file paths in text mode', async () => {
+    const { kernel, stdout } = setup()
+    kernel.changes.status.execute.mockResolvedValue({
+      change: makeMockChange({ name: 'add-login', state: 'designing' }),
+      artifactStatuses: [
+        {
+          type: 'tasks',
+          state: 'drifted-pending-review',
+          effectiveStatus: 'drifted-pending-review',
+          files: [{ key: 'tasks', filename: 'tasks.md', state: 'drifted-pending-review' }],
+        },
+      ],
+      review: {
+        required: true,
+        route: 'designing',
+        reason: 'artifact-drift',
+        affectedArtifacts: [
+          {
+            type: 'tasks',
+            files: [
+              {
+                key: 'tasks',
+                filename: 'tasks.md',
+                path: '/project/.specd/changes/add-login/tasks.md',
+              },
+            ],
+          },
+        ],
+      },
+      lifecycle: {
+        validTransitions: [],
+        availableTransitions: [],
+        blockers: [],
+        approvals: { spec: false, signoff: false },
+        nextArtifact: null,
+        changePath: '/project/.specd/changes/add-login',
+        schemaInfo: { name: '@specd/schema-std', version: 1 },
+      },
+    })
+
+    const program = makeProgram()
+    registerChangeStatus(program.command('change'))
+    await program.parseAsync(['node', 'specd', 'change', 'status', 'add-login'])
+
+    const out = stdout()
+    expect(out).toContain('review:')
+    expect(out).toContain('/project/.specd/changes/add-login/tasks.md')
+    expect(out).not.toContain('tasks: tasks')
+  })
+
+  it('JSON output includes review files with filename and absolute path', async () => {
+    const { kernel, stdout } = setup()
+    kernel.changes.status.execute.mockResolvedValue({
+      change: makeMockChange({ name: 'add-login', state: 'designing' }),
+      artifactStatuses: [
+        {
+          type: 'tasks',
+          state: 'drifted-pending-review',
+          effectiveStatus: 'drifted-pending-review',
+          files: [{ key: 'tasks', filename: 'tasks.md', state: 'drifted-pending-review' }],
+        },
+      ],
+      review: {
+        required: true,
+        route: 'designing',
+        reason: 'artifact-drift',
+        affectedArtifacts: [
+          {
+            type: 'tasks',
+            files: [
+              {
+                key: 'tasks',
+                filename: 'tasks.md',
+                path: '/project/.specd/changes/add-login/tasks.md',
+              },
+            ],
+          },
+        ],
+      },
+      lifecycle: {
+        validTransitions: [],
+        availableTransitions: [],
+        blockers: [],
+        approvals: { spec: false, signoff: false },
+        nextArtifact: null,
+        changePath: '/project/.specd/changes/add-login',
+        schemaInfo: { name: '@specd/schema-std', version: 1 },
+      },
+    })
+
+    const program = makeProgram()
+    registerChangeStatus(program.command('change'))
+    await program.parseAsync(['node', 'specd', 'change', 'status', 'add-login', '--format', 'json'])
+
+    const parsed = JSON.parse(stdout())
+    expect(parsed.review).toEqual({
+      required: true,
+      route: 'designing',
+      reason: 'artifact-drift',
+      affectedArtifacts: [
+        {
+          type: 'tasks',
+          files: [
+            {
+              key: 'tasks',
+              filename: 'tasks.md',
+              path: '/project/.specd/changes/add-login/tasks.md',
+            },
+          ],
+        },
+      ],
+    })
   })
 })
 

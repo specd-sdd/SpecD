@@ -122,6 +122,40 @@ describe('FsChangeRepository', () => {
       expect(loaded?.state).toBe('ready')
     })
 
+    it('given a historical manifest stores artifact-change, when get is called, then the cause is normalized to artifact-drift', async () => {
+      const change = makeChange('legacy-invalidated-cause')
+      change.invalidate(
+        'artifact-drift',
+        actor,
+        'Invalidated because validated artifacts drifted: proposal (proposal)',
+        [{ type: 'proposal', files: ['proposal'] }],
+      )
+      await ctx.repo.save(change)
+
+      const manifestPath = path.join(
+        ctx.changesPath,
+        '20240115-100000-legacy-invalidated-cause',
+        'manifest.json',
+      )
+      const manifest = JSON.parse(await fs.readFile(manifestPath, 'utf8')) as {
+        history: Array<Record<string, unknown>>
+      }
+      const invalidated = manifest.history.find((event) => event.type === 'invalidated')
+      expect(invalidated).toBeDefined()
+      invalidated!.cause = 'artifact-change'
+      await fs.writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, 'utf8')
+
+      const loaded = await ctx.repo.get('legacy-invalidated-cause')
+      expect(loaded).not.toBeNull()
+      const invalidatedEvents = loaded?.history.filter(
+        (event): event is Extract<Change['history'][number], { type: 'invalidated' }> =>
+          event.type === 'invalidated',
+      )
+
+      expect(invalidatedEvents).toHaveLength(1)
+      expect(invalidatedEvents?.[0]?.cause).toBe('artifact-drift')
+    })
+
     it('given a saved change, when save is called again with updated history, then the manifest is updated', async () => {
       const change = makeChange('add-auth')
       await ctx.repo.save(change)
@@ -426,14 +460,46 @@ describe('FsChangeRepository', () => {
       expect(loaded?.getArtifact('proposal')?.status).toBe('complete')
     })
 
-    it('given validatedHash does not match the file on disk, when get is called, then artifact status is in-progress', async () => {
+    it('given validatedHash does not match the file on disk, when get is called, then artifact status is drifted-pending-review', async () => {
       const change = makeChangeWithArtifact('c1', sha256('original content'))
       await ctx.repo.save(change)
       const dir = path.join(ctx.changesPath, '20240115-100000-c1')
       await fs.writeFile(path.join(dir, 'proposal.md'), 'modified content', 'utf8')
 
       const loaded = await ctx.repo.get('c1')
-      expect(loaded?.getArtifact('proposal')?.status).toBe('in-progress')
+      expect(loaded?.state).toBe('designing')
+      expect(loaded?.getArtifact('proposal')?.status).toBe('drifted-pending-review')
+
+      const reloaded = await ctx.repo.get('c1')
+      expect(reloaded?.state).toBe('designing')
+      expect(reloaded?.getArtifact('proposal')?.status).toBe('drifted-pending-review')
+      expect(reloaded?.history.filter((event) => event.type === 'invalidated')).toHaveLength(1)
+    })
+
+    it('given a drifted file is later revalidated, when get is called again, then it stays complete without a second invalidation', async () => {
+      const updatedContent = 'modified content'
+      const updatedHash = sha256(updatedContent)
+      const change = makeChangeWithArtifact('c1', sha256('original content'))
+      await ctx.repo.save(change)
+      const dir = path.join(ctx.changesPath, '20240115-100000-c1')
+      await fs.writeFile(path.join(dir, 'proposal.md'), updatedContent, 'utf8')
+
+      const drifted = await ctx.repo.get('c1')
+      expect(drifted?.state).toBe('designing')
+      expect(drifted?.getArtifact('proposal')?.status).toBe('drifted-pending-review')
+      expect(drifted?.history.filter((event) => event.type === 'invalidated')).toHaveLength(1)
+
+      expect(drifted).not.toBeNull()
+      drifted!.getArtifact('proposal')?.markComplete('proposal', updatedHash)
+      await ctx.repo.save(drifted!)
+
+      const reloaded = await ctx.repo.get('c1')
+      expect(reloaded?.state).toBe('designing')
+      expect(reloaded?.getArtifact('proposal')?.status).toBe('complete')
+      expect(reloaded?.getArtifact('proposal')?.getFile('proposal')?.validatedHash).toBe(
+        updatedHash,
+      )
+      expect(reloaded?.history.filter((event) => event.type === 'invalidated')).toHaveLength(1)
     })
 
     it('given validatedHash is __skipped__ and optional, when get is called, then artifact status is skipped', async () => {
@@ -840,7 +906,7 @@ describe('FsChangeRepository', () => {
       expect(loaded?.getArtifact('tasks')?.status).toBe('complete')
     })
 
-    it('non-normalized edit triggers in-progress', async () => {
+    it('non-normalized edit triggers drifted-pending-review', async () => {
       const originalContent = '- [ ] task one\n'
       const cleanedHash = sha256(originalContent)
 
@@ -853,7 +919,8 @@ describe('FsChangeRepository', () => {
       await fs.writeFile(path.join(dir, 'tasks.md'), '- [ ] task one\n- [ ] task two\n', 'utf8')
 
       const loaded = await repo.get('c1')
-      expect(loaded?.getArtifact('tasks')?.status).toBe('in-progress')
+      expect(loaded?.state).toBe('designing')
+      expect(loaded?.getArtifact('tasks')?.status).toBe('drifted-pending-review')
     })
 
     it('no preHashCleanup rules hashes raw content', async () => {
@@ -1019,8 +1086,8 @@ describe('FsChangeRepository', () => {
       expect(loaded?.getArtifact('proposal')?.getFile('proposal')?.validatedHash).toBe(proposalHash)
       // Design (upstream of tasks) should remain complete
       expect(loaded?.getArtifact('design')?.getFile('design')?.validatedHash).toBe(designHash)
-      // Tasks (drifted) should be reset — no downstream, so only tasks
-      expect(loaded?.getArtifact('tasks')?.getFile('tasks')?.validatedHash).toBeUndefined()
+      expect(loaded?.getArtifact('tasks')?.getFile('tasks')?.validatedHash).toBe(tasksHash)
+      expect(loaded?.getArtifact('tasks')?.status).toBe('drifted-pending-review')
     })
 
     it('upstream artifact drifts — it and all downstream are reset', async () => {
@@ -1109,19 +1176,19 @@ describe('FsChangeRepository', () => {
 
       const dir = path.join(ctx.changesPath, '20240115-100000-c2')
       await fs.writeFile(path.join(dir, 'proposal.md'), proposalContent, 'utf8')
-      // Drift design — should cascade to tasks
+      // Drift design — should move the whole change back to review, preserving drift on design
       await fs.writeFile(path.join(dir, 'design.md'), '# Design MODIFIED\n', 'utf8')
       await fs.writeFile(path.join(dir, 'tasks.md'), tasksContent, 'utf8')
 
       const loaded = await repo.get('c2')
 
       expect(loaded?.state).toBe('designing')
-      // Proposal (upstream of drifted) should remain complete
+      expect(loaded?.getArtifact('proposal')?.status).toBe('pending-review')
       expect(loaded?.getArtifact('proposal')?.getFile('proposal')?.validatedHash).toBe(proposalHash)
-      // Design (drifted) should be reset
-      expect(loaded?.getArtifact('design')?.getFile('design')?.validatedHash).toBeUndefined()
-      // Tasks (downstream of design) should be reset
-      expect(loaded?.getArtifact('tasks')?.getFile('tasks')?.validatedHash).toBeUndefined()
+      expect(loaded?.getArtifact('design')?.getFile('design')?.validatedHash).toBe(designHash)
+      expect(loaded?.getArtifact('design')?.status).toBe('drifted-pending-review')
+      expect(loaded?.getArtifact('tasks')?.getFile('tasks')?.validatedHash).toBe(tasksHash)
+      expect(loaded?.getArtifact('tasks')?.status).toBe('pending-review')
     })
 
     it('no drift — no invalidation', async () => {

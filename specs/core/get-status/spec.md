@@ -14,20 +14,48 @@ Users and tooling need a quick way to see where a change stands — both its lif
 
 On success, `execute()` MUST return a `GetStatusResult` containing:
 
-- `change` -- the loaded `Change` entity with its current artifact state
-- `artifactStatuses` -- an array of `ArtifactStatusEntry` objects, one per artifact attached to the change
+- `change` — the loaded `Change` entity with its current artifact state
+- `artifactStatuses` — an array of `ArtifactStatusEntry` objects, one per artifact attached to the change
+- `review` — a derived review summary for agents and CLI serializers
 
 Each `ArtifactStatusEntry` MUST contain:
 
-- `type` -- the artifact type identifier (e.g. `'proposal'`, `'spec'`)
-- `effectiveStatus` -- the effective `ArtifactStatus` after cascading through required dependencies via `Change.effectiveStatus(type)`
-- `files` -- an array of `ArtifactFileStatus` objects, one per file in the artifact
+- `type` — the artifact type identifier (e.g. `'proposal'`, `'specs'`)
+- `state` — the persisted aggregate artifact state
+- `effectiveStatus` — the dependency-aware artifact status used for legacy compatibility and lifecycle explanations
+- `files` — an array of `ArtifactFileStatus` objects, one per file in the artifact
 
 Each `ArtifactFileStatus` MUST contain:
 
-- `key` -- the file key (artifact type id for `scope: change`, spec ID for `scope: spec`)
-- `filename` -- the relative filename within the change directory
-- `status` -- the `ArtifactStatus` of that individual file
+- `key` — the file key (artifact type id for `scope: change`, spec ID for `scope: spec`)
+- `filename` — the relative filename within the change directory
+- `state` — the persisted state of that individual file
+- `validatedHash` — the stored validation hash or skip sentinel
+
+The `review` object MUST contain:
+
+- `required: boolean`
+- `route: 'designing' | null`
+- `reason: 'artifact-drift' | 'artifact-review-required' | null`
+- `affectedArtifacts` — a grouped list of artifact IDs with concrete affected files currently in `pending-review` or `drifted-pending-review`
+
+Each review file entry inside `affectedArtifacts` MUST contain:
+
+- `filename` — the artifact file's relative filename within the change directory
+- `path` — the artifact file's absolute filesystem path
+- `key` — the file key used internally to match persisted invalidation history to current artifact files; included as supplemental context, not as the primary outward-facing identifier
+
+`review.required` is `true` if at least one file is in `pending-review` or `drifted-pending-review`; otherwise it is `false`.
+
+`review.reason` is:
+
+- `'artifact-drift'` when at least one file is `drifted-pending-review`
+- `'artifact-review-required'` when no file is drifted, but at least one file is `pending-review`
+- `null` when `review.required` is `false`
+
+`review.route` is `'designing'` whenever `review.required` is `true`, otherwise `null`.
+
+`GetStatus` MUST resolve `review.affectedArtifacts` against the current artifact file entries so agent-facing consumers can inspect the actual file directly. The outward-facing review summary MUST prioritize `filename` and `path`; consumers must not need to understand manifest-internal file keys in order to locate the affected artifact.
 
 ### Requirement: Throws ChangeNotFoundError for unknown changes
 
@@ -52,13 +80,13 @@ The `artifactStatuses` array MUST contain exactly one entry per artifact in the 
 On success, `GetStatusResult` MUST include a `lifecycle` object with the following fields:
 
 - `validTransitions` — a `readonly ChangeState[]` listing all structurally valid transitions from the current state, as defined by `VALID_TRANSITIONS[state]`
-- `availableTransitions` — a `readonly ChangeState[]` listing the subset of `validTransitions` where the target state's workflow `requires` are all satisfied (each required artifact has effective status `complete` or `skipped`). This is a dry-run: it tells the consumer which transitions would succeed right now without attempting them.
+- `availableTransitions` — a `readonly ChangeState[]` listing the subset of `validTransitions` where the target state's workflow `requires` are all satisfied (each required artifact has persisted `state` `complete` or `skipped`). This is a dry-run: it tells the consumer which transitions would succeed right now without attempting them.
 - `blockers` — a `readonly` array of blocker entries, one per valid-but-unavailable transition. Each entry MUST contain:
   - `transition: ChangeState` — the blocked target state
   - `reason: 'requires' | 'tasks-incomplete'` — why the transition is blocked
-  - `blocking: readonly string[]` — artifact IDs whose effective status is neither `complete` nor `skipped`
+  - `blocking: readonly string[]` — artifact IDs whose persisted `state` is neither `complete` nor `skipped`
 - `approvals` — `{ readonly spec: boolean; readonly signoff: boolean }` reflecting whether each approval gate is active in the project config
-- `nextArtifact` — `string | null`; the ID of the next artifact in schema-declared order whose `requires` are all satisfied (each required artifact has effective status `complete` or `skipped`) but whose own effective status is neither `complete` nor `skipped`. `null` when all artifacts are done.
+- `nextArtifact` — `string | null`; the first artifact in schema-declared order whose `requires` are all satisfied but whose own persisted `state` is neither `complete` nor `skipped`. `null` when all artifacts are done.
 - `changePath` — `string`; the filesystem path to the change directory, obtained from `ChangeRepository.changePath(change)`
 - `schemaInfo` — `{ readonly name: string; readonly version: number } | null`; the active schema's name and version from schema resolution. `null` when schema resolution fails. Consumers MUST use this for schema mismatch warnings instead of resolving the schema independently.
 
@@ -86,8 +114,8 @@ The use case MUST NOT throw when schema resolution fails — it degrades the lif
 
 ## Spec Dependencies
 
-- [`core:core/change`](../change/spec.md) — Change entity, artifact status derivation, `VALID_TRANSITIONS` map
-- [`core:core/kernel`](../kernel/spec.md) — Kernel wiring for `GetStatus` constructor
-- [`core:core/transition-change`](../transition-change/spec.md) — `VALID_TRANSITIONS` map, workflow requires enforcement pattern
-- [`core:core/schema-format`](../schema-format/spec.md) — `SchemaProvider`, `workflowStep()`, `artifacts()` API
-- [`core:core/config`](../config/spec.md) — approvals configuration
+- [`core:core/change`](../change/spec.md) — change entity and artifact state model
+- [`core:core/kernel`](../kernel/spec.md) — kernel wiring for `GetStatus`
+- [`core:core/transition-change`](../transition-change/spec.md) — lifecycle gating and transition rules
+- [`core:core/schema-format`](../schema-format/spec.md) — `SchemaProvider`, workflow, and artifact definitions
+- [`core:core/config`](../config/spec.md) — project approval configuration

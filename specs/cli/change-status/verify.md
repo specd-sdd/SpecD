@@ -11,59 +11,35 @@
 
 ### Requirement: Output format
 
-#### Scenario: Normal status output
+#### Scenario: Text output shows artifact and file state
 
-- **GIVEN** a change `add-login` in state `designing` with spec `auth/login` and one complete artifact
-- **WHEN** `specd change status add-login` is run
-- **THEN** stdout shows `change: add-login`, `state: designing`, `specs: auth/login`, and an artifact line
-- **AND** stdout includes a `lifecycle:` section with `approvals:` and `path:` lines
-- **AND** the process exits with code 0
-
-#### Scenario: Effective status reflects dependency cascading
-
-- **GIVEN** a change where artifact `spec` depends on `proposal` and `proposal` is `in-progress`
+- **GIVEN** a change with artifact `specs` in `pending-review`
+- **AND** one file under `specs` is `drifted-pending-review`
 - **WHEN** `specd change status <name>` is run
-- **THEN** the `spec` artifact line shows `in-progress` even if its own hash is valid
+- **THEN** stdout shows the artifact aggregate state
+- **AND** it lists the individual file row with `drifted-pending-review`
 
-#### Scenario: Text output shows available transitions
+#### Scenario: Text output shows review section when review is required
 
-- **GIVEN** a change in `designing` state with all artifacts complete
-- **WHEN** `specd change status <name>` is run
-- **THEN** the `lifecycle:` section includes a `transitions:` line listing the available transitions
+- **GIVEN** `GetStatus` returns `review.required: true`
+- **WHEN** `specd change status <name>` is run in text mode
+- **THEN** stdout includes a `review:` section
+- **AND** it shows the route, reason, and affected absolute file paths
 
-#### Scenario: Text output omits transitions line when none available
+#### Scenario: JSON output includes review and file state
 
-- **GIVEN** a change in `designing` state with artifacts still missing
-- **AND** no transitions are available
-- **WHEN** `specd change status <name>` is run
-- **THEN** the `lifecycle:` section does not include a `transitions:` line
+- **GIVEN** a change in `designing`
+- **WHEN** `specd change status <name> --format json` is run
+- **THEN** stdout includes `artifacts[].state`
+- **AND** each artifact includes `files[].state`
+- **AND** the top-level payload includes `review`
+- **AND** `review.affectedArtifacts[].files[]` includes `filename` and `path`
 
-#### Scenario: Text output shows blockers
+#### Scenario: Review section omitted when not required
 
-- **GIVEN** a change in `designing` state with artifact `specs` missing
-- **AND** the `ready` transition is blocked by `specs`
-- **WHEN** `specd change status <name>` is run
-- **THEN** stdout includes a `blockers:` section with an entry for `ready`
-
-#### Scenario: Text output shows next artifact
-
-- **GIVEN** a change with `proposal` complete and `specs` as the next artifact
-- **WHEN** `specd change status <name>` is run
-- **THEN** the `lifecycle:` section includes `next artifact: specs`
-
-#### Scenario: Text output omits next artifact when all done
-
-- **GIVEN** all artifacts are complete
-- **WHEN** `specd change status <name>` is run
-- **THEN** the `lifecycle:` section does not include a `next artifact:` line
-
-#### Scenario: JSON output contains lifecycle object
-
-- **GIVEN** a change `add-login` in state `designing`
-- **WHEN** `specd change status add-login --format json` is run
-- **THEN** stdout is valid JSON containing a `lifecycle` object
-- **AND** `lifecycle` has `validTransitions`, `availableTransitions`, `blockers`, `approvals`, `nextArtifact`, and `changePath`
-- **AND** `approvals` has `spec` and `signoff` boolean fields
+- **GIVEN** `GetStatus` returns `review.required: false`
+- **WHEN** `specd change status <name>` is run in text mode
+- **THEN** stdout omits the `review:` section
 
 ### Requirement: Schema version warning
 

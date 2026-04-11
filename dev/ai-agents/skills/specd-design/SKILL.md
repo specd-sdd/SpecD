@@ -42,6 +42,19 @@ schema or lifecycle semantics.
 specd change status <name> --format json
 ```
 
+Store `lifecycle.changePath`, `specIds`, and `review` from the response.
+
+If `review.required` is `true`, enter **artifact review mode**:
+
+- Treat `review.affectedArtifacts` as the first review scope
+- Review those artifact files against the latest user conversation and the
+  current change state before deciding what to rewrite
+- Do NOT revalidate or rewrite downstream artifacts blindly just because they
+  are marked `pending-review`; first confirm whether the upstream change really
+  requires a content update
+- If `review.reason` is `artifact-drift`, inspect the drifted files first and
+  use them to decide which other artifacts actually need edits
+
 If state is `drafting` or `designing`, transition to `designing`:
 
 ```bash
@@ -67,8 +80,6 @@ If state is not `drafting` or `designing`, this is the wrong skill. Suggest base
 
 **Stop — do not continue.**
 
-Store `lifecycle.changePath` — artifacts are written there.
-Store `specIds` from the response — you need them for validation.
 Check `artifacts` array — if some are already `complete`, you're resuming mid-design.
 
 ### 2. Check workspace ownership
@@ -190,6 +201,12 @@ name, description, and specs. Let the user's answers guide your follow-ups. Keep
 flowing until you understand the problem, the approach, what's affected, and any
 decisions or constraints. Once you have enough, write a `<changePath>/.specd-exploration.md` yourself
 to capture what you learned, then continue with step 5.
+
+If `review.required` is `true`, use the stored `review.reason` and
+`review.affectedArtifacts` together with the current context to decide what
+actually needs revision. Review the current artifact files before editing them,
+and only rewrite the artifacts whose content no longer matches the conversation
+or the updated change context.
 
 ### 5. Show context summary
 

@@ -22,6 +22,16 @@ transitions to `done`. If any fail, loops back to implementing.
 specd change status <name> --format json
 ```
 
+Store `lifecycle.changePath`, `specIds`, and `review` from the response.
+
+If `review.required` is `true`, this change has artifacts that require review
+before verification can continue. Summarize `review.reason` and
+`review.affectedArtifacts`, then tell the user:
+
+> Artifacts need review before verification can continue. Run `/specd-design <name>`.
+
+**Stop — do not continue.**
+
 If not in `implementing`, `verifying`, or `done`, this is the wrong skill. Suggest based on state:
 
 - `drafting` / `designing` → `/specd-design <name>`
@@ -33,8 +43,6 @@ If not in `implementing`, `verifying`, or `done`, this is the wrong skill. Sugge
 - `pending-spec-approval` → "Approval pending. Run: `specd change approve spec <name> --reason ...`"
 
 **Stop — do not continue.**
-
-Store `lifecycle.changePath` and `specIds` from the response.
 
 ### 2. Enter verification (or resume)
 
@@ -159,13 +167,46 @@ Present findings to the user:
 
 **If any fail:**
 
+First classify the failure:
+
+- **Implementation-only failure** — the artifacts still describe the desired
+  behavior correctly, and fixing the issue does not require new or changed
+  tasks or design artifacts
+- **Artifact review required** — the desired behavior changed, the artifacts are
+  wrong or incomplete, or fixing the issue requires new or changed tasks,
+  specs, verify scenarios, design, or proposal content
+
+Before choosing a transition, reload status:
+
+```bash
+specd change status <name> --format json
+```
+
+If the fresh status shows `review.required = true`, do NOT route back to
+`implementing`. Summarize `review.reason` and `review.affectedArtifacts`, then
+direct the user to `/specd-design <name>` and **stop**.
+
+If this is an implementation-only failure:
+
 ```bash
 specd change transition <name> implementing --skip-hooks all
 ```
 
 Tell the user which scenarios failed and suggest:
 
-> Some scenarios failed. Run `/specd-implement <name>` to fix.
+> Some scenarios failed, but the artifacts remain correct. Run `/specd-implement <name>` to fix the implementation.
+
+**Stop.**
+
+If this is artifact review required:
+
+```bash
+specd change transition <name> designing --skip-hooks all
+```
+
+Tell the user which scenarios revealed the issue and suggest:
+
+> Verification showed the artifacts need revision. Run `/specd-design <name>` to review and update them.
 
 **Stop.**
 
@@ -286,3 +327,5 @@ specd change transition <name> designing --skip-hooks all
 - Verify against scenarios from the compiled context, not from memory
 - Run actual tests where applicable — don't just inspect code
 - Report each failing scenario with specifics so the user can fix it
+- Any time a fresh `change status` shows `review.required = true`, stop
+  verification and redirect to `/specd-design <name>`

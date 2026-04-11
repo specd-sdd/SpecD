@@ -64,7 +64,9 @@ describe('Output format', () => {
     })
     kernel.changes.status.execute.mockResolvedValue({
       change,
-      artifactStatuses: [{ type: 'proposal', effectiveStatus: 'complete' }],
+      artifactStatuses: [
+        { type: 'proposal', state: 'complete', effectiveStatus: 'complete', files: [] },
+      ],
       lifecycle: { ...defaultLifecycle, nextArtifact: 'specs' },
     })
 
@@ -91,8 +93,8 @@ describe('Output format', () => {
     kernel.changes.status.execute.mockResolvedValue({
       change,
       artifactStatuses: [
-        { type: 'proposal', effectiveStatus: 'in-progress' },
-        { type: 'spec', effectiveStatus: 'in-progress' },
+        { type: 'proposal', state: 'in-progress', effectiveStatus: 'in-progress', files: [] },
+        { type: 'spec', state: 'in-progress', effectiveStatus: 'in-progress', files: [] },
       ],
       lifecycle: defaultLifecycle,
     })
@@ -210,7 +212,9 @@ describe('Output format', () => {
     })
     kernel.changes.status.execute.mockResolvedValue({
       change,
-      artifactStatuses: [{ type: 'proposal', effectiveStatus: 'complete' }],
+      artifactStatuses: [
+        { type: 'proposal', state: 'complete', effectiveStatus: 'complete', files: [] },
+      ],
       lifecycle: {
         ...defaultLifecycle,
         nextArtifact: 'specs',

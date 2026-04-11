@@ -23,7 +23,15 @@ gate is handled by `/specd-verify`, not by this skill.
 specd change status <name> --format json
 ```
 
-Store `lifecycle.changePath` and `specIds` from the response.
+Store `lifecycle.changePath`, `specIds`, and `review` from the response.
+
+If `review.required` is `true`, this change has artifacts that require review
+before archiving. Summarize `review.reason` and `review.affectedArtifacts`, then
+tell the user:
+
+> Artifacts need review before archiving. Run `/specd-design <name>` to update them.
+
+**Stop — do not continue.**
 
 If state is not `archivable`, this is the wrong skill. Suggest based on state:
 
@@ -171,3 +179,5 @@ specd change transition <name> designing --skip-hooks all
 - **Always ask before archiving** — it's irreversible
 - Review deltas before confirming — specs should match what was built
 - If implementation diverged from specs, update the specs first
+- Any time a fresh `change status` shows `review.required = true`, stop
+  archiving and redirect to `/specd-design <name>`

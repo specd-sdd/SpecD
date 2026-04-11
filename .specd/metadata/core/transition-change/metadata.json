@@ -63,13 +63,13 @@
     {
       "requirement": "Artifact validation clearing on verifying to implementing",
       "rules": [
-        "When the current state is `verifying` and the effective target is `implementing`, the use case MUST look up the `implementing` workflow step from the schema and call `change.clearArtifactValidations` with its `requires` list before performing the transition. This resets validation state for the specified artifacts.\n\nIf no `implementing` workflow step exists in the schema, the clearing is skipped."
+        "When the current state is `verifying` and the effective target is `implementing`, the use case MUST treat that path as an implementation-only retry.\n\nThe transition is valid only when the current artifacts still correctly describe the intended behavior and the required fix fits within the already-defined tasks. In that case:\n\n- the use case transitions back to `implementing`\n- it MUST NOT clear unchanged validated artifacts\n- it MUST NOT downgrade artifact or file states merely because verification failed\n\nIf verification concludes that the artifacts must change, or that new tasks are required before implementation can resume, callers must route to `designing` instead of `implementing`."
       ]
     },
     {
       "requirement": "Transition to designing from any state",
       "rules": [
-        "Every state except `drafting` SHALL include `designing` as a valid transition target. This allows the user to return to the design phase at any point in the lifecycle when issues are discovered.\n\nWhen the effective target is `designing`, the use case MUST:\n\n1. Invalidate the active spec approval if one exists — call `change.invalidate('redesign', actor)`.\n2. Invalidate the active signoff if one exists — the invalidation in step 1 already clears both.\n3. Proceed with the transition via `change.transition('designing', actor)`.\n\nIf no active approvals exist, the transition proceeds directly without invalidation.\n\nThe `archivable` state is no longer terminal — it can transition to `designing` like any other state."
+        "Every state except `drafting` SHALL include `designing` as a valid transition target. This allows the user to return to the design phase at any point in the lifecycle when issues are discovered.\n\nWhen the effective target is `designing`, the use case MUST:\n\n1. Invalidate the active spec approval if one exists.\n2. Invalidate the active signoff if one exists — the first invalidation already clears both.\n3. Downgrade every artifact file to `pending-review`, except files already marked `drifted-pending-review`, which keep that more specific state.\n4. Recompute every artifact's aggregate persisted `state`.\n5. Proceed with the transition via `change.transition('designing', actor)`.\n\nThis downgrade applies both to explicit redesign transitions and to scope changes that keep the lifecycle in `designing` while invalidating previously validated work."
       ]
     },
     {
@@ -269,23 +269,23 @@
     },
     {
       "requirement": "Artifact validation clearing on verifying to implementing",
-      "name": "Artifact validations are cleared using schema requires",
+      "name": "Implementation-only retry preserves validated artifacts",
       "given": [
         "a change in verifying state with validated artifacts",
-        "AND the schema's implementing step declares requires: ['specs', 'tasks']"
+        "AND verification fails for implementation-only reasons"
       ],
       "when": ["execute is called with to: 'implementing'"],
-      "then": ["change.clearArtifactValidations is called with ['specs', 'tasks'] from the schema"]
+      "then": ["unchanged validated artifacts are not cleared"]
     },
     {
       "requirement": "Artifact validation clearing on verifying to implementing",
-      "name": "No implementing step in schema defaults to no clearing",
+      "name": "Artifact review required does not route through implementing",
       "given": [
         "a change in verifying state",
-        "AND the schema does not declare an implementing workflow step"
+        "AND the required fix needs new tasks or revised artifacts"
       ],
-      "when": ["execute is called with to: 'implementing'"],
-      "then": ["change.clearArtifactValidations is not called"]
+      "when": ["lifecycle routing is resolved"],
+      "then": ["the caller must transition to designing, not implementing"]
     },
     {
       "requirement": "Transition to designing from any state",
@@ -296,37 +296,23 @@
     },
     {
       "requirement": "Transition to designing from any state",
-      "name": "Transition from implementing to designing",
-      "given": ["a change in implementing state"],
+      "name": "Transition to designing downgrades files to pending-review",
+      "given": [
+        "a change with validated artifacts",
+        "AND one file is already drifted-pending-review"
+      ],
       "when": ["execute is called with to: 'designing'"],
-      "then": ["the change transitions to designing"]
+      "then": [
+        "every other tracked file becomes pending-review",
+        "AND the drifted file remains drifted-pending-review"
+      ]
     },
     {
       "requirement": "Transition to designing from any state",
       "name": "Transition to designing invalidates active approvals",
       "given": ["a change in implementing state with an active spec approval"],
       "when": ["execute is called with to: 'designing'"],
-      "then": [
-        "change.invalidate is called before the transition",
-        "AND the spec approval is cleared",
-        "AND the change transitions to designing"
-      ]
-    },
-    {
-      "requirement": "Transition to designing from any state",
-      "name": "Transition to designing without active approvals skips invalidation",
-      "given": ["a change in implementing state with no active approvals"],
-      "when": ["execute is called with to: 'designing'"],
-      "then": ["change.invalidate is not called", "AND the change transitions to designing"]
-    },
-    {
-      "requirement": "Transition to designing from any state",
-      "name": "Transition to designing from drafting is not a special case",
-      "given": ["a change in drafting state"],
-      "when": ["execute is called with to: 'designing'"],
-      "then": [
-        "the change transitions to designing via the normal transition path (no approval invalidation logic)"
-      ]
+      "then": ["the approval is invalidated before the transition"]
     },
     {
       "requirement": "Post-hook execution",
@@ -436,8 +422,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:2350bcbbc9c8b9b71db77139aaa4e2a5af89effd9ed4c144f5ae45600117796c",
-    "verify.md": "sha256:4ccba3b6819ba82cd22cf2461ae1ab7da9a15c635680cc83c4e3c4bd2aa68e9a"
+    "spec.md": "sha256:349ab041bf7c12750d3d12ef7d59b3b33a58d8f2f55a6267836573b1dfd4883b",
+    "verify.md": "sha256:3e3215fced17f2e1b3f316c7b127486d808007d8597993cab6f0c08235475b01"
   },
   "generatedBy": "core"
 }

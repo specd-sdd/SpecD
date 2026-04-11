@@ -12,9 +12,11 @@ Without an abstraction over change storage, use cases would couple directly to f
 
 ### Requirement: get returns a Change or null
 
-`get(name)` MUST accept a change name string and return the `Change` with that name, or `null` if no change with that name exists. The returned `Change` MUST have its artifact statuses derived at load time by comparing the current file hash against the stored `validatedHash` (see `specs/core/change/spec.md` — Requirement: Artifacts). A hash mismatch MUST reset the artifact status to `in-progress`.
+`get(name)` MUST accept a change name string and return the `Change` with that name, or `null` if no change with that name exists. The returned `Change` MUST load artifact and file states from the persisted manifest. If an artifact or file entry omits `state`, the repository defaults that missing value to `missing` while loading.
 
-`get()` is a snapshot read for callers. It MAY auto-invalidate and persist drifted artifacts before returning (see Requirement: Auto-invalidation on get when artifact files drift), but it MUST NOT be the repository's serialized mutation primitive. Callers that need a coordinated read-modify-write section for an existing persisted change MUST use `mutate(name, fn)` instead of relying on a later `save()` against a stale snapshot.
+`validatedHash` is still loaded with the artifact data, but hash comparison is not the sole source of truth for steady-state status. The repository MAY detect drift and persist updated file and artifact states before returning (see Requirement: Auto-invalidation on get when artifact files drift).
+
+`get()` is a snapshot read for callers. It MAY auto-invalidate and persist drifted artifacts before returning, but it MUST NOT be the repository's serialized mutation primitive. Callers that need a coordinated read-modify-write section for an existing persisted change MUST use `mutate(name, fn)` instead of relying on a later `save()` against a stale snapshot.
 
 ### Requirement: mutate serializes persisted change updates
 
@@ -38,16 +40,30 @@ Exclusive access is per change, not global. Mutations targeting different change
 
 ### Requirement: Auto-invalidation on get when artifact files drift
 
-The `FsChangeRepository` implementation of `get()` MUST detect artifact file drift and auto-invalidate the change when appropriate. After loading a change and deriving artifact statuses, the repository checks whether any previously-validated artifact file has drifted — that is, the file's `validatedHash` was set (indicating a prior validation) but the derived status is now `missing` or `in-progress` (indicating the file was deleted or modified on disk).
+The `FsChangeRepository` implementation of `get()` MUST detect artifact file drift and auto-invalidate the change when appropriate. After loading a change, the repository compares the current cleaned file hash against each file's stored `validatedHash` for files that were previously validated.
 
-If drift is detected AND either of the following conditions is true, the repository MUST collect the artifact type IDs of all drifted artifacts and call `change.invalidate('artifact-change', SYSTEM_ACTOR, driftedArtifactIds)` and persist the updated manifest before returning:
+A file is drifted when:
 
-1. The change is beyond `designing` state (i.e. has progressed past the initial design phase), OR
-2. The change has an active approval (spec approval or signoff) that has not been superseded by a subsequent `invalidated` event.
+- `validatedHash` is a SHA-256 value recorded by prior validation, and
+- the current cleaned content hash no longer matches that `validatedHash`
 
-When `driftedArtifactIds` is provided, `invalidate()` only resets the drifted artifacts and their downstream dependents in the artifact DAG — upstream artifacts that the drifted artifacts depend on are left intact. Approval revocation and state transition to `designing` still happen globally.
+When drift is detected, the repository MUST:
 
-This ensures that approval drift and state-inconsistent artifact changes are detected eagerly on any change load, not only during explicit validation. The `SYSTEM_ACTOR` constant (`{ name: 'specd', email: 'system@specd.dev' }`) is used as the actor for these automated invalidations.
+1. Scan the full affected artifact set first, collecting every drifted file key grouped by artifact type. It MUST NOT stop at the first mismatch.
+2. Mark each drifted file as `drifted-pending-review`.
+3. Recompute every affected artifact's aggregate `state`.
+4. Invalidate the change back to `designing` using the domain invalidation mechanism, preserving `drifted-pending-review` on the drifted files and downgrading the remaining files to `pending-review`.
+5. Persist the updated manifest before returning.
+
+This invalidation is lifecycle-independent: if a validated file drifts, the change is invalidated back to `designing` regardless of whether the current lifecycle state is `designing`, `ready`, `implementing`, `verifying`, `done`, or `archivable`.
+
+The invalidation history entry MUST record:
+
+- `cause: "artifact-drift"`
+- a clear `message`
+- `affectedArtifacts`, including each affected artifact type and the full list of drifted file keys captured in step 1
+
+The `SYSTEM_ACTOR` constant (`{ name: 'specd', email: 'system@specd.dev' }`) is used as the actor for these automated invalidations.
 
 ### Requirement: list returns active changes in creation order
 
@@ -137,8 +153,8 @@ ports with shared construction are abstract classes.
 
 ## Spec Dependencies
 
-- [`core:core/repository-port`](../repository-port/spec.md) — `Repository` base class, `RepositoryConfig`, shared accessors
-- [`default:_global/architecture`](../../_global/architecture/spec.md) — ports as abstract classes, application layer uses ports only
-- [`core:core/change`](../change/spec.md) — Change entity, artifact status derivation, history events
-- [`core:core/storage`](../storage/spec.md) — change directory naming, manifest format, atomic writes
-- [`core:core/change-manifest`](../change-manifest/spec.md) — manifest structure persisted by `save()`
+- [`core:core/repository-port`](../repository-port/spec.md) — shared repository base contract
+- [`default:_global/architecture`](../../_global/architecture/spec.md) — application ports and ownership boundaries
+- [`core:core/change`](../change/spec.md) — change entity state, invalidation, and artifact semantics
+- [`core:core/storage`](../storage/spec.md) — filesystem persistence and change directory layout
+- [`core:core/change-manifest`](../change-manifest/spec.md) — manifest fields persisted by the repository

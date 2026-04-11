@@ -15,7 +15,7 @@
     {
       "requirement": "Output format",
       "rules": [
-        "In `text` mode (default), the command prints a structured summary to stdout:\n\n```\nchange:      <name>\nstate:       <state>\nspecs:       <specId>, <specId>, ...\ndescription: <description>            ← only if set\n\nartifacts:\n  <type>  <effectiveStatus>\n  ...\n\nlifecycle:\n  transitions:  <available1>, <available2>, ...    ← only availableTransitions\n  next artifact: <artifactId>                      ← omitted when null\n  approvals:     spec=on|off  signoff=on|off\n  path:          <changePath>\n```\n\nThe `description:` line is omitted when no description is set on the change.\n\nEach artifact line shows the artifact type ID and its effective status (`missing`, `in-progress`, `complete`, or `skipped`). Artifacts are listed in schema-declared order.\n\nThe `lifecycle:` section is always present. The `transitions:` line shows only `availableTransitions` (transitions that would succeed now). It is omitted when the list is empty. The `next artifact:` line is omitted when `nextArtifact` is `null`.\n\nIf there are blockers, they are shown after the lifecycle section:\n\n```\nblockers:\n  → <transition>: <reason> — <blocking1>, <blocking2>, ...\n```\n\nThe `blockers:` section is omitted when there are no blockers.\n\nIn `json` or `toon` mode, the output is:\n\n```json\n{\n  \"name\": \"...\",\n  \"state\": \"...\",\n  \"specIds\": [\"...\"],\n  \"schema\": { \"name\": \"...\", \"version\": 1 },\n  \"description\": \"...\",\n  \"artifacts\": [{ \"type\": \"...\", \"effectiveStatus\": \"...\" }],\n  \"lifecycle\": {\n    \"validTransitions\": [\"...\"],\n    \"availableTransitions\": [\"...\"],\n    \"blockers\": [{ \"transition\": \"...\", \"reason\": \"requires\", \"blocking\": [\"...\"] }],\n    \"approvals\": { \"spec\": false, \"signoff\": false },\n    \"nextArtifact\": \"...\",\n    \"changePath\": \"...\",\n    \"schemaInfo\": { \"name\": \"...\", \"version\": 1 }\n  }\n}\n```\n\n`description` is omitted from the JSON object when not set. The `lifecycle` object is always present. `nextArtifact` is `null` (not omitted) when all artifacts are done."
+        "In `text` mode (default), the command prints a structured summary to stdout:\n\n```\nchange:      <name>\nstate:       <state>\nspecs:       <specId>, <specId>, ...\ndescription: <description>            ← only if set\n\nartifacts:\n  <type>  <state>\n    <file-key>  <file-state>  <filename>\n  ...\n\nlifecycle:\n  transitions:  <available1>, <available2>, ...    ← only availableTransitions\n  next artifact: <artifactId>                      ← omitted when null\n  approvals:     spec=on|off  signoff=on|off\n  path:          <changePath>\n\nreview:\n  required:  yes|no\n  route:     designing\n  reason:    artifact-drift|artifact-review-required\n  affected:\n    <artifact-type>:\n      - <absolute-path>\n      - <absolute-path>\n```\n\nThe `description:` line is omitted when no description is set on the change.\n\nEach artifact line shows the artifact type ID and its persisted aggregate `state`. Under each artifact, the command prints every tracked file with its file key, persisted file `state`, and relative filename. Artifacts are listed in schema-declared order, with file rows in artifact order.\n\nThe `lifecycle:` section is always present. The `transitions:` line shows only `availableTransitions` (transitions that would succeed now). It is omitted when the list is empty. The `next artifact:` line is omitted when `nextArtifact` is `null`.\n\nIf there are blockers, they are shown after the lifecycle section:\n\n```\nblockers:\n  → <transition>: <reason> — <blocking1>, <blocking2>, ...\n```\n\nThe `blockers:` section is omitted when there are no blockers.\n\nThe `review:` section is omitted when `review.required` is `false`. When present, it summarizes why the change must return through design review. Within that section, affected files are rendered using their absolute paths so an operator or agent can jump directly to the file that needs review. If supplemental `key` data is present, it is secondary and must not replace the path-first rendering.\n\nIn `json` or `toon` mode, the output is:\n\n```json\n{\n  \"name\": \"...\",\n  \"state\": \"...\",\n  \"specIds\": [\"...\"],\n  \"schema\": { \"name\": \"...\", \"version\": 1 },\n  \"description\": \"...\",\n  \"artifacts\": [\n    {\n      \"type\": \"...\",\n      \"state\": \"pending-review\",\n      \"effectiveStatus\": \"pending-review\",\n      \"files\": [\n        {\n          \"key\": \"...\",\n          \"filename\": \"...\",\n          \"state\": \"drifted-pending-review\"\n        }\n      ]\n    }\n  ],\n  \"review\": {\n    \"required\": true,\n    \"route\": \"designing\",\n    \"reason\": \"artifact-drift\",\n    \"affectedArtifacts\": [\n      {\n        \"type\": \"specs\",\n        \"files\": [\n          {\n            \"key\": \"core:core/change\",\n            \"filename\": \"deltas/core/core/change/spec.md.delta.yaml\",\n            \"path\": \"/abs/path/.specd/changes/<change>/deltas/core/core/change/spec.md.delta.yaml\"\n          }\n        ]\n      }\n    ]\n  },\n  \"lifecycle\": {\n    \"validTransitions\": [\"...\"],\n    \"availableTransitions\": [\"...\"],\n    \"blockers\": [{ \"transition\": \"...\", \"reason\": \"requires\", \"blocking\": [\"...\"] }],\n    \"approvals\": { \"spec\": false, \"signoff\": false },\n    \"nextArtifact\": \"...\",\n    \"changePath\": \"...\",\n    \"schemaInfo\": { \"name\": \"...\", \"version\": 1 }\n  }\n}\n```\n\n`description` is omitted from the JSON object when not set. The `lifecycle` object is always present. `nextArtifact` is `null` (not omitted) when all artifacts are done."
       ]
     },
     {
@@ -46,77 +46,45 @@
     },
     {
       "requirement": "Output format",
-      "name": "Normal status output",
+      "name": "Text output shows artifact and file state",
       "given": [
-        "a change add-login in state designing with spec auth/login and one complete artifact"
+        "a change with artifact specs in pending-review",
+        "AND one file under specs is drifted-pending-review"
       ],
-      "when": ["specd change status add-login is run"],
+      "when": ["specd change status <name> is run"],
       "then": [
-        "stdout shows change: add-login, state: designing, specs: auth/login, and an artifact line",
-        "AND stdout includes a lifecycle: section with approvals: and path: lines",
-        "AND the process exits with code 0"
+        "stdout shows the artifact aggregate state",
+        "AND it lists the individual file row with drifted-pending-review"
       ]
     },
     {
       "requirement": "Output format",
-      "name": "Effective status reflects dependency cascading",
-      "given": ["a change where artifact spec depends on proposal and proposal is in-progress"],
-      "when": ["specd change status <name> is run"],
-      "then": ["the spec artifact line shows in-progress even if its own hash is valid"]
-    },
-    {
-      "requirement": "Output format",
-      "name": "Text output shows available transitions",
-      "given": ["a change in designing state with all artifacts complete"],
-      "when": ["specd change status <name> is run"],
+      "name": "Text output shows review section when review is required",
+      "given": ["GetStatus returns review.required: true"],
+      "when": ["specd change status <name> is run in text mode"],
       "then": [
-        "the lifecycle: section includes a transitions: line listing the available transitions"
+        "stdout includes a review: section",
+        "AND it shows the route, reason, and affected absolute file paths"
       ]
     },
     {
       "requirement": "Output format",
-      "name": "Text output omits transitions line when none available",
-      "given": [
-        "a change in designing state with artifacts still missing",
-        "AND no transitions are available"
-      ],
-      "when": ["specd change status <name> is run"],
-      "then": ["the lifecycle: section does not include a transitions: line"]
-    },
-    {
-      "requirement": "Output format",
-      "name": "Text output shows blockers",
-      "given": [
-        "a change in designing state with artifact specs missing",
-        "AND the ready transition is blocked by specs"
-      ],
-      "when": ["specd change status <name> is run"],
-      "then": ["stdout includes a blockers: section with an entry for ready"]
-    },
-    {
-      "requirement": "Output format",
-      "name": "Text output shows next artifact",
-      "given": ["a change with proposal complete and specs as the next artifact"],
-      "when": ["specd change status <name> is run"],
-      "then": ["the lifecycle: section includes next artifact: specs"]
-    },
-    {
-      "requirement": "Output format",
-      "name": "Text output omits next artifact when all done",
-      "given": ["all artifacts are complete"],
-      "when": ["specd change status <name> is run"],
-      "then": ["the lifecycle: section does not include a next artifact: line"]
-    },
-    {
-      "requirement": "Output format",
-      "name": "JSON output contains lifecycle object",
-      "given": ["a change add-login in state designing"],
-      "when": ["specd change status add-login --format json is run"],
+      "name": "JSON output includes review and file state",
+      "given": ["a change in designing"],
+      "when": ["specd change status <name> --format json is run"],
       "then": [
-        "stdout is valid JSON containing a lifecycle object",
-        "AND lifecycle has validTransitions, availableTransitions, blockers, approvals, nextArtifact, and changePath",
-        "AND approvals has spec and signoff boolean fields"
+        "stdout includes artifacts[].state",
+        "AND each artifact includes files[].state",
+        "AND the top-level payload includes review",
+        "AND review.affectedArtifacts[].files[] includes filename and path"
       ]
+    },
+    {
+      "requirement": "Output format",
+      "name": "Review section omitted when not required",
+      "given": ["GetStatus returns review.required: false"],
+      "when": ["specd change status <name> is run in text mode"],
+      "then": ["stdout omits the review: section"]
     },
     {
       "requirement": "Schema version warning",
@@ -136,8 +104,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:dcab505c153393fecd99c938fbb54a25dfc09d50456364e4217328b64e391709",
-    "verify.md": "sha256:7d5fe1856869a175ea663da6a0f589e17ef1b11397e3788a5b9d4ea12d6aa896"
+    "spec.md": "sha256:8e415ed1cc7342c1a0be0ce44cf4679645c2354e0892e218547243a887ff03cd",
+    "verify.md": "sha256:9eeae85fcaddbfdec948ef45d680ccb013a39ff70b7ab47e7b72c0f647880449"
   },
   "generatedBy": "core"
 }

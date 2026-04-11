@@ -49,7 +49,7 @@
   ],
   "constraints": [
     "specs/_global/ is for cross-cutting constraints only — not for any single package's implementation details",
-    "Package spec directories use the short package name: core, cli, mcp, skills, schema-std, schema-openspec",
+    "Package spec directories use the short package name: core, cli, mcp, skills, schema-std",
     "Every spec subdirectory contains exactly two authored files: spec.md and verify.md",
     "Delta files (spec.md.delta.yaml, verify.md.delta.yaml, etc.) are change artifacts — they live in the change directory alongside the artifact and are never synced to the permanent specs/ directories",
     "spec.md contains no WHEN/THEN scenarios; verify.md contains no requirement prose",
@@ -140,7 +140,7 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:4c7a4c4be788795137800970a738d0c31c91ecf58c495dc87e35ea235877e98c",
+    "spec.md": "sha256:dc536a9d1c39e10b307978144bfbbd4143f5f0d2b58d1858bb9938af4fe05d05",
     "verify.md": "sha256:4e3f613bfc55584afcb370a13de35d0a14d85a54ba261aee879db4745a21d30d"
   },
   "generatedBy": "core"

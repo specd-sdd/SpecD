@@ -123,7 +123,13 @@ in progress. Load its status and redirect:
 specd change status <name> --format json
 ```
 
-Suggest based on state:
+Read `state` and `review` from the response.
+
+If `review.required` is `true`, suggest `/specd-design <name>` regardless of
+the lifecycle state. Summarize `review.reason` and `review.affectedArtifacts`,
+then stop.
+
+If `review.required` is `false`, suggest based on `state`:
 
 | State                            | Suggest                                                                    |
 | -------------------------------- | -------------------------------------------------------------------------- |

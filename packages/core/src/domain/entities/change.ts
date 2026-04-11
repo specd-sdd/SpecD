@@ -56,11 +56,19 @@ export interface SignedOffEvent {
 }
 
 /** Appended when specIds or artifact content changes, superseding approvals. */
+export interface InvalidatedArtifactEntry {
+  readonly type: string
+  readonly files: readonly string[]
+}
+
+/** Appended when specIds or artifact content changes, superseding approvals. */
 export interface InvalidatedEvent {
   readonly type: 'invalidated'
   readonly at: Date
   readonly by: ActorIdentity
-  readonly cause: 'spec-change' | 'artifact-change' | 'redesign'
+  readonly cause: 'spec-change' | 'artifact-drift' | 'artifact-review-required'
+  readonly message: string
+  readonly affectedArtifacts: readonly InvalidatedArtifactEntry[]
 }
 
 /** Appended when the change is shelved to `drafts/`. */
@@ -399,38 +407,50 @@ export class Change {
    * Called when specIds or artifact content changes and supersedes any active
    * spec approval or signoff.
    *
-   * When `driftedArtifactIds` is provided, only the specified artifacts and
-   * their downstream dependents have their validation reset. When omitted,
-   * all artifacts are reset (backward-compatible fallback).
-   *
    * @param cause - The reason for invalidation
    * @param actor - Identity of the actor triggering the change
-   * @param driftedArtifactIds - Optional set of artifact type IDs that actually drifted
+   * @param message - Human-readable invalidation summary
+   * @param affectedArtifacts - Artifact/file payload that triggered the invalidation
    */
   invalidate(
     cause: InvalidatedEvent['cause'],
     actor: ActorIdentity,
-    driftedArtifactIds?: ReadonlySet<string>,
+    message: string = 'Invalidated because artifacts require review.',
+    affectedArtifacts: readonly InvalidatedArtifactEntry[] = [...this._artifacts.values()].map(
+      (artifact) => ({
+        type: artifact.type,
+        files: [...artifact.files.keys()],
+      }),
+    ),
   ): void {
     const from = this.state
     const now = new Date()
-    this._history.push({ type: 'invalidated', cause, at: now, by: actor })
+    this._history.push({
+      type: 'invalidated',
+      cause,
+      message,
+      affectedArtifacts,
+      at: now,
+      by: actor,
+    })
     // Only push a transition event when we are not already in 'designing'.
     if (from !== 'designing') {
       this._history.push({ type: 'transitioned', from, to: 'designing', at: now, by: actor })
     }
 
-    if (driftedArtifactIds === undefined) {
-      for (const artifact of this._artifacts.values()) {
-        artifact.resetValidation()
+    const affectedMap = new Map<string, readonly string[]>(
+      affectedArtifacts.map((artifact) => [artifact.type, [...artifact.files]]),
+    )
+
+    if (cause === 'artifact-drift') {
+      for (const [type, keys] of affectedMap) {
+        this._artifacts.get(type)?.markDriftedPendingReview(keys)
       }
-    } else {
-      const toReset = this._downstreamClosure(driftedArtifactIds)
-      for (const [typeId, artifact] of this._artifacts) {
-        if (toReset.has(typeId)) {
-          artifact.resetValidation()
-        }
-      }
+    }
+
+    for (const [typeId, artifact] of this._artifacts) {
+      if (affectedMap.has(typeId) && cause === 'artifact-drift') continue
+      artifact.markPendingReview()
     }
   }
 
@@ -532,7 +552,15 @@ export class Change {
     for (const key of this._specDependsOn.keys()) {
       if (!newIds.has(key)) this._specDependsOn.delete(key)
     }
-    this.invalidate('spec-change', actor)
+    this.invalidate(
+      'spec-change',
+      actor,
+      'Invalidated because the change scope changed and artifacts require review.',
+      [...this._artifacts.values()].map((artifact) => ({
+        type: artifact.type,
+        files: [...artifact.files.keys()],
+      })),
+    )
   }
 
   /**
@@ -543,20 +571,6 @@ export class Change {
   assertArchivable(): void {
     if (!this.isArchivable) {
       throw new InvalidStateTransitionError(this.state, 'archivable')
-    }
-  }
-
-  /**
-   * Resets the validation state for the specified artifacts.
-   *
-   * Called when transitioning `verifying → implementing` to clear only the
-   * artifacts listed in the `implementing` workflow step's `requires` field.
-   *
-   * @param artifactIds - The artifact type IDs whose validation is cleared
-   */
-  clearArtifactValidations(artifactIds: readonly string[]): void {
-    for (const id of artifactIds) {
-      this._artifacts.get(id)?.resetValidation()
     }
   }
 
@@ -572,7 +586,7 @@ export class Change {
    *   filename = basename from `artifactType.output`
    * - Removes files for specIds no longer in the change
    * - Removes artifacts for types no longer in the schema
-   * - Preserves existing `validatedHash` for surviving entries
+   * - Preserves existing `validatedHash` and `state` for surviving entries
    *
    * If the sync produces any changes, an `artifacts-synced` event is appended
    * to the history.
@@ -695,34 +709,6 @@ export class Change {
    */
   getArtifact(type: string): ChangeArtifact | null {
     return this._artifacts.get(type) ?? null
-  }
-
-  /**
-   * Computes the transitive downstream closure from a set of seed artifact IDs.
-   *
-   * Starting from the seeds, iteratively adds any artifact whose `requires`
-   * list includes an artifact already in the closure, until no more can be added.
-   *
-   * @param seeds - The initial set of artifact type IDs
-   * @returns A set containing the seeds plus all their transitive dependents
-   */
-  private _downstreamClosure(seeds: ReadonlySet<string>): Set<string> {
-    const closure = new Set(seeds)
-    let changed = true
-    while (changed) {
-      changed = false
-      for (const [typeId, artifact] of this._artifacts) {
-        if (closure.has(typeId)) continue
-        for (const req of artifact.requires) {
-          if (closure.has(req)) {
-            closure.add(typeId)
-            changed = true
-            break
-          }
-        }
-      }
-    }
-    return closure
   }
 
   /**

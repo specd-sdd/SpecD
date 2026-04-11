@@ -23,31 +23,38 @@ specIds) produce one row per file. Single-file artifacts produce one row.
 In `text` mode (default), each file is listed on one line:
 
 ```
-<id>  <effectiveStatus>  <exists>
+<id>  <artifact-state>  <file-state>  <exists>  <absolute-path>
 ```
 
 For multi-file artifacts, `<id>` includes the file key: `<artifact-id> [<file-key>]`.
 For single-file artifacts, `<id>` is just the artifact type id.
 
 When an artifact has no files yet (not synced), a summary row is shown with the
-artifact-level `effectiveStatus`.
+artifact-level `state`.
 
 In `json` or `toon` mode, the output is (encoded in the respective format):
 
 ```json
 {
   "name": "<change-name>",
+  "changeDir": "<absolute-change-dir>",
   "artifacts": [
     {
-      "id": "proposal",
+      "artifactType": "proposal",
+      "artifactState": "complete",
+      "fileKey": "proposal",
       "filename": "proposal.md",
-      "effectiveStatus": "complete",
+      "path": "/abs/path/proposal.md",
+      "fileState": "complete",
       "exists": true
     },
     {
-      "id": "specs [default:auth/login]",
+      "artifactType": "specs",
+      "artifactState": "drifted-pending-review",
+      "fileKey": "default:auth/login",
       "filename": "specs/default/auth/login/spec.md",
-      "effectiveStatus": "in-progress",
+      "path": "/abs/path/specs/default/auth/login/spec.md",
+      "fileState": "drifted-pending-review",
       "exists": true
     }
   ]
@@ -79,5 +86,5 @@ tasks                         missing       no
 
 ## Spec Dependencies
 
-- [`cli:cli/entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
-- [`core:core/change`](../../core/change/spec.md) — artifact status derivation, change directory structure
+- [`cli:cli/entrypoint`](../entrypoint/spec.md) — CLI config discovery, exit codes, and output conventions
+- [`core:core/change`](../../core/change/spec.md) — artifact and file state model used for listing

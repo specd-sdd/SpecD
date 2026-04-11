@@ -102,7 +102,17 @@ If the user provided a change name, or selected one from the list:
 specd change status <name> --format json
 ```
 
-Read `state` and suggest the next skill:
+Read `state` and `review` from the response.
+
+If `review.required` is `true`, this change has artifacts or files that must be
+reviewed before any other skill continues. Summarize `review.reason` and
+`review.affectedArtifacts`, then suggest:
+
+- `/specd-design <name>`
+
+Do NOT suggest implementation, verification, or archive while review is required.
+
+If `review.required` is `false`, suggest the next skill based on `state`:
 
 | State                   | Suggest                                                                                            |
 | ----------------------- | -------------------------------------------------------------------------------------------------- |
