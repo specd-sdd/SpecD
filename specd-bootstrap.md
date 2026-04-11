@@ -71,7 +71,6 @@ specd/                          ← monorepo root
 │   ├── schema-std/             ← @specd/schema-std — default schema.yaml + templates
 │   ├── mcp/                    ← @specd/mcp — MCP server (scaffolded)
 │   ├── skills/                 ← @specd/skills — skill registry (redesigning)
-│   ├── schema-openspec/        ← @specd/schema-openspec — OpenSpec schema (scaffolded)
 │   └── plugins/                ← @specd/plugin-{claude,copilot,codex} — scaffolded
 ├── specs/                      ← project specs (the authoritative requirements)
 │   ├── _global/                ← 7 global constraint specs (architecture, conventions, etc.)

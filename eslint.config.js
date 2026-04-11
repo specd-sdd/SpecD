@@ -15,7 +15,6 @@ export default tseslint.config(
       '**/*.mjs',
       '**/.history/**',
       'packages/schema-std/**',
-      'packages/schema-openspec/**',
       'packages/mcp/**',
       'packages/skills/**',
       'packages/plugins/**',
@@ -165,11 +164,7 @@ export default tseslint.config(
 
   // Test files (specs and helpers) — relax all quality rules
   {
-    files: [
-      'packages/*/test/**/*.ts',
-      'apps/*/test/**/*.ts',
-      'apps/*/test/**/*.tsx',
-    ],
+    files: ['packages/*/test/**/*.ts', 'apps/*/test/**/*.ts', 'apps/*/test/**/*.tsx'],
     rules: {
       'jsdoc/require-jsdoc': 'off',
       'jsdoc/require-description': 'off',

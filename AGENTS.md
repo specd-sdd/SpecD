@@ -114,7 +114,6 @@ specd/
 │   ├── mcp/               # @specd/mcp — MCP server adapter (stub)
 │   ├── skills/            # @specd/skills — skill registry API
 │   ├── schema-std/        # @specd/schema-std — default schema
-│   ├── schema-openspec/   # @specd/schema-openspec — OpenSpec-compatible schema (stub)
 │   └── plugins/
 │       ├── claude/        # @specd/plugin-claude (stub)
 │       ├── copilot/       # @specd/plugin-copilot (stub)
