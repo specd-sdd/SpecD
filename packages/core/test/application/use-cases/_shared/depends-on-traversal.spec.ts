@@ -53,7 +53,7 @@ describe('traverseDependsOn', () => {
     expect(metaWarnings[0]!.path).toBe('default:auth/shared')
   })
 
-  it('detects cycles and emits warning', async () => {
+  it('detects cycles and stops quietly', async () => {
     const repo = makeSpecRepository({
       specs: [makeSpec('a/one'), makeSpec('a/two')],
       artifacts: {
@@ -80,10 +80,11 @@ describe('traverseDependsOn', () => {
       0,
     )
 
-    // a/two tries to traverse back to a/one → cycle detected
+    // a/two tries to traverse back to a/one → cycle cut without warning
     const cycleWarning = warnings.find((w) => w.type === 'cycle')
-    expect(cycleWarning).toBeDefined()
-    expect(cycleWarning!.path).toBe('default:a/one')
+    expect(cycleWarning).toBeUndefined()
+    expect(added.has('default:a/one')).toBe(true)
+    expect(added.has('default:a/two')).toBe(true)
   })
 
   it('respects maxDepth', async () => {

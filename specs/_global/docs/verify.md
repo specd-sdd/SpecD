@@ -57,6 +57,11 @@
 - **WHEN** a new `specd` command is added to `@specd/cli`
 - **THEN** a corresponding `docs/cli/<command>.md` file must be created in the same change
 
+#### Scenario: Output contract changes without doc update
+
+- **WHEN** an existing `specd` command changes its output semantics, caching behavior, or other documented response contract
+- **THEN** the corresponding `docs/cli/` reference must be updated in the same change
+
 ### Requirement: MCP documentation
 
 #### Scenario: New MCP tool without docs

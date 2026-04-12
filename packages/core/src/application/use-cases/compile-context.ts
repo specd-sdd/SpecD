@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto'
 import { type SpecMetadata } from '../../domain/services/parse-metadata.js'
 import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
 import { SchemaMismatchError } from '../errors/schema-mismatch-error.js'
@@ -22,6 +21,28 @@ import { listMatchingSpecs, type ResolvedSpec } from './_shared/spec-pattern-mat
 import { traverseDependsOn, type DependsOnFallback } from './_shared/depends-on-traversal.js'
 import { compileContextFingerprint } from './_shared/compile-context-fingerprint.js'
 import { createExtractorTransformContext } from './_shared/extractor-transform-context.js'
+
+const CONTEXT_SOURCE_PRIORITY: Record<ContextSpecSource, number> = {
+  includePattern: 0,
+  dependsOnTraversal: 1,
+  specDependsOn: 2,
+  specIds: 3,
+}
+
+/** Ordered schema artifact descriptor used to resolve displayable spec files. */
+interface SpecArtifactDescriptor {
+  readonly artifactId: string
+  readonly filename: string
+  readonly format: string
+}
+
+/** A resolved spec-scoped file ready for rendering or metadata extraction. */
+interface SpecContentFile {
+  readonly artifactId: string
+  readonly filename: string
+  readonly content: string
+  readonly format: string
+}
 
 export { type ContextWarning } from './_shared/context-warning.js'
 
@@ -47,7 +68,7 @@ export interface CompileContextConfig {
   /**
    * Controls how specs are rendered in the result.
    *
-   * - `'lazy'` (default) — tier 1 specs (specIds + specDependsOn) in full; tier 2 as summaries.
+   * - `'lazy'` (default) — only `specIds` render in full; all other collected specs render as summaries.
    * - `'full'` — all specs rendered with full content.
    */
   readonly contextMode?: 'full' | 'lazy'
@@ -225,30 +246,54 @@ export class CompileContext {
 
     const warnings: ContextWarning[] = []
 
-    // --- Source tracking: build sets for tier classification ---
+    // --- Source tracking: build seed sets for collection and tier classification ---
     const specIdsSet = new Set(change.specIds)
     const specDependsOnSet = new Set<string>()
-    for (const deps of change.specDependsOn.values()) {
-      for (const dep of deps) specDependsOnSet.add(dep)
-    }
     const sourceMap = new Map<string, ContextSpecSource>()
+    const collectedSpecs = new Map<string, ResolvedSpec>()
+    const protectedKeys = new Set<string>()
 
-    // Pre-populate sources for specIds and specDependsOn
-    for (const id of specIdsSet) sourceMap.set(id, 'specIds')
-    for (const id of specDependsOnSet) {
-      if (!sourceMap.has(id)) sourceMap.set(id, 'specDependsOn')
+    const registerCollectedSpec = (
+      spec: ResolvedSpec,
+      source: ContextSpecSource,
+      opts: { protect?: boolean } = {},
+    ): void => {
+      const key = `${spec.workspace}:${spec.capPath}`
+      if (!collectedSpecs.has(key)) {
+        collectedSpecs.set(key, spec)
+      }
+
+      const existingSource = sourceMap.get(key)
+      if (
+        existingSource === undefined ||
+        CONTEXT_SOURCE_PRIORITY[source] > CONTEXT_SOURCE_PRIORITY[existingSource]
+      ) {
+        sourceMap.set(key, source)
+      }
+
+      if (opts.protect === true) protectedKeys.add(key)
+    }
+
+    for (const specId of change.specIds) {
+      const { workspace, capPath } = parseSpecId(specId)
+      registerCollectedSpec({ workspace, capPath }, 'specIds', { protect: true })
+    }
+
+    for (const deps of change.specDependsOn.values()) {
+      for (const dep of deps) {
+        if (specDependsOnSet.has(dep)) continue
+        specDependsOnSet.add(dep)
+        const { workspace, capPath } = parseSpecId(dep)
+        registerCollectedSpec({ workspace, capPath }, 'specDependsOn', { protect: true })
+      }
     }
 
     // --- 5-step context spec collection ---
-    const includedSpecs = new Map<string, ResolvedSpec>()
-
     // Step 1: Project-level include patterns (all workspaces, bare * = all)
     for (const pattern of input.config.contextIncludeSpecs ?? []) {
       const matches = await listMatchingSpecs(pattern, 'default', true, this._specs, warnings)
       for (const spec of matches) {
-        const key = `${spec.workspace}:${spec.capPath}`
-        if (!includedSpecs.has(key)) includedSpecs.set(key, spec)
-        if (!sourceMap.has(key)) sourceMap.set(key, 'includePattern')
+        registerCollectedSpec(spec, 'includePattern')
       }
     }
 
@@ -260,7 +305,9 @@ export class CompileContext {
         projectExcludedKeys.add(`${spec.workspace}:${spec.capPath}`)
       }
     }
-    for (const key of projectExcludedKeys) includedSpecs.delete(key)
+    for (const key of projectExcludedKeys) {
+      if (!protectedKeys.has(key)) collectedSpecs.delete(key)
+    }
 
     // Step 3: Workspace-level include patterns (active workspaces only)
     const activeWorkspaces = new Set(change.workspaces)
@@ -270,9 +317,7 @@ export class CompileContext {
       for (const pattern of wsConfig.contextIncludeSpecs ?? []) {
         const matches = await listMatchingSpecs(pattern, wsName, false, this._specs, warnings)
         for (const spec of matches) {
-          const key = `${spec.workspace}:${spec.capPath}`
-          if (!includedSpecs.has(key)) includedSpecs.set(key, spec)
-          if (!sourceMap.has(key)) sourceMap.set(key, 'includePattern')
+          registerCollectedSpec(spec, 'includePattern')
         }
       }
     }
@@ -283,7 +328,8 @@ export class CompileContext {
       for (const pattern of wsConfig.contextExcludeSpecs ?? []) {
         const matches = await listMatchingSpecs(pattern, wsName, false, this._specs, warnings)
         for (const spec of matches) {
-          includedSpecs.delete(`${spec.workspace}:${spec.capPath}`)
+          const key = `${spec.workspace}:${spec.capPath}`
+          if (!protectedKeys.has(key)) collectedSpecs.delete(key)
         }
       }
     }
@@ -345,7 +391,7 @@ export class CompileContext {
             await traverseDependsOn(
               dw,
               dp,
-              includedSpecs,
+              collectedSpecs,
               dependsOnAdded,
               depSeen,
               new Set<string>(),
@@ -360,19 +406,12 @@ export class CompileContext {
       }
 
       // Tag dependsOn discoveries — dependsOnTraversal has higher priority than includePattern
-      for (const [key] of dependsOnAdded) {
-        const existing = sourceMap.get(key)
-        if (existing === undefined || existing === 'includePattern') {
-          sourceMap.set(key, 'dependsOnTraversal')
-        }
+      for (const [, spec] of dependsOnAdded) {
+        registerCollectedSpec(spec, 'dependsOnTraversal')
       }
     }
 
-    // Merge: includedSpecs first (preserve order), then dependsOnAdded
-    const allSpecs: ResolvedSpec[] = [...includedSpecs.values()]
-    for (const [key, spec] of dependsOnAdded) {
-      if (!includedSpecs.has(key)) allSpecs.push(spec)
-    }
+    const allSpecs: ResolvedSpec[] = [...collectedSpecs.values()]
 
     // --- Tier classification ---
     const contextMode = input.config.contextMode ?? 'lazy'
@@ -394,7 +433,6 @@ export class CompileContext {
 
     // --- Part 1: Project context entries ---
     const projectContext: ProjectContextEntry[] = []
-    const fileHashes = new Map<string, string>()
     for (const entry of input.config.context ?? []) {
       if ('instruction' in entry) {
         projectContext.push({ source: 'instruction', content: entry.instruction })
@@ -408,12 +446,14 @@ export class CompileContext {
           })
         } else {
           projectContext.push({ source: 'file', path: entry.file, content })
-          fileHashes.set(entry.file, this._hashContent(content))
         }
       }
     }
 
     // --- Part 2: Spec entries ---
+    const specArtifactDescriptors = this._listSpecArtifactDescriptors(schema)
+    const sectionsFilter = input.sections
+    const showAllSections = sectionsFilter === undefined
     const specs: ContextSpecEntry[] = []
     for (const { workspace, capPath } of allSpecs) {
       const specRepo = this._specs.get(workspace)
@@ -433,9 +473,7 @@ export class CompileContext {
 
       // Determine mode based on contextMode and source
       const mode: 'full' | 'summary' =
-        contextMode === 'lazy' && source !== 'specIds' && source !== 'specDependsOn'
-          ? 'summary'
-          : 'full'
+        contextMode === 'lazy' && source !== 'specIds' ? 'summary' : 'full'
 
       // Extract title and description from metadata (needed for both modes)
       let title = ''
@@ -446,17 +484,15 @@ export class CompileContext {
         description = metadata.description ?? ''
       }
 
-      // If no title from metadata, extract from spec heading
-      if (title === '') {
-        const specArtifact = await specRepo.artifact(spec, 'spec.md')
-        if (specArtifact !== null) {
-          const headingMatch = /^#\s+(.+)/m.exec(specArtifact.content)
-          if (headingMatch !== null && headingMatch[1] !== undefined) title = headingMatch[1]
-        }
-      }
+      let baseFiles: SpecContentFile[] | undefined
+      let mergedFiles: SpecContentFile[] | undefined
 
       if (mode === 'summary') {
         // Tier 2: summary only — no content rendering
+        if (title === '') {
+          baseFiles = await this._loadBaseSpecFiles(specRepo, spec, specArtifactDescriptors)
+          title = this._extractTitleFromFiles(baseFiles)
+        }
         if (metadata === null) {
           warnings.push({
             type: 'stale-metadata',
@@ -481,9 +517,8 @@ export class CompileContext {
             warnings.push({ type: 'preview', path: specId, message: w })
           }
           if (preview.files.length > 0) {
-            // Use merged content from spec.md entry, or first file
-            const specMdEntry = preview.files.find((f) => f.filename === 'spec.md')
-            content = (specMdEntry ?? preview.files[0])!.merged
+            baseFiles = await this._loadBaseSpecFiles(specRepo, spec, specArtifactDescriptors)
+            mergedFiles = this._mergePreviewFiles(preview.files, baseFiles, specArtifactDescriptors)
           }
         } catch {
           warnings.push({
@@ -494,49 +529,67 @@ export class CompileContext {
         }
       }
 
+      const displayFiles =
+        mergedFiles ??
+        (baseFiles ??= await this._loadBaseSpecFiles(specRepo, spec, specArtifactDescriptors))
+
+      if (title === '') {
+        title = this._extractTitleFromFiles(displayFiles)
+      }
+
       // Fall back to metadata or extraction if preview didn't produce content
       if (content === undefined) {
-        let isFresh = false
-        if (metadata !== null) {
-          isFresh = await this._isMetadataFresh(specRepo, spec, metadata)
-        }
-
-        const sectionsFilter = input.sections
-        const showAll = sectionsFilter === undefined
-
-        if (isFresh && metadata !== null) {
-          content = this._renderFromMetadata(metadata, sectionsFilter, showAll)
-        } else {
-          if (metadata !== null) {
-            warnings.push({
-              type: 'stale-metadata',
-              path: specId,
-              message: `Metadata for '${specId}' is stale — falling back to raw artifact content`,
-            })
-          } else {
-            warnings.push({
-              type: 'stale-metadata',
-              path: specId,
-              message: `No metadata for '${specId}' — falling back to raw artifact content`,
-            })
-          }
-
+        if (showAllSections) {
+          content = this._renderSpecFiles(displayFiles)
+        } else if (mergedFiles !== undefined) {
           const extraction = schema.metadataExtraction()
-          let fallbackParts: string[] = []
-
           if (extraction !== undefined) {
-            fallbackParts = await this._extractionFallback(
-              specRepo,
-              spec,
-              schema,
+            content = this._renderExtractedSectionsFromFiles(
+              mergedFiles,
               extraction,
-              specId,
+              workspace,
+              capPath,
               sectionsFilter,
-              showAll,
             )
+          } else {
+            content = ''
+          }
+        } else {
+          let isFresh = false
+          if (metadata !== null) {
+            isFresh = await this._isMetadataFresh(specRepo, spec, metadata)
           }
 
-          content = fallbackParts.join('\n\n')
+          if (isFresh && metadata !== null) {
+            content = this._renderFromMetadata(metadata, sectionsFilter, showAllSections)
+          } else {
+            if (metadata !== null) {
+              warnings.push({
+                type: 'stale-metadata',
+                path: specId,
+                message: `Metadata for '${specId}' is stale — falling back to raw artifact content`,
+              })
+            } else {
+              warnings.push({
+                type: 'stale-metadata',
+                path: specId,
+                message: `No metadata for '${specId}' — falling back to raw artifact content`,
+              })
+            }
+
+            const extraction = schema.metadataExtraction()
+            if (extraction !== undefined) {
+              content = this._renderExtractedSectionsFromFiles(
+                displayFiles,
+                extraction,
+                workspace,
+                capPath,
+                sectionsFilter,
+              )
+            } else {
+              content = ''
+            }
+          }
         }
       }
 
@@ -561,20 +614,14 @@ export class CompileContext {
     }
 
     // --- Calculate fingerprint (after all fields are ready) ---
-    const fingerprintInput = {
-      specIds: change.specIds,
-      contextEntries: input.config.context ?? [],
-      contextIncludeSpecs: input.config.contextIncludeSpecs ?? [],
-      contextExcludeSpecs: input.config.contextExcludeSpecs ?? [],
-      workspaces: input.config.workspaces ?? {},
-      step: input.step,
-      schemaVersion: schema.version(),
-      followDeps: input.followDeps ?? false,
-      depth: input.depth,
-      sections: input.sections,
-      fileHashes,
-    }
-    const currentFingerprint = compileContextFingerprint(fingerprintInput)
+    const currentFingerprint = compileContextFingerprint({
+      stepAvailable,
+      blockingArtifacts,
+      projectContext,
+      specs,
+      availableSteps,
+      warnings,
+    })
 
     // If fingerprint matches, omit context content but keep everything else
     if (input.fingerprint !== undefined && input.fingerprint === currentFingerprint) {
@@ -645,6 +692,173 @@ export class CompileContext {
   }
 
   /**
+   * Returns schema artifact descriptors for all spec-scoped artifacts in display order.
+   *
+   * `spec.md` is ordered first when present; remaining files are ordered alphabetically.
+   *
+   * @param schema - The active schema
+   * @returns Ordered spec-scoped artifact descriptors
+   */
+  private _listSpecArtifactDescriptors(
+    schema: import('../../domain/value-objects/schema.js').Schema,
+  ): SpecArtifactDescriptor[] {
+    return schema
+      .artifacts()
+      .filter((artifactType) => artifactType.scope === 'spec')
+      .map((artifactType) => {
+        const filename = artifactType.output.split('/').pop()!
+        return {
+          artifactId: artifactType.id,
+          filename,
+          format: artifactType.format ?? inferFormat(filename) ?? 'plaintext',
+        }
+      })
+      .sort((a, b) => {
+        if (a.filename === 'spec.md') return -1
+        if (b.filename === 'spec.md') return 1
+        return a.filename.localeCompare(b.filename)
+      })
+  }
+
+  /**
+   * Loads the current base content for all spec-scoped artifacts defined by the schema.
+   *
+   * @param specRepo - Repository for loading base spec artifacts
+   * @param spec - The target spec
+   * @param descriptors - Ordered schema artifact descriptors
+   * @returns Ordered content entries for existing base files
+   */
+  private async _loadBaseSpecFiles(
+    specRepo: SpecRepository,
+    spec: Spec,
+    descriptors: readonly SpecArtifactDescriptor[],
+  ): Promise<SpecContentFile[]> {
+    const files: SpecContentFile[] = []
+
+    for (const descriptor of descriptors) {
+      const artifactFile = await specRepo.artifact(spec, descriptor.filename)
+      if (artifactFile === null) continue
+      files.push({
+        artifactId: descriptor.artifactId,
+        filename: descriptor.filename,
+        content: artifactFile.content,
+        format: descriptor.format,
+      })
+    }
+
+    return files
+  }
+
+  /**
+   * Overlays merged preview files on top of the base artifact set, preserving schema order.
+   *
+   * Unchanged base files remain in the output so full rendering shows the complete spec.
+   *
+   * @param previewFiles - Files returned by `PreviewSpec`
+   * @param baseFiles - Base artifact files loaded from the repository
+   * @param descriptors - Ordered schema artifact descriptors
+   * @returns Ordered merged file set for display or extraction
+   */
+  private _mergePreviewFiles(
+    previewFiles: readonly { filename: string; merged: string }[],
+    baseFiles: readonly SpecContentFile[],
+    descriptors: readonly SpecArtifactDescriptor[],
+  ): SpecContentFile[] {
+    const baseByFilename = new Map(baseFiles.map((file) => [file.filename, file]))
+    const previewByFilename = new Map(previewFiles.map((file) => [file.filename, file]))
+    const merged: SpecContentFile[] = []
+
+    for (const descriptor of descriptors) {
+      const preview = previewByFilename.get(descriptor.filename)
+      if (preview !== undefined) {
+        merged.push({
+          artifactId: descriptor.artifactId,
+          filename: descriptor.filename,
+          content: preview.merged,
+          format: descriptor.format,
+        })
+        continue
+      }
+
+      const base = baseByFilename.get(descriptor.filename)
+      if (base !== undefined) merged.push(base)
+    }
+
+    return merged
+  }
+
+  /**
+   * Extracts a best-effort title from the ordered artifact files by scanning for an H1 heading.
+   *
+   * @param files - Ordered artifact files
+   * @returns The first discovered H1 text, or an empty string
+   */
+  private _extractTitleFromFiles(files: readonly SpecContentFile[]): string {
+    for (const file of files) {
+      const headingMatch = /^#\s+(.+)/m.exec(file.content)
+      if (headingMatch !== null && headingMatch[1] !== undefined) {
+        return headingMatch[1]
+      }
+    }
+    return ''
+  }
+
+  /**
+   * Renders ordered spec-scoped files into one readable text block with filename labels.
+   *
+   * @param files - Ordered files to render
+   * @returns Concatenated content string
+   */
+  private _renderSpecFiles(files: readonly SpecContentFile[]): string {
+    return files.map((file) => `#### ${file.filename}\n\n${file.content}`).join('\n\n')
+  }
+
+  /**
+   * Parses a file set and extracts section-filtered metadata content from it.
+   *
+   * @param files - Ordered source files to extract from
+   * @param extraction - Schema metadata extraction declarations
+   * @param workspace - Workspace owning the spec
+   * @param specPath - Capability path for transform context
+   * @param sectionsFilter - Required selected sections
+   * @returns Rendered section content
+   */
+  private _renderExtractedSectionsFromFiles(
+    files: readonly SpecContentFile[],
+    extraction: import('../../domain/value-objects/metadata-extraction.js').MetadataExtraction,
+    workspace: string,
+    specPath: string,
+    sectionsFilter: ReadonlyArray<SpecSection>,
+  ): string {
+    const astsByArtifact = new Map<string, { root: SelectorNode }>()
+    const renderers = new Map<string, SubtreeRenderer>()
+    const transformContexts = new Map<string, ReturnType<typeof createExtractorTransformContext>>()
+
+    for (const file of files) {
+      const parser = this._parsers.get(file.format)
+      if (parser === undefined) continue
+
+      const ast = parser.parse(file.content)
+      astsByArtifact.set(file.artifactId, ast)
+      renderers.set(file.artifactId, parser as SubtreeRenderer)
+      transformContexts.set(
+        file.artifactId,
+        createExtractorTransformContext(workspace, specPath, file.artifactId, file.filename),
+      )
+    }
+
+    const extracted = extractMetadata(
+      extraction,
+      astsByArtifact,
+      renderers,
+      this._extractorTransforms,
+      transformContexts,
+    )
+
+    return this._renderFromMetadata(extracted, sectionsFilter, false)
+  }
+
+  /**
    * Extracts `dependsOn` from spec content using the schema's metadata extraction
    * declarations as a best-effort fallback.
    *
@@ -658,30 +872,33 @@ export class CompileContext {
     spec: Spec,
     fallback: DependsOnFallback,
   ): Promise<string[] | undefined> {
+    const descriptors = fallback.schemaArtifacts
+      .filter((artifactType) => artifactType.scope === 'spec')
+      .map((artifactType) => ({
+        artifactId: artifactType.id,
+        filename: artifactType.output.split('/').pop()!,
+        format:
+          artifactType.format ?? inferFormat(artifactType.output.split('/').pop()!) ?? 'plaintext',
+      }))
+    const files = await this._loadBaseSpecFiles(specRepo, spec, descriptors)
     const astsByArtifact = new Map<string, { root: SelectorNode }>()
     const renderers = new Map<string, SubtreeRenderer>()
     const transformContexts = new Map<string, ReturnType<typeof createExtractorTransformContext>>()
 
-    for (const artifactType of fallback.schemaArtifacts) {
-      if (artifactType.scope !== 'spec') continue
-      const filename = artifactType.output.split('/').pop()!
-      const format = artifactType.format ?? inferFormat(filename) ?? 'plaintext'
-      const parser = this._parsers.get(format)
+    for (const file of files) {
+      const parser = this._parsers.get(file.format)
       if (parser === undefined) continue
 
-      const artifactFile = await specRepo.artifact(spec, filename)
-      if (artifactFile === null) continue
-
-      const ast = parser.parse(artifactFile.content)
-      astsByArtifact.set(artifactType.id, ast)
-      renderers.set(artifactType.id, parser as SubtreeRenderer)
+      const ast = parser.parse(file.content)
+      astsByArtifact.set(file.artifactId, ast)
+      renderers.set(file.artifactId, parser as SubtreeRenderer)
       transformContexts.set(
-        artifactType.id,
+        file.artifactId,
         createExtractorTransformContext(
           spec.workspace,
           spec.name.toString(),
-          artifactType.id,
-          filename,
+          file.artifactId,
+          file.filename,
         ),
       )
     }
@@ -696,92 +913,6 @@ export class CompileContext {
       transformContexts,
     )
     return extracted.dependsOn
-  }
-
-  /**
-   * Falls back to the metadataExtraction engine when metadata is stale/absent.
-   *
-   * @param specRepo - Repository for loading spec artifacts
-   * @param spec - The spec entity to extract metadata from
-   * @param schema - The resolved schema with artifact definitions
-   * @param extraction - The metadata extraction declarations from the schema
-   * @param specLabel - Display label for the spec (e.g. `workspace:capPath`)
-   * @param sectionsFilter - Optional filter to include only specific sections
-   * @param showAll - Whether to include all sections regardless of filter
-   * @returns Rendered context parts as strings
-   */
-  private async _extractionFallback(
-    specRepo: SpecRepository,
-    spec: Spec,
-    schema: import('../../domain/value-objects/schema.js').Schema,
-    extraction: import('../../domain/value-objects/metadata-extraction.js').MetadataExtraction,
-    specLabel: string,
-    sectionsFilter: ReadonlyArray<SpecSection> | undefined,
-    showAll: boolean,
-  ): Promise<string[]> {
-    const astsByArtifact = new Map<string, { root: SelectorNode }>()
-    const renderers = new Map<string, SubtreeRenderer>()
-    const transformContexts = new Map<string, ReturnType<typeof createExtractorTransformContext>>()
-
-    for (const artifactType of schema.artifacts()) {
-      if (artifactType.scope !== 'spec') continue
-      const filename = artifactType.output.split('/').pop()!
-      const format = artifactType.format ?? inferFormat(filename) ?? 'plaintext'
-      const parser = this._parsers.get(format)
-      if (parser === undefined) continue
-
-      const artifactFile = await specRepo.artifact(spec, filename)
-      if (artifactFile === null) continue
-
-      const ast = parser.parse(artifactFile.content)
-      astsByArtifact.set(artifactType.id, ast)
-      renderers.set(artifactType.id, parser as SubtreeRenderer)
-      transformContexts.set(
-        artifactType.id,
-        createExtractorTransformContext(
-          spec.workspace,
-          spec.name.toString(),
-          artifactType.id,
-          filename,
-        ),
-      )
-    }
-
-    const extracted = extractMetadata(
-      extraction,
-      astsByArtifact,
-      renderers,
-      this._extractorTransforms,
-      transformContexts,
-    )
-    const metaParts: string[] = []
-
-    if (showAll && extracted.description !== undefined) {
-      metaParts.push(`**Description:** ${extracted.description}`)
-    }
-    if ((showAll || sectionsFilter?.includes('rules')) && extracted.rules?.length) {
-      const rulesText = extracted.rules
-        .map((r) => `##### ${r.requirement}\n${r.rules.map((rule) => `- ${rule}`).join('\n')}`)
-        .join('\n\n')
-      metaParts.push(`#### Rules\n\n${rulesText}`)
-    }
-    if ((showAll || sectionsFilter?.includes('constraints')) && extracted.constraints?.length) {
-      metaParts.push(`#### Constraints\n\n${extracted.constraints.map((c) => `- ${c}`).join('\n')}`)
-    }
-    if ((showAll || sectionsFilter?.includes('scenarios')) && extracted.scenarios?.length) {
-      const scenariosText = extracted.scenarios
-        .map((s) => {
-          const lines: string[] = [`##### Scenario: ${s.name}`, `*Requirement: ${s.requirement}*`]
-          if (s.given?.length) lines.push(`**Given:** ${s.given.join('; ')}`)
-          if (s.when?.length) lines.push(`**When:** ${s.when.join('; ')}`)
-          if (s.then?.length) lines.push(`**Then:** ${s.then.join('; ')}`)
-          return lines.join('\n')
-        })
-        .join('\n\n')
-      metaParts.push(`#### Scenarios\n\n${scenariosText}`)
-    }
-
-    return metaParts
   }
 
   /**
@@ -807,15 +938,5 @@ export class CompileContext {
       (c) => this._hasher.hash(c),
     )
     return result.allFresh
-  }
-
-  /**
-   * Hashes content using SHA-256 for fingerprint calculation.
-   *
-   * @param content - The content string to hash
-   * @returns The SHA-256 hash of the content
-   */
-  private _hashContent(content: string): string {
-    return createHash('sha256').update(content).digest('hex')
   }
 }

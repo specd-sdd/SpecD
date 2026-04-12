@@ -34,7 +34,7 @@
 - **GIVEN** the current context fingerprint is `sha256:abc123...`
 - **WHEN** `specd change context my-change designing --fingerprint sha256:abc123... --format json` is called
 - **THEN** the JSON output contains `contextFingerprint`, `status: "unchanged"`, `stepAvailable`, `blockingArtifacts`, `availableSteps`, and `warnings`
-- **AND** `projectContext` and `specs` are absent (the agent uses its cached values)
+- **AND** `projectContext` and `specs` are absent because the agent uses its cached values
 
 #### Scenario: JSON output returns full context when fingerprint does not match
 
@@ -45,12 +45,35 @@
 - **AND** `contextFingerprint` is `sha256:xyz789...`
 - **AND** `status` is `"changed"`
 
-#### Scenario: Text output shows unchanged message when fingerprint matches
+#### Scenario: Text output begins with fingerprint before context sections
+
+- **GIVEN** the current context fingerprint is `sha256:abc123...`
+- **WHEN** `specd change context my-change designing --format text` is called
+- **THEN** the first rendered line is `Context Fingerprint: sha256:abc123...`
+- **AND** any project context, spec content, or available steps appear after that line
+
+#### Scenario: Text output shows fingerprint and unchanged message when fingerprint matches
 
 - **GIVEN** the current context fingerprint is `sha256:abc123...`
 - **WHEN** `specd change context my-change designing --fingerprint sha256:abc123... --format text` is called
-- **THEN** the output is `Context unchanged since last call.`
+- **THEN** the output begins with `Context Fingerprint: sha256:abc123...`
+- **AND** it then prints `Context unchanged since last call.`
 - **AND** no spec content is printed
+
+#### Scenario: Text output labels full-mode specs explicitly
+
+- **GIVEN** `CompileContext` returns a full-mode spec entry for `core:core/compile-context`
+- **WHEN** `specd change context <name> <step>` is called with `--format text`
+- **THEN** the rendered block for `core:core/compile-context` includes an explicit full-mode label
+- **AND** the reader can identify that the rendered content is complete without inferring it from the title alone
+
+#### Scenario: Text output labels summary-mode specs explicitly
+
+- **GIVEN** `config.contextMode: 'lazy'`
+- **AND** a spec has `mode: 'summary'`
+- **WHEN** `specd change context <name> <step>` is called with `--format text`
+- **THEN** the rendered summary entry includes an explicit summary-mode label
+- **AND** the section still instructs the reader to use `specd spec show <spec-id>` for full content
 
 #### Scenario: JSON output — structured result with mode and source
 
@@ -64,12 +87,6 @@
 - **AND** a spec has `mode: 'summary'`
 - **WHEN** `specd change context <name> <step>` is called with `--format json`
 - **THEN** the spec entry in JSON has `specId`, `title`, `description`, `source`, `mode` but no `content` field
-
-#### Scenario: Full mode — text output unchanged from previous behaviour
-
-- **GIVEN** `config.contextMode: 'full'` (or not set)
-- **WHEN** `specd change context <name> <step>` is called with `--format text`
-- **THEN** all specs are rendered with full content — no `## Available context specs` section appears
 
 #### Scenario: dependsOn not followed by default
 
@@ -121,6 +138,13 @@
 - **THEN** stderr contains a `warning:` line for the stale spec
 - **AND** the context output is still printed to stdout
 - **AND** the process exits with code 0
+
+#### Scenario: dependsOn cycles do not produce warning lines
+
+- **GIVEN** dependency traversal encounters a `dependsOn` cycle while compiling context
+- **WHEN** `specd change context my-change designing --follow-deps` is run
+- **THEN** stderr does not include a warning line solely for the cycle
+- **AND** the command still returns the compiled context
 
 ### Requirement: Error cases
 

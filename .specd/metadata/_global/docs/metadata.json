@@ -33,7 +33,7 @@
     {
       "requirement": "CLI documentation",
       "rules": [
-        "Every `specd` command has a corresponding doc file in `docs/cli/` describing its purpose, flags, examples, and exit codes."
+        "Every `specd` command has a corresponding doc file in `docs/cli/` describing its purpose, flags, examples, and exit codes.\n\nWhen a command's contract includes command-specific output semantics, caching semantics, or other machine-consumed response behavior, the corresponding CLI documentation MUST describe those behaviors clearly enough for a reader to understand how the command behaves without reading the implementation.\n\nChanges to a command's documented output contract MUST update the corresponding `docs/cli/` reference in the same change."
       ]
     },
     {
@@ -129,6 +129,14 @@
       "then": ["a corresponding docs/cli/<command>.md file must be created in the same change"]
     },
     {
+      "requirement": "CLI documentation",
+      "name": "Output contract changes without doc update",
+      "when": [
+        "an existing specd command changes its output semantics, caching behavior, or other documented response contract"
+      ],
+      "then": ["the corresponding docs/cli/ reference must be updated in the same change"]
+    },
+    {
       "requirement": "MCP documentation",
       "name": "New MCP tool without docs",
       "when": ["a new tool is added to @specd/mcp"],
@@ -154,8 +162,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:144f9390f27b907615d32199b60d4eb4961175dc982cb7abd9a9d71a168db5d1",
-    "verify.md": "sha256:2bed20f27ce16cffa390fd112ffdc02f1d36ab49c3882c1176c30c328597feb2"
+    "spec.md": "sha256:133c8794e9d440808d2d236cbd5f1c4264d3c8c8687815c470196fbdc712026c",
+    "verify.md": "sha256:d231692473762a2bb54913270bda6814b425486c45f931f59009b0c1cfac8173"
   },
   "generatedBy": "core"
 }

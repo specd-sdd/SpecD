@@ -110,6 +110,10 @@ An ADR is created for every significant architectural or design decision. Signif
 
 Every `specd` command has a corresponding doc file in `docs/cli/` describing its purpose, flags, examples, and exit codes.
 
+When a command's contract includes command-specific output semantics, caching semantics, or other machine-consumed response behavior, the corresponding CLI documentation MUST describe those behaviors clearly enough for a reader to understand how the command behaves without reading the implementation.
+
+Changes to a command's documented output contract MUST update the corresponding `docs/cli/` reference in the same change.
+
 ### Requirement: MCP documentation
 
 Every MCP tool and resource exposed by `@specd/mcp` has a corresponding entry in `docs/mcp/` describing its input schema, output schema, and example usage.

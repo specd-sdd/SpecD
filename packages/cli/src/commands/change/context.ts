@@ -10,6 +10,9 @@ import { handleError, cliError } from '../../handle-error.js'
  * @param parent - The parent Commander command to attach the subcommand to.
  */
 export function registerChangeContext(parent: Command): void {
+  const renderFingerprintLine = (fingerprint: string): string =>
+    `Context Fingerprint: ${fingerprint}`
+
   parent
     .command('context <name> <step>')
     .allowExcessArguments(false)
@@ -40,10 +43,10 @@ JSON/TOON output schema:
     projectContext: ProjectContextEntry[]
     specs: ContextSpecEntry[]
     availableSteps: AvailableStep[]
-    warnings: string[]
+    warnings: ContextWarning[]
   }
 
-When status is 'unchanged', only contextFingerprint and status are returned.
+When status is 'unchanged', projectContext and specs are omitted from the structured output.
 `,
     )
     .action(
@@ -131,25 +134,21 @@ When status is 'unchanged', only contextFingerprint and status are returned.
           const fmt = parseFormat(opts.format)
           if (result.status === 'unchanged') {
             if (fmt === 'text') {
-              output('Context unchanged since last call.', 'text')
-            } else {
               output(
-                {
-                  contextFingerprint: result.contextFingerprint,
-                  status: result.status,
-                  stepAvailable: result.stepAvailable,
-                  blockingArtifacts: result.blockingArtifacts,
-                  availableSteps: result.availableSteps,
-                  warnings: result.warnings.map((w) => w.message),
-                },
-                fmt,
+                [
+                  renderFingerprintLine(result.contextFingerprint),
+                  'Context unchanged since last call.',
+                ].join('\n\n'),
+                'text',
               )
+            } else {
+              output(result, fmt)
             }
             return
           }
 
           if (fmt === 'text') {
-            const parts: string[] = []
+            const parts: string[] = [renderFingerprintLine(result.contextFingerprint)]
 
             // Project context entries
             for (const entry of result.projectContext) {
@@ -163,7 +162,9 @@ When status is 'unchanged', only contextFingerprint and status are returned.
             // Full-mode specs
             const fullSpecs = result.specs.filter((s) => s.mode === 'full')
             if (fullSpecs.length > 0) {
-              const specParts = fullSpecs.map((s) => `### Spec: ${s.specId}\n\n${s.content ?? ''}`)
+              const specParts = fullSpecs.map(
+                (s) => `### Spec: ${s.specId}\nMode: full\n\n${s.content ?? ''}`,
+              )
               parts.push(`## Spec content\n\n${specParts.join('\n\n---\n\n')}`)
             }
 
@@ -183,10 +184,10 @@ When status is 'unchanged', only contextFingerprint and status are returned.
               ]
 
               if (includePatternSpecs.length > 0) {
-                catalogueParts.push('| Spec ID | Title | Description |')
-                catalogueParts.push('|---------|-------|-------------|')
+                catalogueParts.push('| Spec ID | Mode | Title | Description |')
+                catalogueParts.push('|---------|------|-------|-------------|')
                 for (const s of includePatternSpecs) {
-                  catalogueParts.push(`| ${s.specId} | ${s.title} | ${s.description} |`)
+                  catalogueParts.push(`| ${s.specId} | ${s.mode} | ${s.title} | ${s.description} |`)
                 }
               }
 
@@ -194,10 +195,10 @@ When status is 'unchanged', only contextFingerprint and status are returned.
                 catalogueParts.push('')
                 catalogueParts.push('### Via dependencies')
                 catalogueParts.push('')
-                catalogueParts.push('| Spec ID | Title | Description |')
-                catalogueParts.push('|---------|-------|-------------|')
+                catalogueParts.push('| Spec ID | Mode | Title | Description |')
+                catalogueParts.push('|---------|------|-------|-------------|')
                 for (const s of depTraversalSpecs) {
-                  catalogueParts.push(`| ${s.specId} | ${s.title} | ${s.description} |`)
+                  catalogueParts.push(`| ${s.specId} | ${s.mode} | ${s.title} | ${s.description} |`)
                 }
               }
 
@@ -216,19 +217,7 @@ When status is 'unchanged', only contextFingerprint and status are returned.
 
             output(parts.join('\n\n---\n\n'), 'text')
           } else {
-            output(
-              {
-                contextFingerprint: result.contextFingerprint,
-                status: result.status,
-                stepAvailable: result.stepAvailable,
-                blockingArtifacts: result.blockingArtifacts,
-                projectContext: result.projectContext,
-                specs: result.specs,
-                availableSteps: result.availableSteps,
-                warnings: result.warnings.map((w) => w.message),
-              },
-              fmt,
-            )
+            output(result, fmt)
           }
         } catch (err) {
           handleError(err, opts.format)

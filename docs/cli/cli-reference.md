@@ -219,6 +219,12 @@ specd change context <name> <step> [options]
 
 Compile the context block for a specific lifecycle step of the change. The compiled context is what an agent receives when working on that step — it includes specs, rules, constraints, scenarios, artifact instructions, and hook instructions as applicable.
 
+In `text` mode, the first line is always `Context Fingerprint: <sha256...>`. Full spec blocks include an explicit `Mode: full` label, and summary entries render an explicit `summary` mode marker in the available-context table so readers do not have to infer completeness from layout alone.
+
+The fingerprint follows the compiled logical result, not the presentation format. Flags such as `--follow-deps`, `--depth`, `--rules`, `--constraints`, and `--scenarios` can change the fingerprint when they change the emitted context. Switching only `--format` does not.
+
+When no section flags are provided, a full spec renders all schema artifacts with `scope: spec` in stable order: `spec.md` first when present, then the remaining files alphabetically, each labeled with its filename. When `--rules`, `--constraints`, or `--scenarios` is used, raw file rendering is replaced by metadata-derived section output; for specs in the change, those sections are derived from the merged preview artifacts so delta changes in files like `verify.md` affect the compiled context.
+
 | Option                 | Description                                                                                                                                                         |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- | -------------- |
 | `--rules`              | Include rules extracted from spec metadata.                                                                                                                         |
@@ -229,6 +235,8 @@ Compile the context block for a specific lifecycle step of the change. The compi
 | `--fingerprint <hash>` | Provide a fingerprint to skip context return if unchanged. Returns status "unchanged" without full context. Use for caching to avoid re-fetching identical context. |
 | `--format text         | json                                                                                                                                                                | toon` | Output format. |
 | `--config <path>`      | Config file path.                                                                                                                                                   |
+
+If `--fingerprint <hash>` matches the current compiled fingerprint, `text` mode still prints `Context Fingerprint: <sha256...>` first and then `Context unchanged since last call.`. Structured output keeps the fingerprint plus the current step availability, available steps, and warnings, while omitting the full context body.
 
 ### change artifacts
 

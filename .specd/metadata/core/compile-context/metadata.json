@@ -27,7 +27,7 @@
     {
       "requirement": "Input",
       "rules": [
-        "`CompileContext.execute` receives:\n\n- `name` — the change name to compile context for\n- `step` — the lifecycle step name being entered (e.g. `'designing'`, `'implementing'`, `'verifying'`, `'archiving'`)\n- `config` — the resolved project configuration containing `context`, `contextIncludeSpecs`, `contextExcludeSpecs`, per-workspace `contextIncludeSpecs` / `contextExcludeSpecs`, and `contextMode`\n- `followDeps` (optional, default `false`) — when `true`, performs the `dependsOn` transitive traversal (step 5 of context spec collection) to discover additional specs. When `false` or absent, traversal is skipped and only specs collected in steps 1–4 are included.\n- `depth` (optional) — only valid when `followDeps` is `true`; limits `dependsOn` traversal to N levels deep (1 = direct dependencies only, 2 = deps of deps, etc.). When absent and `followDeps` is `true`, traversal is unlimited.\n- `sections` (optional) — when present, restricts the metadata content rendered for each spec in the output to the listed sections (`'rules'`, `'constraints'`, `'scenarios'`). When absent, all available sections are rendered (description + rules + constraints + scenarios). `sections` applies only to full-mode spec content — it does not affect summary-mode specs, project context entries, or available steps.\n- `fingerprint` (optional) — when provided, `CompileContext` compares this value against the fingerprint it calculates from the current context inputs. If they match, the result's `status` field is set to `'unchanged'` and the full context is not assembled. If omitted or the fingerprint does not match, `status` is `'changed'` and the full context is returned with the new fingerprint."
+        "`CompileContext.execute` receives:\n\n- `name` — the change name to compile context for\n- `step` — the lifecycle step name being entered (e.g. `'designing'`, `'implementing'`, `'verifying'`, `'archiving'`)\n- `config` — the resolved project configuration containing `context`, `contextIncludeSpecs`, `contextExcludeSpecs`, per-workspace `contextIncludeSpecs` / `contextExcludeSpecs`, and `contextMode`\n- `followDeps` (optional, default `false`) — when `true`, performs the `dependsOn` transitive traversal (step 5 of context spec collection) to discover additional specs. When `false` or absent, traversal is skipped and only specs collected in steps 1–4 are included.\n- `depth` (optional) — only valid when `followDeps` is `true`; limits `dependsOn` traversal to N levels deep (1 = direct dependencies only, 2 = deps of deps, etc.). When absent and `followDeps` is `true`, traversal is unlimited.\n- `sections` (optional) — when present, restricts the metadata-derived content rendered for each full-mode spec in the output to the listed sections (`'rules'`, `'constraints'`, `'scenarios'`). When absent, full-mode specs are rendered from their artifact files rather than from metadata sections. `sections` applies only to full-mode spec content — it does not affect summary-mode specs, project context entries, or available steps.\n- `fingerprint` (optional) — when provided, `CompileContext` compares this value against the fingerprint it calculates from the current context inputs. If they match, the result's `status` field is set to `'unchanged'` and the full context is not assembled. If omitted or the fingerprint does not match, `status` is `'changed'` and the full context is returned with the new fingerprint."
       ]
     },
     {
@@ -45,13 +45,13 @@
     {
       "requirement": "Context spec collection",
       "rules": [
-        "`CompileContext` must collect the set of specs to include in the context by applying the five-step resolution defined in [`specs/core/config/spec.md` — Requirement: Context spec selection](../config/spec.md). The steps are:\n\n1. **Project-level include patterns** — always applied, regardless of which workspaces are active.\n2. **Project-level exclude patterns** — always applied; removes specs matched by any project-level exclude pattern from the accumulated set.\n3. **Workspace-level include patterns** — applied only for workspaces active in the current change (a workspace is active if any of its spec IDs appears in `change.specIds`).\n4. **Workspace-level exclude patterns** — applied only for active workspaces; removes further specs from the set.\n5. **`dependsOn` traversal** — only performed when `followDeps: true` is passed. Starting from `change.specIds`, `CompileContext` resolves each spec's metadata `dependsOn` entries via `SpecRepository.metadata()`, then follows links transitively until no new specs are discovered or the `depth` limit is reached. Specs added in this step are **not** subject to the exclude rules from steps 2 or 4. When `followDeps` is `false` or absent, this step is skipped entirely. This works in all change states (designing, ready, implementing, etc.) — it is not gated on reaching `ready`.\n\nWhen a spec in the traversal has no metadata, `CompileContext` emits a `missing-metadata` warning identifying the spec and suggesting metadata generation. Traversal continues with any `dependsOn` information available from the change manifest's `specDependsOn` or from content extraction via the schema's `metadataExtraction` declarations.\n\nA spec matched by multiple include patterns appears exactly once, at the position of the first matching include pattern. Specs added via `dependsOn` traversal that were already included in steps 1–4 also appear once (at their earlier position)."
+        "`CompileContext` must collect the set of specs to include in the context by applying the five-step resolution defined in [`specs/core/config/spec.md` — Requirement: Context spec selection](../config/spec.md) on top of a mandatory change-scoped seed set.\n\nBefore steps 1–5 begin, `CompileContext` MUST seed the collected set with:\n\n- every spec in `change.specIds`\n- every spec that appears as a value in `change.specDependsOn`\n\nThese seed entries are mandatory context members for the change. In particular, specs from `change.specIds` MUST remain in the collected set even when later project-level or workspace-level exclude rules would otherwise match them.\n\nAfter seeding the mandatory change-scoped entries, `CompileContext` applies the five-step resolution:\n\n1. **Project-level include patterns** — always applied, regardless of which workspaces are active.\n2. **Project-level exclude patterns** — always applied; removes specs matched by any project-level exclude pattern from the accumulated set, except the mandatory `change.specIds` seed entries.\n3. **Workspace-level include patterns** — applied only for workspaces active in the current change (a workspace is active if any of its spec IDs appears in `change.specIds`).\n4. **Workspace-level exclude patterns** — applied only for active workspaces; removes further specs from the set, except the mandatory `change.specIds` seed entries.\n5. **`dependsOn` traversal** — only performed when `followDeps: true` is passed. Starting from `change.specIds`, `CompileContext` resolves each spec's metadata `dependsOn` entries via `SpecRepository.metadata()`, then follows links transitively until no new specs are discovered or the `depth` limit is reached. Specs added in this step are **not** subject to the exclude rules from steps 2 or 4. When `followDeps` is `false` or absent, this step is skipped entirely. This works in all change states (designing, ready, implementing, etc.) — it is not gated on reaching `ready`.\n\nWhen a spec in the traversal has no metadata, `CompileContext` emits a `missing-metadata` warning identifying the spec and suggesting metadata generation. Traversal continues with any `dependsOn` information available from the change manifest's `specDependsOn` or from content extraction via the schema's `metadataExtraction` declarations.\n\nThe final collected set is deduplicated across all seed and traversal sources. A spec matched by multiple include patterns appears exactly once, at the position of the first matching include pattern. Specs added via `dependsOn` traversal that were already included earlier also appear once, at their earlier position."
       ]
     },
     {
       "requirement": "Tier classification",
       "rules": [
-        "After collecting all context specs (steps 1–5), `CompileContext` MUST classify each spec into one of two tiers based on the `config.contextMode` setting:\n\n**When `contextMode` is `'lazy'`:**\n\n- **Tier 1 (full)** — a spec belongs to tier 1 if it appears in `change.specIds` OR if it appears as a value in any entry of `change.specDependsOn`. These are the specs the agent is actively working on or has explicitly declared as needed context.\n- **Tier 2 (summary)** — all other collected specs: those matched by `contextIncludeSpecs` patterns (steps 1–4) and those discovered via `dependsOn` metadata traversal (step 5) that are not already in tier 1.\n\n**When `contextMode` is `'lazy'` (default):**\n\nTier classification is applied as described above.\n\n**When `contextMode` is `'full'`:**\n\nAll specs are classified as tier 1. Behaviour is identical to the pre-change implementation — every spec is rendered with full content.\n\nTier classification MUST happen after the full collection pipeline (steps 1–5) completes and before rendering. A spec that qualifies for both tiers (e.g. it is in `specIds` AND matched by an include pattern) MUST be classified as tier 1."
+        "After collecting all context specs (steps 1–5), `CompileContext` MUST classify each spec into one of two tiers based on the `config.contextMode` setting.\n\n**When `contextMode` is `'lazy'`:**\n\n- **Tier 1 (full)** — only specs that appear in `change.specIds`\n- **Tier 2 (summary)** — all other collected specs, including:\n  - specs seeded from `change.specDependsOn`\n  - specs matched by `contextIncludeSpecs` patterns (steps 1–4)\n  - specs discovered via `dependsOn` metadata traversal (step 5)\n\n`change.specDependsOn` still affects collection and ordering, but it does not by itself promote a spec to full content in lazy mode.\n\n**When `contextMode` is `'full'`:**\n\nAll collected specs are classified as tier 1 and rendered with full content.\n\nTier classification MUST happen after the full collection pipeline (steps 1–5) completes and before rendering. A spec that appears in `change.specIds` remains tier 1 even if it also qualifies through another source."
       ]
     },
     {
@@ -63,13 +63,13 @@
     {
       "requirement": "Cycle detection during dependsOn traversal",
       "rules": [
-        "During step 5, if `CompileContext` detects a cycle in the `dependsOn` graph (spec A depends on spec B which depends back on spec A), it must break the cycle and emit a warning. It must not enter an infinite loop. All specs that can be reached without traversing the cycle are still included."
+        "During step 5, if `CompileContext` detects a cycle in the `dependsOn` graph (spec A depends on spec B which depends back on spec A), it must break the cycle and stop following the repeated edge. It must not enter an infinite loop. All specs that can be reached without traversing the repeated edge are still included.\n\nA detected cycle is an internal traversal condition, not a user-facing warning. `CompileContext` must not emit a warning solely because a `dependsOn` cycle exists."
       ]
     },
     {
       "requirement": "Staleness detection and content fallback",
       "rules": [
-        "For every spec in the collected context set, `CompileContext` must check whether the spec's metadata exists (via `SpecRepository.metadata()`) and whether its `contentHashes` are fresh (all required artifact file hashes match the recorded values).\n\n- **Fresh metadata** — use the structured content from metadata (`rules`, `constraints`, `scenarios`, `description`).\n- **Stale or absent metadata** — fall back to live extraction from the spec's artifact files using the schema's `metadataExtraction` declarations, the shared extractor-transform registry, and caller-owned origin context for each artifact. Emit a warning identifying the spec path so the caller knows metadata should be regenerated.\n\nStaleness is advisory — it never blocks context compilation. The fallback ensures the context is always assembled, even for specs whose metadata has not yet been generated."
+        "Whenever `CompileContext` needs structured metadata-derived content for a spec — summary fields (`title`, `description`) or section-filtered full content (`rules`, `constraints`, `scenarios`) — it must check whether the spec's metadata exists (via `SpecRepository.metadata()`) and whether its `contentHashes` are fresh (all required artifact file hashes match the recorded values).\n\n- **Fresh metadata** — use the structured content from metadata (`rules`, `constraints`, `scenarios`, `description`).\n- **Stale or absent metadata** — fall back to live extraction from the spec's artifact files using the schema's `metadataExtraction` declarations, the shared extractor-transform registry, and caller-owned origin context for each artifact. Emit a warning identifying the spec path so the caller knows metadata should be regenerated.\n\nFor specs in `change.specIds`, when `CompileContext` is rendering section-filtered full content and merged preview artifacts are available from `PreviewSpec`, the same metadata/extraction flow MUST operate over the merged artifact set rather than over the base spec files. This keeps merged previews and non-merged specs on the same rendering path for `sections`.\n\nWhen `sections` is absent, full-mode spec content is rendered from ordered spec-scoped artifact files rather than from metadata sections. In that case metadata freshness does not control the full-content body, though metadata may still supply summary fields."
       ]
     },
     {
@@ -81,7 +81,7 @@
     {
       "requirement": "Structured result assembly",
       "rules": [
-        "`CompileContext` MUST assemble the result by producing three structured components rather than a single text string:\n\n1. **Project context entries** (`projectContext: ProjectContextEntry[]`) — for each entry in `config.context` (in declaration order): resolve `instruction` values verbatim; resolve `file` values by reading the file at the given path relative to the `specd.yaml` directory. Missing files emit a warning and are skipped. Each entry is an object with:\n   - `source` (`'instruction' | 'file'`) — the type of context entry\n   - `path` (string, only for `file` entries) — the file path\n   - `content` (string) — the rendered text content\n2. **Spec entries** (`specs: ContextSpecEntry[]`) — for each spec in the collected context set, produce an entry with: Specs MUST appear in the same order as before: specIds first, then specDependsOn, then include-pattern matches in pattern declaration order, then dependsOn traversal discoveries.\n   - `specId` (string) — the fully-qualified spec ID (e.g. `core:core/compile-context`)\n   - `title` (string) — the spec title from metadata or extracted from the heading\n   - `description` (string) — the spec description from metadata (2–3 sentence summary)\n   - `source` (`'specIds' | 'specDependsOn' | 'includePattern' | 'dependsOnTraversal'`) — how this spec was collected. `specIds` for specs in `change.specIds`; `specDependsOn` for specs that appear as values in `change.specDependsOn`; `includePattern` for specs matched by contextIncludeSpecs patterns (steps 1–4); `dependsOnTraversal` for specs discovered via metadata dependsOn traversal (step 5). When a spec qualifies through multiple sources, the highest-priority source wins: `specIds` > `specDependsOn` > `dependsOnTraversal` > `includePattern`.\n   - `mode` (`'full' | 'summary'`) — `full` for tier 1 specs, `summary` for tier 2 specs\n   - `content` (string, present only when `mode` is `'full'`) — the rendered spec content (rules, constraints, scenarios) using the same fresh-metadata / metadataExtraction-fallback logic as before. When `sections` is present, only the listed sections are rendered.\n3. **Available steps** (`availableSteps: AvailableStep[]`) — list all steps declared in the schema's `workflow[]`, each with:\n   - `step` (string) — the step name\n   - `available` (boolean) — whether the step is currently available\n   - `blockingArtifacts` (string\\[]) — artifact IDs blocking the step (empty if available)"
+        "`CompileContext` MUST assemble the result by producing three structured components rather than a single text string:\n\n1. **Project context entries** (`projectContext: ProjectContextEntry[]`) — for each entry in `config.context` (in declaration order): resolve `instruction` values verbatim; resolve `file` values by reading the file at the given path relative to the `specd.yaml` directory. Missing files emit a warning and are skipped. Each entry is an object with:\n   - `source` (`'instruction' | 'file'`) — the type of context entry\n   - `path` (string, only for `file` entries) — the file path\n   - `content` (string) — the rendered text content\n2. **Spec entries** (`specs: ContextSpecEntry[]`) — for each spec in the collected context set, produce an entry with: Specs MUST appear in the same order as before: `change.specIds` seed entries first, then `change.specDependsOn` seed entries, then include-pattern matches in pattern declaration order, then `dependsOn` traversal discoveries.\n   - `specId` (string) — the fully-qualified spec ID (e.g. `core:core/compile-context`)\n   - `title` (string) — the spec title from metadata or extracted from the artifact set\n   - `description` (string) — the spec description from metadata (2–3 sentence summary)\n   - `source` (`'specIds' | 'specDependsOn' | 'includePattern' | 'dependsOnTraversal'`) — how this spec was collected. `specIds` for specs in `change.specIds`; `specDependsOn` for specs that appear as values in `change.specDependsOn`; `includePattern` for specs matched by contextIncludeSpecs patterns (steps 1–4); `dependsOnTraversal` for specs discovered via metadata `dependsOn` traversal (step 5). When a spec qualifies through multiple sources, the highest-priority source wins: `specIds` > `specDependsOn` > `dependsOnTraversal` > `includePattern`.\n   - `mode` (`'full' | 'summary'`) — `full` for tier 1 specs, `summary` for tier 2 specs\n   - `content` (string, present only when `mode` is `'full'`) — the rendered spec content.\n\nFull-mode rendering follows these rules:\n\n- When `sections` is absent, `CompileContext` renders all artifacts whose schema `scope` is `spec` for that spec. If a file named `spec.md` exists, it is rendered first. All remaining spec-scoped artifact files are rendered after it in alphabetical order by filename.\n- The rendered full content concatenates those files in display order and labels each file with its filename so multi-file specs remain readable.\n- For specs in `change.specIds`, `CompileContext` uses the merged artifact set returned by `PreviewSpec` when available, preserving the same ordering rule (`spec.md` first if present, then alphabetical). If merged preview files are unavailable, it falls back to the base spec artifact set.\n- When `sections` is present, `CompileContext` does not render raw artifact files. Instead it renders only the selected metadata-derived sections. For specs in `change.specIds`, those selected sections are extracted from the merged preview artifact set when available so merged deltas affect `rules`, `constraints`, and `scenarios` output. For all other specs, the selected sections come from fresh metadata or fallback extraction against the base artifact set.\n\n3. **Available steps** (`availableSteps: AvailableStep[]`) — list all steps declared in the schema's `workflow[]`, each with:\n   - `step` (string) — the step name\n   - `available` (boolean) — whether the step is currently available\n   - `blockingArtifacts` (string\\[]) — artifact IDs blocking the step (empty if available)"
       ]
     },
     {
@@ -105,7 +105,7 @@
     {
       "requirement": "Context fingerprint",
       "rules": [
-        "`CompileContext` calculates a fingerprint that uniquely identifies the current context state. The fingerprint is a SHA-256 hash of a canonicalized string representation of all inputs that affect the logical context content:\n\n1. Change specIds (sorted alphabetically)\n2. Project context entries (instruction values verbatim, file content hashed)\n3. Context include/exclude patterns from config\n4. The step being queried\n5. Schema version\n6. All flags that affect output: `followDeps`, `depth`, `sections`\n\nWhen `fingerprint` is provided to `execute()`:\n\n- If `fingerprint` matches the calculated fingerprint, `status` is `'unchanged'` and the context is not assembled (early return).\n- If `fingerprint` does not match or is omitted, `status` is `'changed'` and the full context is assembled and returned.\n\nThe fingerprint enables clients to skip re-fetching unchanged context without comparing the full output themselves."
+        "`CompileContext` calculates a fingerprint that uniquely identifies the current compiled context state. The fingerprint is a SHA-256 hash of a canonicalized representation of the complete logical output that `CompileContext` would emit when `status` is `'changed'`.\n\nThe canonicalized fingerprint input MUST include every emitted field whose value affects the compiled context seen by callers, including:\n\n- step availability (`stepAvailable`, `blockingArtifacts`)\n- rendered project context entries\n- rendered spec entries, including their resolved `source`, `mode`, summary fields, and full content when present\n- available workflow steps and their blocking artifacts\n- emitted warnings\n\nThe fingerprint must therefore change whenever the compiled result changes, including changes caused by `change.specIds`, `change.specDependsOn`, include/exclude resolution, dependency traversal, metadata freshness, rendered content fallback, workflow availability, or any execution flag that changes the logical result (for example `followDeps`, `depth`, or `sections`).\n\nThe fingerprint MUST remain format-agnostic. Differences in CLI presentation format such as `text`, `json`, or `toon` do not affect the fingerprint when the logical compiled context is otherwise identical.\n\nWhen `fingerprint` is provided to `execute()`:\n\n- If `fingerprint` matches the calculated fingerprint, `status` is `'unchanged'` and the context is not assembled into the returned `projectContext` and `specs` arrays.\n- If `fingerprint` does not match or is omitted, `status` is `'changed'` and the full context is assembled and returned.\n\nThe fingerprint enables clients to skip re-fetching unchanged context without comparing the full output themselves."
       ]
     }
   ],
@@ -173,6 +173,30 @@
     },
     {
       "requirement": "Context spec collection",
+      "name": "change specId survives matching exclude rules",
+      "given": [
+        "change.specIds: ['default:auth/login']",
+        "AND project-level or workspace-level exclude patterns also match default:auth/login"
+      ],
+      "when": ["CompileContext.execute applies the collection pipeline"],
+      "then": [
+        "default:auth/login remains in the collected set because change-scoped spec IDs are mandatory context members"
+      ]
+    },
+    {
+      "requirement": "Context spec collection",
+      "name": "specDependsOn value is seeded even without pattern matches",
+      "given": [
+        "change.specDependsOn: { 'default:auth/login': ['default:auth/shared'] }",
+        "AND default:auth/shared is not matched by any include pattern"
+      ],
+      "when": ["CompileContext.execute is called without followDeps"],
+      "then": [
+        "default:auth/shared is still included in the collected set as a seeded specDependsOn entry"
+      ]
+    },
+    {
+      "requirement": "Context spec collection",
       "name": "dependsOn traversal adds specs beyond include set",
       "given": [
         "change.specIds: ['default:auth/login']",
@@ -194,100 +218,58 @@
     },
     {
       "requirement": "Context spec collection",
-      "name": "Spec appears only once even if matched multiple times",
-      "given": ["contextIncludeSpecs: ['auth/login', 'auth/*']"],
+      "name": "Spec appears only once even if seeded and matched multiple times",
+      "given": [
+        "change.specIds: ['default:auth/login']",
+        "AND contextIncludeSpecs: ['auth/login', 'auth/*'] also matches default:auth/login",
+        "AND change.specDependsOn: { 'default:auth/login': ['default:auth/shared'] }",
+        "AND default:auth/shared is also discovered later via dependsOn traversal"
+      ],
       "when": ["CompileContext.execute is called"],
       "then": [
-        "auth/login appears exactly once in the context, at the position of the first matching pattern"
+        "each collected spec appears exactly once at the earliest qualifying position in the final specs array"
       ]
     },
     {
       "requirement": "Tier classification",
       "name": "Lazy mode — specIds specs are tier 1 full",
-      "given": ["config.contextMode: 'lazy'", "AND change.specIds: ['default:auth/login']"],
+      "given": ["config.contextMode: 'lazy'", "AND a spec appears in change.specIds"],
       "when": ["CompileContext.execute is called"],
-      "then": [
-        "the spec entry for default:auth/login has mode: 'full' and source: 'specIds'",
-        "AND its content field is present with full structured content"
-      ]
+      "then": ["that spec is emitted with mode: 'full'"]
     },
     {
       "requirement": "Tier classification",
-      "name": "Lazy mode — specDependsOn specs are tier 1 full",
+      "name": "Lazy mode — specDependsOn specs are seeded but summary",
       "given": [
         "config.contextMode: 'lazy'",
         "AND change.specDependsOn: { 'default:auth/login': ['default:auth/shared'] }"
       ],
       "when": ["CompileContext.execute is called"],
-      "then": [
-        "the spec entry for default:auth/shared has mode: 'full' and source: 'specDependsOn'",
-        "AND its content field is present with full structured content"
-      ]
+      "then": ["default:auth/shared is emitted with source: 'specDependsOn'", "AND mode: 'summary'"]
     },
     {
       "requirement": "Tier classification",
       "name": "Lazy mode — include pattern specs are tier 2 summary",
-      "given": [
-        "config.contextMode: 'lazy'",
-        "AND contextIncludeSpecs: ['default:*'] matches default:_global/architecture",
-        "AND default:_global/architecture is NOT in change.specIds or change.specDependsOn"
-      ],
+      "given": ["config.contextMode: 'lazy'", "AND a spec is matched only by include patterns"],
       "when": ["CompileContext.execute is called"],
-      "then": [
-        "the spec entry for default:_global/architecture has mode: 'summary' and source: 'includePattern'",
-        "AND its content field is absent",
-        "AND title and description are present"
-      ]
+      "then": ["that spec is emitted with mode: 'summary'"]
     },
     {
       "requirement": "Tier classification",
       "name": "Lazy mode — dependsOn traversal specs are tier 2 summary",
       "given": [
         "config.contextMode: 'lazy'",
-        "AND followDeps: true",
-        "AND a spec default:auth/jwt is discovered via dependsOn traversal",
-        "AND default:auth/jwt is NOT in change.specIds or change.specDependsOn"
+        "AND a spec is discovered only through dependsOn traversal"
       ],
       "when": ["CompileContext.execute is called"],
-      "then": [
-        "the spec entry for default:auth/jwt has mode: 'summary' and source: 'dependsOnTraversal'"
-      ]
+      "then": ["that spec is emitted with mode: 'summary'"]
     },
     {
       "requirement": "Tier classification",
-      "name": "Lazy mode — spec in both specIds and include pattern is tier 1",
-      "given": [
-        "config.contextMode: 'lazy'",
-        "AND change.specIds: ['default:auth/login']",
-        "AND contextIncludeSpecs: ['default:*'] also matches default:auth/login"
-      ],
+      "name": "Full mode — all collected specs are tier 1 full",
+      "given": ["config.contextMode: 'full'"],
       "when": ["CompileContext.execute is called"],
-      "then": [
-        "the spec entry for default:auth/login has mode: 'full' and source: 'specIds'",
-        "AND it appears exactly once in the specs array"
-      ]
-    },
-    {
-      "requirement": "Tier classification",
-      "name": "Full mode — all specs are tier 1 full",
-      "given": [
-        "config.contextMode: 'full'",
-        "AND contextIncludeSpecs: ['default:*'] matches multiple specs"
-      ],
-      "when": ["CompileContext.execute is called"],
-      "then": ["all spec entries have mode: 'full'", "AND all spec entries have content present"]
-    },
-    {
-      "requirement": "Tier classification",
-      "name": "Default contextMode is lazy",
-      "given": [
-        "config.contextMode is not set",
-        "AND change.specIds contains some specs and contextIncludeSpecs matches others"
-      ],
-      "when": ["CompileContext.execute is called"],
-      "then": [
-        "specIds specs have mode: 'full' and other specs have mode: 'summary' — same as contextMode: 'lazy'"
-      ]
+      "then": ["every collected spec is emitted with mode: 'full'"]
     },
     {
       "requirement": "Cycle detection during dependsOn traversal",
@@ -295,9 +277,9 @@
       "given": ["auth/login depends on auth/jwt and auth/jwt depends back on auth/login"],
       "when": ["CompileContext.execute traverses dependsOn"],
       "then": [
-        "both specs are included (or the cycle is broken at one point)",
+        "both specs are included if they can be reached before the repeated edge is cut",
         "AND no infinite loop occurs",
-        "AND a cycle warning is emitted"
+        "AND no cycle warning is emitted"
       ]
     },
     {
@@ -424,6 +406,20 @@
     },
     {
       "requirement": "Structured result assembly",
+      "name": "Specs preserve change-scoped seed ordering ahead of discovered context",
+      "given": [
+        "change.specIds: ['default:auth/login']",
+        "AND change.specDependsOn: { 'default:auth/login': ['default:auth/shared'] }",
+        "AND include patterns add default:_global/architecture",
+        "AND dependsOn traversal later discovers default:auth/jwt"
+      ],
+      "when": ["CompileContext.execute assembles result.specs"],
+      "then": [
+        "the entries appear in order: default:auth/login, default:auth/shared, default:_global/architecture, default:auth/jwt"
+      ]
+    },
+    {
+      "requirement": "Structured result assembly",
       "name": "spec source priority — specIds wins over includePattern",
       "given": [
         "change.specIds: ['default:auth/login']",
@@ -472,6 +468,53 @@
       "when": ["CompileContext.execute is called"],
       "then": [
         "the spec entry's content is produced via extraction and a staleness warning is emitted"
+      ]
+    },
+    {
+      "requirement": "Structured result assembly",
+      "name": "Full rendering shows all spec-scoped artifacts in stable order",
+      "given": ["a full-mode spec has spec-scoped artifacts verify.md, spec.md, and examples.md"],
+      "when": ["CompileContext.execute is called without sections"],
+      "then": [
+        "the rendered content includes all three files",
+        "AND spec.md appears first",
+        "AND the remaining files appear in alphabetical order"
+      ]
+    },
+    {
+      "requirement": "Structured result assembly",
+      "name": "Full rendering does not depend on spec.md existing",
+      "given": [
+        "a full-mode spec has spec-scoped artifacts verify.md and examples.md but no spec.md"
+      ],
+      "when": ["CompileContext.execute is called without sections"],
+      "then": ["the rendered content includes both files", "AND they appear in alphabetical order"]
+    },
+    {
+      "requirement": "Structured result assembly",
+      "name": "Merged preview content uses the same file ordering",
+      "given": [
+        "a spec in change.specIds has merged preview files from PreviewSpec",
+        "AND those files include verify.md, spec.md, and examples.md"
+      ],
+      "when": ["CompileContext.execute is called without sections"],
+      "then": [
+        "the rendered merged content includes all preview files",
+        "AND spec.md appears first",
+        "AND the remaining merged files appear in alphabetical order"
+      ]
+    },
+    {
+      "requirement": "Structured result assembly",
+      "name": "Section filtering on merged preview derives content from merged artifacts",
+      "given": [
+        "a spec in change.specIds has merged preview artifacts whose merged verify.md adds a new scenario",
+        "AND CompileContext.execute is called with sections: ['scenarios']"
+      ],
+      "when": ["the full spec entry is rendered"],
+      "then": [
+        "the rendered content includes the scenario extracted from the merged preview artifacts",
+        "AND it does not fall back to a raw single-file preview body"
       ]
     },
     {
@@ -544,26 +587,30 @@
     },
     {
       "requirement": "Context fingerprint",
-      "name": "Fingerprint calculated from specIds, context, and flags",
-      "given": ["a change with specIds, project context entries, and include/exclude patterns"],
+      "name": "Fingerprint calculated from the compiled result",
+      "given": [
+        "a change with project context entries, collected specs, available steps, and warnings"
+      ],
       "when": ["CompileContext.execute is called without a fingerprint"],
-      "then": ["a fingerprint is calculated and included in the result"]
+      "then": [
+        "a fingerprint is calculated from the canonicalized compiled context result and included in the response"
+      ]
     },
     {
       "requirement": "Context fingerprint",
       "name": "Unchanged status returned when fingerprint matches",
-      "given": ["the current context fingerprint is sha256:abc123..."],
+      "given": ["the current compiled context fingerprint is sha256:abc123..."],
       "when": ["CompileContext.execute is called with fingerprint: 'sha256:abc123...'"],
       "then": [
         "the result status is 'unchanged'",
         "AND projectContext and specs are empty arrays",
-        "AND the full context is not assembled"
+        "AND the full context is not re-emitted"
       ]
     },
     {
       "requirement": "Context fingerprint",
       "name": "Changed status returned when fingerprint does not match",
-      "given": ["the current context fingerprint is sha256:xyz789..."],
+      "given": ["the current compiled context fingerprint is sha256:xyz789..."],
       "when": ["CompileContext.execute is called with fingerprint: 'sha256:abc123...'"],
       "then": [
         "the result status is 'changed'",
@@ -573,20 +620,48 @@
     },
     {
       "requirement": "Context fingerprint",
-      "name": "Fingerprint changes when flags change",
-      "given": ["CompileContext was called without --follow-deps"],
-      "when": ["CompileContext is called with followDeps: true"],
-      "then": [
-        "the fingerprint is different from the previous call",
-        "AND the result status is 'changed'"
-      ]
+      "name": "Fingerprint changes when specDependsOn changes emitted specs",
+      "given": ["a change initially emits no seeded specDependsOn specs"],
+      "when": [
+        "change.specDependsOn is updated so the compiled specs array gains a new emitted entry"
+      ],
+      "then": ["the fingerprint changes because the compiled output changed"]
+    },
+    {
+      "requirement": "Context fingerprint",
+      "name": "Fingerprint changes when warnings change",
+      "given": ["a compiled context with fresh metadata emits no warnings"],
+      "when": ["metadata becomes stale and the same context emits a warning"],
+      "then": ["the fingerprint changes because the emitted result changed"]
+    },
+    {
+      "requirement": "Context fingerprint",
+      "name": "Fingerprint changes when step availability changes",
+      "given": ["a compiled context where the requested step is available"],
+      "when": [
+        "a required artifact becomes incomplete and stepAvailable plus blockingArtifacts change"
+      ],
+      "then": ["the fingerprint changes because the emitted availability result changed"]
+    },
+    {
+      "requirement": "Context fingerprint",
+      "name": "Fingerprint changes when result-shaping flags change emitted context",
+      "given": ["a compiled context requested without dependency traversal or section filters"],
+      "when": [
+        "CompileContext.execute is called again with flags that change the emitted result, such as followDeps, depth, or sections"
+      ],
+      "then": ["the fingerprint changes because the compiled logical output changed"]
     },
     {
       "requirement": "Context fingerprint",
       "name": "--format flag does not affect fingerprint",
-      "given": ["the fingerprint was calculated from a call with --format text"],
-      "when": ["the same context is requested with --format json"],
-      "then": ["the fingerprint matches the previous call", "AND status is 'unchanged'"]
+      "given": [
+        "the fingerprint was calculated from a call whose compiled logical output matches the current context"
+      ],
+      "when": [
+        "the same context is requested through a different presentation format such as text or json"
+      ],
+      "then": ["the fingerprint remains unchanged"]
     },
     {
       "requirement": "Materialized delta view",
@@ -645,8 +720,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:a38d19d49c2f52473951ca7bc49ad5fd009e82e8c2bea50824e28b6b509f2192",
-    "verify.md": "sha256:613faff66e803eeb8f85ddab162d9b659519ae14cad3e62e1e815ee50894ceb1"
+    "spec.md": "sha256:78f090ee9a9fbda86b380382fc3675b6bec580968b94871c4cf720810b3e23fb",
+    "verify.md": "sha256:be04cecccbfd27cab60193aade6954e8a307719488482d17d106801d05234826"
   },
   "generatedBy": "core"
 }
