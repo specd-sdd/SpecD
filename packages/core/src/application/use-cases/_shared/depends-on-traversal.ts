@@ -64,11 +64,6 @@ export async function traverseDependsOn(
   const key = `${workspace}:${capPath}`
 
   if (ancestors.has(key)) {
-    warnings.push({
-      type: 'cycle',
-      path: key,
-      message: `Cycle detected in dependsOn traversal at '${key}'`,
-    })
     return
   }
 

@@ -37,7 +37,7 @@ class CompileContext {
 - `config` — the resolved project configuration containing `context`, `contextIncludeSpecs`, `contextExcludeSpecs`, per-workspace `contextIncludeSpecs` / `contextExcludeSpecs`, and `contextMode`
 - `followDeps` (optional, default `false`) — when `true`, performs the `dependsOn` transitive traversal (step 5 of context spec collection) to discover additional specs. When `false` or absent, traversal is skipped and only specs collected in steps 1–4 are included.
 - `depth` (optional) — only valid when `followDeps` is `true`; limits `dependsOn` traversal to N levels deep (1 = direct dependencies only, 2 = deps of deps, etc.). When absent and `followDeps` is `true`, traversal is unlimited.
-- `sections` (optional) — when present, restricts the metadata content rendered for each spec in the output to the listed sections (`'rules'`, `'constraints'`, `'scenarios'`). When absent, all available sections are rendered (description + rules + constraints + scenarios). `sections` applies only to full-mode spec content — it does not affect summary-mode specs, project context entries, or available steps.
+- `sections` (optional) — when present, restricts the metadata-derived content rendered for each full-mode spec in the output to the listed sections (`'rules'`, `'constraints'`, `'scenarios'`). When absent, full-mode specs are rendered from their artifact files rather than from metadata sections. `sections` applies only to full-mode spec content — it does not affect summary-mode specs, project context entries, or available steps.
 - `fingerprint` (optional) — when provided, `CompileContext` compares this value against the fingerprint it calculates from the current context inputs. If they match, the result's `status` field is set to `'unchanged'` and the full context is not assembled. If omitted or the fingerprint does not match, `status` is `'changed'` and the full context is returned with the new fingerprint.
 
 ### Requirement: Schema name guard
@@ -58,36 +58,46 @@ If a pattern or `dependsOn` entry references a workspace name that has no entry 
 
 ### Requirement: Context spec collection
 
-`CompileContext` must collect the set of specs to include in the context by applying the five-step resolution defined in [`specs/core/config/spec.md` — Requirement: Context spec selection](../config/spec.md). The steps are:
+`CompileContext` must collect the set of specs to include in the context by applying the five-step resolution defined in [`specs/core/config/spec.md` — Requirement: Context spec selection](../config/spec.md) on top of a mandatory change-scoped seed set.
+
+Before steps 1–5 begin, `CompileContext` MUST seed the collected set with:
+
+- every spec in `change.specIds`
+- every spec that appears as a value in `change.specDependsOn`
+
+These seed entries are mandatory context members for the change. In particular, specs from `change.specIds` MUST remain in the collected set even when later project-level or workspace-level exclude rules would otherwise match them.
+
+After seeding the mandatory change-scoped entries, `CompileContext` applies the five-step resolution:
 
 1. **Project-level include patterns** — always applied, regardless of which workspaces are active.
-2. **Project-level exclude patterns** — always applied; removes specs matched by any project-level exclude pattern from the accumulated set.
+2. **Project-level exclude patterns** — always applied; removes specs matched by any project-level exclude pattern from the accumulated set, except the mandatory `change.specIds` seed entries.
 3. **Workspace-level include patterns** — applied only for workspaces active in the current change (a workspace is active if any of its spec IDs appears in `change.specIds`).
-4. **Workspace-level exclude patterns** — applied only for active workspaces; removes further specs from the set.
+4. **Workspace-level exclude patterns** — applied only for active workspaces; removes further specs from the set, except the mandatory `change.specIds` seed entries.
 5. **`dependsOn` traversal** — only performed when `followDeps: true` is passed. Starting from `change.specIds`, `CompileContext` resolves each spec's metadata `dependsOn` entries via `SpecRepository.metadata()`, then follows links transitively until no new specs are discovered or the `depth` limit is reached. Specs added in this step are **not** subject to the exclude rules from steps 2 or 4. When `followDeps` is `false` or absent, this step is skipped entirely. This works in all change states (designing, ready, implementing, etc.) — it is not gated on reaching `ready`.
 
 When a spec in the traversal has no metadata, `CompileContext` emits a `missing-metadata` warning identifying the spec and suggesting metadata generation. Traversal continues with any `dependsOn` information available from the change manifest's `specDependsOn` or from content extraction via the schema's `metadataExtraction` declarations.
 
-A spec matched by multiple include patterns appears exactly once, at the position of the first matching include pattern. Specs added via `dependsOn` traversal that were already included in steps 1–4 also appear once (at their earlier position).
+The final collected set is deduplicated across all seed and traversal sources. A spec matched by multiple include patterns appears exactly once, at the position of the first matching include pattern. Specs added via `dependsOn` traversal that were already included earlier also appear once, at their earlier position.
 
 ### Requirement: Tier classification
 
-After collecting all context specs (steps 1–5), `CompileContext` MUST classify each spec into one of two tiers based on the `config.contextMode` setting:
+After collecting all context specs (steps 1–5), `CompileContext` MUST classify each spec into one of two tiers based on the `config.contextMode` setting.
 
 **When `contextMode` is `'lazy'`:**
 
-- **Tier 1 (full)** — a spec belongs to tier 1 if it appears in `change.specIds` OR if it appears as a value in any entry of `change.specDependsOn`. These are the specs the agent is actively working on or has explicitly declared as needed context.
-- **Tier 2 (summary)** — all other collected specs: those matched by `contextIncludeSpecs` patterns (steps 1–4) and those discovered via `dependsOn` metadata traversal (step 5) that are not already in tier 1.
+- **Tier 1 (full)** — only specs that appear in `change.specIds`
+- **Tier 2 (summary)** — all other collected specs, including:
+  - specs seeded from `change.specDependsOn`
+  - specs matched by `contextIncludeSpecs` patterns (steps 1–4)
+  - specs discovered via `dependsOn` metadata traversal (step 5)
 
-**When `contextMode` is `'lazy'` (default):**
-
-Tier classification is applied as described above.
+`change.specDependsOn` still affects collection and ordering, but it does not by itself promote a spec to full content in lazy mode.
 
 **When `contextMode` is `'full'`:**
 
-All specs are classified as tier 1. Behaviour is identical to the pre-change implementation — every spec is rendered with full content.
+All collected specs are classified as tier 1 and rendered with full content.
 
-Tier classification MUST happen after the full collection pipeline (steps 1–5) completes and before rendering. A spec that qualifies for both tiers (e.g. it is in `specIds` AND matched by an include pattern) MUST be classified as tier 1.
+Tier classification MUST happen after the full collection pipeline (steps 1–5) completes and before rendering. A spec that appears in `change.specIds` remains tier 1 even if it also qualifies through another source.
 
 ### Requirement: dependsOn resolution order
 
@@ -101,16 +111,20 @@ The first tier that returns a non-empty result is used. If all tiers return empt
 
 ### Requirement: Cycle detection during dependsOn traversal
 
-During step 5, if `CompileContext` detects a cycle in the `dependsOn` graph (spec A depends on spec B which depends back on spec A), it must break the cycle and emit a warning. It must not enter an infinite loop. All specs that can be reached without traversing the cycle are still included.
+During step 5, if `CompileContext` detects a cycle in the `dependsOn` graph (spec A depends on spec B which depends back on spec A), it must break the cycle and stop following the repeated edge. It must not enter an infinite loop. All specs that can be reached without traversing the repeated edge are still included.
+
+A detected cycle is an internal traversal condition, not a user-facing warning. `CompileContext` must not emit a warning solely because a `dependsOn` cycle exists.
 
 ### Requirement: Staleness detection and content fallback
 
-For every spec in the collected context set, `CompileContext` must check whether the spec's metadata exists (via `SpecRepository.metadata()`) and whether its `contentHashes` are fresh (all required artifact file hashes match the recorded values).
+Whenever `CompileContext` needs structured metadata-derived content for a spec — summary fields (`title`, `description`) or section-filtered full content (`rules`, `constraints`, `scenarios`) — it must check whether the spec's metadata exists (via `SpecRepository.metadata()`) and whether its `contentHashes` are fresh (all required artifact file hashes match the recorded values).
 
 - **Fresh metadata** — use the structured content from metadata (`rules`, `constraints`, `scenarios`, `description`).
 - **Stale or absent metadata** — fall back to live extraction from the spec's artifact files using the schema's `metadataExtraction` declarations, the shared extractor-transform registry, and caller-owned origin context for each artifact. Emit a warning identifying the spec path so the caller knows metadata should be regenerated.
 
-Staleness is advisory — it never blocks context compilation. The fallback ensures the context is always assembled, even for specs whose metadata has not yet been generated.
+For specs in `change.specIds`, when `CompileContext` is rendering section-filtered full content and merged preview artifacts are available from `PreviewSpec`, the same metadata/extraction flow MUST operate over the merged artifact set rather than over the base spec files. This keeps merged previews and non-merged specs on the same rendering path for `sections`.
+
+When `sections` is absent, full-mode spec content is rendered from ordered spec-scoped artifact files rather than from metadata sections. In that case metadata freshness does not control the full-content body, though metadata may still supply summary fields.
 
 ### Requirement: Step availability
 
@@ -126,13 +140,21 @@ If the step is not available (one or more required artifacts are neither `comple
    - `source` (`'instruction' | 'file'`) — the type of context entry
    - `path` (string, only for `file` entries) — the file path
    - `content` (string) — the rendered text content
-2. **Spec entries** (`specs: ContextSpecEntry[]`) — for each spec in the collected context set, produce an entry with: Specs MUST appear in the same order as before: specIds first, then specDependsOn, then include-pattern matches in pattern declaration order, then dependsOn traversal discoveries.
+2. **Spec entries** (`specs: ContextSpecEntry[]`) — for each spec in the collected context set, produce an entry with: Specs MUST appear in the same order as before: `change.specIds` seed entries first, then `change.specDependsOn` seed entries, then include-pattern matches in pattern declaration order, then `dependsOn` traversal discoveries.
    - `specId` (string) — the fully-qualified spec ID (e.g. `core:core/compile-context`)
-   - `title` (string) — the spec title from metadata or extracted from the heading
+   - `title` (string) — the spec title from metadata or extracted from the artifact set
    - `description` (string) — the spec description from metadata (2–3 sentence summary)
-   - `source` (`'specIds' | 'specDependsOn' | 'includePattern' | 'dependsOnTraversal'`) — how this spec was collected. `specIds` for specs in `change.specIds`; `specDependsOn` for specs that appear as values in `change.specDependsOn`; `includePattern` for specs matched by contextIncludeSpecs patterns (steps 1–4); `dependsOnTraversal` for specs discovered via metadata dependsOn traversal (step 5). When a spec qualifies through multiple sources, the highest-priority source wins: `specIds` > `specDependsOn` > `dependsOnTraversal` > `includePattern`.
+   - `source` (`'specIds' | 'specDependsOn' | 'includePattern' | 'dependsOnTraversal'`) — how this spec was collected. `specIds` for specs in `change.specIds`; `specDependsOn` for specs that appear as values in `change.specDependsOn`; `includePattern` for specs matched by contextIncludeSpecs patterns (steps 1–4); `dependsOnTraversal` for specs discovered via metadata `dependsOn` traversal (step 5). When a spec qualifies through multiple sources, the highest-priority source wins: `specIds` > `specDependsOn` > `dependsOnTraversal` > `includePattern`.
    - `mode` (`'full' | 'summary'`) — `full` for tier 1 specs, `summary` for tier 2 specs
-   - `content` (string, present only when `mode` is `'full'`) — the rendered spec content (rules, constraints, scenarios) using the same fresh-metadata / metadataExtraction-fallback logic as before. When `sections` is present, only the listed sections are rendered.
+   - `content` (string, present only when `mode` is `'full'`) — the rendered spec content.
+
+Full-mode rendering follows these rules:
+
+- When `sections` is absent, `CompileContext` renders all artifacts whose schema `scope` is `spec` for that spec. If a file named `spec.md` exists, it is rendered first. All remaining spec-scoped artifact files are rendered after it in alphabetical order by filename.
+- The rendered full content concatenates those files in display order and labels each file with its filename so multi-file specs remain readable.
+- For specs in `change.specIds`, `CompileContext` uses the merged artifact set returned by `PreviewSpec` when available, preserving the same ordering rule (`spec.md` first if present, then alphabetical). If merged preview files are unavailable, it falls back to the base spec artifact set.
+- When `sections` is present, `CompileContext` does not render raw artifact files. Instead it renders only the selected metadata-derived sections. For specs in `change.specIds`, those selected sections are extracted from the merged preview artifact set when available so merged deltas affect `rules`, `constraints`, and `scenarios` output. For all other specs, the selected sections come from fresh metadata or fallback extraction against the base artifact set.
+
 3. **Available steps** (`availableSteps: AvailableStep[]`) — list all steps declared in the schema's `workflow[]`, each with:
    - `step` (string) — the step name
    - `available` (boolean) — whether the step is currently available
@@ -165,18 +187,23 @@ If a pattern or `dependsOn` entry references a workspace name that has no corres
 
 ### Requirement: Context fingerprint
 
-`CompileContext` calculates a fingerprint that uniquely identifies the current context state. The fingerprint is a SHA-256 hash of a canonicalized string representation of all inputs that affect the logical context content:
+`CompileContext` calculates a fingerprint that uniquely identifies the current compiled context state. The fingerprint is a SHA-256 hash of a canonicalized representation of the complete logical output that `CompileContext` would emit when `status` is `'changed'`.
 
-1. Change specIds (sorted alphabetically)
-2. Project context entries (instruction values verbatim, file content hashed)
-3. Context include/exclude patterns from config
-4. The step being queried
-5. Schema version
-6. All flags that affect output: `followDeps`, `depth`, `sections`
+The canonicalized fingerprint input MUST include every emitted field whose value affects the compiled context seen by callers, including:
+
+- step availability (`stepAvailable`, `blockingArtifacts`)
+- rendered project context entries
+- rendered spec entries, including their resolved `source`, `mode`, summary fields, and full content when present
+- available workflow steps and their blocking artifacts
+- emitted warnings
+
+The fingerprint must therefore change whenever the compiled result changes, including changes caused by `change.specIds`, `change.specDependsOn`, include/exclude resolution, dependency traversal, metadata freshness, rendered content fallback, workflow availability, or any execution flag that changes the logical result (for example `followDeps`, `depth`, or `sections`).
+
+The fingerprint MUST remain format-agnostic. Differences in CLI presentation format such as `text`, `json`, or `toon` do not affect the fingerprint when the logical compiled context is otherwise identical.
 
 When `fingerprint` is provided to `execute()`:
 
-- If `fingerprint` matches the calculated fingerprint, `status` is `'unchanged'` and the context is not assembled (early return).
+- If `fingerprint` matches the calculated fingerprint, `status` is `'unchanged'` and the context is not assembled into the returned `projectContext` and `specs` arrays.
 - If `fingerprint` does not match or is omitted, `status` is `'changed'` and the full context is assembled and returned.
 
 The fingerprint enables clients to skip re-fetching unchanged context without comparing the full output themselves.

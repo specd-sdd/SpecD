@@ -22,6 +22,8 @@ import { createCliKernel } from '../../src/kernel.js'
 import { registerChangeContext } from '../../src/commands/change/context.js'
 
 const mockResult = {
+  contextFingerprint: 'sha256:test-context',
+  status: 'changed' as const,
   projectContext: [
     { source: 'instruction' as const, content: '# Designing step instructions\n\nDo this.' },
   ],
@@ -76,9 +78,11 @@ describe('change context', () => {
     registerChangeContext(program.command('change'))
     await program.parseAsync(['node', 'specd', 'change', 'context', 'my-change', 'designing'])
 
+    expect(stdout().startsWith('Context Fingerprint: sha256:test-context')).toBe(true)
     expect(stdout()).toContain('# Designing step instructions')
     expect(stdout()).toContain('Do this.')
     expect(stdout()).toContain('### Spec: default:auth/login')
+    expect(stdout()).toContain('Mode: full')
   })
 
   it('outputs JSON with structured result fields', async () => {
@@ -98,6 +102,8 @@ describe('change context', () => {
     ])
 
     const parsed = JSON.parse(stdout())
+    expect(parsed.contextFingerprint).toBe('sha256:test-context')
+    expect(parsed.status).toBe('changed')
     expect(parsed.stepAvailable).toBe(true)
     expect(Array.isArray(parsed.projectContext)).toBe(true)
     expect(Array.isArray(parsed.specs)).toBe(true)
@@ -105,6 +111,65 @@ describe('change context', () => {
     expect(Array.isArray(parsed.warnings)).toBe(true)
     expect(parsed.specs[0].specId).toBe('default:auth/login')
     expect(parsed.specs[0].mode).toBe('full')
+  })
+
+  it('prints fingerprint first and unchanged message when fingerprint matches in text mode', async () => {
+    const { kernel, stdout } = setup()
+    kernel.changes.compile.execute.mockResolvedValue({
+      ...mockResult,
+      status: 'unchanged' as const,
+      projectContext: [],
+      specs: [],
+    })
+
+    const program = makeProgram()
+    registerChangeContext(program.command('change'))
+    await program.parseAsync([
+      'node',
+      'specd',
+      'change',
+      'context',
+      'my-change',
+      'designing',
+      '--fingerprint',
+      'sha256:test-context',
+    ])
+
+    expect(stdout()).toBe(
+      'Context Fingerprint: sha256:test-context\n\nContext unchanged since last call.\n',
+    )
+  })
+
+  it('outputs unchanged JSON as direct structured passthrough', async () => {
+    const { kernel, stdout } = setup()
+    kernel.changes.compile.execute.mockResolvedValue({
+      ...mockResult,
+      status: 'unchanged' as const,
+      projectContext: [],
+      specs: [],
+    })
+
+    const program = makeProgram()
+    registerChangeContext(program.command('change'))
+    await program.parseAsync([
+      'node',
+      'specd',
+      'change',
+      'context',
+      'my-change',
+      'designing',
+      '--fingerprint',
+      'sha256:test-context',
+      '--format',
+      'json',
+    ])
+
+    const parsed = JSON.parse(stdout())
+    expect(parsed.contextFingerprint).toBe('sha256:test-context')
+    expect(parsed.status).toBe('unchanged')
+    expect(parsed.projectContext).toEqual([])
+    expect(parsed.specs).toEqual([])
+    expect(parsed.availableSteps).toEqual(mockResult.availableSteps)
   })
 
   it('passes --follow-deps flag to use case', async () => {
@@ -218,6 +283,20 @@ describe('change context', () => {
     expect(stderr()).toContain('stale metadata')
   })
 
+  it('does not print a warning line for pure cycle traversal suppression', async () => {
+    const { kernel, stderr } = setup()
+    kernel.changes.compile.execute.mockResolvedValue({
+      ...mockResult,
+      warnings: [],
+    })
+
+    const program = makeProgram()
+    registerChangeContext(program.command('change'))
+    await program.parseAsync(['node', 'specd', 'change', 'context', 'my-change', 'designing'])
+
+    expect(stderr()).not.toContain('cycle')
+  })
+
   it('exits 1 when step argument is missing', async () => {
     setup()
 
@@ -280,6 +359,7 @@ describe('change context', () => {
     expect(stdout()).toContain('specd spec show')
     expect(stdout()).toContain('Architecture')
     expect(stdout()).toContain('Hexagonal architecture')
+    expect(stdout()).toContain('| default:_global/architecture | summary |')
   })
 
   it('renders dependsOnTraversal summary specs under Via dependencies heading', async () => {
@@ -313,6 +393,7 @@ describe('change context', () => {
     expect(stdout()).toContain('### Via dependencies')
     expect(stdout()).toContain('Database')
     expect(stdout()).toContain('Database layer')
+    expect(stdout()).toContain('| default:infra/database | summary |')
   })
 
   it('JSON output includes projectContext, specs, availableSteps with mode and source', async () => {
@@ -337,6 +418,7 @@ describe('change context', () => {
     expect(parsed.availableSteps).toBeDefined()
     expect(parsed.specs[0].mode).toBe('full')
     expect(parsed.specs[0].source).toBe('includePattern')
+    expect(parsed.warnings).toEqual([])
   })
 
   it('exits 1 when change not found', async () => {

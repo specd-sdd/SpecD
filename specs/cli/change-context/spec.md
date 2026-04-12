@@ -38,20 +38,20 @@ When `--fingerprint` is provided, the CLI first checks whether the provided fing
 
 The CLI MUST assemble the final output from the structured `CompileContextResult` returned by the use case.
 
-**In `text` or `toon` mode** (default `text`):
+**In `text` mode** (default):
 
-1. Project context entries are rendered first, each preceded by its source label (e.g. `**Source: <path>**` for file entries, `**Source: instruction**` for instruction entries). Entries are separated by `---`.
-2. Spec content follows under a `## Spec content` header:
-   - **Full-mode specs** (`mode: 'full'`) are rendered with their content under a `### Spec: <specId>` heading, as today.
-   - **Summary-mode specs** (`mode: 'summary'`) are rendered in a separate section under a `## Available context specs` heading. Each summary spec is listed with its spec ID, title, and description. The section includes an instruction: `Use \`specd spec show <spec-id>\` to load the full content of any spec you need.\`
-   - Within each group, specs from `dependsOnTraversal` source MUST be visually distinguished from `includePattern` specs — rendered under a `### Via dependencies` sub-heading within the available context specs section.
-3. Available steps are rendered last, each annotated with availability status.
+1. The first rendered line is `Context Fingerprint: <sha256...>`, before any project context or spec content.
+2. Project context entries are rendered next, each preceded by its source label (for example `**Source: <path>**` for file entries and `**Source: instruction**` for instruction entries). Entries are separated by `---`.
+3. Spec content follows under a `## Spec content` header:
+   - **Full-mode specs** (`mode: 'full'`) are rendered under a `### Spec: <specId>` heading and MUST include an explicit mode label in the rendered block so the reader can tell that the spec content is complete without inferring it from layout alone.
+   - **Summary-mode specs** (`mode: 'summary'`) are rendered in a separate section under a `## Available context specs` heading. Each summary entry MUST include an explicit mode label showing that it is summary content. The section includes an instruction: `Use \`specd spec show <spec-id>\` to load the full content of any spec you need.\`
+   - Mode visibility in text output must not depend on rewriting or trusting the spec title. The reader must be able to identify full versus summary content even when title metadata is absent or incomplete.
+   - Within the summary group, specs from `dependsOnTraversal` source MUST be visually distinguished from `includePattern` specs — rendered under a `### Via dependencies` sub-heading within the available context specs section.
+4. Available steps are rendered last, each annotated with availability status.
 
-When `--fingerprint` is provided and matches the current fingerprint, text mode outputs only a brief message: `Context unchanged since last call.` The full context is not printed.
+When `--fingerprint` is provided and matches the current fingerprint, text mode still begins with `Context Fingerprint: <sha256...>` and then outputs a brief unchanged message. The full context is not printed.
 
-No additional framing or headers are added beyond those listed above.
-
-**In `json` mode**, the output is the structured result directly:
+**In `json` or `toon` mode**, the output is the structured result directly:
 
 ```json
 {
@@ -109,7 +109,7 @@ If the requested step is not currently available (i.e. `stepAvailable: false`), 
 
 ### Requirement: Context warnings
 
-Any warnings from the `CompileContext` use case (stale metadata, missing specs, unknown workspaces, cycles) are printed to stderr as `warning:` lines. The context block is still printed to stdout and the process exits with code 0.
+Any warnings from the `CompileContext` use case (for example stale metadata, missing specs, or unknown workspaces) are printed to stderr as `warning:` lines. The context block is still printed to stdout and the process exits with code 0.
 
 ### Requirement: Error cases
 
@@ -118,14 +118,16 @@ Any warnings from the `CompileContext` use case (stale metadata, missing specs, 
 
 ## Constraints
 
-- In text mode, project context entries appear first, then full-mode specs, then summary-mode specs, then available steps
+- In text mode, the first line is `Context Fingerprint: <sha256...>`, before project context entries
+- In text mode, project context entries appear before spec entries, and available steps appear last
+- Text output MUST label each rendered spec entry explicitly as full or summary content without relying on title rewriting
 - Summary-mode specs in text output MUST include a note instructing the agent to use `specd spec show <spec-id>` for full content
 - Summary-mode specs from `dependsOnTraversal` MUST be rendered under a separate sub-heading from `includePattern` specs
 - All warnings go to stderr; the assembled output goes to stdout
 - `dependsOn` traversal is opt-in via `--follow-deps`; without the flag, deps are not followed
 - `--depth` without `--follow-deps` is a CLI usage error (exit code 1)
 - Section flags (`--rules`, `--constraints`, `--scenarios`) only filter full-mode spec content; summary-mode specs and available steps are unaffected
-- The fingerprint is calculated from all inputs that affect the logical context content: change specIds, project context entries, context include/exclude patterns, step, schema version, and the flags `--rules`, `--constraints`, `--scenarios`, `--follow-deps`, `--depth`. The `--format` flag does not affect the fingerprint.
+- The fingerprint is calculated from the complete logical `CompileContext` output emitted by the use case for the selected result-shaping flags. Flags such as `--rules`, `--constraints`, `--scenarios`, `--follow-deps`, and `--depth` affect the fingerprint when they change the logical result. The `--format` flag does not affect the fingerprint.
 
 ## Examples
 

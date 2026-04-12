@@ -31,6 +31,20 @@
 - **WHEN** `CompileContext.execute` applies step 4 (workspace-level exclude)
 - **THEN** `default:internal/notes` is removed from the context set
 
+#### Scenario: change specId survives matching exclude rules
+
+- **GIVEN** `change.specIds: ['default:auth/login']`
+- **AND** project-level or workspace-level exclude patterns also match `default:auth/login`
+- **WHEN** `CompileContext.execute` applies the collection pipeline
+- **THEN** `default:auth/login` remains in the collected set because change-scoped spec IDs are mandatory context members
+
+#### Scenario: specDependsOn value is seeded even without pattern matches
+
+- **GIVEN** `change.specDependsOn: { 'default:auth/login': ['default:auth/shared'] }`
+- **AND** `default:auth/shared` is not matched by any include pattern
+- **WHEN** `CompileContext.execute` is called without `followDeps`
+- **THEN** `default:auth/shared` is still included in the collected set as a seeded `specDependsOn` entry
+
 #### Scenario: dependsOn traversal adds specs beyond include set
 
 - **GIVEN** `change.specIds: ['default:auth/login']`
@@ -46,72 +60,51 @@
 - **WHEN** `CompileContext.execute` is called
 - **THEN** `auth/jwt` is not excluded — `dependsOn` traversal specs are immune to exclude rules
 
-#### Scenario: Spec appears only once even if matched multiple times
+#### Scenario: Spec appears only once even if seeded and matched multiple times
 
-- **GIVEN** `contextIncludeSpecs: ['auth/login', 'auth/*']`
+- **GIVEN** `change.specIds: ['default:auth/login']`
+- **AND** `contextIncludeSpecs: ['auth/login', 'auth/*']` also matches `default:auth/login`
+- **AND** `change.specDependsOn: { 'default:auth/login': ['default:auth/shared'] }`
+- **AND** `default:auth/shared` is also discovered later via `dependsOn` traversal
 - **WHEN** `CompileContext.execute` is called
-- **THEN** `auth/login` appears exactly once in the context, at the position of the first matching pattern
+- **THEN** each collected spec appears exactly once at the earliest qualifying position in the final `specs` array
 
 ### Requirement: Tier classification
 
 #### Scenario: Lazy mode — specIds specs are tier 1 full
 
 - **GIVEN** `config.contextMode: 'lazy'`
-- **AND** `change.specIds: ['default:auth/login']`
+- **AND** a spec appears in `change.specIds`
 - **WHEN** `CompileContext.execute` is called
-- **THEN** the spec entry for `default:auth/login` has `mode: 'full'` and `source: 'specIds'`
-- **AND** its `content` field is present with full structured content
+- **THEN** that spec is emitted with `mode: 'full'`
 
-#### Scenario: Lazy mode — specDependsOn specs are tier 1 full
+#### Scenario: Lazy mode — specDependsOn specs are seeded but summary
 
 - **GIVEN** `config.contextMode: 'lazy'`
 - **AND** `change.specDependsOn: { 'default:auth/login': ['default:auth/shared'] }`
 - **WHEN** `CompileContext.execute` is called
-- **THEN** the spec entry for `default:auth/shared` has `mode: 'full'` and `source: 'specDependsOn'`
-- **AND** its `content` field is present with full structured content
+- **THEN** `default:auth/shared` is emitted with `source: 'specDependsOn'`
+- **AND** `mode: 'summary'`
 
 #### Scenario: Lazy mode — include pattern specs are tier 2 summary
 
 - **GIVEN** `config.contextMode: 'lazy'`
-- **AND** `contextIncludeSpecs: ['default:*']` matches `default:_global/architecture`
-- **AND** `default:_global/architecture` is NOT in `change.specIds` or `change.specDependsOn`
+- **AND** a spec is matched only by include patterns
 - **WHEN** `CompileContext.execute` is called
-- **THEN** the spec entry for `default:_global/architecture` has `mode: 'summary'` and `source: 'includePattern'`
-- **AND** its `content` field is absent
-- **AND** `title` and `description` are present
+- **THEN** that spec is emitted with `mode: 'summary'`
 
 #### Scenario: Lazy mode — dependsOn traversal specs are tier 2 summary
 
 - **GIVEN** `config.contextMode: 'lazy'`
-- **AND** `followDeps: true`
-- **AND** a spec `default:auth/jwt` is discovered via dependsOn traversal
-- **AND** `default:auth/jwt` is NOT in `change.specIds` or `change.specDependsOn`
+- **AND** a spec is discovered only through `dependsOn` traversal
 - **WHEN** `CompileContext.execute` is called
-- **THEN** the spec entry for `default:auth/jwt` has `mode: 'summary'` and `source: 'dependsOnTraversal'`
+- **THEN** that spec is emitted with `mode: 'summary'`
 
-#### Scenario: Lazy mode — spec in both specIds and include pattern is tier 1
-
-- **GIVEN** `config.contextMode: 'lazy'`
-- **AND** `change.specIds: ['default:auth/login']`
-- **AND** `contextIncludeSpecs: ['default:*']` also matches `default:auth/login`
-- **WHEN** `CompileContext.execute` is called
-- **THEN** the spec entry for `default:auth/login` has `mode: 'full'` and `source: 'specIds'`
-- **AND** it appears exactly once in the `specs` array
-
-#### Scenario: Full mode — all specs are tier 1 full
+#### Scenario: Full mode — all collected specs are tier 1 full
 
 - **GIVEN** `config.contextMode: 'full'`
-- **AND** `contextIncludeSpecs: ['default:*']` matches multiple specs
 - **WHEN** `CompileContext.execute` is called
-- **THEN** all spec entries have `mode: 'full'`
-- **AND** all spec entries have `content` present
-
-#### Scenario: Default contextMode is lazy
-
-- **GIVEN** `config.contextMode` is not set
-- **AND** `change.specIds` contains some specs and `contextIncludeSpecs` matches others
-- **WHEN** `CompileContext.execute` is called
-- **THEN** specIds specs have `mode: 'full'` and other specs have `mode: 'summary'` — same as `contextMode: 'lazy'`
+- **THEN** every collected spec is emitted with `mode: 'full'`
 
 ### Requirement: Cycle detection during dependsOn traversal
 
@@ -119,9 +112,9 @@
 
 - **GIVEN** `auth/login` depends on `auth/jwt` and `auth/jwt` depends back on `auth/login`
 - **WHEN** `CompileContext.execute` traverses `dependsOn`
-- **THEN** both specs are included (or the cycle is broken at one point)
+- **THEN** both specs are included if they can be reached before the repeated edge is cut
 - **AND** no infinite loop occurs
-- **AND** a cycle warning is emitted
+- **AND** no cycle warning is emitted
 
 ### Requirement: Staleness detection and content fallback
 
@@ -211,6 +204,15 @@
 - **WHEN** `CompileContext.execute` is called
 - **THEN** `result.availableSteps` contains an entry for each step with `available` and `blockingArtifacts`
 
+#### Scenario: Specs preserve change-scoped seed ordering ahead of discovered context
+
+- **GIVEN** `change.specIds: ['default:auth/login']`
+- **AND** `change.specDependsOn: { 'default:auth/login': ['default:auth/shared'] }`
+- **AND** include patterns add `default:_global/architecture`
+- **AND** `dependsOn` traversal later discovers `default:auth/jwt`
+- **WHEN** `CompileContext.execute` assembles `result.specs`
+- **THEN** the entries appear in order: `default:auth/login`, `default:auth/shared`, `default:_global/architecture`, `default:auth/jwt`
+
 #### Scenario: spec source priority — specIds wins over includePattern
 
 - **GIVEN** `change.specIds: ['default:auth/login']`
@@ -243,6 +245,38 @@
 - **AND** the schema declares `metadataExtraction` rules
 - **WHEN** `CompileContext.execute` is called
 - **THEN** the spec entry's `content` is produced via extraction and a staleness warning is emitted
+
+#### Scenario: Full rendering shows all spec-scoped artifacts in stable order
+
+- **GIVEN** a full-mode spec has spec-scoped artifacts `verify.md`, `spec.md`, and `examples.md`
+- **WHEN** `CompileContext.execute` is called without `sections`
+- **THEN** the rendered `content` includes all three files
+- **AND** `spec.md` appears first
+- **AND** the remaining files appear in alphabetical order
+
+#### Scenario: Full rendering does not depend on spec.md existing
+
+- **GIVEN** a full-mode spec has spec-scoped artifacts `verify.md` and `examples.md` but no `spec.md`
+- **WHEN** `CompileContext.execute` is called without `sections`
+- **THEN** the rendered `content` includes both files
+- **AND** they appear in alphabetical order
+
+#### Scenario: Merged preview content uses the same file ordering
+
+- **GIVEN** a spec in `change.specIds` has merged preview files from `PreviewSpec`
+- **AND** those files include `verify.md`, `spec.md`, and `examples.md`
+- **WHEN** `CompileContext.execute` is called without `sections`
+- **THEN** the rendered merged `content` includes all preview files
+- **AND** `spec.md` appears first
+- **AND** the remaining merged files appear in alphabetical order
+
+#### Scenario: Section filtering on merged preview derives content from merged artifacts
+
+- **GIVEN** a spec in `change.specIds` has merged preview artifacts whose merged `verify.md` adds a new scenario
+- **AND** `CompileContext.execute` is called with `sections: ['scenarios']`
+- **WHEN** the full spec entry is rendered
+- **THEN** the rendered `content` includes the scenario extracted from the merged preview artifacts
+- **AND** it does not fall back to a raw single-file preview body
 
 ### Requirement: Missing spec IDs emit a warning
 
@@ -297,41 +331,57 @@
 
 ### Requirement: Context fingerprint
 
-#### Scenario: Fingerprint calculated from specIds, context, and flags
+#### Scenario: Fingerprint calculated from the compiled result
 
-- **GIVEN** a change with specIds, project context entries, and include/exclude patterns
+- **GIVEN** a change with project context entries, collected specs, available steps, and warnings
 - **WHEN** `CompileContext.execute` is called without a fingerprint
-- **THEN** a fingerprint is calculated and included in the result
+- **THEN** a fingerprint is calculated from the canonicalized compiled context result and included in the response
 
 #### Scenario: Unchanged status returned when fingerprint matches
 
-- **GIVEN** the current context fingerprint is `sha256:abc123...`
+- **GIVEN** the current compiled context fingerprint is `sha256:abc123...`
 - **WHEN** `CompileContext.execute` is called with `fingerprint: 'sha256:abc123...'`
 - **THEN** the result `status` is `'unchanged'`
 - **AND** `projectContext` and `specs` are empty arrays
-- **AND** the full context is not assembled
+- **AND** the full context is not re-emitted
 
 #### Scenario: Changed status returned when fingerprint does not match
 
-- **GIVEN** the current context fingerprint is `sha256:xyz789...`
+- **GIVEN** the current compiled context fingerprint is `sha256:xyz789...`
 - **WHEN** `CompileContext.execute` is called with `fingerprint: 'sha256:abc123...'`
 - **THEN** the result `status` is `'changed'`
 - **AND** the full context is assembled and returned
 - **AND** `contextFingerprint` is `sha256:xyz789...`
 
-#### Scenario: Fingerprint changes when flags change
+#### Scenario: Fingerprint changes when specDependsOn changes emitted specs
 
-- **GIVEN** `CompileContext` was called without `--follow-deps`
-- **WHEN** `CompileContext` is called with `followDeps: true`
-- **THEN** the fingerprint is different from the previous call
-- **AND** the result `status` is `'changed'`
+- **GIVEN** a change initially emits no seeded `specDependsOn` specs
+- **WHEN** `change.specDependsOn` is updated so the compiled `specs` array gains a new emitted entry
+- **THEN** the fingerprint changes because the compiled output changed
+
+#### Scenario: Fingerprint changes when warnings change
+
+- **GIVEN** a compiled context with fresh metadata emits no warnings
+- **WHEN** metadata becomes stale and the same context emits a warning
+- **THEN** the fingerprint changes because the emitted result changed
+
+#### Scenario: Fingerprint changes when step availability changes
+
+- **GIVEN** a compiled context where the requested step is available
+- **WHEN** a required artifact becomes incomplete and `stepAvailable` plus `blockingArtifacts` change
+- **THEN** the fingerprint changes because the emitted availability result changed
+
+#### Scenario: Fingerprint changes when result-shaping flags change emitted context
+
+- **GIVEN** a compiled context requested without dependency traversal or section filters
+- **WHEN** `CompileContext.execute` is called again with flags that change the emitted result, such as `followDeps`, `depth`, or `sections`
+- **THEN** the fingerprint changes because the compiled logical output changed
 
 #### Scenario: --format flag does not affect fingerprint
 
-- **GIVEN** the fingerprint was calculated from a call with `--format text`
-- **WHEN** the same context is requested with `--format json`
-- **THEN** the fingerprint matches the previous call
-- **AND** `status` is `'unchanged'`
+- **GIVEN** the fingerprint was calculated from a call whose compiled logical output matches the current context
+- **WHEN** the same context is requested through a different presentation format such as `text` or `json`
+- **THEN** the fingerprint remains unchanged
 
 ### Requirement: Materialized delta view
 
