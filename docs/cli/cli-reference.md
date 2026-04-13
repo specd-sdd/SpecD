@@ -144,11 +144,14 @@ specd change draft <name> [options]
 
 Shelve the change to the drafts directory. The change is removed from active changes and can be restored later with `drafts restore`. Use this when work needs to be paused without discarding it.
 
-| Option                      | Description                                   |
-| --------------------------- | --------------------------------------------- |
-| `--reason <text>`           | Reason for shelving. Recorded with the draft. |
-| `--format text\|json\|toon` | Output format.                                |
-| `--config <path>`           | Config file path.                             |
+When a change has previously reached the `implementing` state, drafting is blocked by default because the code and specs may be out of sync. Use `--force` to override this guard when you are certain you want to shelve anyway.
+
+| Option                      | Description                                                                                                      |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `--reason <text>`           | Reason for shelving. Recorded with the draft.                                                                    |
+| `--force`                   | Bypass the historical implementation guard. Required only when the change has previously reached `implementing`. |
+| `--format text\|json\|toon` | Output format.                                                                                                   |
+| `--config <path>`           | Config file path.                                                                                                |
 
 ### change edit
 
@@ -299,11 +302,14 @@ specd change discard <name> [options]
 
 Permanently discard a change. The change is moved to the discarded directory and cannot be recovered. Use `change draft` if you want to pause work and resume it later.
 
-| Option                      | Description                      |
-| --------------------------- | -------------------------------- |
-| `--reason <text>`           | Reason for discarding. Required. |
-| `--format text\|json\|toon` | Output format.                   |
-| `--config <path>`           | Config file path.                |
+When a change has previously reached the `implementing` state, discarding is blocked by default because the code and specs may be out of sync. Use `--force` to override this guard when you are certain you want to discard anyway.
+
+| Option                      | Description                                                                                                      |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `--reason <text>`           | Reason for discarding. Required.                                                                                 |
+| `--force`                   | Bypass the historical implementation guard. Required only when the change has previously reached `implementing`. |
+| `--format text\|json\|toon` | Output format.                                                                                                   |
+| `--config <path>`           | Config file path.                                                                                                |
 
 ### change check-overlap
 

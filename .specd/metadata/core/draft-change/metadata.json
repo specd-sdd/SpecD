@@ -9,7 +9,7 @@
     {
       "requirement": "Input contract",
       "rules": [
-        "`DraftChange.execute` SHALL accept a `DraftChangeInput` with the following fields:\n\n- `name` (string, required) — the change to shelve\n- `reason` (string, optional) — explanation for shelving the change"
+        "`DraftChange.execute` SHALL accept a `DraftChangeInput` with the following fields:\n\n- `name` (string, required) — the change to shelve\n- `reason` (string, optional) — explanation for shelving the change\n- `force` (boolean, optional) — explicit override for the historical implementation guard"
       ]
     },
     {
@@ -25,9 +25,15 @@
       ]
     },
     {
+      "requirement": "Historical implementation guard",
+      "rules": [
+        "`DraftChange` SHALL respect the `Change` entity's historical implementation guard.\n\nIf the loaded change has ever reached `implementing`, `DraftChange.execute` SHALL fail by default instead of shelving it, because implementation may already exist and moving the change to `drafts/` would risk leaving permanent specs and code out of sync.\n\nThe use case MAY proceed only when `input.force === true`, in which case the guard is bypassed intentionally."
+      ]
+    },
+    {
       "requirement": "Drafted event appended to history",
       "rules": [
-        "The use case MUST call `change.draft(actor, reason)` to append a `drafted` event to the change's history. The event records:\n\n- `type`: `'drafted'`\n- `at`: the current timestamp\n- `by`: the resolved actor identity\n- `reason`: included only when provided in the input"
+        "The use case MUST call `change.draft(actor, reason, force)` to append a `drafted` event to the change's history after the historical implementation guard has been satisfied or explicitly bypassed. The event records:\n\n- `type`: `'drafted'`\n- `at`: the current timestamp\n- `by`: the resolved actor identity\n- `reason`: included only when provided in the input"
       ]
     },
     {
@@ -64,6 +70,23 @@
       ]
     },
     {
+      "requirement": "Historical implementation guard",
+      "name": "Historically implemented change is rejected by default",
+      "given": ["the loaded change has previously reached implementing"],
+      "when": ["DraftChange.execute is called without force"],
+      "then": [
+        "it fails without appending a drafted event",
+        "AND the error explains that implementation may already exist and specs and code could be left out of sync"
+      ]
+    },
+    {
+      "requirement": "Historical implementation guard",
+      "name": "Force bypasses the historical implementation guard",
+      "given": ["the loaded change has previously reached implementing"],
+      "when": ["DraftChange.execute is called with force: true"],
+      "then": ["the use case succeeds", "AND it appends a drafted event"]
+    },
+    {
       "requirement": "Drafted event appended to history",
       "name": "Reason is included when provided",
       "when": ["DraftChange.execute is called with reason: 'blocked on dependency'"],
@@ -97,8 +120,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:83c40390f1ae13e9f70e3bb938e05dc7638c7a4eb4d7379613614e904ae54703",
-    "verify.md": "sha256:340ab3d2663e29266f9f0b7f81e996108cf893b0392a7d15e9cf12b46567f0e7"
+    "spec.md": "sha256:d3fe6c682814c28edbb0fa9ac590a8025cd8ca0617d2b23fa5a80102a6b94e62",
+    "verify.md": "sha256:8637787c28622baa3fb90f92888415b6a7ec3fa0efd1a4b37075c566cff5c582"
   },
   "generatedBy": "core"
 }

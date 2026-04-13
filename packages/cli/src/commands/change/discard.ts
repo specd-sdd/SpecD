@@ -16,6 +16,10 @@ export function registerChangeDiscard(parent: Command): void {
       'Discard a change, moving it to the discarded state and removing it from the active change list.',
     )
     .requiredOption('--reason <text>', 'mandatory explanation for discarding')
+    .option(
+      '--force',
+      'bypass the historical implementation guard when the change has previously reached implementing',
+    )
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
     .addHelpText(
@@ -25,24 +29,30 @@ JSON/TOON output schema:
   { result: "ok", name: string }
 `,
     )
-    .action(async (name: string, opts: { reason: string; format: string; config?: string }) => {
-      try {
-        if (opts.reason.trim().length === 0) {
-          cliError('--reason must not be empty', opts.format)
+    .action(
+      async (
+        name: string,
+        opts: { reason: string; force?: boolean; format: string; config?: string },
+      ) => {
+        try {
+          if (opts.reason.trim().length === 0) {
+            cliError('--reason must not be empty', opts.format)
+          }
+          const { kernel } = await resolveCliContext({ configPath: opts.config })
+          await kernel.changes.discard.execute({
+            name,
+            reason: opts.reason,
+            ...(opts.force ? { force: true } : {}),
+          })
+          const fmt = parseFormat(opts.format)
+          if (fmt === 'text') {
+            output(`discarded change ${name}`, 'text')
+          } else {
+            output({ result: 'ok', name }, fmt)
+          }
+        } catch (err) {
+          handleError(err, opts.format)
         }
-        const { kernel } = await resolveCliContext({ configPath: opts.config })
-        await kernel.changes.discard.execute({
-          name,
-          reason: opts.reason,
-        })
-        const fmt = parseFormat(opts.format)
-        if (fmt === 'text') {
-          output(`discarded change ${name}`, 'text')
-        } else {
-          output({ result: 'ok', name }, fmt)
-        }
-      } catch (err) {
-        handleError(err, opts.format)
-      }
-    })
+      },
+    )
 }

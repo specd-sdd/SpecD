@@ -8,6 +8,7 @@ import {
   mockProcessExit,
   captureStdout,
   captureStderr,
+  ExitSentinel,
 } from './helpers.js'
 
 vi.mock('../../src/helpers/cli-context.js', () => ({
@@ -16,7 +17,7 @@ vi.mock('../../src/helpers/cli-context.js', () => ({
 
 import { resolveCliContext } from '../../src/helpers/cli-context.js'
 import { registerChangeDiscard } from '../../src/commands/change/discard.js'
-import { ChangeNotFoundError } from '@specd/core'
+import { ChangeNotFoundError, HistoricalImplementationGuardError } from '@specd/core'
 
 function setup() {
   const config = makeMockConfig()
@@ -158,5 +159,59 @@ describe('Error cases', () => {
 
     expect(process.exit).toHaveBeenCalledWith(1)
     expect(stderr()).toMatch(/error:/)
+  })
+
+  it('Historically implemented change requires force', async () => {
+    const { kernel, stderr } = setup()
+    kernel.changes.discard.execute.mockRejectedValue(
+      new HistoricalImplementationGuardError('discard', 'my-change'),
+    )
+
+    const program = makeProgram()
+    registerChangeDiscard(program.command('change'))
+
+    try {
+      await program.parseAsync([
+        'node',
+        'specd',
+        'change',
+        'discard',
+        'my-change',
+        '--reason',
+        'abandoned',
+      ])
+    } catch (err) {
+      expect(err).toBeInstanceOf(ExitSentinel)
+      expect((err as ExitSentinel).code).toBe(1)
+    }
+
+    expect(stderr()).toMatch(/implementing/)
+    expect(stderr()).toMatch(/out of sync/)
+  })
+
+  it('Force flag is passed through to the use case', async () => {
+    const { kernel } = setup()
+    kernel.changes.discard.execute.mockResolvedValue(undefined)
+
+    const program = makeProgram()
+    registerChangeDiscard(program.command('change'))
+    await program.parseAsync([
+      'node',
+      'specd',
+      'change',
+      'discard',
+      'my-change',
+      '--reason',
+      'intentional rollback',
+      '--force',
+    ])
+
+    expect(kernel.changes.discard.execute).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'my-change',
+        reason: 'intentional rollback',
+        force: true,
+      }),
+    )
   })
 })

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { DiscardChange } from '../../../src/application/use-cases/discard-change.js'
 import { ChangeNotFoundError } from '../../../src/application/errors/change-not-found-error.js'
+import { HistoricalImplementationGuardError } from '../../../src/domain/errors/historical-implementation-guard-error.js'
 import { makeChangeRepository, makeActorResolver, makeChange } from './helpers.js'
 
 describe('DiscardChange', () => {
@@ -79,6 +80,48 @@ describe('DiscardChange', () => {
       await expect(uc.execute({ name: 'missing', reason: 'gone' })).rejects.toThrow(
         ChangeNotFoundError,
       )
+    })
+  })
+
+  describe('historical implementation guard', () => {
+    it('rejects discarding a change that has previously reached implementing without force', async () => {
+      const change = makeChange('my-change')
+      change.transition('designing', { name: 'User', email: 'user@example.com' })
+      change.transition('ready', { name: 'User', email: 'user@example.com' })
+      change.transition('implementing', { name: 'User', email: 'user@example.com' })
+      const repo = makeChangeRepository([change])
+      const uc = new DiscardChange(repo, makeActorResolver())
+
+      await expect(uc.execute({ name: 'my-change', reason: 'cleanup' })).rejects.toThrow(
+        HistoricalImplementationGuardError,
+      )
+    })
+
+    it('allows discarding with force when change has previously reached implementing', async () => {
+      const change = makeChange('my-change')
+      change.transition('designing', { name: 'User', email: 'user@example.com' })
+      change.transition('ready', { name: 'User', email: 'user@example.com' })
+      change.transition('implementing', { name: 'User', email: 'user@example.com' })
+      const repo = makeChangeRepository([change])
+      const uc = new DiscardChange(repo, makeActorResolver())
+
+      const result = await uc.execute({
+        name: 'my-change',
+        reason: 'workflow cleanup',
+        force: true,
+      })
+
+      expect(result.history.some((e) => e.type === 'discarded')).toBe(true)
+    })
+
+    it('allows discarding without force when change has never reached implementing', async () => {
+      const change = makeChange('my-change')
+      const repo = makeChangeRepository([change])
+      const uc = new DiscardChange(repo, makeActorResolver())
+
+      const result = await uc.execute({ name: 'my-change', reason: 'no longer needed' })
+
+      expect(result.history.some((e) => e.type === 'discarded')).toBe(true)
     })
   })
 })

@@ -2,7 +2,11 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { Command } from 'commander'
-import { ChangeNotFoundError, InvalidStateTransitionError } from '@specd/core'
+import {
+  ChangeNotFoundError,
+  InvalidStateTransitionError,
+  HistoricalImplementationGuardError,
+} from '@specd/core'
 import {
   makeMockConfig,
   makeMockChange,
@@ -837,6 +841,42 @@ describe('change draft', () => {
     expect(process.exit).toHaveBeenCalledWith(1)
     expect(stderr()).toMatch(/error:/i)
   })
+
+  it('passes --force to the use case', async () => {
+    const { kernel } = setup()
+    kernel.changes.draft.execute.mockResolvedValue(undefined)
+    captureStdout()
+
+    const program = makeProgram()
+    registerChangeDraft(program.command('change'))
+    await program.parseAsync([
+      'node',
+      'specd',
+      'change',
+      'draft',
+      'my-change',
+      '--reason',
+      'rollback',
+      '--force',
+    ])
+
+    const call = kernel.changes.draft.execute.mock.calls[0]![0]
+    expect(call.force).toBe(true)
+  })
+
+  it('exits 1 when historical implementation guard blocks draft', async () => {
+    const { kernel, stderr } = setup()
+    kernel.changes.draft.execute.mockRejectedValue(
+      new HistoricalImplementationGuardError('draft', 'my-change'),
+    )
+
+    const program = makeProgram()
+    registerChangeDraft(program.command('change'))
+    await program.parseAsync(['node', 'specd', 'change', 'draft', 'my-change']).catch(() => {})
+
+    expect(process.exit).toHaveBeenCalledWith(1)
+    expect(stderr()).toMatch(/implementing/)
+  })
 })
 
 // ---------------------------------------------------------------------------
@@ -945,6 +985,44 @@ describe('change discard', () => {
     const parsed = JSON.parse(stdout())
     expect(parsed.result).toBe('ok')
     expect(parsed.name).toBe('my-change')
+  })
+
+  it('passes --force to the use case', async () => {
+    const { kernel } = setup()
+    kernel.changes.discard.execute.mockResolvedValue(undefined)
+    captureStdout()
+
+    const program = makeProgram()
+    registerChangeDiscard(program.command('change'))
+    await program.parseAsync([
+      'node',
+      'specd',
+      'change',
+      'discard',
+      'my-change',
+      '--reason',
+      'superseded',
+      '--force',
+    ])
+
+    const call = kernel.changes.discard.execute.mock.calls[0]![0]
+    expect(call.force).toBe(true)
+  })
+
+  it('exits 1 when historical implementation guard blocks discard', async () => {
+    const { kernel, stderr } = setup()
+    kernel.changes.discard.execute.mockRejectedValue(
+      new HistoricalImplementationGuardError('discard', 'my-change'),
+    )
+
+    const program = makeProgram()
+    registerChangeDiscard(program.command('change'))
+    await program
+      .parseAsync(['node', 'specd', 'change', 'discard', 'my-change', '--reason', 'done'])
+      .catch(() => {})
+
+    expect(process.exit).toHaveBeenCalledWith(1)
+    expect(stderr()).toMatch(/implementing/)
   })
 })
 

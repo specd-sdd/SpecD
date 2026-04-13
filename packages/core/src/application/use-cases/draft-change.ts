@@ -8,6 +8,8 @@ export interface DraftChangeInput {
   readonly name: string
   /** Optional explanation for shelving the change. */
   readonly reason?: string
+  /** Explicit override for the historical implementation guard. */
+  readonly force?: boolean
 }
 
 /**
@@ -41,7 +43,7 @@ export class DraftChange {
   async execute(input: DraftChangeInput): Promise<Change> {
     const actor = await this._actor.identity()
     return this._changes.mutate(input.name, (change) => {
-      change.draft(actor, input.reason)
+      change.draft(actor, input.reason, input.force)
       return change
     })
   }

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { DraftChange } from '../../../src/application/use-cases/draft-change.js'
 import { ChangeNotFoundError } from '../../../src/application/errors/change-not-found-error.js'
+import { HistoricalImplementationGuardError } from '../../../src/domain/errors/historical-implementation-guard-error.js'
 import { makeChangeRepository, makeActorResolver, makeChange } from './helpers.js'
 
 describe('DraftChange', () => {
@@ -68,6 +69,45 @@ describe('DraftChange', () => {
       const uc = new DraftChange(repo, makeActorResolver())
 
       await expect(uc.execute({ name: 'missing' })).rejects.toThrow(ChangeNotFoundError)
+    })
+  })
+
+  describe('historical implementation guard', () => {
+    it('rejects drafting a change that has previously reached implementing without force', async () => {
+      const change = makeChange('my-change')
+      change.transition('designing', { name: 'User', email: 'user@example.com' })
+      change.transition('ready', { name: 'User', email: 'user@example.com' })
+      change.transition('implementing', { name: 'User', email: 'user@example.com' })
+      const repo = makeChangeRepository([change])
+      const uc = new DraftChange(repo, makeActorResolver())
+
+      await expect(uc.execute({ name: 'my-change' })).rejects.toThrow(
+        HistoricalImplementationGuardError,
+      )
+    })
+
+    it('allows drafting with force when change has previously reached implementing', async () => {
+      const change = makeChange('my-change')
+      change.transition('designing', { name: 'User', email: 'user@example.com' })
+      change.transition('ready', { name: 'User', email: 'user@example.com' })
+      change.transition('implementing', { name: 'User', email: 'user@example.com' })
+      const repo = makeChangeRepository([change])
+      const uc = new DraftChange(repo, makeActorResolver())
+
+      const result = await uc.execute({ name: 'my-change', force: true })
+
+      expect(result.isDrafted).toBe(true)
+      expect(result.history.some((e) => e.type === 'drafted')).toBe(true)
+    })
+
+    it('allows drafting without force when change has never reached implementing', async () => {
+      const change = makeChange('my-change')
+      const repo = makeChangeRepository([change])
+      const uc = new DraftChange(repo, makeActorResolver())
+
+      const result = await uc.execute({ name: 'my-change' })
+
+      expect(result.isDrafted).toBe(true)
     })
   })
 })

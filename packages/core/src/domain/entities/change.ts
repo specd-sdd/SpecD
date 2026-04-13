@@ -3,6 +3,7 @@ import { type ArtifactStatus } from '../value-objects/artifact-status.js'
 import { InvalidStateTransitionError } from '../errors/invalid-state-transition-error.js'
 import { InvalidChangeError } from '../errors/invalid-change-error.js'
 import { CorruptedManifestError } from '../errors/corrupted-manifest-error.js'
+import { HistoricalImplementationGuardError } from '../errors/historical-implementation-guard-error.js'
 import { ChangeArtifact } from './change-artifact.js'
 import { ArtifactFile } from '../value-objects/artifact-file.js'
 import { type ArtifactType } from '../value-objects/artifact-type.js'
@@ -274,6 +275,23 @@ export class Change {
   }
 
   /**
+   * Whether the change has ever reached the `implementing` lifecycle state.
+   *
+   * Derived from the append-only history by scanning for any
+   * `transitioned` event whose `to` field is `'implementing'`.
+   * This is a temporary pragmatic heuristic until specd can detect
+   * whether a change has actually modified code files.
+   *
+   * The signal is historical, not state-based — it remains true once
+   * reached regardless of subsequent state transitions.
+   */
+  get hasEverReachedImplementing(): boolean {
+    return this._history.some(
+      (evt): evt is TransitionedEvent => evt.type === 'transitioned' && evt.to === 'implementing',
+    )
+  }
+
+  /**
    * The active spec approval — the most recent `spec-approved` event that has
    * not been superseded by a subsequent `invalidated` event, or `undefined`.
    */
@@ -502,10 +520,21 @@ export class Change {
   /**
    * Shelves this change to `drafts/`, appending a `drafted` event.
    *
+   * If the change has ever reached `implementing`, drafting is blocked
+   * by default because implementation may already exist and shelving
+   * the change would risk leaving permanent specs and code out of sync.
+   * Pass `force: true` to bypass this guard intentionally.
+   *
    * @param actor - Identity of the person shelving the change
    * @param reason - Optional explanation for shelving
+   * @param force - Explicit override for the historical implementation guard
+   * @throws {HistoricalImplementationGuardError} If the change has ever
+   *   reached `implementing` and `force` is not `true`
    */
-  draft(actor: ActorIdentity, reason?: string): void {
+  draft(actor: ActorIdentity, reason?: string, force?: boolean): void {
+    if (this.hasEverReachedImplementing && force !== true) {
+      throw new HistoricalImplementationGuardError('draft', this._name)
+    }
     const event: DraftedEvent =
       reason !== undefined
         ? { type: 'drafted', at: new Date(), by: actor, reason }
@@ -525,11 +554,27 @@ export class Change {
   /**
    * Permanently abandons the change, appending a `discarded` event.
    *
+   * If the change has ever reached `implementing`, discarding is blocked
+   * by default because implementation may already exist and abandoning
+   * the workflow would risk leaving permanent specs and code out of sync.
+   * Pass `force: true` to bypass this guard intentionally.
+   *
    * @param reason - Mandatory explanation for discarding
    * @param actor - Identity of the person discarding the change
    * @param supersededBy - Optional list of change names that replace this one
+   * @param force - Explicit override for the historical implementation guard
+   * @throws {HistoricalImplementationGuardError} If the change has ever
+   *   reached `implementing` and `force` is not `true`
    */
-  discard(reason: string, actor: ActorIdentity, supersededBy?: readonly string[]): void {
+  discard(
+    reason: string,
+    actor: ActorIdentity,
+    supersededBy?: readonly string[],
+    force?: boolean,
+  ): void {
+    if (this.hasEverReachedImplementing && force !== true) {
+      throw new HistoricalImplementationGuardError('discard', this._name)
+    }
     const event: DiscardedEvent =
       supersededBy !== undefined
         ? { type: 'discarded', reason, at: new Date(), by: actor, supersededBy }

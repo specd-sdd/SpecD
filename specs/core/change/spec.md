@@ -200,6 +200,14 @@ Event types:
 
 Approval invalidation caused by artifact drift MUST capture the full set of affected files before the event is appended. If multiple files drift in the same invalidation pass, they are recorded in the same `invalidated` event.
 
+### Requirement: Historical implementation detection
+
+A Change SHALL treat any historical transition to `implementing` as evidence that implementation may already exist, even if the current lifecycle state later returns to `designing`, `verifying`, or another non-terminal state.
+
+This detection is temporary and pragmatic. Until specd can detect whether a change has actually modified code files, the system SHALL derive this signal by scanning the append-only history for any `transitioned` event whose `to` field is `implementing`.
+
+The signal is historical, not state-based. It remains true once reached unless the project later introduces a more precise file-level implementation detector.
+
 ### Requirement: Schema version
 
 The `created` event records the `schemaName` and `schemaVersion` of the schema active at creation time.
@@ -212,12 +220,12 @@ A **`schemaVersion` mismatch** within the same schema name is advisory. A warnin
 
 A change may be moved between storage locations without affecting its lifecycle state. All operations are recorded as events in history.
 
-- **Draft** (`changes/` → `drafts/`) — shelves the change. Appends a `drafted` event with: Can be performed at any point before archiving. The change retains its full history and lifecycle state.
+- **Draft** (`changes/` → `drafts/`) — shelves the change. Appends a `drafted` event with: Drafting remains orthogonal to the current lifecycle state, but it is guarded by historical implementation detection. If the change has ever reached `implementing`, drafting SHALL fail by default because implementation may already exist and shelving the change would risk leaving permanent specs and code out of sync. The operation MAY proceed only when the caller explicitly forces it.
   - **`by`** — mandatory git identity (name + email) of the person shelving
   - **`at`** — timestamp
   - **`reason`** — optional explanation
 - **Restore** (`drafts/` → `changes/`) — recovers a drafted change. Appends a `restored` event. The change resumes from its preserved state.
-- **Discard** (`changes/` or `drafts/` → `discarded/`) — permanently abandons the change. Appends a `discarded` event with: Cannot be undone. A change may be drafted and restored multiple times before being discarded; the full cycle is preserved in history.
+- **Discard** (`changes/` or `drafts/` → `discarded/`) — permanently abandons the change. Appends a `discarded` event with: Discarding is irreversible. A change may be drafted and restored multiple times before being discarded; the full cycle is preserved in history. If the change has ever reached `implementing`, discarding SHALL fail by default because implementation may already exist and abandoning the workflow would risk leaving permanent specs and code out of sync. The operation MAY proceed only when the caller explicitly forces it.
   - **`reason`** — mandatory human-provided explanation
   - **`by`** — mandatory git identity (name + email) of the person discarding
   - **`at`** — timestamp
@@ -247,6 +255,8 @@ A change may be moved between storage locations without affecting its lifecycle 
 - Task completion gating is enforced generically by the workflow model — any step that requires an artifact with `taskCompletionCheck` is automatically gated (see [`specs/core/workflow-model/spec.md`](../workflow-model/spec.md))
 - `verifying → implementing` does not trigger approval invalidation
 - History events are never modified or deleted; invalidated approvals are identifiable by a subsequent `invalidated` event
+- Historical implementation detection is derived from append-only history by scanning for any `transitioned` event whose `to` field is `implementing`
+- Drafting or discarding after historical implementation requires an explicit force override because implementation may already exist and specs and code could otherwise be left out of sync
 - Discarding a change requires a `discarded` event with mandatory `reason` and `by`; it is irreversible
 
 ## Spec Dependencies

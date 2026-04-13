@@ -9,13 +9,13 @@
     {
       "requirement": "Command signature",
       "rules": [
-        "```\nspecd change draft <name> [--reason <text>] [--format text|json|toon]\n```\n\n- `<name>` — required positional; the name of the change to shelve\n- `--reason <text>` — optional; a human-readable explanation for shelving the change\n- `--format text|json|toon` — optional; output format, defaults to `text`"
+        "```\nspecd change draft <name> [--reason <text>] [--force] [--format text|json|toon]\n```\n\n- `<name>` — required positional; the name of the change to shelve\n- `--reason <text>` — optional; a human-readable explanation for shelving the change\n- `--force` — optional; bypasses the historical implementation guard when the change has previously reached `implementing`\n- `--format text|json|toon` — optional; output format, defaults to `text`"
       ]
     },
     {
       "requirement": "Behaviour",
       "rules": [
-        "The command moves the change from `changes/` to `drafts/` and appends a `drafted` event to history. The lifecycle state is preserved. The change can be recovered at any time using `specd change restore`."
+        "The command moves the change from `changes/` to `drafts/` and appends a `drafted` event to history. The lifecycle state is preserved. The change can be recovered at any time using `specd drafts restore`.\n\nIf the change has ever reached `implementing`, the command SHALL fail by default because implementation may already exist and shelving the workflow would risk leaving permanent specs and code out of sync. The operation MAY proceed only when `--force` is provided."
       ]
     },
     {
@@ -27,14 +27,15 @@
     {
       "requirement": "Error cases",
       "rules": [
-        "- If the change does not exist, the command exits with code 1 and prints an `error:` message to stderr.\n- If the change is already in `drafts/`, the command exits with code 1 and prints an `error:` message to stderr."
+        "- If the change does not exist, the command exits with code 1 and prints an `error:` message to stderr.\n- If the change is already in `drafts/`, the command exits with code 1 and prints an `error:` message to stderr.\n- If the change has ever reached `implementing` and `--force` is not provided, the command exits with code 1 and prints an `error:` message explaining that implementation may already exist and shelving the change could leave specs and code out of sync."
       ]
     }
   ],
   "constraints": [
     "Drafting does not affect lifecycle state",
-    "A change may be drafted at any point before archiving",
-    "--reason is stored in the drafted event but not printed on success"
+    "A change may be drafted before archiving, but once it has ever reached implementing the operation requires --force",
+    "--reason is stored in the drafted event but not printed on success",
+    "--force bypasses only the historical implementation guard; it does not change lifecycle semantics"
   ],
   "scenarios": [
     {
@@ -42,6 +43,12 @@
       "name": "Missing name argument",
       "when": ["specd change draft is run without a name"],
       "then": ["the command exits with code 1 and prints a usage error to stderr"]
+    },
+    {
+      "requirement": "Command signature",
+      "name": "Force flag is accepted",
+      "when": ["specd change draft my-change --force is run with a valid change name"],
+      "then": ["the command accepts the flag as part of its input contract"]
     },
     {
       "requirement": "Behaviour",
@@ -59,6 +66,13 @@
       "name": "Optional reason stored in history",
       "when": ["specd change draft my-change --reason \"on hold\" is run"],
       "then": ["the drafted event in history has reason: \"on hold\""]
+    },
+    {
+      "requirement": "Behaviour",
+      "name": "Historically implemented change can still be drafted when forced",
+      "given": ["my-change has previously reached implementing"],
+      "when": ["specd change draft my-change --force is run"],
+      "then": ["the change is moved to drafts/", "AND a drafted event is appended to history"]
     },
     {
       "requirement": "Output on success",
@@ -80,6 +94,16 @@
       "then": ["the command exits with code 1", "AND stderr contains an error: message"]
     },
     {
+      "requirement": "Error cases",
+      "name": "Historically implemented change requires force",
+      "given": ["my-change has previously reached implementing"],
+      "when": ["specd change draft my-change is run without --force"],
+      "then": [
+        "the command exits with code 1",
+        "AND stderr explains that implementation may already exist and shelving the change could leave specs and code out of sync"
+      ]
+    },
+    {
       "requirement": "Output on success",
       "name": "JSON output on success",
       "when": ["specd change draft my-change --format json succeeds"],
@@ -90,8 +114,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:de5cf8b952278f589efcf5cc39b0e9e5df8121bb923b1f26b770eabdf0640b63",
-    "verify.md": "sha256:0f77f98c97c78c66be75e340ff6ca5ea159ca4c1c18da20e32823c435e064ca2"
+    "spec.md": "sha256:e32f285a2dec661e3964af3224447f81795b5cb1af29f3a3df6ce9bf1a1da111",
+    "verify.md": "sha256:28522e6dcea4f4bbe5ebf49fbbe282ea7bd4dc340aaf5ceb76ab8da65e78fd85"
   },
   "generatedBy": "core"
 }

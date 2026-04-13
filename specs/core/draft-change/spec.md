@@ -12,6 +12,7 @@ Users need to pause work on a change without losing its state or history — for
 
 - `name` (string, required) — the change to shelve
 - `reason` (string, optional) — explanation for shelving the change
+- `force` (boolean, optional) — explicit override for the historical implementation guard
 
 ### Requirement: Change must exist
 
@@ -21,9 +22,17 @@ The use case MUST load the change from the `ChangeRepository` by name. If no cha
 
 The use case MUST resolve the current actor identity via the `ActorResolver` port. The resolved actor is recorded in the `drafted` event.
 
+### Requirement: Historical implementation guard
+
+`DraftChange` SHALL respect the `Change` entity's historical implementation guard.
+
+If the loaded change has ever reached `implementing`, `DraftChange.execute` SHALL fail by default instead of shelving it, because implementation may already exist and moving the change to `drafts/` would risk leaving permanent specs and code out of sync.
+
+The use case MAY proceed only when `input.force === true`, in which case the guard is bypassed intentionally.
+
 ### Requirement: Drafted event appended to history
 
-The use case MUST call `change.draft(actor, reason)` to append a `drafted` event to the change's history. The event records:
+The use case MUST call `change.draft(actor, reason, force)` to append a `drafted` event to the change's history after the historical implementation guard has been satisfied or explicitly bypassed. The event records:
 
 - `type`: `'drafted'`
 - `at`: the current timestamp

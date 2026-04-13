@@ -24,3 +24,7 @@ export { MissingDefaultWorkspaceError } from './missing-default-workspace-error.
 export { StepNotValidError } from './step-not-valid-error.js'
 export { HookNotFoundError } from './hook-not-found-error.js'
 export { SpecOverlapError } from './spec-overlap-error.js'
+export {
+  HistoricalImplementationGuardError,
+  type GuardedChangeOperation,
+} from './historical-implementation-guard-error.js'

@@ -208,6 +208,27 @@
 - **THEN** its `cause` is `artifact-review-required`
 - **AND** it is distinct from `artifact-drift`
 
+### Requirement: Historical implementation detection
+
+#### Scenario: Historical detection becomes true after implementing
+
+- **GIVEN** a Change whose history already contains a `transitioned` event with `to: 'implementing'`
+- **WHEN** historical implementation detection is evaluated
+- **THEN** it reports that implementation may already exist
+
+#### Scenario: Historical detection remains true after returning to designing
+
+- **GIVEN** a Change whose history contains a `transitioned` event to `implementing`
+- **AND** a later `transitioned` event returns it to `designing`
+- **WHEN** historical implementation detection is evaluated
+- **THEN** it still reports that implementation may already exist
+
+#### Scenario: Historical detection stays false before implementing
+
+- **GIVEN** a Change whose history has no `transitioned` event with `to: 'implementing'`
+- **WHEN** historical implementation detection is evaluated
+- **THEN** it reports that implementation may not yet exist
+
 ### Requirement: Schema version
 
 #### Scenario: Schema version mismatch warns
@@ -227,10 +248,29 @@
 - **WHEN** a Change is drafted without providing a `by` identity
 - **THEN** the operation fails with a validation error and no event is appended
 
-#### Scenario: Draft appends drafted event
+#### Scenario: Draft succeeds before implementation has ever been reached
 
-- **WHEN** a Change in `implementing` state is drafted with a valid identity
-- **THEN** a `drafted` event is appended to history, the change is moved to `drafts/`, and it retains its `implementing` lifecycle state
+- **GIVEN** a Change whose history contains no `transitioned` event to `implementing`
+- **WHEN** it is drafted with a valid identity
+- **THEN** a `drafted` event is appended to history
+- **AND** the change is moved to `drafts/`
+- **AND** it retains its current lifecycle state
+
+#### Scenario: Draft after historical implementation requires force
+
+- **GIVEN** a Change whose history contains a `transitioned` event to `implementing`
+- **WHEN** it is drafted without forcing the operation
+- **THEN** the operation fails
+- **AND** no `drafted` event is appended
+- **AND** the failure explains that implementation may already exist and specs and code could be left out of sync
+
+#### Scenario: Forced draft after historical implementation appends drafted event
+
+- **GIVEN** a Change whose history contains a `transitioned` event to `implementing`
+- **WHEN** it is drafted with a valid identity and the force override enabled
+- **THEN** a `drafted` event is appended to history
+- **AND** the change is moved to `drafts/`
+- **AND** it retains its current lifecycle state
 
 #### Scenario: Drafted change no longer appears in active changes
 
@@ -240,22 +280,37 @@
 #### Scenario: Restore appends restored event
 
 - **WHEN** a drafted Change is restored
-- **THEN** a `restored` event is appended to history, the change is moved back to `changes/`, and it resumes from its preserved lifecycle state
+- **THEN** a `restored` event is appended to history
+- **AND** the change is moved back to `changes/`
+- **AND** it resumes from its preserved lifecycle state
 
 #### Scenario: Discard requires reason and identity
 
 - **WHEN** a Change is discarded without providing a reason or `by` identity
 - **THEN** the operation fails with a validation error and no event is appended
 
-#### Scenario: Discard appends discarded event
+#### Scenario: Discard succeeds before implementation has ever been reached
 
-- **WHEN** a Change is discarded with a reason, identity, and optional superseding change names
-- **THEN** a `discarded` event is appended to history and the change is moved to `discarded/`
+- **GIVEN** a Change whose history contains no `transitioned` event to `implementing`
+- **WHEN** the Change is discarded with a reason, identity, and optional superseding change names
+- **THEN** a `discarded` event is appended to history
+- **AND** the change is moved to `discarded/`
 
-#### Scenario: Discard from drafts
+#### Scenario: Discard after historical implementation requires force
 
-- **WHEN** a drafted Change is discarded
-- **THEN** a `discarded` event is appended, the change is moved to `discarded/`, and it cannot be recovered
+- **GIVEN** a Change whose history contains a `transitioned` event to `implementing`
+- **WHEN** it is discarded without forcing the operation
+- **THEN** the operation fails
+- **AND** no `discarded` event is appended
+- **AND** the failure explains that implementation may already exist and specs and code could be left out of sync
+
+#### Scenario: Forced discard from drafts after historical implementation succeeds
+
+- **GIVEN** a drafted Change whose history contains a `transitioned` event to `implementing`
+- **WHEN** it is discarded with a reason, identity, and the force override enabled
+- **THEN** a `discarded` event is appended
+- **AND** the change is moved to `discarded/`
+- **AND** it cannot be recovered
 
 #### Scenario: Discard with supersededBy
 

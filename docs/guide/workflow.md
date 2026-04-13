@@ -384,6 +384,12 @@ specd drafts restore add-auth      # move back to changes/
 
 A drafted change retains its current lifecycle state. When restored, it continues from where it left off. Drafting is useful when you need to context-switch to another change and want to keep the current work safely out of the way.
 
+**Guard:** When a change has previously reached the `implementing` state, drafting is blocked by default — the code and specs may be out of sync, and shelving without archival risks leaving partial implementation behind. If you are certain you want to draft anyway, use `--force`:
+
+```bash
+specd change draft add-auth --force
+```
+
 ### Discarding
 
 Discarding permanently abandons a change. A reason is required.
@@ -396,6 +402,12 @@ A discarded change is moved to the discarded directory and is never archived. Th
 
 ```bash
 specd discard add-auth --reason "Superseded" --superseded-by add-oauth-flow
+```
+
+**Guard:** When a change has previously reached the `implementing` state, discarding is blocked by default — code that has been implemented should ideally be archived, not silently abandoned. If you are certain you want to discard anyway, use `--force`:
+
+```bash
+specd change discard add-auth --reason "No longer needed" --force
 ```
 
 ---

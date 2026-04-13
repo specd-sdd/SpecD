@@ -235,7 +235,7 @@ describe('FsArchiveRepository', () => {
 
     it('archives a drafted change from drafts/', async () => {
       const change = await makeArchivableChange(ctx, 'drafted-change')
-      change.draft(actor)
+      change.draft(actor, undefined, true)
       await ctx.changes.save(change)
 
       // Restore to archivable state (already archivable, just drafted)
