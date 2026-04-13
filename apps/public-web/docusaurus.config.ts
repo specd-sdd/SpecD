@@ -80,7 +80,7 @@ const config: Config = {
   title: publicSiteTitle,
   tagline: publicSiteTagline,
   favicon: 'img/logo-mark.svg',
-  url: 'https://specd.dev',
+  url: 'https://getspecd.dev',
   baseUrl: '/',
   customFields: {
     apiReferenceEnabled,

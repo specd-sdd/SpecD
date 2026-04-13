@@ -29,7 +29,7 @@ describe('public docs config', () => {
   it('publishes stable navigation routes and repository links', () => {
     expect(publicDocsHref).toBe('/docs/guide/getting-started')
     expect(publicApiHref).toBe('/api')
-    expect(publicGithubHref).toBe('https://github.com/lsmonki/SpecD')
+    expect(publicGithubHref).toBe('https://github.com/specd-sdd/SpecD')
   })
 
   it('exposes explicit homepage metadata for search and social previews', () => {
@@ -37,7 +37,7 @@ describe('public docs config', () => {
     expect(publicSiteTagline).toBe('Spec-Driven Development for real codebases.')
     expect(publicHomePageTitle).toBe('Spec-Driven Development for real codebases')
     expect(publicSiteDescription).toContain('compiles agent context')
-    expect(publicSiteUrl).toBe('https://specd.dev')
+    expect(publicSiteUrl).toBe('https://getspecd.dev')
     expect(publicSocialImageHref).toBe('/img/og-card.svg')
   })
 

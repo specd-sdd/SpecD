@@ -16,13 +16,17 @@ describe('LandingPage', () => {
     expect(screen.getByText(/spec-first workflow/i)).toBeInTheDocument()
     expect(screen.getByText('SpecD')).toBeInTheDocument()
     expect(screen.getByText('Spec-Driven Development')).toBeInTheDocument()
-    expect(screen.getByText(/give agents the right context, not a repo to guess from/i)).toBeInTheDocument()
+    expect(
+      screen.getByText(/give agents the right context, not a repo to guess from/i),
+    ).toBeInTheDocument()
     expect(screen.getByText(/impact analysis, search, and hotspot discovery/i)).toBeInTheDocument()
     expect(screen.getByText(/across coding agents/i)).toBeInTheDocument()
     expect(screen.getByText(/one workflow above the agent layer/i)).toBeInTheDocument()
     expect(screen.getByText(/plugins for other coding agents/i)).toBeInTheDocument()
     expect(screen.getByText(/hooks at the right gates/i)).toBeInTheDocument()
-    expect(screen.getByText(/from problem to implementation, one change at a time/i)).toBeInTheDocument()
+    expect(
+      screen.getByText(/from problem to implementation, one change at a time/i),
+    ).toBeInTheDocument()
     expect(screen.getByText(/resolve relevant specs/i)).toBeInTheDocument()
     expect(screen.getByText(/analyze their impact/i)).toBeInTheDocument()
     expect(screen.getByText(/verify the change/i)).toBeInTheDocument()
@@ -40,9 +44,25 @@ describe('LandingPage', () => {
 
     const links = screen.getAllByRole('link')
 
-    expect(links.some((link) => link.textContent === 'Get Started' && link.getAttribute('href') === '/docs/guide/getting-started')).toBe(true)
-    expect(links.some((link) => link.textContent === 'Browse API' && link.getAttribute('href') === '/api')).toBe(true)
-    expect(links.some((link) => link.textContent?.includes('GitHub') && link.getAttribute('href') === 'https://github.com/lsmonki/SpecD')).toBe(true)
+    expect(
+      links.some(
+        (link) =>
+          link.textContent === 'Get Started' &&
+          link.getAttribute('href') === '/docs/guide/getting-started',
+      ),
+    ).toBe(true)
+    expect(
+      links.some(
+        (link) => link.textContent === 'Browse API' && link.getAttribute('href') === '/api',
+      ),
+    ).toBe(true)
+    expect(
+      links.some(
+        (link) =>
+          link.textContent?.includes('GitHub') &&
+          link.getAttribute('href') === 'https://github.com/specd-sdd/SpecD',
+      ),
+    ).toBe(true)
   })
 
   it('hides API entrypoints when the generated API section is disabled', () => {

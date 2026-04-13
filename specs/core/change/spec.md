@@ -156,7 +156,7 @@ A Change can reconcile its artifact map against the current schema's artifact ty
 5. Returns `true` if any changes were made, `false` if the artifact map was already in sync.
 6. When changes are made, appends an `ArtifactsSyncedEvent` to history with the `SYSTEM_ACTOR` identity.
 
-`SYSTEM_ACTOR` is a constant `{ name: 'specd', email: 'system@specd.dev' }` used for automated operations like artifact sync. It is not a user actor and does not require VCS resolution.
+`SYSTEM_ACTOR` is a constant `{ name: 'specd', email: 'system@getspecd.dev' }` used for automated operations like artifact sync. It is not a user actor and does not require VCS resolution.
 
 ### Requirement: History and event sourcing
 

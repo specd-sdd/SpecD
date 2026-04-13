@@ -210,7 +210,7 @@ interface ActorIdentity {
 ```typescript
 import { SYSTEM_ACTOR } from '@specd/core'
 
-// { name: 'specd', email: 'system@specd.dev' }
+// { name: 'specd', email: 'system@getspecd.dev' }
 ```
 
 When iterating history, check `event.by.email === SYSTEM_ACTOR.email` to distinguish automated events from human-initiated ones.

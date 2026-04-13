@@ -137,7 +137,7 @@ The JSON serialization of each event type is:
 { "type": "artifact-skipped", "at": "...", "by": { "name": "...", "email": "..." }, "artifactId": "design", "reason": "not needed for this change" }
 
 // artifact sync reconciled the artifact map against the schema
-{ "type": "artifacts-synced", "at": "...", "by": { "name": "specd", "email": "system@specd.dev" }, "typesAdded": ["tasks"], "typesRemoved": [], "filesAdded": [{ "type": "specs", "key": "default:auth/register" }], "filesRemoved": [] }
+{ "type": "artifacts-synced", "at": "...", "by": { "name": "specd", "email": "system@getspecd.dev" }, "typesAdded": ["tasks"], "typesRemoved": [], "filesAdded": [{ "type": "specs", "key": "default:auth/register" }], "filesRemoved": [] }
 
 // permanently abandoned
 { "type": "discarded", "at": "...", "by": { "name": "...", "email": "..." }, "reason": "superseded", "supersededBy": ["new-auth-flow"] }
