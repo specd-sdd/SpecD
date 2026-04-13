@@ -152,6 +152,30 @@
 - **WHEN** `execute` is called with `to: 'designing'`
 - **THEN** the approval is invalidated before the transition
 
+#### Scenario: Transition from designing to designing does not invalidate
+
+- **GIVEN** a change already in `designing` state
+- **WHEN** `execute` is called with `to: 'designing'`
+- **THEN** `change.invalidate()` is not called
+- **AND** `change.transition('designing', actor)` is called directly
+- **AND** no artifact files are downgraded
+- **AND** no approvals are cleared
+
+#### Scenario: Transition from drafting to designing does not invalidate
+
+- **GIVEN** a change in `drafting` state
+- **WHEN** `execute` is called with `to: 'designing'`
+- **THEN** `change.invalidate()` is not called
+- **AND** `change.transition('designing', actor)` is called directly
+
+#### Scenario: Transition from implementing to designing invalidates
+
+- **GIVEN** a change in `implementing` state with validated artifacts
+- **WHEN** `execute` is called with `to: 'designing'`
+- **THEN** `change.invalidate()` is called with cause `'artifact-review-required'`
+- **AND** all artifact files are downgraded to `pending-review`
+- **AND** any active spec approval is cleared
+
 ### Requirement: Post-hook execution
 
 #### Scenario: Post hooks run for the source state, not the target

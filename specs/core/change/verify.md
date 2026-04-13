@@ -78,6 +78,15 @@
 - **WHEN** it is transitioned to `designing`
 - **THEN** the transition succeeds
 
+#### Scenario: Designing to designing does not downgrade artifacts or approvals
+
+- **GIVEN** a Change already in `designing` state with validated artifacts and an active spec approval
+- **WHEN** the change is transitioned to `designing` again
+- **THEN** no `invalidated` event is appended
+- **AND** no artifact files are downgraded to `pending-review`
+- **AND** the active spec approval remains valid
+- **AND** a `transitioned` event with `from: 'designing'` and `to: 'designing'` is appended
+
 ### Requirement: Implementation and verification loop
 
 #### Scenario: implementation-failure returns to implementing without downgrading unchanged artifacts
