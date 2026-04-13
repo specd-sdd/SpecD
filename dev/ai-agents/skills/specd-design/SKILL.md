@@ -338,7 +338,29 @@ specd change hook-instruction <name> designing --phase post --format text
 
 Follow guidance. If hooks fail, fix and re-run.
 
-### 10b. Implementation scope guard — mandatory before `ready`
+### 10b. Blast radius check
+
+Use the code graph to assess the downstream impact of the planned implementation.
+This surfaces hidden risks early, when the design can still be adjusted.
+
+```bash
+specd graph impact --changes <workspace:path1> <workspace:path2> ... --format json
+```
+
+File paths must use the `{workspace}:{relativePath}` format (e.g. `core:src/auth.ts`,
+`cli:src/commands/context.ts`). Map each implementation target from the design artifacts
+to its workspace-prefixed path using the workspace config loaded in step 10c.
+
+If `riskLevel` is HIGH or CRITICAL, surface it to the user:
+
+> **Impact analysis:** the planned implementation touches symbols with `<riskLevel>` risk.
+> `<N>` files affected downstream. Consider whether the design needs additional
+> constraints or scenarios to cover the blast radius.
+
+If risk is HIGH or CRITICAL, confirm with the user before continuing. The user
+may choose to adjust the design, add scenarios, or accept the risk and continue.
+
+### 10c. Implementation scope guard — mandatory before `ready`
 
 Before entering `ready`, verify that the implementation described by the design
 stays inside the change's writable workspace code roots. This is the enforcement
@@ -407,6 +429,8 @@ but do not hard-fail them without user confirmation.
 Do not "mentally waive" a path because it seems harmless. If the design says to
 touch a concrete file outside the active writable `codeRoot` set, surface it
 explicitly before `ready`.
+
+### 10d. Enter `ready`
 
 Run ready pre-hooks, then transition:
 

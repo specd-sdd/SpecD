@@ -124,23 +124,6 @@ For each scenario:
 - Run relevant tests if applicable
 - Confirm GIVEN/WHEN/THEN conditions are satisfied using the merged spec content
 
-### 4b. Check blast radius with code graph
-
-After verifying scenarios, use the code graph to check whether the implementation
-touched high-risk areas that might need extra scrutiny:
-
-```bash
-specd graph impact --changes <file1> <file2> ... --format json
-```
-
-Pass the files that were modified during implementation (from `git diff` or the task
-list). If `riskLevel` is HIGH or CRITICAL, surface it to the user:
-
-> **Impact analysis:** the implementation touches symbols with `<riskLevel>` risk.
-> `<N>` files affected downstream. Consider additional testing.
-
-If risk is HIGH or CRITICAL, confirm with the user before transitioning.
-
 ### 5. Run exit hooks — immediately after last scenario verified
 
 The moment all scenarios have been evaluated, run the post-verifying hooks before

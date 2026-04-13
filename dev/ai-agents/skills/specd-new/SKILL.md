@@ -72,7 +72,7 @@ specd graph search "<keyword>" --format json
 If the user mentions specific files or symbols, check their impact to understand scope:
 
 ```bash
-specd graph impact --file "<path>" --direction both --format json
+specd graph impact --file "<workspace:path>" --direction both --format json
 specd graph impact --symbol "<name>" --direction both --format json
 ```
 
