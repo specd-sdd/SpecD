@@ -123,14 +123,22 @@ a previous state can lead to wrong decisions.
 ### Fingerprint mechanism
 
 To avoid re-reading unchanged context, the agent stores a `contextFingerprint` from
-the first `change context` call and passes it to subsequent calls:
+the first `change context` call and passes it to subsequent calls — including across
+skill transitions within the same conversation:
 
-1. **First call** (no fingerprint stored): `change context <name> <step> --format text`
+1. **No fingerprint stored** (first call in conversation, or new step without prior context):
+   `change context <name> <step> --format text`
    - Parse the `contextFingerprint` from the JSON response
    - Store it in the conversation window
-2. **Subsequent calls**: `change context <name> <step> --format text --fingerprint <value>`
+2. **Fingerprint stored** (any subsequent call, including after transitioning to a new skill):
+   `change context <name> <step> --format text --fingerprint <value>`
    - If `status: "unchanged"`: use the context already in memory, no re-processing needed
    - If `status: "changed"`: update stored context and fingerprint with the new response
+
+The fingerprint persists across skill boundaries. When moving from design → implement →
+verify → archive within the same conversation, carry the stored `contextFingerprint`
+forward and pass it to the next skill's `change context` call. Only omit the fingerprint
+if no `change context` call has been made yet in the conversation.
 
 The fingerprint represents the logical context state. When unchanged, the agent still
 receives `stepAvailable`, `blockingArtifacts`, `availableSteps`, and `warnings` — only

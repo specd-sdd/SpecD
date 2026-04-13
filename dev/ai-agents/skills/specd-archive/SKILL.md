@@ -48,10 +48,10 @@ If state is not `archivable`, this is the wrong skill. Suggest based on state:
 ### 2. Load context
 
 ```bash
-specd change context <name> archiving --follow-deps --depth 1 --format json
+specd change context <name> archiving --follow-deps --depth 1 --format json [--fingerprint <stored-value>]
 ```
 
-Extract and store the `contextFingerprint` from the response. If the response is `status: "changed"`, use the full context. If `status: "unchanged"`, you already have the context from a previous call.
+Pass `--fingerprint <stored-value>` if you have a `contextFingerprint` from a previous `change context` call in this conversation (see `shared.md` — "Fingerprint mechanism"). Extract and store the `contextFingerprint` from the response. If you passed a fingerprint and the response is `status: "unchanged"`, use the context already in memory. If `status: "changed"`, update your stored context and fingerprint with the new response.
 
 **MUST follow** — project context entries are binding directives. If lazy mode returns
 summary specs, evaluate and load any that are relevant to the archiving work
