@@ -226,7 +226,11 @@ export class TransitionChange {
     const persistedChange = await this._changes.mutate(input.name, (freshChange) => {
       let invalidated = false
 
-      if (effectiveTarget === 'designing' && freshChange.state !== 'drafting') {
+      if (
+        effectiveTarget === 'designing' &&
+        freshChange.state !== 'drafting' &&
+        freshChange.state !== 'designing'
+      ) {
         freshChange.invalidate(
           'artifact-review-required',
           actor,

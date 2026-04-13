@@ -52,7 +52,9 @@ Only the transitions shown above are valid. Any attempt to transition to a state
 
 The `implementing ↔ verifying` loop may repeat any number of times. The transition `implementing → verifying` is only valid when all tasks in the `tasks` artifact are complete. The transition `verifying → implementing` is valid only for implementation-only failures: the current artifacts still describe the intended behavior and the required fix fits within the already-defined tasks. If verification concludes that the artifacts themselves must be revised, or that new tasks are required before implementation can resume, the change returns to `designing` instead.
 
-Every state except `drafting` may return to `designing`. Returning to `designing` does not imply that artifacts drifted; it means the artifact set must be reviewed again before work can proceed.
+Every state except `drafting` MAY return to `designing`. However, when the change is already in `designing` (a `designing → designing` transition), this is a state-preserving re-entry and MUST NOT trigger approval invalidation or artifact downgrade.
+
+Returning to `designing` from a later state (e.g. `implementing → designing`, `ready → designing`) does not imply that artifacts drifted; it means the artifact set must be reviewed again before work can proceed.
 
 ### Requirement: Implementation and verification loop
 
@@ -238,6 +240,7 @@ A change may be moved between storage locations without affecting its lifecycle 
 - `specIds` may be empty (empty specIds results in empty workspaces)
 - Current lifecycle state is derived from history (last `transitioned` event); no state snapshot is stored
 - Any modification to the spec list or any artifact content appends an `invalidated` event followed by a `transitioned` event back to `designing` — this may be triggered by use cases or automatically by `FsChangeRepository.get()` using `SYSTEM_ACTOR`
+- A `designing → designing` transition MUST NOT trigger approval invalidation or artifact downgrade — re-entering the same step is not a backward transition
 - `ChangeArtifact` contains a `files: Map<string, ArtifactFile>` — artifact status is aggregated from per-file statuses
 - `ArtifactFile` status is never stored directly — always derived from `validatedHash` and file presence
 - `validatedHash === "__skipped__"` is the sentinel for `skipped` status — only valid on `optional: true` artifacts

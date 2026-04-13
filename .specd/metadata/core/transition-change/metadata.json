@@ -69,7 +69,7 @@
     {
       "requirement": "Transition to designing from any state",
       "rules": [
-        "Every state except `drafting` SHALL include `designing` as a valid transition target. This allows the user to return to the design phase at any point in the lifecycle when issues are discovered.\n\nWhen the effective target is `designing`, the use case MUST:\n\n1. Invalidate the active spec approval if one exists.\n2. Invalidate the active signoff if one exists — the first invalidation already clears both.\n3. Downgrade every artifact file to `pending-review`, except files already marked `drifted-pending-review`, which keep that more specific state.\n4. Recompute every artifact's aggregate persisted `state`.\n5. Proceed with the transition via `change.transition('designing', actor)`.\n\nThis downgrade applies both to explicit redesign transitions and to scope changes that keep the lifecycle in `designing` while invalidating previously validated work."
+        "Every state except `drafting` SHALL include `designing` as a valid transition target. This allows the user to return to the design phase at any point in the lifecycle when issues are discovered.\n\nWhen the effective target is `designing` and the change is **not already in** `designing` or `drafting`, the use case MUST:\n\n1. Invalidate the active spec approval if one exists.\n2. Invalidate the active signoff if one exists — the first invalidation already clears both.\n3. Downgrade every artifact file to `pending-review`, except files already marked `drifted-pending-review`, which keep that more specific state.\n4. Recompute every artifact's aggregate persisted `state`.\n5. Proceed with the transition via `change.transition('designing', actor)`.\n\nWhen the change is **already in** `designing` (a `designing → designing` transition) or in `drafting` (the natural first entry), the use case MUST NOT invalidate approvals, downgrade artifacts, or call `invalidate()`. It MUST proceed directly with the transition via `change.transition('designing', actor)`.\n\nDrift detection (artifact content changes) is handled independently at the repository layer and is not affected by this rule."
       ]
     },
     {
@@ -130,7 +130,8 @@
     "Pre-hook failure aborts the transition — no state change occurs",
     "Post-hook failure aborts the transition — no state change occurs (both phases are fail-fast)",
     "When schema resolution fails or no workflow step exists for the target, requires and hooks are skipped gracefully",
-    "Artifact validation clearing on verifying → implementing reads the implementing step's requires from the schema — the caller does not supply them"
+    "Artifact validation clearing on verifying → implementing reads the implementing step's requires from the schema — the caller does not supply them",
+    "A designing → designing transition MUST NOT trigger approval invalidation or artifact downgrade — it is a state-preserving transition that only re-enters the same step"
   ],
   "scenarios": [
     {
@@ -315,6 +316,39 @@
       "then": ["the approval is invalidated before the transition"]
     },
     {
+      "requirement": "Transition to designing from any state",
+      "name": "Transition from designing to designing does not invalidate",
+      "given": ["a change already in designing state"],
+      "when": ["execute is called with to: 'designing'"],
+      "then": [
+        "change.invalidate() is not called",
+        "AND change.transition('designing', actor) is called directly",
+        "AND no artifact files are downgraded",
+        "AND no approvals are cleared"
+      ]
+    },
+    {
+      "requirement": "Transition to designing from any state",
+      "name": "Transition from drafting to designing does not invalidate",
+      "given": ["a change in drafting state"],
+      "when": ["execute is called with to: 'designing'"],
+      "then": [
+        "change.invalidate() is not called",
+        "AND change.transition('designing', actor) is called directly"
+      ]
+    },
+    {
+      "requirement": "Transition to designing from any state",
+      "name": "Transition from implementing to designing invalidates",
+      "given": ["a change in implementing state with validated artifacts"],
+      "when": ["execute is called with to: 'designing'"],
+      "then": [
+        "change.invalidate() is called with cause 'artifact-review-required'",
+        "AND all artifact files are downgraded to pending-review",
+        "AND any active spec approval is cleared"
+      ]
+    },
+    {
       "requirement": "Post-hook execution",
       "name": "Post hooks run for the source state, not the target",
       "given": [
@@ -422,8 +456,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:349ab041bf7c12750d3d12ef7d59b3b33a58d8f2f55a6267836573b1dfd4883b",
-    "verify.md": "sha256:3e3215fced17f2e1b3f316c7b127486d808007d8597993cab6f0c08235475b01"
+    "spec.md": "sha256:9dfea41867b640e354186fca704d493ef94b9536e9d9494498a1055a42a55b9e",
+    "verify.md": "sha256:53d2a7d0eea6ea5514bb44fe8821e5fb1c80cc8d59646fddc291c5c4a7c61caa"
   },
   "generatedBy": "core"
 }

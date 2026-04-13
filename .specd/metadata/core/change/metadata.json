@@ -27,7 +27,7 @@
     {
       "requirement": "Lifecycle",
       "rules": [
-        "A Change progresses through the following states. Two approval gates are configurable in `specd.yaml` (`approvals.spec` and `approvals.signoff`, both default `false`); the dashed paths are only active when the corresponding gate is enabled:\n\n```\ndrafting → designing → ready ──────────────────────────────────────── → implementing ⇄ verifying → done ──────────────────── → archivable\n                             ╌→ pending-spec-approval → spec-approved ┘                            ╌→ pending-signoff → signed-off ┘\n                               (if approvals.spec: true)                                              (if approvals.signoff: true)\n```\n\n| State                   | Meaning                                                                                            |\n| ----------------------- | -------------------------------------------------------------------------------------------------- |\n| `drafting`              | Initial state; the change has been created but no design work has started                          |\n| `designing`             | The agent is elaborating or revising the change artifacts                                          |\n| `ready`                 | The design artifact set is complete; awaiting implementation (or spec approval if gate is enabled) |\n| `pending-spec-approval` | Waiting for human approval of the spec before implementation may begin                             |\n| `spec-approved`         | Spec has been approved; implementation may begin                                                   |\n| `implementing`          | Code is being written against the current artifacts and task set                                   |\n| `verifying`             | The implementation is being verified against the current verify scenarios                          |\n| `done`                  | Verification is complete; the change is ready to archive                                           |\n| `pending-signoff`       | Waiting for human sign-off on the completed work before archiving                                  |\n| `signed-off`            | Work has been signed off; the change may be archived                                               |\n| `archivable`            | Final archival checks have passed and the change may be moved to the archive                       |\n\nOnly the transitions shown above are valid. Any attempt to transition to a state not reachable from the current state throws `InvalidStateTransitionError`.\n\nThe `implementing ↔ verifying` loop may repeat any number of times. The transition `implementing → verifying` is only valid when all tasks in the `tasks` artifact are complete. The transition `verifying → implementing` is valid only for implementation-only failures: the current artifacts still describe the intended behavior and the required fix fits within the already-defined tasks. If verification concludes that the artifacts themselves must be revised, or that new tasks are required before implementation can resume, the change returns to `designing` instead.\n\nEvery state except `drafting` may return to `designing`. Returning to `designing` does not imply that artifacts drifted; it means the artifact set must be reviewed again before work can proceed."
+        "A Change progresses through the following states. Two approval gates are configurable in `specd.yaml` (`approvals.spec` and `approvals.signoff`, both default `false`); the dashed paths are only active when the corresponding gate is enabled:\n\n```\ndrafting → designing → ready ──────────────────────────────────────── → implementing ⇄ verifying → done ──────────────────── → archivable\n                             ╌→ pending-spec-approval → spec-approved ┘                            ╌→ pending-signoff → signed-off ┘\n                               (if approvals.spec: true)                                              (if approvals.signoff: true)\n```\n\n| State                   | Meaning                                                                                            |\n| ----------------------- | -------------------------------------------------------------------------------------------------- |\n| `drafting`              | Initial state; the change has been created but no design work has started                          |\n| `designing`             | The agent is elaborating or revising the change artifacts                                          |\n| `ready`                 | The design artifact set is complete; awaiting implementation (or spec approval if gate is enabled) |\n| `pending-spec-approval` | Waiting for human approval of the spec before implementation may begin                             |\n| `spec-approved`         | Spec has been approved; implementation may begin                                                   |\n| `implementing`          | Code is being written against the current artifacts and task set                                   |\n| `verifying`             | The implementation is being verified against the current verify scenarios                          |\n| `done`                  | Verification is complete; the change is ready to archive                                           |\n| `pending-signoff`       | Waiting for human sign-off on the completed work before archiving                                  |\n| `signed-off`            | Work has been signed off; the change may be archived                                               |\n| `archivable`            | Final archival checks have passed and the change may be moved to the archive                       |\n\nOnly the transitions shown above are valid. Any attempt to transition to a state not reachable from the current state throws `InvalidStateTransitionError`.\n\nThe `implementing ↔ verifying` loop may repeat any number of times. The transition `implementing → verifying` is only valid when all tasks in the `tasks` artifact are complete. The transition `verifying → implementing` is valid only for implementation-only failures: the current artifacts still describe the intended behavior and the required fix fits within the already-defined tasks. If verification concludes that the artifacts themselves must be revised, or that new tasks are required before implementation can resume, the change returns to `designing` instead.\n\nEvery state except `drafting` MAY return to `designing`. However, when the change is already in `designing` (a `designing → designing` transition), this is a state-preserving re-entry and MUST NOT trigger approval invalidation or artifact downgrade.\n\nReturning to `designing` from a later state (e.g. `implementing → designing`, `ready → designing`) does not imply that artifacts drifted; it means the artifact set must be reviewed again before work can proceed."
       ]
     },
     {
@@ -91,6 +91,7 @@
     "specIds may be empty (empty specIds results in empty workspaces)",
     "Current lifecycle state is derived from history (last transitioned event); no state snapshot is stored",
     "Any modification to the spec list or any artifact content appends an invalidated event followed by a transitioned event back to designing — this may be triggered by use cases or automatically by FsChangeRepository.get() using SYSTEM_ACTOR",
+    "A designing → designing transition MUST NOT trigger approval invalidation or artifact downgrade — re-entering the same step is not a backward transition",
     "ChangeArtifact contains a files: Map<string, ArtifactFile> — artifact status is aggregated from per-file statuses",
     "ArtifactFile status is never stored directly — always derived from validatedHash and file presence",
     "validatedHash === \"__skipped__\" is the sentinel for skipped status — only valid on optional: true artifacts",
@@ -210,6 +211,20 @@
       "given": ["a Change in archivable state"],
       "when": ["it is transitioned to designing"],
       "then": ["the transition succeeds"]
+    },
+    {
+      "requirement": "Lifecycle",
+      "name": "Designing to designing does not downgrade artifacts or approvals",
+      "given": [
+        "a Change already in designing state with validated artifacts and an active spec approval"
+      ],
+      "when": ["the change is transitioned to designing again"],
+      "then": [
+        "no invalidated event is appended",
+        "AND no artifact files are downgraded to pending-review",
+        "AND the active spec approval remains valid",
+        "AND a transitioned event with from: 'designing' and to: 'designing' is appended"
+      ]
     },
     {
       "requirement": "Implementation and verification loop",
@@ -519,8 +534,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:4543cce8d2006227756009048869d7d6fb08762e7640b805599073b2250f3085",
-    "verify.md": "sha256:59ef8775668ffcb80d83d3949271ec59faa66c561e956a5369d92b8c0a8e8739"
+    "spec.md": "sha256:7249831fab09f3c3151778f6530db52b57c584649dc6048273c777e499a7dd43",
+    "verify.md": "sha256:347fd4f2c33b5b8b071a740e1b3ace8bc1b681622c8dec1edb1a51fa51e1ea60"
   },
   "generatedBy": "core"
 }

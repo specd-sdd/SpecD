@@ -1785,5 +1785,83 @@ describe('TransitionChange', () => {
       expect(result.change.state).toBe('designing')
       expect(invalidateSpy).not.toHaveBeenCalled()
     })
+
+    it('does not invalidate when transitioning from designing to designing', async () => {
+      const change = makeChangeInState('my-change', [
+        { type: 'transitioned', from: 'drafting', to: 'designing', at: new Date(), by: actor },
+      ])
+      expect(change.state).toBe('designing')
+
+      const invalidateSpy = vi.spyOn(change, 'invalidate')
+      const uc = makeUseCase(makeChangeRepository([change]))
+
+      const result = await uc.execute({
+        name: 'my-change',
+        to: 'designing',
+        approvalsSpec: false,
+        approvalsSignoff: false,
+      })
+
+      expect(result.change.state).toBe('designing')
+      expect(invalidateSpy).not.toHaveBeenCalled()
+    })
+
+    it('does not downgrade artifacts when transitioning from designing to designing', async () => {
+      const change = makeChangeInState('my-change', [
+        { type: 'transitioned', from: 'drafting', to: 'designing', at: new Date(), by: actor },
+      ])
+      expect(change.state).toBe('designing')
+
+      const proposalFile = new ArtifactFile({
+        key: 'proposal',
+        filename: 'proposal.md',
+        status: 'in-progress',
+      })
+      const proposal = new ChangeArtifact({
+        type: 'proposal',
+        optional: false,
+        files: new Map([['proposal', proposalFile]]),
+      })
+      proposal.markComplete('proposal', 'sha256:abc')
+      change.setArtifact(proposal)
+
+      const uc = makeUseCase(makeChangeRepository([change]))
+
+      const result = await uc.execute({
+        name: 'my-change',
+        to: 'designing',
+        approvalsSpec: false,
+        approvalsSignoff: false,
+      })
+
+      expect(result.change.state).toBe('designing')
+      const proposalAfter = result.change.getArtifact('proposal')
+      expect(proposalAfter).not.toBeNull()
+      const file = proposalAfter!.files.get('proposal')!
+      expect(file.status).toBe('complete')
+      expect(file.validatedHash).toBe('sha256:abc')
+      expect(result.change.history.filter((e) => e.type === 'invalidated')).toHaveLength(0)
+    })
+
+    it('preserves active spec approval when transitioning from designing to designing', async () => {
+      const change = makeChangeInState('my-change', [
+        { type: 'transitioned', from: 'drafting', to: 'designing', at: new Date(), by: actor },
+        { type: 'spec-approved', reason: 'lgtm', at: new Date(), by: actor, artifactHashes: {} },
+      ])
+      expect(change.state).toBe('designing')
+      expect(change.activeSpecApproval).toBeDefined()
+
+      const uc = makeUseCase(makeChangeRepository([change]))
+
+      const result = await uc.execute({
+        name: 'my-change',
+        to: 'designing',
+        approvalsSpec: false,
+        approvalsSignoff: false,
+      })
+
+      expect(result.change.state).toBe('designing')
+      expect(result.change.activeSpecApproval).toBeDefined()
+    })
   })
 })

@@ -82,7 +82,7 @@ If verification concludes that the artifacts must change, or that new tasks are 
 
 Every state except `drafting` SHALL include `designing` as a valid transition target. This allows the user to return to the design phase at any point in the lifecycle when issues are discovered.
 
-When the effective target is `designing`, the use case MUST:
+When the effective target is `designing` and the change is **not already in** `designing` or `drafting`, the use case MUST:
 
 1. Invalidate the active spec approval if one exists.
 2. Invalidate the active signoff if one exists — the first invalidation already clears both.
@@ -90,7 +90,9 @@ When the effective target is `designing`, the use case MUST:
 4. Recompute every artifact's aggregate persisted `state`.
 5. Proceed with the transition via `change.transition('designing', actor)`.
 
-This downgrade applies both to explicit redesign transitions and to scope changes that keep the lifecycle in `designing` while invalidating previously validated work.
+When the change is **already in** `designing` (a `designing → designing` transition) or in `drafting` (the natural first entry), the use case MUST NOT invalidate approvals, downgrade artifacts, or call `invalidate()`. It MUST proceed directly with the transition via `change.transition('designing', actor)`.
+
+Drift detection (artifact content changes) is handled independently at the repository layer and is not affected by this rule.
 
 ### Requirement: Pre-hook execution
 
@@ -162,6 +164,7 @@ The previous `postHookFailures` field is removed because both hook phases are no
 - Post-hook failure aborts the transition — no state change occurs (both phases are fail-fast)
 - When schema resolution fails or no workflow step exists for the target, requires and hooks are skipped gracefully
 - Artifact validation clearing on `verifying → implementing` reads the `implementing` step's `requires` from the schema — the caller does not supply them
+- A `designing → designing` transition MUST NOT trigger approval invalidation or artifact downgrade — it is a state-preserving transition that only re-enters the same step
 
 ## Spec Dependencies
 
@@ -169,4 +172,4 @@ The previous `postHookFailures` field is removed because both hook phases are no
 - [`core:core/run-step-hooks`](../run-step-hooks/spec.md) — hook execution entry point
 - [`core:core/hook-execution-model`](../hook-execution-model/spec.md) — hook ordering and failure semantics
 - [`core:core/workflow-model`](../workflow-model/spec.md) — workflow `requires` and verification routing
-- [`default:_global/architecture`](../../_global/architecture/spec.md) — application ownership and port boundaries
+- [`default:_global/architecture`](../../../_global/architecture/spec.md) — application ownership and port boundaries
