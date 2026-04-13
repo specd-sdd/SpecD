@@ -2,7 +2,11 @@
   "name": "@specd/mcp",
   "version": "0.0.1",
   "license": "MIT",
-  "private": true,
+  "private": false,
+  "repository": "https://github.com/specd-sdd/SpecD",
+  "files": [
+    "dist/"
+  ],
   "type": "module",
   "exports": {
     ".": {
