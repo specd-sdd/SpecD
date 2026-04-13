@@ -1356,7 +1356,7 @@ function deserializeEvent(raw: RawChangeEvent): ChangeEvent {
       return {
         type: 'artifacts-synced',
         at: new Date(raw.at),
-        by: raw.by ?? { name: 'specd', email: 'system@specd.dev' },
+        by: raw.by ?? { name: 'specd', email: 'system@getspecd.dev' },
         typesAdded: raw.typesAdded ?? [],
         typesRemoved: raw.typesRemoved ?? [],
         filesAdded: raw.filesAdded ?? [],

@@ -63,7 +63,7 @@ The invalidation history entry MUST record:
 - a clear `message`
 - `affectedArtifacts`, including each affected artifact type and the full list of drifted file keys captured in step 1
 
-The `SYSTEM_ACTOR` constant (`{ name: 'specd', email: 'system@specd.dev' }`) is used as the actor for these automated invalidations.
+The `SYSTEM_ACTOR` constant (`{ name: 'specd', email: 'system@getspecd.dev' }`) is used as the actor for these automated invalidations.
 
 ### Requirement: list returns active changes in creation order
 

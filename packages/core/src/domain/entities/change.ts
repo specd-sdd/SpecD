@@ -67,7 +67,11 @@ export interface InvalidatedEvent {
   readonly type: 'invalidated'
   readonly at: Date
   readonly by: ActorIdentity
-  readonly cause: 'spec-change' | 'artifact-drift' | 'artifact-review-required'
+  readonly cause:
+    | 'spec-change'
+    | 'artifact-drift'
+    | 'artifact-review-required'
+    | 'spec-overlap-conflict'
   readonly message: string
   readonly affectedArtifacts: readonly InvalidatedArtifactEntry[]
 }
@@ -106,7 +110,7 @@ export interface ArtifactSkippedEvent {
 }
 
 /** System actor identity used for automated operations like artifact sync. */
-export const SYSTEM_ACTOR: ActorIdentity = { name: 'specd', email: 'system@specd.dev' }
+export const SYSTEM_ACTOR: ActorIdentity = { name: 'specd', email: 'system@getspecd.dev' }
 
 /** Appended when artifact sync reconciles the artifact map against the schema. */
 export interface ArtifactsSyncedEvent {

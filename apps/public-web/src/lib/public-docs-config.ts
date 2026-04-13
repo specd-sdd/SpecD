@@ -22,7 +22,7 @@ export const publicSiteDescription =
 /**
  * Canonical public site origin.
  */
-export const publicSiteUrl = 'https://specd.dev'
+export const publicSiteUrl = 'https://getspecd.dev'
 
 /**
  * Social preview image for the public site.
@@ -32,7 +32,7 @@ export const publicSocialImageHref = '/img/og-card.svg'
 /**
  * Canonical repository URL exposed from the public site.
  */
-export const publicGithubHref = 'https://github.com/lsmonki/SpecD'
+export const publicGithubHref = 'https://github.com/specd-sdd/SpecD'
 
 /**
  * Primary public docs route promoted from the landing page.
