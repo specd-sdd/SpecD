@@ -1,0 +1,22 @@
+{
+  "name": "@specd/specd",
+  "version": "0.0.1",
+  "license": "MIT",
+  "private": false,
+  "type": "module",
+  "description": "specd — Spec-driven development platform",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/specd-sdd/SpecD.git"
+  },
+  "dependencies": {
+    "@specd/cli": "workspace:*",
+    "@specd/code-graph": "workspace:*",
+    "@specd/core": "workspace:*",
+    "@specd/plugin-claude": "workspace:*",
+    "@specd/plugin-codex": "workspace:*",
+    "@specd/plugin-copilot": "workspace:*",
+    "@specd/schema-std": "workspace:*",
+    "@specd/skills": "workspace:*"
+  }
+}

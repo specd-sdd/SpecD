@@ -4,6 +4,9 @@
   "license": "MIT",
   "private": false,
   "type": "module",
+  "files": [
+    "dist/"
+  ],
   "dependencies": {
     "mdast-util-from-markdown": "^2.0.3",
     "mdast-util-to-markdown": "^2.1.2",
