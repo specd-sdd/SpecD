@@ -9,13 +9,13 @@
     {
       "requirement": "Command signature",
       "rules": [
-        "```\nspecd change discard <name> --reason <text> [--format text|json|toon]\n```\n\n- `<name>` — required positional; the name of the change to discard\n- `--reason <text>` — required; a human-readable explanation for discarding the change\n- `--format text|json|toon` — optional; output format, defaults to `text`"
+        "```\nspecd change discard <name> --reason <text> [--force] [--format text|json|toon]\n```\n\n- `<name>` — required positional; the name of the change to discard\n- `--reason <text>` — required; a human-readable explanation for discarding the change\n- `--force` — optional; bypasses the historical implementation guard when the change has previously reached `implementing`\n- `--format text|json|toon` — optional; output format, defaults to `text`"
       ]
     },
     {
       "requirement": "Behaviour",
       "rules": [
-        "The command moves the change from `changes/` or `drafts/` to `discarded/` and appends a `discarded` event to history. This operation is irreversible."
+        "The command moves the change from `changes/` or `drafts/` to `discarded/` and appends a `discarded` event to history. This operation is irreversible.\n\nIf the change has ever reached `implementing`, the command SHALL fail by default because implementation may already exist and abandoning the workflow would risk leaving permanent specs and code out of sync. The operation MAY proceed only when `--force` is provided."
       ]
     },
     {
@@ -27,14 +27,16 @@
     {
       "requirement": "Error cases",
       "rules": [
-        "- If the change does not exist, the command exits with code 1 and prints an `error:` message.\n- `--reason` is mandatory; omitting it is a CLI usage error (exit code 1)."
+        "- If the change does not exist, the command exits with code 1 and prints an `error:` message.\n- `--reason` is mandatory; omitting it is a CLI usage error (exit code 1).\n- If the change has ever reached `implementing` and `--force` is not provided, the command exits with code 1 and prints an `error:` message explaining that implementation may already exist and discarding the change could leave specs and code out of sync."
       ]
     }
   ],
   "constraints": [
     "Discarding is irreversible — there is no undo command",
     "A change may be discarded from changes/ or drafts/; it cannot be discarded from discarded/ (already there) or from the archive",
-    "The reason is stored in the discarded event and must be a non-empty string"
+    "Once a change has ever reached implementing, discarding requires --force",
+    "The reason is stored in the discarded event and must be a non-empty string",
+    "--force bypasses only the historical implementation guard; it does not make discarding reversible"
   ],
   "scenarios": [
     {
@@ -48,6 +50,14 @@
       "name": "Empty reason rejected",
       "when": ["specd change discard my-change --reason \"\" is run"],
       "then": ["the command exits with code 1 and prints a usage error to stderr"]
+    },
+    {
+      "requirement": "Command signature",
+      "name": "Force flag is accepted",
+      "when": [
+        "specd change discard my-change --reason \"cleanup\" --force is run with a valid change name"
+      ],
+      "then": ["the command accepts the flag as part of its input contract"]
     },
     {
       "requirement": "Behaviour",
@@ -67,6 +77,13 @@
       "then": ["the change is moved to discarded/", "AND a discarded event is appended to history"]
     },
     {
+      "requirement": "Behaviour",
+      "name": "Historically implemented change can still be discarded when forced",
+      "given": ["old-experiment has previously reached implementing"],
+      "when": ["specd change discard old-experiment --reason \"workflow cleanup\" --force is run"],
+      "then": ["the change is moved to discarded/", "AND a discarded event is appended to history"]
+    },
+    {
       "requirement": "Output on success",
       "name": "Success message",
       "when": ["specd change discard old-experiment --reason \"done\" succeeds"],
@@ -82,6 +99,16 @@
       "then": ["the command exits with code 1", "AND stderr contains an error: message"]
     },
     {
+      "requirement": "Error cases",
+      "name": "Historically implemented change requires force",
+      "given": ["old-experiment has previously reached implementing"],
+      "when": ["specd change discard old-experiment --reason \"done\" is run without --force"],
+      "then": [
+        "the command exits with code 1",
+        "AND stderr explains that implementation may already exist and discarding the change could leave specs and code out of sync"
+      ]
+    },
+    {
       "requirement": "Output on success",
       "name": "JSON output on success",
       "when": ["specd change discard old-experiment --reason \"done\" --format json succeeds"],
@@ -92,8 +119,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:541dd4b0734df6a3ec767d758ce5a42b1e4f89420dbf0835e6436b1e5d5df5d9",
-    "verify.md": "sha256:389304936ed477b87d36c5c22450f605dd20f9e6b775ace4650b9e200b8f3a3d"
+    "spec.md": "sha256:be5b0c5c7af512bcbb98d1d0a7fd9f852765afc7e27b0607df06d1a80eeb3776",
+    "verify.md": "sha256:4cfa631cac38cb1685d1f313fd9d5deb64075da660c5a512080e978d7708e557"
   },
   "generatedBy": "core"
 }

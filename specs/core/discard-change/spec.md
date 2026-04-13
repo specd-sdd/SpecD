@@ -13,6 +13,7 @@ Sometimes a change becomes obsolete or is superseded, and the team needs a way t
 - `name` (string, required) — the change to permanently discard
 - `reason` (string, required) — mandatory explanation for discarding
 - `supersededBy` (string\[], optional) — names of changes that supersede this one
+- `force` (boolean, optional) — explicit override for the historical implementation guard
 
 ### Requirement: Change must exist
 
@@ -22,9 +23,17 @@ The use case MUST load the change from the `ChangeRepository` by name. If no cha
 
 The use case MUST resolve the current actor identity via the `ActorResolver` port. The resolved actor is recorded in the `discarded` event.
 
+### Requirement: Historical implementation guard
+
+`DiscardChange` SHALL respect the `Change` entity's historical implementation guard.
+
+If the loaded change has ever reached `implementing`, `DiscardChange.execute` SHALL fail by default instead of discarding it, because implementation may already exist and abandoning the workflow would risk leaving permanent specs and code out of sync.
+
+The use case MAY proceed only when `input.force === true`, in which case the guard is bypassed intentionally.
+
 ### Requirement: Discarded event appended to history
 
-The use case MUST call `change.discard(reason, actor, supersededBy)` to append a `discarded` event to the change's history. The event records:
+The use case MUST call `change.discard(reason, actor, supersededBy, force)` to append a `discarded` event to the change's history after the historical implementation guard has been satisfied or explicitly bypassed. The event records:
 
 - `type`: `'discarded'`
 - `at`: the current timestamp

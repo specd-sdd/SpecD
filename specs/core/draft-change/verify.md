@@ -16,6 +16,22 @@
 - **WHEN** `DraftChange.execute` is called
 - **THEN** the `drafted` event's `by` field matches the identity returned by `ActorResolver.identity()`
 
+### Requirement: Historical implementation guard
+
+#### Scenario: Historically implemented change is rejected by default
+
+- **GIVEN** the loaded change has previously reached `implementing`
+- **WHEN** `DraftChange.execute` is called without `force`
+- **THEN** it fails without appending a `drafted` event
+- **AND** the error explains that implementation may already exist and specs and code could be left out of sync
+
+#### Scenario: Force bypasses the historical implementation guard
+
+- **GIVEN** the loaded change has previously reached `implementing`
+- **WHEN** `DraftChange.execute` is called with `force: true`
+- **THEN** the use case succeeds
+- **AND** it appends a `drafted` event
+
 ### Requirement: Drafted event appended to history
 
 #### Scenario: Reason is included when provided

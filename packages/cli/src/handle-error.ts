@@ -3,6 +3,7 @@ import {
   SchemaNotFoundError,
   SchemaValidationError,
   HookFailedError,
+  HistoricalImplementationGuardError,
 } from '@specd/core'
 import { output } from './formatter.js'
 
@@ -73,6 +74,10 @@ export function handleError(err: unknown, format?: string): never {
 
     if (err instanceof SchemaNotFoundError || err instanceof SchemaValidationError) {
       return cliError(err.message, format, 3, err.code)
+    }
+
+    if (err instanceof HistoricalImplementationGuardError) {
+      return cliError(err.message, format, 1, err.code)
     }
 
     // All other SpecdError subtypes → exit 1

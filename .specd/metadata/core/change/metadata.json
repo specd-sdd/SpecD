@@ -67,6 +67,12 @@
       ]
     },
     {
+      "requirement": "Historical implementation detection",
+      "rules": [
+        "A Change SHALL treat any historical transition to `implementing` as evidence that implementation may already exist, even if the current lifecycle state later returns to `designing`, `verifying`, or another non-terminal state.\n\nThis detection is temporary and pragmatic. Until specd can detect whether a change has actually modified code files, the system SHALL derive this signal by scanning the append-only history for any `transitioned` event whose `to` field is `implementing`.\n\nThe signal is historical, not state-based. It remains true once reached unless the project later introduces a more precise file-level implementation detector."
+      ]
+    },
+    {
       "requirement": "Schema version",
       "rules": [
         "The `created` event records the `schemaName` and `schemaVersion` of the schema active at creation time.\n\nA **`schemaName` mismatch** (e.g. `schema-std` → `custom-schema`) indicates structural incompatibility — different artifact types, formats, delta rules, and validations. When a use case (`ArchiveChange`, `ValidateArtifacts`, `CompileContext`) detects that `schema.name() !== change.schemaName`, it must throw `SchemaMismatchError` before performing any work. This is an error, not a warning.\n\nA **`schemaVersion` mismatch** within the same schema name is advisory. A warning is emitted but the change remains fully usable. Archiving with a `schemaVersion` mismatch is allowed; a `schemaName` mismatch throws `SchemaMismatchError`."
@@ -75,7 +81,7 @@
     {
       "requirement": "Drafting and discarding",
       "rules": [
-        "A change may be moved between storage locations without affecting its lifecycle state. All operations are recorded as events in history.\n\n- **Draft** (`changes/` → `drafts/`) — shelves the change. Appends a `drafted` event with: Can be performed at any point before archiving. The change retains its full history and lifecycle state.\n  - **`by`** — mandatory git identity (name + email) of the person shelving\n  - **`at`** — timestamp\n  - **`reason`** — optional explanation\n- **Restore** (`drafts/` → `changes/`) — recovers a drafted change. Appends a `restored` event. The change resumes from its preserved state.\n- **Discard** (`changes/` or `drafts/` → `discarded/`) — permanently abandons the change. Appends a `discarded` event with: Cannot be undone. A change may be drafted and restored multiple times before being discarded; the full cycle is preserved in history.\n  - **`reason`** — mandatory human-provided explanation\n  - **`by`** — mandatory git identity (name + email) of the person discarding\n  - **`at`** — timestamp\n  - **`supersededBy`** — optional list of change names that replace this one"
+        "A change may be moved between storage locations without affecting its lifecycle state. All operations are recorded as events in history.\n\n- **Draft** (`changes/` → `drafts/`) — shelves the change. Appends a `drafted` event with: Drafting remains orthogonal to the current lifecycle state, but it is guarded by historical implementation detection. If the change has ever reached `implementing`, drafting SHALL fail by default because implementation may already exist and shelving the change would risk leaving permanent specs and code out of sync. The operation MAY proceed only when the caller explicitly forces it.\n  - **`by`** — mandatory git identity (name + email) of the person shelving\n  - **`at`** — timestamp\n  - **`reason`** — optional explanation\n- **Restore** (`drafts/` → `changes/`) — recovers a drafted change. Appends a `restored` event. The change resumes from its preserved state.\n- **Discard** (`changes/` or `drafts/` → `discarded/`) — permanently abandons the change. Appends a `discarded` event with: Discarding is irreversible. A change may be drafted and restored multiple times before being discarded; the full cycle is preserved in history. If the change has ever reached `implementing`, discarding SHALL fail by default because implementation may already exist and abandoning the workflow would risk leaving permanent specs and code out of sync. The operation MAY proceed only when the caller explicitly forces it.\n  - **`reason`** — mandatory human-provided explanation\n  - **`by`** — mandatory git identity (name + email) of the person discarding\n  - **`at`** — timestamp\n  - **`supersededBy`** — optional list of change names that replace this one"
       ]
     }
   ],
@@ -102,6 +108,8 @@
     "Task completion gating is enforced generically by the workflow model — any step that requires an artifact with taskCompletionCheck is automatically gated (see [specs/core/workflow-model/spec.md](../workflow-model/spec.md))",
     "verifying → implementing does not trigger approval invalidation",
     "History events are never modified or deleted; invalidated approvals are identifiable by a subsequent invalidated event",
+    "Historical implementation detection is derived from append-only history by scanning for any transitioned event whose to field is implementing",
+    "Drafting or discarding after historical implementation requires an explicit force override because implementation may already exist and specs and code could otherwise be left out of sync",
     "Discarding a change requires a discarded event with mandatory reason and by; it is irreversible"
   ],
   "scenarios": [
@@ -366,6 +374,32 @@
       "then": ["its cause is artifact-review-required", "AND it is distinct from artifact-drift"]
     },
     {
+      "requirement": "Historical implementation detection",
+      "name": "Historical detection becomes true after implementing",
+      "given": [
+        "a Change whose history already contains a transitioned event with to: 'implementing'"
+      ],
+      "when": ["historical implementation detection is evaluated"],
+      "then": ["it reports that implementation may already exist"]
+    },
+    {
+      "requirement": "Historical implementation detection",
+      "name": "Historical detection remains true after returning to designing",
+      "given": [
+        "a Change whose history contains a transitioned event to implementing",
+        "AND a later transitioned event returns it to designing"
+      ],
+      "when": ["historical implementation detection is evaluated"],
+      "then": ["it still reports that implementation may already exist"]
+    },
+    {
+      "requirement": "Historical implementation detection",
+      "name": "Historical detection stays false before implementing",
+      "given": ["a Change whose history has no transitioned event with to: 'implementing'"],
+      "when": ["historical implementation detection is evaluated"],
+      "then": ["it reports that implementation may not yet exist"]
+    },
+    {
       "requirement": "Schema version",
       "name": "Schema version mismatch warns",
       "when": [
@@ -387,10 +421,35 @@
     },
     {
       "requirement": "Drafting and discarding",
-      "name": "Draft appends drafted event",
-      "when": ["a Change in implementing state is drafted with a valid identity"],
+      "name": "Draft succeeds before implementation has ever been reached",
+      "given": ["a Change whose history contains no transitioned event to implementing"],
+      "when": ["it is drafted with a valid identity"],
       "then": [
-        "a drafted event is appended to history, the change is moved to drafts/, and it retains its implementing lifecycle state"
+        "a drafted event is appended to history",
+        "AND the change is moved to drafts/",
+        "AND it retains its current lifecycle state"
+      ]
+    },
+    {
+      "requirement": "Drafting and discarding",
+      "name": "Draft after historical implementation requires force",
+      "given": ["a Change whose history contains a transitioned event to implementing"],
+      "when": ["it is drafted without forcing the operation"],
+      "then": [
+        "the operation fails",
+        "AND no drafted event is appended",
+        "AND the failure explains that implementation may already exist and specs and code could be left out of sync"
+      ]
+    },
+    {
+      "requirement": "Drafting and discarding",
+      "name": "Forced draft after historical implementation appends drafted event",
+      "given": ["a Change whose history contains a transitioned event to implementing"],
+      "when": ["it is drafted with a valid identity and the force override enabled"],
+      "then": [
+        "a drafted event is appended to history",
+        "AND the change is moved to drafts/",
+        "AND it retains its current lifecycle state"
       ]
     },
     {
@@ -404,7 +463,9 @@
       "name": "Restore appends restored event",
       "when": ["a drafted Change is restored"],
       "then": [
-        "a restored event is appended to history, the change is moved back to changes/, and it resumes from its preserved lifecycle state"
+        "a restored event is appended to history",
+        "AND the change is moved back to changes/",
+        "AND it resumes from its preserved lifecycle state"
       ]
     },
     {
@@ -415,18 +476,33 @@
     },
     {
       "requirement": "Drafting and discarding",
-      "name": "Discard appends discarded event",
+      "name": "Discard succeeds before implementation has ever been reached",
+      "given": ["a Change whose history contains no transitioned event to implementing"],
       "when": [
-        "a Change is discarded with a reason, identity, and optional superseding change names"
+        "the Change is discarded with a reason, identity, and optional superseding change names"
       ],
-      "then": ["a discarded event is appended to history and the change is moved to discarded/"]
+      "then": ["a discarded event is appended to history", "AND the change is moved to discarded/"]
     },
     {
       "requirement": "Drafting and discarding",
-      "name": "Discard from drafts",
-      "when": ["a drafted Change is discarded"],
+      "name": "Discard after historical implementation requires force",
+      "given": ["a Change whose history contains a transitioned event to implementing"],
+      "when": ["it is discarded without forcing the operation"],
       "then": [
-        "a discarded event is appended, the change is moved to discarded/, and it cannot be recovered"
+        "the operation fails",
+        "AND no discarded event is appended",
+        "AND the failure explains that implementation may already exist and specs and code could be left out of sync"
+      ]
+    },
+    {
+      "requirement": "Drafting and discarding",
+      "name": "Forced discard from drafts after historical implementation succeeds",
+      "given": ["a drafted Change whose history contains a transitioned event to implementing"],
+      "when": ["it is discarded with a reason, identity, and the force override enabled"],
+      "then": [
+        "a discarded event is appended",
+        "AND the change is moved to discarded/",
+        "AND it cannot be recovered"
       ]
     },
     {
@@ -443,8 +519,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:58f04f73ab873328b90f4c81a847a99f0d3abf8650d28f09dbdd9ddffcd3cc82",
-    "verify.md": "sha256:f3e4af937e0c6721885d2912e6c8edbc72fb81331dc721f72b7ac048584e6d6b"
+    "spec.md": "sha256:4543cce8d2006227756009048869d7d6fb08762e7640b805599073b2250f3085",
+    "verify.md": "sha256:59ef8775668ffcb80d83d3949271ec59faa66c561e956a5369d92b8c0a8e8739"
   },
   "generatedBy": "core"
 }

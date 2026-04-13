@@ -16,6 +16,22 @@
 - **WHEN** `DiscardChange.execute` is called
 - **THEN** the `discarded` event's `by` field matches the identity returned by `ActorResolver.identity()`
 
+### Requirement: Historical implementation guard
+
+#### Scenario: Historically implemented change is rejected by default
+
+- **GIVEN** the loaded change has previously reached `implementing`
+- **WHEN** `DiscardChange.execute` is called without `force`
+- **THEN** it fails without appending a `discarded` event
+- **AND** the error explains that implementation may already exist and specs and code could be left out of sync
+
+#### Scenario: Force bypasses the historical implementation guard
+
+- **GIVEN** the loaded change has previously reached `implementing`
+- **WHEN** `DiscardChange.execute` is called with `force: true`
+- **THEN** the use case succeeds
+- **AND** it appends a `discarded` event
+
 ### Requirement: Discarded event appended to history
 
 #### Scenario: Reason is recorded in the discarded event

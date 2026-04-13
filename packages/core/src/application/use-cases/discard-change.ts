@@ -10,6 +10,8 @@ export interface DiscardChangeInput {
   readonly reason: string
   /** Optional list of change names that supersede this one. */
   readonly supersededBy?: string[]
+  /** Explicit override for the historical implementation guard. */
+  readonly force?: boolean
 }
 
 /**
@@ -43,7 +45,7 @@ export class DiscardChange {
   async execute(input: DiscardChangeInput): Promise<Change> {
     const actor = await this._actor.identity()
     return this._changes.mutate(input.name, (change) => {
-      change.discard(input.reason, actor, input.supersededBy)
+      change.discard(input.reason, actor, input.supersededBy, input.force)
       return change
     })
   }

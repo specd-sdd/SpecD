@@ -15,7 +15,11 @@ vi.mock('../../src/helpers/cli-context.js', () => ({
 
 import { resolveCliContext } from '../../src/helpers/cli-context.js'
 import { registerChangeDraft } from '../../src/commands/change/draft.js'
-import { ChangeNotFoundError, InvalidChangeError } from '@specd/core'
+import {
+  ChangeNotFoundError,
+  InvalidChangeError,
+  HistoricalImplementationGuardError,
+} from '@specd/core'
 
 function setup() {
   const config = makeMockConfig()
@@ -136,5 +140,51 @@ describe('Error cases', () => {
     }
 
     expect(stderr()).toMatch(/error:/)
+  })
+
+  it('Historically implemented change requires force', async () => {
+    const { kernel, stderr } = setup()
+    kernel.changes.draft.execute.mockRejectedValue(
+      new HistoricalImplementationGuardError('draft', 'my-change'),
+    )
+
+    const program = makeProgram()
+    registerChangeDraft(program.command('change'))
+
+    try {
+      await program.parseAsync(['node', 'specd', 'change', 'draft', 'my-change'])
+    } catch (err) {
+      expect(err).toBeInstanceOf(ExitSentinel)
+      expect((err as ExitSentinel).code).toBe(1)
+    }
+
+    expect(stderr()).toMatch(/implementing/)
+    expect(stderr()).toMatch(/out of sync/)
+  })
+
+  it('Force flag is passed through to the use case', async () => {
+    const { kernel } = setup()
+    kernel.changes.draft.execute.mockResolvedValue(undefined)
+
+    const program = makeProgram()
+    registerChangeDraft(program.command('change'))
+    await program.parseAsync([
+      'node',
+      'specd',
+      'change',
+      'draft',
+      'my-change',
+      '--reason',
+      'intentional rollback of workflow only',
+      '--force',
+    ])
+
+    expect(kernel.changes.draft.execute).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'my-change',
+        reason: 'intentional rollback of workflow only',
+        force: true,
+      }),
+    )
   })
 })

@@ -4,6 +4,7 @@ import { ChangeArtifact, SKIPPED_SENTINEL } from '../../../src/domain/entities/c
 import { ArtifactFile } from '../../../src/domain/value-objects/artifact-file.js'
 import { InvalidStateTransitionError } from '../../../src/domain/errors/invalid-state-transition-error.js'
 import { InvalidChangeError } from '../../../src/domain/errors/invalid-change-error.js'
+import { HistoricalImplementationGuardError } from '../../../src/domain/errors/historical-implementation-guard-error.js'
 import type { ActorIdentity, ChangeEvent } from '../../../src/domain/entities/change.js'
 import type { ArtifactStatus } from '../../../src/domain/value-objects/artifact-status.js'
 
@@ -591,6 +592,145 @@ describe('Change', () => {
       c.discard('replaced', actor)
       const evt = c.history[0]
       expect(evt?.type === 'discarded' && 'supersededBy' in evt).toBe(false)
+    })
+  })
+
+  describe('hasEverReachedImplementing', () => {
+    it('returns false when no transitioned events exist', () => {
+      const c = makeChange()
+      expect(c.hasEverReachedImplementing).toBe(false)
+    })
+
+    it('returns false when transitioned events exist but none to implementing', () => {
+      const c = makeChange()
+      c.transition('designing', actor)
+      c.transition('ready', actor)
+      expect(c.hasEverReachedImplementing).toBe(false)
+    })
+
+    it('returns true when a transitioned event has to: implementing', () => {
+      const c = makeChange()
+      c.transition('designing', actor)
+      c.transition('ready', actor)
+      c.transition('implementing', actor)
+      expect(c.hasEverReachedImplementing).toBe(true)
+    })
+
+    it('returns true after implementing then returning to designing', () => {
+      const c = makeChange()
+      c.transition('designing', actor)
+      c.transition('ready', actor)
+      c.transition('implementing', actor)
+      c.transition('verifying', actor)
+      c.transition('implementing', actor)
+      c.transition('designing', actor)
+      expect(c.hasEverReachedImplementing).toBe(true)
+    })
+  })
+
+  describe('draft() with historical implementation guard', () => {
+    it('throws HistoricalImplementationGuardError when change has reached implementing and force is not passed', () => {
+      const c = makeChange()
+      c.transition('designing', actor)
+      c.transition('ready', actor)
+      c.transition('implementing', actor)
+      expect(() => c.draft(actor)).toThrow(HistoricalImplementationGuardError)
+    })
+
+    it('throws HistoricalImplementationGuardError when change has reached implementing and force is false', () => {
+      const c = makeChange()
+      c.transition('designing', actor)
+      c.transition('ready', actor)
+      c.transition('implementing', actor)
+      expect(() => c.draft(actor, undefined, false)).toThrow(HistoricalImplementationGuardError)
+    })
+
+    it('appends drafted event when change has reached implementing and force is true', () => {
+      const c = makeChange()
+      c.transition('designing', actor)
+      c.transition('ready', actor)
+      c.transition('implementing', actor)
+      c.draft(actor, 'intentional rollback of workflow only', true)
+      expect(c.isDrafted).toBe(true)
+      const drafted = c.history.find((e) => e.type === 'drafted')
+      expect(drafted).toBeDefined()
+    })
+
+    it('appends drafted event when change has never reached implementing without force', () => {
+      const c = makeChange()
+      c.draft(actor)
+      expect(c.isDrafted).toBe(true)
+    })
+
+    it('includes the change name in HistoricalImplementationGuardError', () => {
+      const c = makeChange()
+      c.transition('designing', actor)
+      c.transition('ready', actor)
+      c.transition('implementing', actor)
+      try {
+        c.draft(actor)
+        expect.unreachable('Expected HistoricalImplementationGuardError')
+      } catch (err) {
+        expect(err).toBeInstanceOf(HistoricalImplementationGuardError)
+        if (err instanceof HistoricalImplementationGuardError) {
+          expect(err.operation).toBe('draft')
+          expect(err.changeName).toBe('add-oauth-login')
+        }
+      }
+    })
+  })
+
+  describe('discard() with historical implementation guard', () => {
+    it('throws HistoricalImplementationGuardError when change has reached implementing and force is not passed', () => {
+      const c = makeChange()
+      c.transition('designing', actor)
+      c.transition('ready', actor)
+      c.transition('implementing', actor)
+      expect(() => c.discard('cleanup', actor)).toThrow(HistoricalImplementationGuardError)
+    })
+
+    it('throws HistoricalImplementationGuardError when change has reached implementing and force is false', () => {
+      const c = makeChange()
+      c.transition('designing', actor)
+      c.transition('ready', actor)
+      c.transition('implementing', actor)
+      expect(() => c.discard('cleanup', actor, undefined, false)).toThrow(
+        HistoricalImplementationGuardError,
+      )
+    })
+
+    it('appends discarded event when change has reached implementing and force is true', () => {
+      const c = makeChange()
+      c.transition('designing', actor)
+      c.transition('ready', actor)
+      c.transition('implementing', actor)
+      c.discard('workflow cleanup', actor, undefined, true)
+      const discarded = c.history.find((e) => e.type === 'discarded')
+      expect(discarded).toBeDefined()
+    })
+
+    it('appends discarded event when change has never reached implementing without force', () => {
+      const c = makeChange()
+      c.discard('no longer needed', actor)
+      const discarded = c.history.find((e) => e.type === 'discarded')
+      expect(discarded).toBeDefined()
+    })
+
+    it('includes the change name and operation in HistoricalImplementationGuardError', () => {
+      const c = makeChange()
+      c.transition('designing', actor)
+      c.transition('ready', actor)
+      c.transition('implementing', actor)
+      try {
+        c.discard('cleanup', actor)
+        expect.unreachable('Expected HistoricalImplementationGuardError')
+      } catch (err) {
+        expect(err).toBeInstanceOf(HistoricalImplementationGuardError)
+        if (err instanceof HistoricalImplementationGuardError) {
+          expect(err.operation).toBe('discard')
+          expect(err.changeName).toBe('add-oauth-login')
+        }
+      }
     })
   })
 

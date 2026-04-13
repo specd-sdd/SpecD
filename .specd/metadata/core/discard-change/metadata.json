@@ -9,7 +9,7 @@
     {
       "requirement": "Input contract",
       "rules": [
-        "`DiscardChange.execute` SHALL accept a `DiscardChangeInput` with the following fields:\n\n- `name` (string, required) — the change to permanently discard\n- `reason` (string, required) — mandatory explanation for discarding\n- `supersededBy` (string\\[], optional) — names of changes that supersede this one"
+        "`DiscardChange.execute` SHALL accept a `DiscardChangeInput` with the following fields:\n\n- `name` (string, required) — the change to permanently discard\n- `reason` (string, required) — mandatory explanation for discarding\n- `supersededBy` (string\\[], optional) — names of changes that supersede this one\n- `force` (boolean, optional) — explicit override for the historical implementation guard"
       ]
     },
     {
@@ -25,9 +25,15 @@
       ]
     },
     {
+      "requirement": "Historical implementation guard",
+      "rules": [
+        "`DiscardChange` SHALL respect the `Change` entity's historical implementation guard.\n\nIf the loaded change has ever reached `implementing`, `DiscardChange.execute` SHALL fail by default instead of discarding it, because implementation may already exist and abandoning the workflow would risk leaving permanent specs and code out of sync.\n\nThe use case MAY proceed only when `input.force === true`, in which case the guard is bypassed intentionally."
+      ]
+    },
+    {
       "requirement": "Discarded event appended to history",
       "rules": [
-        "The use case MUST call `change.discard(reason, actor, supersededBy)` to append a `discarded` event to the change's history. The event records:\n\n- `type`: `'discarded'`\n- `at`: the current timestamp\n- `by`: the resolved actor identity\n- `reason`: the mandatory discard reason\n- `supersededBy`: included only when provided in the input"
+        "The use case MUST call `change.discard(reason, actor, supersededBy, force)` to append a `discarded` event to the change's history after the historical implementation guard has been satisfied or explicitly bypassed. The event records:\n\n- `type`: `'discarded'`\n- `at`: the current timestamp\n- `by`: the resolved actor identity\n- `reason`: the mandatory discard reason\n- `supersededBy`: included only when provided in the input"
       ]
     },
     {
@@ -64,6 +70,23 @@
       ]
     },
     {
+      "requirement": "Historical implementation guard",
+      "name": "Historically implemented change is rejected by default",
+      "given": ["the loaded change has previously reached implementing"],
+      "when": ["DiscardChange.execute is called without force"],
+      "then": [
+        "it fails without appending a discarded event",
+        "AND the error explains that implementation may already exist and specs and code could be left out of sync"
+      ]
+    },
+    {
+      "requirement": "Historical implementation guard",
+      "name": "Force bypasses the historical implementation guard",
+      "given": ["the loaded change has previously reached implementing"],
+      "when": ["DiscardChange.execute is called with force: true"],
+      "then": ["the use case succeeds", "AND it appends a discarded event"]
+    },
+    {
       "requirement": "Discarded event appended to history",
       "name": "Reason is recorded in the discarded event",
       "when": ["DiscardChange.execute is called with reason: 'no longer needed'"],
@@ -95,8 +118,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:4a87c722e1621c3757a6f07aa8128204b078ef55a65822f1284f74833e059ea7",
-    "verify.md": "sha256:f5a4ef1f06bad1fe8f20e45886cc35d289222e7ccb3cffff28147b8e414ed1b0"
+    "spec.md": "sha256:4f58e12416357296e839acab87e51ce20db861a98096bf533f75dd743e6b78aa",
+    "verify.md": "sha256:f3bfdd1a295f9abc7682d736d05f8a15b68715db5d71bf8a752f9cfbb5043c6c"
   },
   "generatedBy": "core"
 }
