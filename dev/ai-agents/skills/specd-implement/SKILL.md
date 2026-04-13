@@ -130,6 +130,7 @@ downstream dependents:
 
 ```bash
 specd graph impact --symbol "<name>" --direction downstream --format json
+specd graph impact --file "<workspace:path>" --direction downstream --format json
 ```
 
 Surface HIGH or CRITICAL risk findings to the user before starting implementation.
