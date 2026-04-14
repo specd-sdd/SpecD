@@ -266,6 +266,33 @@ importers:
         specifier: workspace:*
         version: link:../core
 
+  packages/specd:
+    dependencies:
+      '@specd/cli':
+        specifier: workspace:*
+        version: link:../cli
+      '@specd/code-graph':
+        specifier: workspace:*
+        version: link:../code-graph
+      '@specd/core':
+        specifier: workspace:*
+        version: link:../core
+      '@specd/plugin-claude':
+        specifier: workspace:*
+        version: link:../plugins/claude
+      '@specd/plugin-codex':
+        specifier: workspace:*
+        version: link:../plugins/codex
+      '@specd/plugin-copilot':
+        specifier: workspace:*
+        version: link:../plugins/copilot
+      '@specd/schema-std':
+        specifier: workspace:*
+        version: link:../schema-std
+      '@specd/skills':
+        specifier: workspace:*
+        version: link:../skills
+
 packages:
 
   '@adobe/css-tools@4.4.4':

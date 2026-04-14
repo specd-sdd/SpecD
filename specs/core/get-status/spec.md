@@ -77,18 +77,27 @@ The `artifactStatuses` array MUST contain exactly one entry per artifact in the 
 
 ### Requirement: Returns lifecycle context
 
-On success, `GetStatusResult` MUST include a `lifecycle` object with the following fields:
+`GetStatus` MUST compute a `ReviewSummary` that determines whether the change requires artifact review and why.
 
-- `validTransitions` — a `readonly ChangeState[]` listing all structurally valid transitions from the current state, as defined by `VALID_TRANSITIONS[state]`
-- `availableTransitions` — a `readonly ChangeState[]` listing the subset of `validTransitions` where the target state's workflow `requires` are all satisfied (each required artifact has persisted `state` `complete` or `skipped`). This is a dry-run: it tells the consumer which transitions would succeed right now without attempting them.
-- `blockers` — a `readonly` array of blocker entries, one per valid-but-unavailable transition. Each entry MUST contain:
-  - `transition: ChangeState` — the blocked target state
-  - `reason: 'requires' | 'tasks-incomplete'` — why the transition is blocked
-  - `blocking: readonly string[]` — artifact IDs whose persisted `state` is neither `complete` nor `skipped`
-- `approvals` — `{ readonly spec: boolean; readonly signoff: boolean }` reflecting whether each approval gate is active in the project config
-- `nextArtifact` — `string | null`; the first artifact in schema-declared order whose `requires` are all satisfied but whose own persisted `state` is neither `complete` nor `skipped`. `null` when all artifacts are done.
-- `changePath` — `string`; the filesystem path to the change directory, obtained from `ChangeRepository.changePath(change)`
-- `schemaInfo` — `{ readonly name: string; readonly version: number } | null`; the active schema's name and version from schema resolution. `null` when schema resolution fails. Consumers MUST use this for schema mismatch warnings instead of resolving the schema independently.
+The review check MUST follow this priority order:
+
+1. **If any artifact file is in `drifted-pending-review` state:** `required` is `true`, `reason` is `'artifact-drift'`, `route` is `'designing'`.
+2. **Else if any artifact file is in `pending-review` state and there are unhandled `spec-overlap-conflict` invalidations:** `required` is `true`, `reason` is `'spec-overlap-conflict'`, `route` is `'designing'`.
+3. **Else if any artifact file is in `pending-review` state:** `required` is `true`, `reason` is `'artifact-review-required'`, `route` is `'designing'`.
+4. **Else:** `required` is `false`, `reason` is `null`, `route` is `null`.
+
+**Unhandled overlap collection:** To determine unhandled `spec-overlap-conflict` invalidations, `GetStatus` MUST scan `change.history` in reverse (newest to oldest) collecting `invalidated` events with `cause: 'spec-overlap-conflict'`. The scan MUST stop at the first `transitioned` event whose `to` field is not `'designing'` — this indicates the change moved forward from a prior invalidation and those earlier overlaps were already handled. If no such boundary event is found, the scan includes all matching events back to the beginning of history.
+
+`ReviewSummary.reason` type MUST be extended to: `'artifact-drift' | 'artifact-review-required' | 'spec-overlap-conflict' | null`.
+
+When `reason` is `'spec-overlap-conflict'`, `ReviewSummary` MUST additionally include:
+
+- `overlapDetail` — an array of `OverlapEntry` objects, one per unhandled `spec-overlap-conflict` invalidation event, each containing:
+  - `archivedChangeName` — the name of the archived change that caused the overlap (extracted from the `invalidated.message`)
+  - `overlappingSpecIds` — readonly array of spec IDs that overlapped (extracted from the `invalidated.message`)
+    The array is ordered newest-first (matching the reverse scan order). This preserves the full picture when multiple changes were archived with overlapping specs before the current change was able to address any of them.
+
+When `reason` is not `'spec-overlap-conflict'`, `overlapDetail` MUST be an empty array.
 
 ### Requirement: Graceful degradation when schema resolution fails
 

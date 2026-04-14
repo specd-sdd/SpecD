@@ -44,7 +44,7 @@
     {
       "requirement": "Output on success",
       "rules": [
-        "On success, output depends on `--format`:\n\n- `text` (default): prints to stdout:\n- `json` or `toon`: outputs the following to stdout (encoded in the respective format):\n\nwhere `<archive-path>` is the path to the archived change directory relative to the project root."
+        "On success, output depends on `--format`:\n\n- `text` (default): prints to stdout: The invalidated changes section is omitted when no changes were invalidated.\n  - The archive path line\n  - If changes were invalidated due to overlap, a summary listing each invalidated change and the overlapping specs:\n- `json` or `toon`: outputs the following to stdout (encoded in the respective format): where `<archive-path>` is the path to the archived change directory relative to the project root, and `invalidatedChanges` is the array from the `ArchiveChange` result (empty when no changes were invalidated)."
       ]
     },
     {
@@ -139,6 +139,33 @@
       "then": ["the command exits with code 1", "AND stderr contains an error: message"]
     },
     {
+      "requirement": "Output on success (extended)",
+      "name": "Text output shows invalidated changes when overlap occurred",
+      "given": ["ArchiveChange returns invalidatedChanges with two entries"],
+      "when": ["specd change archive <name> --allow-overlap succeeds in text mode"],
+      "then": [
+        "stdout includes the archive path line",
+        "AND stdout includes an \"invalidated N overlapping changes:\" section listing each change and its overlapping specs"
+      ]
+    },
+    {
+      "requirement": "Output on success (extended)",
+      "name": "Text output omits invalidated section when no changes were invalidated",
+      "given": ["ArchiveChange returns an empty invalidatedChanges array"],
+      "when": ["specd change archive <name> succeeds in text mode"],
+      "then": [
+        "stdout includes only the archive path line",
+        "AND no invalidated changes section is shown"
+      ]
+    },
+    {
+      "requirement": "Output on success (extended)",
+      "name": "JSON output includes invalidatedChanges array",
+      "given": ["ArchiveChange returns invalidatedChanges with one entry"],
+      "when": ["specd change archive <name> --allow-overlap --format json succeeds"],
+      "then": ["the JSON output includes invalidatedChanges with the entry's name and specIds"]
+    },
+    {
       "requirement": "Output on success",
       "name": "JSON output on success",
       "when": ["specd change archive my-change --format json succeeds"],
@@ -149,8 +176,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:ab4e87388fea1b6a2df552b92c9a792efc2f2f63d65f7ed4f216bb1cf301c3a7",
-    "verify.md": "sha256:59ece8d04b620fc2a42ac449881362ef5e8fe85e1130e620b2261baaf2497051"
+    "spec.md": "sha256:3e801de77c9227ee3b79232c0f667db2dbeb2962251b0d2dc38e709ed77f9119",
+    "verify.md": "sha256:82d84519c2bcb67fbe4db9d2441f8b2b8d7ebd791bcbc5b58759d9c5cc40ec5d"
   },
   "generatedBy": "core"
 }

@@ -78,6 +78,28 @@
 - **THEN** the command exits with code 1
 - **AND** stderr contains an `error:` message
 
+### Requirement: Output on success (extended)
+
+#### Scenario: Text output shows invalidated changes when overlap occurred
+
+- **GIVEN** `ArchiveChange` returns `invalidatedChanges` with two entries
+- **WHEN** `specd change archive <name> --allow-overlap` succeeds in text mode
+- **THEN** stdout includes the archive path line
+- **AND** stdout includes an "invalidated N overlapping changes:" section listing each change and its overlapping specs
+
+#### Scenario: Text output omits invalidated section when no changes were invalidated
+
+- **GIVEN** `ArchiveChange` returns an empty `invalidatedChanges` array
+- **WHEN** `specd change archive <name>` succeeds in text mode
+- **THEN** stdout includes only the archive path line
+- **AND** no invalidated changes section is shown
+
+#### Scenario: JSON output includes invalidatedChanges array
+
+- **GIVEN** `ArchiveChange` returns `invalidatedChanges` with one entry
+- **WHEN** `specd change archive <name> --allow-overlap --format json` succeeds
+- **THEN** the JSON output includes `invalidatedChanges` with the entry's `name` and `specIds`
+
 ### Requirement: Output on success
 
 #### Scenario: JSON output on success

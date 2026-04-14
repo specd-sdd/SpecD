@@ -41,6 +41,43 @@
 - **WHEN** `specd change status <name>` is run in text mode
 - **THEN** stdout omits the `review:` section
 
+### Requirement: spec-overlap-conflict review reason display
+
+#### Scenario: Text output shows overlap entries when reason is spec-overlap-conflict
+
+- **GIVEN** `GetStatus` returns `review.required: true` with `reason: 'spec-overlap-conflict'`
+- **AND** `review.overlapDetail` has two entries: `[{ archivedChangeName: 'beta', overlappingSpecIds: ['core:core/config'] }, { archivedChangeName: 'alpha', overlappingSpecIds: ['core:core/kernel'] }]`
+- **WHEN** `specd change status <name>` is run
+- **THEN** the review section shows `reason: spec-overlap-conflict`
+- **AND** an `overlap:` subsection lists both entries as bullets
+
+#### Scenario: Text output with single overlap entry
+
+- **GIVEN** `GetStatus` returns `review.required: true` with `reason: 'spec-overlap-conflict'`
+- **AND** `review.overlapDetail` has one entry
+- **WHEN** `specd change status <name>` is run
+- **THEN** the overlap subsection shows one bullet with the archived change name and specs
+
+#### Scenario: JSON output includes overlapDetail array when reason is spec-overlap-conflict
+
+- **GIVEN** `GetStatus` returns `review.required: true` with `reason: 'spec-overlap-conflict'`
+- **AND** `review.overlapDetail` has two entries
+- **WHEN** `specd change status <name> --format json` is run
+- **THEN** `review.overlapDetail` is an array with two entries ordered newest-first
+- **AND** each entry has `archivedChangeName` and `overlappingSpecIds`
+
+#### Scenario: JSON output has empty overlapDetail array for other reasons
+
+- **GIVEN** `GetStatus` returns `review.required: true` with `reason: 'artifact-drift'`
+- **WHEN** `specd change status <name> --format json` is run
+- **THEN** `review.overlapDetail` is `[]`
+
+#### Scenario: Overlap subsection omitted in text when reason is not spec-overlap-conflict
+
+- **GIVEN** `GetStatus` returns `review.required: true` with `reason: 'artifact-review-required'`
+- **WHEN** `specd change status <name>` is run
+- **THEN** no `overlap:` subsection appears in the review section
+
 ### Requirement: Schema version warning
 
 #### Scenario: Schema mismatch

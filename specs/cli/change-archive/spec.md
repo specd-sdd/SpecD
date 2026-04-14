@@ -43,10 +43,10 @@ After a successful archive, if any post-archive hooks failed, the CLI exits with
 
 On success, output depends on `--format`:
 
-- `text` (default): prints to stdout:
-- `json` or `toon`: outputs the following to stdout (encoded in the respective format):
-
-where `<archive-path>` is the path to the archived change directory relative to the project root.
+- `text` (default): prints to stdout: The invalidated changes section is omitted when no changes were invalidated.
+  - The archive path line
+  - If changes were invalidated due to overlap, a summary listing each invalidated change and the overlapping specs:
+- `json` or `toon`: outputs the following to stdout (encoded in the respective format): where `<archive-path>` is the path to the archived change directory relative to the project root, and `invalidatedChanges` is the array from the `ArchiveChange` result (empty when no changes were invalidated).
 
 ### Requirement: Error cases
 

@@ -562,6 +562,7 @@ describe('change status', () => {
       required: true,
       route: 'designing',
       reason: 'artifact-drift',
+      overlapDetail: [],
       affectedArtifacts: [
         {
           type: 'tasks',

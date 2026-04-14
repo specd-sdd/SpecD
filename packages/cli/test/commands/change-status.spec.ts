@@ -283,3 +283,105 @@ describe('Change not found', () => {
     expect(stderr()).toMatch(/error:/)
   })
 })
+
+describe('Overlap conflict display', () => {
+  it('Text output shows overlap entries for spec-overlap-conflict reason', async () => {
+    const { kernel, stdout } = setup()
+    const change = makeMockChange({ name: 'overlap-change', state: 'designing' })
+    kernel.changes.status.execute.mockResolvedValue({
+      change,
+      artifactStatuses: [],
+      lifecycle: defaultLifecycle,
+      review: {
+        required: true,
+        route: 'designing',
+        reason: 'spec-overlap-conflict',
+        affectedArtifacts: [],
+        overlapDetail: [
+          { archivedChangeName: 'beta', overlappingSpecIds: ['core:core/config'] },
+          { archivedChangeName: 'alpha', overlappingSpecIds: ['core:core/kernel'] },
+        ],
+      },
+    })
+
+    const program = makeProgram()
+    registerChangeStatus(program.command('change'))
+    await program.parseAsync(['node', 'specd', 'change', 'status', 'overlap-change'])
+
+    const out = stdout()
+    expect(out).toContain('reason:   spec-overlap-conflict')
+    expect(out).toContain('overlap:')
+    expect(out).toContain('archived: beta, specs: core:core/config')
+    expect(out).toContain('archived: alpha, specs: core:core/kernel')
+  })
+
+  it('JSON output includes overlapDetail array', async () => {
+    const { kernel, stdout } = setup()
+    const change = makeMockChange({
+      name: 'overlap-change',
+      state: 'designing',
+      specIds: ['core:core/config'],
+    })
+    kernel.changes.status.execute.mockResolvedValue({
+      change,
+      artifactStatuses: [],
+      lifecycle: defaultLifecycle,
+      review: {
+        required: true,
+        route: 'designing',
+        reason: 'spec-overlap-conflict',
+        affectedArtifacts: [],
+        overlapDetail: [{ archivedChangeName: 'beta', overlappingSpecIds: ['core:core/config'] }],
+      },
+    })
+
+    const program = makeProgram()
+    registerChangeStatus(program.command('change'))
+    await program.parseAsync([
+      'node',
+      'specd',
+      'change',
+      'status',
+      'overlap-change',
+      '--format',
+      'json',
+    ])
+
+    const parsed = JSON.parse(stdout())
+    expect(parsed.review.overlapDetail).toHaveLength(1)
+    expect(parsed.review.overlapDetail[0].archivedChangeName).toBe('beta')
+    expect(parsed.review.overlapDetail[0].overlappingSpecIds).toEqual(['core:core/config'])
+  })
+
+  it('JSON output includes empty overlapDetail for non-overlap reasons', async () => {
+    const { kernel, stdout } = setup()
+    const change = makeMockChange({ name: 'no-overlap', state: 'designing' })
+    kernel.changes.status.execute.mockResolvedValue({
+      change,
+      artifactStatuses: [],
+      lifecycle: defaultLifecycle,
+      review: {
+        required: false,
+        route: null,
+        reason: null,
+        affectedArtifacts: [],
+        overlapDetail: [],
+      },
+    })
+
+    const program = makeProgram()
+    registerChangeStatus(program.command('change'))
+    await program.parseAsync([
+      'node',
+      'specd',
+      'change',
+      'status',
+      'no-overlap',
+      '--format',
+      'json',
+    ])
+
+    const parsed = JSON.parse(stdout())
+    expect(parsed.review.overlapDetail).toEqual([])
+  })
+})

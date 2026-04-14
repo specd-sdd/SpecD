@@ -92,6 +92,14 @@ JSON/TOON output schema:
             lines.push(`  required: ${review.required ? 'yes' : 'no'}`)
             lines.push(`  route:    ${review.route}`)
             lines.push(`  reason:   ${review.reason}`)
+            if (review.reason === 'spec-overlap-conflict' && review.overlapDetail.length > 0) {
+              lines.push('  overlap:')
+              for (const entry of review.overlapDetail) {
+                lines.push(
+                  `    - archived: ${entry.archivedChangeName}, specs: ${entry.overlappingSpecIds.join(', ')}`,
+                )
+              }
+            }
             for (const artifact of review.affectedArtifacts) {
               lines.push(`  ${artifact.type}:`)
               for (const file of artifact.files) {
@@ -148,6 +156,7 @@ JSON/TOON output schema:
                 required: review?.required ?? false,
                 route: review?.route ?? null,
                 reason: review?.reason ?? null,
+                overlapDetail: review?.overlapDetail ?? [],
                 affectedArtifacts: (review?.affectedArtifacts ?? []).map((artifact) => ({
                   type: artifact.type,
                   files: artifact.files.map((file) => ({
