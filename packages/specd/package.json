@@ -18,5 +18,8 @@
     "@specd/plugin-copilot": "workspace:*",
     "@specd/schema-std": "workspace:*",
     "@specd/skills": "workspace:*"
+  },
+  "scripts": {
+    "release:publish": "pnpm publish --access public"
   }
 }

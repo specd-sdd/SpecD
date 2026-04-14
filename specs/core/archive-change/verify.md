@@ -61,20 +61,34 @@
 - **AND** the error message includes `core:core/config` and `beta`
 - **AND** no files are modified and no hooks are executed
 
-#### Scenario: Archive proceeds with allowOverlap flag
+#### Scenario: Archive with allowOverlap invalidates overlapping changes
+
+- **GIVEN** a change `alpha` in `archivable` state targeting `core:core/config` and `core:core/kernel`
+- **AND** another active change `beta` targeting `core:core/config` in `implementing` state
+- **AND** another active change `gamma` targeting `core:core/kernel` in `ready` state
+- **WHEN** `ArchiveChange.execute({ name: 'alpha', allowOverlap: true })` is called
+- **THEN** the archive proceeds normally
+- **AND** `beta` is invalidated to `designing` with cause `'spec-overlap-conflict'`
+- **AND** `gamma` is invalidated to `designing` with cause `'spec-overlap-conflict'`
+- **AND** `beta`'s invalidation message includes `'alpha'` and `'core:core/config'`
+- **AND** `gamma`'s invalidation message includes `'alpha'` and `'core:core/kernel'`
+- **AND** `result.invalidatedChanges` has two entries: `{ name: 'beta', specIds: ['core:core/config'] }` and `{ name: 'gamma', specIds: ['core:core/kernel'] }`
+
+#### Scenario: Archive with allowOverlap invalidation happens via ChangeRepository.mutate
 
 - **GIVEN** a change `alpha` in `archivable` state targeting `core:core/config`
 - **AND** another active change `beta` also targets `core:core/config`
-- **WHEN** `ArchiveChange.execute({ name: 'alpha', allowOverlap: true })` is called
-- **THEN** the archive proceeds normally
-- **AND** no `SpecOverlapError` is thrown
+- **WHEN** `ArchiveChange.execute({ name: 'alpha', allowOverlap: true })` invalidates `beta`
+- **THEN** the invalidation is performed inside `ChangeRepository.mutate('beta', fn)`
+- **AND** the callback calls `change.invalidate('spec-overlap-conflict', message, affectedArtifacts)`
 
-#### Scenario: No overlap allows archive without flag
+#### Scenario: No overlap with allowOverlap produces empty invalidatedChanges
 
 - **GIVEN** a change `alpha` in `archivable` state targeting `core:core/config`
 - **AND** no other active change targets `core:core/config`
-- **WHEN** `ArchiveChange.execute({ name: 'alpha' })` is called
+- **WHEN** `ArchiveChange.execute({ name: 'alpha', allowOverlap: true })` is called
 - **THEN** the archive proceeds normally
+- **AND** `result.invalidatedChanges` is an empty array
 
 #### Scenario: Overlap check excludes the change being archived
 
@@ -235,11 +249,19 @@
 
 ### Requirement: Result shape
 
-#### Scenario: Successful archive returns result
+#### Scenario: Successful archive returns result with empty invalidatedChanges
 
-- **WHEN** `ArchiveChange.execute` completes successfully
+- **WHEN** `ArchiveChange.execute` completes successfully with no overlap
 - **THEN** the result includes the `ArchivedChange` record
 - **AND** `postHookFailures` is empty
+- **AND** `invalidatedChanges` is empty
+
+#### Scenario: Result includes invalidated changes after overlap
+
+- **GIVEN** `ArchiveChange.execute` was called with `allowOverlap: true`
+- **AND** two overlapping changes were invalidated
+- **WHEN** the result is returned
+- **THEN** `invalidatedChanges` has two entries with `name` and `specIds` for each invalidated change
 
 #### Scenario: Pre-archive failure throws
 

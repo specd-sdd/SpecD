@@ -56,6 +56,12 @@ export interface ReviewArtifactSummary {
   readonly files: readonly ReviewArtifactFileSummary[]
 }
 
+/** Describes a single archived change whose overlap invalidated this change. */
+export interface ReviewOverlapEntry {
+  readonly archivedChangeName: string
+  readonly overlappingSpecIds: readonly string[]
+}
+
 /** Review routing summary for agents and operators. */
 export interface ReviewSummary {
   /** Whether the change currently requires artifact review. */
@@ -63,9 +69,11 @@ export interface ReviewSummary {
   /** Recommended workflow route when review is required. */
   readonly route: 'designing' | null
   /** Primary review reason derived from current file states. */
-  readonly reason: 'artifact-drift' | 'artifact-review-required' | null
+  readonly reason: 'artifact-drift' | 'artifact-review-required' | 'spec-overlap-conflict' | null
   /** Affected artifacts and their concrete file paths. */
   readonly affectedArtifacts: readonly ReviewArtifactSummary[]
+  /** Merged overlap entries from unhandled spec-overlap-conflict invalidations. */
+  readonly overlapDetail: readonly ReviewOverlapEntry[]
 }
 
 /** Describes why a structurally valid transition is not currently available. */
@@ -281,6 +289,7 @@ export class GetStatus {
         route: null,
         reason: null,
         affectedArtifacts: [],
+        overlapDetail: [],
       }
     }
 
@@ -290,6 +299,10 @@ export class GetStatus {
     const hasDrift = artifactStatuses.some((artifact) =>
       artifact.files.some((file) => file.state === 'drifted-pending-review'),
     )
+
+    const unhandledOverlaps = this._collectUnhandledOverlaps(change)
+    const overlapReason: 'spec-overlap-conflict' | null =
+      !hasDrift && unhandledOverlaps.length > 0 ? 'spec-overlap-conflict' : null
 
     const projectedLatestAffectedArtifacts =
       latestInvalidated === undefined
@@ -315,11 +328,40 @@ export class GetStatus {
     return {
       required: true,
       route: 'designing',
-      reason: hasDrift ? 'artifact-drift' : 'artifact-review-required',
+      reason: hasDrift ? 'artifact-drift' : (overlapReason ?? 'artifact-review-required'),
       affectedArtifacts:
         projectedLatestAffectedArtifacts.length > 0
           ? projectedLatestAffectedArtifacts
           : fallbackAffectedArtifacts,
+      overlapDetail: overlapReason !== null ? unhandledOverlaps : [],
     }
+  }
+
+  /**
+   * Collects unhandled spec-overlap-conflict invalidation events from history.
+   *
+   * Scans in reverse, collecting events until a forward-transition boundary
+   * is reached (a transition to a non-designing state).
+   *
+   * @param change - The change whose history to scan
+   * @returns Overlap entries ordered newest-first
+   */
+  private _collectUnhandledOverlaps(change: Change): ReviewOverlapEntry[] {
+    const entries: ReviewOverlapEntry[] = []
+    for (const event of [...change.history].reverse()) {
+      if (event.type === 'invalidated' && event.cause === 'spec-overlap-conflict') {
+        const nameMatch = event.message.match(/change '([^']+)'/)
+        const specsMatch = event.message.match(/specs:\s*(.+)$/)
+        entries.push({
+          archivedChangeName: nameMatch?.[1] ?? '',
+          overlappingSpecIds: specsMatch?.[1]?.split(',').map((s) => s.trim()) ?? [],
+        })
+        continue
+      }
+      if (event.type === 'transitioned' && event.to !== 'designing') {
+        break
+      }
+    }
+    return entries
   }
 }

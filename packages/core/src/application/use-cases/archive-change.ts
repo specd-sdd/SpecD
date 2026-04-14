@@ -12,6 +12,7 @@ import { type ArtifactParserRegistry } from '../ports/artifact-parser.js'
 import { type SchemaProvider } from '../ports/schema-provider.js'
 import { type ArchivedChange } from '../../domain/entities/archived-change.js'
 import { type Change } from '../../domain/entities/change.js'
+import { SYSTEM_ACTOR } from '../../domain/entities/change.js'
 import { type ArtifactFile } from '../../domain/value-objects/artifact-file.js'
 import { Spec } from '../../domain/entities/spec.js'
 import { SpecPath } from '../../domain/value-objects/spec-path.js'
@@ -48,6 +49,12 @@ export interface ArchiveChangeInput {
   readonly allowOverlap?: boolean
 }
 
+/** Entry describing a change invalidated due to spec overlap during archive. */
+export interface InvalidatedChangesEntry {
+  readonly name: string
+  readonly specIds: readonly string[]
+}
+
 /** Result returned by a successful {@link ArchiveChange} execution. */
 export interface ArchiveChangeResult {
   /** The `ArchivedChange` record that was persisted. */
@@ -62,6 +69,8 @@ export interface ArchiveChangeResult {
    * generated successfully.
    */
   readonly staleMetadataSpecPaths: string[]
+  /** Changes that were invalidated due to spec overlap; empty when no invalidation occurred. */
+  readonly invalidatedChanges: readonly InvalidatedChangesEntry[]
 }
 
 /**
@@ -150,17 +159,61 @@ export class ArchiveChange {
     })
 
     // --- Overlap guard ---
-    if (!(input.allowOverlap ?? false)) {
-      const allChanges = await this._changes.list()
-      const others = allChanges.filter((c) => c.name !== change.name)
-      if (others.length > 0) {
-        const combined = [...others, change]
-        const overlapReport = detectSpecOverlap(combined)
-        const relevant = overlapReport.entries.filter((entry) =>
-          entry.changes.some((c) => c.name === change.name),
-        )
-        if (relevant.length > 0) {
+    const invalidatedChanges: InvalidatedChangesEntry[] = []
+    const allChanges = await this._changes.list()
+    const others = allChanges.filter((c) => c.name !== change.name)
+    if (others.length > 0) {
+      const combined = [...others, change]
+      const overlapReport = detectSpecOverlap(combined)
+      const relevant = overlapReport.entries.filter((entry) =>
+        entry.changes.some((c) => c.name === change.name),
+      )
+      if (relevant.length > 0) {
+        if (!(input.allowOverlap ?? false)) {
           throw new SpecOverlapError(relevant)
+        }
+        const overlappingChangeNames = [
+          ...new Set(
+            relevant.flatMap((entry) =>
+              entry.changes.filter((c) => c.name !== change.name).map((c) => c.name),
+            ),
+          ),
+        ]
+        for (const overlappingName of overlappingChangeNames) {
+          const specsForChange = [
+            ...new Set(
+              relevant
+                .filter((entry) => entry.changes.some((c) => c.name === overlappingName))
+                .map((entry) => entry.specId),
+            ),
+          ]
+          const affectedArtifacts = others
+            .find((c) => c.name === overlappingName)!
+            .artifacts.values()
+          const artifactEntries = [...affectedArtifacts]
+            .filter((artifact) =>
+              [...artifact.files.keys()].some((key) => specsForChange.includes(key)),
+            )
+            .map((artifact) => ({
+              type: artifact.type,
+              files: [...artifact.files.keys()].filter((key) => specsForChange.includes(key)),
+            }))
+          const message = `Invalidated because change '${change.name}' was archived with overlapping specs: ${specsForChange.join(', ')}`
+          await this._changes.mutate(overlappingName, (freshOverlapping) => {
+            freshOverlapping.invalidate(
+              'spec-overlap-conflict',
+              SYSTEM_ACTOR,
+              message,
+              artifactEntries.length > 0
+                ? artifactEntries
+                : [...freshOverlapping.artifacts.values()].map((a) => ({
+                    type: a.type,
+                    files: [...a.files.keys()],
+                  })),
+            )
+            return freshOverlapping
+          })
+          invalidatedChanges.push({ name: overlappingName, specIds: specsForChange })
         }
       }
     }
@@ -336,6 +389,7 @@ export class ArchiveChange {
       archiveDirPath,
       postHookFailures,
       staleMetadataSpecPaths: failedMetadataSpecPaths,
+      invalidatedChanges,
     }
   }
 

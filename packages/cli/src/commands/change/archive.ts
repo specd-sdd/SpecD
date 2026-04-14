@@ -58,12 +58,20 @@ JSON/TOON output schema:
           const fmt = parseFormat(opts.format)
           if (fmt === 'text') {
             output(`archived change ${name} → ${archivePath}`, 'text')
+            if (result.invalidatedChanges.length > 0) {
+              const lines = [`invalidated ${result.invalidatedChanges.length} overlapping changes:`]
+              for (const ic of result.invalidatedChanges) {
+                lines.push(`  - ${ic.name} (specs: ${ic.specIds.join(', ')})`)
+              }
+              output(lines.join('\n'), 'text')
+            }
           } else {
             output(
               {
                 result: 'ok',
                 name,
                 archivePath,
+                invalidatedChanges: result.invalidatedChanges,
               },
               fmt,
             )

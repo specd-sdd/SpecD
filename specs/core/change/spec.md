@@ -202,6 +202,15 @@ Event types:
 
 Approval invalidation caused by artifact drift MUST capture the full set of affected files before the event is appended. If multiple files drift in the same invalidation pass, they are recorded in the same `invalidated` event.
 
+#### Scenario: Overlap conflict invalidation
+
+- **GIVEN** change `beta` targets `core:core/config`
+- **AND** change `alpha` also targets `core:core/config` and is archived with `allowOverlap: true`
+- **WHEN** the archive invalidates `beta`
+- **THEN** an `invalidated` event with `cause: 'spec-overlap-conflict'` is appended to `beta`'s history
+- **AND** a `transitioned` event rolling back to `designing` is appended
+- **AND** the `invalidated.message` includes the archived change name and the overlapping spec IDs
+
 ### Requirement: Historical implementation detection
 
 A Change SHALL treat any historical transition to `implementing` as evidence that implementation may already exist, even if the current lifecycle state later returns to `designing`, `verifying`, or another non-terminal state.

@@ -49,6 +49,7 @@ describe('change archive', () => {
       },
       archiveDirPath: '/project/.specd/archive/2026-01/feat',
       postHookFailures: [],
+      invalidatedChanges: [],
     })
 
     const program = makeProgram()
@@ -69,6 +70,7 @@ describe('change archive', () => {
       },
       archiveDirPath: '/project/.specd/archive/2026-01/feat',
       postHookFailures: ['notify-team'],
+      invalidatedChanges: [],
     })
 
     const program = makeProgram()
@@ -90,6 +92,7 @@ describe('change archive', () => {
       },
       archiveDirPath: '/project/.specd/archive/2026-01/feat',
       postHookFailures: [],
+      invalidatedChanges: [],
     })
 
     const program = makeProgram()
@@ -100,6 +103,55 @@ describe('change archive', () => {
     expect(parsed.result).toBe('ok')
     expect(parsed.name).toBe('feat')
     expect(typeof parsed.archivePath).toBe('string')
+    expect(parsed.invalidatedChanges).toEqual([])
+  })
+
+  it('reports invalidated changes in text output', async () => {
+    const { kernel, stdout } = setup()
+    kernel.changes.archive.execute.mockResolvedValue({
+      archivedChange: {
+        name: 'feat',
+        archivedName: '2026-01-15-feat',
+        archivedAt: new Date('2026-01-15T10:00:00Z'),
+      },
+      archiveDirPath: '/project/.specd/archive/2026-01/feat',
+      postHookFailures: [],
+      invalidatedChanges: [
+        { name: 'beta', specIds: ['core:core/config', 'core:core/kernel'] },
+        { name: 'gamma', specIds: ['core:core/config'] },
+      ],
+    })
+
+    const program = makeProgram()
+    registerChangeArchive(program.command('change'))
+    await program.parseAsync(['node', 'specd', 'change', 'archive', 'feat'])
+
+    expect(stdout()).toContain('invalidated 2 overlapping changes:')
+    expect(stdout()).toContain('beta (specs: core:core/config, core:core/kernel)')
+    expect(stdout()).toContain('gamma (specs: core:core/config)')
+  })
+
+  it('reports invalidated changes in JSON output', async () => {
+    const { kernel, stdout } = setup()
+    kernel.changes.archive.execute.mockResolvedValue({
+      archivedChange: {
+        name: 'feat',
+        archivedName: '2026-01-15-feat',
+        archivedAt: new Date('2026-01-15T10:00:00Z'),
+      },
+      archiveDirPath: '/project/.specd/archive/2026-01/feat',
+      postHookFailures: [],
+      invalidatedChanges: [{ name: 'beta', specIds: ['core:core/config'] }],
+    })
+
+    const program = makeProgram()
+    registerChangeArchive(program.command('change'))
+    await program.parseAsync(['node', 'specd', 'change', 'archive', 'feat', '--format', 'json'])
+
+    const parsed = JSON.parse(stdout())
+    expect(parsed.invalidatedChanges).toHaveLength(1)
+    expect(parsed.invalidatedChanges[0].name).toBe('beta')
+    expect(parsed.invalidatedChanges[0].specIds).toEqual(['core:core/config'])
   })
 
   it('exits 1 when change not found', async () => {
@@ -147,6 +199,7 @@ describe('change archive', () => {
       },
       archiveDirPath: '/project/.specd/archive/2026-01/feat',
       postHookFailures: [],
+      invalidatedChanges: [],
     })
 
     const program = makeProgram()
@@ -170,6 +223,7 @@ describe('change archive', () => {
       },
       archiveDirPath: '/project/.specd/archive/2026-01/feat',
       postHookFailures: [],
+      invalidatedChanges: [],
     })
 
     const program = makeProgram()
@@ -200,6 +254,7 @@ describe('change archive', () => {
       },
       archiveDirPath: '/project/.specd/archive/2026-01/feat',
       postHookFailures: [],
+      invalidatedChanges: [],
     })
 
     const program = makeProgram()

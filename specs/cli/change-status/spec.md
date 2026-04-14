@@ -39,7 +39,10 @@ lifecycle:
 review:
   required:  yes|no
   route:     designing
-  reason:    artifact-drift|artifact-review-required
+  reason:    artifact-drift|artifact-review-required|spec-overlap-conflict
+  overlap:                                         ← only when reason is spec-overlap-conflict
+    - archived: <name1>, specs: <specId1>, <specId2>
+    - archived: <name2>, specs: <specId3>
   affected:
     <artifact-type>:
       - <absolute-path>
@@ -62,6 +65,8 @@ blockers:
 The `blockers:` section is omitted when there are no blockers.
 
 The `review:` section is omitted when `review.required` is `false`. When present, it summarizes why the change must return through design review. Within that section, affected files are rendered using their absolute paths so an operator or agent can jump directly to the file that needs review. If supplemental `key` data is present, it is secondary and must not replace the path-first rendering.
+
+When `review.reason` is `'spec-overlap-conflict'`, the review section additionally shows an `overlap:` subsection listing each unhandled overlap entry as a bullet with the archived change name and overlapping spec IDs. This subsection is omitted for all other reasons. Multiple entries (from multiple archived changes) are listed newest-first.
 
 In `json` or `toon` mode, the output is:
 
@@ -89,7 +94,8 @@ In `json` or `toon` mode, the output is:
   "review": {
     "required": true,
     "route": "designing",
-    "reason": "artifact-drift",
+    "reason": "artifact-drift|artifact-review-required|spec-overlap-conflict",
+    "overlapDetail": [],
     "affectedArtifacts": [
       {
         "type": "specs",
@@ -116,6 +122,11 @@ In `json` or `toon` mode, the output is:
 ```
 
 `description` is omitted from the JSON object when not set. The `lifecycle` object is always present. `nextArtifact` is `null` (not omitted) when all artifacts are done.
+
+`overlapDetail` is always present in the JSON `review` object:
+
+- When `review.reason` is `'spec-overlap-conflict'`: an array of `{ archivedChangeName, overlappingSpecIds }` entries ordered newest-first
+- For all other reasons: an empty array `[]`
 
 ### Requirement: Schema version warning
 

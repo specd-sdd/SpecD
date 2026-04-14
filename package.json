@@ -20,7 +20,7 @@
     "web:test": "pnpm --filter @specd/public-web test",
     "web:typecheck": "pnpm --filter @specd/public-web typecheck",
     "prepare": "husky",
-    "release:publish": "pnpm -r --filter '!apps/**' run publish --access public"
+    "release:publish": "pnpm -r --filter '!apps/**' run release:publish"
   },
   "devDependencies": {
     "@commitlint/cli": "^19.0.0",

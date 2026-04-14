@@ -60,7 +60,7 @@ export type RawInvalidatedCause =
   | 'spec-change'
   | 'artifact-drift'
   | 'artifact-review-required'
-  | 'artifact-change'
+  | 'spec-overlap-conflict'
 
 /** Raw JSON shape of a `created` event. */
 export interface RawCreatedEvent {

@@ -45,7 +45,7 @@
     {
       "requirement": "Returns lifecycle context",
       "rules": [
-        "On success, `GetStatusResult` MUST include a `lifecycle` object with the following fields:\n\n- `validTransitions` — a `readonly ChangeState[]` listing all structurally valid transitions from the current state, as defined by `VALID_TRANSITIONS[state]`\n- `availableTransitions` — a `readonly ChangeState[]` listing the subset of `validTransitions` where the target state's workflow `requires` are all satisfied (each required artifact has persisted `state` `complete` or `skipped`). This is a dry-run: it tells the consumer which transitions would succeed right now without attempting them.\n- `blockers` — a `readonly` array of blocker entries, one per valid-but-unavailable transition. Each entry MUST contain:\n  - `transition: ChangeState` — the blocked target state\n  - `reason: 'requires' | 'tasks-incomplete'` — why the transition is blocked\n  - `blocking: readonly string[]` — artifact IDs whose persisted `state` is neither `complete` nor `skipped`\n- `approvals` — `{ readonly spec: boolean; readonly signoff: boolean }` reflecting whether each approval gate is active in the project config\n- `nextArtifact` — `string | null`; the first artifact in schema-declared order whose `requires` are all satisfied but whose own persisted `state` is neither `complete` nor `skipped`. `null` when all artifacts are done.\n- `changePath` — `string`; the filesystem path to the change directory, obtained from `ChangeRepository.changePath(change)`\n- `schemaInfo` — `{ readonly name: string; readonly version: number } | null`; the active schema's name and version from schema resolution. `null` when schema resolution fails. Consumers MUST use this for schema mismatch warnings instead of resolving the schema independently."
+        "`GetStatus` MUST compute a `ReviewSummary` that determines whether the change requires artifact review and why.\n\nThe review check MUST follow this priority order:\n\n1. **If any artifact file is in `drifted-pending-review` state:** `required` is `true`, `reason` is `'artifact-drift'`, `route` is `'designing'`.\n2. **Else if any artifact file is in `pending-review` state and there are unhandled `spec-overlap-conflict` invalidations:** `required` is `true`, `reason` is `'spec-overlap-conflict'`, `route` is `'designing'`.\n3. **Else if any artifact file is in `pending-review` state:** `required` is `true`, `reason` is `'artifact-review-required'`, `route` is `'designing'`.\n4. **Else:** `required` is `false`, `reason` is `null`, `route` is `null`.\n\n**Unhandled overlap collection:** To determine unhandled `spec-overlap-conflict` invalidations, `GetStatus` MUST scan `change.history` in reverse (newest to oldest) collecting `invalidated` events with `cause: 'spec-overlap-conflict'`. The scan MUST stop at the first `transitioned` event whose `to` field is not `'designing'` — this indicates the change moved forward from a prior invalidation and those earlier overlaps were already handled. If no such boundary event is found, the scan includes all matching events back to the beginning of history.\n\n`ReviewSummary.reason` type MUST be extended to: `'artifact-drift' | 'artifact-review-required' | 'spec-overlap-conflict' | null`.\n\nWhen `reason` is `'spec-overlap-conflict'`, `ReviewSummary` MUST additionally include:\n\n- `overlapDetail` — an array of `OverlapEntry` objects, one per unhandled `spec-overlap-conflict` invalidation event, each containing:\n  - `archivedChangeName` — the name of the archived change that caused the overlap (extracted from the `invalidated.message`)\n  - `overlappingSpecIds` — readonly array of spec IDs that overlapped (extracted from the `invalidated.message`)\n    The array is ordered newest-first (matching the reverse scan order). This preserves the full picture when multiple changes were archived with overlapping specs before the current change was able to address any of them.\n\nWhen `reason` is not `'spec-overlap-conflict'`, `overlapDetail` MUST be an empty array."
       ]
     },
     {
@@ -165,6 +165,82 @@
       "then": ["that artifact does not block availableTransitions"]
     },
     {
+      "requirement": "Returns lifecycle context",
+      "name": "Review reason is spec-overlap-conflict with single unhandled invalidation",
+      "given": [
+        "a change in designing state with files in pending-review",
+        "AND history contains one invalidated event with cause: 'spec-overlap-conflict'",
+        "AND no transitioned event with to not equal to 'designing' appears after it"
+      ],
+      "when": ["execute() is called"],
+      "then": [
+        "review.required is true",
+        "AND review.reason is 'spec-overlap-conflict'",
+        "AND review.overlapDetail has one entry with the archived change name and overlapping spec IDs"
+      ]
+    },
+    {
+      "requirement": "Returns lifecycle context",
+      "name": "Overlap detail merges multiple unhandled invalidations",
+      "given": [
+        "a change in designing state with files in pending-review",
+        "AND history contains two invalidated events with cause: 'spec-overlap-conflict'",
+        "AND event A was caused by archiving change alpha overlapping core:core/config",
+        "AND event B was caused by archiving change beta overlapping core:core/kernel",
+        "AND no transitioned event with to not equal to 'designing' appears after either"
+      ],
+      "when": ["execute() is called"],
+      "then": [
+        "review.overlapDetail has two entries",
+        "AND the entries are ordered newest-first",
+        "AND one entry references beta with core:core/kernel",
+        "AND the other references alpha with core:core/config"
+      ]
+    },
+    {
+      "requirement": "Returns lifecycle context",
+      "name": "Overlap scan stops at forward transition boundary",
+      "given": [
+        "a change with history: invalidated(spec-overlap-conflict, alpha), transitioned(designing), transitioned(ready), invalidated(spec-overlap-conflict, beta), transitioned(designing)",
+        "AND files are in pending-review"
+      ],
+      "when": ["execute() is called"],
+      "then": [
+        "review.overlapDetail has only one entry referencing beta",
+        "AND the alpha invalidation is excluded because transitioned(ready) appears before it in reverse scan order"
+      ]
+    },
+    {
+      "requirement": "Returns lifecycle context",
+      "name": "Review reason is artifact-drift when drift exists even with overlap invalidation",
+      "given": [
+        "a change with at least one file in drifted-pending-review",
+        "AND unhandled spec-overlap-conflict invalidations exist"
+      ],
+      "when": ["execute() is called"],
+      "then": [
+        "review.reason is 'artifact-drift' (drift takes priority)",
+        "AND review.overlapDetail is an empty array"
+      ]
+    },
+    {
+      "requirement": "Returns lifecycle context",
+      "name": "Review overlapDetail is empty for non-overlap reasons",
+      "given": [
+        "a change in designing state with files in pending-review",
+        "AND the latest invalidated event has cause: 'artifact-review-required'"
+      ],
+      "when": ["execute() is called"],
+      "then": ["review.overlapDetail is an empty array"]
+    },
+    {
+      "requirement": "Returns lifecycle context",
+      "name": "No invalidation event produces empty overlapDetail",
+      "given": ["a change with no invalidated events in history"],
+      "when": ["execute() is called"],
+      "then": ["review.overlapDetail is an empty array"]
+    },
+    {
       "requirement": "Graceful degradation when schema resolution fails",
       "name": "Schema resolution failure degrades lifecycle fields",
       "given": ["SchemaProvider.get() throws SchemaNotFoundError"],
@@ -182,8 +258,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:8422c959c9912a4390576c264c93a72e7f00b5d45dd79e9f82b73c283d37f88d",
-    "verify.md": "sha256:bc43454d8f17fa516cb8a5ec881f8b4d4d924d33ca28bf4b0e8d37643dffee56"
+    "spec.md": "sha256:57c7261ec40cbf84ecfae3961c2ff40fb659d23b87e01e08067559e9ac1ce8c4",
+    "verify.md": "sha256:94b92c76f82b1348ec7c53d801c409dd7103ef71674ff7fb5d377a9cbac58565"
   },
   "generatedBy": "core"
 }

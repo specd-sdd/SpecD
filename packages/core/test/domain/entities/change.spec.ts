@@ -433,6 +433,27 @@ describe('Change', () => {
       expect(design.status).toBe('pending-review')
       expect(design.getFile('design')?.validatedHash).toBe('sha256:d')
     })
+
+    it('handles spec-overlap-conflict cause', () => {
+      const c = makeChange()
+      c.transition('designing', actor)
+      c.transition('ready', actor)
+      c.transition('implementing', actor)
+      const message =
+        "Invalidated because change 'alpha' was archived with overlapping specs: auth/login"
+      c.invalidate('spec-overlap-conflict', actor, message, [
+        { type: 'proposal', files: ['proposal'] },
+      ])
+
+      const evt = c.history.find((e) => e.type === 'invalidated')
+      expect(evt?.type === 'invalidated' && evt.cause).toBe('spec-overlap-conflict')
+      expect(evt?.type === 'invalidated' && evt.message).toBe(message)
+      expect(c.state).toBe('designing')
+
+      const transitioned = [...c.history].reverse().find((e) => e.type === 'transitioned')
+      expect(transitioned?.type === 'transitioned' && transitioned.from).toBe('implementing')
+      expect(transitioned?.type === 'transitioned' && transitioned.to).toBe('designing')
+    })
   })
 
   describe('recordSpecApproval', () => {

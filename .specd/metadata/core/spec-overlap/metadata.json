@@ -1,6 +1,7 @@
 {
   "title": "Spec Overlap",
   "description": "When multiple active changes target the same spec, conflicts are only discovered late — at archive time, when delta application fails or drift is detected. There is no proactive mechanism to warn users that overlapping work may collide. The spec overlap feature provides early awareness by scanning active change manifests and reporting which specs are targeted by more than one change.",
+  "dependsOn": ["core:core/change", "core:core/list-changes", "core:core/kernel"],
   "context": [
     "When multiple active changes target the same spec, conflicts are only discovered late — at archive time, when delta application fails or drift is detected. There is no proactive mechanism to warn users that overlapping work may collide. The spec overlap feature provides early awareness by scanning active change manifests and reporting which specs are targeted by more than one change."
   ],

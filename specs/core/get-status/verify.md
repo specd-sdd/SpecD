@@ -84,6 +84,58 @@
 - **WHEN** `execute()` is called
 - **THEN** that artifact does not block `availableTransitions`
 
+#### Scenario: Review reason is spec-overlap-conflict with single unhandled invalidation
+
+- **GIVEN** a change in `designing` state with files in `pending-review`
+- **AND** history contains one `invalidated` event with `cause: 'spec-overlap-conflict'`
+- **AND** no `transitioned` event with `to` not equal to `'designing'` appears after it
+- **WHEN** `execute()` is called
+- **THEN** `review.required` is `true`
+- **AND** `review.reason` is `'spec-overlap-conflict'`
+- **AND** `review.overlapDetail` has one entry with the archived change name and overlapping spec IDs
+
+#### Scenario: Overlap detail merges multiple unhandled invalidations
+
+- **GIVEN** a change in `designing` state with files in `pending-review`
+- **AND** history contains two `invalidated` events with `cause: 'spec-overlap-conflict'`
+- **AND** event A was caused by archiving change `alpha` overlapping `core:core/config`
+- **AND** event B was caused by archiving change `beta` overlapping `core:core/kernel`
+- **AND** no `transitioned` event with `to` not equal to `'designing'` appears after either
+- **WHEN** `execute()` is called
+- **THEN** `review.overlapDetail` has two entries
+- **AND** the entries are ordered newest-first
+- **AND** one entry references `beta` with `core:core/kernel`
+- **AND** the other references `alpha` with `core:core/config`
+
+#### Scenario: Overlap scan stops at forward transition boundary
+
+- **GIVEN** a change with history: `invalidated(spec-overlap-conflict, alpha)`, `transitioned(designing)`, `transitioned(ready)`, `invalidated(spec-overlap-conflict, beta)`, `transitioned(designing)`
+- **AND** files are in `pending-review`
+- **WHEN** `execute()` is called
+- **THEN** `review.overlapDetail` has only one entry referencing `beta`
+- **AND** the `alpha` invalidation is excluded because `transitioned(ready)` appears before it in reverse scan order
+
+#### Scenario: Review reason is artifact-drift when drift exists even with overlap invalidation
+
+- **GIVEN** a change with at least one file in `drifted-pending-review`
+- **AND** unhandled `spec-overlap-conflict` invalidations exist
+- **WHEN** `execute()` is called
+- **THEN** `review.reason` is `'artifact-drift'` (drift takes priority)
+- **AND** `review.overlapDetail` is an empty array
+
+#### Scenario: Review overlapDetail is empty for non-overlap reasons
+
+- **GIVEN** a change in `designing` state with files in `pending-review`
+- **AND** the latest `invalidated` event has `cause: 'artifact-review-required'`
+- **WHEN** `execute()` is called
+- **THEN** `review.overlapDetail` is an empty array
+
+#### Scenario: No invalidation event produces empty overlapDetail
+
+- **GIVEN** a change with no `invalidated` events in history
+- **WHEN** `execute()` is called
+- **THEN** `review.overlapDetail` is an empty array
+
 ### Requirement: Graceful degradation when schema resolution fails
 
 #### Scenario: Schema resolution failure degrades lifecycle fields

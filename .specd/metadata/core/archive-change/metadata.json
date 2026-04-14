@@ -54,7 +54,7 @@
     {
       "requirement": "Overlap guard",
       "rules": [
-        "After the archivable guard passes and the change transitions to `archiving`, but before pre-archive hooks execute, `ArchiveChange` MUST check for spec overlap with other active changes.\n\nThe check MUST:\n\n1. Call `ChangeRepository.list()` to retrieve all active changes\n2. Exclude the change being archived from the list\n3. Call the `detectSpecOverlap` domain service with the remaining changes plus the change being archived\n4. Filter the result to entries where the change being archived participates\n\nIf the filtered report has overlap and `allowOverlap` is `false`, `ArchiveChange` MUST throw `SpecOverlapError` with the overlap entries. The error message MUST list the overlapping spec IDs and the names of the other changes targeting them.\n\nIf `allowOverlap` is `true`, the overlap check is skipped entirely — the use case proceeds to pre-archive hooks without calling `detectSpecOverlap`."
+        "After the archivable guard passes and the change transitions to `archiving`, but before pre-archive hooks execute, `ArchiveChange` MUST check for spec overlap with other active changes and handle invalidation when `allowOverlap` is `true`.\n\nThe check MUST:\n\n1. Call `ChangeRepository.list()` to retrieve all active changes\n2. Exclude the change being archived from the list\n3. Call the `detectSpecOverlap` domain service with the remaining changes plus the change being archived\n4. Filter the result to entries where the change being archived participates\n\n**When `allowOverlap` is `false`:** If the filtered report has overlap, `ArchiveChange` MUST throw `SpecOverlapError` with the overlap entries. The error message MUST list the overlapping spec IDs and the names of the other changes targeting them.\n\n**When `allowOverlap` is `true`:** If the filtered report has overlap, `ArchiveChange` MUST invalidate each overlapping change:\n\n1. For each overlapping change, call `ChangeRepository.mutate(name, fn)` with a callback that:\n   a. Obtains the fresh `Change` instance\n   b. Calls `change.invalidate('spec-overlap-conflict', message, affectedArtifacts)` with:\n   - `message`: `\"Invalidated because change '<archivedName>' was archived with overlapping specs: <specId1>, <specId2>, ...\"`\n   - `affectedArtifacts`: all artifacts in the change that contain files for the overlapping spec IDs\n     c. Returns the updated change\n2. Collect each invalidated change's name and the overlapping spec IDs into the result's `invalidatedChanges` array\n\nIf the filtered report has no overlap, the archive proceeds normally regardless of the `allowOverlap` flag."
       ]
     },
     {
@@ -90,7 +90,7 @@
     {
       "requirement": "Result shape",
       "rules": [
-        "`ArchiveChange.execute` must return a result object. The result must include:\n\n- `archivedChange` — the `ArchivedChange` record that was persisted\n- `postHookFailures` — array of hook commands that failed post-archive, empty on full success\n- `staleMetadataSpecPaths` — array of spec paths where `.specd-metadata.yaml` generation failed during this archive (e.g. extraction produced no required fields); empty when all metadata was generated successfully\n\n`ArchiveChange` throws on pre-archive hook failure or `assertArchivable` failure. Post-archive failures are returned, not thrown."
+        "`ArchiveChange.execute` must return a result object. The result must include:\n\n- `archivedChange` — the `ArchivedChange` record that was persisted\n- `postHookFailures` — array of hook commands that failed post-archive, empty on full success\n- `staleMetadataSpecPaths` — array of spec paths where `.specd-metadata.yaml` generation failed during this archive (e.g. extraction produced no required fields); empty when all metadata was generated successfully\n- `invalidatedChanges` — array of objects describing changes that were invalidated due to spec overlap, each containing:\n  - `name` — the invalidated change's name\n  - `specIds` — readonly array of overlapping spec IDs that triggered the invalidation\n    Empty when no changes were invalidated (either no overlap existed or `allowOverlap` was `false` and the archive was blocked).\n\n`ArchiveChange` throws on pre-archive hook failure or `assertArchivable` failure. Post-archive failures are returned, not thrown."
       ]
     }
   ],
@@ -183,23 +183,44 @@
     },
     {
       "requirement": "Overlap guard",
-      "name": "Archive proceeds with allowOverlap flag",
+      "name": "Archive with allowOverlap invalidates overlapping changes",
+      "given": [
+        "a change alpha in archivable state targeting core:core/config and core:core/kernel",
+        "AND another active change beta targeting core:core/config in implementing state",
+        "AND another active change gamma targeting core:core/kernel in ready state"
+      ],
+      "when": ["ArchiveChange.execute({ name: 'alpha', allowOverlap: true }) is called"],
+      "then": [
+        "the archive proceeds normally",
+        "AND beta is invalidated to designing with cause 'spec-overlap-conflict'",
+        "AND gamma is invalidated to designing with cause 'spec-overlap-conflict'",
+        "AND beta's invalidation message includes 'alpha' and 'core:core/config'",
+        "AND gamma's invalidation message includes 'alpha' and 'core:core/kernel'",
+        "AND result.invalidatedChanges has two entries: { name: 'beta', specIds: ['core:core/config'] } and { name: 'gamma', specIds: ['core:core/kernel'] }"
+      ]
+    },
+    {
+      "requirement": "Overlap guard",
+      "name": "Archive with allowOverlap invalidation happens via ChangeRepository.mutate",
       "given": [
         "a change alpha in archivable state targeting core:core/config",
         "AND another active change beta also targets core:core/config"
       ],
-      "when": ["ArchiveChange.execute({ name: 'alpha', allowOverlap: true }) is called"],
-      "then": ["the archive proceeds normally", "AND no SpecOverlapError is thrown"]
+      "when": ["ArchiveChange.execute({ name: 'alpha', allowOverlap: true }) invalidates beta"],
+      "then": [
+        "the invalidation is performed inside ChangeRepository.mutate('beta', fn)",
+        "AND the callback calls change.invalidate('spec-overlap-conflict', message, affectedArtifacts)"
+      ]
     },
     {
       "requirement": "Overlap guard",
-      "name": "No overlap allows archive without flag",
+      "name": "No overlap with allowOverlap produces empty invalidatedChanges",
       "given": [
         "a change alpha in archivable state targeting core:core/config",
         "AND no other active change targets core:core/config"
       ],
-      "when": ["ArchiveChange.execute({ name: 'alpha' }) is called"],
-      "then": ["the archive proceeds normally"]
+      "when": ["ArchiveChange.execute({ name: 'alpha', allowOverlap: true }) is called"],
+      "then": ["the archive proceeds normally", "AND result.invalidatedChanges is an empty array"]
     },
     {
       "requirement": "Overlap guard",
@@ -407,9 +428,25 @@
     },
     {
       "requirement": "Result shape",
-      "name": "Successful archive returns result",
-      "when": ["ArchiveChange.execute completes successfully"],
-      "then": ["the result includes the ArchivedChange record", "AND postHookFailures is empty"]
+      "name": "Successful archive returns result with empty invalidatedChanges",
+      "when": ["ArchiveChange.execute completes successfully with no overlap"],
+      "then": [
+        "the result includes the ArchivedChange record",
+        "AND postHookFailures is empty",
+        "AND invalidatedChanges is empty"
+      ]
+    },
+    {
+      "requirement": "Result shape",
+      "name": "Result includes invalidated changes after overlap",
+      "given": [
+        "ArchiveChange.execute was called with allowOverlap: true",
+        "AND two overlapping changes were invalidated"
+      ],
+      "when": ["the result is returned"],
+      "then": [
+        "invalidatedChanges has two entries with name and specIds for each invalidated change"
+      ]
     },
     {
       "requirement": "Result shape",
@@ -419,8 +456,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:af23c61b30ff66c6b8580f023f183eacdc691b812299be24026c6520d12e562c",
-    "verify.md": "sha256:f7e4e41abfda5aedffb84bf4791a731715fae898443237e174a6fa2861562cff"
+    "spec.md": "sha256:a58656de4a3e75430194d0c4e59d05bb93c22c572ef467c15f8f6055cbd3b297",
+    "verify.md": "sha256:77d655d247e573cb63cf7f15476241770efaa353c5cbd9d5cf0fd68177c60571"
   },
   "generatedBy": "core"
 }

@@ -77,7 +77,7 @@ This check MUST occur before any hooks execute or any spec files are written. It
 
 ### Requirement: Overlap guard
 
-After the archivable guard passes and the change transitions to `archiving`, but before pre-archive hooks execute, `ArchiveChange` MUST check for spec overlap with other active changes.
+After the archivable guard passes and the change transitions to `archiving`, but before pre-archive hooks execute, `ArchiveChange` MUST check for spec overlap with other active changes and handle invalidation when `allowOverlap` is `true`.
 
 The check MUST:
 
@@ -86,9 +86,19 @@ The check MUST:
 3. Call the `detectSpecOverlap` domain service with the remaining changes plus the change being archived
 4. Filter the result to entries where the change being archived participates
 
-If the filtered report has overlap and `allowOverlap` is `false`, `ArchiveChange` MUST throw `SpecOverlapError` with the overlap entries. The error message MUST list the overlapping spec IDs and the names of the other changes targeting them.
+**When `allowOverlap` is `false`:** If the filtered report has overlap, `ArchiveChange` MUST throw `SpecOverlapError` with the overlap entries. The error message MUST list the overlapping spec IDs and the names of the other changes targeting them.
 
-If `allowOverlap` is `true`, the overlap check is skipped entirely — the use case proceeds to pre-archive hooks without calling `detectSpecOverlap`.
+**When `allowOverlap` is `true`:** If the filtered report has overlap, `ArchiveChange` MUST invalidate each overlapping change:
+
+1. For each overlapping change, call `ChangeRepository.mutate(name, fn)` with a callback that:
+   a. Obtains the fresh `Change` instance
+   b. Calls `change.invalidate('spec-overlap-conflict', message, affectedArtifacts)` with:
+   - `message`: `"Invalidated because change '<archivedName>' was archived with overlapping specs: <specId1>, <specId2>, ..."`
+   - `affectedArtifacts`: all artifacts in the change that contain files for the overlapping spec IDs
+     c. Returns the updated change
+2. Collect each invalidated change's name and the overlapping spec IDs into the result's `invalidatedChanges` array
+
+If the filtered report has no overlap, the archive proceeds normally regardless of the `allowOverlap` flag.
 
 ### Requirement: Pre-archive hooks
 
@@ -156,6 +166,10 @@ After merging deltas and archiving the change, the archive process generates met
 - `archivedChange` — the `ArchivedChange` record that was persisted
 - `postHookFailures` — array of hook commands that failed post-archive, empty on full success
 - `staleMetadataSpecPaths` — array of spec paths where `.specd-metadata.yaml` generation failed during this archive (e.g. extraction produced no required fields); empty when all metadata was generated successfully
+- `invalidatedChanges` — array of objects describing changes that were invalidated due to spec overlap, each containing:
+  - `name` — the invalidated change's name
+  - `specIds` — readonly array of overlapping spec IDs that triggered the invalidation
+    Empty when no changes were invalidated (either no overlap existed or `allowOverlap` was `false` and the archive was blocked).
 
 `ArchiveChange` throws on pre-archive hook failure or `assertArchivable` failure. Post-archive failures are returned, not thrown.
 

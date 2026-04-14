@@ -249,7 +249,199 @@ describe('GetStatus', () => {
             ],
           },
         ],
+        overlapDetail: [],
       })
+    })
+
+    it('derives spec-overlap-conflict reason from unhandled invalidation', async () => {
+      const change = makeChange('overlap-change')
+      change.transition('designing', testActor)
+      change.setArtifact(
+        new ChangeArtifact({
+          type: 'proposal',
+          requires: [],
+          files: new Map([
+            [
+              'proposal',
+              new ArtifactFile({
+                key: 'proposal',
+                filename: 'proposal.md',
+                status: 'complete',
+                validatedHash: 'hash-p',
+              }),
+            ],
+          ]),
+        }),
+      )
+      change.invalidate(
+        'spec-overlap-conflict',
+        testActor,
+        "Invalidated because change 'alpha' was archived with overlapping specs: auth/login",
+        [{ type: 'proposal', files: ['proposal'] }],
+      )
+
+      const repo = makeChangeRepository([change])
+      const uc = makeGetStatus(repo)
+
+      const result = await uc.execute({ name: 'overlap-change' })
+
+      expect(result.review.required).toBe(true)
+      expect(result.review.reason).toBe('spec-overlap-conflict')
+      expect(result.review.overlapDetail).toHaveLength(1)
+      expect(result.review.overlapDetail[0]!.archivedChangeName).toBe('alpha')
+      expect(result.review.overlapDetail[0]!.overlappingSpecIds).toEqual(['auth/login'])
+    })
+
+    it('merges multiple unhandled overlap invalidations newest-first', async () => {
+      const change = makeChange('multi-overlap')
+      change.transition('designing', testActor)
+      change.setArtifact(
+        new ChangeArtifact({
+          type: 'proposal',
+          requires: [],
+          files: new Map([
+            [
+              'proposal',
+              new ArtifactFile({
+                key: 'proposal',
+                filename: 'proposal.md',
+                status: 'complete',
+                validatedHash: 'hash-p',
+              }),
+            ],
+          ]),
+        }),
+      )
+      change.invalidate(
+        'spec-overlap-conflict',
+        testActor,
+        "Invalidated because change 'alpha' was archived with overlapping specs: auth/login",
+        [{ type: 'proposal', files: ['proposal'] }],
+      )
+      change.invalidate(
+        'spec-overlap-conflict',
+        testActor,
+        "Invalidated because change 'beta' was archived with overlapping specs: core/config",
+        [{ type: 'proposal', files: ['proposal'] }],
+      )
+
+      const repo = makeChangeRepository([change])
+      const uc = makeGetStatus(repo)
+
+      const result = await uc.execute({ name: 'multi-overlap' })
+
+      expect(result.review.reason).toBe('spec-overlap-conflict')
+      expect(result.review.overlapDetail).toHaveLength(2)
+      expect(result.review.overlapDetail[0]!.archivedChangeName).toBe('beta')
+      expect(result.review.overlapDetail[1]!.archivedChangeName).toBe('alpha')
+    })
+
+    it('stops overlap scan at forward transition boundary', async () => {
+      const change = makeChange('boundary-overlap')
+      change.transition('designing', testActor)
+      change.setArtifact(
+        new ChangeArtifact({
+          type: 'proposal',
+          requires: [],
+          files: new Map([
+            [
+              'proposal',
+              new ArtifactFile({
+                key: 'proposal',
+                filename: 'proposal.md',
+                status: 'complete',
+                validatedHash: 'hash-p',
+              }),
+            ],
+          ]),
+        }),
+      )
+      change.invalidate(
+        'spec-overlap-conflict',
+        testActor,
+        "Invalidated because change 'old' was archived with overlapping specs: auth/login",
+        [{ type: 'proposal', files: ['proposal'] }],
+      )
+      change.transition('ready', testActor)
+      change.invalidate(
+        'spec-overlap-conflict',
+        testActor,
+        "Invalidated because change 'new' was archived with overlapping specs: auth/login",
+        [{ type: 'proposal', files: ['proposal'] }],
+      )
+
+      const repo = makeChangeRepository([change])
+      const uc = makeGetStatus(repo)
+
+      const result = await uc.execute({ name: 'boundary-overlap' })
+
+      expect(result.review.overlapDetail).toHaveLength(1)
+      expect(result.review.overlapDetail[0]!.archivedChangeName).toBe('new')
+    })
+
+    it('drift takes priority over overlap conflict', async () => {
+      const change = makeChange('drift-overlap')
+      change.transition('designing', testActor)
+      change.setArtifact(
+        new ChangeArtifact({
+          type: 'proposal',
+          requires: [],
+          files: new Map([
+            [
+              'proposal',
+              new ArtifactFile({
+                key: 'proposal',
+                filename: 'proposal.md',
+                status: 'drifted-pending-review',
+                validatedHash: 'hash-p',
+              }),
+            ],
+          ]),
+        }),
+      )
+      change.invalidate(
+        'spec-overlap-conflict',
+        testActor,
+        "Invalidated because change 'alpha' was archived with overlapping specs: auth/login",
+        [{ type: 'proposal', files: ['proposal'] }],
+      )
+
+      const repo = makeChangeRepository([change])
+      const uc = makeGetStatus(repo)
+
+      const result = await uc.execute({ name: 'drift-overlap' })
+
+      expect(result.review.reason).toBe('artifact-drift')
+      expect(result.review.overlapDetail).toEqual([])
+    })
+
+    it('returns empty overlapDetail when no invalidation exists', async () => {
+      const change = makeChange('no-invalidation')
+      change.transition('designing', testActor)
+      change.setArtifact(
+        new ChangeArtifact({
+          type: 'proposal',
+          requires: [],
+          files: new Map([
+            [
+              'proposal',
+              new ArtifactFile({
+                key: 'proposal',
+                filename: 'proposal.md',
+                status: 'pending-review',
+                validatedHash: 'hash-p',
+              }),
+            ],
+          ]),
+        }),
+      )
+
+      const repo = makeChangeRepository([change])
+      const uc = makeGetStatus(repo)
+
+      const result = await uc.execute({ name: 'no-invalidation' })
+
+      expect(result.review.overlapDetail).toEqual([])
     })
   })
 

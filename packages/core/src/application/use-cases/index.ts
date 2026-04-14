@@ -52,6 +52,8 @@ export {
   type ArtifactStatusEntry,
   type LifecycleContext,
   type TransitionBlocker,
+  type ReviewSummary,
+  type ReviewOverlapEntry,
 } from './get-status.js'
 export {
   type HookPhaseSelector,
@@ -71,6 +73,7 @@ export {
   type ArchiveChange,
   type ArchiveChangeInput,
   type ArchiveChangeResult,
+  type InvalidatedChangesEntry,
 } from './archive-change.js'
 export {
   type ValidateArtifacts,
