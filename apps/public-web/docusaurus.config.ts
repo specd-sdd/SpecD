@@ -79,7 +79,7 @@ const themeConfig: Preset.ThemeConfig = {
 const config: Config = {
   title: publicSiteTitle,
   tagline: publicSiteTagline,
-  favicon: 'img/logo-mark.svg',
+  favicon: 'img/logo-mark.png',
   url: 'https://getspecd.dev',
   baseUrl: '/',
   customFields: {
