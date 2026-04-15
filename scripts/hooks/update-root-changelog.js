@@ -8,6 +8,17 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.resolve(__dirname, '..', '..')
 
 async function main() {
+  const rootReadmePath = path.join(ROOT, 'README.md')
+  const specdReadmePath = path.join(ROOT, 'packages', 'specd', 'README.md')
+
+  try {
+    const content = await fs.readFile(rootReadmePath, 'utf-8')
+    await fs.writeFile(specdReadmePath, content, 'utf-8')
+    console.log('[root-readme] Copied README.md to @specd/specd')
+  } catch {
+    console.log('[root-readme] No README.md found in root')
+  }
+
   const specdChangelogPath = path.join(ROOT, 'packages', 'specd', 'CHANGELOG.md')
   const rootChangelogPath = path.join(ROOT, 'CHANGELOG.md')
 
