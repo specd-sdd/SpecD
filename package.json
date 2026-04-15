@@ -20,7 +20,8 @@
     "web:test": "pnpm --filter @specd/public-web test",
     "web:typecheck": "pnpm --filter @specd/public-web typecheck",
     "prepare": "husky",
-    "release:publish": "pnpm -r --filter '!apps/**' run release:publish"
+    "release:version": "npx @changesets/cli version && node scripts/hooks/update-root-changelog.js",
+    "release:publish": "npx @changesets/cli publish"
   },
   "devDependencies": {
     "@commitlint/cli": "^19.0.0",
