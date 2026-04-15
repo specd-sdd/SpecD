@@ -74,6 +74,15 @@ workspaces:
     codeRoot: packages/skills
     ownership: owned
 
+  plugins:
+    prefix: plugins
+    specs:
+      adapter: fs
+      fs:
+        path: specs/plugins
+    codeRoot: packages/plugins
+    ownership: owned
+
   public-web:
     prefix: public-web
     specs:
