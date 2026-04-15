@@ -65,6 +65,15 @@ workspaces:
     codeRoot: packages/code-graph
     ownership: owned
 
+  skills:
+    prefix: skills
+    specs:
+      adapter: fs
+      fs:
+        path: specs/skills
+    codeRoot: packages/skills
+    ownership: owned
+
   public-web:
     prefix: public-web
     specs:
