@@ -18,7 +18,6 @@ Key differences from earlier SDD tools:
 - **Context compiled, not discovered.** At every lifecycle step, SpecD computes which specs are relevant to the current change and delivers their content as a structured, ready-to-consume block. The agent does not decide what to read — SpecD resolves it.
 - **Compliance gates.** Two structural checkpoints enforce spec adherence: one before implementation (plan vs specs) and one before archiving (code vs specs). The agent cannot advance past either gate until it demonstrably complies.
 - **Multi-workspace and coordinator repos.** A project can declare multiple spec workspaces, each pointing to a different directory or repository. A single coordinator repo can govern specs across an entire microservice architecture without coupling service repos to each other.
-- **Spec lifecycle.** Specs carry explicit status — active, superseded — and can reference what they replace. Append-only workflows like ADRs are supported natively, without overwriting existing specs.
 
 ## Current status (March 2026)
 
