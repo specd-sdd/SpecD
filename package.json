@@ -21,6 +21,7 @@
     "web:typecheck": "pnpm --filter @specd/public-web typecheck",
     "prepare": "husky",
     "release:version": "npx @changesets/cli version && node scripts/hooks/update-root-changelog.js",
+    "release:tag": "npx @changesets/cli tag",
     "release:publish": "npx @changesets/cli publish"
   },
   "devDependencies": {
