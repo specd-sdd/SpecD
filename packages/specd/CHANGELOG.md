@@ -1,5 +1,3 @@
-# Changelog
-
 # @specd/specd
 
 ## 0.0.2
