@@ -22,17 +22,12 @@ async function main() {
   const specdChangelogPath = path.join(ROOT, 'packages', 'specd', 'CHANGELOG.md')
   const rootChangelogPath = path.join(ROOT, 'CHANGELOG.md')
 
-  let content = '# Changelog\n\n'
-
   try {
-    content += await fs.readFile(specdChangelogPath, 'utf-8')
+    await fs.copyFile(specdChangelogPath, rootChangelogPath)
+    console.log('[root-changelog] Copied @specd/specd CHANGELOG.md to root')
   } catch {
     console.log('[root-changelog] No CHANGELOG.md found in @specd/specd')
-    return
   }
-
-  await fs.writeFile(rootChangelogPath, content, 'utf-8')
-  console.log('[root-changelog] Copied @specd/specd CHANGELOG.md to root')
 }
 
 main().catch((err) => {
