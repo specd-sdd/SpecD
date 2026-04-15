@@ -132,6 +132,7 @@ schemaOverrides:
                 and testing (test structure, coverage). Flag any decision that violates
                 a global constraint before proceeding.
                 Ensure proper JSDoc per default:_global/docs.
+
     workflow:
       - step: designing
         hooks:
@@ -144,6 +145,36 @@ schemaOverrides:
                 (naming, exports, ESM), testing (structure, coverage expectations),
                 and any other applicable global constraint. Flag violations before
                 transitioning to ready.
+      - step: ready
+        hooks:
+          pre:
+            - id: design-release-info
+              instruction: >-
+                Run `specd change status` to get the list of affected specs,
+                then add or modify release metadata to the design.md frontmatter:
+
+                ```yaml
+                ---
+                release:
+                  <workspace>:<spec-path>: patch  # major | minor | patch per spec
+                  <workspace>:<spec-path>: minor
+                ---
+                ```
+
+                For each affected spec, set the appropriate bump type:
+                - 'major' — breaking API changes
+                - 'minor' — new features
+                - 'patch' — fixes, refactors, chores (default)
+
+                Example for a change affecting 2 specs:
+                ```yaml
+                ---
+                release:
+                  core:core/validate-artifacts: patch
+                  cli:cli/change-validate: minor
+                ---
+                ```
+
       - step: implementing
         hooks:
           post:
@@ -165,3 +196,6 @@ schemaOverrides:
               run: 'pnpm test'
             - id: archiving-run-lint
               run: 'pnpm lint'
+          post:
+            - id: archiving-create-changeset
+              run: 'node scripts/hooks/post-archive-changeset.js {{change.archivedName}}'
