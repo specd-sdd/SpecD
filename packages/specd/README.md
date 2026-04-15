@@ -10,6 +10,7 @@ SpecD is a ground-up redesign of that workflow, built for professional teams. It
 
 Key differences from earlier SDD tools:
 
+- **Code graph built in.** SpecD indexes your codebase and specs into a queryable graph, enabling impact analysis (upstream/downstream reach), hotspot detection, and change-aware queries. Multi-language: TypeScript, Go, Python, PHP (more languages coming).
 - **Deterministic where possible.** Spec merging, validation, status resolution, and delta application are computed algorithmically — not delegated to the LLM.
 - **Schema-driven format.** The spec file format, section headers, artifact names, and dependency order are defined in a `schema.yaml` you control. SpecD does not hardcode any particular convention.
 - **Governance built in.** Optional approval gates let teams require explicit human sign-off before implementation begins or before a change is archived.
@@ -91,17 +92,17 @@ Teams with microservice architectures can manage cross-cutting specs (authentica
 
 ## Packages
 
-| Package                 | Description                                                                                      | Status      |
-| ----------------------- | ------------------------------------------------------------------------------------------------ | ----------- |
-| `@specd/core`           | Domain library: entities, value objects, use cases, ports, composition, infrastructure adapters. | Functional  |
-| `@specd/cli`            | CLI adapter around `@specd/core` with command registration and formatting/output modes.          | Functional  |
-| `@specd/code-graph`     | Code graph indexing and analysis: multi-language symbols, impact analysis, hotspots.             | Functional  |
-| `@specd/mcp`            | MCP server adapter package.                                                                      | Scaffolded  |
-| `@specd/skills`         | Skill registry API used by plugins and CLI skill commands.                                       | Redesigning |
-| `@specd/schema-std`     | Standard SpecD schema package with `schema.yaml` and template files.                             | Functional  |
-| `@specd/plugin-claude`  | Claude plugin package.                                                                           | Scaffolded  |
-| `@specd/plugin-copilot` | GitHub Copilot plugin package.                                                                   | Scaffolded  |
-| `@specd/plugin-codex`   | OpenAI Codex plugin package.                                                                     | Scaffolded  |
+| Package                 | Description                                                                                                          | Status      |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------- | ----------- |
+| `@specd/core`           | Domain library: entities, value objects, use cases, ports, composition, infrastructure adapters.                     | Functional  |
+| `@specd/cli`            | CLI adapter around `@specd/core` with command registration and formatting/output modes.                              | Functional  |
+| `@specd/code-graph`     | Code graph indexing, impact analysis, and hotspot detection for TypeScript, Go, Python, PHP (more languages coming). | Functional  |
+| `@specd/mcp`            | MCP server adapter package.                                                                                          | Scaffolded  |
+| `@specd/skills`         | Skill registry API used by plugins and CLI skill commands.                                                           | Redesigning |
+| `@specd/schema-std`     | Standard SpecD schema package with `schema.yaml` and template files.                                                 | Functional  |
+| `@specd/plugin-claude`  | Claude plugin package.                                                                                               | Scaffolded  |
+| `@specd/plugin-copilot` | GitHub Copilot plugin package.                                                                                       | Scaffolded  |
+| `@specd/plugin-codex`   | OpenAI Codex plugin package.                                                                                         | Scaffolded  |
 
 ## Getting started (workspace)
 
