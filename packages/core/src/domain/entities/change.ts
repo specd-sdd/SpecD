@@ -127,6 +127,14 @@ export interface ArtifactsSyncedEvent {
   readonly filesRemoved: ReadonlyArray<{ readonly type: string; readonly key: string }>
 }
 
+/** Appended when the change description is updated. Does NOT trigger invalidation. */
+export interface DescriptionUpdatedEvent {
+  readonly type: 'description-updated'
+  readonly at: Date
+  readonly by: ActorIdentity
+  readonly description: string
+}
+
 /** Discriminated union of all change history event types. */
 export type ChangeEvent =
   | CreatedEvent
@@ -139,6 +147,7 @@ export type ChangeEvent =
   | DiscardedEvent
   | ArtifactSkippedEvent
   | ArtifactsSyncedEvent
+  | DescriptionUpdatedEvent
 
 /**
  * Construction properties for a `Change`.
@@ -176,7 +185,7 @@ export interface ChangeProps {
 export class Change {
   private readonly _name: string
   private readonly _createdAt: Date
-  private readonly _description: string | undefined
+  private _description: string | undefined
   private _specIds: string[]
   private _history: ChangeEvent[]
   private _artifacts: Map<string, ChangeArtifact>
@@ -610,6 +619,23 @@ export class Change {
         files: [...artifact.files.keys()],
       })),
     )
+  }
+
+  /**
+   * Updates the description of this change.
+   * Does NOT trigger invalidation — only updates metadata.
+   *
+   * @param description - The new description
+   * @param actor - Identity of the actor making the change
+   */
+  updateDescription(description: string, actor: ActorIdentity): void {
+    this._description = description
+    this._history.push({
+      type: 'description-updated',
+      at: new Date(),
+      by: actor,
+      description,
+    })
   }
 
   /**

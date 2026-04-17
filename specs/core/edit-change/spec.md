@@ -13,6 +13,7 @@ As a change evolves, its spec scope often needs to grow or shrink — but modify
 - `name` (required, string) — the change slug to edit
 - `addSpecIds` (optional, string array) — spec IDs to add to the change's `specIds`
 - `removeSpecIds` (optional, string array) — spec IDs to remove from the change's `specIds`
+- `description` (optional, string) — new description for the change
 
 ### Requirement: Change lookup
 
@@ -22,7 +23,13 @@ Snapshot reads via `ChangeRepository.get(name)` MAY be used for read-only early 
 
 ### Requirement: No-op when no spec changes requested
 
-If both `addSpecIds` and `removeSpecIds` are absent or empty, the use case MUST return the unchanged change with `invalidated: false` without persisting or resolving actor identity.
+If both `addSpecIds` and `removeSpecIds` are absent or empty BUT `description` is provided, the use case MUST update the change's description and return with `invalidated: false`.
+
+If NO specification changes are requested at all (no addSpecIds, no removeSpecIds, no description), the use case MUST return the unchanged change with `invalidated: false` without persisting or resolving actor identity.
+
+### Requirement: Description update does not invalidate
+
+When the only modification requested is updating the description field (no addSpecIds or removeSpecIds), the use case MUST update `Change.description` and return with `invalidated: false`. The change remains in its current state without triggering approval invalidation.
 
 ### Requirement: Removal precedes addition
 

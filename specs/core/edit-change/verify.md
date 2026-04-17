@@ -11,17 +11,49 @@
 
 ### Requirement: No-op when no spec changes requested
 
+#### Scenario: Description provided with no spec changes
+
+- **GIVEN** a change with description "Original description"
+- **WHEN** `EditChange.execute` is called with description but no addSpecIds/removeSpecIds
+- **THEN** the change description is updated
+- **AND** `invalidated` returns `false`
+
 #### Scenario: Both add and remove are absent
 
-- **WHEN** `execute` is called with only `name` (no `addSpecIds`, no `removeSpecIds`)
-- **THEN** it returns `{ change, invalidated: false }`
-- **AND** `ChangeRepository.save` is not called
+- **GIVEN** a change exists
+- **WHEN** `EditChange.execute` is called with no addSpecIds, no removeSpecIds, no description
+- **THEN** the use case returns unchanged change
+- **AND** no mutation is performed
 
 #### Scenario: Both add and remove are empty arrays
 
-- **WHEN** `execute` is called with `addSpecIds: []` and `removeSpecIds: []`
-- **THEN** it returns `{ change, invalidated: false }`
-- **AND** `ChangeRepository.save` is not called
+- **GIVEN** a change exists
+- **WHEN** `EditChange.execute` is called with empty arrays for addSpecIds and removeSpecIds
+- **THEN** the use case returns unchanged change
+- **AND** no mutation is performed
+
+#### Scenario: Description and addSpecIds together
+
+- **GIVEN** a change with description "Original"
+- **WHEN** `EditChange.execute` is called with both addSpecIds and description
+- **THEN** both are applied atomically
+- **AND** `invalidated` is `true` because specIds changed
+
+#### Scenario: addSpecIds with no effective change
+
+- **GIVEN** a change containing the spec already
+- **WHEN** `EditChange.execute` is called adding a spec already in specIds
+- **THEN** specIds unchanged (idempotent)
+- **AND** `invalidated` is `false` because updateSpecIds was not called
+
+### Requirement: Description update does not invalidate
+
+#### Scenario: Description-only update does not invalidate
+
+- **GIVEN** a change in spec-approved state with active spec approval
+- **WHEN** `EditChange.execute` is called with only description
+- **THEN** `invalidated` returns `false`
+- **AND** the change remains in spec-approved state
 
 ### Requirement: Removal precedes addition
 

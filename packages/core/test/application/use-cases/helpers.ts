@@ -307,6 +307,13 @@ function cloneChangeEvent(event: Change['history'][number]): Change['history'][n
         filesAdded: event.filesAdded.map((file) => ({ ...file })),
         filesRemoved: event.filesRemoved.map((file) => ({ ...file })),
       }
+    case 'description-updated':
+      return {
+        type: 'description-updated',
+        at: new Date(event.at),
+        by: { ...event.by },
+        description: event.description,
+      }
   }
 }
 
