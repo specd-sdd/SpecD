@@ -15,6 +15,8 @@ export interface EditChangeInput {
   readonly addSpecIds?: string[]
   /** Spec paths to remove from `specIds`. */
   readonly removeSpecIds?: string[]
+  /** New description for the change. */
+  readonly description?: string
 }
 
 /** Result returned by the {@link EditChange} use case. */
@@ -69,55 +71,61 @@ export class EditChange {
       throw new ChangeNotFoundError(input.name)
     }
 
+    const hasDescriptionChange = input.description !== undefined
     const hasSpecChanges =
       (input.addSpecIds !== undefined && input.addSpecIds.length > 0) ||
       (input.removeSpecIds !== undefined && input.removeSpecIds.length > 0)
 
-    if (!hasSpecChanges) {
+    if (!hasDescriptionChange && !hasSpecChanges) {
       return { change, invalidated: false }
     }
 
     const actor = await this._actor.identity()
+
     const persisted = await this._changes.mutate(input.name, (freshChange) => {
-      const specIds = [...freshChange.specIds]
+      let specIdsChanged = false
+      let removedSpecIds: string[] = []
 
-      if (input.removeSpecIds !== undefined) {
-        for (const id of input.removeSpecIds) {
-          const idx = specIds.indexOf(id)
-          if (idx === -1) {
-            throw new SpecNotInChangeError(id, input.name)
-          }
-          specIds.splice(idx, 1)
-        }
-      }
+      if (hasSpecChanges) {
+        const specIds = [...freshChange.specIds]
 
-      if (input.addSpecIds !== undefined) {
-        for (const id of input.addSpecIds) {
-          if (!specIds.includes(id)) {
-            specIds.push(id)
+        if (input.removeSpecIds !== undefined) {
+          for (const id of input.removeSpecIds) {
+            const idx = specIds.indexOf(id)
+            if (idx === -1) {
+              throw new SpecNotInChangeError(id, input.name)
+            }
+            specIds.splice(idx, 1)
           }
         }
-      }
 
-      const currentSpecIds = freshChange.specIds
-      const specIdsChanged =
-        specIds.length !== currentSpecIds.length ||
-        specIds.some((id, i) => id !== currentSpecIds[i])
+        if (input.addSpecIds !== undefined) {
+          for (const id of input.addSpecIds) {
+            if (!specIds.includes(id)) {
+              specIds.push(id)
+            }
+          }
+        }
 
-      if (!specIdsChanged) {
-        return {
-          change: freshChange,
-          invalidated: false,
-          removedSpecIds: [] as string[],
+        const currentSpecIds = freshChange.specIds
+        specIdsChanged =
+          specIds.length !== currentSpecIds.length ||
+          specIds.some((id, i) => id !== currentSpecIds[i])
+
+        if (specIdsChanged) {
+          removedSpecIds = currentSpecIds.filter((id) => !specIds.includes(id))
+          freshChange.updateSpecIds(specIds, actor)
         }
       }
 
-      const removedSpecIds = currentSpecIds.filter((id) => !specIds.includes(id))
-      freshChange.updateSpecIds(specIds, actor)
-      return { change: freshChange, invalidated: true, removedSpecIds }
+      if (hasDescriptionChange) {
+        freshChange.updateDescription(input.description ?? '', actor)
+      }
+
+      return { change: freshChange, invalidated: specIdsChanged, removedSpecIds }
     })
 
-    if (persisted.removedSpecIds.length > 0) {
+    if (persisted.invalidated && persisted.removedSpecIds.length > 0) {
       await this._changes.unscaffold(persisted.change, persisted.removedSpecIds)
     }
 

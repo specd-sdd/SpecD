@@ -1233,6 +1233,13 @@ function serializeEvent(event: ChangeEvent): RawChangeEvent {
         filesAdded: event.filesAdded.map((f) => ({ type: f.type, key: f.key })),
         filesRemoved: event.filesRemoved.map((f) => ({ type: f.type, key: f.key })),
       }
+    case 'description-updated':
+      return {
+        type: 'description-updated',
+        at: event.at.toISOString(),
+        by: event.by,
+        description: event.description,
+      }
   }
 }
 
@@ -1361,6 +1368,13 @@ function deserializeEvent(raw: RawChangeEvent): ChangeEvent {
         typesRemoved: raw.typesRemoved ?? [],
         filesAdded: raw.filesAdded ?? [],
         filesRemoved: raw.filesRemoved ?? [],
+      }
+    case 'description-updated':
+      return {
+        type: 'description-updated',
+        at: new Date(raw.at),
+        by: raw.by,
+        description: raw.description,
       }
   }
 }

@@ -204,6 +204,14 @@ export interface RawArtifactSkippedEvent {
   readonly reason?: string
 }
 
+/** Raw JSON shape of a `description-updated` event. */
+export interface RawDescriptionUpdatedEvent {
+  readonly type: 'description-updated'
+  readonly at: string
+  readonly by: ManifestActorIdentity
+  readonly description: string
+}
+
 /** Discriminated union of all raw event JSON shapes. */
 export type RawChangeEvent =
   | RawCreatedEvent
@@ -216,6 +224,7 @@ export type RawChangeEvent =
   | RawDiscardedEvent
   | RawArtifactSkippedEvent
   | RawArtifactsSyncedEvent
+  | RawDescriptionUpdatedEvent
 
 // ---- Zod validation schemas ----
 
