@@ -431,7 +431,7 @@ export class FsSpecRepository extends SpecRepository {
    * @returns Absolute path to `<metadataPath>/<specFsPath>/metadata.json`
    */
   private _metadataFilePath(name: SpecPath): string {
-    return path.join(this._metadataPath, name.toFsPath(path.sep), 'metadata.json')
+    return path.join(this._metadataPath, this.workspace(), name.toFsPath(path.sep), 'metadata.json')
   }
 
   /**
