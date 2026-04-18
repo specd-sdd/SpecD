@@ -8,12 +8,16 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.resolve(__dirname, '..', '..')
 
 const WORKSPACE_PACKAGE_MAP = {
-  core: '@specd/core',
-  cli: '@specd/cli',
+  'core': '@specd/core',
+  'cli': '@specd/cli',
   'code-graph': '@specd/code-graph',
-  skills: '@specd/skills',
+  'skills': '@specd/skills',
   'schema-std': '@specd/schema-std',
-  mcp: '@specd/mcp',
+  'mcp': '@specd/mcp',
+  'plugin-manager': '@specd/plugin-manager',
+  'plugin-agent-claude': '@specd/plugin-agent-claude',
+  'plugin-agent-copilot': '@specd/plugin-agent-copilot',
+  'plugin-agent-codex': '@specd/plugin-agent-codex',
 }
 
 async function findIndexFile(archiveDir) {
@@ -76,39 +80,68 @@ async function getChangeDescription(archivePath) {
   }
 }
 
-async function getReleaseInfo(archivePath) {
-  const designPath = path.join(ROOT, '.specd', 'archive', archivePath, 'design.md')
+async function getReleaseInfoFromManifest(archivePath) {
+  const manifestPath = path.join(ROOT, '.specd', 'archive', archivePath, 'manifest.json')
+
+  try {
+    const content = await fs.readFile(manifestPath, 'utf-8')
+    const manifest = JSON.parse(content)
+    const specIds = manifest.specIds || []
+    const specBumps = new Map()
+
+    for (const specId of specIds) {
+      specBumps.set(specId, 'patch')
+    }
+
+    if (specBumps.size > 0) {
+      return { specBumps }
+    }
+  } catch {
+    // Ignore errors
+  }
+
+  return null
+}
+
+async function getReleaseInfoFromYaml(archivePath) {
+  const releaseFilePath = path.join(
+    ROOT,
+    '.specd',
+    'archive',
+    archivePath,
+    '.changeset-release.yaml',
+  )
 
   let content
   try {
-    content = await fs.readFile(designPath, 'utf-8')
+    content = await fs.readFile(releaseFilePath, 'utf-8')
   } catch {
     return null
   }
 
-  const frontmatterMatch = content.match(/^---\r?\n([\s\S]*?)\r?\n---/m)
-  if (!frontmatterMatch) {
-    return null
-  }
-
-  const yamlContent = frontmatterMatch[1]
   const specBumps = new Map()
-  let inReleaseBlock = false
+  const lines = content.split('\n')
+  let inReleasesBlock = false
 
-  for (const line of yamlContent.split('\n')) {
+  for (const line of lines) {
     const trimmed = line.trim()
-    if (trimmed === 'release:') {
-      inReleaseBlock = true
+    if (trimmed === 'releases:') {
+      inReleasesBlock = true
       continue
     }
-    if (inReleaseBlock && line.match(/^\s+\S+:/)) {
+    if (inReleasesBlock && line.match(/^\s+\S+:/)) {
       const colonIndex = line.lastIndexOf(':')
-      const key = line.slice(0, colonIndex).trim()
+      const rawKey = line.slice(0, colonIndex).trim()
+      const key =
+        (rawKey.startsWith('"') && rawKey.endsWith('"')) ||
+        (rawKey.startsWith("'") && rawKey.endsWith("'"))
+          ? rawKey.slice(1, -1)
+          : rawKey
       const value = line.slice(colonIndex + 1).trim()
       const bump = ['major', 'minor', 'patch'].includes(value) ? value : 'patch'
       specBumps.set(key, bump)
-    } else if (inReleaseBlock && line.match(/^\S/)) {
-      inReleaseBlock = false
+    } else if (inReleasesBlock && line.match(/^\S/) && trimmed !== '') {
+      inReleasesBlock = false
     }
   }
 
@@ -122,8 +155,9 @@ async function getReleaseInfo(archivePath) {
 async function analyzeChangeContent(archivePath) {
   const changeDir = path.join(ROOT, '.specd', 'archive', archivePath)
   let hasBreakingChange = false
+  let hasFeature = false
 
-  const filesToCheck = ['proposal.md', 'design.md', 'manifest.json']
+  const filesToCheck = ['proposal.md', 'design.md']
 
   for (const file of filesToCheck) {
     const filePath = path.join(changeDir, file)
@@ -133,12 +167,17 @@ async function analyzeChangeContent(archivePath) {
       if (/\bbreaking:\s*\n/i.test(content) || /^breaking:\s*true/im.test(content)) {
         hasBreakingChange = true
       }
+      if (/\bfeature:\s*\n/i.test(content) || /^feature:\s*true/im.test(content)) {
+        hasFeature = true
+      }
     } catch {
       // File doesn't exist, skip
     }
   }
 
-  return hasBreakingChange ? 'major' : 'patch'
+  if (hasBreakingChange) return 'major'
+  if (hasFeature) return 'minor'
+  return 'patch'
 }
 
 function toKebabCase(str) {
@@ -204,25 +243,28 @@ async function generateChangesets(changeInfo, bumpTypes, description) {
     // Directory may already exist
   }
 
-  const baseName = toKebabCase(name).slice(0, 100 - dateStr.length)
+  const today = new Date().toISOString().slice(0, 10).replace(/-/g, '') + '-'
+  const baseName = toKebabCase(name).slice(0, 100 - today.length)
+  const header = `${today.slice(0, -1)} - ${name}: ${description || name}`
 
   const changesetContent = [
-    description || name,
+    header,
     '',
     'Specs affected:',
     ...specIds.map((id) => `- \`${id}\``),
     '',
   ].join('\n')
 
-  const pkgChangesetPath = path.join(changesetDir, `${dateStr}${baseName}.md`)
+  const pkgChangesetPath = path.join(changesetDir, `${today}${baseName}.md`)
   await writeChangeset(pkgChangesetPath, [...packages.entries()], changesetContent)
-  console.log(`[changeset-hook] Created changeset: .changeset/${dateStr}${baseName}.md`)
+  console.log(`[changeset-hook] Created changeset: .changeset/${today}${baseName}.md`)
   console.log(
     `[changeset-hook] Packages: ${[...packages.entries()].map(([p, t]) => `${p}:${t}`).join(', ')}`,
   )
 
+  const specdHeader = `${today} - ${name}: ${description || name}`
   const specdSpecContent = [
-    description || name,
+    specdHeader,
     '',
     'Modified packages: ',
     ...[...packages.entries()].map(([pkg]) => `- ${pkg}`),
@@ -232,9 +274,9 @@ async function generateChangesets(changeInfo, bumpTypes, description) {
     '',
   ].join('\n')
 
-  const specdChangesetPath = path.join(changesetDir, `${dateStr}${baseName}-specd.md`)
+  const specdChangesetPath = path.join(changesetDir, `${today}${baseName}-specd.md`)
   await writeChangeset(specdChangesetPath, [['@specd/specd', maxBump]], specdSpecContent)
-  console.log(`[changeset-hook] Created changeset: .changeset/${dateStr}${baseName}-specd.md`)
+  console.log(`[changeset-hook] Created changeset: .changeset/${today}${baseName}-specd.md`)
   console.log(`[changeset-hook] Meta: @specd/specd:${maxBump}`)
 }
 
@@ -252,31 +294,39 @@ async function main() {
 
   const changeInfo = await getArchivedChangeInfo(changeName)
   if (!changeInfo) {
-    return
+    throw new Error(`Archived change not found in archive index: ${changeName}`)
   }
 
-  const [description, releaseInfo] = await Promise.all([
+  const [description, releaseInfo, manifestInfo] = await Promise.all([
     getChangeDescription(changeInfo.path),
-    getReleaseInfo(changeInfo.path),
+    getReleaseInfoFromYaml(changeInfo.path),
+    getReleaseInfoFromManifest(changeInfo.path),
   ])
 
   const bumpTypes = {}
   const bumpOrder = { major: 3, minor: 2, patch: 1 }
 
-  if (releaseInfo?.specBumps && releaseInfo.specBumps.size > 0) {
-    for (const [specId, bump] of releaseInfo.specBumps) {
+  let baseBumps = releaseInfo?.specBumps || manifestInfo?.specBumps || new Map()
+
+  if (baseBumps.size > 0) {
+    const inferredBump = await analyzeChangeContent(changeInfo.path)
+
+    for (const [specId, bump] of baseBumps) {
       const [workspace] = specId.split(':')
       const packageName = WORKSPACE_PACKAGE_MAP[workspace]
       if (packageName) {
-        if (!bumpTypes[packageName] || bumpOrder[bump] > bumpOrder[bumpTypes[packageName]]) {
-          bumpTypes[packageName] = bump
+        const finalBump = inferredBump === 'major' && bump !== 'major' ? inferredBump : bump
+        if (!bumpTypes[packageName] || bumpOrder[finalBump] > bumpOrder[bumpTypes[packageName]]) {
+          bumpTypes[packageName] = finalBump
         }
       }
     }
-    console.log(`[changeset-hook] Release info from design.md: ${JSON.stringify(bumpTypes)}`)
+
+    const source = releaseInfo ? '.changeset-release.yaml' : 'manifest.json'
+    console.log(`[changeset-hook] Release info from ${source}: ${JSON.stringify(bumpTypes)}`)
   } else {
     const inferredBump = await analyzeChangeContent(changeInfo.path)
-    console.log(`[changeset-hook] No release frontmatter, inferring bump: ${inferredBump}`)
+    console.log(`[changeset-hook] No release info found, inferring bump: ${inferredBump}`)
     for (const specId of changeInfo.specIds || []) {
       const [workspace] = specId.split(':')
       const packageName = WORKSPACE_PACKAGE_MAP[workspace]
@@ -291,5 +341,5 @@ async function main() {
 
 main().catch((err) => {
   console.error('[changeset-hook] Unexpected error:', err)
-  process.exit(0)
+  process.exit(1)
 })
