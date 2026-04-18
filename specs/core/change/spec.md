@@ -176,25 +176,26 @@ All events share common fields:
 
 Event types:
 
-| Type                  | Additional fields                                          | When appended                                                 |
-| --------------------- | ---------------------------------------------------------- | ------------------------------------------------------------- |
-| `created`             | `specIds`, `schemaName`, `schemaVersion`                   | Once, when the change is first created                        |
-| `transitioned`        | `from: ChangeState`, `to: ChangeState`                     | Each lifecycle state transition                              |
-| `spec-approved`       | `reason: string`, `artifactHashes: Record<string, string>` | When the spec approval gate is passed                        |
-| `signed-off`          | `reason: string`, `artifactHashes: Record<string, string>` | When the signoff gate is passed                              |
-| `invalidated`         | `cause`, `message`, `affectedArtifacts`                    | When scope or artifact review invalidates prior approvals     |
-| `drafted`             | `reason?: string`                                          | When a change is shelved to `drafts/`                         |
-| `restored`            | _(none beyond common fields)_                              | When a drafted change is moved back to `changes/`             |
-| `artifact-skipped`    | `artifactId: string`, `reason?: string`                    | When an optional artifact is explicitly marked as not produced |
-| `artifacts-synced`    | `typesAdded`, `typesRemoved`, `filesAdded`, `filesRemoved` | When artifact sync reconciles the artifact map against schema  |
+| Type                  | Additional fields                                          | When appended                                                                |
+| --------------------- | ---------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| `created`             | `specIds`, `schemaName`, `schemaVersion`                   | Once, when the change is first created                                       |
+| `transitioned`        | `from: ChangeState`, `to: ChangeState`                     | Each lifecycle state transition                                              |
+| `spec-approved`       | `reason: string`, `artifactHashes: Record<string, string>` | When the spec approval gate is passed                                        |
+| `signed-off`          | `reason: string`, `artifactHashes: Record<string, string>` | When the signoff gate is passed                                              |
+| `invalidated`         | `cause`, `message`, `affectedArtifacts`                    | When scope or artifact review invalidates prior approvals                    |
+| `drafted`             | `reason?: string`                                          | When a change is shelved to `drafts/`                                        |
+| `restored`            | _(none beyond common fields)_                              | When a drafted change is moved back to `changes/`                            |
+| `artifact-skipped`    | `artifactId: string`, `reason?: string`                    | When an optional artifact is explicitly marked as not produced               |
+| `artifacts-synced`    | `typesAdded`, `typesRemoved`, `filesAdded`, `filesRemoved` | When artifact sync reconciles the artifact map against schema                |
 | `description-updated` | `description: string`                                      | When the change description is updated via `EditChange` with `--description` |
-| `discarded`           | `reason: string`, `supersededBy?: string[]`                | When a change is permanently abandoned                        |
+| `discarded`           | `reason: string`, `supersededBy?: string[]`                | When a change is permanently abandoned                                       |
 
 `invalidated.cause` is explicit and machine-readable:
 
 - `spec-change` — the change scope changed (for example, `specIds` were edited)
 - `artifact-drift` — one or more validated artifact files changed on disk
 - `artifact-review-required` — the change returned to `designing` because the artifacts must be revised even though no drifted file was detected
+- `spec-overlap-conflict` — the change was invalidated because an archived change with overlapping specs was archived with `allowOverlap: true`
 
 `invalidated.message` is a clear human-readable explanation, not a one-word label. `invalidated.affectedArtifacts` is a structured list of the affected artifact types and file keys so callers can explain exactly what triggered the review:
 
