@@ -72,11 +72,12 @@ import { registerGraphImpact } from './commands/graph/impact.js'
 import { registerGraphSearch } from './commands/graph/search.js'
 import { registerGraphHotspots } from './commands/graph/hotspots.js'
 
-// skills
-import { registerSkillsList } from './commands/skills/list.js'
-import { registerSkillsShow } from './commands/skills/show.js'
-import { registerSkillsInstall } from './commands/skills/install.js'
-import { registerSkillsUpdate } from './commands/skills/update.js'
+// plugins
+import { registerPluginsInstall } from './commands/plugins/install.js'
+import { registerPluginsList } from './commands/plugins/list.js'
+import { registerPluginsShow } from './commands/plugins/show.js'
+import { registerPluginsUpdate } from './commands/plugins/update.js'
+import { registerPluginsUninstall } from './commands/plugins/uninstall.js'
 
 const program = new Command('specd')
   .description(
@@ -188,14 +189,15 @@ registerSchemaFork(schemaCmd)
 registerSchemaExtend(schemaCmd)
 registerSchemaValidate(schemaCmd)
 
-// ---- skills ----
-const skillsCmd = program
-  .command('skills')
-  .description('Commands for listing, installing, and updating specd agent skills.')
-registerSkillsList(skillsCmd)
-registerSkillsShow(skillsCmd)
-registerSkillsInstall(skillsCmd)
-registerSkillsUpdate(skillsCmd)
+// ---- plugins ----
+const pluginsCmd = program
+  .command('plugins')
+  .description('Commands for installing, listing, showing, updating, and uninstalling plugins.')
+registerPluginsInstall(pluginsCmd)
+registerPluginsList(pluginsCmd)
+registerPluginsShow(pluginsCmd)
+registerPluginsUpdate(pluginsCmd)
+registerPluginsUninstall(pluginsCmd)
 
 // ---- graph ----
 const graphCmd = program.command('graph').description('Code graph intelligence')

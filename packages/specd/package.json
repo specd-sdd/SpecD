@@ -13,9 +13,10 @@
     "@specd/cli": "workspace:*",
     "@specd/code-graph": "workspace:*",
     "@specd/core": "workspace:*",
-    "@specd/plugin-claude": "workspace:*",
-    "@specd/plugin-codex": "workspace:*",
-    "@specd/plugin-copilot": "workspace:*",
+    "@specd/plugin-agent-claude": "workspace:*",
+    "@specd/plugin-agent-codex": "workspace:*",
+    "@specd/plugin-agent-copilot": "workspace:*",
+    "@specd/plugin-manager": "workspace:*",
     "@specd/schema-std": "workspace:*",
     "@specd/skills": "workspace:*"
   },

@@ -9,13 +9,13 @@ Getting a specd project off the ground requires creating a config file, storage 
 ### Requirement: Command signature
 
 ```
-specd project init [--schema <ref>] [--workspace <id>] [--workspace-path <path>] [--agent <id>...] [--force] [--format text|json|toon]
+specd project init [--schema <ref>] [--workspace <id>] [--workspace-path <path>] [--plugin <name>...] [--force] [--format text|json|toon]
 ```
 
 - `--schema <ref>` — optional; the schema reference to activate (e.g. `@specd/schema-std`, `./schemas/custom/schema.yaml`). Defaults to `@specd/schema-std`.
 - `--workspace <id>` — optional; the ID of the default workspace. Defaults to `default`.
 - `--workspace-path <path>` — optional; the specs path for the default workspace, relative to the config file. Defaults to `specs/`.
-- `--agent <id>` — optional, repeatable; agents to install skills for immediately after initialisation (e.g. `--agent claude`). When not provided in interactive mode, the wizard asks.
+- `--plugin <name>` — optional, repeatable; agent plugins to install after initialisation (e.g. `--plugin @specd/plugin-agent-claude`). When not provided in interactive mode, the wizard asks.
 - `--force` — optional; overwrite an existing config without prompting.
 - `--format text|json|toon` — optional; forces non-interactive mode; defaults to `text`.
 
@@ -25,24 +25,16 @@ The command enters interactive mode when **all** of the following are true:
 
 - stdout is a TTY
 - `--format` is not `json` or `toon`
-- No configuration flags (`--schema`, `--workspace`, `--workspace-path`, `--agent`) are provided
+- No configuration flags (`--schema`, `--workspace`, `--workspace-path`, `--plugin`) are provided
 
 In interactive mode the command presents a guided wizard:
 
 1. **Welcome header** — an ASCII banner and a short description of specd, shown once at startup.
-
 2. **Project settings prompts** — prompts for each setting with its default value pre-filled:
    - Schema reference (default: `@specd/schema-std`)
    - Default workspace ID (default: `default`)
    - Specs path (default: `specs/`)
-
-3. **Agent selection** — a multi-select listing all known agents. The user selects which agents to install skills for. Selecting none is valid (skills can be installed later with `specd skills install`).
-
-4. **Confirmation summary** — shows the resolved settings and asks for confirmation before writing any files. If the user cancels, the command exits with code 0 and no files are written.
-
-5. **Progress** — a spinner is shown while `InitProject` runs and skills are installed.
-
-6. **Completion** — a success message with the project root path and next-step hints.
+3. **Plugin selection** — a multi-select listing available agent plugins. The user selects which plugins to install. Selecting none is valid (plugins can be installed later with `specd plugins install`).
 
 ### Requirement: Non-interactive mode
 
@@ -61,7 +53,7 @@ The CLI passes the resolved project root, schema reference, workspace id, worksp
 
 ### Requirement: Skills installation after init
 
-After `InitProject` succeeds, if any agents were selected (interactively or via `--agent`), the CLI installs all skills for each selected agent using the same logic as `specd skills install all --agent <id>`, and records the installations in `specd.yaml` via `RecordSkillInstall`.
+After `InitProject` succeeds, if any plugins were selected (interactively or via `--plugin`), the CLI installs each selected plugin using `specd plugins install`. Each plugin's `install()` method handles writing its skill files.
 
 ### Requirement: Already initialised
 

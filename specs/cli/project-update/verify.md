@@ -4,31 +4,23 @@
 
 ### Requirement: Skills update step
 
-#### Scenario: Recorded skills are reinstalled
+#### Scenario: Declared plugins are updated
 
-- **GIVEN** `specd.yaml` records `skills.claude: [my-skill]`
+- **GIVEN** `specd.yaml` has `plugins.agents: [{ name: '@specd/plugin-agent-claude' }]`
 - **WHEN** `specd project update` is run
-- **THEN** `.claude/commands/my-skill.md` is overwritten with the current bundle content
-- **AND** the process exits with code 0
-
-#### Scenario: Skill no longer in bundle generates warning but does not fail
-
-- **GIVEN** `specd.yaml` lists `old-skill` under `skills.claude`
-- **AND** `old-skill` is not present in the current `@specd/skills` bundle
-- **WHEN** `specd project update` is run
-- **THEN** stderr contains a warning about `old-skill`
+- **THEN** each plugin's `install()` method is called
 - **AND** the process exits with code 0
 
 ### Requirement: Output on success
 
 #### Scenario: Text output is prefixed with step name
 
-- **WHEN** `specd project update` succeeds with one skill recorded
-- **THEN** stdout contains a line starting with `skills:` followed by the updated skill info
+- **WHEN** `specd project update` succeeds with one plugin declared
+- **THEN** stdout contains a line starting with `plugins:` followed by the updated plugin info
 
 #### Scenario: Nothing to update prints up-to-date message
 
-- **GIVEN** `specd.yaml` has no `skills` section
+- **GIVEN** `specd.yaml` has no `plugins` section
 - **WHEN** `specd project update` is run
 - **THEN** stdout contains `project is up to date`
 - **AND** the process exits with code 0
@@ -36,7 +28,7 @@
 #### Scenario: JSON output groups results by step
 
 - **WHEN** `specd project update --format json` succeeds
-- **THEN** stdout is valid JSON with a `skills` array containing result objects
+- **THEN** stdout is valid JSON with a `plugins` array containing result objects
 
 ### Requirement: Partial failure
 

@@ -42,11 +42,9 @@ export {
 } from './invalidate-spec-metadata.js'
 export { createGetActiveSchema, type FsGetActiveSchemaOptions } from './get-active-schema.js'
 export { createInitProject, type FsInitProjectOptions } from './init-project.js'
-export {
-  createRecordSkillInstall,
-  type FsRecordSkillInstallOptions,
-} from './record-skill-install.js'
-export { createGetSkillsManifest, type FsGetSkillsManifestOptions } from './get-skills-manifest.js'
+export { createAddPlugin, type FsAddPluginOptions } from './add-plugin.js'
+export { createRemovePlugin, type FsRemovePluginOptions } from './remove-plugin.js'
+export { createListPlugins, type FsListPluginsOptions } from './list-plugins.js'
 export { createGetProjectContext, type FsGetProjectContextOptions } from './get-project-context.js'
 export {
   createCreateChange,

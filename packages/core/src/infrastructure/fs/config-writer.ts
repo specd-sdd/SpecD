@@ -86,16 +86,18 @@ export class FsConfigWriter implements ConfigWriter {
   }
 
   /**
-   * Records that skill names were installed for a given agent.
+   * Adds or updates a plugin declaration under `plugins.<type>`.
    *
    * @param configPath - Absolute path to the `specd.yaml` to update
-   * @param agent - The agent name (e.g. `'claude'`)
-   * @param skillNames - The skill names to record (deduplicated)
+   * @param type - Plugin type key
+   * @param name - Plugin package name
+   * @param config - Optional plugin-specific config
    */
-  async recordSkillInstall(
+  async addPlugin(
     configPath: string,
-    agent: string,
-    skillNames: readonly string[],
+    type: string,
+    name: string,
+    config?: Record<string, unknown>,
   ): Promise<void> {
     const content = await fs.readFile(configPath, 'utf8')
     let doc: Document
@@ -106,27 +108,63 @@ export class FsConfigWriter implements ConfigWriter {
     }
 
     const raw = (doc.toJSON() ?? {}) as Record<string, unknown>
-    const skills = parseSkills(raw['skills'])
-    const existing = skills[agent] ?? []
-    const merged = [...new Set([...existing, ...skillNames])]
-    skills[agent] = merged
-    doc.set('skills', skills)
+    const plugins = parsePlugins(raw['plugins'])
+    const bucket = plugins[type] ?? []
+    const existingIndex = bucket.findIndex((plugin) => plugin.name === name)
+
+    if (existingIndex >= 0) {
+      bucket[existingIndex] = config === undefined ? bucket[existingIndex]! : { name, config }
+    } else {
+      bucket.push(config === undefined ? { name } : { name, config })
+    }
+
+    plugins[type] = bucket
+    doc.set('plugins', plugins)
 
     await writeFileAtomic(configPath, doc.toString())
   }
 
   /**
-   * Reads the `skills` key from `specd.yaml`.
+   * Removes a plugin declaration from `plugins.<type>` by name.
+   *
+   * @param configPath - Absolute path to the `specd.yaml` to update
+   * @param type - Plugin type key
+   * @param name - Plugin package name
+   */
+  async removePlugin(configPath: string, type: string, name: string): Promise<void> {
+    const content = await fs.readFile(configPath, 'utf8')
+    let doc: Document
+    try {
+      doc = parseDocument(content)
+    } catch (err) {
+      throw new ConfigValidationError(configPath, `invalid YAML: ${(err as Error).message}`)
+    }
+
+    const raw = (doc.toJSON() ?? {}) as Record<string, unknown>
+    const plugins = parsePlugins(raw['plugins'])
+    const bucket = plugins[type] ?? []
+    plugins[type] = bucket.filter((plugin) => plugin.name !== name)
+    doc.set('plugins', plugins)
+
+    await writeFileAtomic(configPath, doc.toString())
+  }
+
+  /**
+   * Lists plugin declarations from `plugins`, optionally filtered by type.
    *
    * @param configPath - Absolute path to the `specd.yaml` to read
-   * @returns A map of agent name → list of installed skill names
+   * @param type - Optional plugin type filter
+   * @returns Plugin declarations.
    */
-  async readSkillsManifest(configPath: string): Promise<Record<string, string[]>> {
+  async listPlugins(
+    configPath: string,
+    type?: string,
+  ): Promise<Array<{ name: string; config?: Record<string, unknown> }>> {
     let content: string
     try {
       content = await fs.readFile(configPath, 'utf8')
     } catch (err) {
-      if (isEnoent(err)) return {}
+      if (isEnoent(err)) return []
       throw err
     }
 
@@ -134,27 +172,64 @@ export class FsConfigWriter implements ConfigWriter {
     try {
       doc = parseDocument(content)
     } catch {
-      return {}
+      return []
     }
+
     const raw = (doc.toJSON() ?? {}) as Record<string, unknown>
-    return parseSkills(raw['skills'])
+    const plugins = parsePlugins(raw['plugins'])
+    if (type !== undefined) {
+      return plugins[type] ?? []
+    }
+    return Object.values(plugins).flat()
   }
 }
 
-// ---- Skills YAML validation ----
-
-/** Validates the `skills` key from `specd.yaml` — a record of agent → skill name list. */
-const skillsSchema = z.record(z.array(z.string()))
+// ---- Plugins YAML validation ----
 
 /**
- * Parses a raw `skills` value from a YAML document, returning `{}` if invalid.
+ * Single plugin declaration in `plugins.<type>`.
+ */
+const pluginSchema = z.object({
+  name: z.string(),
+  config: z.record(z.unknown()).optional(),
+})
+
+/**
+ * Validates the `plugins` key from `specd.yaml`.
+ */
+const pluginsSchema = z.record(z.array(pluginSchema))
+
+/**
+ * Normalized plugin entry persisted under `plugins.<type>`.
+ */
+interface PluginEntry {
+  /** Plugin package name. */
+  readonly name: string
+  /** Optional plugin configuration payload. */
+  readonly config?: Record<string, unknown>
+}
+
+/**
+ * Parses a raw `plugins` value from a YAML document, returning `{}` if invalid.
  *
  * @param raw - The raw value from the YAML document
- * @returns A valid skills record, or `{}` on validation failure
+ * @returns A valid plugins record, or `{}` on validation failure
  */
-function parseSkills(raw: unknown): Record<string, string[]> {
-  const result = skillsSchema.safeParse(raw)
-  return result.success ? result.data : {}
+function parsePlugins(raw: unknown): Record<string, PluginEntry[]> {
+  const result = pluginsSchema.safeParse(raw)
+  if (!result.success) {
+    return {}
+  }
+  return Object.fromEntries(
+    Object.entries(result.data).map(([type, entries]) => [
+      type,
+      entries.map((entry) =>
+        entry.config === undefined
+          ? { name: entry.name }
+          : { name: entry.name, config: entry.config },
+      ),
+    ]),
+  )
 }
 
 // ---- Helpers ----

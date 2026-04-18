@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/unbound-method */
-
 /**
  * Tests for config show, schema show, and project commands.
  */
@@ -7,7 +5,6 @@ import { describe, it, expect, vi, afterEach } from 'vitest'
 import {
   makeMockConfig,
   makeMockKernel,
-  makeMockSkill,
   makeProgram,
   mockProcessExit,
   captureStdout,
@@ -19,9 +16,6 @@ vi.mock('../../src/load-config.js', () => ({
   resolveConfigPath: vi.fn().mockResolvedValue(null),
 }))
 vi.mock('../../src/kernel.js', () => ({ createCliKernel: vi.fn() }))
-vi.mock('@specd/skills', () => ({
-  getSkill: vi.fn(),
-}))
 vi.mock('node:fs/promises', () => ({
   mkdir: vi.fn().mockResolvedValue(undefined),
   writeFile: vi.fn().mockResolvedValue(undefined),
@@ -29,11 +23,9 @@ vi.mock('node:fs/promises', () => ({
 
 import { loadConfig } from '../../src/load-config.js'
 import { createCliKernel } from '../../src/kernel.js'
-import { getSkill } from '@specd/skills'
 import { registerConfigShow } from '../../src/commands/config/show.js'
 import { registerSchemaShow } from '../../src/commands/schema/show.js'
 import { registerProjectContext } from '../../src/commands/project/context.js'
-import { registerProjectUpdate } from '../../src/commands/project/update.js'
 
 function setup() {
   const config = makeMockConfig()
@@ -569,61 +561,5 @@ describe('project context', () => {
     expect(parsed.specs[0].workspace).toBe('default')
     expect(parsed.specs[0].path).toBe('arch/overview')
     expect(Array.isArray(parsed.warnings)).toBe(true)
-  })
-})
-
-// ---------------------------------------------------------------------------
-// project update
-// ---------------------------------------------------------------------------
-
-describe('project update', () => {
-  it('prints "project is up to date" when no skills manifest', async () => {
-    const { kernel, stdout } = setup()
-    kernel.project.getSkillsManifest.execute.mockResolvedValue(null)
-
-    const program = makeProgram()
-    registerProjectUpdate(program.command('project'))
-    await program.parseAsync(['node', 'specd', 'project', 'update'])
-
-    expect(stdout()).toContain('project is up to date')
-  })
-
-  it('outputs JSON with empty skills array when no manifest', async () => {
-    const { kernel, stdout } = setup()
-    kernel.project.getSkillsManifest.execute.mockResolvedValue(null)
-
-    const program = makeProgram()
-    registerProjectUpdate(program.command('project'))
-    await program.parseAsync(['node', 'specd', 'project', 'update', '--format', 'json'])
-
-    const parsed = JSON.parse(stdout())
-    expect(parsed.skills).toEqual([])
-  })
-
-  it('prints "project is up to date" when manifest has no skills for known agents', async () => {
-    const { kernel, stdout } = setup()
-    kernel.project.getSkillsManifest.execute.mockResolvedValue({})
-
-    const program = makeProgram()
-    registerProjectUpdate(program.command('project'))
-    await program.parseAsync(['node', 'specd', 'project', 'update'])
-
-    expect(stdout()).toContain('project is up to date')
-  })
-
-  it('reinstalls recorded skills and lists them in text output', async () => {
-    const { kernel, stdout } = setup()
-    kernel.project.getSkillsManifest.execute.mockResolvedValue({
-      claude: ['my-skill'],
-    })
-    vi.mocked(getSkill).mockReturnValue(makeMockSkill({ content: '# My Skill' }))
-
-    const program = makeProgram()
-    registerProjectUpdate(program.command('project'))
-    await program.parseAsync(['node', 'specd', 'project', 'update'])
-
-    const out = stdout()
-    expect(out).toContain('skills:')
-    expect(out).toContain('my-skill')
   })
 })

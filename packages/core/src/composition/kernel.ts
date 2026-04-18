@@ -24,8 +24,9 @@ import { InvalidateSpecMetadata } from '../application/use-cases/invalidate-spec
 import { GetActiveSchema } from '../application/use-cases/get-active-schema.js'
 import { ResolveSchema } from '../application/use-cases/resolve-schema.js'
 import { InitProject } from '../application/use-cases/init-project.js'
-import { RecordSkillInstall } from '../application/use-cases/record-skill-install.js'
-import { GetSkillsManifest } from '../application/use-cases/get-skills-manifest.js'
+import { AddPlugin } from '../application/use-cases/add-plugin.js'
+import { RemovePlugin } from '../application/use-cases/remove-plugin.js'
+import { ListPlugins } from '../application/use-cases/list-plugins.js'
 import { GetProjectContext } from '../application/use-cases/get-project-context.js'
 import { ValidateSpecs } from '../application/use-cases/validate-specs.js'
 import { GetSpecContext } from '../application/use-cases/get-spec-context.js'
@@ -142,10 +143,12 @@ export interface Kernel {
   project: {
     /** Initialises a new specd project. */
     init: InitProject
-    /** Records that a skill set was installed for an agent. */
-    recordSkillInstall: RecordSkillInstall
-    /** Reads the installed skills manifest from `specd.yaml`. */
-    getSkillsManifest: GetSkillsManifest
+    /** Adds or updates one plugin declaration in `specd.yaml`. */
+    addPlugin: AddPlugin
+    /** Removes one plugin declaration from `specd.yaml`. */
+    removePlugin: RemovePlugin
+    /** Lists declared plugins from `specd.yaml`. */
+    listPlugins: ListPlugins
     /** Compiles the project-level context block without a specific change or step. */
     getProjectContext: GetProjectContext
   }
@@ -301,8 +304,9 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
     },
     project: {
       init: new InitProject(i.configWriter),
-      recordSkillInstall: new RecordSkillInstall(i.configWriter),
-      getSkillsManifest: new GetSkillsManifest(i.configWriter),
+      addPlugin: new AddPlugin(i.configWriter),
+      removePlugin: new RemovePlugin(i.configWriter),
+      listPlugins: new ListPlugins(i.configWriter),
       getProjectContext: new GetProjectContext(
         i.specs,
         schemaProvider,

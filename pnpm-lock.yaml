@@ -23,6 +23,9 @@ importers:
       '@commitlint/types':
         specifier: ^19.8.1
         version: 19.8.1
+      '@specd/plugin-agent-claude':
+        specifier: workspace:^
+        version: link:packages/plugin-agent-claude
       '@types/node':
         specifier: ^22.19.17
         version: 22.19.17
@@ -138,21 +141,21 @@ importers:
       '@specd/core':
         specifier: workspace:*
         version: link:../core
-      '@specd/plugin-claude':
+      '@specd/plugin-agent-claude':
         specifier: workspace:*
-        version: link:../plugins/claude
-      '@specd/plugin-codex':
+        version: link:../plugin-agent-claude
+      '@specd/plugin-agent-codex':
         specifier: workspace:*
-        version: link:../plugins/codex
-      '@specd/plugin-copilot':
+        version: link:../plugin-agent-codex
+      '@specd/plugin-agent-copilot':
         specifier: workspace:*
-        version: link:../plugins/copilot
+        version: link:../plugin-agent-copilot
+      '@specd/plugin-manager':
+        specifier: workspace:*
+        version: link:../plugin-manager
       '@specd/schema-std':
         specifier: workspace:*
         version: link:../schema-std
-      '@specd/skills':
-        specifier: workspace:*
-        version: link:../skills
       '@toon-format/toon':
         specifier: ^2.1.0
         version: 2.1.0
@@ -237,32 +240,48 @@ importers:
         specifier: workspace:*
         version: link:../core
 
-  packages/plugins/claude:
+  packages/plugin-agent-claude:
     dependencies:
-      '@specd/core':
+      '@specd/plugin-manager':
         specifier: workspace:*
-        version: link:../../core
+        version: link:../plugin-manager
       '@specd/skills':
         specifier: workspace:*
-        version: link:../../skills
+        version: link:../skills
 
-  packages/plugins/codex:
+  packages/plugin-agent-codex:
     dependencies:
-      '@specd/core':
+      '@specd/plugin-manager':
         specifier: workspace:*
-        version: link:../../core
+        version: link:../plugin-manager
       '@specd/skills':
         specifier: workspace:*
-        version: link:../../skills
+        version: link:../skills
 
-  packages/plugins/copilot:
+  packages/plugin-agent-copilot:
+    dependencies:
+      '@specd/plugin-manager':
+        specifier: workspace:*
+        version: link:../plugin-manager
+      '@specd/skills':
+        specifier: workspace:*
+        version: link:../skills
+
+  packages/plugin-manager:
     dependencies:
       '@specd/core':
         specifier: workspace:*
-        version: link:../../core
-      '@specd/skills':
-        specifier: workspace:*
-        version: link:../../skills
+        version: link:../core
+      zod:
+        specifier: ^3.25.76
+        version: 3.25.76
+    devDependencies:
+      typescript:
+        specifier: ^5.0.0
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.12)(@types/node@25.6.0)(jiti@2.6.1)(jsdom@26.1.0)(terser@5.46.1)(yaml@2.8.3)
 
   packages/schema-std: {}
 
@@ -283,15 +302,18 @@ importers:
       '@specd/core':
         specifier: workspace:*
         version: link:../core
-      '@specd/plugin-claude':
+      '@specd/plugin-agent-claude':
         specifier: workspace:*
-        version: link:../plugins/claude
-      '@specd/plugin-codex':
+        version: link:../plugin-agent-claude
+      '@specd/plugin-agent-codex':
         specifier: workspace:*
-        version: link:../plugins/codex
-      '@specd/plugin-copilot':
+        version: link:../plugin-agent-codex
+      '@specd/plugin-agent-copilot':
         specifier: workspace:*
-        version: link:../plugins/copilot
+        version: link:../plugin-agent-copilot
+      '@specd/plugin-manager':
+        specifier: workspace:*
+        version: link:../plugin-manager
       '@specd/schema-std':
         specifier: workspace:*
         version: link:../schema-std

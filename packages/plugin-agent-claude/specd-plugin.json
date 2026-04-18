@@ -1,0 +1,7 @@
+{
+  "schemaVersion": 1,
+  "name": "@specd/plugin-agent-claude",
+  "description": "Claude agent plugin for specd skills installation",
+  "pluginType": "agent",
+  "minCoreVersion": "*"
+}

@@ -296,10 +296,25 @@
 
 ### Requirement: Plugin declarations
 
-#### Scenario: Plugin installed
+#### Scenario: Plugins section with agents array
 
-- **WHEN** `plugins: [{ name: "@specd/plugin-claude" }]` is declared
-- **THEN** `specd update` ensures the plugin's skill files and hook configuration are up to date
+- **WHEN** `specd.yaml` has a `plugins` section
+- **THEN** it contains an `agents` array
+
+#### Scenario: Agent plugin entry
+
+- **GIVEN** `plugins.agents` has an entry
+- **THEN** each entry has `name` (required) and optional `config`
+
+#### Scenario: ConfigWriter.addPlugin adds to array
+
+- **WHEN** `ConfigWriter.addPlugin(configPath, 'agents', '@specd/plugin-agent-claude')` is called
+- **THEN** the plugin is added to `plugins.agents` array
+
+#### Scenario: ConfigWriter.removePlugin removes from array
+
+- **WHEN** `ConfigWriter.removePlugin(configPath, 'agents', '@specd/plugin-agent-claude')` is called
+- **THEN** the plugin is removed from the array
 
 ### Requirement: Context spec selection
 

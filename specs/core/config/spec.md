@@ -461,17 +461,22 @@ Keys are agent IDs (e.g. `claude`); values are arrays of skill names. The sectio
 
 ### Requirement: Plugin declarations
 
-`specd.yaml` may include a `plugins` section declaring which agent-integration plugins are installed. Each entry must include `name`; `options` is plugin-specific and optional.
+`specd.yaml` MUST include a `plugins` section declaring installed plugins, grouped by type. Each entry MUST include `name`; `config` is plugin-specific and optional.
 
 ```yaml
 plugins:
-  - name: '@specd/plugin-claude'
-  - name: '@specd/plugin-copilot'
-    options:
-      commandsDir: .github/copilot/instructions
+  agents:
+    - name: '@specd/plugin-agent-claude'
+    - name: '@specd/plugin-agent-copilot'
+      config:
+        commandsDir: .github/copilot/instructions
 ```
 
-Plugin declarations are used by `specd project init`, `specd plugin add`, and `specd project update` to install and maintain the plugin's skill files and hooks in the project. They do not affect schema resolution, storage, or context compilation.
+- `plugins.agents` is an array of plugin declarations
+- Each entry has `name` (required) and optional `config` (plugin-specific)
+- ConfigWriter.addPlugin() adds to this array
+- ConfigWriter.removePlugin() removes by name
+- ConfigWriter.listPlugins() returns this array
 
 ### Requirement: Config writer port
 
@@ -479,21 +484,14 @@ Plugin declarations are used by `specd project init`, `specd plugin add`, and `s
 
 The port defines the following operations:
 
-- **`initProject(options)`** — writes a new `specd.yaml` at the given path with the provided schema reference, workspace id, and workspace specs path. Fails if the file already exists and `force` is false. Also creates the standard storage directories (`changes/`, `drafts/`, `discarded/`, `archive/`), appends `specd.local.yaml` to `.gitignore`, and creates a `.gitignore` inside the archive directory to exclude `index.jsonl`.
-- **`recordSkillInstall(configPath, agent, skillNames)`** — adds the given skill names to `specd.yaml`'s `skills.<agent>` array, deduplicating existing entries.
-- **`readSkillsManifest(configPath)`** — returns the `skills` section of `specd.yaml` as a typed map `{ [agent: string]: string[] }`. This is a targeted read that does not require a fully validated `SpecdConfig`.
+- **`initProject(options)`** — writes a new `specd.yaml` at the given path with the provided schema reference, workspace id, and workspace specs path.
+- **`addPlugin(configPath, type, name)`** — adds a plugin to `plugins.<type>` array.
+- **`removePlugin(configPath, type, name)`** — removes a plugin from `plugins.<type>` array by name.
+- **`listPlugins(configPath, type?)`** — returns declared plugins, optionally filtered by type.
 
-The `FsConfigWriter` adapter implements this port using the filesystem. It reads the existing YAML (when required), makes the targeted mutation, and writes the file back, preserving comments and key order as much as the YAML library permits.
+The `FsConfigWriter` adapter implements this port.
 
-**Responsibility boundary:** `@specd/core` owns all YAML serialisation and deserialisation. Adapters (CLI, MCP) call use cases with typed inputs and receive typed outputs — they never read or write `specd.yaml` directly. Conversely, `@specd/core` never writes agent-specific files (e.g. `.claude/commands/*.md`) — those are adapter-layer concerns. This boundary is intentional: `@specd/skills` depends on `@specd/core`, not the other way around, so core cannot resolve skill content.
-
-Use cases that call `ConfigWriter`:
-
-| Use case             | Operation            |
-| -------------------- | -------------------- |
-| `InitProject`        | `initProject`        |
-| `RecordSkillInstall` | `recordSkillInstall` |
-| `GetSkillsManifest`  | `readSkillsManifest` |
+See [`core:core/config-writer-port`](../config-writer-port/spec.md) for full method specifications.
 
 ### Requirement: Startup validation
 

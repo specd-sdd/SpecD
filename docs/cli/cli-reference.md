@@ -1,6 +1,6 @@
 # CLI Reference
 
-The `specd` CLI is the primary interface for managing the spec-driven development workflow. It provides commands for creating and progressing changes, browsing specs, inspecting configuration and schemas, and managing agent skills.
+The `specd` CLI is the primary interface for managing the spec-driven development workflow. It provides commands for creating and progressing changes, browsing specs, inspecting configuration and schemas, and managing plugins.
 
 ## Invocation
 

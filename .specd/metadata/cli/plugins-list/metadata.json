@@ -1,0 +1,69 @@
+{
+  "title": "cli:cli/plugins-list",
+  "description": "Defines the CLI contract for listing installed plugins. The command reads the plugin configuration and reports on each declared plugin's status.",
+  "dependsOn": ["plugin-manager:load-plugin-use-case", "core:core/config-writer-port"],
+  "context": [
+    "Defines the CLI contract for listing installed plugins. The command reads the plugin configuration and reports on each declared plugin's status."
+  ],
+  "rules": [
+    {
+      "requirement": "Command signature",
+      "rules": [
+        "The command MUST accept an optional `--type` flag to filter by plugin type:\n\n```bash\nspecd plugins list [--type <type>]\n```"
+      ]
+    },
+    {
+      "requirement": "Plugin status detection",
+      "rules": [
+        "For each plugin declared in `specd.yaml`:\n\n- **installed**: The plugin is in config and can be loaded via `LoadPlugin`.\n- **not\\_found**: The plugin is in config but the npm package is not installed.\n- **error**: The plugin is in config but fails to load (show error message)."
+      ]
+    },
+    {
+      "requirement": "Output format",
+      "rules": [
+        "The command MUST output:\n\n- Plugin name\n- Plugin type (from the type key in config)\n- Version (if available from the npm package)\n- Status (`installed`, `not_found`, or `error`)\n\nThe format MUST be machine-parseable when invoked with `--format json`."
+      ]
+    }
+  ],
+  "constraints": ["The command MUST NOT modify any state."],
+  "scenarios": [
+    {
+      "requirement": "Command signature",
+      "name": "List all plugins",
+      "when": ["specd plugins list is invoked"],
+      "then": ["all declared plugins are listed"]
+    },
+    {
+      "requirement": "Command signature",
+      "name": "Filter by type",
+      "when": ["specd plugins list --type agents is invoked"],
+      "then": ["only plugins of type \"agents\" are listed"]
+    },
+    {
+      "requirement": "Plugin status detection",
+      "name": "Plugin installed and loadable",
+      "given": ["a plugin is in config and the npm package is installed"],
+      "when": ["specd plugins list is invoked"],
+      "then": ["status shows \"installed\""]
+    },
+    {
+      "requirement": "Plugin status detection",
+      "name": "Plugin not found",
+      "given": ["a plugin is in config but npm package is not installed"],
+      "when": ["specd plugins list is invoked"],
+      "then": ["status shows \"not_found\""]
+    },
+    {
+      "requirement": "Plugin status detection",
+      "name": "Plugin load error",
+      "given": ["a plugin is in config but fails to load"],
+      "when": ["specd plugins list is invoked"],
+      "then": ["status shows \"error\" with error message"]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:3349b567450e167896a29009fe040ec0213c73e7072b6cacf30642b906188f74",
+    "verify.md": "sha256:c7e7f5f7a4c27c2e9733db5a3ff1c52b124fab916515fcab312200e8d56b3f08"
+  },
+  "generatedBy": "core"
+}

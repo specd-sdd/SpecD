@@ -1,6 +1,7 @@
 {
   "title": "Change Spec Preview",
   "description": "Humans reviewing a change need to see how a spec will look after its deltas are applied, without mentally reconstructing the merge or waiting until archive. The `specd change spec-preview` command renders the merged spec content (or a colorized unified diff) by delegating to the `PreviewSpec` use case, keeping the CLI as a thin adapter.",
+  "dependsOn": ["core:core/preview-spec"],
   "context": [
     "Humans reviewing a change need to see how a spec will look after its deltas are applied, without mentally reconstructing the merge or waiting until archive. The `specd change spec-preview` command renders the merged spec content (or a colorized unified diff) by delegating to the `PreviewSpec` use case, keeping the CLI as a thin adapter."
   ],
@@ -145,6 +146,5 @@
     "spec.md": "sha256:957a33dda1a16be9b8e46aa195de86504b1ac469390a43b20b78e5ec4030b8d6",
     "verify.md": "sha256:63051a317532ec3b6de66bd68ec50a12ba355567534aa3221e012f771abfd917"
   },
-  "generatedBy": "core",
-  "dependsOn": ["core:core/preview-spec"]
+  "generatedBy": "core"
 }

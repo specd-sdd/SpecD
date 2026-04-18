@@ -16,24 +16,18 @@ specd project update [--format text|json|toon]
 
 ### Requirement: Skills update step
 
-The command runs the skills update logic for all agents recorded in `specd.yaml`'s `skills` section (equivalent to `specd skills update` with no `--agent` filter). All behaviour defined in the `skills update` spec applies: missing-skill warnings, no-skills output, idempotent overwrites.
+The command runs the plugin update logic for all plugins declared in `specd.yaml`'s `plugins` section (equivalent to `specd plugins update` with no plugin filter). The update is idempotent.
 
 ### Requirement: Output on success
 
 In `text` mode, the command prefixes each sub-step's output with a step label:
 
 ```
-skills: updated my-skill → /path/to/.claude/commands/my-skill.md
-skills: updated my-other-skill → /path/to/.claude/commands/my-other-skill.md
+plugins: updated @specd/plugin-agent-claude
+plugins: updated @specd/plugin-agent-copilot
 ```
 
-If there is nothing to update (no skills recorded, all steps are no-ops), the command prints `project is up to date` and exits with code 0.
-
-In `json` or `toon` mode, the output is an object grouping results by step:
-
-```json
-{ "skills": [{ "name": "...", "path": "...", "status": "updated|skipped", "warning": "..." }] }
-```
+If there is nothing to update (no plugins declared, all steps are no-ops), the command prints `project is up to date` and exits with code 0.
 
 ### Requirement: Partial failure
 

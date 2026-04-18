@@ -8,7 +8,7 @@ Project initialisation and skill installation must create and mutate `specd.yaml
 
 ### Requirement: Interface shape
 
-The port MUST be declared as a TypeScript `interface` named `ConfigWriter` with three methods: `initProject`, `recordSkillInstall`, and `readSkillsManifest`. It SHALL NOT be an abstract class.
+The port MUST be declared as a TypeScript `interface` named `ConfigWriter` with four methods: `initProject`, `addPlugin`, `removePlugin`, and `listPlugins`. It SHALL NOT be an abstract class.
 
 ### Requirement: InitProject method signature
 
@@ -48,42 +48,22 @@ The `initProject` method MUST:
 
 When `specd.yaml` already exists in `projectRoot` and `force` is not `true`, the method MUST throw an `AlreadyInitialisedError`. When `force` is `true`, the existing file MUST be overwritten without error.
 
-### Requirement: RecordSkillInstall method signature
+### Requirement: AddPlugin
 
-The `recordSkillInstall` method MUST accept three parameters:
+The `addPlugin` method MUST accept three parameters:
 
 1. `configPath: string` — absolute path to the `specd.yaml` to update
-2. `agent: string` — the agent name (e.g. `"claude"`)
-3. `skillNames: readonly string[]` — the skill names to record
+2. `type: string` — the plugin type (e.g. `"agents"`)
+3. `name: string` — the plugin package name (e.g. `"@specd/plugin-agent-claude"`)
 
-It MUST return `Promise<void>`.
-
-### Requirement: RecordSkillInstall behaviour
-
-The method MUST merge the provided skill names into the `skills` key of `specd.yaml` for the given agent. Duplicate skill names MUST be deduplicated. Existing skills for other agents MUST NOT be affected.
-
-### Requirement: ReadSkillsManifest method signature
-
-The `readSkillsManifest` method MUST accept a single parameter:
-
-1. `configPath: string` — absolute path to the `specd.yaml` to read
-
-It MUST return `Promise<Record<string, string[]>>` — a map of agent name to list of installed skill names.
-
-### Requirement: ReadSkillsManifest missing file handling
-
-When the config file does not exist, the method MUST return `{}` (an empty record). It SHALL NOT throw for a missing file.
-
-### Requirement: ReadSkillsManifest invalid YAML handling
-
-When the config file contains invalid YAML or the `skills` key does not match the expected `Record<string, string[]>` shape, the method MUST return `{}` rather than throwing.
+It MUST return `Promise<void>`. The method MUST add the plugin to the `plugins.<type>` array in `specd.yaml`. If the plugin is already present, the method MUST NOT duplicate it.
 
 ## Constraints
 
 - The port lives in `application/ports/` per the hexagonal architecture rule
 - No direct dependency on `node:fs`, the `yaml` package, or any I/O at the port level
 - `AlreadyInitialisedError` is an application-layer error
-- The `skills` key in `specd.yaml` follows the schema `Record<string, string[]>`
+- The `plugins` key in `specd.yaml` follows the schema `plugins: { agents: Array<{ name: string, config?: Record<string, unknown> }> }`
 
 ## Spec Dependencies
 

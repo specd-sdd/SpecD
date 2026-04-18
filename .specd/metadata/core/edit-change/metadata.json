@@ -1,6 +1,7 @@
 {
   "title": "EditChange",
   "description": "As a change evolves, its spec scope often needs to grow or shrink — but modifying the spec list has approval implications that must be enforced consistently. The `EditChange` use case adds or removes spec IDs on an existing change, derives workspaces from the resulting `specIds` via the `Change.workspaces` getter, and triggers approval invalidation whenever the spec list effectively changes.",
+  "dependsOn": ["core:core/change", "core:core/composition"],
   "context": [
     "As a change evolves, its spec scope often needs to grow or shrink — but modifying the spec list has approval implications that must be enforced consistently. The `EditChange` use case adds or removes spec IDs on an existing change, derives workspaces from the resulting `specIds` via the `Change.workspaces` getter, and triggers approval invalidation whenever the spec list effectively changes."
   ],
@@ -88,78 +89,42 @@
     {
       "requirement": "Change lookup",
       "name": "Change does not exist",
-      "when": [
-        "execute is called with a name that does not exist in the repository"
-      ],
-      "then": [
-        "it throws ChangeNotFoundError"
-      ]
+      "when": ["execute is called with a name that does not exist in the repository"],
+      "then": ["it throws ChangeNotFoundError"]
     },
     {
       "requirement": "No-op when no spec changes requested",
       "name": "Description provided with no spec changes",
-      "given": [
-        "a change with description \"Original description\""
-      ],
-      "when": [
-        "EditChange.execute is called with description but no addSpecIds/removeSpecIds"
-      ],
-      "then": [
-        "the change description is updated",
-        "AND invalidated returns false"
-      ]
+      "given": ["a change with description \"Original description\""],
+      "when": ["EditChange.execute is called with description but no addSpecIds/removeSpecIds"],
+      "then": ["the change description is updated", "AND invalidated returns false"]
     },
     {
       "requirement": "No-op when no spec changes requested",
       "name": "Both add and remove are absent",
-      "given": [
-        "a change exists"
-      ],
-      "when": [
-        "EditChange.execute is called with no addSpecIds, no removeSpecIds, no description"
-      ],
-      "then": [
-        "the use case returns unchanged change",
-        "AND no mutation is performed"
-      ]
+      "given": ["a change exists"],
+      "when": ["EditChange.execute is called with no addSpecIds, no removeSpecIds, no description"],
+      "then": ["the use case returns unchanged change", "AND no mutation is performed"]
     },
     {
       "requirement": "No-op when no spec changes requested",
       "name": "Both add and remove are empty arrays",
-      "given": [
-        "a change exists"
-      ],
-      "when": [
-        "EditChange.execute is called with empty arrays for addSpecIds and removeSpecIds"
-      ],
-      "then": [
-        "the use case returns unchanged change",
-        "AND no mutation is performed"
-      ]
+      "given": ["a change exists"],
+      "when": ["EditChange.execute is called with empty arrays for addSpecIds and removeSpecIds"],
+      "then": ["the use case returns unchanged change", "AND no mutation is performed"]
     },
     {
       "requirement": "No-op when no spec changes requested",
       "name": "Description and addSpecIds together",
-      "given": [
-        "a change with description \"Original\""
-      ],
-      "when": [
-        "EditChange.execute is called with both addSpecIds and description"
-      ],
-      "then": [
-        "both are applied atomically",
-        "AND invalidated is true because specIds changed"
-      ]
+      "given": ["a change with description \"Original\""],
+      "when": ["EditChange.execute is called with both addSpecIds and description"],
+      "then": ["both are applied atomically", "AND invalidated is true because specIds changed"]
     },
     {
       "requirement": "No-op when no spec changes requested",
       "name": "addSpecIds with no effective change",
-      "given": [
-        "a change containing the spec already"
-      ],
-      "when": [
-        "EditChange.execute is called adding a spec already in specIds"
-      ],
+      "given": ["a change containing the spec already"],
+      "when": ["EditChange.execute is called adding a spec already in specIds"],
       "then": [
         "specIds unchanged (idempotent)",
         "AND invalidated is false because updateSpecIds was not called"
@@ -168,23 +133,14 @@
     {
       "requirement": "Description update does not invalidate",
       "name": "Description-only update does not invalidate",
-      "given": [
-        "a change in spec-approved state with active spec approval"
-      ],
-      "when": [
-        "EditChange.execute is called with only description"
-      ],
-      "then": [
-        "invalidated returns false",
-        "AND the change remains in spec-approved state"
-      ]
+      "given": ["a change in spec-approved state with active spec approval"],
+      "when": ["EditChange.execute is called with only description"],
+      "then": ["invalidated returns false", "AND the change remains in spec-approved state"]
     },
     {
       "requirement": "Removal precedes addition",
       "name": "Remove and add in same call",
-      "given": [
-        "a change with specIds: ['auth/login', 'billing/invoices']"
-      ],
+      "given": ["a change with specIds: ['auth/login', 'billing/invoices']"],
       "when": [
         "execute is called with removeSpecIds: ['auth/login'] and addSpecIds: ['auth/signup']"
       ],
@@ -196,36 +152,21 @@
     {
       "requirement": "Removal of absent spec throws",
       "name": "Removing a spec not in the change",
-      "given": [
-        "a change with specIds: ['auth/login']"
-      ],
-      "when": [
-        "execute is called with removeSpecIds: ['billing/invoices']"
-      ],
-      "then": [
-        "it throws SpecNotInChangeError"
-      ]
+      "given": ["a change with specIds: ['auth/login']"],
+      "when": ["execute is called with removeSpecIds: ['billing/invoices']"],
+      "then": ["it throws SpecNotInChangeError"]
     },
     {
       "requirement": "Addition is idempotent",
       "name": "Adding a spec already present",
-      "given": [
-        "a change with specIds: ['auth/login']"
-      ],
-      "when": [
-        "execute is called with addSpecIds: ['auth/login']"
-      ],
-      "then": [
-        "specIds remains ['auth/login']",
-        "AND invalidated is false"
-      ]
+      "given": ["a change with specIds: ['auth/login']"],
+      "when": ["execute is called with addSpecIds: ['auth/login']"],
+      "then": ["specIds remains ['auth/login']", "AND invalidated is false"]
     },
     {
       "requirement": "No-op when specIds unchanged after processing",
       "name": "Remove and re-add the same spec",
-      "given": [
-        "a change with specIds: ['auth/login', 'billing/invoices']"
-      ],
+      "given": ["a change with specIds: ['auth/login', 'billing/invoices']"],
       "when": [
         "execute is called with removeSpecIds: ['billing/invoices'] and addSpecIds: ['billing/invoices']"
       ],
@@ -237,12 +178,8 @@
     {
       "requirement": "Approval invalidation on effective change",
       "name": "Adding a new spec triggers invalidation",
-      "given": [
-        "a change with specIds: ['auth/login']"
-      ],
-      "when": [
-        "execute is called with addSpecIds: ['billing/invoices']"
-      ],
+      "given": ["a change with specIds: ['auth/login']"],
+      "when": ["execute is called with addSpecIds: ['billing/invoices']"],
       "then": [
         "change.updateSpecIds is called with the new spec list and the resolved actor",
         "AND the change is persisted via ChangeRepository.mutate(input.name, fn)",
@@ -252,12 +189,8 @@
     {
       "requirement": "Approval invalidation on effective change",
       "name": "Removing a spec triggers invalidation",
-      "given": [
-        "a change with specIds: ['auth/login', 'billing/invoices']"
-      ],
-      "when": [
-        "execute is called with removeSpecIds: ['billing/invoices']"
-      ],
+      "given": ["a change with specIds: ['auth/login', 'billing/invoices']"],
+      "when": ["execute is called with removeSpecIds: ['billing/invoices']"],
       "then": [
         "change.updateSpecIds is called with ['auth/login'] and the resolved actor",
         "AND the change is persisted through the repository mutation callback",
@@ -270,9 +203,7 @@
       "given": [
         "another operation updates the same change before the edit persistence step starts"
       ],
-      "when": [
-        "EditChange.execute performs its effective update"
-      ],
+      "when": ["EditChange.execute performs its effective update"],
       "then": [
         "the mutation callback receives the freshest persisted specIds",
         "AND the edit is applied on top of that state instead of overwriting it with an older snapshot"
@@ -284,9 +215,7 @@
       "given": [
         "a change with specIds: ['core:core/edit-change'] and scaffolded directories at specs/core/core/edit-change/ and deltas/core/core/edit-change/"
       ],
-      "when": [
-        "execute is called with removeSpecIds: ['core:core/edit-change']"
-      ],
+      "when": ["execute is called with removeSpecIds: ['core:core/edit-change']"],
       "then": [
         "ChangeRepository.unscaffold is called with the removed spec IDs",
         "AND the directories specs/core/core/edit-change/ and deltas/core/core/edit-change/ are removed from the change directory"
@@ -310,15 +239,9 @@
     {
       "requirement": "Directory cleanup on removal",
       "name": "Adding a spec does not trigger unscaffold",
-      "given": [
-        "a change with specIds: ['core:core/edit-change']"
-      ],
-      "when": [
-        "execute is called with addSpecIds: ['core:core/change-repository-port']"
-      ],
-      "then": [
-        "ChangeRepository.unscaffold is NOT called"
-      ]
+      "given": ["a change with specIds: ['core:core/edit-change']"],
+      "when": ["execute is called with addSpecIds: ['core:core/change-repository-port']"],
+      "then": ["ChangeRepository.unscaffold is NOT called"]
     }
   ],
   "contentHashes": {

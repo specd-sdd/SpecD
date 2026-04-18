@@ -18,6 +18,7 @@ export default tseslint.config(
       'packages/mcp/**',
       'packages/skills/**',
       'packages/plugins/**',
+      'scripts/**',
     ],
   },
 
@@ -177,6 +178,7 @@ export default tseslint.config(
       '@typescript-eslint/no-unsafe-member-access': 'off',
       '@typescript-eslint/require-await': 'off',
       '@typescript-eslint/no-unused-vars': 'off',
+      '@typescript-eslint/unbound-method': 'off',
     },
   },
 )
