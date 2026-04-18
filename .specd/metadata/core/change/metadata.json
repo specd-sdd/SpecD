@@ -1,6 +1,13 @@
 {
   "title": "Change",
   "description": "Without a single entity that owns spec work end-to-end, lifecycle state, approval gates, and artifact tracking would scatter across uncoordinated subsystems. A Change is the central domain entity in specd — a discrete, named unit of in-progress spec work covering one or more workspaces that moves from drafting through implementation and into the archive. Every specd operation targets a Change, and the Change enforces its own lifecycle and invariants; no external code may bypass them.",
+  "dependsOn": [
+    "core:core/change-manifest",
+    "core:core/workflow-model",
+    "core:core/spec-metadata",
+    "core:core/spec-id-format",
+    "default:_global/architecture"
+  ],
   "context": [
     "Without a single entity that owns spec work end-to-end, lifecycle state, approval gates, and artifact tracking would scatter across uncoordinated subsystems. A Change is the central domain entity in specd — a discrete, named unit of in-progress spec work covering one or more workspaces that moves from drafting through implementation and into the archive. Every specd operation targets a Change, and the Change enforces its own lifecycle and invariants; no external code may bypass them."
   ],
@@ -110,59 +117,37 @@
     {
       "requirement": "Identity",
       "name": "Change name immutable after creation",
-      "when": [
-        "a Change is created with name add-auth-flow"
-      ],
-      "then": [
-        "the name cannot be changed by any subsequent operation"
-      ]
+      "when": ["a Change is created with name add-auth-flow"],
+      "then": ["the name cannot be changed by any subsequent operation"]
     },
     {
       "requirement": "Workspaces and specs",
       "name": "Workspaces derived from specIds",
-      "when": [
-        "a Change has specIds: ['default:auth/login', 'billing:invoices']"
-      ],
-      "then": [
-        "workspaces returns ['default', 'billing'] derived via parseSpecId()"
-      ]
+      "when": ["a Change has specIds: ['default:auth/login', 'billing:invoices']"],
+      "then": ["workspaces returns ['default', 'billing'] derived via parseSpecId()"]
     },
     {
       "requirement": "Workspaces and specs",
       "name": "Workspaces empty when specIds empty",
-      "when": [
-        "a Change has an empty specIds list"
-      ],
-      "then": [
-        "workspaces returns an empty list"
-      ]
+      "when": ["a Change has an empty specIds list"],
+      "then": ["workspaces returns an empty list"]
     },
     {
       "requirement": "Workspaces and specs",
       "name": "Empty specIds allowed at creation",
-      "when": [
-        "a Change is created with an empty specIds list"
-      ],
-      "then": [
-        "creation succeeds and workspaces is empty"
-      ]
+      "when": ["a Change is created with an empty specIds list"],
+      "then": ["creation succeeds and workspaces is empty"]
     },
     {
       "requirement": "Workspaces and specs",
       "name": "Single workspace derived from specIds",
-      "when": [
-        "a Change has specIds: ['default:auth/login']"
-      ],
-      "then": [
-        "only the default workspace is active for CompileContext"
-      ]
+      "when": ["a Change has specIds: ['default:auth/login']"],
+      "then": ["only the default workspace is active for CompileContext"]
     },
     {
       "requirement": "Workspaces and specs",
       "name": "Multi-workspace derived from specIds",
-      "when": [
-        "a Change has specIds: ['default:auth/login', 'billing:invoices']"
-      ],
+      "when": ["a Change has specIds: ['default:auth/login', 'billing:invoices']"],
       "then": [
         "both default and billing are active and both workspace-level context patterns are applied"
       ]
@@ -170,9 +155,7 @@
     {
       "requirement": "Workspaces and specs",
       "name": "Spec added after creation",
-      "when": [
-        "a new spec ID is added to the Change's specIds"
-      ],
+      "when": ["a new spec ID is added to the Change's specIds"],
       "then": [
         "an invalidated event with cause: 'spec-change' is appended and a transitioned event rolling back to designing is appended"
       ]
@@ -184,9 +167,7 @@
         "a Change with specIds: ['auth/login', 'auth/session']",
         "AND specDependsOn has entries for both 'auth/login' and 'auth/session'"
       ],
-      "when": [
-        "updateSpecIds(['auth/login'], actor) is called"
-      ],
+      "when": ["updateSpecIds(['auth/login'], actor) is called"],
       "then": [
         "specDependsOn no longer has an entry for 'auth/session'",
         "AND specDependsOn still has the entry for 'auth/login'"
@@ -195,9 +176,7 @@
     {
       "requirement": "Lifecycle",
       "name": "Valid transition — drafting to designing",
-      "when": [
-        "a Change in drafting state is transitioned to designing"
-      ],
+      "when": ["a Change in drafting state is transitioned to designing"],
       "then": [
         "a transitioned event with from: 'drafting' and to: 'designing' is appended and deriving state returns designing"
       ]
@@ -210,9 +189,7 @@
         "AND the current artifacts still describe the intended behavior",
         "AND the required fix fits within the already-defined tasks"
       ],
-      "when": [
-        "the change is transitioned back to implementing"
-      ],
+      "when": ["the change is transitioned back to implementing"],
       "then": [
         "a transitioned event with from: 'verifying' and to: 'implementing' is appended",
         "AND no approval invalidation is triggered"
@@ -225,25 +202,15 @@
         "a Change in verifying state",
         "AND the required fix would introduce tasks not already defined"
       ],
-      "when": [
-        "verification routes the change out of verifying"
-      ],
-      "then": [
-        "the change transitions to designing, not implementing"
-      ]
+      "when": ["verification routes the change out of verifying"],
+      "then": ["the change transitions to designing, not implementing"]
     },
     {
       "requirement": "Lifecycle",
       "name": "archivable can return to designing",
-      "given": [
-        "a Change in archivable state"
-      ],
-      "when": [
-        "it is transitioned to designing"
-      ],
-      "then": [
-        "the transition succeeds"
-      ]
+      "given": ["a Change in archivable state"],
+      "when": ["it is transitioned to designing"],
+      "then": ["the transition succeeds"]
     },
     {
       "requirement": "Lifecycle",
@@ -251,9 +218,7 @@
       "given": [
         "a Change already in designing state with validated artifacts and an active spec approval"
       ],
-      "when": [
-        "the change is transitioned to designing again"
-      ],
+      "when": ["the change is transitioned to designing again"],
       "then": [
         "no invalidated event is appended",
         "AND no artifact files are downgraded to pending-review",
@@ -268,9 +233,7 @@
         "a Change in verifying state with validated artifacts",
         "AND verification concludes that only the implementation is wrong"
       ],
-      "when": [
-        "the change returns to implementing"
-      ],
+      "when": ["the change returns to implementing"],
       "then": [
         "unchanged validated artifacts remain complete",
         "AND no file is moved to pending-review"
@@ -283,12 +246,8 @@
         "a Change in verifying state",
         "AND verification concludes that the desired behavior has changed"
       ],
-      "when": [
-        "the verification outcome is artifact-review-required"
-      ],
-      "then": [
-        "the change returns to designing"
-      ]
+      "when": ["the verification outcome is artifact-review-required"],
+      "then": ["the change returns to designing"]
     },
     {
       "requirement": "Implementation and verification loop",
@@ -297,9 +256,7 @@
         "a Change in verifying state",
         "AND a previously validated artifact file changes on disk"
       ],
-      "when": [
-        "drift is detected"
-      ],
+      "when": ["drift is detected"],
       "then": [
         "the change is invalidated to designing",
         "AND the drifted file is marked drifted-pending-review"
@@ -308,29 +265,19 @@
     {
       "requirement": "Spec approval gate",
       "name": "Gate disabled — free transition to implementing",
-      "when": [
-        "approvals.spec: false (default) and a Change is in ready state"
-      ],
-      "then": [
-        "it transitions directly to implementing with no approval required"
-      ]
+      "when": ["approvals.spec: false (default) and a Change is in ready state"],
+      "then": ["it transitions directly to implementing with no approval required"]
     },
     {
       "requirement": "Spec approval gate",
       "name": "Gate enabled — blocked until spec approved",
-      "when": [
-        "approvals.spec: true and a Change is in ready state"
-      ],
-      "then": [
-        "it transitions to pending-spec-approval, not implementing"
-      ]
+      "when": ["approvals.spec: true and a Change is in ready state"],
+      "then": ["it transitions to pending-spec-approval, not implementing"]
     },
     {
       "requirement": "Spec approval gate",
       "name": "Gate enabled — implementing reachable after approval",
-      "when": [
-        "approvals.spec: true and a Change in pending-spec-approval receives approval"
-      ],
+      "when": ["approvals.spec: true and a Change in pending-spec-approval receives approval"],
       "then": [
         "a spec-approved event is appended, then a transitioned event to spec-approved state, then to implementing"
       ]
@@ -338,19 +285,13 @@
     {
       "requirement": "Signoff gate",
       "name": "Gate disabled — free transition to archivable",
-      "when": [
-        "approvals.signoff: false (default) and a Change is in done state"
-      ],
-      "then": [
-        "it transitions directly to archivable regardless of change content"
-      ]
+      "when": ["approvals.signoff: false (default) and a Change is in done state"],
+      "then": ["it transitions directly to archivable regardless of change content"]
     },
     {
       "requirement": "Signoff gate",
       "name": "Gate enabled — always blocked at done",
-      "when": [
-        "approvals.signoff: true and a Change is in done state"
-      ],
+      "when": ["approvals.signoff: true and a Change is in done state"],
       "then": [
         "it transitions to pending-signoff, not archivable — regardless of whether changes are additions, modifications, or removals"
       ]
@@ -358,9 +299,7 @@
     {
       "requirement": "Signoff gate",
       "name": "Gate enabled — archivable after signoff",
-      "when": [
-        "approvals.signoff: true and a Change in pending-signoff receives sign-off"
-      ],
+      "when": ["approvals.signoff: true and a Change in pending-signoff receives sign-off"],
       "then": [
         "a signed-off event is appended, then a transitioned event to signed-off state, then to archivable"
       ]
@@ -368,22 +307,14 @@
     {
       "requirement": "Signoff gate",
       "name": "Archive from non-archivable state throws",
-      "when": [
-        "archiving is attempted on a Change not in archivable state"
-      ],
-      "then": [
-        "InvalidStateTransitionError is thrown"
-      ]
+      "when": ["archiving is attempted on a Change not in archivable state"],
+      "then": ["InvalidStateTransitionError is thrown"]
     },
     {
       "requirement": "Artifacts",
       "name": "File state is persisted explicitly",
-      "given": [
-        "an artifact file stored in the manifest with state: 'pending-review'"
-      ],
-      "when": [
-        "the Change is loaded"
-      ],
+      "given": ["an artifact file stored in the manifest with state: 'pending-review'"],
+      "when": ["the Change is loaded"],
       "then": [
         "the file state is pending-review",
         "AND it is not recomputed from validatedHash alone"
@@ -397,12 +328,8 @@
         "AND one file is complete",
         "AND one file is drifted-pending-review"
       ],
-      "when": [
-        "the artifact aggregate state is computed"
-      ],
-      "then": [
-        "the artifact state is drifted-pending-review"
-      ]
+      "when": ["the artifact aggregate state is computed"],
+      "then": ["the artifact state is drifted-pending-review"]
     },
     {
       "requirement": "Artifacts",
@@ -411,9 +338,7 @@
         "a change with validated artifacts",
         "AND one file is already drifted-pending-review"
       ],
-      "when": [
-        "the change returns to designing"
-      ],
+      "when": ["the change returns to designing"],
       "then": [
         "every other file becomes pending-review",
         "AND the drifted file remains drifted-pending-review"
@@ -422,50 +347,28 @@
     {
       "requirement": "Artifacts",
       "name": "Requires satisfied only by complete or skipped",
-      "given": [
-        "artifact B requires artifact A",
-        "AND artifact A is pending-review"
-      ],
-      "when": [
-        "dependency satisfaction is evaluated"
-      ],
-      "then": [
-        "artifact A does not satisfy the requirement"
-      ]
+      "given": ["artifact B requires artifact A", "AND artifact A is pending-review"],
+      "when": ["dependency satisfaction is evaluated"],
+      "then": ["artifact A does not satisfy the requirement"]
     },
     {
       "requirement": "Artifacts",
       "name": "markComplete sets file and artifact state to complete",
-      "given": [
-        "an artifact file in in-progress"
-      ],
-      "when": [
-        "markComplete(key, hash) is called through validation"
-      ],
-      "then": [
-        "the file state becomes complete",
-        "AND the parent artifact state is recomputed"
-      ]
+      "given": ["an artifact file in in-progress"],
+      "when": ["markComplete(key, hash) is called through validation"],
+      "then": ["the file state becomes complete", "AND the parent artifact state is recomputed"]
     },
     {
       "requirement": "History and event sourcing",
       "name": "History is append-only",
-      "when": [
-        "any operation is performed on a Change"
-      ],
-      "then": [
-        "new events are appended to history; no existing event is modified or removed"
-      ]
+      "when": ["any operation is performed on a Change"],
+      "then": ["new events are appended to history; no existing event is modified or removed"]
     },
     {
       "requirement": "History and event sourcing",
       "name": "Invalidated event records artifact drift details",
-      "given": [
-        "two validated spec files drift in the same invalidation pass"
-      ],
-      "when": [
-        "the change is invalidated for artifact drift"
-      ],
+      "given": ["two validated spec files drift in the same invalidation pass"],
+      "when": ["the change is invalidated for artifact drift"],
       "then": [
         "the invalidated event contains cause: 'artifact-drift'",
         "AND it includes a human-readable message",
@@ -475,26 +378,15 @@
     {
       "requirement": "History and event sourcing",
       "name": "Scope change invalidation records spec-change cause",
-      "when": [
-        "specIds are edited after prior validation"
-      ],
-      "then": [
-        "the appended invalidated event uses cause: 'spec-change'"
-      ]
+      "when": ["specIds are edited after prior validation"],
+      "then": ["the appended invalidated event uses cause: 'spec-change'"]
     },
     {
       "requirement": "History and event sourcing",
       "name": "Review-required invalidation remains distinguishable from drift",
-      "given": [
-        "a change returns to designing because verification requires artifact review"
-      ],
-      "when": [
-        "the invalidation event is appended"
-      ],
-      "then": [
-        "its cause is artifact-review-required",
-        "AND it is distinct from artifact-drift"
-      ]
+      "given": ["a change returns to designing because verification requires artifact review"],
+      "when": ["the invalidation event is appended"],
+      "then": ["its cause is artifact-review-required", "AND it is distinct from artifact-drift"]
     },
     {
       "requirement": "Historical implementation detection",
@@ -502,12 +394,8 @@
       "given": [
         "a Change whose history already contains a transitioned event with to: 'implementing'"
       ],
-      "when": [
-        "historical implementation detection is evaluated"
-      ],
-      "then": [
-        "it reports that implementation may already exist"
-      ]
+      "when": ["historical implementation detection is evaluated"],
+      "then": ["it reports that implementation may already exist"]
     },
     {
       "requirement": "Historical implementation detection",
@@ -516,25 +404,15 @@
         "a Change whose history contains a transitioned event to implementing",
         "AND a later transitioned event returns it to designing"
       ],
-      "when": [
-        "historical implementation detection is evaluated"
-      ],
-      "then": [
-        "it still reports that implementation may already exist"
-      ]
+      "when": ["historical implementation detection is evaluated"],
+      "then": ["it still reports that implementation may already exist"]
     },
     {
       "requirement": "Historical implementation detection",
       "name": "Historical detection stays false before implementing",
-      "given": [
-        "a Change whose history has no transitioned event with to: 'implementing'"
-      ],
-      "when": [
-        "historical implementation detection is evaluated"
-      ],
-      "then": [
-        "it reports that implementation may not yet exist"
-      ]
+      "given": ["a Change whose history has no transitioned event with to: 'implementing'"],
+      "when": ["historical implementation detection is evaluated"],
+      "then": ["it reports that implementation may not yet exist"]
     },
     {
       "requirement": "Schema version",
@@ -542,39 +420,25 @@
       "when": [
         "a Change is loaded and the active schema's version differs from the schemaVersion recorded in the created event"
       ],
-      "then": [
-        "specd emits a warning but the change remains fully usable"
-      ]
+      "then": ["specd emits a warning but the change remains fully usable"]
     },
     {
       "requirement": "Schema version",
       "name": "Schema mismatch does not block archive",
-      "when": [
-        "a Change with a schema version mismatch is in archivable state"
-      ],
-      "then": [
-        "archiving proceeds normally — the mismatch warning is advisory only"
-      ]
+      "when": ["a Change with a schema version mismatch is in archivable state"],
+      "then": ["archiving proceeds normally — the mismatch warning is advisory only"]
     },
     {
       "requirement": "Drafting and discarding",
       "name": "Draft requires identity",
-      "when": [
-        "a Change is drafted without providing a by identity"
-      ],
-      "then": [
-        "the operation fails with a validation error and no event is appended"
-      ]
+      "when": ["a Change is drafted without providing a by identity"],
+      "then": ["the operation fails with a validation error and no event is appended"]
     },
     {
       "requirement": "Drafting and discarding",
       "name": "Draft succeeds before implementation has ever been reached",
-      "given": [
-        "a Change whose history contains no transitioned event to implementing"
-      ],
-      "when": [
-        "it is drafted with a valid identity"
-      ],
+      "given": ["a Change whose history contains no transitioned event to implementing"],
+      "when": ["it is drafted with a valid identity"],
       "then": [
         "a drafted event is appended to history",
         "AND the change is moved to drafts/",
@@ -584,12 +448,8 @@
     {
       "requirement": "Drafting and discarding",
       "name": "Draft after historical implementation requires force",
-      "given": [
-        "a Change whose history contains a transitioned event to implementing"
-      ],
-      "when": [
-        "it is drafted without forcing the operation"
-      ],
+      "given": ["a Change whose history contains a transitioned event to implementing"],
+      "when": ["it is drafted without forcing the operation"],
       "then": [
         "the operation fails",
         "AND no drafted event is appended",
@@ -599,12 +459,8 @@
     {
       "requirement": "Drafting and discarding",
       "name": "Forced draft after historical implementation appends drafted event",
-      "given": [
-        "a Change whose history contains a transitioned event to implementing"
-      ],
-      "when": [
-        "it is drafted with a valid identity and the force override enabled"
-      ],
+      "given": ["a Change whose history contains a transitioned event to implementing"],
+      "when": ["it is drafted with a valid identity and the force override enabled"],
       "then": [
         "a drafted event is appended to history",
         "AND the change is moved to drafts/",
@@ -614,19 +470,13 @@
     {
       "requirement": "Drafting and discarding",
       "name": "Drafted change no longer appears in active changes",
-      "when": [
-        "a Change has a drafted event as its most recent drafted/restored event"
-      ],
-      "then": [
-        "the change is resolved from drafts/, not changes/"
-      ]
+      "when": ["a Change has a drafted event as its most recent drafted/restored event"],
+      "then": ["the change is resolved from drafts/, not changes/"]
     },
     {
       "requirement": "Drafting and discarding",
       "name": "Restore appends restored event",
-      "when": [
-        "a drafted Change is restored"
-      ],
+      "when": ["a drafted Change is restored"],
       "then": [
         "a restored event is appended to history",
         "AND the change is moved back to changes/",
@@ -636,36 +486,23 @@
     {
       "requirement": "Drafting and discarding",
       "name": "Discard requires reason and identity",
-      "when": [
-        "a Change is discarded without providing a reason or by identity"
-      ],
-      "then": [
-        "the operation fails with a validation error and no event is appended"
-      ]
+      "when": ["a Change is discarded without providing a reason or by identity"],
+      "then": ["the operation fails with a validation error and no event is appended"]
     },
     {
       "requirement": "Drafting and discarding",
       "name": "Discard succeeds before implementation has ever been reached",
-      "given": [
-        "a Change whose history contains no transitioned event to implementing"
-      ],
+      "given": ["a Change whose history contains no transitioned event to implementing"],
       "when": [
         "the Change is discarded with a reason, identity, and optional superseding change names"
       ],
-      "then": [
-        "a discarded event is appended to history",
-        "AND the change is moved to discarded/"
-      ]
+      "then": ["a discarded event is appended to history", "AND the change is moved to discarded/"]
     },
     {
       "requirement": "Drafting and discarding",
       "name": "Discard after historical implementation requires force",
-      "given": [
-        "a Change whose history contains a transitioned event to implementing"
-      ],
-      "when": [
-        "it is discarded without forcing the operation"
-      ],
+      "given": ["a Change whose history contains a transitioned event to implementing"],
+      "when": ["it is discarded without forcing the operation"],
       "then": [
         "the operation fails",
         "AND no discarded event is appended",
@@ -675,12 +512,8 @@
     {
       "requirement": "Drafting and discarding",
       "name": "Forced discard from drafts after historical implementation succeeds",
-      "given": [
-        "a drafted Change whose history contains a transitioned event to implementing"
-      ],
-      "when": [
-        "it is discarded with a reason, identity, and the force override enabled"
-      ],
+      "given": ["a drafted Change whose history contains a transitioned event to implementing"],
+      "when": ["it is discarded with a reason, identity, and the force override enabled"],
       "then": [
         "a discarded event is appended",
         "AND the change is moved to discarded/",
@@ -690,32 +523,20 @@
     {
       "requirement": "Drafting and discarding",
       "name": "Discard with supersededBy",
-      "when": [
-        "a Change is discarded with supersededBy: ['new-auth-flow', 'cleanup-tokens']"
-      ],
-      "then": [
-        "the discarded event stores those names for traceability"
-      ]
+      "when": ["a Change is discarded with supersededBy: ['new-auth-flow', 'cleanup-tokens']"],
+      "then": ["the discarded event stores those names for traceability"]
     },
     {
       "requirement": "Drafting and discarding",
       "name": "Discarded change cannot be restored",
-      "when": [
-        "a discard operation is attempted to be reversed"
-      ],
-      "then": [
-        "no operation exists to move a change out of discarded/"
-      ]
+      "when": ["a discard operation is attempted to be reversed"],
+      "then": ["no operation exists to move a change out of discarded/"]
     },
     {
       "requirement": "History and event sourcing",
       "name": "Description update appends description-updated event",
-      "given": [
-        "a Change with description \"Original\""
-      ],
-      "when": [
-        "updateDescription(\"New description\", actor) is called"
-      ],
+      "given": ["a Change with description \"Original\""],
+      "when": ["updateDescription(\"New description\", actor) is called"],
       "then": [
         "a description-updated event is appended to history",
         "AND the event contains description: \"New description\"",
@@ -725,16 +546,9 @@
     {
       "requirement": "History and event sourcing",
       "name": "Description update does not append invalidated event",
-      "given": [
-        "a Change in spec-approved state with active approval"
-      ],
-      "when": [
-        "updateDescription(\"New description\", actor) is called"
-      ],
-      "then": [
-        "no invalidated event is appended",
-        "AND the change remains in spec-approved state"
-      ]
+      "given": ["a Change in spec-approved state with active approval"],
+      "when": ["updateDescription(\"New description\", actor) is called"],
+      "then": ["no invalidated event is appended", "AND the change remains in spec-approved state"]
     }
   ],
   "contentHashes": {

@@ -1,0 +1,45 @@
+{
+  "title": "plugin-manager:plugin-errors",
+  "description": "Defines error classes for plugin operations. All errors extend the base `SpecdError` from the domain.",
+  "dependsOn": ["default:_global/architecture"],
+  "context": [
+    "Defines error classes for plugin operations. All errors extend the base `SpecdError` from the domain."
+  ],
+  "rules": [
+    {
+      "requirement": "PluginNotFoundError",
+      "rules": [
+        "```typescript\nclass PluginNotFoundError extends SpecdError {\n  readonly pluginName: string\n}\n```\n\nThe error MUST include the plugin name that was not found."
+      ]
+    },
+    {
+      "requirement": "PluginValidationError",
+      "rules": [
+        "```typescript\nclass PluginValidationError extends SpecdError {\n  readonly pluginName: string\n  readonly fields: string[]\n}\n```\n\nThe error MUST include:\n\n- The plugin name that failed validation\n- Array of fields that failed validation"
+      ]
+    }
+  ],
+  "constraints": [
+    "Errors MUST extend SpecdError from @specd/core.",
+    "Errors SHOULD be catchable by type for error handling."
+  ],
+  "scenarios": [
+    {
+      "requirement": "PluginNotFoundError",
+      "name": "Error has pluginName",
+      "when": ["PluginNotFoundError is thrown"],
+      "then": ["it includes the pluginName property"]
+    },
+    {
+      "requirement": "PluginValidationError",
+      "name": "Error has fields",
+      "when": ["PluginValidationError is thrown"],
+      "then": ["it includes the fields property"]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:e1471688736aac1e0a98e49171d8d07d731e2b2a872299c7d599e9b7c66a14ff",
+    "verify.md": "sha256:2178c297cea502896cce8744eadd2bdd4d95f22d9911f9e4282f7407cd774e47"
+  },
+  "generatedBy": "core"
+}

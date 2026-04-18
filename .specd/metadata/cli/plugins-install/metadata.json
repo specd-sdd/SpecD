@@ -1,0 +1,97 @@
+{
+  "title": "cli:cli/plugins-install",
+  "description": "Defines the CLI contract for installing specd plugins. The command reads the current plugin configuration, validates each requested plugin, installs it via the plugin manager, and records the installation in the project configuration.",
+  "dependsOn": [
+    "plugin-manager:install-plugin-use-case",
+    "plugin-manager:load-plugin-use-case",
+    "core:core/config-writer-port"
+  ],
+  "context": [
+    "Defines the CLI contract for installing specd plugins. The command reads the current plugin configuration, validates each requested plugin, installs it via the plugin manager, and records the installation in the project configuration."
+  ],
+  "rules": [
+    {
+      "requirement": "Command signature",
+      "rules": [
+        "The command MUST accept one or more plugin names as positional arguments:\n\n```bash\nspecd plugins install <plugin> [<plugin>...]\n```\n\nEach `plugin` is an npm package name (e.g., `@specd/plugin-agent-claude`)."
+      ]
+    },
+    {
+      "requirement": "Display name",
+      "rules": [
+        "The command MUST display a suitable header above any tabular output. The header MUST be `Installed plugins` with a trailing colon, followed by newline-separated details."
+      ]
+    },
+    {
+      "requirement": "Already-installed handling",
+      "rules": [
+        "When a plugin name is already declared in `specd.yaml` under the appropriate type:\n\n- The command MUST emit a warning message containing the string `already installed` and the word `update` (in that order).\n- The command SHOULD suggest using `update` to reinstall.\n- The command MUST NOT re-install the plugin."
+      ]
+    },
+    {
+      "requirement": "Installation workflow",
+      "rules": [
+        "For each plugin name that is not already installed:\n\n1. The command MUST call the `InstallPlugin` use case from `@specd/plugin-manager`.\n2. On success, the command MUST call `ConfigWriter.addPlugin()` to record the plugin in `specd.yaml`.\n3. On failure, the command MUST emit the error message and continue with the remaining plugins."
+      ]
+    },
+    {
+      "requirement": "Exit code",
+      "rules": [
+        "The command MUST exit with code 1 if any plugin fails to install, but continue processing the remaining plugins."
+      ]
+    },
+    {
+      "requirement": "Output format",
+      "rules": [
+        "The command MUST output:\n\n- Plugin name\n- Installation status (`installed`, `skipped`, or error message)\n- Any additional details\n\nThe format MUST be machine-parseable when invoked with `--format json`."
+      ]
+    }
+  ],
+  "constraints": [
+    "The command MUST NOT mutate specd.yaml for plugins that are already installed.",
+    "The command MUST validate plugin names before attempting installation."
+  ],
+  "scenarios": [
+    {
+      "requirement": "Command signature",
+      "name": "Valid plugin names",
+      "when": ["specd plugins install @specd/plugin-agent-claude is invoked"],
+      "then": ["the command attempts to install the plugin"]
+    },
+    {
+      "requirement": "Command signature",
+      "name": "Multiple plugin names",
+      "when": [
+        "specd plugins install @specd/plugin-agent-claude @specd/plugin-agent-copilot is invoked"
+      ],
+      "then": ["the command attempts to install both plugins"]
+    },
+    {
+      "requirement": "Already-installed handling",
+      "name": "Plugin already installed",
+      "given": ["@specd/plugin-agent-claude is already in specd.yaml"],
+      "when": ["specd plugins install @specd/plugin-agent-claude is invoked"],
+      "then": [
+        "a warning containing \"already installed\" and \"update\" is emitted",
+        "AND the plugin is NOT re-installed"
+      ]
+    },
+    {
+      "requirement": "Exit code",
+      "name": "Installation failure",
+      "when": ["any plugin fails to install"],
+      "then": ["the command exits with code 1"]
+    },
+    {
+      "requirement": "Output format",
+      "name": "JSON format",
+      "when": ["--format json is passed"],
+      "then": ["output is machine-parseable JSON"]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:0c3932242b64a359037ec3ef0f44cf997ffd5b44a6e08529049d44cfb968cef3",
+    "verify.md": "sha256:f4a5cf966c3f7768e401bc824d9807535d8fcae09361450afd7905da4864e16d"
+  },
+  "generatedBy": "core"
+}

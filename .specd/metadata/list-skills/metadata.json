@@ -1,0 +1,44 @@
+{
+  "title": "skills:list-skills",
+  "description": "Use case for listing all available skills in the repository.",
+  "dependsOn": ["skills:skill", "skills:skill-repository-port"],
+  "context": ["Use case for listing all available skills in the repository."],
+  "rules": [
+    {
+      "requirement": "Input",
+      "rules": [
+        "The input MUST be an empty object:\n\n```typescript\ninterface ListSkillsInput {}\n```"
+      ]
+    },
+    {
+      "requirement": "Output",
+      "rules": [
+        "The output MUST contain:\n\n```typescript\ninterface ListSkillsOutput {\n  skills: readonly Skill[]\n}\n```"
+      ]
+    },
+    {
+      "requirement": "Behavior",
+      "rules": ["The use case MUST call `SkillRepository.list()` and return the result."]
+    }
+  ],
+  "constraints": ["No validation needed for empty input."],
+  "scenarios": [
+    {
+      "requirement": "Input",
+      "name": "Empty input",
+      "when": ["ListSkills use case is executed with empty input"],
+      "then": ["it succeeds"]
+    },
+    {
+      "requirement": "Output",
+      "name": "Returns skills array",
+      "when": ["ListSkills use case is executed"],
+      "then": ["it returns { skills: readonly Skill[] }"]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:2c3f7ff1e88c15bfeece12b03e9f483499b155ea98f4c204455e02d99642a7b0",
+    "verify.md": "sha256:3c3ed9ed5a744e195c226b1fa2b69ff2e90c9cb429683b590cbfa47c67285d3f"
+  },
+  "generatedBy": "core"
+}

@@ -477,7 +477,7 @@ metadataExtraction:
     extractor:
       selector: { type: section, matches: '^Spec Dependencies$' }
       extract: content
-      capture: '(?:^|\n)\s*-\s+(?:\[`?|`)?([^`\]\n]+?)(?:(?:`?\]\(([^)]+)\)|`)|(?=\s*(?:—|$)))'
+      capture: '(?:^|\n)\s*-\s+(?:\[`?|\[|`)?((?:[A-Za-z\-\_0-9]+:[A-Za-z\-\_0-9\/]+|(?:[A-Za-z]:\\)?(?:[A-Za-z\-\_0-9]+\.[A-Za-z\-\_0-9]+|(?:[A-Za-z\-\_0-9]+[\/\\])+[A-Za-z\-\_0-9]+\.[A-Za-z\-\_0-9]+)))(?:`?\]|\]|`)?(?:\(((?:[A-Za-z]:\\|(?:\.{1,2}[\\//])*)?(?:[A-Za-z\-\_0-9]+[\/\\])+[A-Za-z\-\_0-9]+\.[A-Za-z\-\_0-9]+))?'
       transform:
         name: resolveSpecPath
         args: ['$2']

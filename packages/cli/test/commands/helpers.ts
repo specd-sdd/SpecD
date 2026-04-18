@@ -9,7 +9,6 @@ import type { Stats } from 'node:fs'
 import { vi } from 'vitest'
 import { Command } from 'commander'
 import type { SpecdConfig, Kernel, SpecRepository, ChangeRepository } from '@specd/core'
-import type { Skill } from '@specd/skills'
 
 /**
  * Mirrors the {@link Kernel} shape but with every `execute` replaced by a
@@ -179,8 +178,9 @@ export function makeMockKernel(overrides: Record<string, unknown> = {}): Kernel 
 
   const project = {
     init: { execute: vi.fn() },
-    recordSkillInstall: { execute: vi.fn() },
-    getSkillsManifest: { execute: vi.fn() },
+    addPlugin: { execute: vi.fn() },
+    removePlugin: { execute: vi.fn() },
+    listPlugins: { execute: vi.fn().mockResolvedValue([]) },
     getProjectContext: {
       execute: vi.fn().mockResolvedValue({ contextEntries: [], specs: [], warnings: [] }),
     },
@@ -237,18 +237,6 @@ export function captureStderr(): () => string {
 // ---------------------------------------------------------------------------
 // Typed mock factories for external dependencies
 // ---------------------------------------------------------------------------
-
-/**
- * Creates a mock `Skill` with sensible defaults.
- */
-export function makeMockSkill(overrides: Partial<Skill> = {}): Skill {
-  return {
-    name: 'test-skill',
-    description: 'A test skill',
-    content: '# Test Skill',
-    ...overrides,
-  }
-}
 
 /**
  * Creates a minimal mock `Stats` object for `fs.stat` assertions.

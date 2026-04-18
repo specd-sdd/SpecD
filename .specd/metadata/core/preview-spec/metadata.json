@@ -1,6 +1,12 @@
 {
   "title": "PreviewSpec",
   "description": "During an active change, agents and humans need to see what a spec will look like after its deltas are applied — but the canonical spec remains untouched until archive. `PreviewSpec` fills this gap by applying a change's delta artifacts to the base spec content and returning the merged result per artifact file, without mutating anything. It is the single source of delta-merge logic for read-only preview, consumed both by `CompileContext` (for materialized views) and by the CLI preview command (for human review).",
+  "dependsOn": [
+    "core:core/delta-format",
+    "core:core/artifact-parser-port",
+    "core:core/change-layout",
+    "core:core/file-reader-port"
+  ],
   "context": [
     "During an active change, agents and humans need to see what a spec will look like after its deltas are applied — but the canonical spec remains untouched until archive. `PreviewSpec` fills this gap by applying a change's delta artifacts to the base spec content and returning the merged result per artifact file, without mutating anything. It is the single source of delta-merge logic for read-only preview, consumed both by `CompileContext` (for materialized views) and by the CLI preview command (for human review)."
   ],
@@ -185,13 +191,5 @@
     "spec.md": "sha256:23dc217475113c9be9f549cb14f1986c2651d6b4bca74ab888780c753cb1824b",
     "verify.md": "sha256:0fda7610d48333859a12c62d967fa6653f7fc6a4a3b512afe167cd8f4e7e53d2"
   },
-  "generatedBy": "core",
-  "dependsOn": [
-    "core:core/compile-context",
-    "core:core/delta-format",
-    "core:core/validate-artifacts",
-    "core:core/artifact-parser-port",
-    "core:core/change-layout",
-    "core:core/file-reader-port"
-  ]
+  "generatedBy": "core"
 }

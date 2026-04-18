@@ -95,38 +95,74 @@ describe('FsConfigWriter', () => {
     })
   })
 
-  describe('recordSkillInstall', () => {
-    it('records skill names under the agent key', async () => {
+  describe('addPlugin', () => {
+    it('adds a plugin under the provided plugin type', async () => {
       const { configPath } = await writer.initProject(defaultOptions())
 
-      await writer.recordSkillInstall(configPath, 'claude', ['review', 'lint'])
+      await writer.addPlugin(configPath, 'agents', '@specd/plugin-agent-claude')
 
-      const manifest = await writer.readSkillsManifest(configPath)
-      expect(manifest['claude']).toEqual(expect.arrayContaining(['review', 'lint']))
+      const plugins = await writer.listPlugins(configPath, 'agents')
+      expect(plugins).toEqual([{ name: '@specd/plugin-agent-claude' }])
     })
 
-    it('merges with existing skills without duplicates', async () => {
+    it('updates existing plugin config without duplicating entries', async () => {
       const { configPath } = await writer.initProject(defaultOptions())
 
-      await writer.recordSkillInstall(configPath, 'claude', ['review'])
-      await writer.recordSkillInstall(configPath, 'claude', ['review', 'lint'])
+      await writer.addPlugin(configPath, 'agents', '@specd/plugin-agent-copilot')
+      await writer.addPlugin(configPath, 'agents', '@specd/plugin-agent-copilot', {
+        instructionsDir: '.github/copilot/instructions',
+      })
 
-      const manifest = await writer.readSkillsManifest(configPath)
-      expect(manifest['claude']).toEqual(['review', 'lint'])
+      const plugins = await writer.listPlugins(configPath, 'agents')
+      expect(plugins).toEqual([
+        {
+          name: '@specd/plugin-agent-copilot',
+          config: { instructionsDir: '.github/copilot/instructions' },
+        },
+      ])
     })
   })
 
-  describe('readSkillsManifest', () => {
-    it('returns empty object when config does not exist', async () => {
-      const manifest = await writer.readSkillsManifest(path.join(tmpDir, 'nonexistent.yaml'))
-      expect(manifest).toEqual({})
+  describe('removePlugin', () => {
+    it('removes a plugin by name from the selected type', async () => {
+      const { configPath } = await writer.initProject(defaultOptions())
+      await writer.addPlugin(configPath, 'agents', '@specd/plugin-agent-claude')
+      await writer.addPlugin(configPath, 'agents', '@specd/plugin-agent-copilot')
+
+      await writer.removePlugin(configPath, 'agents', '@specd/plugin-agent-claude')
+
+      const plugins = await writer.listPlugins(configPath, 'agents')
+      expect(plugins).toEqual([{ name: '@specd/plugin-agent-copilot' }])
+    })
+  })
+
+  describe('listPlugins', () => {
+    it('returns empty array when config does not exist', async () => {
+      const plugins = await writer.listPlugins(path.join(tmpDir, 'nonexistent.yaml'))
+      expect(plugins).toEqual([])
     })
 
-    it('returns empty object when skills key is absent', async () => {
+    it('returns empty array when plugins key is absent', async () => {
       const { configPath } = await writer.initProject(defaultOptions())
+      const plugins = await writer.listPlugins(configPath)
+      expect(plugins).toEqual([])
+    })
 
-      const manifest = await writer.readSkillsManifest(configPath)
-      expect(manifest).toEqual({})
+    it('preserves unrelated yaml keys while mutating plugins', async () => {
+      const { configPath } = await writer.initProject(defaultOptions())
+      const original = await fs.readFile(configPath, 'utf8')
+
+      await writer.addPlugin(configPath, 'agents', '@specd/plugin-agent-codex', {
+        mode: 'workspace',
+      })
+      await writer.removePlugin(configPath, 'agents', '@specd/plugin-agent-codex')
+
+      const after = await fs.readFile(configPath, 'utf8')
+      const parsedOriginal = yamlParse(original) as Record<string, unknown>
+      const parsedAfter = yamlParse(after) as Record<string, unknown>
+      expect(parsedAfter['schema']).toEqual(parsedOriginal['schema'])
+      expect(parsedAfter['workspaces']).toEqual(parsedOriginal['workspaces'])
+      expect(parsedAfter['storage']).toEqual(parsedOriginal['storage'])
     })
   })
 })

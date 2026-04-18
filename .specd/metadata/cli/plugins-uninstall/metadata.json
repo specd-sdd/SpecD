@@ -1,0 +1,63 @@
+{
+  "title": "cli:cli/plugins-uninstall",
+  "description": "Defines the CLI contract for uninstalling plugins. The command calls the plugin's uninstall hook and removes the plugin declaration from configuration.",
+  "dependsOn": [
+    "plugin-manager:uninstall-plugin-use-case",
+    "plugin-manager:load-plugin-use-case",
+    "core:core/config-writer-port"
+  ],
+  "context": [
+    "Defines the CLI contract for uninstalling plugins. The command calls the plugin's uninstall hook and removes the plugin declaration from configuration."
+  ],
+  "rules": [
+    {
+      "requirement": "Command signature",
+      "rules": [
+        "The command MUST accept one or more plugin names as positional arguments:\n\n```bash\nspecd plugins uninstall <plugin> [<plugin>...]\n```"
+      ]
+    },
+    {
+      "requirement": "Uninstall workflow",
+      "rules": [
+        "For each plugin name:\n\n1. The command MUST load the plugin via `LoadPlugin` use case.\n2. The command MUST call the plugin's `uninstall()` method.\n3. The command MUST call `ConfigWriter.removePlugin()` to remove from `specd.yaml`."
+      ]
+    },
+    {
+      "requirement": "Exit code",
+      "rules": [
+        "The command MUST exit with code 1 if any plugin fails, but continue processing the remaining plugins."
+      ]
+    },
+    {
+      "requirement": "Output",
+      "rules": [
+        "For each plugin, the command MUST output:\n\n- Plugin name\n- Uninstall status (`uninstalled` or error message)\n\nThe format MUST be machine-parseable when invoked with `--format json`."
+      ]
+    }
+  ],
+  "constraints": [
+    "The command MUST remove the plugin declaration from config on success.",
+    "The command MUST call the plugin's uninstall hook before removing from config."
+  ],
+  "scenarios": [
+    {
+      "requirement": "Command signature",
+      "name": "Uninstall multiple plugins",
+      "when": [
+        "specd plugins uninstall @specd/plugin-agent-claude @specd/plugin-agent-copilot is invoked"
+      ],
+      "then": ["both plugins are uninstalled"]
+    },
+    {
+      "requirement": "Exit code",
+      "name": "Uninstall failure",
+      "when": ["any plugin fails to uninstall"],
+      "then": ["the command exits with code 1"]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:aa5c70cd56bf6bba87b7c587baba242068af365957f4f2cc681b289c541e2136",
+    "verify.md": "sha256:1f71feb2c962ebf523ab419fade927e1cc7cd16d08ed77549c094bd52a85b528"
+  },
+  "generatedBy": "core"
+}

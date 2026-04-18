@@ -1,6 +1,7 @@
 {
   "title": "Public Site",
   "description": "`specd` needs a public-facing website that explains the project clearly to new users and gives them a guided entry point into the documentation. This spec defines the public site itself: the presentation homepage, the public documentation information architecture, and the rules for what content is and is not exposed on that site.",
+  "dependsOn": ["default:_global/docs"],
   "context": [
     "`specd` needs a public-facing website that explains the project clearly to new users and gives them a guided entry point into the documentation. This spec defines the public site itself: the presentation homepage, the public documentation information architecture, and the rules for what content is and is not exposed on that site."
   ],

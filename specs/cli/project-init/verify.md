@@ -4,27 +4,18 @@
 
 ### Requirement: Command signature
 
-#### Scenario: Unknown schema ref does not error at init time
+#### Scenario: --plugin flag
 
-- **WHEN** `specd project init --schema ./custom/schema.yaml` is run
-- **THEN** the command exits with code 0
-- **AND** `specd.yaml` is written with the given schema reference
+- **WHEN** `specd project init --plugin @specd/plugin-agent-claude` is invoked
+- **THEN** the plugin is selected for installation
 
 ### Requirement: Interactive mode
 
-#### Scenario: Interactive mode is skipped when --format json is set
+#### Scenario: Plugin selection wizard
 
-- **GIVEN** stdout is a TTY
-- **WHEN** `specd project init --format json` is run with no other flags
-- **THEN** no wizard prompts are shown
-- **AND** the command runs non-interactively with defaults
-- **AND** stdout is valid JSON
-
-#### Scenario: Interactive mode is skipped when any config flag is provided
-
-- **GIVEN** stdout is a TTY
-- **WHEN** `specd project init --schema @specd/schema-std` is run
-- **THEN** no wizard prompts are shown
+- **GIVEN** interactive mode is active
+- **WHEN** the user selects plugins
+- **THEN** selected plugins are marked for installation
 
 ### Requirement: Non-interactive mode
 
@@ -69,11 +60,11 @@
 
 ### Requirement: Skills installation after init
 
-#### Scenario: Skills are installed for selected agents after init
+#### Scenario: Plugins are installed for selected plugins after init
 
-- **WHEN** `specd project init --workspace default --agent claude` is run
-- **THEN** skill files are written to `<git-root>/.claude/commands/`
-- **AND** `specd.yaml` records the installed skills under `skills.claude`
+- **WHEN** `specd project init --plugin @specd/plugin-agent-claude` is run
+- **THEN** each plugin's `install()` method is called
+- **AND** `specd.yaml` records the plugin under `plugins.agents`
 
 ### Requirement: Already initialised
 

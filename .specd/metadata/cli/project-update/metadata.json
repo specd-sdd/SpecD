@@ -15,13 +15,13 @@
     {
       "requirement": "Skills update step",
       "rules": [
-        "The command runs the skills update logic for all agents recorded in `specd.yaml`'s `skills` section (equivalent to `specd skills update` with no `--agent` filter). All behaviour defined in the `skills update` spec applies: missing-skill warnings, no-skills output, idempotent overwrites."
+        "The command runs the plugin update logic for all plugins declared in `specd.yaml`'s `plugins` section (equivalent to `specd plugins update` with no plugin filter). The update is idempotent."
       ]
     },
     {
       "requirement": "Output on success",
       "rules": [
-        "In `text` mode, the command prefixes each sub-step's output with a step label:\n\n```\nskills: updated my-skill → /path/to/.claude/commands/my-skill.md\nskills: updated my-other-skill → /path/to/.claude/commands/my-other-skill.md\n```\n\nIf there is nothing to update (no skills recorded, all steps are no-ops), the command prints `project is up to date` and exits with code 0.\n\nIn `json` or `toon` mode, the output is an object grouping results by step:\n\n```json\n{ \"skills\": [{ \"name\": \"...\", \"path\": \"...\", \"status\": \"updated|skipped\", \"warning\": \"...\" }] }\n```"
+        "In `text` mode, the command prefixes each sub-step's output with a step label:\n\n```\nplugins: updated @specd/plugin-agent-claude\nplugins: updated @specd/plugin-agent-copilot\n```\n\nIf there is nothing to update (no plugins declared, all steps are no-ops), the command prints `project is up to date` and exits with code 0."
       ]
     },
     {
@@ -39,34 +39,21 @@
   "scenarios": [
     {
       "requirement": "Skills update step",
-      "name": "Recorded skills are reinstalled",
-      "given": ["specd.yaml records skills.claude: [my-skill]"],
+      "name": "Declared plugins are updated",
+      "given": ["specd.yaml has plugins.agents: [{ name: '@specd/plugin-agent-claude' }]"],
       "when": ["specd project update is run"],
-      "then": [
-        ".claude/commands/my-skill.md is overwritten with the current bundle content",
-        "AND the process exits with code 0"
-      ]
-    },
-    {
-      "requirement": "Skills update step",
-      "name": "Skill no longer in bundle generates warning but does not fail",
-      "given": [
-        "specd.yaml lists old-skill under skills.claude",
-        "AND old-skill is not present in the current @specd/skills bundle"
-      ],
-      "when": ["specd project update is run"],
-      "then": ["stderr contains a warning about old-skill", "AND the process exits with code 0"]
+      "then": ["each plugin's install() method is called", "AND the process exits with code 0"]
     },
     {
       "requirement": "Output on success",
       "name": "Text output is prefixed with step name",
-      "when": ["specd project update succeeds with one skill recorded"],
-      "then": ["stdout contains a line starting with skills: followed by the updated skill info"]
+      "when": ["specd project update succeeds with one plugin declared"],
+      "then": ["stdout contains a line starting with plugins: followed by the updated plugin info"]
     },
     {
       "requirement": "Output on success",
       "name": "Nothing to update prints up-to-date message",
-      "given": ["specd.yaml has no skills section"],
+      "given": ["specd.yaml has no plugins section"],
       "when": ["specd project update is run"],
       "then": ["stdout contains project is up to date", "AND the process exits with code 0"]
     },
@@ -74,7 +61,7 @@
       "requirement": "Output on success",
       "name": "JSON output groups results by step",
       "when": ["specd project update --format json succeeds"],
-      "then": ["stdout is valid JSON with a skills array containing result objects"]
+      "then": ["stdout is valid JSON with a plugins array containing result objects"]
     },
     {
       "requirement": "Partial failure",
@@ -96,8 +83,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:0122a038febd3c4e9d5d3ef297342c30869fdc00b529c9cd13452663cc7d85bd",
-    "verify.md": "sha256:5eca73ac38e4e1eeb855d02b0ad671ee37d8a4a48e9b9891d781aa72a4d29f70"
+    "spec.md": "sha256:80fae7509df87232d75d636990ef60a323b266d47726ab5f1ae43bda3430df3b",
+    "verify.md": "sha256:bc1beb07dd586de93f2af3c99e0fc2b56ba83f2e6b2b9c80e4c5e0fd0fb3f9a4"
   },
   "generatedBy": "core"
 }

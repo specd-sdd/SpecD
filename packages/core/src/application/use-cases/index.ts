@@ -37,8 +37,9 @@ export {
   type ValidateSchemaResult,
 } from './validate-schema.js'
 export { type InitProject } from './init-project.js'
-export { type RecordSkillInstall, type RecordSkillInstallInput } from './record-skill-install.js'
-export { type GetSkillsManifest, type GetSkillsManifestInput } from './get-skills-manifest.js'
+export { type AddPlugin, type AddPluginInput } from './add-plugin.js'
+export { type RemovePlugin, type RemovePluginInput } from './remove-plugin.js'
+export { type ListPlugins, type ListPluginsInput, type ListPluginsEntry } from './list-plugins.js'
 export {
   type GetProjectContext,
   type GetProjectContextInput,

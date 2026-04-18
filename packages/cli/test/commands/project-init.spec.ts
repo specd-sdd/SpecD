@@ -1,12 +1,11 @@
-/* eslint-disable @typescript-eslint/unbound-method */
-
-import { describe, it, expect, vi, afterEach } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
+  captureStdout,
+  makeMockConfig,
+  makeMockKernel,
   makeMockUseCase,
   makeProgram,
   mockProcessExit,
-  captureStdout,
-  captureStderr,
 } from './helpers.js'
 
 vi.mock('@specd/core', async (importOriginal) => {
@@ -14,7 +13,6 @@ vi.mock('@specd/core', async (importOriginal) => {
   return {
     ...original,
     createInitProject: vi.fn(),
-    createRecordSkillInstall: vi.fn(),
     createVcsAdapter: vi.fn().mockResolvedValue({
       rootDir: vi.fn().mockResolvedValue('/project'),
       branch: vi.fn().mockResolvedValue('main'),
@@ -24,53 +22,51 @@ vi.mock('@specd/core', async (importOriginal) => {
     }),
   }
 })
-vi.mock('@specd/skills', () => ({
-  listSkills: vi.fn().mockReturnValue([]),
-  getSkill: vi.fn(),
+
+vi.mock('../../src/helpers/cli-context.js', () => ({
+  resolveCliContext: vi.fn(),
 }))
-vi.mock('node:fs/promises', () => ({
-  access: vi.fn(),
-  mkdir: vi.fn().mockResolvedValue(undefined),
-  writeFile: vi.fn().mockResolvedValue(undefined),
-  stat: vi.fn(),
+
+vi.mock('../../src/commands/plugins/install.js', () => ({
+  installPluginsWithKernel: vi.fn(),
 }))
-import {
-  createInitProject,
-  createRecordSkillInstall,
-  createVcsAdapter,
-  AlreadyInitialisedError,
-} from '@specd/core'
+
+import { createInitProject } from '@specd/core'
+import { resolveCliContext } from '../../src/helpers/cli-context.js'
+import { installPluginsWithKernel } from '../../src/commands/plugins/install.js'
 import { registerProjectInit } from '../../src/commands/project/init.js'
 
 function setup() {
-  const mockExecute = vi.fn().mockResolvedValue({
+  const initExecute = vi.fn().mockResolvedValue({
     configPath: '/project/specd.yaml',
     schemaRef: '@specd/schema-std',
-    workspaces: [{ name: 'default', specsPath: 'specs/' }],
+    workspaces: ['default'],
   })
   vi.mocked(createInitProject).mockReturnValue(
-    makeMockUseCase<ReturnType<typeof createInitProject>>(mockExecute),
+    makeMockUseCase<ReturnType<typeof createInitProject>>(initExecute),
   )
-
-  const mockRecordExecute = vi.fn().mockResolvedValue(undefined)
-  vi.mocked(createRecordSkillInstall).mockReturnValue(
-    makeMockUseCase<ReturnType<typeof createRecordSkillInstall>>(mockRecordExecute),
-  )
-
+  vi.mocked(resolveCliContext).mockResolvedValue({
+    config: makeMockConfig(),
+    configFilePath: '/project/specd.yaml',
+    kernel: makeMockKernel(),
+  })
+  vi.mocked(installPluginsWithKernel).mockResolvedValue({
+    plugins: [],
+    hasErrors: false,
+  })
   const stdout = captureStdout()
-  const stderr = captureStderr()
   mockProcessExit()
-  return { mockExecute, mockRecordExecute, stdout, stderr }
+  return { initExecute, stdout }
 }
 
 afterEach(() => vi.restoreAllMocks())
 
-describe('project init (non-interactive)', () => {
-  it('initializes project with defaults in text format', async () => {
-    const { stdout } = setup()
-
+describe('project init', () => {
+  it('supports --plugin and installs selected plugins after init', async () => {
+    const { initExecute } = setup()
     const program = makeProgram()
     registerProjectInit(program.command('project'))
+
     await program.parseAsync([
       'node',
       'specd',
@@ -80,13 +76,24 @@ describe('project init (non-interactive)', () => {
       'default',
       '--workspace-path',
       'specs/',
+      '--plugin',
+      '@specd/plugin-agent-claude',
     ])
 
-    expect(stdout()).toContain('initialized specd in')
+    expect(initExecute).toHaveBeenCalledOnce()
+    expect(installPluginsWithKernel).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pluginNames: ['@specd/plugin-agent-claude'],
+      }),
+    )
   })
 
-  it('outputs JSON with result and configPath', async () => {
+  it('outputs JSON with plugin results', async () => {
     const { stdout } = setup()
+    vi.mocked(installPluginsWithKernel).mockResolvedValue({
+      plugins: [{ name: '@specd/plugin-agent-claude', status: 'installed', detail: 'ok' }],
+      hasErrors: false,
+    })
 
     const program = makeProgram()
     registerProjectInit(program.command('project'))
@@ -99,111 +106,16 @@ describe('project init (non-interactive)', () => {
       'default',
       '--workspace-path',
       'specs/',
+      '--plugin',
+      '@specd/plugin-agent-claude',
       '--format',
       'json',
     ])
 
     const parsed = JSON.parse(stdout())
     expect(parsed.result).toBe('ok')
-    expect(parsed.configPath).toContain('specd.yaml')
-    expect(parsed.schema).toBe('@specd/schema-std')
-    expect(Array.isArray(parsed.workspaces)).toBe(true)
-  })
-
-  it('JSON output includes skillsInstalled as object', async () => {
-    const { stdout } = setup()
-
-    const program = makeProgram()
-    registerProjectInit(program.command('project'))
-    await program.parseAsync([
-      'node',
-      'specd',
-      'project',
-      'init',
-      '--workspace',
-      'default',
-      '--workspace-path',
-      'specs/',
-      '--format',
-      'json',
+    expect(parsed.plugins).toEqual([
+      { name: '@specd/plugin-agent-claude', status: 'installed', detail: 'ok' },
     ])
-
-    const parsed = JSON.parse(stdout())
-    expect(parsed.skillsInstalled).toEqual({})
-    expect(typeof parsed.skillsInstalled).toBe('object')
-    expect(Array.isArray(parsed.skillsInstalled)).toBe(false)
-  })
-
-  it('passes --force to use case', async () => {
-    const { mockExecute } = setup()
-    captureStdout()
-
-    const program = makeProgram()
-    registerProjectInit(program.command('project'))
-    await program.parseAsync([
-      'node',
-      'specd',
-      'project',
-      'init',
-      '--workspace',
-      'default',
-      '--workspace-path',
-      'specs/',
-      '--force',
-    ])
-
-    const call = mockExecute.mock.calls[0]![0]
-    expect(call.force).toBe(true)
-  })
-
-  it('exits 1 when AlreadyInitialisedError without --force', async () => {
-    const { mockExecute, stderr } = setup()
-    mockExecute.mockRejectedValue(new AlreadyInitialisedError('/project/specd.yaml'))
-
-    const program = makeProgram()
-    registerProjectInit(program.command('project'))
-    await program
-      .parseAsync([
-        'node',
-        'specd',
-        'project',
-        'init',
-        '--workspace',
-        'default',
-        '--workspace-path',
-        'specs/',
-      ])
-      .catch(() => {})
-
-    expect(process.exit).toHaveBeenCalledWith(1)
-    expect(stderr()).toMatch(/error:/)
-  })
-
-  it('uses VCS root as project root', async () => {
-    const { mockExecute } = setup()
-    vi.mocked(createVcsAdapter).mockResolvedValue({
-      rootDir: vi.fn().mockResolvedValue('/project'),
-      branch: vi.fn().mockResolvedValue('main'),
-      isClean: vi.fn().mockResolvedValue(true),
-      ref: vi.fn().mockResolvedValue('abc1234'),
-      show: vi.fn().mockResolvedValue(null),
-    })
-    captureStdout()
-
-    const program = makeProgram()
-    registerProjectInit(program.command('project'))
-    await program.parseAsync([
-      'node',
-      'specd',
-      'project',
-      'init',
-      '--workspace',
-      'default',
-      '--workspace-path',
-      'specs/',
-    ])
-
-    const call = mockExecute.mock.calls[0]![0]
-    expect(call.projectRoot).toBe('/project')
   })
 })

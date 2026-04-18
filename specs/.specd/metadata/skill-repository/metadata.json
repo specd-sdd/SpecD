@@ -1,0 +1,66 @@
+{
+  "title": "skills:skill-repository",
+  "description": "Defines the `SkillRepository` interface that provides access to skills and their bundles. This is the concrete implementation combining skill retrieval with bundle resolution.",
+  "dependsOn": ["skills:skill", "skills:skill-bundle"],
+  "context": [
+    "Defines the `SkillRepository` interface that provides access to skills and their bundles. This is the concrete implementation combining skill retrieval with bundle resolution."
+  ],
+  "rules": [
+    {
+      "requirement": "list() method",
+      "rules": [
+        "The `list()` method MUST:\n\n- Return an array of all `Skill` objects (metadata only, no template content)\n- Return `readonly Skill[]`"
+      ]
+    },
+    {
+      "requirement": "get() method",
+      "rules": [
+        "The `get()` method MUST:\n\n- Accept a `name: string` parameter\n- Return `Skill | undefined` — the skill with that name, or undefined if not found"
+      ]
+    },
+    {
+      "requirement": "getBundle() method",
+      "rules": [
+        "The `getBundle()` method MUST:\n\n- Accept `name: string` and optional `variables: Record<string, string>` (defaults to `{}`)\n- Return `SkillBundle` with all template files resolved\n- Replace `{{key}}` placeholders in template content with values from the variables map\n- Variables are passed at invocation time — the repository does not define predefined variables"
+      ]
+    },
+    {
+      "requirement": "listSharedFiles() method",
+      "rules": [
+        "The `listSharedFiles()` method MUST:\n\n- Scan the `templates/shared/` directory for `.meta.json` files\n- Return `SharedFile[]` where each `SharedFile` has:\n  - `filename: string`\n  - `content: string`\n  - `skills: string[]` — which skills use this shared file"
+      ]
+    }
+  ],
+  "constraints": ["No I/O in the interface definition — implementations handle I/O."],
+  "scenarios": [
+    {
+      "requirement": "list() method",
+      "name": "List returns skills",
+      "when": ["repository.list() is called"],
+      "then": ["an array of Skill objects is returned"]
+    },
+    {
+      "requirement": "get() method",
+      "name": "Get existing skill",
+      "when": ["repository.get('skill-name') is called for an existing skill"],
+      "then": ["the Skill object is returned"]
+    },
+    {
+      "requirement": "get() method",
+      "name": "Get non-existing skill",
+      "when": ["repository.get('nonexistent') is called"],
+      "then": ["undefined is returned"]
+    },
+    {
+      "requirement": "getBundle() method",
+      "name": "Get bundle with variables",
+      "when": ["repository.getBundle('skill-name', { key: 'value' }) is called"],
+      "then": ["placeholders {{key}} are replaced with 'value'"]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:cbf21ae312d1629d0251a46e76293e336308a69a34201fccec855b484d788c67",
+    "verify.md": "sha256:58cf7c8d5e6a08c81d5c9d4c6639db5d3b3f73532334e925c1ef4fb4dcd109ba"
+  },
+  "generatedBy": "core"
+}

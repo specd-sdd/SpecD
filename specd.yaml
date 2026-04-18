@@ -3,19 +3,22 @@ schema: '@specd/schema-std'
 # Agent instructions prepended before spec content
 context:
   - instruction: >-
-      specd is a spec-driven development platform. TypeScript, pnpm monorepo, ESM only.
-      Hexagonal architecture: domain (no I/O), application (ports), infrastructure (fs adapters).
-      Rich entities enforce invariants; pure functions for stateless services; manual DI, no IoC.
-      Packages: @specd/core (business logic), @specd/cli, @specd/mcp, @specd/skills,
-      @specd/schema-std, plugins (claude, copilot, codex).
-      Never write directly to specs/ folder. Use specd workflow skills or specd commands: draft spec,
-      implement, review, approve, merge, archive.
-      Specs live in specs/ — they are requirements, not documentation. Code implements specs.
-      Don't write code without a spec. Use specd's workflow: draft spec, implement, review, approve, merge, archive.
-      Always keep specs up to date. Specs are the source of truth, not code comments or external docs.
-      Always read existing specs before drafting new ones. Avoid duplicates; update existing specs instead.
-      Use specd's context features to include relevant specs in workflow steps. For example, include
-      'default:*' to always have global specs in context.
+      specd is a spec-driven development platform. TypeScript, pnpm monorepo,
+      ESM only. Hexagonal architecture: domain (no I/O), application (ports),
+      infrastructure (fs adapters). Rich entities enforce invariants; pure
+      functions for stateless services; manual DI, no IoC. Packages: @specd/core
+      (business logic), @specd/cli, @specd/mcp, @specd/skills,
+      @specd/schema-std, plugins (claude, copilot, codex). Never write directly
+      to specs/ folder. Use specd workflow skills or specd commands: draft spec,
+      implement, review, approve, merge, archive. Specs live in specs/ — they
+      are requirements, not documentation. Code implements specs. Don't write
+      code without a spec. Use specd's workflow: draft spec, implement, review,
+      approve, merge, archive. Always keep specs up to date. Specs are the
+      source of truth, not code comments or external docs. Always read existing
+      specs before drafting new ones. Avoid duplicates; update existing specs
+      instead. Use specd's context features to include relevant specs in
+      workflow steps. For example, include 'default:*' to always have global
+      specs in context.
 
 workspaces:
   default:
@@ -66,7 +69,6 @@ workspaces:
     ownership: owned
 
   skills:
-    prefix: skills
     specs:
       adapter: fs
       fs:
@@ -81,6 +83,38 @@ workspaces:
       fs:
         path: specs/plugins
     codeRoot: packages/plugins
+    ownership: owned
+
+  plugin-manager:
+    specs:
+      adapter: fs
+      fs:
+        path: specs/plugins-manager
+    codeRoot: packages/plugin-manager
+    ownership: owned
+
+  plugin-agent-claude:
+    specs:
+      adapter: fs
+      fs:
+        path: specs/plugins-claude
+    codeRoot: packages/plugin-agent-claude
+    ownership: owned
+
+  plugin-agent-copilot:
+    specs:
+      adapter: fs
+      fs:
+        path: specs/plugins-copilot
+    codeRoot: packages/plugin-agent-copilot
+    ownership: owned
+
+  plugin-agent-codex:
+    specs:
+      adapter: fs
+      fs:
+        path: specs/plugins-codex
+    codeRoot: packages/plugin-agent-codex
     ownership: owned
 
   public-web:
@@ -120,7 +154,7 @@ contextIncludeSpecs:
   - 'default:*'
 
 contextExcludeSpecs:
-  - 'default:commits'
+  - 'default:_global/commits'
 
 llmOptimizedContext: true
 
@@ -132,15 +166,16 @@ schemaOverrides:
           post:
             - id: designing-docs
               instruction: >-
-                You MUST add instructions to update documentation in docs/ if needed on the design.md.
+                You MUST add instructions to update documentation in docs/ if
+                needed on the design.md.
             - id: check-global-specs-compliance
               instruction: >-
-                Cross-reference this design against the global specs (default:_global/*):
-                architecture (hexagonal layers, dependency direction, no I/O in domain),
-                conventions (naming, exports, ESM, no default exports, no any),
-                and testing (test structure, coverage). Flag any decision that violates
-                a global constraint before proceeding.
-                Ensure proper JSDoc per default:_global/docs.
+                Cross-reference this design against the global specs
+                (default:_global/*): architecture (hexagonal layers, dependency
+                direction, no I/O in domain), conventions (naming, exports, ESM,
+                no default exports, no any), and testing (test structure,
+                coverage). Flag any decision that violates a global constraint
+                before proceeding. Ensure proper JSDoc per default:_global/docs.
 
     workflow:
       - step: designing
@@ -148,42 +183,13 @@ schemaOverrides:
           post:
             - id: designing-check-global-specs
               instruction: >-
-                Before finishing design, review all artifacts and deltas in this change
-                against the global specs (default:_global/*). Check compliance with:
-                architecture (hexagonal layers, dependency direction), conventions
-                (naming, exports, ESM), testing (structure, coverage expectations),
-                and any other applicable global constraint. Flag violations before
-                transitioning to ready.
-      - step: ready
-        hooks:
-          pre:
-            - id: design-release-info
-              instruction: >-
-                Run `specd change status` to get the list of affected specs,
-                then add or modify release metadata to the design.md frontmatter:
-
-                ```yaml
-                ---
-                release:
-                  <workspace>:<spec-path>: patch  # major | minor | patch per spec
-                  <workspace>:<spec-path>: minor
-                ---
-                ```
-
-                For each affected spec, set the appropriate bump type:
-                - 'major' — breaking API changes
-                - 'minor' — new features
-                - 'patch' — fixes, refactors, chores (default)
-
-                Example for a change affecting 2 specs:
-                ```yaml
-                ---
-                release:
-                  core:core/validate-artifacts: patch
-                  cli:cli/change-validate: minor
-                ---
-                ```
-
+                Before finishing design, review all artifacts and deltas in this
+                change against the global specs (default:_global/*). Check
+                compliance with: architecture (hexagonal layers, dependency
+                direction), conventions (naming, exports, ESM), testing
+                (structure, coverage expectations), and any other applicable
+                global constraint. Flag violations before transitioning to
+                ready.
       - step: implementing
         hooks:
           post:
@@ -205,6 +211,38 @@ schemaOverrides:
               run: 'pnpm test'
             - id: archiving-run-lint
               run: 'pnpm lint'
+            - id: archiving-edit-description
+              instruction: >-
+                Read the proposal.md anddesign.md files in this change directory.
+                Based on their content, write a more elaborate description (2-3 sentences)
+                that summarizes the change purpose and outcomes. Update the change
+                description using `specd change edit <change-name> --description "..."`.
+            - id: archiving-release-info
+              instruction: >-
+                Run `specd change status` to get the list of affected specs,
+                then create a `.changeset-release.yaml` file in the change
+                directory with release metadata:
+
+                ```yaml
+                releases:
+                  <workspace>:<spec-path>: patch  # major | minor | patch per spec
+                  <workspace>:<spec-path>: minor
+                ```
+
+                For each affected spec, set the appropriate bump type: - 'major'
+                — breaking API changes - 'minor' — new features - 'patch' —
+                fixes, refactors, chores (default)
+
+                Example for a change affecting 2 specs:
+                ```yaml
+                releases:
+                  core:core/validate-artifacts: patch
+                  cli:cli/change-validate: minor
+                ```
           post:
             - id: archiving-create-changeset
               run: 'node scripts/hooks/post-archive-changeset.js {{change.archivedName}}'
+
+plugins:
+  agents:
+    - name: '@specd/plugin-agent-claude'

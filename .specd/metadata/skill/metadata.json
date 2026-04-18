@@ -1,0 +1,62 @@
+{
+  "title": "skills:skill",
+  "description": "Defines the core domain models for skills: `Skill` and `SkillTemplate`. These are pure domain types with no I/O dependencies.",
+  "context": [
+    "Defines the core domain models for skills: `Skill` and `SkillTemplate`. These are pure domain types with no I/O dependencies."
+  ],
+  "rules": [
+    {
+      "requirement": "Skill interface",
+      "rules": [
+        "`Skill` MUST be an interface with:\n\n- `name: string` — unique identifier for the skill\n- `description: string` — human-readable description of what the skill does\n- `templates: SkillTemplate[]` — template files associated with this skill"
+      ]
+    },
+    {
+      "requirement": "SkillTemplate interface",
+      "rules": [
+        "`SkillTemplate` MUST be an interface with:\n\n- `filename: string` — template file name\n- `getContent(): Promise<string>` — lazy content loading, returns the template content"
+      ]
+    },
+    {
+      "requirement": "No I/O in domain",
+      "rules": [
+        "The domain layer MUST NOT contain any I/O (file system, network, etc.). All I/O happens in the infrastructure layer."
+      ]
+    },
+    {
+      "requirement": "Lazy content loading",
+      "rules": [
+        "Template content MUST be loaded lazily via `getContent()`. The `Skill` object itself MUST NOT hold loaded content in memory."
+      ]
+    }
+  ],
+  "constraints": [
+    "Domain types MUST be pure TypeScript interfaces.",
+    "No dependencies on node:fs or any I/O library."
+  ],
+  "scenarios": [
+    {
+      "requirement": "Skill interface",
+      "name": "Skill creation",
+      "when": ["a Skill object is created"],
+      "then": ["it has name, description, and templates properties"]
+    },
+    {
+      "requirement": "SkillTemplate interface",
+      "name": "Lazy content loading",
+      "when": ["getContent() is called on a SkillTemplate"],
+      "then": ["it returns the template content as a Promise"]
+    },
+    {
+      "requirement": "No I/O in domain",
+      "name": "Domain has no I/O imports",
+      "when": ["the domain layer is inspected"],
+      "then": ["no imports from node:fs or similar I/O modules exist"]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:b7fdf36d7c254d0f457eeb910aaa8af13bf7396c25c692bfbd9abf76fc661ac1",
+    "verify.md": "sha256:5e0968ac5105daf9f9b81322688d54f9ef280c3427040dd1836e10c3755d5618"
+  },
+  "generatedBy": "core"
+}

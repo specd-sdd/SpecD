@@ -9,13 +9,13 @@
     {
       "requirement": "Command signature",
       "rules": [
-        "```\nspecd project init [--schema <ref>] [--workspace <id>] [--workspace-path <path>] [--agent <id>...] [--force] [--format text|json|toon]\n```\n\n- `--schema <ref>` — optional; the schema reference to activate (e.g. `@specd/schema-std`, `./schemas/custom/schema.yaml`). Defaults to `@specd/schema-std`.\n- `--workspace <id>` — optional; the ID of the default workspace. Defaults to `default`.\n- `--workspace-path <path>` — optional; the specs path for the default workspace, relative to the config file. Defaults to `specs/`.\n- `--agent <id>` — optional, repeatable; agents to install skills for immediately after initialisation (e.g. `--agent claude`). When not provided in interactive mode, the wizard asks.\n- `--force` — optional; overwrite an existing config without prompting.\n- `--format text|json|toon` — optional; forces non-interactive mode; defaults to `text`."
+        "```\nspecd project init [--schema <ref>] [--workspace <id>] [--workspace-path <path>] [--plugin <name>...] [--force] [--format text|json|toon]\n```\n\n- `--schema <ref>` — optional; the schema reference to activate (e.g. `@specd/schema-std`, `./schemas/custom/schema.yaml`). Defaults to `@specd/schema-std`.\n- `--workspace <id>` — optional; the ID of the default workspace. Defaults to `default`.\n- `--workspace-path <path>` — optional; the specs path for the default workspace, relative to the config file. Defaults to `specs/`.\n- `--plugin <name>` — optional, repeatable; agent plugins to install after initialisation (e.g. `--plugin @specd/plugin-agent-claude`). When not provided in interactive mode, the wizard asks.\n- `--force` — optional; overwrite an existing config without prompting.\n- `--format text|json|toon` — optional; forces non-interactive mode; defaults to `text`."
       ]
     },
     {
       "requirement": "Interactive mode",
       "rules": [
-        "The command enters interactive mode when **all** of the following are true:\n\n- stdout is a TTY\n- `--format` is not `json` or `toon`\n- No configuration flags (`--schema`, `--workspace`, `--workspace-path`, `--agent`) are provided\n\nIn interactive mode the command presents a guided wizard:\n\n1. **Welcome header** — an ASCII banner and a short description of specd, shown once at startup.\n2. **Project settings prompts** — prompts for each setting with its default value pre-filled:\n   - Schema reference (default: `@specd/schema-std`)\n   - Default workspace ID (default: `default`)\n   - Specs path (default: `specs/`)\n3. **Agent selection** — a multi-select listing all known agents. The user selects which agents to install skills for. Selecting none is valid (skills can be installed later with `specd skills install`).\n4. **Confirmation summary** — shows the resolved settings and asks for confirmation before writing any files. If the user cancels, the command exits with code 0 and no files are written.\n5. **Progress** — a spinner is shown while `InitProject` runs and skills are installed.\n6. **Completion** — a success message with the project root path and next-step hints."
+        "The command enters interactive mode when **all** of the following are true:\n\n- stdout is a TTY\n- `--format` is not `json` or `toon`\n- No configuration flags (`--schema`, `--workspace`, `--workspace-path`, `--plugin`) are provided\n\nIn interactive mode the command presents a guided wizard:\n\n1. **Welcome header** — an ASCII banner and a short description of specd, shown once at startup.\n2. **Project settings prompts** — prompts for each setting with its default value pre-filled:\n   - Schema reference (default: `@specd/schema-std`)\n   - Default workspace ID (default: `default`)\n   - Specs path (default: `specs/`)\n3. **Plugin selection** — a multi-select listing available agent plugins. The user selects which plugins to install. Selecting none is valid (plugins can be installed later with `specd plugins install`)."
       ]
     },
     {
@@ -39,7 +39,7 @@
     {
       "requirement": "Skills installation after init",
       "rules": [
-        "After `InitProject` succeeds, if any agents were selected (interactively or via `--agent`), the CLI installs all skills for each selected agent using the same logic as `specd skills install all --agent <id>`, and records the installations in `specd.yaml` via `RecordSkillInstall`."
+        "After `InitProject` succeeds, if any plugins were selected (interactively or via `--plugin`), the CLI installs each selected plugin using `specd plugins install`. Each plugin's `install()` method handles writing its skill files."
       ]
     },
     {
@@ -58,30 +58,16 @@
   "scenarios": [
     {
       "requirement": "Command signature",
-      "name": "Unknown schema ref does not error at init time",
-      "when": ["specd project init --schema ./custom/schema.yaml is run"],
-      "then": [
-        "the command exits with code 0",
-        "AND specd.yaml is written with the given schema reference"
-      ]
+      "name": "--plugin flag",
+      "when": ["specd project init --plugin @specd/plugin-agent-claude is invoked"],
+      "then": ["the plugin is selected for installation"]
     },
     {
       "requirement": "Interactive mode",
-      "name": "Interactive mode is skipped when --format json is set",
-      "given": ["stdout is a TTY"],
-      "when": ["specd project init --format json is run with no other flags"],
-      "then": [
-        "no wizard prompts are shown",
-        "AND the command runs non-interactively with defaults",
-        "AND stdout is valid JSON"
-      ]
-    },
-    {
-      "requirement": "Interactive mode",
-      "name": "Interactive mode is skipped when any config flag is provided",
-      "given": ["stdout is a TTY"],
-      "when": ["specd project init --schema @specd/schema-std is run"],
-      "then": ["no wizard prompts are shown"]
+      "name": "Plugin selection wizard",
+      "given": ["interactive mode is active"],
+      "when": ["the user selects plugins"],
+      "then": ["selected plugins are marked for installation"]
     },
     {
       "requirement": "Non-interactive mode",
@@ -132,11 +118,11 @@
     },
     {
       "requirement": "Skills installation after init",
-      "name": "Skills are installed for selected agents after init",
-      "when": ["specd project init --workspace default --agent claude is run"],
+      "name": "Plugins are installed for selected plugins after init",
+      "when": ["specd project init --plugin @specd/plugin-agent-claude is run"],
       "then": [
-        "skill files are written to <git-root>/.claude/commands/",
-        "AND specd.yaml records the installed skills under skills.claude"
+        "each plugin's install() method is called",
+        "AND specd.yaml records the plugin under plugins.agents"
       ]
     },
     {
@@ -162,8 +148,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:ce74d845d0367530b24fd3008417bd08ada05bdb1fc4d308589c2516cffa566b",
-    "verify.md": "sha256:7ade80d114c3c229088640b78866fed9c5f5e7f0505637209731d56320398269"
+    "spec.md": "sha256:fd03ea39eac35e9b5525ad0de5e6733fa518e3eb453572f96de324b5c0e68d34",
+    "verify.md": "sha256:c8df257b20414f45eadab11aa0d4f7f5f460feaafd4c190059fb3b3b0989c6eb"
   },
   "generatedBy": "core"
 }

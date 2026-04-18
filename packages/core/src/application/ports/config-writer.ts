@@ -40,24 +40,40 @@ export interface ConfigWriter {
   initProject(options: InitProjectOptions): Promise<InitProjectResult>
 
   /**
-   * Records that a skill set was installed for a given agent by merging the
-   * skill names into the `skills` key of `specd.yaml`.
+   * Adds or updates a plugin declaration under `plugins.<type>`.
    *
    * @param configPath - Absolute path to the `specd.yaml` to update
-   * @param agent - The agent name (e.g. `'claude'`)
-   * @param skillNames - The skill names to record
+   * @param type - Plugin type key (e.g. `'agents'`)
+   * @param name - Plugin package name
+   * @param config - Optional plugin-specific config
+   * @returns A promise that resolves when persistence completes
    */
-  recordSkillInstall(
+  addPlugin(
     configPath: string,
-    agent: string,
-    skillNames: readonly string[],
+    type: string,
+    name: string,
+    config?: Record<string, unknown>,
   ): Promise<void>
 
   /**
-   * Reads the `skills` key from `specd.yaml` and returns it, or `{}` if absent.
+   * Removes a plugin declaration by name from `plugins.<type>`.
+   *
+   * @param configPath - Absolute path to the `specd.yaml` to update
+   * @param type - Plugin type key (e.g. `'agents'`)
+   * @param name - Plugin package name
+   * @returns A promise that resolves when persistence completes
+   */
+  removePlugin(configPath: string, type: string, name: string): Promise<void>
+
+  /**
+   * Lists plugin declarations, optionally filtered by type.
    *
    * @param configPath - Absolute path to the `specd.yaml` to read
-   * @returns A map of agent name → list of installed skill names
+   * @param type - Optional plugin type filter
+   * @returns Declared plugin entries
    */
-  readSkillsManifest(configPath: string): Promise<Record<string, string[]>>
+  listPlugins(
+    configPath: string,
+    type?: string,
+  ): Promise<Array<{ name: string; config?: Record<string, unknown> }>>
 }

@@ -1,0 +1,51 @@
+{
+  "title": "skills:resolve-bundle",
+  "description": "Use case for resolving a skill bundle with variable substitution.",
+  "dependsOn": ["skills:skill-bundle", "skills:skill-repository-port"],
+  "context": ["Use case for resolving a skill bundle with variable substitution."],
+  "rules": [
+    {
+      "requirement": "Input",
+      "rules": [
+        "The input MUST contain:\n\n```typescript\ninterface ResolveBundleInput {\n  name: string\n  variables?: Record<string, string>\n}\n```\n\n`variables` defaults to an empty object."
+      ]
+    },
+    {
+      "requirement": "Output",
+      "rules": [
+        "The output MUST contain:\n\n```typescript\ninterface ResolveBundleOutput {\n  bundle: SkillBundle\n}\n```"
+      ]
+    },
+    {
+      "requirement": "Behavior",
+      "rules": [
+        "The use case MUST:\n\n1. Call `SkillRepository.getBundle(input.name, input.variables || {})`\n2. Replace `{{key}}` placeholders in each template file with values from the variables map\n3. Return the resolved bundle"
+      ]
+    }
+  ],
+  "constraints": [
+    "Variables are passed at invocation time.",
+    "The repository does not define predefined variables."
+  ],
+  "scenarios": [
+    {
+      "requirement": "Input",
+      "name": "With variables",
+      "when": [
+        "ResolveBundle use case is executed with { name: 'skill', variables: { key: 'value' } }"
+      ],
+      "then": ["it replaces {{key}} with 'value'"]
+    },
+    {
+      "requirement": "Input",
+      "name": "Without variables",
+      "when": ["ResolveBundle use case is executed with { name: 'skill' }"],
+      "then": ["placeholders remain as-is"]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:1486bd4878c9098ca4209c2e2830785636163906de0c93c21d2835efd77c89ef",
+    "verify.md": "sha256:c8260766bde230e30fc1e51322278ea243e8d21cbe55944e3b8706f410c5214b"
+  },
+  "generatedBy": "core"
+}

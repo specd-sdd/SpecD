@@ -1,0 +1,51 @@
+{
+  "title": "plugin-manager:update-plugin-use-case",
+  "description": "Use case that orchestrates plugin update. This is an idempotent reinstall that does not modify config.",
+  "dependsOn": ["plugin-manager:agent-plugin-type", "plugin-manager:plugin-loader"],
+  "context": [
+    "Use case that orchestrates plugin update. This is an idempotent reinstall that does not modify config."
+  ],
+  "rules": [
+    {
+      "requirement": "Input",
+      "rules": [
+        "Same as `InstallPluginInput`:\n\n```typescript\ninterface UpdatePluginInput {\n  readonly pluginName: string\n  readonly projectRoot: string\n  readonly options?: Record<string, unknown>\n}\n```"
+      ]
+    },
+    {
+      "requirement": "Output",
+      "rules": [
+        "Same as `InstallPluginOutput`:\n\n```typescript\ninterface UpdatePluginOutput {\n  readonly success: boolean\n  readonly message: string\n  readonly data?: unknown\n}\n```"
+      ]
+    },
+    {
+      "requirement": "Behavior",
+      "rules": [
+        "The use case MUST:\n\n1. Load the plugin via `PluginLoader`\n2. Call the plugin's `install()` method (same as install, but no config mutation)\n3. Return a generic result"
+      ]
+    },
+    {
+      "requirement": "Idempotency",
+      "rules": [
+        "The use case MUST be idempotent — calling it multiple times produces the same result."
+      ]
+    }
+  ],
+  "constraints": [
+    "This use case does NOT modify config.",
+    "The CLI is responsible for any config operations."
+  ],
+  "scenarios": [
+    {
+      "requirement": "Idempotency",
+      "name": "Multiple updates produce same result",
+      "when": ["UpdatePlugin is executed twice"],
+      "then": ["both return the same result"]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:8a613745cb52a226b75388190629727a1f16a2d8082a8482a743ffd17835beea",
+    "verify.md": "sha256:0aa31131ba359517c26bb5c9268319ff523db901c12c409829b454fd7c078891"
+  },
+  "generatedBy": "core"
+}

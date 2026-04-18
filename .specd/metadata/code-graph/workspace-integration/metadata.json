@@ -1,6 +1,7 @@
 {
   "title": "Workspace Integration",
   "description": "`@specd/code-graph` must integrate with specd's multi-workspace system to index code and specs from each workspace individually, while storing everything in a single graph database. This enables cross-workspace impact analysis and ensures file paths are globally unique across workspaces.",
+  "dependsOn": ["core:core/config"],
   "context": [
     "`@specd/code-graph` must integrate with specd's multi-workspace system to index code and specs from each workspace individually, while storing everything in a single graph database. This enables cross-workspace impact analysis and ensures file paths are globally unique across workspaces."
   ],
@@ -237,6 +238,5 @@
     "spec.md": "sha256:e0f9bcf36e6456a84da9340cdac3174ae1192632be5ba29ec032b9efe54764ad",
     "verify.md": "sha256:afed709823fa591672e23decadfc8161b4e599ebba79446e8ccda078ee5582c8"
   },
-  "generatedBy": "core",
-  "dependsOn": ["core:core/config"]
+  "generatedBy": "core"
 }

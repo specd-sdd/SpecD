@@ -118,13 +118,13 @@
     {
       "requirement": "Plugin declarations",
       "rules": [
-        "`specd.yaml` may include a `plugins` section declaring which agent-integration plugins are installed. Each entry must include `name`; `options` is plugin-specific and optional.\n\n```yaml\nplugins:\n  - name: '@specd/plugin-claude'\n  - name: '@specd/plugin-copilot'\n    options:\n      commandsDir: .github/copilot/instructions\n```\n\nPlugin declarations are used by `specd project init`, `specd plugin add`, and `specd project update` to install and maintain the plugin's skill files and hooks in the project. They do not affect schema resolution, storage, or context compilation."
+        "`specd.yaml` MUST include a `plugins` section declaring installed plugins, grouped by type. Each entry MUST include `name`; `config` is plugin-specific and optional.\n\n```yaml\nplugins:\n  agents:\n    - name: '@specd/plugin-agent-claude'\n    - name: '@specd/plugin-agent-copilot'\n      config:\n        commandsDir: .github/copilot/instructions\n```\n\n- `plugins.agents` is an array of plugin declarations\n- Each entry has `name` (required) and optional `config` (plugin-specific)\n- ConfigWriter.addPlugin() adds to this array\n- ConfigWriter.removePlugin() removes by name\n- ConfigWriter.listPlugins() returns this array"
       ]
     },
     {
       "requirement": "Config writer port",
       "rules": [
-        "`@specd/core` exposes a `ConfigWriter` application port for all operations that mutate `specd.yaml`. Adapters (CLI, MCP) never serialise or deserialise YAML directly — they call use cases that delegate to `ConfigWriter`.\n\nThe port defines the following operations:\n\n- **`initProject(options)`** — writes a new `specd.yaml` at the given path with the provided schema reference, workspace id, and workspace specs path. Fails if the file already exists and `force` is false. Also creates the standard storage directories (`changes/`, `drafts/`, `discarded/`, `archive/`), appends `specd.local.yaml` to `.gitignore`, and creates a `.gitignore` inside the archive directory to exclude `index.jsonl`.\n- **`recordSkillInstall(configPath, agent, skillNames)`** — adds the given skill names to `specd.yaml`'s `skills.<agent>` array, deduplicating existing entries.\n- **`readSkillsManifest(configPath)`** — returns the `skills` section of `specd.yaml` as a typed map `{ [agent: string]: string[] }`. This is a targeted read that does not require a fully validated `SpecdConfig`.\n\nThe `FsConfigWriter` adapter implements this port using the filesystem. It reads the existing YAML (when required), makes the targeted mutation, and writes the file back, preserving comments and key order as much as the YAML library permits.\n\n**Responsibility boundary:** `@specd/core` owns all YAML serialisation and deserialisation. Adapters (CLI, MCP) call use cases with typed inputs and receive typed outputs — they never read or write `specd.yaml` directly. Conversely, `@specd/core` never writes agent-specific files (e.g. `.claude/commands/*.md`) — those are adapter-layer concerns. This boundary is intentional: `@specd/skills` depends on `@specd/core`, not the other way around, so core cannot resolve skill content.\n\nUse cases that call `ConfigWriter`:\n\n| Use case             | Operation            |\n| -------------------- | -------------------- |\n| `InitProject`        | `initProject`        |\n| `RecordSkillInstall` | `recordSkillInstall` |\n| `GetSkillsManifest`  | `readSkillsManifest` |"
+        "`@specd/core` exposes a `ConfigWriter` application port for all operations that mutate `specd.yaml`. Adapters (CLI, MCP) never serialise or deserialise YAML directly — they call use cases that delegate to `ConfigWriter`.\n\nThe port defines the following operations:\n\n- **`initProject(options)`** — writes a new `specd.yaml` at the given path with the provided schema reference, workspace id, and workspace specs path.\n- **`addPlugin(configPath, type, name)`** — adds a plugin to `plugins.<type>` array.\n- **`removePlugin(configPath, type, name)`** — removes a plugin from `plugins.<type>` array by name.\n- **`listPlugins(configPath, type?)`** — returns declared plugins, optionally filtered by type.\n\nThe `FsConfigWriter` adapter implements this port.\n\nSee [`core:core/config-writer-port`](../config-writer-port/spec.md) for full method specifications."
       ]
     },
     {
@@ -546,11 +546,31 @@
     },
     {
       "requirement": "Plugin declarations",
-      "name": "Plugin installed",
-      "when": ["plugins: [{ name: \"@specd/plugin-claude\" }] is declared"],
-      "then": [
-        "specd update ensures the plugin's skill files and hook configuration are up to date"
-      ]
+      "name": "Plugins section with agents array",
+      "when": ["specd.yaml has a plugins section"],
+      "then": ["it contains an agents array"]
+    },
+    {
+      "requirement": "Plugin declarations",
+      "name": "Agent plugin entry",
+      "given": ["plugins.agents has an entry"],
+      "then": ["each entry has name (required) and optional config"]
+    },
+    {
+      "requirement": "Plugin declarations",
+      "name": "ConfigWriter.addPlugin adds to array",
+      "when": [
+        "ConfigWriter.addPlugin(configPath, 'agents', '@specd/plugin-agent-claude') is called"
+      ],
+      "then": ["the plugin is added to plugins.agents array"]
+    },
+    {
+      "requirement": "Plugin declarations",
+      "name": "ConfigWriter.removePlugin removes from array",
+      "when": [
+        "ConfigWriter.removePlugin(configPath, 'agents', '@specd/plugin-agent-claude') is called"
+      ],
+      "then": ["the plugin is removed from the array"]
     },
     {
       "requirement": "Context spec selection",
@@ -879,8 +899,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:10738afce6cd518911f64dfa75f2e1462c491c0bc2cf2d2e6eae38042cb90ea5",
-    "verify.md": "sha256:c3d740a7ac92e6d4a4d30fd547c36dc0496e3274496c5ed46ceb3b2b6a0ddd5a"
+    "spec.md": "sha256:23beede952de343ef315a4d9f1fef25f334ece4a8b9957c742ff46de5253fdec",
+    "verify.md": "sha256:42f99bd3fcc7a6972003ececa8c89b956f9519be48f09ae06470767ff221445d"
   },
   "generatedBy": "core"
 }

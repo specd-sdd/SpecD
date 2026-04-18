@@ -1,0 +1,53 @@
+# plugin-manager:update-plugin-use-case
+
+## Purpose
+
+Use case that orchestrates plugin update. This is an idempotent reinstall that does not modify config.
+
+## Requirements
+
+### Requirement: Input
+
+Same as `InstallPluginInput`:
+
+```typescript
+interface UpdatePluginInput {
+  readonly pluginName: string
+  readonly projectRoot: string
+  readonly options?: Record<string, unknown>
+}
+```
+
+### Requirement: Output
+
+Same as `InstallPluginOutput`:
+
+```typescript
+interface UpdatePluginOutput {
+  readonly success: boolean
+  readonly message: string
+  readonly data?: unknown
+}
+```
+
+### Requirement: Behavior
+
+The use case MUST:
+
+1. Load the plugin via `PluginLoader`
+2. Call the plugin's `install()` method (same as install, but no config mutation)
+3. Return a generic result
+
+### Requirement: Idempotency
+
+The use case MUST be idempotent — calling it multiple times produces the same result.
+
+## Constraints
+
+- This use case does NOT modify config.
+- The CLI is responsible for any config operations.
+
+## Spec Dependencies
+
+- [`plugin-manager:agent-plugin-type`](../agent-plugin-type/spec.md) — plugin interface
+- [`plugin-manager:plugin-loader`](../plugin-loader/spec.md) — loads plugins

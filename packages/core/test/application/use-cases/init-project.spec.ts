@@ -11,8 +11,9 @@ function makeConfigWriter(overrides: Partial<ConfigWriter> = {}) {
   })
   const writer: ConfigWriter = {
     initProject,
-    recordSkillInstall: vi.fn().mockResolvedValue(undefined),
-    readSkillsManifest: vi.fn().mockResolvedValue({}),
+    addPlugin: vi.fn().mockResolvedValue(undefined),
+    removePlugin: vi.fn().mockResolvedValue(undefined),
+    listPlugins: vi.fn().mockResolvedValue([]),
     ...overrides,
   }
   return { writer, initProject }
