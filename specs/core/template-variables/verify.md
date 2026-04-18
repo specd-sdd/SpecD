@@ -104,3 +104,16 @@
 - **GIVEN** a change named `add-auth` in workspace `default` at path `/project/changes/add-auth`
 - **WHEN** the use case builds the variable map
 - **THEN** the map contains `{ change: { name: "add-auth", workspace: "default", path: "/project/changes/add-auth" } }`
+
+#### Scenario: Archived context includes change.archivedName
+
+- **GIVEN** an archived runtime context with archived name `20260418-103000-add-auth`
+- **WHEN** the use case builds the variable map for archived post-hook execution
+- **THEN** the map includes `change.archivedName`
+- **AND** `change.archivedName` equals `20260418-103000-add-auth`
+
+#### Scenario: Active context may omit change.archivedName
+
+- **GIVEN** an active (non-archived) runtime context
+- **WHEN** the use case builds the variable map
+- **THEN** `change.archivedName` may be absent without invalidating expansion

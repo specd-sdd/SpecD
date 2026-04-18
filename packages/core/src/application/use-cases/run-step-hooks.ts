@@ -140,6 +140,7 @@ export class RunStepHooks {
         const variables: TemplateVariables = {
           change: {
             name: archived.name,
+            archivedName: archived.archivedName,
             workspace,
             path: this._archive.archivePath(archived),
           },

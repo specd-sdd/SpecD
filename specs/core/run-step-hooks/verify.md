@@ -81,6 +81,24 @@
 - **WHEN** `RunStepHooks.execute` is called with `only: "guidance"`
 - **THEN** `HookNotFoundError` is thrown with reason `'wrong-type'`
 
+### Requirement: HookVariables construction
+
+#### Scenario: Archived post-phase includes archivedName in change namespace
+
+- **GIVEN** the active change is not found in `ChangeRepository`
+- **AND** the request is `step: "archiving"` with `phase: "post"`
+- **AND** the archived change exists with archived name `20260418-103000-add-auth`
+- **WHEN** `RunStepHooks.execute` builds `TemplateVariables` for hook execution
+- **THEN** the `change` namespace includes `name`, `workspace`, `path`, and `archivedName`
+- **AND** `change.archivedName` equals `20260418-103000-add-auth`
+
+#### Scenario: Active change path may omit archivedName
+
+- **GIVEN** the change is loaded from `ChangeRepository`
+- **WHEN** `RunStepHooks.execute` builds `TemplateVariables`
+- **THEN** the `change` namespace includes `name`, `workspace`, and `path`
+- **AND** `change.archivedName` may be absent
+
 ### Requirement: Pre-phase execution (fail-fast)
 
 #### Scenario: First hook failure stops execution
