@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/unbound-method */
+ 
 
 /**
  * Tests for list-only commands:
@@ -417,6 +417,7 @@ describe('archive list', () => {
         name: 'old-feat',
         archivedName: '2026-01-15-old-feat',
         archivedAt: new Date('2026-01-15T10:00:00Z'),
+        workspaces: ['default'],
         artifacts: new Set(['spec.md']),
       },
     ])
@@ -437,7 +438,7 @@ describe('archive list', () => {
         name: 'old-feat',
         archivedName: '2026-01-15-old-feat',
         archivedAt: new Date('2026-01-15T10:00:00Z'),
-        workspace: { toString: () => 'default' },
+        workspaces: ['default'],
         artifacts: new Set(['spec']),
       },
     ])
@@ -460,12 +461,14 @@ describe('archive list', () => {
         name: 'older-change',
         archivedName: '2024-01-10-older-change',
         archivedAt: new Date('2024-01-10T10:00:00Z'),
+        workspaces: ['default'],
         artifacts: new Set(['spec.md']),
       },
       {
         name: 'newer-change',
         archivedName: '2024-01-15-newer-change',
         archivedAt: new Date('2024-01-15T10:00:00Z'),
+        workspaces: ['default'],
         artifacts: new Set(['spec.md']),
       },
     ])
@@ -515,7 +518,7 @@ describe('archive show', () => {
       name: 'old-feat',
       archivedName: '2026-01-15-old-feat',
       archivedAt: new Date('2026-01-15T10:00:00Z'),
-      workspace: { toString: () => 'default' },
+      workspaces: ['default'],
       specIds: ['auth/login'],
       schemaName: 'schema-std',
       schemaVersion: 1,
@@ -543,7 +546,7 @@ describe('archive show', () => {
       name: 'old-feat',
       archivedName: '2026-01-15-old-feat',
       archivedAt: new Date('2026-01-15T10:00:00Z'),
-      workspace: { toString: () => 'default' },
+      workspaces: ['default'],
       specIds: ['auth/login'],
       schemaName: 'schema-std',
       schemaVersion: 1,
@@ -575,7 +578,7 @@ describe('archive show', () => {
       name: 'add-oauth-login',
       archivedName: '2024-01-15-add-oauth-login',
       archivedAt: new Date('2024-01-15T12:00:00Z'),
-      workspace: { toString: () => 'default' },
+      workspaces: ['default'],
       specIds: ['auth/oauth'],
       schemaName: 'schema-std',
       schemaVersion: 1,
@@ -597,7 +600,7 @@ describe('archive show', () => {
       name: 'add-oauth-login',
       archivedName: '2024-01-15-add-oauth-login',
       archivedAt: new Date('2024-01-15T12:00:00Z'),
-      workspace: { toString: () => 'default' },
+      workspaces: ['default'],
       specIds: ['auth/oauth'],
       schemaName: 'schema-std',
       schemaVersion: 1,

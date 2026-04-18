@@ -1,14 +1,12 @@
 import { describe, it, expect } from 'vitest'
 import { ListArchived } from '../../../src/application/use-cases/list-archived.js'
 import { ArchivedChange } from '../../../src/domain/entities/archived-change.js'
-import { SpecPath } from '../../../src/domain/value-objects/spec-path.js'
 import { type ArchiveRepository } from '../../../src/application/ports/archive-repository.js'
 
 function makeArchivedChange(name: string): ArchivedChange {
   return new ArchivedChange({
     name,
     archivedName: name,
-    workspace: SpecPath.parse('default'),
     archivedAt: new Date('2024-01-01T00:00:00Z'),
     artifacts: ['spec'],
     specIds: ['auth/login'],

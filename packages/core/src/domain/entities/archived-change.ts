@@ -1,4 +1,3 @@
-import { SpecPath } from '../value-objects/spec-path.js'
 import { type ActorIdentity } from './change.js'
 
 /**
@@ -9,8 +8,6 @@ export interface ArchivedChangeProps {
   readonly name: string
   /** The name used for the archive directory (may differ from `name`). */
   readonly archivedName: string
-  /** The workspace under which the change's specs lived. */
-  readonly workspace: SpecPath
   /** Timestamp when the change was archived. */
   readonly archivedAt: Date
   /** Git identity of the actor who archived the change, if recorded. */
@@ -34,7 +31,6 @@ export interface ArchivedChangeProps {
 export class ArchivedChange {
   private readonly _name: string
   private readonly _archivedName: string
-  private readonly _workspace: SpecPath
   private readonly _archivedAt: Date
   private readonly _archivedBy: ActorIdentity | undefined
   private readonly _artifacts: readonly string[]
@@ -50,7 +46,6 @@ export class ArchivedChange {
   constructor(props: ArchivedChangeProps) {
     this._name = props.name
     this._archivedName = props.archivedName
-    this._workspace = props.workspace
     this._archivedAt = new Date(props.archivedAt.getTime())
     this._archivedBy = props.archivedBy
     this._artifacts = [...props.artifacts]
@@ -67,11 +62,6 @@ export class ArchivedChange {
   /** The name used for the archive directory. */
   get archivedName(): string {
     return this._archivedName
-  }
-
-  /** The workspace under which the change's specs lived. */
-  get workspace(): SpecPath {
-    return this._workspace
   }
 
   /** Timestamp when the change was archived. */
@@ -102,5 +92,17 @@ export class ArchivedChange {
   /** Version of the schema that governed the change. */
   get schemaVersion(): number {
     return this._schemaVersion
+  }
+
+  /** Workspaces derived from specIds at runtime. */
+  get workspaces(): readonly string[] {
+    const set = new Set<string>()
+    for (const id of this._specIds) {
+      const colonIdx = id.indexOf(':')
+      if (colonIdx >= 0) {
+        set.add(id.substring(0, colonIdx))
+      }
+    }
+    return [...set]
   }
 }

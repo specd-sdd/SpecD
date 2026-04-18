@@ -44,7 +44,7 @@ JSON/TOON output schema:
             output('no archived changes', 'text')
           } else {
             const dates = changes.map((c) => c.archivedAt.toISOString().slice(0, 10))
-            const workspaces = changes.map((c) => c.workspace?.toString() ?? '')
+            const workspaces = changes.map((c) => c.workspaces[0] ?? '')
             const byCol = changes.map((c) => (c.archivedBy ? `by ${c.archivedBy.name}` : ''))
             output(
               renderTable(
@@ -71,7 +71,7 @@ JSON/TOON output schema:
             changes.map((c) => ({
               name: c.name,
               archivedName: c.archivedName,
-              workspace: c.workspace?.toString() ?? '',
+              workspace: c.workspaces[0] ?? '',
               archivedAt: c.archivedAt.toISOString(),
               ...(c.archivedBy
                 ? { archivedBy: { name: c.archivedBy.name, email: c.archivedBy.email } }

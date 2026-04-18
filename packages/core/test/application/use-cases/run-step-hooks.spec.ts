@@ -678,8 +678,8 @@ describe('RunStepHooks', () => {
       ).rejects.toThrow(ChangeNotFoundError)
     })
 
-    it('builds template variables from ArchivedChange properties', async () => {
-      const archived = makeArchivedChange('my-change', { workspace: 'core' })
+it('builds template variables from ArchivedChange properties', async () => {
+      const archived = makeArchivedChange('my-change', { specIds: ['core:test'] })
       let capturedVars: unknown = null
       const hookRunner = {
         async run(_command: string, variables: unknown): Promise<HookResult> {

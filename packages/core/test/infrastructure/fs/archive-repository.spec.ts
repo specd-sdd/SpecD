@@ -73,13 +73,13 @@ async function makeArchivableChange(
   const change = new Change({
     name,
     createdAt: at,
-    specIds: ['auth/login'],
+    specIds: ['default:auth/login'],
     history: [
       {
         type: 'created',
         at,
         by: actor,
-        specIds: ['auth/login'],
+        specIds: ['default:auth/login'],
         schemaName: '@specd/schema-std',
         schemaVersion: 1,
       },
@@ -152,7 +152,7 @@ describe('FsArchiveRepository', () => {
 
       expect(archivedChange.name).toBe('add-auth')
       expect(archivedChange.archivedName).toBe(changeDirName('add-auth', change.createdAt))
-      expect(archivedChange.workspace.toString()).toBe('default')
+      expect(archivedChange.workspaces[0]).toBe('default')
       expect(archivedChange.archivedAt).toBeInstanceOf(Date)
       expect(archivedChange.artifacts).toEqual([])
     })
