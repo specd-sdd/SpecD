@@ -88,6 +88,9 @@ When `only` is provided, `RunStepHooks` MUST filter the collected hook list to t
 - `change.name` — the change name (from `Change.name` or `ArchivedChange.name`)
 - `change.workspace` — the primary workspace (from `Change.workspaces[0]` or `ArchivedChange.workspace`)
 - `change.path` — the absolute path to the change directory (via `ChangeRepository.changePath()` for active changes, or `ArchiveRepository.archivePath()` for archived changes)
+- `change.archivedName` — the archived directory basename (`YYYYMMDD-HHmmss-<name>`) when the archived fallback path is used (archiving post phase)
+
+For active changes (non-archived lookup path), `change.archivedName` may be absent.
 
 Built-in variables (e.g. `project.root`) are already present in the `TemplateExpander` — the use case only builds the contextual `change` namespace.
 

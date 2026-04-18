@@ -700,6 +700,7 @@ describe('RunStepHooks', () => {
       expect(capturedVars).toEqual({
         change: {
           name: 'my-change',
+          archivedName: archived.archivedName,
           workspace: 'core',
           path: `/test/archive/${archived.archivedName}`,
         },
