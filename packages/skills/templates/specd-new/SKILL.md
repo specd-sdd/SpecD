@@ -245,6 +245,8 @@ Create tasks at the start for session visibility. Update them as you go.
 
 ## Guardrails
 
+- Do NOT write any code — this skill is for discovery and change creation only
+- Do NOT modify any existing files in the codebase
 - Do NOT create artifacts — that's `/specd-design`
 - Do NOT skip the discovery conversation to rush to creation
 - Spec IDs must be `workspace:capability-path` — look up from `spec list`, never guess

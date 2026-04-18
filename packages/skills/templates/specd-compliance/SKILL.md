@@ -11,13 +11,13 @@ The skill supports four modes, determined by the argument passed:
 | Argument                  | Mode              | What it audits                                                 |
 | ------------------------- | ----------------- | -------------------------------------------------------------- |
 | _(empty)_                 | **Full**          | Every spec in `specs/` — full project audit                    |
-| `core/change`             | **Single Spec**   | Only the specified spec (`specs/core/change/`)                 |
+| `core:core/change`        | **Single Spec**   | Only the specified spec (e.g., `core:core/change`)             |
 | `--changed`               | **Changed Files** | Only specs whose implementation files have uncommitted changes |
 | `--pr 42` or `--pr <url>` | **Pull Request**  | Only specs whose implementation files are touched by the PR    |
 
 ### Mode details
 
-**Single Spec** — The argument is a spec path relative to `specs/` (e.g., `core/change`, `_global/testing`). It resolves to `specs/{argument}/spec.md`. If the spec doesn't exist, report an error and stop. No subagent batching — audit inline or with a single subagent.
+**Single Spec** — The argument is a spec ID in `workspace:path` format (e.g., `core:core/change`, `default:_global/testing`). Run `specd spec show <specId>` to verify the spec exists. If not found, report an error and stop. No subagent batching — audit inline or with a single subagent.
 
 **Changed Files (`--changed`)** — Scoped audit based on uncommitted changes (staged + unstaged):
 
@@ -44,7 +44,7 @@ For `--changed` and `--pr` modes, map changed files to specs using this algorith
    b. Find all specs under `specs/<pkg>/`
    c. For each spec, check if the changed file is related:
    - **Name matching**: Does the changed file path contain the spec name or a derivative? (e.g., `change.ts` → `specs/core/change/`, `spec-loader.ts` → `specs/core/spec-loading/`)
-   - **GitNexus mapping**: Run `gitnexus_context({name: "<exported symbol from changed file>"})` to find which execution flows the changed code participates in. Map flow names to spec areas.
+   - **Graph mapping**: Run `specd graph impact --symbol "<exported symbol>" --direction both` to find which execution flows the changed code participates in. Map flow names to spec areas.
    - **Broad match fallback**: If neither name nor GitNexus produces a confident match, include ALL specs for that package (better to over-audit than miss something).
 
 3. **Config/tooling changes**: If files like `tsconfig.json`, `.eslintrc.*`, `vitest.config.*`, `package.json`, or files outside `packages/` changed → include relevant global specs (`specs/_global/`).
@@ -95,7 +95,7 @@ Parse the argument to determine the audit mode:
 3. **Argument starts with `--pr`** → `mode = pr`, extract the PR number/URL from the rest of the argument
 4. **Anything else** → `mode = single`, treat the argument as a spec path relative to `specs/`
 
-For single mode, validate that `specs/{argument}/spec.md` exists. If not, report an error and stop.
+For single mode, run `specd spec show <specId>` to verify the spec exists. If not found, report an error and stop.
 
 ### Phase 1 — Discovery and Setup
 
@@ -111,33 +111,34 @@ mkdir -p .specd/reports/spec-compliance
 date +"%Y%m%d-%H%M%S"
 ```
 
-3. **Check GitNexus index freshness.** Read `gitnexus://repo/specd/context` to verify the index is not stale. If stale, run `npx gitnexus analyze` before proceeding.
+3. **Check code graph freshness.** Run `specd graph stats --format json` to verify the graph is not stale. If stale, run `specd graph index` before proceeding.
 
-4. **Build a codebase map from GitNexus.** Read `gitnexus://repo/specd/clusters` to get all functional areas and their cohesion scores. This gives you a structural understanding of how code is organized — use it to map specs to the right code areas instead of guessing from file paths alone.
-
-5. **Resolve the spec scope** based on the detected mode:
+4. **Resolve the spec scope** based on the detected mode:
 
    **If `mode = full`:**
-   - Use Glob to find every `spec.md` under `specs/`: `specs/**/spec.md`
-   - Categorize by top-level directory:
-     - `specs/_global/*` → Global specs (apply to all packages)
-     - `specs/<package>/*` → Package-specific specs
+   - Run `specd spec list --format json` to get all specs
+   - Parse the JSON and categorize by workspace:
+     - `default:_global/*` → Global specs (apply to all packages)
+     - `core:*` → Core package specs
+     - `cli:*` → CLI package specs
+     - etc.
 
    **If `mode = single`:**
-   - The scope is just `specs/{argument}/spec.md`
-   - Also read its `## Spec Dependencies` and include those specs (depth 1)
+   - Run `specd spec show <specId>` to get the spec content
+   - Extract spec dependencies from the spec's `## Spec Dependencies` section
+   - Run `specd spec show` for each dependency (depth 1)
 
    **If `mode = changed`:**
    - Run: `git diff --name-only HEAD` and `git ls-files --others --exclude-standard`
-   - Apply the **File-to-Spec Mapping** algorithm (see Audit Modes section above)
+   - Map changed files to affected specs (see "File-to-Spec Mapping" above)
    - Print the resolved scope to screen
 
    **If `mode = pr`:**
    - Run: `gh pr diff <N> --name-only`
-   - Apply the **File-to-Spec Mapping** algorithm (see Audit Modes section above)
+   - Map changed files to affected specs (see "File-to-Spec Mapping" above)
    - Print the resolved scope to screen
 
-6. **Discover the package structure.** Use Glob to find all `package.json` files under `packages/`:
+5. **Discover the package structure.** Use Glob to find all `package.json` files under `packages/`:
 
 ```
 packages/*/package.json
@@ -177,23 +178,23 @@ Launch one subagent per batch, all in parallel. Each subagent receives:
 
 **For global spec subagents:**
 
-1. Read `spec.md` and `verify.md` in each spec directory
+1. For each spec ID (e.g., `default:_global/architecture`), run `specd spec show <specId>` to get the spec content
 2. Check the ENTIRE codebase for compliance (these are cross-cutting constraints)
 3. Sample files from each package to verify conventions
 4. Check that configuration (ESLint, TypeScript, etc.) matches relevant specs
 
 **For package spec subagents:**
 
-1. Read `spec.md` and `verify.md` in each spec directory
+1. For each spec ID (e.g., `core:core/change`), run `specd spec show <specId>` to get the spec content
 2. **Use GitNexus first to locate relevant code:**
-   - `gitnexus_query({query: "<spec concept>"})` to find execution flows related to the spec's domain (e.g., `gitnexus_query({query: "change creation lifecycle"})` for the change spec). This returns processes grouped by relevance with file locations — far more precise than keyword grep.
-   - `gitnexus_context({name: "<symbol>"})` on key symbols found in the query results to get the full picture: all callers, callees, and which execution flows the symbol participates in. This reveals whether a requirement is implemented across multiple call sites.
+   - `specd graph search "<spec concept>"` to find execution flows related to the spec's domain (e.g., `specd graph search "change creation lifecycle"` for the change spec). This returns symbols and files related to the query — far more precise than keyword grep.
+   - `specd graph impact --symbol "<symbol>" --direction both` to get the full picture: all callers, callees, which files use the symbol. This reveals whether a requirement is implemented across multiple call sites.
    - Fall back to Grep/Glob only when GitNexus doesn't surface the relevant code (e.g., for configuration files, static patterns, or newly added code not yet indexed).
 3. Compare every requirement against the implementation
 4. Find corresponding tests in the package's `test/` directory
 5. Verify test coverage for each scenario in `verify.md`
 6. If the implementation doesn't exist yet, note it as "NOT_IMPLEMENTED"
-7. **Trace execution flows for behavioral requirements.** When a spec describes a multi-step process (e.g., "validates X then persists Y then emits Z"), use `gitnexus_query` to find the matching execution flow, then read `gitnexus://repo/specd/process/{processName}` to get the step-by-step trace. Compare the trace against the spec's expected sequence.
+7. **Trace execution flows for behavioral requirements.** When a spec describes a multi-step process (e.g., "validates X then persists Y then emits Z"), use `specd graph search` to find matching code, then use `specd graph impact` to trace the full execution path. Compare the trace against the spec's expected sequence.
 8. **Validate spec dependency chain.** Each spec may declare a `## Spec Dependencies` section listing other specs it depends on (as markdown links). For each dependency:
    - Read the referenced spec and verify that its requirements are **consistent** with what the current spec assumes about it. For example, if spec A says "specIds are validated against the filesystem" but the referenced spec B defines specIds as workspace-qualified strings with no filesystem validation, that's a cross-spec contradiction.
    - Check that concepts, terminology, and data structures used in the current spec match their definition in the dependency. If spec A references "approval gates" and depends on spec B for their config, verify that both specs agree on the gate names, defaults, and semantics.
@@ -366,12 +367,12 @@ Missing Tests, Spec Dependency Chain. Do NOT summarize or condense.}
 
 When launching subagents, use these settings:
 
-- `subagent_type: "general-purpose"` — they need deep codebase access plus GitNexus MCP tools
+- `subagent_type: "general-purpose"` — they need deep codebase access plus specd graph tools
 - `model: "opus"` — use the most capable model for accuracy
-- Give each subagent the exact list of spec directory paths it must review
+- Give each subagent the exact list of spec IDs it must review
 - Tell each subagent to be exhaustive and follow the output format exactly
 - Remind each subagent: **do NOT modify any code or spec files — only write to the assigned `_partial-*.md` output file**
-- Instruct each subagent to use GitNexus tools (`gitnexus_query`, `gitnexus_context`, and process resources) as its primary code navigation method, falling back to Grep/Glob when needed
+- Instruct each subagent to use `specd graph` commands as its primary code navigation method: `specd graph search`, `specd graph impact`, `specd graph hotspots`. Use Grep/Glob as fallback.
 - **CRITICAL: Every subagent prompt MUST include this instruction:**
   > "When you have completed your audit, use the Write tool to save your COMPLETE findings to `.specd/reports/spec-compliance/_partial-{batch-name}.md`. Include every spec's full Implementation Status table, all Discrepancies, all Test Coverage tables, Missing Tests, and Spec Dependency Chain. Do NOT truncate or summarize. After writing the file, return only a brief summary message with the aggregate counts."
 - The main agent must NOT attempt to reconstruct detailed findings from the subagent's return message. Always read the `_partial-*.md` files instead.
@@ -388,20 +389,21 @@ When launching subagents, use these settings:
 - Check that function signatures, parameter names, and return types match
 - Check domain entity invariants (constructors, state transitions, validation)
 - For CLI commands, check argument parsing, output formatting, and error handling
-- **Use `gitnexus_context` to verify all callers/callees of a symbol** — this catches cases where a domain invariant is bypassed by an unexpected caller, or where a validation exists in one call path but not another
-- **Use `gitnexus_query` to find execution flows** — when a spec describes a process (e.g., "create → validate → persist"), query for it and compare the actual flow steps against the spec's expected sequence
+- **Use `specd graph impact --symbol` to verify all callers/callees of a symbol** — this catches cases where a domain invariant is bypassed by an unexpected caller, or where a validation exists in one call path but not another
+- **Use `specd graph search` to find execution flows** — when a spec describes a process (e.g., "create → validate → persist"), query for it and compare the actual flow steps against the spec's expected sequence
 - **Validate the spec dependency chain** — when a spec references another spec's concepts (e.g., "specIds are validated at creation time"), read the referenced spec and verify the claim is consistent. Contradictions between specs are findings, not assumptions to resolve silently
 
 ---
 
 ## Important Reminders
 
+- **DO NOT write any code** — this is a read-only audit
 - **DO NOT modify any files** except writing the final report
 - **DO NOT assume spec is always right** — present both sides of every discrepancy
 - **DO NOT skip specs** — if a spec area seems trivial, still check it
 - **DO NOT hardcode spec paths** — always discover them dynamically via Glob
 - **DO check verify.md** — the scenarios there are testable requirements
 - If a spec or code file is too large, read it in sections but still cover everything
-- Use GitNexus tools as the primary code navigation method; use `Grep` and `Glob` as fallback for things GitNexus doesn't cover (config files, static patterns, unindexed code)
+- Use `specd graph` commands as the primary code navigation method; use `Grep` and `Glob` as fallback for things the graph doesn't cover (config files, static patterns, unindexed code)
 - If new spec directories or packages appear that you haven't seen before, handle them — do not ignore unknown areas
-- If GitNexus index is stale, run `npx gitnexus analyze` before starting the audit
+- If code graph is stale, run `specd graph index` before starting the audit
