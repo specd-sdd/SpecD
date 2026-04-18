@@ -2,7 +2,6 @@ import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
 import { ArchivedChange } from '../../domain/entities/archived-change.js'
 import { type Change } from '../../domain/entities/change.js'
-import { SpecPath } from '../../domain/value-objects/spec-path.js'
 import {
   ArchiveRepository,
   type ArchiveRepositoryConfig,
@@ -15,7 +14,6 @@ import { isEnoent } from './is-enoent.js'
 import { moveDir } from './move-dir.js'
 import { writeFileAtomic } from './write-atomic.js'
 import { type ChangeManifest, changeManifestSchema } from './manifest.js'
-import { parseSpecId } from '../../domain/services/parse-spec-id.js'
 
 /** Filename of the append-only archive index at the archive root. */
 const INDEX_FILE = '.specd-index.jsonl'
@@ -213,7 +211,6 @@ export class FsArchiveRepository extends ArchiveRepository {
             new ArchivedChange({
               name: entry.name,
               archivedName,
-              workspace: SpecPath.parse(entry.workspace ?? 'default'),
               archivedAt,
               ...(entry.archivedBy !== undefined ? { archivedBy: entry.archivedBy } : {}),
               artifacts: entry.artifacts ?? [],
@@ -307,7 +304,7 @@ export class FsArchiveRepository extends ArchiveRepository {
       archivedChange.name,
       archivedChange.archivedName,
       archivedChange.archivedAt,
-      archivedChange.workspace.toString(),
+      archivedChange.workspaces[0] ?? 'default',
     )
     return path.join(this._archivePath, ...relPath.split('/'))
   }
@@ -382,11 +379,9 @@ export class FsArchiveRepository extends ArchiveRepository {
     archivedName: string,
     archivedAt: Date,
   ): ArchivedChange {
-    const firstWorkspace = deriveFirstWorkspace(manifest)
     return new ArchivedChange({
       name: manifest.name,
       archivedName,
-      workspace: SpecPath.parse(firstWorkspace),
       archivedAt,
       ...(manifest.archivedBy !== undefined ? { archivedBy: manifest.archivedBy } : {}),
       artifacts: manifest.artifacts.map((a) => a.type),
@@ -410,7 +405,6 @@ export class FsArchiveRepository extends ArchiveRepository {
       createdAt: manifest.createdAt,
       archivedAt: manifest.archivedAt,
       ...(manifest.archivedBy !== undefined ? { archivedBy: manifest.archivedBy } : {}),
-      workspace: deriveFirstWorkspace(manifest),
       artifacts: manifest.artifacts.map((a) => a.type),
       specIds: manifest.specIds,
       schemaName: manifest.schema.name,
@@ -754,19 +748,4 @@ export class FsArchiveRepository extends ArchiveRepository {
   }
 }
 
-/**
- * Derives the first workspace from a manifest's specIds, falling back to
- * the legacy `workspaces` field, then to `'default'`.
- *
- * @param manifest - The parsed manifest to derive a workspace from
- * @returns The first workspace name
- */
-function deriveFirstWorkspace(manifest: ChangeManifest): string {
-  if (manifest.specIds.length > 0) {
-    return parseSpecId(manifest.specIds[0]!).workspace
-  }
-  if (manifest.workspaces !== undefined && manifest.workspaces.length > 0) {
-    return manifest.workspaces[0]!
-  }
-  return 'default'
-}
+

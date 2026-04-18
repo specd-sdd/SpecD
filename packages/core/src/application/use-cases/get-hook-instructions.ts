@@ -78,7 +78,7 @@ export class GetHookInstructions {
         contextVars = {
           change: {
             name: archived.name,
-            workspace: archived.workspace.toString(),
+            workspace: archived.specIds[0]?.split(':')[0] ?? 'default',
             path: this._archive.archivePath(archived),
           },
         }

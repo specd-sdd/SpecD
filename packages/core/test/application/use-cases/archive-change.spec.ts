@@ -9,7 +9,6 @@ import { DeltaApplicationError } from '../../../src/domain/errors/delta-applicat
 import { SpecOverlapError } from '../../../src/domain/errors/spec-overlap-error.js'
 import { Change, type ChangeEvent } from '../../../src/domain/entities/change.js'
 import { ArchivedChange } from '../../../src/domain/entities/archived-change.js'
-import { SpecPath } from '../../../src/domain/value-objects/spec-path.js'
 import { SpecArtifact } from '../../../src/domain/value-objects/spec-artifact.js'
 import { ArchiveRepository } from '../../../src/application/ports/archive-repository.js'
 import { ChangeArtifact } from '../../../src/domain/entities/change-artifact.js'
@@ -69,7 +68,6 @@ class StubArchiveRepository extends ArchiveRepository {
       : new ArchivedChange({
           name: change.name,
           archivedName,
-          workspace: SpecPath.parse(change.workspaces[0] ?? 'default'),
           archivedAt: new Date(),
           artifacts: [],
           specIds: [...change.specIds],

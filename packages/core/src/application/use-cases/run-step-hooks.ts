@@ -136,7 +136,7 @@ export class RunStepHooks {
           return { hooks: [], success: true, failedHook: null }
         }
 
-        const workspace = archived.workspace.toString()
+        const workspace = archived.specIds[0]?.split(':')[0] ?? 'default'
         const variables: TemplateVariables = {
           change: {
             name: archived.name,

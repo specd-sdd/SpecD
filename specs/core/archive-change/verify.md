@@ -196,6 +196,26 @@
 - **WHEN** `ArchiveChange` constructs the `ArchivedChange`
 - **THEN** the result has no `approval` field and no `wasStructural` field
 
+#### Scenario: ArchivedChange workspace derived from specIds at runtime
+
+- **GIVEN** a change with `specIds: ['core:core/archive-change', 'cli:cli/context']`
+- **WHEN** `ArchiveChange` constructs the `ArchivedChange`
+- **THEN** the `ArchivedChange` record does NOT contain a `workspace` property
+- **AND** calling `archivedChange.workspaces` returns `['core', 'cli']` (derived from specIds)
+
+#### Scenario: ArchivedChange.workspaces returns unique workspaces from specIds
+
+- **GIVEN** a change with `specIds: ['core:core/a', 'core:core/b', 'cli:cli/x']`
+- **WHEN** the change is archived and `archivedChange.workspaces` is accessed
+- **THEN** the result is `['core', 'cli']` (unique workspaces only)
+
+#### Scenario: Archive index entry does not contain workspace field
+
+- **GIVEN** a change is archived
+- **WHEN** reading the archive index (`index.jsonl`)
+- **THEN** each entry does NOT contain a `workspace` field
+- **AND** the workspace can be derived from `specIds[0]` (first entry in the specIds array)
+
 ### Requirement: Post-archive hooks
 
 #### Scenario: Post-archive hook runs after archive

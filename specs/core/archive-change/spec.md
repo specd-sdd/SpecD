@@ -138,14 +138,13 @@ The port's contract requires:
 - `archivedName` — the full timestamped directory name: `YYYYMMDD-HHmmss-<name>` where the timestamp is derived from `change.createdAt` (zero-padded), never from wall-clock time at execution
 - `archivedAt` — the timestamp when the archive operation completes, set by the repository
 - `archivedBy` (optional) — the git identity of the actor who performed the archive; absent if git identity was unavailable
-- `workspace` — the `SpecPath` of the primary workspace (the first entry in `change.workspaces`)
 - `artifacts` — artifact metadata tracked by the repository
 
 The `FsArchiveRepository` implementation additionally moves the change directory from its current location (`changes/` or `drafts/`) to the archive directory using the configured pattern, then appends an entry to `index.jsonl`. The use case has no knowledge of these implementation details.
 
-`ArchiveChange` receives the returned `ArchivedChange` record and includes it in the result.
-
 `ArchivedChange` has no `approval` field and no `wasStructural` flag — these were removed from the domain model.
+
+Note: The `workspace` property is no longer stored in `ArchivedChange`. It is derived at runtime from the first entry in `archivedChange.specIds`, matching how `Change.workspaces` works.
 
 ### Requirement: Post-archive hooks
 

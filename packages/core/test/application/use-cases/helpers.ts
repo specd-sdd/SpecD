@@ -673,17 +673,16 @@ export function makeArchiveRepository(
  */
 export function makeArchivedChange(
   name: string,
-  opts: { workspace?: string; schemaName?: string } = {},
+  opts: { specIds?: string[]; schemaName?: string } = {},
 ): ArchivedChange {
   const createdAt = new Date('2024-01-01T00:00:00Z')
   const archivedName = `20240101-000000-${name}`
   return new ArchivedChange({
     name,
     archivedName,
-    workspace: SpecPath.parse(opts.workspace ?? 'default'),
     archivedAt: new Date('2024-01-02T00:00:00Z'),
     artifacts: [],
-    specIds: [],
+    specIds: opts.specIds ?? ['default:default'],
     schemaName: opts.schemaName ?? 'test-schema',
     schemaVersion: 1,
   })
