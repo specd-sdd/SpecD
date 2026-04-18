@@ -678,4 +678,63 @@ describe('FsSpecRepository', () => {
       expect(result!.content).toBe('# Tokens spec')
     })
   })
+
+  // ---- metadata path ----
+
+  describe('metadata path', () => {
+    it('includes workspace name in metadata path', async () => {
+      const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'specd-metadata-ws-'))
+      const specsPath = path.join(tmpDir, 'specs')
+      await fs.mkdir(specsPath, { recursive: true })
+      await fs.mkdir(path.join(specsPath, 'get-skill'), { recursive: true })
+      await fs.writeFile(path.join(specsPath, 'get-skill', 'spec.md'), '# Get Skill', 'utf8')
+
+      const repo = new FsSpecRepository({
+        workspace: 'skills',
+        ownership: 'owned',
+        isExternal: false,
+        specsPath,
+        metadataPath: path.join(tmpDir, '.specd', 'metadata'),
+      })
+
+      const spec = await repo.get(SpecPath.parse('get-skill'))
+      expect(spec).not.toBeNull()
+
+      await repo.saveMetadata(spec!, JSON.stringify({ title: 'Get Skill', description: 'Test', contentHashes: {} }))
+
+      const metadataPath = path.join(tmpDir, '.specd', 'metadata', 'skills', 'get-skill', 'metadata.json')
+      const exists = await fs.access(metadataPath).then(() => true).catch(() => false)
+      expect(exists).toBe(true)
+
+      await fs.rm(tmpDir, { recursive: true, force: true })
+    })
+
+    it('includes workspace AND prefix in metadata path when both exist', async () => {
+      const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'specd-metadata-prefix-'))
+      const specsPath = path.join(tmpDir, 'specs')
+      await fs.mkdir(specsPath, { recursive: true })
+      await fs.mkdir(path.join(specsPath, 'config'), { recursive: true })
+      await fs.writeFile(path.join(specsPath, 'config', 'spec.md'), '# Config', 'utf8')
+
+      const repo = new FsSpecRepository({
+        workspace: 'core',
+        ownership: 'owned',
+        isExternal: false,
+        specsPath,
+        metadataPath: path.join(tmpDir, '.specd', 'metadata'),
+        prefix: 'core',
+      })
+
+      const spec = await repo.get(SpecPath.parse('core/config'))
+      expect(spec).not.toBeNull()
+
+      await repo.saveMetadata(spec!, JSON.stringify({ title: 'Config', description: 'Test', contentHashes: {} }))
+
+      const metadataPath = path.join(tmpDir, '.specd', 'metadata', 'core', 'core', 'config', 'metadata.json')
+      const exists = await fs.access(metadataPath).then(() => true).catch(() => false)
+      expect(exists).toBe(true)
+
+      await fs.rm(tmpDir, { recursive: true, force: true })
+    })
+  })
 })
