@@ -135,3 +135,9 @@ If no changes exist (or the user wants something new):
 
 Show the user what you found and suggest the next action. **Do NOT invoke skills
 automatically** — let the user decide.
+
+## Guardrails
+
+- Do NOT write any code — this skill is read-only for routing
+- Do NOT modify any existing files in the codebase
+- Do NOT create artifacts — that's handled by other skills
