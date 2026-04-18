@@ -1247,7 +1247,12 @@ function serializeEvent(event: ChangeEvent): RawChangeEvent {
 const CHANGE_STATES = Object.keys(VALID_TRANSITIONS) as ChangeState[]
 
 /** All valid `InvalidatedEvent` cause values. */
-const INVALIDATED_CAUSES = ['spec-change', 'artifact-drift', 'artifact-review-required'] as const
+const INVALIDATED_CAUSES = [
+  'spec-change',
+  'artifact-drift',
+  'artifact-review-required',
+  'spec-overlap-conflict',
+] as const
 /** Historical persisted cause kept readable for archived/discarded manifests. */
 const LEGACY_INVALIDATED_CAUSE = 'artifact-change' as const
 /** Union of valid `InvalidatedEvent` cause strings. */
