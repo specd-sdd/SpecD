@@ -20,6 +20,8 @@ import { NodeContentHasher } from '../../infrastructure/node/content-hasher.js'
 import { GenerateSpecMetadata } from '../../application/use-cases/generate-spec-metadata.js'
 import { SaveSpecMetadata } from '../../application/use-cases/save-spec-metadata.js'
 import { createBuiltinExtractorTransforms } from '../extractor-transforms/index.js'
+import { createSpecWorkspaceRoutes } from '../spec-workspace-routes.js'
+import { type SpecWorkspaceRoute } from '../../application/use-cases/_shared/spec-reference-resolver.js'
 
 /**
  * Domain context for the primary (default) workspace used by `ArchiveChange`.
@@ -63,6 +65,8 @@ export interface FsArchiveChangeOptions {
   readonly schemaRepositories: ReadonlyMap<string, SchemaRepository>
   /** Absolute path to the project root. */
   readonly projectRoot: string
+  /** Workspace routing metadata for cross-workspace spec reference resolution. */
+  readonly workspaceRoutes?: readonly SpecWorkspaceRoute[]
 }
 
 /**
@@ -159,6 +163,7 @@ export function createArchiveChange(
         schemaRef: config.schemaRef,
         schemaRepositories: schemaRepos,
         projectRoot: config.projectRoot,
+        workspaceRoutes: createSpecWorkspaceRoutes(config.workspaces),
       },
     )
   }
@@ -192,6 +197,7 @@ export function createArchiveChange(
     parsers,
     hasher,
     createBuiltinExtractorTransforms(),
+    opts.workspaceRoutes ?? [],
   )
   const saveMetadata = new SaveSpecMetadata(opts.specRepositories)
   const runStepHooks = new RunStepHooks(changeRepo, archiveRepo, hooks, new Map(), schemaProvider)

@@ -57,6 +57,12 @@
 - **WHEN** `GenerateSpecMetadata` executes extraction
 - **THEN** it supplies the shared extractor-transform registry and origin context to `extractMetadata`
 
+#### Scenario: Extraction awaits async transform resolution
+
+- **GIVEN** a metadata extractor declares a transform whose runtime implementation returns a promise
+- **WHEN** `GenerateSpecMetadata` executes extraction
+- **THEN** it awaits that promise before assembling the final metadata object
+
 ### Requirement: dependsOn resolution
 
 #### Scenario: Relative spec path resolved during extraction
@@ -67,6 +73,15 @@
 - **WHEN** `GenerateSpecMetadata` executes extraction
 - **THEN** the transformed `dependsOn` value is `core:core/storage`
 - **AND** no separate post-extraction repair step runs afterward
+
+#### Scenario: Cross-workspace relative spec path resolves through repository-backed normalization
+
+- **GIVEN** the current spec origin is workspace `core` and capability path `core/actor-resolver-port`
+- **AND** extraction yields the relative link `../../_global/architecture/spec.md`
+- **AND** the registered `resolveSpecPath` runtime uses repository-backed resolution across configured workspaces
+- **WHEN** `GenerateSpecMetadata` executes extraction
+- **THEN** the transformed `dependsOn` value is `default:_global/architecture`
+- **AND** it is not normalized to `core:_global/architecture`
 
 #### Scenario: Unresolvable dependency value fails extraction instead of being omitted
 

@@ -15,6 +15,7 @@ import { type SelectorNode } from '../../../domain/services/selector-matching.js
 import { type ContextWarning } from './context-warning.js'
 import { type ResolvedSpec } from './spec-pattern-matching.js'
 import { createExtractorTransformContext } from './extractor-transform-context.js'
+import { createSpecReferenceResolver, type SpecWorkspaceRoute } from './spec-reference-resolver.js'
 
 /**
  * Optional fallback configuration for extracting `dependsOn` from spec content
@@ -29,6 +30,8 @@ export interface DependsOnFallback {
   readonly parsers: ArtifactParserRegistry
   /** Shared extractor transform registry. */
   readonly extractorTransforms?: ExtractorTransformRegistry
+  /** Workspace routing metadata for cross-workspace resolution. */
+  readonly workspaceRoutes: readonly SpecWorkspaceRoute[]
 }
 
 /**
@@ -109,7 +112,7 @@ export async function traverseDependsOn(
 
     // Attempt fallback extraction from spec content
     if (fallback !== undefined && fallback.extraction.dependsOn !== undefined) {
-      dependsOn = await extractDependsOnFromContent(specRepo, spec, fallback)
+      dependsOn = await extractDependsOnFromContent(specRepo, spec, specs, fallback)
     }
   }
 
@@ -142,17 +145,25 @@ export async function traverseDependsOn(
  *
  * @param specRepo - Repository for loading spec artifacts
  * @param spec - The spec entity to extract from
+ * @param repositories - Repositories keyed by workspace name
  * @param fallback - Fallback configuration with extraction rules and parsers
  * @returns Extracted dependsOn array, or undefined if extraction yields nothing
  */
 async function extractDependsOnFromContent(
   specRepo: SpecRepository,
   spec: Spec,
+  repositories: ReadonlyMap<string, SpecRepository>,
   fallback: DependsOnFallback,
 ): Promise<string[] | undefined> {
   const astsByArtifact = new Map<string, { root: SelectorNode }>()
   const renderers = new Map<string, SubtreeRenderer>()
   const transformContexts = new Map<string, ReturnType<typeof createExtractorTransformContext>>()
+  const resolveSpecReference = createSpecReferenceResolver({
+    originWorkspace: spec.workspace,
+    originSpecPath: spec.name,
+    repositories,
+    workspaceRoutes: fallback.workspaceRoutes,
+  })
 
   for (const artifactType of fallback.schemaArtifacts) {
     if (artifactType.scope !== 'spec') continue
@@ -174,13 +185,16 @@ async function extractDependsOnFromContent(
         spec.name.toString(),
         artifactType.id,
         filename,
+        {
+          resolveSpecReference,
+        },
       ),
     )
   }
 
   if (astsByArtifact.size === 0) return undefined
 
-  const extracted = extractMetadata(
+  const extracted = await extractMetadata(
     fallback.extraction,
     astsByArtifact,
     renderers,

@@ -16,11 +16,25 @@
 - **WHEN** `metadata(spec)` is called
 - **THEN** the result is `null`
 
+#### Scenario: Workspace without prefix stores metadata correctly
+
+- **GIVEN** a workspace `skills` with no prefix configured
+- **AND** a spec at `skills:get-skill`
+- **WHEN** metadata is saved for that spec
+- **THEN** the file is stored at `.specd/metadata/skills/get-skill/metadata.json`
+
+#### Scenario: Workspace with prefix stores metadata correctly
+
+- **GIVEN** a workspace `core` with prefix `core` configured
+- **AND** a spec at `core:core/config`
+- **WHEN** metadata is saved for that spec
+- **THEN** the file is stored at `.specd/metadata/core/core/config/metadata.json`
+
 #### Scenario: Explicit metadataPath in workspace config
 
 - **GIVEN** a workspace config with `specs.fs.metadataPath: .specd/metadata`
 - **WHEN** metadata is requested for a spec in that workspace
-- **THEN** the adapter reads from the configured path at `<metadataPath>/<specPath>/metadata.yaml`
+- **THEN** the adapter reads from the configured path at `<metadataPath>/<workspace>/<specPath>/metadata.json`
 
 #### Scenario: Auto-derived metadataPath from VCS root
 

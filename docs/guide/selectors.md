@@ -238,7 +238,7 @@ Every extractor has a `selector` field plus a post-processing pipeline. The pipe
 2. **Extract** text using `extract`
 3. **Strip** unwanted patterns using `strip`
 4. **Capture** a portion of the text using `capture`
-5. **Transform** the result using a named callback with `transform`
+5. **Transform** the result using a named callback with `transform` (callbacks may be sync or async)
 6. **Group** results using `groupBy`
 
 Or, for complex structured data:
@@ -313,7 +313,7 @@ extractor:
     args: ['$2']
 ```
 
-This extracts dependency entries from the `Spec Dependencies` section, capturing the visible label as the primary `value` and the optional `href` as `$2`. `resolveSpecPath` first tries the label itself (for canonical entries like ``[`core:core/config`](../config/spec.md)`` or `` `core:core/config` ``), then falls back to the captured `href` when the label is legacy text.
+This extracts dependency entries from the `Spec Dependencies` section, capturing the visible label as the primary `value` and the optional `href` as `$2`. `resolveSpecPath` first tries the label itself (for canonical entries like ``[`core:core/config`](../config/spec.md)`` or `` `core:core/config` ``), then falls back to the captured `href` when the label is legacy text. Relative candidates are resolved through repository-backed normalization (`resolveFromPath` + `crossWorkspaceHint` routing), so links like `../../_global/architecture/spec.md` can normalize to canonical IDs such as `default:_global/architecture`.
 
 ### Grouping results by label
 

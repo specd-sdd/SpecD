@@ -126,8 +126,8 @@ Everything exported is a domain type (entity, value object, error, service), an 
 | `mergeSchemaLayers`        | function | Applies ordered customisation layers to a base schema's intermediate data. |
 | `parseSpecId`              | function | Splits a spec ID into workspace and capability path.                       |
 | `extractSpecSummary`       | function | Extracts a short summary from `spec.md` content.                           |
-| `extractMetadata`          | function | Orchestrates metadata extraction across multiple artifact ASTs.            |
-| `extractContent`           | function | Runs a single extractor against an AST root.                               |
+| `extractMetadata`          | function | Async metadata extraction orchestration across multiple artifact ASTs.     |
+| `extractContent`           | function | Async extractor runtime for one AST root (supports promise transforms).    |
 | `evaluateRules`            | function | Evaluates validation rules against an AST, returning failures/warnings.    |
 | `findNodes`                | function | Finds all nodes matching a selector in an AST.                             |
 | `nodeMatches`              | function | Tests whether a single AST node matches a selector.                        |

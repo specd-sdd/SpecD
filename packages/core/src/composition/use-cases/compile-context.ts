@@ -15,6 +15,8 @@ import { LazySchemaProvider } from '../lazy-schema-provider.js'
 import { FsFileReader } from '../../infrastructure/fs/file-reader.js'
 import { NodeContentHasher } from '../../infrastructure/node/content-hasher.js'
 import { createBuiltinExtractorTransforms } from '../extractor-transforms/index.js'
+import { createSpecWorkspaceRoutes } from '../spec-workspace-routes.js'
+import { type SpecWorkspaceRoute } from '../../application/use-cases/_shared/spec-reference-resolver.js'
 
 /**
  * Domain context for the primary (default) workspace used by `CompileContext`.
@@ -51,6 +53,8 @@ export interface FsCompileContextOptions {
   readonly configDir: string
   readonly schemaRef: string
   readonly schemaRepositories: ReadonlyMap<string, SchemaRepository>
+  /** Workspace routing metadata for cross-workspace spec reference resolution. */
+  readonly workspaceRoutes?: readonly SpecWorkspaceRoute[]
 }
 
 /**
@@ -135,6 +139,7 @@ export function createCompileContext(
         configDir: config.projectRoot,
         schemaRef: config.schemaRef,
         schemaRepositories: schemaRepos,
+        workspaceRoutes: createSpecWorkspaceRoutes(config.workspaces),
       },
     )
   }
@@ -164,5 +169,6 @@ export function createCompileContext(
     hasher,
     previewSpec,
     createBuiltinExtractorTransforms(),
+    opts.workspaceRoutes ?? [],
   )
 }

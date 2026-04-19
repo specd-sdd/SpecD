@@ -15,6 +15,10 @@ import { SpecPath } from '../../domain/value-objects/spec-path.js'
 import { inferFormat } from '../../domain/services/format-inference.js'
 import { parseSpecId } from '../../domain/services/parse-spec-id.js'
 import { createExtractorTransformContext } from './_shared/extractor-transform-context.js'
+import {
+  createSpecReferenceResolver,
+  type SpecWorkspaceRoute,
+} from './_shared/spec-reference-resolver.js'
 
 /** Input for the {@link GenerateSpecMetadata} use case. */
 export interface GenerateSpecMetadataInput {
@@ -48,6 +52,7 @@ export class GenerateSpecMetadata {
   private readonly _parsers: ArtifactParserRegistry
   private readonly _hasher: ContentHasher
   private readonly _extractorTransforms: ExtractorTransformRegistry
+  private readonly _workspaceRoutes: readonly SpecWorkspaceRoute[]
 
   /**
    * Creates a new GenerateSpecMetadata use case instance.
@@ -57,6 +62,7 @@ export class GenerateSpecMetadata {
    * @param parsers - Registry of artifact format parsers
    * @param hasher - Content hashing service
    * @param extractorTransforms - Shared extractor transform registry
+   * @param workspaceRoutes - Workspace routing metadata for cross-workspace resolution
    */
   constructor(
     specs: ReadonlyMap<string, SpecRepository>,
@@ -64,12 +70,14 @@ export class GenerateSpecMetadata {
     parsers: ArtifactParserRegistry,
     hasher: ContentHasher,
     extractorTransforms: ExtractorTransformRegistry,
+    workspaceRoutes: readonly SpecWorkspaceRoute[] = [],
   ) {
     this._specs = specs
     this._schemaProvider = schemaProvider
     this._parsers = parsers
     this._hasher = hasher
     this._extractorTransforms = extractorTransforms
+    this._workspaceRoutes = workspaceRoutes
   }
 
   /**
@@ -104,6 +112,12 @@ export class GenerateSpecMetadata {
     const renderers = new Map<string, SubtreeRenderer>()
     const contentsByFilename = new Map<string, string>()
     const transformContexts = new Map<string, ReturnType<typeof createExtractorTransformContext>>()
+    const resolveSpecReference = createSpecReferenceResolver({
+      originWorkspace: workspace,
+      originSpecPath: specPath,
+      repositories: this._specs,
+      workspaceRoutes: this._workspaceRoutes,
+    })
 
     for (const artifactType of schema.artifacts()) {
       if (artifactType.scope !== 'spec') continue
@@ -123,11 +137,13 @@ export class GenerateSpecMetadata {
       renderers.set(artifactType.id, parser as SubtreeRenderer)
       transformContexts.set(
         artifactType.id,
-        createExtractorTransformContext(workspace, capPath, artifactType.id, filename),
+        createExtractorTransformContext(workspace, capPath, artifactType.id, filename, {
+          resolveSpecReference,
+        }),
       )
     }
 
-    const extracted = extractMetadata(
+    const extracted = await extractMetadata(
       extraction,
       astsByArtifact,
       renderers,

@@ -15,6 +15,7 @@ import {
 // Re-export generic types so existing consumers don't break
 export {
   extractContent,
+  type ExtractorTransformResult,
   type ExtractorTransform,
   type ExtractorTransformContext,
   type ExtractorTransformRegistry,
@@ -55,14 +56,14 @@ export interface ExtractedMetadata {
  * @param targetArtifactId - Optional filter: only extract fields where field.artifact === targetArtifactId
  * @returns The extracted metadata with all available fields populated
  */
-export function extractMetadata(
+export async function extractMetadata(
   extraction: MetadataExtraction,
   astsByArtifact: ReadonlyMap<string, { root: SelectorNode }>,
   renderers: ReadonlyMap<string, SubtreeRenderer>,
   transforms?: ExtractorTransformRegistry,
   transformContextsOrTargetArtifactId?: ReadonlyMap<string, ExtractorTransformContext> | string,
   targetArtifactId?: string,
-): ExtractedMetadata {
+): Promise<ExtractedMetadata> {
   const result: Record<string, unknown> = {}
   const transformContexts =
     typeof transformContextsOrTargetArtifactId === 'string'
@@ -81,7 +82,7 @@ export function extractMetadata(
 
   // Single-value fields
   if (extraction.title !== undefined && shouldExtract(extraction.title.artifact)) {
-    const val = extractSingle(
+    const val = await extractSingle(
       extraction.title,
       astsByArtifact,
       renderers,
@@ -92,7 +93,7 @@ export function extractMetadata(
   }
 
   if (extraction.description !== undefined && shouldExtract(extraction.description.artifact)) {
-    const val = extractSingle(
+    const val = await extractSingle(
       extraction.description,
       astsByArtifact,
       renderers,
@@ -104,7 +105,7 @@ export function extractMetadata(
 
   // Array-value fields
   if (extraction.dependsOn !== undefined && shouldExtract(extraction.dependsOn.artifact)) {
-    const val = extractArray(
+    const val = await extractArray(
       extraction.dependsOn,
       astsByArtifact,
       renderers,
@@ -115,7 +116,7 @@ export function extractMetadata(
   }
 
   if (extraction.keywords !== undefined && shouldExtract(extraction.keywords.artifact)) {
-    const val = extractArray(
+    const val = await extractArray(
       extraction.keywords,
       astsByArtifact,
       renderers,
@@ -129,7 +130,7 @@ export function extractMetadata(
   if (extraction.context !== undefined) {
     const filtered = extraction.context.filter((e) => shouldExtract(e.artifact))
     if (filtered.length > 0) {
-      const val = extractMultiEntryArray(
+      const val = await extractMultiEntryArray(
         filtered,
         astsByArtifact,
         renderers,
@@ -143,7 +144,7 @@ export function extractMetadata(
   if (extraction.rules !== undefined) {
     const filtered = extraction.rules.filter((e) => shouldExtract(e.artifact))
     if (filtered.length > 0) {
-      const groups = extractMultiEntryGrouped(
+      const groups = await extractMultiEntryGrouped(
         filtered,
         astsByArtifact,
         renderers,
@@ -159,7 +160,7 @@ export function extractMetadata(
   if (extraction.constraints !== undefined) {
     const filtered = extraction.constraints.filter((e) => shouldExtract(e.artifact))
     if (filtered.length > 0) {
-      const val = extractMultiEntryArray(
+      const val = await extractMultiEntryArray(
         filtered,
         astsByArtifact,
         renderers,
@@ -173,7 +174,7 @@ export function extractMetadata(
   if (extraction.scenarios !== undefined) {
     const filtered = extraction.scenarios.filter((e) => shouldExtract(e.artifact))
     if (filtered.length > 0) {
-      const structured = extractMultiEntryStructured(
+      const structured = await extractMultiEntryStructured(
         filtered,
         astsByArtifact,
         renderers,
@@ -209,18 +210,18 @@ export function extractMetadata(
  * @param transformContexts - Opaque caller-owned transform context bags keyed by artifact id
  * @returns First matched string or undefined
  */
-function extractSingle(
+async function extractSingle(
   entry: MetadataExtractorEntry,
   asts: ReadonlyMap<string, { root: SelectorNode }>,
   renderers: ReadonlyMap<string, SubtreeRenderer>,
   transforms?: ExtractorTransformRegistry,
   transformContexts?: ReadonlyMap<string, ExtractorTransformContext>,
-): string | undefined {
+): Promise<string | undefined> {
   const ast = asts.get(entry.artifact)
   const renderer = renderers.get(entry.artifact)
   if (ast === undefined || renderer === undefined) return undefined
 
-  const values = extractContent(
+  const values = await extractContent(
     ast.root,
     entry.extractor,
     renderer,
@@ -244,18 +245,18 @@ function extractSingle(
  * @param transformContexts - Opaque caller-owned transform context bags keyed by artifact id
  * @returns All matched strings
  */
-function extractArray(
+async function extractArray(
   entry: MetadataExtractorEntry,
   asts: ReadonlyMap<string, { root: SelectorNode }>,
   renderers: ReadonlyMap<string, SubtreeRenderer>,
   transforms?: ExtractorTransformRegistry,
   transformContexts?: ReadonlyMap<string, ExtractorTransformContext>,
-): string[] {
+): Promise<string[]> {
   const ast = asts.get(entry.artifact)
   const renderer = renderers.get(entry.artifact)
   if (ast === undefined || renderer === undefined) return []
 
-  const values = extractContent(
+  const values = await extractContent(
     ast.root,
     entry.extractor,
     renderer,
@@ -275,16 +276,16 @@ function extractArray(
  * @param transformContexts - Opaque caller-owned transform context bags keyed by artifact id
  * @returns Concatenated string results from all entries
  */
-function extractMultiEntryArray(
+async function extractMultiEntryArray(
   entries: readonly MetadataExtractorEntry[],
   asts: ReadonlyMap<string, { root: SelectorNode }>,
   renderers: ReadonlyMap<string, SubtreeRenderer>,
   transforms?: ExtractorTransformRegistry,
   transformContexts?: ReadonlyMap<string, ExtractorTransformContext>,
-): string[] {
+): Promise<string[]> {
   const results: string[] = []
   for (const entry of entries) {
-    results.push(...extractArray(entry, asts, renderers, transforms, transformContexts))
+    results.push(...(await extractArray(entry, asts, renderers, transforms, transformContexts)))
   }
   return results
 }
@@ -299,20 +300,20 @@ function extractMultiEntryArray(
  * @param transformContexts - Opaque caller-owned transform context bags keyed by artifact id
  * @returns Grouped extraction results with label and items
  */
-function extractMultiEntryGrouped(
+async function extractMultiEntryGrouped(
   entries: readonly MetadataExtractorEntry[],
   asts: ReadonlyMap<string, { root: SelectorNode }>,
   renderers: ReadonlyMap<string, SubtreeRenderer>,
   transforms?: ExtractorTransformRegistry,
   transformContexts?: ReadonlyMap<string, ExtractorTransformContext>,
-): GroupedExtraction[] {
+): Promise<GroupedExtraction[]> {
   const results: GroupedExtraction[] = []
   for (const entry of entries) {
     const ast = asts.get(entry.artifact)
     const renderer = renderers.get(entry.artifact)
     if (ast === undefined || renderer === undefined) continue
 
-    const values = extractContent(
+    const values = await extractContent(
       ast.root,
       entry.extractor,
       renderer,
@@ -338,20 +339,20 @@ function extractMultiEntryGrouped(
  * @param transformContexts - Opaque caller-owned transform context bags keyed by artifact id
  * @returns Structured extraction results as record objects
  */
-function extractMultiEntryStructured(
+async function extractMultiEntryStructured(
   entries: readonly MetadataExtractorEntry[],
   asts: ReadonlyMap<string, { root: SelectorNode }>,
   renderers: ReadonlyMap<string, SubtreeRenderer>,
   transforms?: ExtractorTransformRegistry,
   transformContexts?: ReadonlyMap<string, ExtractorTransformContext>,
-): StructuredExtraction[] {
+): Promise<StructuredExtraction[]> {
   const results: StructuredExtraction[] = []
   for (const entry of entries) {
     const ast = asts.get(entry.artifact)
     const renderer = renderers.get(entry.artifact)
     if (ast === undefined || renderer === undefined) continue
 
-    const values = extractContent(
+    const values = await extractContent(
       ast.root,
       entry.extractor,
       renderer,

@@ -230,7 +230,7 @@ import { ExtractorTransformError } from '@specd/core'
 // "extractor transform 'resolveSpecPath' failed: could not resolve a canonical spec id from candidates [\"Shared\",\"not-a-spec\"] (...)"
 ```
 
-Transforms are strict once invoked: if a callback receives an extracted value, it must return a normalized string. Returning a non-string value (including `null` or `undefined`) is treated as a failure and is wrapped as `ExtractorTransformError`.
+Transforms are strict once invoked: if a callback receives an extracted value, it may return either a normalized string or a promise that resolves to one. Rejected promises, or resolved non-string values (including `null` or `undefined`), are treated as failures and wrapped as `ExtractorTransformError`.
 
 Carries:
 

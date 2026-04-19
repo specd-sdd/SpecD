@@ -14,6 +14,8 @@ import { LazySchemaProvider } from '../lazy-schema-provider.js'
 import { createVcsActorResolver } from '../actor-resolver.js'
 import { NodeContentHasher } from '../../infrastructure/node/content-hasher.js'
 import { createBuiltinExtractorTransforms } from '../extractor-transforms/index.js'
+import { createSpecWorkspaceRoutes } from '../spec-workspace-routes.js'
+import { type SpecWorkspaceRoute } from '../../application/use-cases/_shared/spec-reference-resolver.js'
 
 /**
  * Domain context for the primary (default) workspace used by `ValidateArtifacts`.
@@ -50,6 +52,8 @@ export interface FsValidateArtifactsOptions {
   readonly configDir: string
   readonly schemaRef: string
   readonly schemaRepositories: ReadonlyMap<string, SchemaRepository>
+  /** Workspace routing metadata for cross-workspace spec reference resolution. */
+  readonly workspaceRoutes?: readonly SpecWorkspaceRoute[]
 }
 
 /**
@@ -134,6 +138,7 @@ export function createValidateArtifacts(
         configDir: config.projectRoot,
         schemaRef: config.schemaRef,
         schemaRepositories: schemaRepos,
+        workspaceRoutes: createSpecWorkspaceRoutes(config.workspaces),
       },
     )
   }
@@ -161,5 +166,6 @@ export function createValidateArtifacts(
     actor,
     hasher,
     createBuiltinExtractorTransforms(),
+    opts.workspaceRoutes ?? [],
   )
 }

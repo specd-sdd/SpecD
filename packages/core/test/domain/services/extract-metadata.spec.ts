@@ -57,7 +57,7 @@ function paragraph(value: string): SelectorNode {
 // ---------------------------------------------------------------------------
 
 describe('extractContent', () => {
-  it('extracts label from first matching node', () => {
+  it('extracts label from first matching node', async () => {
     const root: SelectorNode = {
       type: 'document',
       children: [section('My Title', [], 1)],
@@ -66,11 +66,11 @@ describe('extractContent', () => {
       selector: { type: 'section', level: 1 },
       extract: 'label',
     }
-    const result = extractContent(root, extractor, renderer)
+    const result = await extractContent(root, extractor, renderer)
     expect(result).toEqual(['My Title'])
   })
 
-  it('extracts content from matching nodes', () => {
+  it('extracts content from matching nodes', async () => {
     const root: SelectorNode = {
       type: 'document',
       children: [section('Overview', [paragraph('This is the overview.')])],
@@ -79,19 +79,19 @@ describe('extractContent', () => {
       selector: { type: 'section', matches: '^Overview$' },
       extract: 'content',
     }
-    const result = extractContent(root, extractor, renderer)
+    const result = await extractContent(root, extractor, renderer)
     expect(result).toEqual(['This is the overview.'])
   })
 
-  it('returns empty array when no nodes match', () => {
+  it('returns empty array when no nodes match', async () => {
     const root: SelectorNode = { type: 'document', children: [] }
     const extractor: Extractor = {
       selector: { type: 'section', matches: '^Missing$' },
     }
-    expect(extractContent(root, extractor, renderer)).toEqual([])
+    await expect(extractContent(root, extractor, renderer)).resolves.toEqual([])
   })
 
-  it('applies capture regex to extract links', () => {
+  it('applies capture regex to extract links', async () => {
     const root: SelectorNode = {
       type: 'document',
       children: [
@@ -105,11 +105,11 @@ describe('extractContent', () => {
       extract: 'content',
       capture: '\\[.*?\\]\\(([^)]+)\\)',
     }
-    const result = extractContent(root, extractor, renderer)
+    const result = await extractContent(root, extractor, renderer)
     expect(result).toEqual(['../dep1/spec.md', '../dep2/spec.md'])
   })
 
-  it('applies strip regex to remove prefix', () => {
+  it('applies strip regex to remove prefix', async () => {
     const root: SelectorNode = {
       type: 'document',
       children: [section('Requirement: User Login')],
@@ -119,11 +119,11 @@ describe('extractContent', () => {
       extract: 'label',
       strip: '^Requirement:\\s*',
     }
-    const result = extractContent(root, extractor, renderer)
+    const result = await extractContent(root, extractor, renderer)
     expect(result).toEqual(['User Login'])
   })
 
-  it('applies named transform', () => {
+  it('applies named transform', async () => {
     const root: SelectorNode = {
       type: 'document',
       children: [section('Deps', [paragraph('../a/spec.md')])],
@@ -136,11 +136,56 @@ describe('extractContent', () => {
     const transforms = new Map<string, ExtractorTransform>([
       ['resolveSpecPath', (value: string) => value.replace('../', '').replace('/spec.md', '')],
     ])
-    const result = extractContent(root, extractor, renderer, transforms)
+    const result = await extractContent(root, extractor, renderer, transforms)
     expect(result).toEqual(['a'])
   })
 
-  it('interpolates capture placeholders before invoking extractor transforms', () => {
+  it('awaits async extractor transforms before returning values', async () => {
+    const root: SelectorNode = {
+      type: 'document',
+      children: [section('Deps', [paragraph('../a/spec.md')])],
+    }
+    const extractor: Extractor = {
+      selector: { type: 'section', matches: '^Deps$' },
+      extract: 'content',
+      transform: { name: 'resolveSpecPath' },
+    }
+    const transforms = new Map<string, ExtractorTransform>([
+      [
+        'resolveSpecPath',
+        async (value: string) => Promise.resolve(value.replace('../', '').replace('/spec.md', '')),
+      ],
+    ])
+
+    const result = await extractContent(root, extractor, renderer, transforms)
+    expect(result).toEqual(['a'])
+  })
+
+  it('throws ExtractorTransformError when an async transform rejects', async () => {
+    const root: SelectorNode = {
+      type: 'document',
+      children: [section('Deps', [paragraph('../a/spec.md')])],
+    }
+    const extractor: Extractor = {
+      selector: { type: 'section', matches: '^Deps$' },
+      extract: 'content',
+      transform: { name: 'rejectingTransform' },
+    }
+    const transforms = new Map<string, ExtractorTransform>([
+      [
+        'rejectingTransform',
+        async () => {
+          throw new Error('transform rejected')
+        },
+      ],
+    ])
+
+    await expect(extractContent(root, extractor, renderer, transforms)).rejects.toThrow(
+      ExtractorTransformError,
+    )
+  })
+
+  it('interpolates capture placeholders before invoking extractor transforms', async () => {
     const root: SelectorNode = {
       type: 'document',
       children: [section('Release Date', [paragraph('2026-04-09')])],
@@ -164,11 +209,11 @@ describe('extractContent', () => {
       ],
     ])
 
-    const result = extractContent(root, extractor, renderer, transforms)
+    const result = await extractContent(root, extractor, renderer, transforms)
     expect(result).toEqual(['2026|09/04/2026|undefined'])
   })
 
-  it('throws ExtractorTransformError when a transform returns a non-string', () => {
+  it('throws ExtractorTransformError when a transform returns a non-string', async () => {
     const root: SelectorNode = {
       type: 'document',
       children: [section('Deps', [paragraph('../a/spec.md')])],
@@ -182,20 +227,39 @@ describe('extractContent', () => {
       ['badTransform', (() => null) as unknown as ExtractorTransform],
     ])
 
-    expect(() => extractContent(root, extractor, renderer, transforms)).toThrow(
+    await expect(extractContent(root, extractor, renderer, transforms)).rejects.toThrow(
       ExtractorTransformError,
     )
 
     try {
-      extractContent(root, extractor, renderer, transforms)
+      await extractContent(root, extractor, renderer, transforms)
     } catch (error) {
       expect(error).toBeInstanceOf(ExtractorTransformError)
       expect((error as Error).message).toContain('must return a string')
     }
   })
 
+  it('throws ExtractorTransformError when an async transform resolves to non-string', async () => {
+    const root: SelectorNode = {
+      type: 'document',
+      children: [section('Deps', [paragraph('../a/spec.md')])],
+    }
+    const extractor: Extractor = {
+      selector: { type: 'section', matches: '^Deps$' },
+      extract: 'content',
+      transform: { name: 'badAsyncTransform' },
+    }
+    const transforms = new Map<string, ExtractorTransform>([
+      ['badAsyncTransform', async () => Promise.resolve(null as unknown as string)],
+    ])
+
+    await expect(extractContent(root, extractor, renderer, transforms)).rejects.toThrow(
+      ExtractorTransformError,
+    )
+  })
+
   // groupBy: label
-  it('groups matched nodes by label', () => {
+  it('groups matched nodes by label', async () => {
     const root: SelectorNode = {
       type: 'document',
       children: [
@@ -218,7 +282,7 @@ describe('extractContent', () => {
       strip: '^Requirement:\\s*',
       extract: 'content',
     }
-    const result = extractContent(root, extractor, renderer) as GroupedExtraction[]
+    const result = (await extractContent(root, extractor, renderer)) as GroupedExtraction[]
     expect(result).toHaveLength(2)
     expect(result[0]).toEqual({
       label: 'Auth',
@@ -231,7 +295,7 @@ describe('extractContent', () => {
   })
 
   // fields (structured extraction)
-  it('extracts structured objects with fields mapping', () => {
+  it('extracts structured objects with fields mapping', async () => {
     const root: SelectorNode = {
       type: 'document',
       children: [
@@ -266,7 +330,7 @@ describe('extractContent', () => {
         },
       },
     }
-    const result = extractContent(root, extractor, renderer) as StructuredExtraction[]
+    const result = (await extractContent(root, extractor, renderer)) as StructuredExtraction[]
     expect(result).toHaveLength(1)
     expect(result[0]).toEqual({
       name: 'Token Valid',
@@ -276,7 +340,7 @@ describe('extractContent', () => {
     })
   })
 
-  it('applies field-level transforms after capture in structured extraction', () => {
+  it('applies field-level transforms after capture in structured extraction', async () => {
     const root: SelectorNode = {
       type: 'document',
       children: [
@@ -318,7 +382,12 @@ describe('extractContent', () => {
       ],
     ])
 
-    const result = extractContent(root, extractor, renderer, transforms) as StructuredExtraction[]
+    const result = (await extractContent(
+      root,
+      extractor,
+      renderer,
+      transforms,
+    )) as StructuredExtraction[]
     expect(result).toEqual([
       {
         name: 'Token Valid',
@@ -328,7 +397,53 @@ describe('extractContent', () => {
     ])
   })
 
-  it('throws ExtractorTransformError with field metadata for missing field transforms', () => {
+  it('awaits async field-level transforms in structured extraction', async () => {
+    const root: SelectorNode = {
+      type: 'document',
+      children: [
+        section('Requirement: Auth', [
+          section('Scenario: Token Valid', [
+            listItem('GIVEN a valid token', '**GIVEN** a valid token'),
+            listItem('THEN access granted', '**THEN** access is granted'),
+          ]),
+        ]),
+      ],
+    }
+    const extractor: Extractor = {
+      selector: {
+        type: 'section',
+        matches: '^Scenario:',
+        parent: { type: 'section', matches: '^Requirement:' },
+      },
+      fields: {
+        given: {
+          childSelector: { type: 'list-item', contains: 'GIVEN' },
+          capture: '\\*\\*GIVEN\\*\\*\\s*(.+)',
+          transform: {
+            name: 'prefixAsync',
+            args: ['Given: ', '$1'],
+          },
+        },
+      },
+    }
+    const transforms = new Map<string, ExtractorTransform>([
+      [
+        'prefixAsync',
+        async (_value: string, args: readonly (string | undefined)[]) =>
+          Promise.resolve(`${args[0] ?? ''}${args[1] ?? ''}`),
+      ],
+    ])
+
+    const result = (await extractContent(
+      root,
+      extractor,
+      renderer,
+      transforms,
+    )) as StructuredExtraction[]
+    expect(result).toEqual([{ given: ['Given: a valid token'] }])
+  })
+
+  it('throws ExtractorTransformError with field metadata for missing field transforms', async () => {
     const root: SelectorNode = {
       type: 'document',
       children: [
@@ -354,12 +469,12 @@ describe('extractContent', () => {
       },
     }
 
-    expect(() => extractContent(root, extractor, renderer, new Map())).toThrow(
+    await expect(extractContent(root, extractor, renderer, new Map())).rejects.toThrow(
       ExtractorTransformError,
     )
 
     try {
-      extractContent(root, extractor, renderer, new Map())
+      await extractContent(root, extractor, renderer, new Map())
     } catch (error) {
       expect(error).toBeInstanceOf(ExtractorTransformError)
       expect((error as ExtractorTransformError).transformName).toBe('missingTransform')
@@ -368,7 +483,7 @@ describe('extractContent', () => {
   })
 
   // followSiblings — sequential AND grouping
-  it('groups AND siblings with the preceding keyword field via followSiblings', () => {
+  it('groups AND siblings with the preceding keyword field via followSiblings', async () => {
     const root: SelectorNode = {
       type: 'document',
       children: [
@@ -408,7 +523,7 @@ describe('extractContent', () => {
         },
       },
     }
-    const result = extractContent(root, extractor, renderer) as StructuredExtraction[]
+    const result = (await extractContent(root, extractor, renderer)) as StructuredExtraction[]
     expect(result).toHaveLength(1)
     expect(result[0]).toEqual({
       name: 'Multi-step',
@@ -418,7 +533,7 @@ describe('extractContent', () => {
     })
   })
 
-  it('handles scenario with no WHEN (GIVEN + AND + THEN)', () => {
+  it('handles scenario with no WHEN (GIVEN + AND + THEN)', async () => {
     const root: SelectorNode = {
       type: 'document',
       children: [
@@ -456,7 +571,7 @@ describe('extractContent', () => {
         },
       },
     }
-    const result = extractContent(root, extractor, renderer) as StructuredExtraction[]
+    const result = (await extractContent(root, extractor, renderer)) as StructuredExtraction[]
     expect(result).toHaveLength(1)
     expect(result[0]).toEqual({
       name: 'Direct',
@@ -471,7 +586,7 @@ describe('extractContent', () => {
 // ---------------------------------------------------------------------------
 
 describe('extractMetadata', () => {
-  it('extracts title and description from spec artifact', () => {
+  it('extracts title and description from spec artifact', async () => {
     const specAst: { root: SelectorNode } = {
       root: {
         type: 'document',
@@ -496,12 +611,12 @@ describe('extractMetadata', () => {
     const asts = new Map([['specs', specAst]])
     const renderers = new Map([['specs', renderer]])
 
-    const result = extractMetadata(extraction, asts, renderers)
+    const result = await extractMetadata(extraction, asts, renderers)
     expect(result.title).toBe('Selector Model')
     expect(result.description).toBe('The selector model defines how nodes are identified.')
   })
 
-  it('extracts dependsOn with capture and transform', () => {
+  it('extracts dependsOn with capture and transform', async () => {
     const specAst: { root: SelectorNode } = {
       root: {
         type: 'document',
@@ -537,11 +652,11 @@ describe('extractMetadata', () => {
       ],
     ])
 
-    const result = extractMetadata(extraction, asts, renderers, transforms)
+    const result = await extractMetadata(extraction, asts, renderers, transforms)
     expect(result.dependsOn).toEqual(['core/artifact-ast', 'core/delta-format'])
   })
 
-  it('extracts rules as grouped extraction', () => {
+  it('extracts rules as grouped extraction', async () => {
     const specAst: { root: SelectorNode } = {
       root: {
         type: 'document',
@@ -578,14 +693,14 @@ describe('extractMetadata', () => {
     const asts = new Map([['specs', specAst]])
     const renderers = new Map([['specs', renderer]])
 
-    const result = extractMetadata(extraction, asts, renderers)
+    const result = await extractMetadata(extraction, asts, renderers)
     expect(result.rules).toEqual([
       { requirement: 'Selector fields', rules: ['type is required\n\nmatches is optional'] },
       { requirement: 'Multi-match', rules: ['multiple matches are returned'] },
     ])
   })
 
-  it('extracts constraints as string array', () => {
+  it('extracts constraints as string array', async () => {
     const specAst: { root: SelectorNode } = {
       root: {
         type: 'document',
@@ -616,14 +731,14 @@ describe('extractMetadata', () => {
     const asts = new Map([['specs', specAst]])
     const renderers = new Map([['specs', renderer]])
 
-    const result = extractMetadata(extraction, asts, renderers)
+    const result = await extractMetadata(extraction, asts, renderers)
     expect(result.constraints).toEqual([
       'index and where are mutually exclusive',
       'type must be valid',
     ])
   })
 
-  it('returns empty metadata when no ASTs are provided', () => {
+  it('returns empty metadata when no ASTs are provided', async () => {
     const extraction: MetadataExtraction = {
       title: {
         artifact: 'specs',
@@ -631,11 +746,11 @@ describe('extractMetadata', () => {
       },
     }
 
-    const result = extractMetadata(extraction, new Map(), new Map())
+    const result = await extractMetadata(extraction, new Map(), new Map())
     expect(result.title).toBeUndefined()
   })
 
-  it('extracts context from multiple entries', () => {
+  it('extracts context from multiple entries', async () => {
     const specAst: { root: SelectorNode } = {
       root: {
         type: 'document',
@@ -668,11 +783,11 @@ describe('extractMetadata', () => {
     const asts = new Map([['specs', specAst]])
     const renderers = new Map([['specs', renderer]])
 
-    const result = extractMetadata(extraction, asts, renderers)
+    const result = await extractMetadata(extraction, asts, renderers)
     expect(result.context).toEqual(['Overview content.', 'Purpose content.'])
   })
 
-  it('filters extraction by targetArtifactId', () => {
+  it('filters extraction by targetArtifactId', async () => {
     const specAst: { root: SelectorNode } = {
       root: {
         type: 'document',
@@ -713,11 +828,11 @@ describe('extractMetadata', () => {
       ['verify', renderer],
     ])
 
-    const resultWithFilter = extractMetadata(extraction, asts, renderers, undefined, 'verify')
+    const resultWithFilter = await extractMetadata(extraction, asts, renderers, undefined, 'verify')
     expect(resultWithFilter.title).toBeUndefined()
     expect(resultWithFilter.description).toBe('Verify description.')
 
-    const resultWithoutFilter = extractMetadata(extraction, asts, renderers)
+    const resultWithoutFilter = await extractMetadata(extraction, asts, renderers)
     expect(resultWithoutFilter.title).toBe('Spec Title')
     expect(resultWithoutFilter.description).toBe('Verify description.')
   })
