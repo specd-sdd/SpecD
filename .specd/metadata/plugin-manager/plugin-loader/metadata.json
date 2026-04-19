@@ -1,0 +1,55 @@
+{
+  "title": "plugin-manager:plugin-loader",
+  "description": "Infrastructure component for dynamically loading plugins. Handles package resolution, manifest validation, and plugin instantiation.",
+  "dependsOn": ["plugin-manager:specd-plugin-type", "plugin-manager:plugin-errors"],
+  "context": [
+    "Infrastructure component for dynamically loading plugins. Handles package resolution, manifest validation, and plugin instantiation."
+  ],
+  "rules": [
+    {
+      "requirement": "Load workflow",
+      "rules": [
+        "The loader MUST:\n\n1. **Package availability**: The package must be in node\\_modules (installed via npm/pnpm or linked as workspace)\n2. **Resolve path**: Use `import.meta.resolve()` or `require.resolve()` to get package path\n3. **Read manifest**: Read `specd-plugin.json` (no import yet)\n4. **Validate manifest**: Validate with Zod schema\n5. **Dynamic import**: `import(name)` as ESM module\n6. **Factory call**: Call `create()` factory function\n7. **Validate interface**: Validate the returned object against expected interface"
+      ]
+    },
+    {
+      "requirement": "Manifest schema",
+      "rules": [
+        "```typescript\nconst SpecdPluginManifestSchema = z.object({\n  schemaVersion: z.number().min(1),\n  name: z.string().min(1),\n  description: z.string().optional(),\n  pluginType: z.enum(['agent']),\n  minCoreVersion: z.string().default('*'),\n})\n```"
+      ]
+    },
+    {
+      "requirement": "Error handling",
+      "rules": ["Validation failures MUST throw `PluginValidationError`."]
+    },
+    {
+      "requirement": "Factory function",
+      "rules": ["The npm package MUST export `create(): SpecdPlugin` as default or named export."]
+    }
+  ],
+  "constraints": [
+    "All I/O happens here in the infrastructure layer.",
+    "Zod validation happens at the boundary before reaching domain."
+  ],
+  "scenarios": [
+    {
+      "requirement": "Load workflow",
+      "name": "Package available",
+      "given": ["a plugin package is in node_modules"],
+      "when": ["PluginLoader loads it"],
+      "then": ["it returns the plugin instance"]
+    },
+    {
+      "requirement": "Zod validation",
+      "name": "Invalid manifest",
+      "given": ["specd-plugin.json has invalid schema"],
+      "when": ["PluginLoader loads it"],
+      "then": ["PluginValidationError is thrown"]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:e867fe0638af156894bad590221afe5c9e4ab4b58cb731678e173f9ef489c8e7",
+    "verify.md": "sha256:d4f80e0ac3e8922be5788aa8dd75245fcee9546b2778caa10398d4489920ab70"
+  },
+  "generatedBy": "core"
+}

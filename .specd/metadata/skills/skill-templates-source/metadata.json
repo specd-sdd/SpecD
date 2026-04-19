@@ -1,0 +1,63 @@
+{
+  "title": "skills:skill-templates-source",
+  "description": "Defines how skill templates are sourced, stored, and how frontmatter is handled. Templates live without frontmatter in the skills package, and agent plugins inject their specific frontmatter.",
+  "dependsOn": ["skills:skill"],
+  "context": [
+    "Defines how skill templates are sourced, stored, and how frontmatter is handled. Templates live without frontmatter in the skills package, and agent plugins inject their specific frontmatter."
+  ],
+  "rules": [
+    {
+      "requirement": "Template source location",
+      "rules": [
+        "Template files MUST live in `packages/skills/templates/<skill-name>/` WITHOUT frontmatter YAML blocks."
+      ]
+    },
+    {
+      "requirement": "Template migration",
+      "rules": [
+        "The template directory MUST contain:\n\n- `specd/`, `specd-archive/`, `specd-design/`, `specd-implement/`, `specd-new/`, `specd-metadata/`, `specd-compliance/`, `specd-verify/` directories\n- `shared.md` as shared content across all skills\n\nEach skill directory contains `.md` files (without frontmatter)."
+      ]
+    },
+    {
+      "requirement": "Frontmatter source",
+      "rules": [
+        "Original frontmatter MUST be read from `dev/ai-agents/skills/<skill-name>/SKILL.md` before stripping and stored in the appropriate agent plugin package."
+      ]
+    },
+    {
+      "requirement": "Frontmatter injection",
+      "rules": [
+        "Each agent plugin MUST inject its stored frontmatter when installing a skill. The injection happens during the install process with:\n\n- `name` — display name\n- `description` — what it does\n- `allowed_tools` — permitted tools\n- `argument_hint` — autocomplete hint"
+      ]
+    },
+    {
+      "requirement": "Why no frontmatter in skills package",
+      "rules": [
+        "The skills package does not include frontmatter because each agent environment (Claude, Copilot, Codex) has different metadata fields. Agent plugins know their target environment and inject appropriate metadata while preserving the base skill definition."
+      ]
+    }
+  ],
+  "constraints": [
+    "Templates in skills package MUST NOT contain frontmatter YAML.",
+    "Each agent plugin is responsible for storing and injecting its own frontmatter."
+  ],
+  "scenarios": [
+    {
+      "requirement": "Templates without frontmatter",
+      "name": "Template files are clean",
+      "when": ["files in packages/skills/templates/ are inspected"],
+      "then": ["no YAML frontmatter blocks exist in the files"]
+    },
+    {
+      "requirement": "Agent plugin injects frontmatter",
+      "name": "Install prepends frontmatter",
+      "when": ["an agent plugin calls install"],
+      "then": ["YAML frontmatter is prepended to each skill file"]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:ea8b201ccec993308982e2a3c2f9240770a4a2719ff4e29e015e9a5312bfb6ef",
+    "verify.md": "sha256:0d7fe66c213eb85c3895924f32f00d6da6e56253d256f957c1e8d490e0dce403"
+  },
+  "generatedBy": "core"
+}

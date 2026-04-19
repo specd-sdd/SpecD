@@ -1,0 +1,49 @@
+{
+  "title": "plugin-manager:specd-plugin-type",
+  "description": "Defines the base plugin interface (`SpecdPlugin`) that all specd plugins must implement. This is the foundation for extensible plugin types.",
+  "dependsOn": ["default:_global/architecture"],
+  "context": [
+    "Defines the base plugin interface (`SpecdPlugin`) that all specd plugins must implement. This is the foundation for extensible plugin types."
+  ],
+  "rules": [
+    {
+      "requirement": "PluginType",
+      "rules": ["```typescript\ntype PluginType = 'agent' // extensible\n```"]
+    },
+    {
+      "requirement": "SpecdPlugin interface",
+      "rules": [
+        "All plugins MUST implement:\n\n- `name: string` — npm package name\n- `type: PluginType` — plugin type\n- `version: string` — semver version\n- `configSchema: Record<string, ConfigSchemaEntry>` — configuration schema\n- `init(context: PluginContext): Promise<void>` — initialization\n- `destroy(): Promise<void>` — cleanup"
+      ]
+    },
+    {
+      "requirement": "PluginContext",
+      "rules": [
+        "```typescript\ninterface PluginContext {\n  projectRoot: string // absolute path\n  config: Record<string, unknown> // this plugin's config from specd.yaml\n  typeContext: unknown // type-specific context\n}\n```"
+      ]
+    },
+    {
+      "requirement": "ConfigSchemaEntry",
+      "rules": [
+        "```typescript\ninterface ConfigSchemaEntry {\n  type: 'string' | 'boolean' | 'number'\n  description: string\n  default?: unknown\n  required?: boolean\n}\n```"
+      ]
+    }
+  ],
+  "constraints": [
+    "Plugins are pure — no direct I/O in the interface.",
+    "The init() and destroy() methods handle lifecycle."
+  ],
+  "scenarios": [
+    {
+      "requirement": "SpecdPlugin interface",
+      "name": "Has required properties",
+      "when": ["a SpecdPlugin is created"],
+      "then": ["it has name, type, version, configSchema, init(), and destroy()"]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:e10e133e76fe11c55f819e7c19a492b1175881a3cd01a6494c2352599c6958e0",
+    "verify.md": "sha256:1533f69211e08a0df5203ead58ed106618dc936890021411a365790169741d0d"
+  },
+  "generatedBy": "core"
+}

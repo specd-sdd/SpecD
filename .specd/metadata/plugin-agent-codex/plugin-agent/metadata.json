@@ -1,0 +1,43 @@
+{
+  "title": "plugin-agent-codex:plugin-agent",
+  "description": "Codex agent plugin stub. Provides the interface structure for future full implementation.",
+  "dependsOn": ["plugin-manager:agent-plugin-type"],
+  "context": [
+    "Codex agent plugin stub. Provides the interface structure for future full implementation."
+  ],
+  "rules": [
+    {
+      "requirement": "Factory export",
+      "rules": ["The package MUST export `create(): AgentPlugin` as default or named export."]
+    },
+    {
+      "requirement": "Placeholder implementation",
+      "rules": [
+        "This is a stub for phase 2. The implementation MUST return a valid `AgentPlugin` that:\n\n- Has `type: 'agent'`\n- Has a descriptive name and version\n- Has an empty or minimal `configSchema`"
+      ]
+    },
+    {
+      "requirement": "Future expansion",
+      "rules": [
+        "When implemented in phase 2:\n\n- Will depend on `skills:skill-repository` for skill access\n- Will install to the appropriate Codex skills directory\n- Will inject Codex-specific metadata during install"
+      ]
+    }
+  ],
+  "constraints": [
+    "This is a placeholder/stub for phase 1.",
+    "Full implementation is deferred to phase 2."
+  ],
+  "scenarios": [
+    {
+      "requirement": "Stub implementation",
+      "name": "Returns valid AgentPlugin",
+      "when": ["create() is called"],
+      "then": ["it returns an AgentPlugin with type 'agent'"]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:8f027b9333c62e712ea5f834934f7ae6c05449cff248cfcbfeeb430e85234b4c",
+    "verify.md": "sha256:ac4c1a998b8f9aa16dae4523e9805c2875cab31377dac555d20fa80c0db0fd93"
+  },
+  "generatedBy": "core"
+}

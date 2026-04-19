@@ -1,0 +1,68 @@
+{
+  "title": "plugin-agent-claude:plugin-agent",
+  "description": "Claude agent plugin implementation. Exports `create(): AgentPlugin` that provides skill installation with Claude Code frontmatter injection.",
+  "dependsOn": ["plugin-manager:agent-plugin-type", "skills:skill-repository"],
+  "context": [
+    "Claude agent plugin implementation. Exports `create(): AgentPlugin` that provides skill installation with Claude Code frontmatter injection."
+  ],
+  "rules": [
+    {
+      "requirement": "Factory export",
+      "rules": ["The package MUST export `create(): AgentPlugin` as default or named export."]
+    },
+    {
+      "requirement": "Domain layer",
+      "rules": [
+        "The domain layer MUST contain:\n\n- `claude-plugin.ts` — implementation of `AgentPlugin` interface\n- `frontmatter.ts` — Frontmatter type definitions\n- `frontmatter/` — skill metadata map (`skillFrontmatter: Record<string, Frontmatter>`)"
+      ]
+    },
+    {
+      "requirement": "Frontmatter type",
+      "rules": [
+        "```typescript\ninterface Frontmatter {\n  name?: string // Display name (defaults to directory name)\n  description: string // REQUIRED\n  when_to_use?: string\n  argument_hint?: string\n  disable_model_invocation?: boolean\n  user_invocable?: boolean\n  allowed_tools?: string\n  model?: string\n  effort?: string\n  context?: string\n  agent?: string\n  hooks?: Record<string, unknown>\n  paths?: string\n  shell?: string\n}\n```"
+      ]
+    },
+    {
+      "requirement": "Application layer",
+      "rules": [
+        "The application layer MUST have `InstallSkills` use case that orchestrates:\n\n1. Get skills via `@specd/skills` repository\n2. Inject stored frontmatter to each skill template\n3. Install to `.claude/skills/` in project root"
+      ]
+    },
+    {
+      "requirement": "Frontmatter injection",
+      "rules": [
+        "During install, the plugin MUST prepend YAML frontmatter to each skill file:\n\n```yaml\n---\nname: { { name } }\ndescription: { { description } }\nallowed_tools: { { allowed_tools } }\nargument_hint: { { argument_hint } }\n---\n```"
+      ]
+    },
+    {
+      "requirement": "Install location",
+      "rules": ["Skills MUST be installed to `.claude/skills/` in the project root."]
+    }
+  ],
+  "constraints": ["This plugin depends on @specd/skills for skill operations."],
+  "scenarios": [
+    {
+      "requirement": "Factory export",
+      "name": "Exports create function",
+      "when": ["the package is imported"],
+      "then": ["it exports create(): AgentPlugin"]
+    },
+    {
+      "requirement": "Frontmatter injection",
+      "name": "Install adds frontmatter",
+      "when": ["install() is called"],
+      "then": ["YAML frontmatter is prepended to each skill file"]
+    },
+    {
+      "requirement": "Install location",
+      "name": "Installs to .claude/skills/",
+      "when": ["install is called with projectRoot"],
+      "then": ["files are written to {projectRoot}/.claude/skills/"]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:1ab21ad6d4ad42ebe70693271b2fc3c3ef734c2b5fa10a6707232b903f07c1c5",
+    "verify.md": "sha256:4b558ac30eae20126a3d561652a47152e0a50861c03f6b68494445690a81c420"
+  },
+  "generatedBy": "core"
+}

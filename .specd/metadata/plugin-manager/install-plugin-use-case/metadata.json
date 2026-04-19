@@ -1,0 +1,57 @@
+{
+  "title": "plugin-manager:install-plugin-use-case",
+  "description": "Use case that orchestrates plugin installation. Loads the plugin, calls its install method, and returns a generic result.",
+  "dependsOn": ["plugin-manager:agent-plugin-type", "plugin-manager:plugin-loader"],
+  "context": [
+    "Use case that orchestrates plugin installation. Loads the plugin, calls its install method, and returns a generic result."
+  ],
+  "rules": [
+    {
+      "requirement": "Input",
+      "rules": [
+        "```typescript\ninterface InstallPluginInput {\n  readonly pluginName: string // npm package name\n  readonly projectRoot: string\n  readonly options?: Record<string, unknown> // plugin-specific options\n}\n```"
+      ]
+    },
+    {
+      "requirement": "Output",
+      "rules": [
+        "```typescript\ninterface InstallPluginOutput {\n  readonly success: boolean\n  readonly message: string // human-readable result\n  readonly data?: unknown // plugin-specific result\n}\n```"
+      ]
+    },
+    {
+      "requirement": "Behavior",
+      "rules": [
+        "The use case MUST:\n\n1. Load the plugin via `PluginLoader`\n2. Call the plugin's `install()` method with project root and options\n3. Return a generic result (no config mutation — that is the CLI's responsibility)"
+      ]
+    },
+    {
+      "requirement": "Error handling",
+      "rules": [
+        "On failure, the use case MUST throw an appropriate error (`PluginNotFoundError` or `PluginValidationError`)."
+      ]
+    }
+  ],
+  "constraints": [
+    "This use case does NOT modify config — it only calls the plugin's install.",
+    "Config mutation is the CLI's responsibility via ConfigWriter."
+  ],
+  "scenarios": [
+    {
+      "requirement": "Behavior",
+      "name": "Successful install",
+      "when": ["InstallPlugin is executed with valid plugin"],
+      "then": ["it returns success with message"]
+    },
+    {
+      "requirement": "Behavior",
+      "name": "Plugin not found",
+      "when": ["InstallPlugin is executed with non-existent plugin"],
+      "then": ["PluginNotFoundError is thrown"]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:d6df1854bccc24081b69e76c9acd3acbdcf29d0f0316f1b6a2dec5f1a6d445e1",
+    "verify.md": "sha256:486e90ae70d218ad3c21a750acf0b06923b87724f4e5e81f16f2ed70c3179ce2"
+  },
+  "generatedBy": "core"
+}
