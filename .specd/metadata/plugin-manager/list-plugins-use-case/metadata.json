@@ -1,0 +1,40 @@
+{
+  "title": "plugin-manager:list-plugins-use-case",
+  "description": "Use case that returns the plugin inventory — the status of each requested plugin.",
+  "dependsOn": ["plugin-manager:plugin-loader"],
+  "context": ["Use case that returns the plugin inventory — the status of each requested plugin."],
+  "rules": [
+    {
+      "requirement": "Input",
+      "rules": [
+        "```typescript\ninterface ListPluginsInput {\n  readonly pluginNames: string[]\n}\n```"
+      ]
+    },
+    {
+      "requirement": "Output",
+      "rules": [
+        "```typescript\ninterface ListPluginsOutput {\n  readonly plugins: Array<{\n    name: string\n    status: 'loaded' | 'not_found' | 'error'\n    plugin?: SpecdPlugin\n    error?: string\n  }>\n}\n```"
+      ]
+    },
+    {
+      "requirement": "Behavior",
+      "rules": [
+        "For each plugin name:\n\n- Attempt to load via `PluginLoader`\n- If loaded successfully → status: `'loaded'`\n- If npm package not found → status: `'not_found'`\n- If load fails → status: `'error'` with error message"
+      ]
+    }
+  ],
+  "constraints": ["Read-only operation, no state modification."],
+  "scenarios": [
+    {
+      "requirement": "Output",
+      "name": "Returns plugin statuses",
+      "when": ["ListPlugins is executed with plugin names"],
+      "then": ["it returns array with name, status, and optional plugin/error"]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:b55b58f01a7b3275b9b3a5a4d9f97c419cee96f9b8446451112b81c76b562e76",
+    "verify.md": "sha256:d723bf8dce80cb6cc5f17fd049f67d836cb4d7739f7cbb13330679dd813c0441"
+  },
+  "generatedBy": "core"
+}

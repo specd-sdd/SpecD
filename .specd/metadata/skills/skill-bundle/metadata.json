@@ -1,0 +1,62 @@
+{
+  "title": "skills:skill-bundle",
+  "description": "Defines the `SkillBundle` and `ResolvedFile` types for representing a skill with all its templates resolved and ready for installation.",
+  "dependsOn": ["skills:skill"],
+  "context": [
+    "Defines the `SkillBundle` and `ResolvedFile` types for representing a skill with all its templates resolved and ready for installation."
+  ],
+  "rules": [
+    {
+      "requirement": "ResolvedFile interface",
+      "rules": [
+        "`ResolvedFile` MUST be an interface with:\n\n- `filename: string` — resolved file name\n- `content: string` — file content with variables substituted"
+      ]
+    },
+    {
+      "requirement": "SkillBundle interface",
+      "rules": [
+        "`SkillBundle` MUST be an interface with:\n\n- `name: string` — skill name\n- `description: string` — skill description\n- `files: ResolvedFile[]` — array of resolved files\n- `install(targetDir: string): Promise<void>` — writes files to target directory\n- `uninstall(targetDir: string): Promise<void>` — removes installed files from target directory"
+      ]
+    },
+    {
+      "requirement": "Install behavior",
+      "rules": [
+        "The `install()` method MUST:\n\n- Create the target directory if it does not exist\n- Write each file in `files` to the target directory, preserving the filename\n- Fail gracefully if a file cannot be written"
+      ]
+    },
+    {
+      "requirement": "Uninstall behavior",
+      "rules": [
+        "The `uninstall()` method MUST:\n\n- Remove each file that was installed\n- Not fail if files do not exist (idempotent)"
+      ]
+    }
+  ],
+  "constraints": [
+    "All file operations happen in the domain layer for SkillBundle (unlike Skill which has lazy loading)."
+  ],
+  "scenarios": [
+    {
+      "requirement": "ResolvedFile interface",
+      "name": "File has filename and content",
+      "when": ["a ResolvedFile is created"],
+      "then": ["it has filename and content properties"]
+    },
+    {
+      "requirement": "SkillBundle interface",
+      "name": "Bundle has install method",
+      "when": ["bundle.install(targetDir) is called"],
+      "then": ["files are written to the target directory"]
+    },
+    {
+      "requirement": "SkillBundle interface",
+      "name": "Bundle has uninstall method",
+      "when": ["bundle.uninstall(targetDir) is called"],
+      "then": ["installed files are removed"]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:c216032eca9ab745a3d616c44709da37d1bc404f9d4cdba10e32ff75fe6e09d1",
+    "verify.md": "sha256:7acb4ac98cbc10a6e5021ac68ade2297f0e45e0603863a4f6b2d2b1564a201c1"
+  },
+  "generatedBy": "core"
+}

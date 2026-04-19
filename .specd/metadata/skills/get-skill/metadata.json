@@ -1,0 +1,46 @@
+{
+  "title": "skills:get-skill",
+  "description": "Use case for retrieving a single skill by name.",
+  "dependsOn": ["skills:skill", "skills:skill-repository-port"],
+  "context": ["Use case for retrieving a single skill by name."],
+  "rules": [
+    {
+      "requirement": "Input",
+      "rules": [
+        "The input MUST contain:\n\n```typescript\ninterface GetSkillInput {\n  name: string\n}\n```"
+      ]
+    },
+    {
+      "requirement": "Output",
+      "rules": [
+        "The output MUST be a discriminated union:\n\n```typescript\ntype GetSkillOutput = { skill: Skill } | { error: 'NOT_FOUND' }\n```"
+      ]
+    },
+    {
+      "requirement": "Behavior",
+      "rules": [
+        "The use case MUST call `SkillRepository.get(input.name)`:\n\n- If the skill exists, return `{ skill: Skill }`\n- If the skill does not exist, return `{ error: 'NOT_FOUND' }`"
+      ]
+    }
+  ],
+  "constraints": ["The name parameter MUST be validated as non-empty."],
+  "scenarios": [
+    {
+      "requirement": "Input",
+      "name": "Valid skill name",
+      "when": ["GetSkill use case is executed with { name: 'skill-name' }"],
+      "then": ["it returns { skill: Skill }"]
+    },
+    {
+      "requirement": "Input",
+      "name": "Invalid skill name",
+      "when": ["GetSkill use case is executed with { name: 'nonexistent' }"],
+      "then": ["it returns { error: 'NOT_FOUND' }"]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:b7b4a537f276ba2b0f062016589e1fb8436d64b41292e5c80096a75cc6bfbb72",
+    "verify.md": "sha256:793c6f119faffac0605dfdee341f525837908bb74bc81be788bf2cdda857da69"
+  },
+  "generatedBy": "core"
+}

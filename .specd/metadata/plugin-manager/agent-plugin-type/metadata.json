@@ -1,0 +1,42 @@
+{
+  "title": "plugin-manager:agent-plugin-type",
+  "description": "Defines the agent plugin interface that extends `SpecdPlugin` for agent integrations (Claude, Copilot, Codex, etc.).",
+  "dependsOn": ["plugin-manager:specd-plugin-type"],
+  "context": [
+    "Defines the agent plugin interface that extends `SpecdPlugin` for agent integrations (Claude, Copilot, Codex, etc.)."
+  ],
+  "rules": [
+    {
+      "requirement": "AgentPlugin extends SpecdPlugin",
+      "rules": [
+        "`AgentPlugin` MUST extend `SpecdPlugin` with `type: 'agent'` and add:\n\n- `install(projectRoot: string, options?: InstallOptions): Promise<InstallResult>`\n- `uninstall(projectRoot: string, options?: InstallOptions): Promise<void>`"
+      ]
+    },
+    {
+      "requirement": "InstallOptions",
+      "rules": [
+        "```typescript\ninterface InstallOptions {\n  skills?: string[] // specific skill names; omit = all\n  variables?: Record<string, string> // variable substitution\n}\n```"
+      ]
+    },
+    {
+      "requirement": "InstallResult",
+      "rules": [
+        "```typescript\ninterface InstallResult {\n  installed: Array<{ skill: string; path: string }>\n  skipped: Array<{ skill: string; reason: string }>\n}\n```"
+      ]
+    }
+  ],
+  "constraints": ["Agent plugins specialize the base plugin type for agent integrations."],
+  "scenarios": [
+    {
+      "requirement": "AgentPlugin extends SpecdPlugin",
+      "name": "Has install and uninstall",
+      "when": ["an AgentPlugin is created"],
+      "then": ["it has install() and uninstall() methods"]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:12453ed34c0023d1be265e699267bcc34d16878aab467afe18492e035f9db6bb",
+    "verify.md": "sha256:88116cfb603d8292a2ee34f37b9d2281274962bd9569e413d656877c4fb9fa47"
+  },
+  "generatedBy": "core"
+}

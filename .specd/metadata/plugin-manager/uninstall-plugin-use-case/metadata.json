@@ -1,0 +1,46 @@
+{
+  "title": "plugin-manager:uninstall-plugin-use-case",
+  "description": "Use case that orchestrates plugin removal. Loads the plugin and calls its uninstall method.",
+  "dependsOn": ["plugin-manager:agent-plugin-type", "plugin-manager:plugin-loader"],
+  "context": [
+    "Use case that orchestrates plugin removal. Loads the plugin and calls its uninstall method."
+  ],
+  "rules": [
+    {
+      "requirement": "Input",
+      "rules": [
+        "```typescript\ninterface UninstallPluginInput {\n  readonly pluginName: string\n  readonly projectRoot: string\n  readonly options?: Record<string, unknown> // plugin-specific options\n}\n```"
+      ]
+    },
+    {
+      "requirement": "Output",
+      "rules": ["```typescript\ntype UninstallPluginOutput = void\n```"]
+    },
+    {
+      "requirement": "Behavior",
+      "rules": [
+        "The use case MUST:\n\n1. Load the plugin via `PluginLoader`\n2. Call the plugin's `uninstall()` method with project root and options\n3. Return void (no config mutation)"
+      ]
+    },
+    {
+      "requirement": "Error handling",
+      "rules": ["On failure, the use case MUST throw an appropriate error."]
+    }
+  ],
+  "constraints": [
+    "This use case does NOT modify config — config mutation is the CLI's responsibility."
+  ],
+  "scenarios": [
+    {
+      "requirement": "Behavior",
+      "name": "Successful uninstall",
+      "when": ["UninstallPlugin is executed"],
+      "then": ["it returns void"]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:69d1499df57314ed2002b0834f98cb378e5f87e71ee43c778bec6bd11b7ed811",
+    "verify.md": "sha256:4d0f8bb426c57351870e9298c16e37a136aa2129739b520771679794e4715b8d"
+  },
+  "generatedBy": "core"
+}

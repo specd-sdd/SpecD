@@ -1,0 +1,36 @@
+{
+  "title": "plugin-manager:plugin-repository-port",
+  "description": "Abstract interface for plugin storage. The CLI implements this via ConfigWriter, but we define the port here for clarity.",
+  "dependsOn": ["plugin-manager:specd-plugin-type"],
+  "context": [
+    "Abstract interface for plugin storage. The CLI implements this via ConfigWriter, but we define the port here for clarity."
+  ],
+  "rules": [
+    {
+      "requirement": "PluginRepositoryPort interface",
+      "rules": [
+        "```typescript\ninterface PluginRepositoryPort {\n  addPlugin(type: string, name: string, config?: Record<string, unknown>): Promise<void>\n  removePlugin(type: string, name: string): Promise<void>\n  listPlugins(type?: string): Promise<Array<{ name: string; config?: Record<string, unknown> }>>\n}\n```"
+      ]
+    },
+    {
+      "requirement": "Implementation note",
+      "rules": [
+        "In the CLI, this port is implemented via `ConfigWriter.addPlugin()`, `ConfigWriter.removePlugin()`, and `ConfigWriter.listPlugins()`."
+      ]
+    }
+  ],
+  "constraints": ["The port is an abstraction — implementations handle the actual storage."],
+  "scenarios": [
+    {
+      "requirement": "Interface",
+      "name": "Has required methods",
+      "when": ["PluginRepositoryPort is inspected"],
+      "then": ["it has addPlugin(), removePlugin(), and listPlugins()"]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:3e22c50ecd3368e2251bc0aa77edbc0fd0bc2aad89f6dddf17f0db536d9896cc",
+    "verify.md": "sha256:7bee8e1e67d3cb651c8987b106fbe921fbcc452096018698c09b5effe5d4a09b"
+  },
+  "generatedBy": "core"
+}

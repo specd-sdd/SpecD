@@ -1,0 +1,36 @@
+{
+  "title": "skills:skill-repository-port",
+  "description": "Abstract interface for skill storage. This port defines the contract that infrastructure implementations must fulfill.",
+  "dependsOn": ["skills:skill", "skills:skill-bundle"],
+  "context": [
+    "Abstract interface for skill storage. This port defines the contract that infrastructure implementations must fulfill."
+  ],
+  "rules": [
+    {
+      "requirement": "SkillRepositoryPort interface",
+      "rules": [
+        "`SkillRepositoryPort` MUST define the same interface as `SkillRepository`:\n\n- `list(): Skill[]`\n- `get(name: string): Skill | undefined`\n- `getBundle(name: string, variables?: Record<string, string>): SkillBundle`\n- `listSharedFiles(): SharedFile[]`"
+      ]
+    },
+    {
+      "requirement": "Port abstraction",
+      "rules": [
+        "The port is an abstract interface. Concrete implementations (e.g., using node:fs) live in the infrastructure layer."
+      ]
+    }
+  ],
+  "constraints": ["The port interface MUST NOT contain any I/O code."],
+  "scenarios": [
+    {
+      "requirement": "Port interface",
+      "name": "Has required methods",
+      "when": ["SkillRepositoryPort is inspected"],
+      "then": ["it has list(), get(), getBundle(), and listSharedFiles() methods"]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:8b9d5bc22d58e8fb9ae770bb27e04e0cb53461fb3613d81bb4e53a2573fe9549",
+    "verify.md": "sha256:eb53e6e475d8132548a430491907a66833446a18cb831b2763fcdc0a3fff3209"
+  },
+  "generatedBy": "core"
+}

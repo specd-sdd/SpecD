@@ -1,0 +1,43 @@
+{
+  "title": "plugin-agent-copilot:plugin-agent",
+  "description": "Copilot agent plugin stub. Provides the interface structure for future full implementation.",
+  "dependsOn": ["plugin-manager:agent-plugin-type"],
+  "context": [
+    "Copilot agent plugin stub. Provides the interface structure for future full implementation."
+  ],
+  "rules": [
+    {
+      "requirement": "Factory export",
+      "rules": ["The package MUST export `create(): AgentPlugin` as default or named export."]
+    },
+    {
+      "requirement": "Placeholder implementation",
+      "rules": [
+        "This is a stub for phase 2. The implementation MUST return a valid `AgentPlugin` that:\n\n- Has `type: 'agent'`\n- Has a descriptive name and version\n- Has an empty or minimal `configSchema`"
+      ]
+    },
+    {
+      "requirement": "Future expansion",
+      "rules": [
+        "When implemented in phase 2:\n\n- Will depend on `skills:skill-repository` for skill access\n- Will install to the appropriate Copilot skills directory\n- Will inject Copilot-specific metadata during install"
+      ]
+    }
+  ],
+  "constraints": [
+    "This is a placeholder/stub for phase 1.",
+    "Full implementation is deferred to phase 2."
+  ],
+  "scenarios": [
+    {
+      "requirement": "Stub implementation",
+      "name": "Returns valid AgentPlugin",
+      "when": ["create() is called"],
+      "then": ["it returns an AgentPlugin with type 'agent'"]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:01656494a13b341959cfd95b9e4358654d45dd2438e67884b0120752f958d584",
+    "verify.md": "sha256:d35a05780039746bb7383aca633f2ccb71f004ee0416e46bbc650a49801ed28b"
+  },
+  "generatedBy": "core"
+}
