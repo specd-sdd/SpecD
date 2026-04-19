@@ -26,11 +26,16 @@ export type ExtractorTransformContext = ReadonlyMap<string, unknown>
  * Callback contract for extractor transforms.
  *
  */
+export type ExtractorTransformResult = string | Promise<string>
+
+/**
+ * Callback contract for extractor transforms.
+ */
 export type ExtractorTransform = (
   value: string,
   args: readonly (string | undefined)[],
   context: ExtractorTransformContext,
-) => string
+) => ExtractorTransformResult
 
 /** Registry of extractor transforms keyed by registered transform name. */
 export type ExtractorTransformRegistry = ReadonlyMap<string, ExtractorTransform>
@@ -243,14 +248,14 @@ function interpolateArgs(
  * @returns The transformed value
  * @throws {ExtractorTransformError} When lookup or execution fails
  */
-function executeTransform(
+async function executeTransform(
   declaration: ExtractorTransformDeclaration | string,
   captured: CapturedValue,
   transforms: ExtractorTransformRegistry | undefined,
   context: ExtractorTransformContext,
   owner: 'extractor' | 'field',
   fieldName?: string,
-): string {
+): Promise<string> {
   const normalized = normalizeTransformDeclaration(declaration)
   if (normalized === undefined) return captured.value
 
@@ -266,7 +271,12 @@ function executeTransform(
   }
 
   try {
-    return executeRegisteredTransform(fn, captured, interpolateArgs(normalized, captured), context)
+    return await executeRegisteredTransform(
+      fn,
+      captured,
+      interpolateArgs(normalized, captured),
+      context,
+    )
   } catch (error) {
     const detail = error instanceof Error && error.message.length > 0 ? `: ${error.message}` : ''
     throw new ExtractorTransformError(
@@ -293,14 +303,14 @@ function executeTransform(
  * @returns Final string values to include in the extraction result
  * @throws {ExtractorTransformError} When lookup or execution fails
  */
-function resolveCapturedValues(
+async function resolveCapturedValues(
   capturedValues: readonly CapturedValue[],
   declaration: ExtractorTransformDeclaration | string | undefined,
   transforms: ExtractorTransformRegistry | undefined,
   context: ExtractorTransformContext,
   owner: 'extractor' | 'field',
   fieldName?: string,
-): string[] {
+): Promise<string[]> {
   const results: string[] = []
 
   for (const captured of capturedValues) {
@@ -309,7 +319,9 @@ function resolveCapturedValues(
       continue
     }
 
-    results.push(executeTransform(declaration, captured, transforms, context, owner, fieldName))
+    results.push(
+      await executeTransform(declaration, captured, transforms, context, owner, fieldName),
+    )
   }
 
   return results
@@ -325,13 +337,13 @@ function resolveCapturedValues(
  * @returns Transformed string
  * @throws {TypeError} When the transform does not return a string
  */
-function executeRegisteredTransform(
+async function executeRegisteredTransform(
   transform: ExtractorTransform,
   captured: CapturedValue,
   args: readonly (string | undefined)[],
   context: ExtractorTransformContext,
-): string {
-  const result = transform(captured.value, args, context)
+): Promise<string> {
+  const result = await transform(captured.value, args, context)
   if (typeof result !== 'string') {
     throw new TypeError('extractor transforms must return a string')
   }
@@ -366,23 +378,23 @@ function normalizeExtractedText(text: string, stripPattern?: string): string {
  * @returns Extracted values as strings, grouped objects, or structured objects
  * @throws {ExtractorTransformError} When transform lookup or execution fails
  */
-export function extractContent(
+export async function extractContent(
   root: SelectorNode,
   extractor: Extractor,
   renderer: SubtreeRenderer,
   transforms?: ExtractorTransformRegistry,
   transformContext: ExtractorTransformContext = EMPTY_TRANSFORM_CONTEXT,
-): string[] | GroupedExtraction[] | StructuredExtraction[] {
+): Promise<string[] | GroupedExtraction[] | StructuredExtraction[]> {
   const nodes = findNodes(root, extractor.selector)
   if (nodes.length === 0) return []
 
   if (extractor.fields !== undefined) {
     const matches = findNodesWithAncestors(root, extractor.selector)
-    return extractStructured(matches, extractor, renderer, transforms, transformContext)
+    return await extractStructured(matches, extractor, renderer, transforms, transformContext)
   }
 
   if (extractor.groupBy === 'label') {
-    return extractGrouped(nodes, extractor, renderer, transforms, transformContext)
+    return await extractGrouped(nodes, extractor, renderer, transforms, transformContext)
   }
 
   const results: string[] = []
@@ -393,13 +405,13 @@ export function extractContent(
     )
     const captured = captureValues(text, extractor.capture)
     results.push(
-      ...resolveCapturedValues(
+      ...(await resolveCapturedValues(
         captured,
         extractor.transform,
         transforms,
         transformContext,
         'extractor',
-      ),
+      )),
     )
   }
 
@@ -417,13 +429,13 @@ export function extractContent(
  * @param transformContext - Opaque caller-owned transform context bag
  * @returns Grouped extraction results
  */
-function extractGrouped(
+async function extractGrouped(
   nodes: readonly SelectorNode[],
   extractor: Extractor,
   renderer: SubtreeRenderer,
   transforms: ExtractorTransformRegistry | undefined,
   transformContext: ExtractorTransformContext,
-): GroupedExtraction[] {
+): Promise<GroupedExtraction[]> {
   const groups = new Map<string, string[]>()
 
   for (const node of nodes) {
@@ -436,7 +448,7 @@ function extractGrouped(
       extractText(node, extractor.extract, renderer),
       extractor.strip,
     )
-    const items = resolveCapturedValues(
+    const items = await resolveCapturedValues(
       captureValues(text, extractor.capture),
       extractor.transform,
       transforms,
@@ -464,13 +476,13 @@ function extractGrouped(
  * @param transformContext - Opaque caller-owned transform context bag
  * @returns Structured extraction results
  */
-function extractStructured(
+async function extractStructured(
   matches: readonly NodeMatch[],
   extractor: Extractor,
   renderer: SubtreeRenderer,
   transforms: ExtractorTransformRegistry | undefined,
   transformContext: ExtractorTransformContext,
-): StructuredExtraction[] {
+): Promise<StructuredExtraction[]> {
   const fields = extractor.fields!
   const results: StructuredExtraction[] = []
   const hasFollowSiblings = Object.values(fields).some(
@@ -481,7 +493,7 @@ function extractStructured(
     const obj: Record<string, string | string[]> = {}
 
     if (hasFollowSiblings) {
-      extractFieldsWithFollowSiblings(
+      await extractFieldsWithFollowSiblings(
         node,
         ancestors,
         fields,
@@ -492,7 +504,7 @@ function extractStructured(
       )
     } else {
       for (const [fieldName, mapping] of Object.entries(fields)) {
-        const value = extractField(
+        const value = await extractField(
           node,
           ancestors,
           fieldName,
@@ -531,7 +543,7 @@ function extractStructured(
  * @param transforms - Named transform callbacks
  * @param transformContext - Opaque caller-owned transform context bag
  */
-function extractFieldsWithFollowSiblings(
+async function extractFieldsWithFollowSiblings(
   node: SelectorNode,
   ancestors: readonly SelectorNode[],
   fields: Readonly<Record<string, FieldMapping>>,
@@ -539,10 +551,10 @@ function extractFieldsWithFollowSiblings(
   obj: Record<string, string | string[]>,
   transforms: ExtractorTransformRegistry | undefined,
   transformContext: ExtractorTransformContext,
-): void {
+): Promise<void> {
   for (const [fieldName, mapping] of Object.entries(fields)) {
     if (mapping.childSelector !== undefined) continue
-    const value = extractField(
+    const value = await extractField(
       node,
       ancestors,
       fieldName,
@@ -587,7 +599,7 @@ function extractFieldsWithFollowSiblings(
 
       activeField = field
       matchedField = true
-      const values = extractChildValues(
+      const values = await extractChildValues(
         child,
         field.name,
         field.mapping,
@@ -613,7 +625,7 @@ function extractFieldsWithFollowSiblings(
       continue
     }
 
-    const values = extractFollowSiblingValues(
+    const values = await extractFollowSiblingValues(
       child,
       activeField.name,
       activeField.mapping,
@@ -671,19 +683,19 @@ function collectLeafChildren(node: SelectorNode): SelectorNode[] {
  * @param transformContext - Opaque caller-owned transform context bag
  * @returns Final field values derived from the child node
  */
-function extractChildValues(
+async function extractChildValues(
   child: SelectorNode,
   fieldName: string,
   mapping: FieldMapping,
   renderer: SubtreeRenderer,
   transforms: ExtractorTransformRegistry | undefined,
   transformContext: ExtractorTransformContext,
-): string[] {
+): Promise<string[]> {
   const text = normalizeExtractedText(
     renderer.renderSubtree(child).trim() || (child.label ?? ''),
     mapping.strip,
   )
-  return resolveCapturedValues(
+  return await resolveCapturedValues(
     captureValues(text, mapping.capture),
     mapping.transform,
     transforms,
@@ -704,14 +716,14 @@ function extractChildValues(
  * @param transformContext - Opaque caller-owned transform context bag
  * @returns Final field values derived from the sibling node
  */
-function extractFollowSiblingValues(
+async function extractFollowSiblingValues(
   child: SelectorNode,
   fieldName: string,
   mapping: FieldMapping,
   renderer: SubtreeRenderer,
   transforms: ExtractorTransformRegistry | undefined,
   transformContext: ExtractorTransformContext,
-): string[] {
+): Promise<string[]> {
   const baseText = normalizeExtractedText(
     renderer.renderSubtree(child).trim() || (child.label ?? ''),
     mapping.strip,
@@ -719,7 +731,7 @@ function extractFollowSiblingValues(
   const followPattern = mapping.followSiblings
   if (followPattern === undefined) return []
 
-  return resolveCapturedValues(
+  return await resolveCapturedValues(
     captureFollowSiblingValue(baseText, followPattern),
     mapping.transform,
     transforms,
@@ -742,7 +754,7 @@ function extractFollowSiblingValues(
  * @param transformContext - Opaque caller-owned transform context bag
  * @returns The extracted field value, or `undefined`
  */
-function extractField(
+async function extractField(
   node: SelectorNode,
   ancestors: readonly SelectorNode[],
   fieldName: string,
@@ -751,7 +763,7 @@ function extractField(
   nodeFinder: (root: SelectorNode, selector: Selector) => SelectorNode[],
   transforms: ExtractorTransformRegistry | undefined,
   transformContext: ExtractorTransformContext,
-): string | string[] | undefined {
+): Promise<string | string[] | undefined> {
   if (mapping.childSelector !== undefined) {
     const children = nodeFinder(node, mapping.childSelector)
     if (children.length === 0) return undefined
@@ -759,7 +771,14 @@ function extractField(
     const results: string[] = []
     for (const child of children) {
       results.push(
-        ...extractChildValues(child, fieldName, mapping, renderer, transforms, transformContext),
+        ...(await extractChildValues(
+          child,
+          fieldName,
+          mapping,
+          renderer,
+          transforms,
+          transformContext,
+        )),
       )
     }
     return results.length > 0 ? results : undefined
@@ -777,7 +796,7 @@ function extractField(
     text = renderer.renderSubtree(node).trim()
   }
 
-  const values = resolveCapturedValues(
+  const values = await resolveCapturedValues(
     captureValues(normalizeExtractedText(text, mapping.strip), mapping.capture),
     mapping.transform,
     transforms,

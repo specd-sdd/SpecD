@@ -12,6 +12,8 @@ import { LazySchemaProvider } from '../lazy-schema-provider.js'
 import { FsFileReader } from '../../infrastructure/fs/file-reader.js'
 import { NodeContentHasher } from '../../infrastructure/node/content-hasher.js'
 import { createBuiltinExtractorTransforms } from '../extractor-transforms/index.js'
+import { createSpecWorkspaceRoutes } from '../spec-workspace-routes.js'
+import { type SpecWorkspaceRoute } from '../../application/use-cases/_shared/spec-reference-resolver.js'
 
 /** Filesystem adapter options for `createGetProjectContext(options)`. */
 export interface FsGetProjectContextOptions {
@@ -27,6 +29,8 @@ export interface FsGetProjectContextOptions {
   readonly configDir: string
   readonly schemaRef: string
   readonly schemaRepositories: ReadonlyMap<string, SchemaRepository>
+  /** Workspace routing metadata for cross-workspace spec reference resolution. */
+  readonly workspaceRoutes?: readonly SpecWorkspaceRoute[]
 }
 
 /**
@@ -96,6 +100,7 @@ export function createGetProjectContext(
       configDir: config.projectRoot,
       schemaRef: config.schemaRef,
       schemaRepositories: schemaRepos,
+      workspaceRoutes: createSpecWorkspaceRoutes(config.workspaces),
     })
   }
   const opts = configOrOptions
@@ -116,5 +121,6 @@ export function createGetProjectContext(
     parsers,
     hasher,
     createBuiltinExtractorTransforms(),
+    opts.workspaceRoutes ?? [],
   )
 }

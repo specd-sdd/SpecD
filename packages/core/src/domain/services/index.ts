@@ -12,6 +12,7 @@ export { safeRegex } from './safe-regex.js'
 export { shiftHeadings } from './shift-headings.js'
 export {
   extractContent,
+  type ExtractorTransformResult,
   type ExtractorTransform,
   type ExtractorTransformContext,
   type ExtractorTransformRegistry,

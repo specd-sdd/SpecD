@@ -41,7 +41,9 @@ The use case calls `extractMetadata()` with:
 
 The extraction engine produces fields including `title`, `description`, `dependsOn`, `keywords`, `rules`, `constraints`, `scenarios`, and `context`.
 
-When the schema declares transforms for those fields, the extracted metadata returned from `extractMetadata()` is already normalized by that runtime transform path.
+When the schema declares transforms for those fields, the use case awaits the extraction runtime and the extracted metadata returned from `extractMetadata()` is already normalized by that runtime transform path.
+
+The use case may satisfy that normalization through repository-backed transform execution assembled by the caller, rather than through filesystem-specific path inference embedded in the extraction engine.
 
 ### Requirement: dependsOn resolution
 
@@ -49,7 +51,7 @@ When the schema declares transforms for those fields, the extracted metadata ret
 
 If `dependsOn` entries require normalization from artifact-local strings (for example relative spec links) to canonical spec IDs, that behavior must be declared through the schema's extractor transform model and executed during `extractMetadata()`.
 
-The use case supplies the origin context needed by those registered transforms and accepts the transformed extraction output as final. It does not re-run `SpecRepository.resolveFromPath(...)` as a separate ad hoc repair step.
+The use case supplies the origin context and repository-backed transform runtime needed by those registered transforms, awaits the transformed extraction output, and accepts that output as final. It does not re-run `SpecRepository.resolveFromPath(...)` as a separate ad hoc repair step after extraction.
 
 If extraction finds dependency values but transform execution cannot normalize them, metadata generation fails explicitly. It does not silently drop those found values and continue with an incomplete `dependsOn` set.
 
@@ -70,7 +72,7 @@ The result is returned with `hasExtraction: true`.
 ## Constraints
 
 - No LLM involvement — extraction is purely deterministic via the schema's `metadataExtraction` engine
-- Delegates to `extractMetadata()` domain service for all extraction logic — the use case orchestrates but does not implement extraction
+- Delegates to async `extractMetadata()` domain service for all extraction logic — the use case orchestrates but does not implement extraction
 - Does not write to disk — writing is `SaveSpecMetadata`'s responsibility
 - Content hashes only cover artifacts that were successfully loaded from disk
 
@@ -80,3 +82,4 @@ The result is returned with `hasExtraction: true`.
 - [`core:core/content-extraction`](../content-extraction/spec.md) — the `extractMetadata()` domain service
 - [`core:core/schema-format`](../schema-format/spec.md) — `metadataExtraction` declarations and artifact type definitions
 - [`core:core/spec-id-format`](../spec-id-format/spec.md) — `parseSpecId()` resolution
+- [`core:core/spec-repository-port`](../spec-repository-port/spec.md) — repository-backed path resolution used by dependency-normalizing transforms

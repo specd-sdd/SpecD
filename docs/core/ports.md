@@ -30,7 +30,7 @@ const kernel = await createKernelBuilder(config)
   .registerGraphStore('custom-sqlite', customSqliteFactory)
   .useGraphStore('sqlite')
   .registerParser('plaintext-plus', parser)
-  .registerExtractorTransform('trim', (value) => value.trim())
+  .registerExtractorTransform('trim', async (value) => value.trim())
   .registerExternalHookRunner('http-runner', httpRunner)
   .build()
 
@@ -46,6 +46,7 @@ Extractor transforms use the same additive merge rules as other kernel registrie
 - `createKernel(..., { extractorTransforms })` adds external transforms
 - `createKernelBuilder(...).registerExtractorTransform(name, fn)` offers the fluent equivalent
 - duplicate names fail kernel construction with `RegistryConflictError`
+- transform callbacks may return either `string` or `Promise<string>`; the extraction runtime awaits them
 
 ---
 
@@ -166,6 +167,8 @@ Resolves a storage path or relative spec link to a spec identity within this wor
 - `{ specPath, specId }` — resolved within this workspace.
 - `{ crossWorkspaceHint }` — relative path escaped this workspace; try other repositories with the hint segments.
 - `null` — not a valid spec link.
+
+The built-in `resolveSpecPath` extractor transform consumes this contract through an application-level resolver: it resolves in the origin repository first, then uses `crossWorkspaceHint` plus workspace routes to try target repositories and confirm candidates with `get()`.
 
 ```typescript
 export type ResolveFromPathResult =

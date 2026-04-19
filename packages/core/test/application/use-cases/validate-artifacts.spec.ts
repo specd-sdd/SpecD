@@ -16,6 +16,7 @@ import {
   type ArtifactNode,
 } from '../../../src/application/ports/artifact-parser.js'
 import { DeltaApplicationError } from '../../../src/domain/errors/delta-application-error.js'
+import { createBuiltinExtractorTransforms } from '../../../src/composition/extractor-transforms/index.js'
 import {
   makeChangeRepository,
   makeActorResolver,
@@ -1870,6 +1871,124 @@ describe('ValidateArtifacts', () => {
       expect(result.passed).toBe(true)
       expect(repo.store.get('c')?.specDependsOn.get('default:auth/login')).toEqual([
         'default:auth/shared',
+      ])
+    })
+
+    it('normalizes ../../_global/architecture/spec.md via resolver-backed metadata extraction', async () => {
+      const schema = makeSchema({
+        artifacts: [
+          makeArtifactType('specs', {
+            scope: 'spec',
+            output: 'spec.md',
+            format: 'markdown',
+          }),
+        ],
+        metadataExtraction: {
+          dependsOn: {
+            artifact: 'specs',
+            extractor: {
+              selector: { type: 'section', matches: '^Spec Dependencies$' },
+              extract: 'content',
+              capture:
+                '(?:^|\\n)\\s*-\\s+(?:\\[`?|`)?([^`\\]\\n]+?)(?:(?:`?\\]\\(([^)]+)\\)|`)|(?=\\s*(?:—|$)))',
+              transform: { name: 'resolveSpecPath', args: ['$2'] },
+            },
+          },
+        },
+      })
+
+      const specsArtifact = new ChangeArtifact({
+        type: 'specs',
+        files: new Map([
+          [
+            'core:core/actor-resolver-port',
+            new ArtifactFile({
+              key: 'core:core/actor-resolver-port',
+              filename: 'spec.md',
+              status: 'in-progress',
+            }),
+          ],
+        ]),
+      })
+      const change = makeChangeWithArtifacts('c', [specsArtifact], {
+        specIds: ['core:core/actor-resolver-port'],
+      })
+
+      const repo = makeChangeRepository([change])
+      Object.assign(repo, {
+        async artifact(_change: Change, filename: string): Promise<SpecArtifact | null> {
+          if (filename !== 'spec.md') return null
+          return new SpecArtifact(
+            'spec.md',
+            '# Actor Resolver\n\n## Spec Dependencies\n\n- [`../../_global/architecture/spec.md`](../../_global/architecture/spec.md)\n',
+          )
+        },
+      })
+
+      const coreRepo = makeSpecRepository({
+        workspace: 'core',
+        specs: [new Spec('core', SpecPath.parse('core/actor-resolver-port'), ['spec.md'])],
+        resolveFromPath: async (inputPath) => {
+          if (inputPath !== '../../_global/architecture/spec.md') return null
+          return { crossWorkspaceHint: ['_global', 'architecture'] }
+        },
+      })
+      const defaultRepo = makeSpecRepository({
+        workspace: 'default',
+        specs: [new Spec('default', SpecPath.parse('_global/architecture'), ['spec.md'])],
+      })
+
+      const markdownParser = makeParser({
+        parse: () => ({
+          root: {
+            type: 'document',
+            children: [
+              {
+                type: 'section',
+                label: 'Spec Dependencies',
+                children: [
+                  {
+                    type: 'paragraph',
+                    value:
+                      '- [`../../_global/architecture/spec.md`](../../_global/architecture/spec.md)',
+                  },
+                ],
+              },
+            ],
+          },
+        }),
+        renderSubtree: (node) =>
+          (node.value as string | undefined) ??
+          (node.children ?? [])
+            .map((child) => ((child as { value?: unknown }).value as string | undefined) ?? '')
+            .join('\n'),
+      })
+
+      const uc = new ValidateArtifacts(
+        repo,
+        new Map([
+          ['core', coreRepo],
+          ['default', defaultRepo],
+        ]),
+        makeSchemaProvider(schema),
+        makeParsers(markdownParser),
+        makeActorResolver(),
+        makeContentHasher(),
+        createBuiltinExtractorTransforms(),
+        [
+          { workspace: 'default', prefixSegments: ['_global'] },
+          { workspace: 'core', prefixSegments: ['core'] },
+        ],
+      )
+
+      const result = await uc.execute({
+        name: 'c',
+        specPath: 'core:core/actor-resolver-port',
+      })
+
+      expect(result.passed).toBe(true)
+      expect(repo.store.get('c')?.specDependsOn.get('core:core/actor-resolver-port')).toEqual([
+        'default:_global/architecture',
       ])
     })
 

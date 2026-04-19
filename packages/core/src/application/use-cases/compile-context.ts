@@ -21,6 +21,10 @@ import { listMatchingSpecs, type ResolvedSpec } from './_shared/spec-pattern-mat
 import { traverseDependsOn, type DependsOnFallback } from './_shared/depends-on-traversal.js'
 import { compileContextFingerprint } from './_shared/compile-context-fingerprint.js'
 import { createExtractorTransformContext } from './_shared/extractor-transform-context.js'
+import {
+  createSpecReferenceResolver,
+  type SpecWorkspaceRoute,
+} from './_shared/spec-reference-resolver.js'
 
 const CONTEXT_SOURCE_PRIORITY: Record<ContextSpecSource, number> = {
   includePattern: 0,
@@ -192,6 +196,7 @@ export class CompileContext {
   private readonly _hasher: ContentHasher
   private readonly _previewSpec: PreviewSpec
   private readonly _extractorTransforms: ExtractorTransformRegistry
+  private readonly _workspaceRoutes: readonly SpecWorkspaceRoute[]
 
   /**
    * Creates a new `CompileContext` use case instance.
@@ -204,6 +209,7 @@ export class CompileContext {
    * @param hasher - Content hasher for metadata freshness checks
    * @param previewSpec - Use case for merging deltas into spec content
    * @param extractorTransforms - Shared extractor transform registry
+   * @param workspaceRoutes - Workspace routing metadata for cross-workspace resolution
    */
   constructor(
     changes: ChangeRepository,
@@ -214,6 +220,7 @@ export class CompileContext {
     hasher: ContentHasher,
     previewSpec: PreviewSpec,
     extractorTransforms: ExtractorTransformRegistry = new Map(),
+    workspaceRoutes: readonly SpecWorkspaceRoute[] = [],
   ) {
     this._changes = changes
     this._specs = specs
@@ -223,6 +230,7 @@ export class CompileContext {
     this._hasher = hasher
     this._previewSpec = previewSpec
     this._extractorTransforms = extractorTransforms
+    this._workspaceRoutes = workspaceRoutes
   }
 
   /**
@@ -345,6 +353,7 @@ export class CompileContext {
               schemaArtifacts: schema.artifacts(),
               parsers: this._parsers,
               extractorTransforms: this._extractorTransforms,
+              workspaceRoutes: this._workspaceRoutes,
             }
           : undefined
 
@@ -544,7 +553,7 @@ export class CompileContext {
         } else if (mergedFiles !== undefined) {
           const extraction = schema.metadataExtraction()
           if (extraction !== undefined) {
-            content = this._renderExtractedSectionsFromFiles(
+            content = await this._renderExtractedSectionsFromFiles(
               mergedFiles,
               extraction,
               workspace,
@@ -579,7 +588,7 @@ export class CompileContext {
 
             const extraction = schema.metadataExtraction()
             if (extraction !== undefined) {
-              content = this._renderExtractedSectionsFromFiles(
+              content = await this._renderExtractedSectionsFromFiles(
                 displayFiles,
                 extraction,
                 workspace,
@@ -823,16 +832,23 @@ export class CompileContext {
    * @param sectionsFilter - Required selected sections
    * @returns Rendered section content
    */
-  private _renderExtractedSectionsFromFiles(
+  private async _renderExtractedSectionsFromFiles(
     files: readonly SpecContentFile[],
     extraction: import('../../domain/value-objects/metadata-extraction.js').MetadataExtraction,
     workspace: string,
     specPath: string,
     sectionsFilter: ReadonlyArray<SpecSection>,
-  ): string {
+  ): Promise<string> {
     const astsByArtifact = new Map<string, { root: SelectorNode }>()
     const renderers = new Map<string, SubtreeRenderer>()
     const transformContexts = new Map<string, ReturnType<typeof createExtractorTransformContext>>()
+    const originSpecPath = SpecPath.parse(specPath)
+    const resolveSpecReference = createSpecReferenceResolver({
+      originWorkspace: workspace,
+      originSpecPath,
+      repositories: this._specs,
+      workspaceRoutes: this._workspaceRoutes,
+    })
 
     for (const file of files) {
       const parser = this._parsers.get(file.format)
@@ -843,11 +859,13 @@ export class CompileContext {
       renderers.set(file.artifactId, parser as SubtreeRenderer)
       transformContexts.set(
         file.artifactId,
-        createExtractorTransformContext(workspace, specPath, file.artifactId, file.filename),
+        createExtractorTransformContext(workspace, specPath, file.artifactId, file.filename, {
+          resolveSpecReference,
+        }),
       )
     }
 
-    const extracted = extractMetadata(
+    const extracted = await extractMetadata(
       extraction,
       astsByArtifact,
       renderers,
@@ -884,6 +902,12 @@ export class CompileContext {
     const astsByArtifact = new Map<string, { root: SelectorNode }>()
     const renderers = new Map<string, SubtreeRenderer>()
     const transformContexts = new Map<string, ReturnType<typeof createExtractorTransformContext>>()
+    const resolveSpecReference = createSpecReferenceResolver({
+      originWorkspace: spec.workspace,
+      originSpecPath: spec.name,
+      repositories: this._specs,
+      workspaceRoutes: fallback.workspaceRoutes,
+    })
 
     for (const file of files) {
       const parser = this._parsers.get(file.format)
@@ -899,13 +923,16 @@ export class CompileContext {
           spec.name.toString(),
           file.artifactId,
           file.filename,
+          {
+            resolveSpecReference,
+          },
         ),
       )
     }
 
     if (astsByArtifact.size === 0) return undefined
 
-    const extracted = extractMetadata(
+    const extracted = await extractMetadata(
       fallback.extraction,
       astsByArtifact,
       renderers,

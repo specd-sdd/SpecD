@@ -305,6 +305,7 @@ describe('traverseDependsOn', () => {
         makeArtifactType('specs', { scope: 'spec', output: 'spec.md', format: 'markdown' }),
       ],
       parsers: new Map([['markdown', mockParser]]),
+      workspaceRoutes: [],
     }
 
     await traverseDependsOn(

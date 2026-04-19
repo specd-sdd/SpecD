@@ -238,7 +238,7 @@ function extractMetadata(
   transforms?: ExtractorTransformRegistry,
   transformContexts?: ReadonlyMap<string, ExtractorTransformContext>,
   targetArtifactId?: string,
-): ExtractedMetadata
+): Promise<ExtractedMetadata>
 ```
 
 Orchestrates metadata extraction across multiple artifact ASTs. For each declared field in the schema's `metadataExtraction` block, looks up the corresponding artifact AST, runs the configured extractor, and assembles the result into an `ExtractedMetadata` object.
@@ -252,7 +252,7 @@ Orchestrates metadata extraction across multiple artifact ASTs. For each declare
 | `transformContexts` | `ReadonlyMap<string, ExtractorTransformContext>` (optional) | Opaque context bags keyed by artifact id.             |
 | `targetArtifactId`  | `string` (optional)                                         | Restricts extraction to one artifact id.              |
 
-**Returns:** `ExtractedMetadata` — all available metadata fields populated.
+**Returns:** `Promise<ExtractedMetadata>` — all available metadata fields populated after all transform callbacks settle.
 
 ---
 
@@ -267,7 +267,7 @@ function extractContent(
   renderer: SubtreeRenderer,
   transforms?: ExtractorTransformRegistry,
   transformContext?: ExtractorTransformContext,
-): string[] | GroupedExtraction[] | StructuredExtraction[]
+): Promise<string[] | GroupedExtraction[] | StructuredExtraction[]>
 ```
 
 Generic extraction engine — runs a single extractor configuration against an AST root. Supports simple string extraction, grouped extraction (nodes grouped by label), and structured extraction (field-mapped objects). Used internally by `extractMetadata` and available for custom extraction when building a port.
@@ -279,16 +279,20 @@ Generic extraction engine — runs a single extractor configuration against an A
 - `$0`, `$1`, `$2`, and higher groups can be interpolated into transform args before invocation
 - extractor-level transforms run per emitted value
 - field-level transforms run per emitted field value
-- once a transform receives a value, it must return a normalized string or throw
+- once a transform receives a value, it may return either a normalized string or a promise that resolves to a normalized string
+- rejected transform promises surface as `ExtractorTransformError`
+- resolved non-string values are rejected after awaiting and surfaced as `ExtractorTransformError`
 
 The transform callback contract is:
 
 ```typescript
+type ExtractorTransformResult = string | Promise<string>
+
 type ExtractorTransform = (
   value: string,
   args: readonly (string | undefined)[],
   context: ReadonlyMap<string, unknown>,
-) => string
+) => ExtractorTransformResult
 ```
 
 Transforms are registered through the kernel:
@@ -296,7 +300,7 @@ Transforms are registered through the kernel:
 - `createKernel(config, { extractorTransforms: { myTransform } })`
 - `createKernelBuilder(config).registerExtractorTransform('myTransform', myTransform)`
 
-Built-ins are registered under the same mechanism. `resolveSpecPath` is the standard transform for dependency extraction: it tries the extracted `value` first, then any interpolated args in order, returning the first candidate that normalizes to a canonical spec id. This supports canonical dependency labels, optional relative `href` fallbacks, and legacy labels during migration.
+Built-ins are registered under the same mechanism. `resolveSpecPath` is the standard transform for dependency extraction: it tries the extracted `value` first, then any interpolated args in order, returning the first candidate that normalizes to a canonical spec id. Canonical `workspace:capability-path` candidates are normalized locally; relative candidates are delegated to a repository-backed resolver in transform context. That resolver uses `SpecRepository.resolveFromPath()` in the origin workspace and consumes `crossWorkspaceHint` to route to the correct workspace before confirming existence via `SpecRepository.get()`.
 
 ---
 

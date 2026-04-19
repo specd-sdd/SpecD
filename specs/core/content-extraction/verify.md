@@ -61,6 +61,13 @@
 - **THEN** the transform is called with `value = "2026"` when the first capture group is the semantic value for that match
 - **AND** the interpolated args are `["09", "/", "04", "/", "2026"]`
 
+#### Scenario: Async transform is awaited before the result is returned
+
+- **GIVEN** an extractor emits a captured value
+- **AND** the registered transform returns a promise that resolves to a normalized string
+- **WHEN** `extractContent` runs with that transform
+- **THEN** the extraction result includes the resolved string rather than a pending promise value
+
 #### Scenario: No matches returns empty array
 
 - **WHEN** the selector matches zero nodes
@@ -100,6 +107,13 @@
 - **AND** that field declares `transform: resolveSpecPath`
 - **WHEN** structured extraction runs with a registry containing `resolveSpecPath`
 - **THEN** the transform is applied to that field value before the structured result is returned
+
+#### Scenario: Async field transform is awaited before the structured result is returned
+
+- **GIVEN** a field mapping extracts a dependency candidate
+- **AND** that field's registered transform returns a promise that resolves to a normalized value
+- **WHEN** structured extraction runs
+- **THEN** the structured result includes the resolved value after the promise settles
 
 ### Requirement: Follow siblings
 
@@ -153,7 +167,7 @@
 #### Scenario: Field transform failure identifies the field
 
 - **GIVEN** a structured extractor with a field `dependsOn` that declares `transform: resolveSpecPath`
-- **AND** the registered transform throws while processing that field
+- **AND** the registered transform throws or rejects while processing that field
 - **WHEN** `extractContent` runs
 - **THEN** extraction fails with `ExtractorTransformError`
 - **AND** the error identifies `resolveSpecPath` as the transform name
@@ -173,6 +187,12 @@
 - **WHEN** that transform attempts to return a null value instead of a normalized string
 - **THEN** extraction fails with `ExtractorTransformError`
 - **AND** the value is not silently omitted from the final result
+
+#### Scenario: Async transform result is awaited
+
+- **GIVEN** a registered transform returns a promise that resolves to a normalized string
+- **WHEN** `extractContent` runs
+- **THEN** extraction awaits the promise before returning the final extracted value
 
 #### Scenario: resolveSpecPath accepts a canonical spec ID directly
 

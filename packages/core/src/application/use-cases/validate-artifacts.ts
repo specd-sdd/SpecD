@@ -22,10 +22,18 @@ import { evaluateRules } from '../../domain/services/rule-evaluator.js'
 import { inferFormat } from '../../domain/services/format-inference.js'
 import { type ContentHasher } from '../ports/content-hasher.js'
 import { SpecArtifact } from '../../domain/value-objects/spec-artifact.js'
-import { extractMetadata, type SubtreeRenderer } from '../../domain/services/extract-metadata.js'
+import {
+  extractMetadata,
+  type ExtractedMetadata,
+  type SubtreeRenderer,
+} from '../../domain/services/extract-metadata.js'
 import { type SelectorNode } from '../../domain/services/selector-matching.js'
 import * as path from 'node:path'
 import { createExtractorTransformContext } from './_shared/extractor-transform-context.js'
+import {
+  createSpecReferenceResolver,
+  type SpecWorkspaceRoute,
+} from './_shared/spec-reference-resolver.js'
 
 /** Input for the {@link ValidateArtifacts} use case. */
 export interface ValidateArtifactsInput {
@@ -88,6 +96,7 @@ export class ValidateArtifacts {
   private readonly _actor: ActorResolver
   private readonly _hasher: ContentHasher
   private readonly _extractorTransforms: ExtractorTransformRegistry
+  private readonly _workspaceRoutes: readonly SpecWorkspaceRoute[]
 
   /**
    * Creates a new `ValidateArtifacts` use case instance.
@@ -99,6 +108,7 @@ export class ValidateArtifacts {
    * @param actor - Resolver for the actor identity
    * @param hasher - Content hasher for computing artifact hashes
    * @param extractorTransforms - Shared extractor transform registry
+   * @param workspaceRoutes - Workspace routing metadata for cross-workspace resolution
    */
   constructor(
     changes: ChangeRepository,
@@ -108,6 +118,7 @@ export class ValidateArtifacts {
     actor: ActorResolver,
     hasher: ContentHasher,
     extractorTransforms: ExtractorTransformRegistry = new Map(),
+    workspaceRoutes: readonly SpecWorkspaceRoute[] = [],
   ) {
     this._changes = changes
     this._specs = specs
@@ -116,6 +127,7 @@ export class ValidateArtifacts {
     this._actor = actor
     this._hasher = hasher
     this._extractorTransforms = extractorTransforms
+    this._workspaceRoutes = workspaceRoutes
   }
 
   /**
@@ -170,6 +182,17 @@ export class ValidateArtifacts {
 
     const { workspace, capPath: capabilityPath } = parseSpecId(input.specPath)
     const specRepo = this._specs.get(workspace)
+    let resolveSpecReference: ReturnType<typeof createSpecReferenceResolver> | undefined = undefined
+    try {
+      resolveSpecReference = createSpecReferenceResolver({
+        originWorkspace: workspace,
+        originSpecPath: SpecPath.parse(capabilityPath),
+        repositories: this._specs,
+        workspaceRoutes: this._workspaceRoutes,
+      })
+    } catch {
+      resolveSpecReference = undefined
+    }
 
     // --- Required artifacts check (skipped when artifactId is provided) ---
     if (input.artifactId === undefined) {
@@ -260,7 +283,7 @@ export class ValidateArtifacts {
 
       let validationContent: string | null = null
       let artifactFailed = false
-      let extractedMetadataForArtifact: ReturnType<typeof extractMetadata> | undefined
+      let extractedMetadataForArtifact: ExtractedMetadata | undefined
 
       // --- Delta processing ---
       if (artifactType.delta) {
@@ -382,7 +405,10 @@ export class ValidateArtifacts {
             try {
               const astsByArtifact = new Map<string, { root: SelectorNode }>()
               const renderers = new Map<string, SubtreeRenderer>()
-              const transformContexts = new Map()
+              const transformContexts = new Map<
+                string,
+                ReturnType<typeof createExtractorTransformContext>
+              >()
               const ast = parser.parse(validationContent)
               astsByArtifact.set(artifactType.id, ast)
               renderers.set(artifactType.id, parser as SubtreeRenderer)
@@ -395,10 +421,13 @@ export class ValidateArtifacts {
                     : input.specPath,
                   artifactType.id,
                   path.basename(file.filename),
+                  {
+                    ...(resolveSpecReference !== undefined ? { resolveSpecReference } : {}),
+                  },
                 ),
               )
 
-              const extracted = extractMetadata(
+              const extracted = await extractMetadata(
                 extraction,
                 astsByArtifact,
                 renderers,

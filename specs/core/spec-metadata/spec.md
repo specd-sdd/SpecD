@@ -8,16 +8,23 @@ Tooling and AI agents need a compact, machine-readable summary of each spec — 
 
 ### Requirement: File location and naming
 
-`metadata.json` lives under the `.specd/metadata/` directory, mirroring the spec's capability path:
+`metadata.json` lives under the `.specd/metadata/` directory, organized by workspace then capability path:
 
 ```
 .specd/metadata/core/config/
 └── metadata.json
 
-specs/core/config/
-├── spec.md          ← user content only
-└── verify.md
+.specd/metadata/skills/get-skill/
+└── metadata.json
+
+.specd/metadata/plugin-manager/agent-plugin-type/
+└── metadata.json
 ```
+
+The path structure is: `.specd/metadata/<workspace>/<capability-path>/metadata.json`, where:
+
+- `<workspace>` is the workspace name from `specd.yaml`
+- `<capability-path>` is the spec's capability path (with prefix segments if workspace has a prefix)
 
 The metadata root path is configured per workspace via `specs.fs.metadataPath` in `specd.yaml`. When not set, the composition layer auto-derives it from the VCS root of the workspace's specs path: `createVcsAdapter(specs.path).rootDir()` + `/.specd/metadata/`. This works across heterogeneous VCS setups (git, hg, svn). When `NullVcsAdapter` is returned (specs path is not inside any VCS), the fallback is `.specd/metadata/` relative to the specs root parent directory. The `FsSpecRepository` adapter receives the resolved path as config — it does not perform VCS detection itself.
 

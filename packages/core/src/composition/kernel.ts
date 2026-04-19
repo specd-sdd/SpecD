@@ -49,6 +49,7 @@ import {
   type KernelRegistryView,
 } from './kernel-registries.js'
 import { LazySchemaProvider } from './lazy-schema-provider.js'
+import { createSpecWorkspaceRoutes } from './spec-workspace-routes.js'
 
 /**
  * All use cases instantiated from a single `SpecdConfig`, grouped by domain area.
@@ -185,6 +186,7 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
     throw new Error(`graph store '${options.graphStoreId}' is not registered`)
   }
   const i = await createKernelInternals(config, registry, options)
+  const workspaceRoutes = createSpecWorkspaceRoutes(config.workspaces)
 
   // Shared ResolveSchema + LazySchemaProvider — resolves once with plugins and overrides
   const resolveSchema = new ResolveSchema(
@@ -235,6 +237,7 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
           i.parsers,
           i.hasher,
           i.registry.extractorTransforms,
+          workspaceRoutes,
         ),
         new SaveSpecMetadata(i.specs),
       ),
@@ -246,6 +249,7 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
         i.actor,
         i.hasher,
         i.registry.extractorTransforms,
+        workspaceRoutes,
       ),
       compile: new CompileContext(
         i.changes,
@@ -256,6 +260,7 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
         i.hasher,
         previewSpec,
         i.registry.extractorTransforms,
+        workspaceRoutes,
       ),
       list: new ListChanges(i.changes),
       listDrafts: new ListDrafts(i.changes),
@@ -299,6 +304,7 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
         i.parsers,
         i.hasher,
         i.registry.extractorTransforms,
+        workspaceRoutes,
       ),
       getContext: new GetSpecContext(i.specs, i.hasher),
     },
@@ -314,6 +320,7 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
         i.parsers,
         i.hasher,
         i.registry.extractorTransforms,
+        workspaceRoutes,
       ),
     },
   }

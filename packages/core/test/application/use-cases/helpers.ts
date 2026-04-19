@@ -370,6 +370,9 @@ class StubSpecRepository extends SpecRepository {
     | ((spec: Spec, artifact: SpecArtifact, options?: { force?: boolean }) => Promise<void>)
     | undefined
   private readonly _deleteFn: ((spec: Spec) => Promise<void>) | undefined
+  private readonly _resolveFromPathFn:
+    | ((inputPath: string, from?: SpecPath) => Promise<ResolveFromPathResult | null>)
+    | undefined
   readonly saved = new Map<string, string>()
 
   constructor(opts: {
@@ -377,6 +380,7 @@ class StubSpecRepository extends SpecRepository {
     artifacts?: Record<string, string | null>
     save?: (spec: Spec, artifact: SpecArtifact, options?: { force?: boolean }) => Promise<void>
     delete?: (spec: Spec) => Promise<void>
+    resolveFromPath?: (inputPath: string, from?: SpecPath) => Promise<ResolveFromPathResult | null>
     ownership?: 'owned' | 'shared' | 'readOnly'
     workspace?: string
   }) {
@@ -389,6 +393,7 @@ class StubSpecRepository extends SpecRepository {
     this._artifacts = opts.artifacts ?? {}
     this._saveFn = opts.save
     this._deleteFn = opts.delete
+    this._resolveFromPathFn = opts.resolveFromPath
   }
 
   override async get(name: SpecPath): Promise<Spec | null> {
@@ -442,9 +447,12 @@ class StubSpecRepository extends SpecRepository {
   }
 
   override async resolveFromPath(
-    _inputPath: string,
-    _from?: SpecPath,
+    inputPath: string,
+    from?: SpecPath,
   ): Promise<ResolveFromPathResult | null> {
+    if (this._resolveFromPathFn !== undefined) {
+      return await this._resolveFromPathFn(inputPath, from)
+    }
     return null
   }
 }
@@ -459,6 +467,10 @@ export function makeSpecRepository(
         artifacts?: Record<string, string | null>
         save?: (spec: Spec, artifact: SpecArtifact, options?: { force?: boolean }) => Promise<void>
         delete?: (spec: Spec) => Promise<void>
+        resolveFromPath?: (
+          inputPath: string,
+          from?: SpecPath,
+        ) => Promise<ResolveFromPathResult | null>
         ownership?: 'owned' | 'shared' | 'readOnly'
         workspace?: string
       }

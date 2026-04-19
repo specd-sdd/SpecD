@@ -21,6 +21,10 @@ import { type SelectorNode } from '../../domain/services/selector-matching.js'
 import { listMatchingSpecs, type ResolvedSpec } from './_shared/spec-pattern-matching.js'
 import { traverseDependsOn, type DependsOnFallback } from './_shared/depends-on-traversal.js'
 import { createExtractorTransformContext } from './_shared/extractor-transform-context.js'
+import {
+  createSpecReferenceResolver,
+  type SpecWorkspaceRoute,
+} from './_shared/spec-reference-resolver.js'
 
 /** Input for the {@link GetProjectContext} use case. */
 export interface GetProjectContextInput {
@@ -70,6 +74,7 @@ export class GetProjectContext {
   private readonly _parsers: ArtifactParserRegistry
   private readonly _hasher: ContentHasher
   private readonly _extractorTransforms: ExtractorTransformRegistry
+  private readonly _workspaceRoutes: readonly SpecWorkspaceRoute[]
 
   /**
    * Creates a new `GetProjectContext` use case instance.
@@ -80,6 +85,7 @@ export class GetProjectContext {
    * @param parsers - Registry of artifact format parsers
    * @param hasher - Content hasher for metadata freshness checks
    * @param extractorTransforms - Shared extractor transform registry
+   * @param workspaceRoutes - Workspace routing metadata for cross-workspace resolution
    */
   constructor(
     specs: ReadonlyMap<string, SpecRepository>,
@@ -88,6 +94,7 @@ export class GetProjectContext {
     parsers: ArtifactParserRegistry,
     hasher: ContentHasher,
     extractorTransforms: ExtractorTransformRegistry = new Map(),
+    workspaceRoutes: readonly SpecWorkspaceRoute[] = [],
   ) {
     this._specs = specs
     this._schemaProvider = schemaProvider
@@ -95,6 +102,7 @@ export class GetProjectContext {
     this._parsers = parsers
     this._hasher = hasher
     this._extractorTransforms = extractorTransforms
+    this._workspaceRoutes = workspaceRoutes
   }
 
   /**
@@ -160,6 +168,7 @@ export class GetProjectContext {
               schemaArtifacts: schema.artifacts(),
               parsers: this._parsers,
               extractorTransforms: this._extractorTransforms,
+              workspaceRoutes: this._workspaceRoutes,
             }
           : undefined
 
@@ -306,6 +315,12 @@ export class GetProjectContext {
     const astsByArtifact = new Map<string, { root: SelectorNode }>()
     const renderers = new Map<string, SubtreeRenderer>()
     const transformContexts = new Map<string, ReturnType<typeof createExtractorTransformContext>>()
+    const resolveSpecReference = createSpecReferenceResolver({
+      originWorkspace: spec.workspace,
+      originSpecPath: spec.name,
+      repositories: this._specs,
+      workspaceRoutes: this._workspaceRoutes,
+    })
 
     for (const artifactType of schema.artifacts()) {
       if (artifactType.scope !== 'spec') continue
@@ -327,11 +342,14 @@ export class GetProjectContext {
           spec.name.toString(),
           artifactType.id,
           filename,
+          {
+            resolveSpecReference,
+          },
         ),
       )
     }
 
-    const extracted = extractMetadata(
+    const extracted = await extractMetadata(
       extraction,
       astsByArtifact,
       renderers,

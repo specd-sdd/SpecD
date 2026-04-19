@@ -264,6 +264,114 @@ describe('GetProjectContext', () => {
     expect(result.warnings.some((warning) => warning.type === 'missing-metadata')).toBe(true)
   })
 
+  it('normalizes ../../_global/architecture/spec.md during followDeps fallback extraction', async () => {
+    const specType = makeArtifactType('specs', {
+      scope: 'spec',
+      output: 'spec.md',
+      format: 'markdown',
+    })
+    const schema = makeSchema({
+      artifacts: [specType],
+      metadataExtraction: {
+        dependsOn: {
+          artifact: 'specs',
+          extractor: {
+            selector: { type: 'section', matches: '^Spec Dependencies$' },
+            extract: 'content',
+            capture:
+              '(?:^|\\n)\\s*-\\s+(?:\\[`?|`)?([^`\\]\\n]+?)(?:(?:`?\\]\\(([^)]+)\\)|`)|(?=\\s*(?:—|$)))',
+            transform: { name: 'resolveSpecPath', args: ['$2'] },
+          },
+        },
+      },
+    })
+
+    const actorResolverSpec = new Spec('core', SpecPath.parse('core/actor-resolver-port'), [
+      'spec.md',
+    ])
+    const architectureSpec = new Spec('default', SpecPath.parse('_global/architecture'), [
+      'spec.md',
+    ])
+    const architectureContent = '# Architecture'
+    const coreRepo = makeSpecRepository({
+      workspace: 'core',
+      specs: [actorResolverSpec],
+      artifacts: {
+        'core/actor-resolver-port/spec.md':
+          '# Actor Resolver\n\n## Spec Dependencies\n\n- [`../../_global/architecture/spec.md`](../../_global/architecture/spec.md)\n',
+      },
+      resolveFromPath: async (inputPath) => {
+        if (inputPath !== '../../_global/architecture/spec.md') return null
+        return { crossWorkspaceHint: ['_global', 'architecture'] }
+      },
+    })
+    const defaultRepo = makeSpecRepository({
+      workspace: 'default',
+      specs: [architectureSpec],
+      artifacts: {
+        '_global/architecture/spec.md': architectureContent,
+        '_global/architecture/.specd-metadata.yaml': JSON.stringify({
+          title: 'Architecture',
+          description: 'Global architecture constraints.',
+          contentHashes: {
+            'spec.md': 'sha256:a38f7bc6aff8e64968ac404465c1579222a2e0b6388f37e9bb31b8fe5f7829a0',
+          },
+        }),
+      },
+    })
+
+    const markdownParser = makeParser({
+      parse: () => ({
+        root: {
+          type: 'document',
+          children: [
+            {
+              type: 'section',
+              label: 'Spec Dependencies',
+              children: [
+                {
+                  type: 'paragraph',
+                  value:
+                    '- [`../../_global/architecture/spec.md`](../../_global/architecture/spec.md)',
+                },
+              ],
+            },
+          ],
+        },
+      }),
+      renderSubtree: (node) =>
+        (node.value as string | undefined) ??
+        (node.children ?? [])
+          .map((child) => ((child as { value?: unknown }).value as string | undefined) ?? '')
+          .join('\n'),
+    })
+
+    const uc = new GetProjectContext(
+      new Map([
+        ['core', coreRepo],
+        ['default', defaultRepo],
+      ]),
+      makeSchemaProvider(schema),
+      makeFileReader(),
+      makeParsers(markdownParser),
+      makeContentHasher(),
+      createBuiltinExtractorTransforms(),
+      [
+        { workspace: 'default', prefixSegments: ['_global'] },
+        { workspace: 'core', prefixSegments: ['core'] },
+      ],
+    )
+
+    const result = await uc.execute({
+      config: {
+        contextIncludeSpecs: ['core:core/actor-resolver-port'],
+      },
+      followDeps: true,
+    })
+
+    expect(result.specs.some((spec) => spec.specId === 'default:_global/architecture')).toBe(true)
+  })
+
   it('fails followDeps fallback extraction when no dependency candidate is resolvable', async () => {
     const specType = makeArtifactType('specs', {
       scope: 'spec',

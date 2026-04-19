@@ -236,12 +236,25 @@ function makeSut(opts: {
   parsers?: ArtifactParserRegistry
   previewSpec?: PreviewSpec
   extractorTransforms?: ExtractorTransformRegistry
+  workspaceRoutes?: readonly {
+    workspace: string
+    prefixSegments: readonly string[]
+  }[]
 }): {
   sut: CompileContext
   changeRepo: ChangeRepository
   schemaProvider: SchemaProvider
 } {
-  const { change, schema, specRepos, fileReader, parsers, previewSpec, extractorTransforms } = opts
+  const {
+    change,
+    schema,
+    specRepos,
+    fileReader,
+    parsers,
+    previewSpec,
+    extractorTransforms,
+    workspaceRoutes,
+  } = opts
   const changeRepo = makeStubChangeRepo(change)
   const schemaProvider = makeStubSchemaProvider(schema ?? null)
 
@@ -254,6 +267,7 @@ function makeSut(opts: {
     makeContentHasher(),
     previewSpec ?? makeStubPreviewSpec(),
     extractorTransforms ?? new Map(),
+    workspaceRoutes ?? [],
   )
 
   return { sut, changeRepo, schemaProvider }
@@ -509,6 +523,106 @@ describe('CompileContext', () => {
           followDeps: true,
         }),
       ).rejects.toThrow(ExtractorTransformError)
+    })
+
+    it('normalizes ../../_global/architecture/spec.md during fallback dependsOn traversal', async () => {
+      const specType = makeArtifactType('specs', {
+        scope: 'spec',
+        output: 'spec.md',
+        format: 'markdown',
+      })
+      const schema = makeSchema({
+        artifacts: [specType],
+        metadataExtraction: {
+          dependsOn: {
+            artifact: 'specs',
+            extractor: {
+              selector: { type: 'section', matches: '^Spec Dependencies$' },
+              extract: 'content',
+              capture:
+                '(?:^|\\n)\\s*-\\s+(?:\\[`?|`)?([^`\\]\\n]+?)(?:(?:`?\\]\\(([^)]+)\\)|`)|(?=\\s*(?:—|$)))',
+              transform: { name: 'resolveSpecPath', args: ['$2'] },
+            },
+          },
+        },
+      })
+
+      const actorResolverSpec = new Spec('core', SpecPath.parse('core/actor-resolver-port'), [
+        'spec.md',
+      ])
+      const architectureSpec = new Spec('default', SpecPath.parse('_global/architecture'), [
+        'spec.md',
+      ])
+      const architectureContent = '# Architecture'
+      const coreRepo = makeSpecRepository({
+        workspace: 'core',
+        specs: [actorResolverSpec],
+        artifacts: {
+          'core/actor-resolver-port/spec.md':
+            '# Actor Resolver\n\n## Spec Dependencies\n\n- [`../../_global/architecture/spec.md`](../../_global/architecture/spec.md)\n',
+        },
+        resolveFromPath: async (inputPath) => {
+          if (inputPath !== '../../_global/architecture/spec.md') return null
+          return { crossWorkspaceHint: ['_global', 'architecture'] }
+        },
+      })
+      const defaultRepo = makeSpecRepository({
+        workspace: 'default',
+        specs: [architectureSpec],
+        artifacts: {
+          '_global/architecture/spec.md': architectureContent,
+          '_global/architecture/.specd-metadata.yaml': freshMetadata(architectureContent, {
+            description: 'Architecture constraints.',
+          }),
+        },
+      })
+
+      const markdownParser: ArtifactParser = {
+        ...stubParser,
+        parse: () => ({
+          root: {
+            type: 'document',
+            children: [
+              {
+                type: 'section',
+                label: 'Spec Dependencies',
+                children: [
+                  {
+                    type: 'paragraph',
+                    value:
+                      '- [`../../_global/architecture/spec.md`](../../_global/architecture/spec.md)',
+                  },
+                ],
+              },
+            ],
+          },
+        }),
+        renderSubtree: renderSubtreeRecursive,
+      }
+
+      const { sut } = makeSut({
+        change: makeChange('dep-fallback', { specIds: ['core:core/actor-resolver-port'] }),
+        schema,
+        specRepos: new Map([
+          ['core', coreRepo],
+          ['default', defaultRepo],
+        ]),
+        parsers: new Map([['markdown', markdownParser]]) as ArtifactParserRegistry,
+        extractorTransforms: createBuiltinExtractorTransforms(),
+        workspaceRoutes: [
+          { workspace: 'default', prefixSegments: ['_global'] },
+          { workspace: 'core', prefixSegments: ['core'] },
+        ],
+      })
+
+      const result = await sut.execute({
+        name: 'dep-fallback',
+        step: 'implementing',
+        config: noOp,
+        followDeps: true,
+      })
+
+      expect(result.specs.some((spec) => spec.specId === 'default:_global/architecture')).toBe(true)
     })
   })
 

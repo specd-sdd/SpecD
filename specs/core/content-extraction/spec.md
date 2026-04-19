@@ -49,9 +49,9 @@ When an extractor has no `fields` and no `groupBy`, `extractContent` operates in
 2. For each match, extract text according to `extract` mode.
 3. Apply `strip` if present.
 4. If `capture` is absent, emit one extracted value from the text. If `capture` is present, emit one extracted value per regex match, where the emitted `value` is the first capture group (`$1`) and placeholder interpolation also exposes `$0` for the full match plus any higher groups.
-5. Apply `transform` if present — the named callback is looked up from an injected transform registry and called once per emitted extracted value with the current `value`, interpolated args, and caller-provided context bag.
-6. A transform that receives an emitted extracted value must return a non-null string. If it cannot normalize that value, it must fail with an extraction error instead of silently omitting the value.
-7. Return the result as `string[]`.
+5. Apply `transform` if present — the named callback is looked up from an injected transform registry and called once per emitted extracted value with the current `value`, interpolated args, and caller-provided context bag. If the callback returns a promise, extraction awaits it before continuing.
+6. A transform that receives an emitted extracted value must return or resolve to a non-null string. If it cannot normalize that value, it must fail with an extraction error instead of silently omitting the value.
+7. Return the result as `Promise<string[]>`.
 
 ### Requirement: Grouped extraction
 
@@ -69,7 +69,7 @@ When `fields` is present, each matched node produces one `StructuredExtraction` 
 - `from: 'content'` — renders the matched node's subtree
 - `childSelector` — finds children within the matched node matching the selector
 - `capture` — when present, the field's main extracted value becomes the first capture group (`$1`) and placeholder interpolation also exposes `$0` plus higher groups
-- `transform` — when present, applies to each extracted field value using the registered transform runtime
+- `transform` — when present, applies to each extracted field value using the registered transform runtime. If the registered transform resolves asynchronously, extraction awaits it before the structured result is returned.
 
 Ancestor tracking is required for `parentLabel` — the engine uses `findNodesWithAncestors` to obtain ancestor chains alongside matched nodes.
 
@@ -104,12 +104,13 @@ Named transforms (for example `'resolveSpecPath'`) are injected by the caller th
 Each registered transform has a fixed callable contract:
 
 - `value` (`string`) — the main extracted string value for this invocation
-- `args` (`readonly (string | undefined)[]`) — declarative transform args after placeholder interpolation (`$0`, `$1`, `$2`, ...)
+- `args` (`readonly (string | undefined)[]`) — declarative transform args after placeholder interpolation (`$0`, `$1`, `$2`, ...\`)
 - `context` (`ReadonlyMap<string, unknown>`) — opaque caller-provided key/value data describing the origin of the extraction
+- return value — either a normalized `string` or a promise that resolves to one
 
 The extraction engine treats `context` as opaque. It does not validate or interpret context keys. Each transform documents the minimum keys it requires, and each caller is responsible for supplying them.
 
-Unknown transform names are runtime extraction errors — they are not ignored silently. A registered transform may also fail or throw when its required context keys are absent or invalid. Once a transform receives a value, it must return a non-null string; inability to normalize the value is also an `ExtractorTransformError` extraction failure rather than a silent omission.
+Unknown transform names are runtime extraction errors — they are not ignored silently. A registered transform may also fail, throw, or reject when its required context keys are absent or invalid. Once a transform receives a value, it must return or resolve to a non-null string; inability to normalize the value is also an `ExtractorTransformError` extraction failure rather than a silent omission.
 
 `ExtractorTransformError` is the contract error for transform resolution and execution failures. It is thrown when:
 
@@ -121,17 +122,17 @@ The error identifies the transform name and whether the failure happened on an e
 
 The kernel owns the built-in transform registry and also allows external callers to register additional extractor transforms through the same additive composition model used for other kernel registries.
 
-Built-in transforms may interpret declarative string args for behavior variants. `resolveSpecPath` specifically tries the primary extracted `value` first and then each interpolated arg in order, returning the first candidate that resolves to a canonical spec ID. This allows one extractor to support canonical dependency labels, relative `href` values, and plain canonical dependency entries without introducing multiple extractors for `dependsOn`.
+Built-in transforms may interpret declarative string args for behavior variants. `resolveSpecPath` specifically tries the primary extracted `value` first and then each interpolated arg in order, returning the first candidate that resolves to a canonical spec ID. This allows one extractor to support canonical dependency labels, relative `href` values, plain canonical dependency entries, and repository-backed normalization without introducing multiple extractors for `dependsOn`.
 
 ## Constraints
 
-- `extractContent` is a pure function — no I/O, no side effects
+- The extraction engine itself performs no I/O and owns no side effects; any awaited work happens only inside caller-injected transforms
 - `from` and `childSelector` on `FieldMapping` are mutually exclusive; when `childSelector` is present, `from` is ignored
 - `followSiblings` is only meaningful when `childSelector` is also present; it has no effect on `from`-based field mappings
 - When `followSiblings` is declared on any field in an extractor's `fields`, all `childSelector` fields in that extractor are processed via sequential walk — not independently
 - Transform args are declarative strings; placeholder interpolation may resolve individual args to `undefined`
 - The extraction engine does not validate or interpret transform context keys
-- Unknown transform names, transform execution failures, and any attempt to return a null value after receiving an extracted value are `ExtractorTransformError` extraction errors
+- Unknown transform names, transform execution failures, rejected transform promises, and any attempt to return a null value after receiving an extracted value are `ExtractorTransformError` extraction errors
 - The engine operates on `SelectorNode` — the generic node interface from selector matching — not on `ArtifactNode` directly
 
 ## Examples
