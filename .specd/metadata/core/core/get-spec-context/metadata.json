@@ -2,6 +2,8 @@
   "title": "Get Spec Context",
   "description": "AI agents and delivery mechanisms need to understand a spec together with everything it depends on, but dependency chains can be deep and metadata may be stale or missing. The `GetSpecContext` use case builds structured context entries for a single spec, optionally following `dependsOn` links transitively, to assemble the full context needed to understand a spec and its dependency chain. Metadata freshness is checked via SHA-256 content hashes; stale or absent metadata produces a minimal entry.",
   "dependsOn": [
+    "core:core/config",
+    "core:core/compile-context",
     "core:core/spec-metadata",
     "core:core/storage",
     "core:core/workspace",
@@ -20,19 +22,19 @@
     {
       "requirement": "Build context entry from metadata",
       "rules": [
-        "For each resolved spec, the use case SHALL load all artifact files and attempt to read metadata via `SpecRepository.metadata()`. When metadata exists and content hashes confirm freshness, the entry SHALL include:\n\n- `spec` — display label in `workspace:capabilityPath` format.\n- `stale` — `false`.\n- `title` — from metadata, when present (included only when no section filter is active or all sections requested).\n- `description` — from metadata, when present (same inclusion rule as `title`).\n- `rules` — from metadata, when present and non-empty (included when no section filter or `'rules'` is in `sections`).\n- `constraints` — from metadata, when present and non-empty (included when no section filter or `'constraints'` is in `sections`).\n- `scenarios` — from metadata, when present and non-empty (included when no section filter or `'scenarios'` is in `sections`)."
+        "For each resolved spec, the use case SHALL load all artifact files and attempt to read metadata via `SpecRepository.metadata()`. The rendered entry shape SHALL be controlled by the resolved `contextMode`:\n\n- `list` — include only `spec`, `stale`, and mode/source metadata.\n- `summary` — include `spec`, `stale`, title, and description when available.\n- `full` — include `spec`, `stale`, title, description, rules, constraints, and scenarios when available.\n- `hybrid` — equivalent to `full` for a single-spec context command, because there is no change-scoped tier.\n\nWhen metadata exists and content hashes confirm freshness, the entry SHALL render from metadata according to that mode. In full mode, `rules`, `constraints`, and `scenarios` are included when no section filter is active or when the corresponding section is requested."
       ]
     },
     {
       "requirement": "Stale or absent metadata produces minimal entry",
       "rules": [
-        "When `SpecRepository.metadata()` returns `null` or content hashes indicate staleness, the use case SHALL return a minimal entry with only `spec` (the label) and `stale: true`. No title, description, rules, constraints, or scenarios SHALL be included."
+        "When `SpecRepository.metadata()` returns `null` or content hashes indicate staleness, the use case SHALL emit a stale entry without pretending that full content is available.\n\n- In `list` mode, the entry contains only `spec`, `stale: true`, and mode/source metadata.\n- In `summary`, `full`, and `hybrid` modes, the entry contains `spec`, `stale: true`, and any title or description that can be safely extracted without fresh metadata.\n\nNo rules, constraints, or scenarios SHALL be included from stale metadata."
       ]
     },
     {
       "requirement": "Section filtering",
       "rules": [
-        "When `input.sections` is provided and non-empty, the entry MUST include only the listed section types (`'rules'`, `'constraints'`, `'scenarios'`). The `title` and `description` fields SHALL only be included when no section filter is active (i.e. `sections` is `undefined` or empty)."
+        "When `input.sections` is provided and non-empty, the entry MUST include only the listed section types (`'rules'`, `'constraints'`, `'scenarios'`) for full-mode output. The `title` and `description` fields SHALL only be included in full-mode output when no section filter is active.\n\nSection filters MUST have no effect in `list` or `summary` modes. Those modes continue to emit list or summary-shaped entries regardless of requested sections."
       ]
     },
     {
@@ -56,7 +58,7 @@
     {
       "requirement": "Result shape",
       "rules": [
-        "`GetSpecContextResult` MUST include:\n\n- `entries` — ordered array of `SpecContextEntry` objects (root first, then dependencies in DFS order).\n- `warnings` — array of `ContextWarning` objects accumulated during resolution."
+        "`GetSpecContextResult` MUST include:\n\n- `entries` — ordered array of `SpecContextEntry` objects (root first, then dependencies in DFS order).\n- `warnings` — array of `ContextWarning` objects accumulated during resolution.\n\nEach entry MUST include the canonical spec label and its display mode. List entries contain no content fields. Summary entries contain title and description when available. Full entries contain the metadata sections allowed by the section filter."
       ]
     }
   ],
@@ -82,9 +84,10 @@
     },
     {
       "requirement": "Build context entry from metadata",
-      "name": "Fresh metadata produces full entry",
+      "name": "Full mode produces full entry from fresh metadata",
       "given": [
-        "a spec with fresh metadata containing title, description, rules, constraints, and scenarios"
+        "a spec with fresh metadata containing title, description, rules, constraints, and scenarios",
+        "AND effective context mode is full"
       ],
       "when": ["execute(input) is called without section filters"],
       "then": [
@@ -93,37 +96,60 @@
     },
     {
       "requirement": "Build context entry from metadata",
-      "name": "Empty rules/constraints/scenarios omitted from entry",
-      "given": ["a spec with fresh metadata where rules is an empty array"],
+      "name": "Summary mode produces summary entry from fresh metadata",
+      "given": [
+        "a spec with fresh metadata containing title and description",
+        "AND effective context mode is summary"
+      ],
       "when": ["execute(input) is called"],
-      "then": ["the entry does not include a rules field"]
+      "then": ["the entry includes title and description but no full section arrays"]
+    },
+    {
+      "requirement": "Build context entry from metadata",
+      "name": "List mode produces list entry from fresh metadata",
+      "given": ["a spec with fresh metadata", "AND effective context mode is list"],
+      "when": ["execute(input) is called"],
+      "then": [
+        "the entry includes identity/mode fields but no title, description, rules, constraints, or scenarios"
+      ]
     },
     {
       "requirement": "Stale or absent metadata produces minimal entry",
-      "name": "No metadata yields stale entry",
-      "given": ["a spec with no metadata"],
+      "name": "No metadata yields stale list entry in list mode",
+      "given": ["a spec with no metadata", "AND effective context mode is list"],
       "when": ["execute(input) is called"],
-      "then": ["the entry has stale: true and only spec and stale fields"]
+      "then": ["the entry is stale and includes only minimal list-shape fields"]
     },
     {
       "requirement": "Stale or absent metadata produces minimal entry",
-      "name": "Stale hashes yield stale entry",
+      "name": "Stale hashes yield stale summary/full-compatible entry",
       "given": ["a spec with metadata whose content hashes do not match current files"],
       "when": ["execute(input) is called"],
-      "then": ["the entry has stale: true", "AND a warning of type 'stale-metadata' is emitted"]
+      "then": ["the entry is stale", "AND a warning of type 'stale-metadata' is emitted"]
     },
     {
       "requirement": "Section filtering",
-      "name": "Only requested sections included",
-      "given": ["a spec with fresh metadata containing rules, constraints, and scenarios"],
+      "name": "Only requested sections included in full mode",
+      "given": [
+        "a spec with fresh metadata containing rules, constraints, and scenarios",
+        "AND effective context mode is full"
+      ],
       "when": ["execute({ ..., sections: ['rules'] }) is called"],
       "then": ["the entry includes rules but not constraints, scenarios, title, or description"]
     },
     {
       "requirement": "Section filtering",
-      "name": "Empty sections array shows all",
+      "name": "Empty sections array shows all in full mode",
+      "given": ["effective context mode is full"],
       "when": ["execute({ ..., sections: [] }) is called"],
-      "then": ["the entry includes all available fields (same as no filter)"]
+      "then": ["the entry includes all available full-mode fields"]
+    },
+    {
+      "requirement": "Section filtering",
+      "name": "Section filters do not affect list and summary modes",
+      "given": ["effective context mode is list or summary"],
+      "when": ["execute is called with section filters"],
+      "then": ["entry shape remains list/summary without full section rendering"]
     },
     {
       "requirement": "Transitive dependency traversal",
@@ -185,11 +211,17 @@
       "given": ["a dependency spec with no metadata"],
       "when": ["dependency traversal reaches that spec"],
       "then": ["warnings contains an entry with type: 'missing-metadata'"]
+    },
+    {
+      "requirement": "Result shape",
+      "name": "Result entries include explicit display mode",
+      "when": ["execute(input) is called"],
+      "then": ["each returned entry includes its resolved display mode"]
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:84bf4be5df115baf9bc95b2e9a2389a40c80afbcc9216c411fdc827a47330ff6",
-    "verify.md": "sha256:50d9862aa3afe7af017529ae37ffc27b92ad4c8a8a48241f8216a28f1d753b66"
+    "spec.md": "sha256:47d727afbc07b9e770e51d52a0b52579ff8145c785020882b5c52b11f0d909de",
+    "verify.md": "sha256:76fea18354ba1fba119764b069f7e1ae8e15dbe529b50ec0c8fb095da6ca5fa6"
   },
   "generatedBy": "core"
 }

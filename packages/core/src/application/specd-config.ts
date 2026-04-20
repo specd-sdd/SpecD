@@ -9,6 +9,9 @@ import { type SchemaOperations } from '../domain/services/merge-schema-layers.js
  */
 export type SpecdContextEntry = { readonly file: string } | { readonly instruction: string }
 
+/** Supported display modes for compiled context specs. */
+export type SpecdContextMode = 'list' | 'summary' | 'full' | 'hybrid'
+
 /** Per-workspace code graph configuration from `specd.yaml`. */
 export interface SpecdWorkspaceGraphConfig {
   /**
@@ -155,13 +158,14 @@ export interface SpecdConfig {
   /**
    * Controls how `CompileContext` renders specs in the compiled context.
    *
-   * - `'lazy'` (default) — tier 1 specs (specIds + specDependsOn) rendered in full;
-   *   tier 2 specs (include patterns + dependsOn traversal) rendered as summaries.
-   * - `'full'` — all collected specs rendered with full content.
+   * - `'list'` — render only spec IDs with source/mode metadata.
+   * - `'summary'` (default) — render spec catalogue entries (title + description).
+   * - `'full'` — render all collected specs with full content.
+   * - `'hybrid'` — render direct change specs in full when included, all others as summary.
    *
    * Project-level only — not valid inside workspace entries.
    */
-  readonly contextMode?: 'full' | 'lazy'
+  readonly contextMode?: SpecdContextMode
   /** When `true`, specd may invoke an LLM for enriched output (default: `false`). */
   readonly llmOptimizedContext?: boolean
   /** Schema plugin references from `specd.yaml`, in declaration order. */

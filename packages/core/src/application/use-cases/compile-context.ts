@@ -72,10 +72,12 @@ export interface CompileContextConfig {
   /**
    * Controls how specs are rendered in the result.
    *
-   * - `'lazy'` (default) — only `specIds` render in full; all other collected specs render as summaries.
-   * - `'full'` — all specs rendered with full content.
+   * - `'list'` — all entries are list-only.
+   * - `'summary'` (default) — all entries are summary-only.
+   * - `'full'` — all entries include full content.
+   * - `'hybrid'` — direct change specs included via `includeChangeSpecs` are full, others summary.
    */
-  readonly contextMode?: 'full' | 'lazy'
+  readonly contextMode?: 'list' | 'summary' | 'full' | 'hybrid'
   /** Per-workspace context include/exclude patterns. */
   readonly workspaces?: Record<string, WorkspaceContextConfig>
 }
@@ -91,6 +93,11 @@ export interface CompileContextInput {
   readonly step: string
   /** Resolved project configuration. */
   readonly config: CompileContextConfig
+  /**
+   * When `true`, directly seeds `change.specIds` into the collected set.
+   * When `false` or absent, direct `specIds` seeding is skipped.
+   */
+  readonly includeChangeSpecs?: boolean
   /**
    * When `true`, performs the `dependsOn` transitive traversal (step 5) to discover
    * additional specs. When `false` or absent, step 5 is skipped entirely.
@@ -136,14 +143,14 @@ export type ContextSpecSource =
 export interface ContextSpecEntry {
   /** Fully-qualified spec ID (e.g. `core:core/compile-context`). */
   readonly specId: string
-  /** The spec title from metadata or heading extraction. */
-  readonly title: string
-  /** The spec description from metadata (2-3 sentence summary). */
-  readonly description: string
+  /** The spec title from metadata or heading extraction (summary/full modes). */
+  readonly title?: string
+  /** The spec description from metadata (summary/full modes). */
+  readonly description?: string
   /** How this spec was collected. */
   readonly source: ContextSpecSource
-  /** Whether full content or just summary was rendered. */
-  readonly mode: 'full' | 'summary'
+  /** Rendering shape for this entry. */
+  readonly mode: 'list' | 'summary' | 'full'
   /** Rendered spec content (present only when `mode` is `'full'`). */
   readonly content?: string
 }
@@ -170,7 +177,7 @@ export interface CompileContextResult {
   readonly blockingArtifacts: readonly string[]
   /** Rendered project context entries. */
   readonly projectContext: readonly ProjectContextEntry[]
-  /** Spec entries with tier classification, source, and content. */
+  /** Spec entries with display mode, source, and content. */
   readonly specs: readonly ContextSpecEntry[]
   /** All workflow steps with availability status. */
   readonly availableSteps: readonly AvailableStep[]
@@ -183,7 +190,7 @@ export interface CompileContextResult {
  *
  * Collects context specs via five-step include/exclude/dependsOn resolution,
  * evaluates step availability, and returns structured project context entries,
- * spec entries (with tier classification), and available steps. Artifact
+ * spec entries (with display-mode classification), and available steps. Artifact
  * instructions and step hook instructions are separate concerns handled by
  * `GetArtifactInstruction` and `GetHookInstructions` respectively.
  */
@@ -254,7 +261,8 @@ export class CompileContext {
 
     const warnings: ContextWarning[] = []
 
-    // --- Source tracking: build seed sets for collection and tier classification ---
+    // --- Source tracking: build seed sets for collection and source classification ---
+    const includeChangeSpecs = input.includeChangeSpecs === true
     const specIdsSet = new Set(change.specIds)
     const specDependsOnSet = new Set<string>()
     const sourceMap = new Map<string, ContextSpecSource>()
@@ -282,9 +290,11 @@ export class CompileContext {
       if (opts.protect === true) protectedKeys.add(key)
     }
 
-    for (const specId of change.specIds) {
-      const { workspace, capPath } = parseSpecId(specId)
-      registerCollectedSpec({ workspace, capPath }, 'specIds', { protect: true })
+    if (includeChangeSpecs) {
+      for (const specId of change.specIds) {
+        const { workspace, capPath } = parseSpecId(specId)
+        registerCollectedSpec({ workspace, capPath }, 'specIds', { protect: true })
+      }
     }
 
     for (const deps of change.specDependsOn.values()) {
@@ -292,7 +302,7 @@ export class CompileContext {
         if (specDependsOnSet.has(dep)) continue
         specDependsOnSet.add(dep)
         const { workspace, capPath } = parseSpecId(dep)
-        registerCollectedSpec({ workspace, capPath }, 'specDependsOn', { protect: true })
+        registerCollectedSpec({ workspace, capPath }, 'specDependsOn')
       }
     }
 
@@ -422,8 +432,9 @@ export class CompileContext {
 
     const allSpecs: ResolvedSpec[] = [...collectedSpecs.values()]
 
-    // --- Tier classification ---
-    const contextMode = input.config.contextMode ?? 'lazy'
+    // --- Display mode classification ---
+    const contextMode: 'list' | 'summary' | 'full' | 'hybrid' =
+      input.config.contextMode ?? 'summary'
 
     // --- Step availability ---
     const schemaWorkflowStep = schema.workflowStep(input.step)
@@ -480,9 +491,26 @@ export class CompileContext {
       const specId = `${workspace}:${capPath}`
       const source = sourceMap.get(specId) ?? 'includePattern'
 
-      // Determine mode based on contextMode and source
-      const mode: 'full' | 'summary' =
-        contextMode === 'lazy' && source !== 'specIds' ? 'summary' : 'full'
+      // Determine entry mode from configured context mode and source.
+      const mode: ContextSpecEntry['mode'] = (() => {
+        switch (contextMode) {
+          case 'list':
+            return 'list'
+          case 'summary':
+            return 'summary'
+          case 'full':
+            return 'full'
+          case 'hybrid':
+            return source === 'specIds' ? 'full' : 'summary'
+          default:
+            return 'summary'
+        }
+      })()
+
+      if (mode === 'list') {
+        specs.push({ specId, source, mode })
+        continue
+      }
 
       // Extract title and description from metadata (needed for both modes)
       let title = ''
@@ -497,7 +525,7 @@ export class CompileContext {
       let mergedFiles: SpecContentFile[] | undefined
 
       if (mode === 'summary') {
-        // Tier 2: summary only — no content rendering
+        // Summary only — no content rendering.
         if (title === '') {
           baseFiles = await this._loadBaseSpecFiles(specRepo, spec, specArtifactDescriptors)
           title = this._extractTitleFromFiles(baseFiles)
@@ -513,7 +541,7 @@ export class CompileContext {
         continue
       }
 
-      // Tier 1: full content rendering
+      // Full content rendering.
       // Attempt materialized delta view for specs in the change's specIds
       let content: string | undefined
       if (specIdsSet.has(specId)) {
@@ -623,7 +651,17 @@ export class CompileContext {
     }
 
     // --- Calculate fingerprint (after all fields are ready) ---
+    const fingerprintSections: readonly SpecSection[] =
+      sectionsFilter !== undefined && specs.some((entry) => entry.mode === 'full')
+        ? sectionsFilter
+        : []
+
     const currentFingerprint = compileContextFingerprint({
+      contextMode,
+      includeChangeSpecs,
+      followDeps: input.followDeps === true,
+      ...(input.depth !== undefined ? { depth: input.depth } : {}),
+      sections: fingerprintSections,
       stepAvailable,
       blockingArtifacts,
       projectContext,

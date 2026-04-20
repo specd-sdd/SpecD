@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/unbound-method */
-
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { ChangeNotFoundError } from '@specd/core'
 import {
@@ -319,7 +317,7 @@ describe('change context', () => {
     expect(call.sections).toBeUndefined()
   })
 
-  it('renders summary specs as catalogue in lazy mode', async () => {
+  it('renders summary specs as catalogue in summary mode', async () => {
     const { kernel, stdout } = setup()
     kernel.changes.compile.execute.mockResolvedValue({
       ...mockResult,
@@ -356,7 +354,7 @@ describe('change context', () => {
     ])
 
     expect(stdout()).toContain('## Available context specs')
-    expect(stdout()).toContain('specd spec show')
+    expect(stdout()).toContain('specd change spec-preview')
     expect(stdout()).toContain('Architecture')
     expect(stdout()).toContain('Hexagonal architecture')
     expect(stdout()).toContain('| default:_global/architecture | summary |')

@@ -100,7 +100,7 @@ describe('GetProjectContext', () => {
     expect(result.specs).toHaveLength(1)
     expect(result.specs[0]!.specId).toBe('default:auth/login')
     expect(result.specs[0]!.source).toBe('includePattern')
-    expect(result.specs[0]!.mode).toBe('full')
+    expect(result.specs[0]!.mode).toBe('summary')
   })
 
   it('populates title and description from metadata', async () => {

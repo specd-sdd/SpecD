@@ -22,6 +22,10 @@ export function registerChangeContext(parent: Command): void {
     .option('--rules', 'include only rules sections in spec content')
     .option('--constraints', 'include only constraints sections in spec content')
     .option('--scenarios', 'include only scenarios sections in spec content')
+    .option(
+      '--include-change-specs',
+      'directly include change specIds as context seeds (default: false)',
+    )
     .option('--follow-deps', 'follow dependsOn links to include transitive spec dependencies')
     .option(
       '--depth <n>',
@@ -57,6 +61,7 @@ When status is 'unchanged', projectContext and specs are omitted from the struct
           rules?: boolean
           constraints?: boolean
           scenarios?: boolean
+          includeChangeSpecs?: boolean
           followDeps?: boolean
           depth?: number
           format: string
@@ -115,6 +120,7 @@ When status is 'unchanged', projectContext and specs are omitted from the struct
             name,
             step,
             config: compileConfig,
+            includeChangeSpecs: opts.includeChangeSpecs === true,
             ...(opts.followDeps ? { followDeps: true } : {}),
             ...(opts.depth !== undefined ? { depth: opts.depth } : {}),
             ...(sectionFlags.length > 0 ? { sections: sectionFlags } : {}),
@@ -168,26 +174,28 @@ When status is 'unchanged', projectContext and specs are omitted from the struct
               parts.push(`## Spec content\n\n${specParts.join('\n\n---\n\n')}`)
             }
 
-            // Summary-mode specs (catalogue)
-            const summarySpecs = result.specs.filter((s) => s.mode === 'summary')
-            if (summarySpecs.length > 0) {
-              const includePatternSpecs = summarySpecs.filter(
+            // Non-full specs (catalogue)
+            const nonFullSpecs = result.specs.filter((s) => s.mode !== 'full')
+            if (nonFullSpecs.length > 0) {
+              const includePatternSpecs = nonFullSpecs.filter(
                 (s) => s.source !== 'dependsOnTraversal',
               )
-              const depTraversalSpecs = summarySpecs.filter(
+              const depTraversalSpecs = nonFullSpecs.filter(
                 (s) => s.source === 'dependsOnTraversal',
               )
 
               const catalogueParts: string[] = [
-                'Use `specd spec show <spec-id>` to load the full content of any spec you need.',
+                'Use `specd change spec-preview <change-name> <specId>` to load the merged full content of any change spec you need.',
                 '',
               ]
 
               if (includePatternSpecs.length > 0) {
-                catalogueParts.push('| Spec ID | Mode | Title | Description |')
-                catalogueParts.push('|---------|------|-------|-------------|')
+                catalogueParts.push('| Spec ID | Mode | Source | Title | Description |')
+                catalogueParts.push('|---------|------|--------|-------|-------------|')
                 for (const s of includePatternSpecs) {
-                  catalogueParts.push(`| ${s.specId} | ${s.mode} | ${s.title} | ${s.description} |`)
+                  catalogueParts.push(
+                    `| ${s.specId} | ${s.mode} | ${s.source} | ${s.title ?? '—'} | ${s.description ?? '—'} |`,
+                  )
                 }
               }
 
@@ -195,10 +203,12 @@ When status is 'unchanged', projectContext and specs are omitted from the struct
                 catalogueParts.push('')
                 catalogueParts.push('### Via dependencies')
                 catalogueParts.push('')
-                catalogueParts.push('| Spec ID | Mode | Title | Description |')
-                catalogueParts.push('|---------|------|-------|-------------|')
+                catalogueParts.push('| Spec ID | Mode | Source | Title | Description |')
+                catalogueParts.push('|---------|------|--------|-------|-------------|')
                 for (const s of depTraversalSpecs) {
-                  catalogueParts.push(`| ${s.specId} | ${s.mode} | ${s.title} | ${s.description} |`)
+                  catalogueParts.push(
+                    `| ${s.specId} | ${s.mode} | ${s.source} | ${s.title ?? '—'} | ${s.description ?? '—'} |`,
+                  )
                 }
               }
 

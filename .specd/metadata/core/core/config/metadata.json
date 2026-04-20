@@ -88,7 +88,7 @@
     {
       "requirement": "Context mode",
       "rules": [
-        "`specd.yaml` MUST accept an optional top-level `contextMode` field that controls how `CompileContext` renders specs in the compiled context.\n\nValid values:\n\n- `'lazy'` (default) — specs are split into two tiers. Tier 1 specs (those in the change's `specIds` and `specDependsOn`) are rendered with full content. Tier 2 specs (those from include patterns and `dependsOn` traversal) are rendered as summaries (spec ID, title, description only).\n- `'full'` — all collected specs are rendered with full structured content (rules, constraints, scenarios). This preserves the pre-change behaviour.\n\n`contextMode` is project-level only — it MUST NOT appear inside workspace entries. If declared inside a workspace, startup validation MUST reject it as an unknown field.\n\nWhen omitted, `contextMode` defaults to `'lazy'`."
+        "`specd.yaml` MUST accept an optional top-level `contextMode` field that controls how context commands render specs in compiled context output.\n\nAccepted values:\n\n- `'list'` — render collected specs as spec IDs and source metadata only, without descriptions or full content\n- `'summary'` (default) — render collected specs as a catalogue with spec ID, title, and description, without full content\n- `'full'` — render all collected specs with full content\n- `'hybrid'` — render direct change specs in full when the caller includes them, and render all other collected specs as summaries\n\nThe legacy `'lazy'` value is removed. It MUST NOT be accepted as an alias or fallback for `hybrid`.\n\n`contextMode` is project-level only — it MUST NOT appear inside workspace entries. If declared inside a workspace, startup validation MUST reject it as an unknown field.\n\nWhen omitted, `contextMode` defaults to `'summary'`."
       ]
     },
     {
@@ -130,7 +130,7 @@
     {
       "requirement": "Startup validation",
       "rules": [
-        "`specd.yaml` MUST be validated at startup. The following conditions are **errors** that prevent startup:\n\n- File does not exist at the discovered path (after traversal)\n- YAML parse failure\n- Missing required top-level field: `schema`\n- `schema` value does not match `<name>@<version>` format (when string) or is not a valid object with `name` and `version`\n- Duplicate workspace names (last-wins in YAML; reject if detected)\n- Unknown adapter value in any `specs`, `schemas`, or storage section\n- Required adapter-specific fields are absent (e.g. `fs.path` missing when `adapter: fs`)\n- Storage path (`changes.fs.path` or `archive.fs.path`) resolves outside the repo root\n- Invalid `contextIncludeSpecs` or `contextExcludeSpecs` pattern syntax (e.g. `*` in a disallowed position)\n- `schemaPlugins` entry is not a valid string reference\n- `schemaOverrides` has an invalid structure (unknown operation keys, wrong types)\n- `contextMode` value is not `'full'` or `'lazy'`\n- `contextMode` appears inside a workspace entry (it is project-level only)\n- `graph.respectGitignore` is present but not a boolean\n- `graph.excludePaths` is present but not an array of strings\n\nThe following conditions emit **warnings** but allow startup to proceed:\n\n- Duplicate workspace names (YAML retains last-wins; warn about the pattern)\n- Unknown workspace qualifier in a `contextIncludeSpecs` or `contextExcludeSpecs` pattern (runtime only — `specd config validate` treats this as an error)"
+        "At startup, specd MUST validate the resolved configuration before constructing use cases. Validation MUST reject:\n\n- missing required `schema`\n- missing required `workspaces.default`\n- unsupported storage adapters\n- invalid path values\n- invalid `contextIncludeSpecs` or `contextExcludeSpecs` pattern syntax\n- `contextMode` values other than `'list'`, `'summary'`, `'full'`, or `'hybrid'`\n- `contextMode: lazy`\n- `contextMode` inside a workspace entry\n- non-boolean `graph.respectGitignore`\n\nValidation errors MUST surface as `ConfigValidationError`."
       ]
     }
   ],
@@ -142,7 +142,7 @@
     "All relative paths resolve from the specd.yaml directory; storage paths (fs.path in changes and archive) must remain within the repo root",
     "Project-level contextIncludeSpecs defaults to ['default:*']; project-level contextExcludeSpecs defaults to []",
     "Workspace-level contextIncludeSpecs defaults to ['*'] (all specs in that workspace); workspace-level contextExcludeSpecs defaults to []",
-    "contextMode is optional; defaults to 'lazy'; must be 'full' or 'lazy' — any other value is a startup validation error",
+    "contextMode is optional; defaults to 'summary'; must be one of 'list', 'summary', 'full', or 'hybrid' — any other value is a startup validation error",
     "contextMode is project-level only; it MUST NOT appear inside workspace entries",
     "llmOptimizedContext is optional; defaults to false; must be a boolean — any other type is a startup validation error",
     "context is optional; each entry is an object with exactly one key: either file or instruction — no other shapes are valid",
@@ -774,29 +774,50 @@
     },
     {
       "requirement": "Context mode",
-      "name": "contextMode lazy is the default",
+      "name": "contextMode summary is the default",
       "given": ["specd.yaml does not declare contextMode"],
       "when": ["config is loaded"],
-      "then": ["config.contextMode defaults to 'lazy' at the use case level"]
+      "then": ["config.contextMode defaults to \"summary\" at the use case level"]
     },
     {
       "requirement": "Context mode",
-      "name": "contextMode lazy is accepted",
+      "name": "contextMode list is accepted",
+      "given": ["specd.yaml declares contextMode: list"],
+      "when": ["config is loaded"],
+      "then": ["config.contextMode is \"list\""]
+    },
+    {
+      "requirement": "Context mode",
+      "name": "contextMode summary is accepted",
+      "given": ["specd.yaml declares contextMode: summary"],
+      "when": ["config is loaded"],
+      "then": ["config.contextMode is \"summary\""]
+    },
+    {
+      "requirement": "Context mode",
+      "name": "contextMode full is accepted",
+      "given": ["specd.yaml declares contextMode: full"],
+      "when": ["config is loaded"],
+      "then": ["config.contextMode is \"full\""]
+    },
+    {
+      "requirement": "Context mode",
+      "name": "contextMode hybrid is accepted",
+      "given": ["specd.yaml declares contextMode: hybrid"],
+      "when": ["config is loaded"],
+      "then": ["config.contextMode is \"hybrid\""]
+    },
+    {
+      "requirement": "Context mode",
+      "name": "legacy lazy value is rejected",
       "given": ["specd.yaml declares contextMode: lazy"],
       "when": ["config is loaded"],
-      "then": ["config.contextMode is 'lazy'"]
-    },
-    {
-      "requirement": "Context mode",
-      "name": "Invalid contextMode rejected at startup",
-      "given": ["specd.yaml declares contextMode: partial"],
-      "when": ["config is loaded"],
-      "then": ["startup validation fails with an error identifying the invalid value"]
+      "then": ["startup validation fails with an error identifying lazy as invalid"]
     },
     {
       "requirement": "Context mode",
       "name": "contextMode inside workspace is rejected",
-      "given": ["specd.yaml declares contextMode: lazy inside a workspace entry"],
+      "given": ["specd.yaml declares contextMode: summary inside a workspace entry"],
       "when": ["config is loaded"],
       "then": [
         "startup validation fails with an error indicating contextMode is project-level only"
@@ -820,19 +841,19 @@
     },
     {
       "requirement": "Startup validation",
+      "name": "Legacy lazy contextMode rejected",
+      "given": ["specd.yaml contains contextMode: lazy"],
+      "when": ["config is validated at startup"],
+      "then": ["validation fails with a ConfigValidationError because lazy is no longer accepted"]
+    },
+    {
+      "requirement": "Startup validation",
       "name": "contextMode in workspace entry rejected",
-      "given": ["specd.yaml contains a workspace with contextMode: lazy"],
+      "given": ["specd.yaml contains a workspace with contextMode: summary"],
       "when": ["config is validated at startup"],
       "then": [
         "validation fails with a ConfigValidationError indicating contextMode is not valid inside a workspace"
       ]
-    },
-    {
-      "requirement": "Startup validation",
-      "name": "graph.respectGitignore must be boolean",
-      "given": ["a workspace with graph.respectGitignore: \"yes\" (string instead of boolean)"],
-      "when": ["specd starts"],
-      "then": ["specd exits with ConfigValidationError"]
     },
     {
       "requirement": "Project context instructions",
@@ -899,8 +920,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:b2af4459a52c1be86780e622b880d2f26e70df0b502cbc72b5b2df606bae827b",
-    "verify.md": "sha256:42f99bd3fcc7a6972003ececa8c89b956f9519be48f09ae06470767ff221445d"
+    "spec.md": "sha256:0cc8680ff85ec0dc418ea064fa9a6f3c4b95ce93bcf264b59ea657aff40969fd",
+    "verify.md": "sha256:5cc118607a87e16198f70ebaef1305b4bda80c77ec3310403d9ce85dfd382ca8"
   },
   "generatedBy": "core"
 }

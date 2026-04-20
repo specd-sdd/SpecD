@@ -27,42 +27,24 @@ When none of `--rules`, `--constraints`, or `--scenarios` are passed, all availa
 
 ### Requirement: Behaviour
 
-The command reads the spec's `.specd-metadata.yaml` and renders the requested sections. If the metadata is absent or stale (content hashes do not match current artifact files), the command falls back to the schema's `metadataExtraction` declarations to extract content deterministically from the spec's raw artifact files and emits a `warning:` to stderr.
+The command reads the active project config and renders the requested spec according to the configured `contextMode`. It reads the spec's `.specd-metadata.yaml` and renders the requested sections only when the selected mode is full-shaped. If the metadata is absent or stale (content hashes do not match current artifact files), the command falls back to the schema's `metadataExtraction` declarations where available and emits a `warning:` to stderr.
 
-When `--follow-deps` is passed, the command recursively follows the `dependsOn` entries in each spec's `.specd-metadata.yaml`, applying the same section filtering and stale-fallback logic to each dependency. Cycles are detected and silently broken. The root spec is always listed first; dependencies follow in traversal order.
+When `--follow-deps` is passed, the command recursively follows the `dependsOn` entries in each spec's `.specd-metadata.yaml`, applying the same display mode and stale-fallback logic to each dependency. Cycles are detected and silently broken. The root spec is always listed first; dependencies follow in traversal order.
 
 ### Requirement: Output
 
-In `text` mode (default), each spec in the output is introduced by a header:
+In `text` mode (default), each spec entry in the output is introduced by a header:
 
 ```
 ### Spec: <workspace>:<capability-path>
-
-<metadata content>
+Mode: <list|summary|full>
 ```
 
-When `--follow-deps` is passed, each dependency appears as a subsequent `### Spec:` block after the root.
+List-mode entries include only the spec ID and mode/source metadata. Summary-mode entries include title and description when available. Full-mode entries include the rendered metadata content, filtered by section flags when present.
 
-In `json` or `toon` mode, the output is (encoded in the respective format):
+When `--follow-deps` is passed, each dependency appears as a subsequent `### Spec:` block after the root using the same display mode.
 
-```json
-{
-  "specs": [
-    {
-      "spec": "workspace:cap/path",
-      "title": "...",
-      "description": "...",
-      "rules": [...],
-      "constraints": [...],
-      "scenarios": [...],
-      "stale": false
-    }
-  ],
-  "warnings": []
-}
-```
-
-Only the requested sections are included in each spec object. `description` is always included when not using section filters. When a section is requested but absent, it is omitted from the object (not `null` or `[]`). The root spec is always `specs[0]`; dependencies follow in traversal order.
+In `json` or `toon` mode, the output includes `specs` and `warnings`. Only fields available for the selected display mode are included in each spec object. The root spec is always `specs[0]`; dependencies follow in traversal order.
 
 ### Requirement: Error cases
 
@@ -74,7 +56,8 @@ Only the requested sections are included in each spec object. `description` is a
 
 - This command is read-only — it never updates metadata
 - The workspace is always explicit in the path
-- Section flags are additive — passing `--rules --constraints` includes both sections
+- Section flags are additive for full-mode output — passing `--rules --constraints` includes both sections
+- Section flags have no effect in `list` or `summary` modes
 - `--follow-deps` traversal uses the same cycle detection as `CompileContext`
 - Stale/absent metadata is never a hard error — the fallback is always attempted
 
@@ -117,3 +100,5 @@ $ specd spec context default:auth/login --constraints --format json
 ## Spec Dependencies
 
 - [`cli:cli/entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
+- [`core:core/config`](../../core/config/spec.md) — `contextMode` accepted values and default
+- [`core:core/get-spec-context`](../../core/get-spec-context/spec.md) — use case and result shape for spec context entries

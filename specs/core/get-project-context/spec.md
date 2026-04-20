@@ -10,20 +10,20 @@ Tooling sometimes needs the project's compiled spec context without an active ch
 
 `execute(input)` MUST accept a `GetProjectContextInput` object with the following fields:
 
-- `config` (`CompileContextConfig`, required) — the resolved project configuration containing `context` entries, `contextIncludeSpecs`, and `contextExcludeSpecs`.
+- `config` (`CompileContextConfig`, required) — the resolved project configuration containing `context` entries, `contextIncludeSpecs`, `contextExcludeSpecs`, and `contextMode`
 - `followDeps` (boolean, optional) — when `true`, follows `dependsOn` links from `.specd-metadata.yaml` transitively to discover additional specs beyond those matched by include/exclude patterns. When `false` or absent, traversal is not performed.
 - `depth` (number, optional) — limits `dependsOn` traversal depth. Only meaningful when `followDeps` is `true`. `1` means direct dependencies only; absent means unlimited.
-- `sections` (`ReadonlyArray<SpecSection>`, optional) — restricts which metadata sections are rendered per spec (`"rules"`, `"constraints"`, `"scenarios"`). When absent, all sections are rendered including the description.
+- `sections` (`ReadonlyArray<SpecSection>`, optional) — restricts which metadata sections are rendered per full-mode spec (`"rules"`, `"constraints"`, `"scenarios"`). It has no effect for list-mode or summary-mode entries.
 
 ### Requirement: Returns GetProjectContextResult on success
 
 `execute` MUST return a `GetProjectContextResult` containing:
 
 - `contextEntries` (string\[]) — rendered project-level context entries (instruction text or file content).
-- `specs` (`ContextSpecEntry[]`) — specs matched by include/exclude patterns, each with `specId`, `title`, `description`, `source`, `mode`, and optionally `content` fields. The `ContextSpecEntry` type is the same as defined in the `CompileContext` spec.
+- `specs` (`ContextSpecEntry[]`) — specs matched by include/exclude patterns, each with `specId`, `source`, `mode`, and optional `title`, `description`, and `content` fields according to the display mode. The `ContextSpecEntry` type is the same as defined in the `CompileContext` spec.
 - `warnings` (`ContextWarning[]`) — advisory warnings for missing files, stale metadata, unknown workspaces, etc.
 
-Since `GetProjectContext` operates without a change, it has no `specIds` or `specDependsOn` to drive tier classification. All specs MUST have `source: 'includePattern'`. The `mode` field MUST always be `'full'` — lazy mode requires an active change to determine tier 1 membership.
+Since `GetProjectContext` operates without a change, all specs MUST have `source: 'includePattern'`. The mode field is determined by `config.contextMode`: `list` emits list entries, `summary` emits summary entries, and `full` or `hybrid` emits full entries. Project context has no direct change specs, so `hybrid` is equivalent to `full`.
 
 ### Requirement: Resolves schema before processing
 
@@ -56,7 +56,14 @@ If fallback extraction finds dependency values but transform execution cannot no
 
 ### Requirement: Renders spec content from metadata when fresh
 
-For each included spec, if `.specd-metadata.yaml` exists and its content hashes match the current artifacts (verified via `ContentHasher`), the use case MUST render from the parsed metadata. The rendered output MUST include description, rules, constraints, and scenarios as applicable, filtered by `input.sections` when provided.
+For each included spec, if `.specd-metadata.yaml` exists and its content hashes match the current artifacts (verified via `ContentHasher`), the use case MUST render from the parsed metadata according to `config.contextMode`.
+
+- In `list` mode, render no title, description, or content.
+- In `summary` mode, render title and description only.
+- In `full` mode, render description, rules, constraints, and scenarios as applicable, filtered by `input.sections` when provided.
+- In `hybrid` mode, render the same output as `full` because project context has no change-scoped tier.
+
+Section filters MUST NOT affect list-mode or summary-mode entries.
 
 ### Requirement: Falls back to extraction when metadata is stale or absent
 

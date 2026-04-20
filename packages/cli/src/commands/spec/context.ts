@@ -12,20 +12,24 @@ import { parseSpecId } from '../../helpers/spec-path.js'
  * @returns The formatted text block.
  */
 function renderEntryText(entry: SpecContextEntry): string {
-  const parts: string[] = [`### Spec: ${entry.spec}`]
+  const parts: string[] = [
+    `### Spec: ${entry.spec}`,
+    `Mode: ${entry.mode}`,
+    `Source: ${entry.source}`,
+  ]
 
   if (entry.description !== undefined) {
-    parts.push(`\n**Description:** ${entry.description}`)
+    parts.push(`**Description:** ${entry.description}`)
   }
   if (entry.rules !== undefined) {
     const rulesText = entry.rules
       .map((r) => `#### ${r.requirement}\n${r.rules.map((rule) => `- ${rule}`).join('\n')}`)
       .join('\n\n')
-    parts.push(`\n### Rules\n\n${rulesText}`)
+    parts.push(`### Rules\n\n${rulesText}`)
   }
   if (entry.constraints !== undefined) {
     const constraintsText = entry.constraints.map((c) => `- ${c}`).join('\n')
-    parts.push(`\n### Constraints\n\n${constraintsText}`)
+    parts.push(`### Constraints\n\n${constraintsText}`)
   }
   if (entry.scenarios !== undefined) {
     const scenariosText = entry.scenarios
@@ -37,10 +41,10 @@ function renderEntryText(entry: SpecContextEntry): string {
         return lines.join('\n')
       })
       .join('\n\n')
-    parts.push(`\n### Scenarios\n\n${scenariosText}`)
+    parts.push(`### Scenarios\n\n${scenariosText}`)
   }
 
-  return parts.join('')
+  return parts.join('\n\n')
 }
 
 /**
@@ -113,6 +117,7 @@ JSON/TOON output schema:
             specPath: SpecPath.parse(parsed.capabilityPath),
             ...(opts.followDeps === true ? { followDeps: true } : {}),
             ...(opts.depth !== undefined ? { depth: parseInt(opts.depth, 10) } : {}),
+            ...(config.contextMode !== undefined ? { contextMode: config.contextMode } : {}),
             ...(sectionFlags.length > 0 ? { sections: sectionFlags } : {}),
           })
 
@@ -133,7 +138,11 @@ JSON/TOON output schema:
           } else {
             // Clean up entries for JSON: remove undefined fields
             const jsonSpecs = result.entries.map((e) => {
-              const obj: Record<string, unknown> = { spec: e.spec }
+              const obj: Record<string, unknown> = {
+                spec: e.spec,
+                mode: e.mode,
+                source: e.source,
+              }
               if (e.title !== undefined) obj.title = e.title
               if (e.description !== undefined) obj.description = e.description
               if (e.rules !== undefined) obj.rules = e.rules

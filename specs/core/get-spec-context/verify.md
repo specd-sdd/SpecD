@@ -17,45 +17,63 @@
 
 ### Requirement: Build context entry from metadata
 
-#### Scenario: Fresh metadata produces full entry
+#### Scenario: Full mode produces full entry from fresh metadata
 
 - **GIVEN** a spec with fresh metadata containing title, description, rules, constraints, and scenarios
+- **AND** effective context mode is full
 - **WHEN** `execute(input)` is called without section filters
 - **THEN** the entry has `stale: false` and includes `title`, `description`, `rules`, `constraints`, and `scenarios`
 
-#### Scenario: Empty rules/constraints/scenarios omitted from entry
+#### Scenario: Summary mode produces summary entry from fresh metadata
 
-- **GIVEN** a spec with fresh metadata where `rules` is an empty array
+- **GIVEN** a spec with fresh metadata containing title and description
+- **AND** effective context mode is summary
 - **WHEN** `execute(input)` is called
-- **THEN** the entry does not include a `rules` field
+- **THEN** the entry includes title and description but no full section arrays
+
+#### Scenario: List mode produces list entry from fresh metadata
+
+- **GIVEN** a spec with fresh metadata
+- **AND** effective context mode is list
+- **WHEN** `execute(input)` is called
+- **THEN** the entry includes identity/mode fields but no title, description, rules, constraints, or scenarios
 
 ### Requirement: Stale or absent metadata produces minimal entry
 
-#### Scenario: No metadata yields stale entry
+#### Scenario: No metadata yields stale list entry in list mode
 
 - **GIVEN** a spec with no metadata
+- **AND** effective context mode is list
 - **WHEN** `execute(input)` is called
-- **THEN** the entry has `stale: true` and only `spec` and `stale` fields
+- **THEN** the entry is stale and includes only minimal list-shape fields
 
-#### Scenario: Stale hashes yield stale entry
+#### Scenario: Stale hashes yield stale summary/full-compatible entry
 
 - **GIVEN** a spec with metadata whose content hashes do not match current files
 - **WHEN** `execute(input)` is called
-- **THEN** the entry has `stale: true`
+- **THEN** the entry is stale
 - **AND** a warning of type `'stale-metadata'` is emitted
 
 ### Requirement: Section filtering
 
-#### Scenario: Only requested sections included
+#### Scenario: Only requested sections included in full mode
 
 - **GIVEN** a spec with fresh metadata containing rules, constraints, and scenarios
+- **AND** effective context mode is full
 - **WHEN** `execute({ ..., sections: ['rules'] })` is called
 - **THEN** the entry includes `rules` but not `constraints`, `scenarios`, `title`, or `description`
 
-#### Scenario: Empty sections array shows all
+#### Scenario: Empty sections array shows all in full mode
 
+- **GIVEN** effective context mode is full
 - **WHEN** `execute({ ..., sections: [] })` is called
-- **THEN** the entry includes all available fields (same as no filter)
+- **THEN** the entry includes all available full-mode fields
+
+#### Scenario: Section filters do not affect list and summary modes
+
+- **GIVEN** effective context mode is list or summary
+- **WHEN** `execute` is called with section filters
+- **THEN** entry shape remains list/summary without full section rendering
 
 ### Requirement: Transitive dependency traversal
 
@@ -111,3 +129,10 @@
 - **GIVEN** a dependency spec with no metadata
 - **WHEN** dependency traversal reaches that spec
 - **THEN** `warnings` contains an entry with `type: 'missing-metadata'`
+
+### Requirement: Result shape
+
+#### Scenario: Result entries include explicit display mode
+
+- **WHEN** `execute(input)` is called
+- **THEN** each returned entry includes its resolved display mode

@@ -70,6 +70,7 @@ JSON/TOON output schema:
             ...(config.contextExcludeSpecs !== undefined
               ? { contextExcludeSpecs: [...config.contextExcludeSpecs] }
               : {}),
+            ...(config.contextMode !== undefined ? { contextMode: config.contextMode } : {}),
           }
 
           const sectionFlags: SpecSection[] = []
@@ -90,26 +91,36 @@ JSON/TOON output schema:
 
           if (fmt === 'text') {
             const parts: string[] = [...result.contextEntries]
-            if (result.specs.length > 0) {
-              const specParts = result.specs.map(
-                (s) => `### Spec: ${s.specId}\n\n${s.content ?? ''}`,
+            const fullSpecs = result.specs.filter((s) => s.mode === 'full')
+            const nonFullSpecs = result.specs.filter((s) => s.mode !== 'full')
+
+            if (fullSpecs.length > 0) {
+              const specParts = fullSpecs.map(
+                (s) => `### Spec: ${s.specId}\nMode: full\n\n${s.content ?? ''}`,
               )
               parts.push(`## Spec content\n\n${specParts.join('\n\n---\n\n')}`)
             }
+
+            if (nonFullSpecs.length > 0) {
+              const rows: string[] = [
+                '| Spec ID | Mode | Title | Description |',
+                '|---------|------|-------|-------------|',
+              ]
+              for (const spec of nonFullSpecs) {
+                rows.push(
+                  `| ${spec.specId} | ${spec.mode} | ${spec.title ?? '—'} | ${spec.description ?? '—'} |`,
+                )
+              }
+              parts.push(`## Available context specs\n\n${rows.join('\n')}`)
+            }
+
             if (parts.length === 0) {
               output('no project context configured', 'text')
             } else {
               output(parts.join('\n\n---\n\n'), 'text')
             }
           } else {
-            output(
-              {
-                contextEntries: result.contextEntries,
-                specs: result.specs,
-                warnings: result.warnings.map((w) => w.message),
-              },
-              fmt,
-            )
+            output(result, fmt)
           }
         } catch (err) {
           handleError(err, opts.format)

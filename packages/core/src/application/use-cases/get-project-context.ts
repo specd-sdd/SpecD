@@ -194,7 +194,15 @@ export class GetProjectContext {
       }
     }
 
-    // Render spec content for each included spec
+    // Render entries for each included spec according to contextMode.
+    const resolvedMode: ContextSpecEntry['mode'] =
+      input.config.contextMode === undefined
+        ? 'summary'
+        : input.config.contextMode === 'hybrid'
+          ? 'full'
+          : input.config.contextMode
+
+    // Project context has no change-scoped tier, so hybrid behaves as full.
     const sectionsFilter = input.sections
     const showAll = sectionsFilter === undefined
 
@@ -221,6 +229,18 @@ export class GetProjectContext {
       const specId = `${workspace}:${capPath}`
       const title = metadata?.title ?? ''
       const description = metadata?.description ?? ''
+      const source: ContextSpecEntry['source'] = 'includePattern'
+
+      if (resolvedMode === 'list') {
+        specs.push({ specId, source, mode: 'list' })
+        continue
+      }
+
+      if (resolvedMode === 'summary') {
+        specs.push({ specId, title, description, source, mode: 'summary' })
+        continue
+      }
+
       let content: string
 
       if (isFresh && metadata !== null) {
@@ -287,7 +307,7 @@ export class GetProjectContext {
         content = fallbackParts.join('\n\n')
       }
 
-      specs.push({ specId, title, description, source: 'includePattern', mode: 'full', content })
+      specs.push({ specId, title, description, source, mode: 'full', content })
     }
 
     return { contextEntries, specs, warnings }

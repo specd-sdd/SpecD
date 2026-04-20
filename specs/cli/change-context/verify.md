@@ -19,105 +19,68 @@
 - **WHEN** `specd change context my-change designing --fingerprint sha256:abc123...` is run
 - **THEN** the command proceeds normally
 
+#### Scenario: --include-change-specs flag accepted
+
+- **WHEN** `specd change context my-change designing --include-change-specs` is run
+- **THEN** the command proceeds normally and requests direct change-spec seeding
+
 ### Requirement: Output
-
-#### Scenario: JSON output includes fingerprint and status on first call
-
-- **GIVEN** no `--fingerprint` flag is provided
-- **WHEN** `specd change context my-change designing --format json` is called
-- **THEN** the JSON output includes `contextFingerprint` with a SHA-256 hash
-- **AND** `status` is `"changed"`
-- **AND** the full context is returned
-
-#### Scenario: JSON output returns unchanged when fingerprint matches
-
-- **GIVEN** the current context fingerprint is `sha256:abc123...`
-- **WHEN** `specd change context my-change designing --fingerprint sha256:abc123... --format json` is called
-- **THEN** the JSON output contains `contextFingerprint`, `status: "unchanged"`, `stepAvailable`, `blockingArtifacts`, `availableSteps`, and `warnings`
-- **AND** `projectContext` and `specs` are absent because the agent uses its cached values
-
-#### Scenario: JSON output returns full context when fingerprint does not match
-
-- **GIVEN** the current context fingerprint is `sha256:xyz789...`
-- **AND** the provided fingerprint is `sha256:abc123...`
-- **WHEN** `specd change context my-change designing --fingerprint sha256:abc123... --format json` is called
-- **THEN** the full context is returned
-- **AND** `contextFingerprint` is `sha256:xyz789...`
-- **AND** `status` is `"changed"`
 
 #### Scenario: Text output begins with fingerprint before context sections
 
 - **GIVEN** the current context fingerprint is `sha256:abc123...`
 - **WHEN** `specd change context my-change designing --format text` is called
 - **THEN** the first rendered line is `Context Fingerprint: sha256:abc123...`
-- **AND** any project context, spec content, or available steps appear after that line
 
-#### Scenario: Text output shows fingerprint and unchanged message when fingerprint matches
+#### Scenario: Text output shows unchanged message when fingerprint matches
 
 - **GIVEN** the current context fingerprint is `sha256:abc123...`
 - **WHEN** `specd change context my-change designing --fingerprint sha256:abc123... --format text` is called
-- **THEN** the output begins with `Context Fingerprint: sha256:abc123...`
-- **AND** it then prints `Context unchanged since last call.`
+- **THEN** the output includes `Context unchanged since last call.`
 - **AND** no spec content is printed
 
 #### Scenario: Text output labels full-mode specs explicitly
 
-- **GIVEN** `CompileContext` returns a full-mode spec entry for `core:core/compile-context`
-- **WHEN** `specd change context <name> <step>` is called with `--format text`
-- **THEN** the rendered block for `core:core/compile-context` includes an explicit full-mode label
-- **AND** the reader can identify that the rendered content is complete without inferring it from the title alone
+- **GIVEN** `CompileContext` returns a full-mode spec entry
+- **WHEN** `specd change context <name> <step> --format text` is called
+- **THEN** the rendered block includes an explicit full-mode label
 
 #### Scenario: Text output labels summary-mode specs explicitly
 
-- **GIVEN** `config.contextMode: 'lazy'`
-- **AND** a spec has `mode: 'summary'`
-- **WHEN** `specd change context <name> <step>` is called with `--format text`
-- **THEN** the rendered summary entry includes an explicit summary-mode label
-- **AND** the section still instructs the reader to use `specd spec show <spec-id>` for full content
+- **GIVEN** `CompileContext` returns a summary-mode spec entry
+- **WHEN** `specd change context <name> <step> --format text` is called
+- **THEN** the rendered block includes an explicit summary-mode label
 
-#### Scenario: JSON output — structured result with mode and source
+#### Scenario: Text output labels list-mode specs explicitly
 
-- **GIVEN** `CompileContext` returns specs with `mode: 'full'`
-- **WHEN** `specd change context <name> <step>` is called with `--format json`
-- **THEN** the JSON output includes `projectContext`, `specs` (with `specId`, `mode`, `source` fields), `availableSteps`, and `warnings`
+- **GIVEN** `CompileContext` returns a list-mode spec entry
+- **WHEN** `specd change context <name> <step> --format text` is called
+- **THEN** the rendered block includes an explicit list-mode label
 
-#### Scenario: JSON output — summary specs have no content field
+#### Scenario: Non-full output instructs spec-preview usage
 
-- **GIVEN** `config.contextMode: 'lazy'`
-- **AND** a spec has `mode: 'summary'`
-- **WHEN** `specd change context <name> <step>` is called with `--format json`
-- **THEN** the spec entry in JSON has `specId`, `title`, `description`, `source`, `mode` but no `content` field
+- **GIVEN** the output contains summary-mode or list-mode entries
+- **WHEN** text output is rendered
+- **THEN** it includes guidance to run `specd change spec-preview <change-name> <specId>` for merged full content
 
-#### Scenario: dependsOn not followed by default
+#### Scenario: JSON output includes list-mode entries
 
-- **GIVEN** a spec in the change's context has `.specd-metadata.yaml` with `dependsOn` entries pointing to other specs
-- **WHEN** `specd change context my-change implementing` is run without `--follow-deps`
-- **THEN** the dependent specs are not included in the output
+- **GIVEN** `CompileContext` returns `mode: "list"` entries
+- **WHEN** `specd change context <name> <step> --format json` is called
+- **THEN** JSON includes those entries with mode and source fields
 
-#### Scenario: --follow-deps includes transitive dependencies
+#### Scenario: Section flags have no effect on list and summary entries
 
-- **GIVEN** a spec in context has `dependsOn` entries pointing to other specs
-- **WHEN** `specd change context my-change implementing --follow-deps` is run
-- **THEN** the output includes content from the dependent specs as well
+- **GIVEN** the result is rendered in list mode or summary mode
+- **WHEN** `--rules` or `--constraints` are passed
+- **THEN** output remains list/summary shaped without full content blocks
 
-#### Scenario: --depth limits traversal
+#### Scenario: include-change-specs false still allows reinjection
 
-- **GIVEN** spec A depends on spec B which depends on spec C
-- **WHEN** `specd change context my-change implementing --follow-deps --depth 1` is run
-- **THEN** the output includes content from spec B but not spec C
-
-#### Scenario: Section flags filter full-mode spec content only
-
-- **GIVEN** specs in context have description, rules, constraints, and scenarios in their metadata
-- **WHEN** `specd change context my-change implementing --rules --constraints` is run
-- **THEN** only rules and constraints sections appear in full-mode spec content
-- **AND** summary-mode specs are unaffected by section flags
-
-#### Scenario: No section flags includes all sections
-
-- **GIVEN** specs in context have all metadata sections populated
-- **WHEN** `specd change context my-change implementing` is run without section flags
-- **THEN** full-mode specs contain description, rules, constraints, and scenarios
+- **GIVEN** `--include-change-specs` is omitted
+- **AND** a change spec matches include patterns or traversal
+- **WHEN** the command is executed
+- **THEN** that spec can still appear in emitted context entries
 
 ### Requirement: Step availability warning
 

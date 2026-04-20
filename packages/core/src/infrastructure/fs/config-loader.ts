@@ -223,7 +223,7 @@ const SpecdYamlZodSchema = z.object({
   context: z.array(ContextEntryRawZodSchema).optional(),
   contextIncludeSpecs: z.array(z.string()).optional(),
   contextExcludeSpecs: z.array(z.string()).optional(),
-  contextMode: z.enum(['full', 'lazy']).optional(),
+  contextMode: z.enum(['list', 'summary', 'full', 'hybrid']).optional(),
   llmOptimizedContext: z.boolean().optional(),
   schemaPlugins: z.array(z.string()).optional(),
   schemaOverrides: SchemaOverridesZodSchema.optional(),
