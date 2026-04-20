@@ -287,5 +287,9 @@ function isSpecdPlugin(value: unknown): value is SpecdPlugin {
  */
 function isAgentPlugin(value: SpecdPlugin): value is AgentPlugin {
   const record = value as unknown as Record<string, unknown>
-  return typeof record['install'] === 'function' && typeof record['uninstall'] === 'function'
+  return (
+    record['type'] === 'agent' &&
+    typeof record['install'] === 'function' &&
+    typeof record['uninstall'] === 'function'
+  )
 }
