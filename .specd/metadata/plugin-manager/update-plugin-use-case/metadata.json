@@ -21,13 +21,19 @@
     {
       "requirement": "Behavior",
       "rules": [
-        "The use case MUST:\n\n1. Load the plugin via `PluginLoader`\n2. Call the plugin's `install()` method (same as install, but no config mutation)\n3. Return a generic result"
+        "The use case MUST:\n\n1. Load the plugin via `PluginLoader`\n2. Verify the loaded plugin is an `AgentPlugin` using the `isAgentPlugin` type guard\n3. If the plugin is not an `AgentPlugin`, throw `PluginValidationError`\n4. Call the plugin's `install()` method (same as install, but no config mutation)\n5. Return a generic result"
       ]
     },
     {
       "requirement": "Idempotency",
       "rules": [
         "The use case MUST be idempotent — calling it multiple times produces the same result."
+      ]
+    },
+    {
+      "requirement": "Error handling",
+      "rules": [
+        "On failure, the use case MUST throw an appropriate error:\n\n- `PluginNotFoundError` — when the plugin package cannot be resolved\n- `PluginValidationError` — when the plugin fails type guard validation (not an `AgentPlugin`)\n- `PluginValidationError` — when `install()` throws"
       ]
     }
   ],
@@ -41,11 +47,18 @@
       "name": "Multiple updates produce same result",
       "when": ["UpdatePlugin is executed twice"],
       "then": ["both return the same result"]
+    },
+    {
+      "requirement": "Error handling",
+      "name": "Non-agent plugin rejected",
+      "given": ["a loaded plugin that is a valid SpecdPlugin but not an AgentPlugin"],
+      "when": ["UpdatePlugin.execute() is called"],
+      "then": ["PluginValidationError is thrown"]
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:d18254b1191dc82c40f9acc75ae110935b17dc78f528246ad5ba626ed3b7e459",
-    "verify.md": "sha256:0c847ee020b406e092fd3d80d3d5b77325069a4bc35d3382d7092dcccb84f19a"
+    "spec.md": "sha256:6c564526a8456d3c86fc19041e3137025000d0e8bb6056f4bbd73fefbf94492d",
+    "verify.md": "sha256:6b3373cd7d2fa44d24b997c4fe4d84465e1f172ad6469500a803191f2e2f4331"
   },
   "generatedBy": "core"
 }

@@ -35,12 +35,22 @@ interface UpdatePluginOutput {
 The use case MUST:
 
 1. Load the plugin via `PluginLoader`
-2. Call the plugin's `install()` method (same as install, but no config mutation)
-3. Return a generic result
+2. Verify the loaded plugin is an `AgentPlugin` using the `isAgentPlugin` type guard
+3. If the plugin is not an `AgentPlugin`, throw `PluginValidationError`
+4. Call the plugin's `install()` method (same as install, but no config mutation)
+5. Return a generic result
 
 ### Requirement: Idempotency
 
 The use case MUST be idempotent — calling it multiple times produces the same result.
+
+### Requirement: Error handling
+
+On failure, the use case MUST throw an appropriate error:
+
+- `PluginNotFoundError` — when the plugin package cannot be resolved
+- `PluginValidationError` — when the plugin fails type guard validation (not an `AgentPlugin`)
+- `PluginValidationError` — when `install()` throws
 
 ## Constraints
 

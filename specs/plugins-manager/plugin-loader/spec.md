@@ -16,7 +16,7 @@ The loader MUST:
 4. **Validate manifest**: Validate with Zod schema
 5. **Dynamic import**: `import(name)` as ESM module
 6. **Factory call**: Call `create()` factory function
-7. **Validate interface**: Validate the returned object against expected interface
+7. **Validate interface**: Use `isSpecdPlugin` and `isAgentPlugin` from the domain layer to validate the returned object
 
 ### Requirement: Manifest schema
 
@@ -32,7 +32,11 @@ const SpecdPluginManifestSchema = z.object({
 
 ### Requirement: Error handling
 
-Validation failures MUST throw `PluginValidationError`.
+Validation failures MUST throw `PluginValidationError`:
+
+- Base contract violation (missing `name`, `type`, `version`, `configSchema`, `init`, `destroy`) — caught by `isSpecdPlugin`
+- Unknown plugin type (type not in `PLUGIN_TYPES`) — caught by `isSpecdPlugin`
+- Agent-specific contract violation (missing `install` or `uninstall` when `pluginType` is `'agent'`) — caught by `isAgentPlugin`
 
 ### Requirement: Factory function
 

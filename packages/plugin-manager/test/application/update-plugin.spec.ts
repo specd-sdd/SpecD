@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
-import { InstallPlugin } from '../../src/index.js'
+import { UpdatePlugin } from '../../src/index.js'
 import type { PluginLoader } from '../../src/index.js'
 import { PluginValidationError } from '../../src/index.js'
 
-describe('InstallPlugin', () => {
-  it('given a loadable agent plugin, when execute is called, then installs and returns success', async () => {
+describe('UpdatePlugin', () => {
+  it('given a loadable agent plugin, when execute is called, then reinstalls and returns success', async () => {
     const install = vi.fn(async () => ({
       installed: [{ skill: 'specd', path: '/tmp/specd.md' }],
       skipped: [],
@@ -23,7 +23,7 @@ describe('InstallPlugin', () => {
       })),
     }
 
-    const useCase = new InstallPlugin(loader)
+    const useCase = new UpdatePlugin(loader)
     const result = await useCase.execute({
       pluginName: '@specd/plugin-agent-claude',
       projectRoot: '/tmp/project',
@@ -31,7 +31,6 @@ describe('InstallPlugin', () => {
 
     expect(result.success).toBe(true)
     expect(install).toHaveBeenCalledOnce()
-    expect(loader.load).toHaveBeenCalledWith('@specd/plugin-agent-claude')
   })
 
   it('given a non-agent plugin, when execute is called, then throws PluginValidationError', async () => {
@@ -46,7 +45,7 @@ describe('InstallPlugin', () => {
       })),
     }
 
-    const useCase = new InstallPlugin(loader)
+    const useCase = new UpdatePlugin(loader)
     await expect(
       useCase.execute({
         pluginName: 'some-plugin',

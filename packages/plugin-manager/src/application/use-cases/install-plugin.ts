@@ -1,5 +1,6 @@
 import type { PluginLoader } from '../ports/plugin-loader.js'
-import type { AgentPlugin } from '../../domain/types/agent-plugin.js'
+import { isAgentPlugin } from '../../domain/types/agent-plugin.js'
+import { PluginValidationError } from '../../domain/errors/plugin-validation.js'
 
 /**
  * Input contract for plugin install.
@@ -60,8 +61,10 @@ export class InstallPlugin {
    */
   async execute(input: InstallPluginInput): Promise<InstallPluginOutput> {
     const plugin = await this.loader.load(input.pluginName)
-    const agentPlugin = plugin as AgentPlugin
-    const data = await agentPlugin.install(input.projectRoot, input.options)
+    if (!isAgentPlugin(plugin)) {
+      throw new PluginValidationError(input.pluginName, ['install'])
+    }
+    const data = await plugin.install(input.projectRoot, input.options)
     return {
       success: true,
       message: `Installed '${input.pluginName}'`,

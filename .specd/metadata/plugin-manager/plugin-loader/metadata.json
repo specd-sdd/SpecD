@@ -9,7 +9,7 @@
     {
       "requirement": "Load workflow",
       "rules": [
-        "The loader MUST:\n\n1. **Package availability**: The package must be in node\\_modules (installed via npm/pnpm or linked as workspace)\n2. **Resolve path**: Use `import.meta.resolve()` or `require.resolve()` to get package path\n3. **Read manifest**: Read `specd-plugin.json` (no import yet)\n4. **Validate manifest**: Validate with Zod schema\n5. **Dynamic import**: `import(name)` as ESM module\n6. **Factory call**: Call `create()` factory function\n7. **Validate interface**: Validate the returned object against expected interface"
+        "The loader MUST:\n\n1. **Package availability**: The package must be in node\\_modules (installed via npm/pnpm or linked as workspace)\n2. **Resolve path**: Use `import.meta.resolve()` or `require.resolve()` to get package path\n3. **Read manifest**: Read `specd-plugin.json` (no import yet)\n4. **Validate manifest**: Validate with Zod schema\n5. **Dynamic import**: `import(name)` as ESM module\n6. **Factory call**: Call `create()` factory function\n7. **Validate interface**: Use `isSpecdPlugin` and `isAgentPlugin` from the domain layer to validate the returned object"
       ]
     },
     {
@@ -20,7 +20,9 @@
     },
     {
       "requirement": "Error handling",
-      "rules": ["Validation failures MUST throw `PluginValidationError`."]
+      "rules": [
+        "Validation failures MUST throw `PluginValidationError`:\n\n- Base contract violation (missing `name`, `type`, `version`, `configSchema`, `init`, `destroy`) — caught by `isSpecdPlugin`\n- Unknown plugin type (type not in `PLUGIN_TYPES`) — caught by `isSpecdPlugin`\n- Agent-specific contract violation (missing `install` or `uninstall` when `pluginType` is `'agent'`) — caught by `isAgentPlugin`"
+      ]
     },
     {
       "requirement": "Factory function",
@@ -45,11 +47,29 @@
       "given": ["specd-plugin.json has invalid schema"],
       "when": ["PluginLoader loads it"],
       "then": ["PluginValidationError is thrown"]
+    },
+    {
+      "requirement": "Zod validation",
+      "name": "Unknown plugin type rejected at runtime",
+      "given": [
+        "a plugin whose manifest declares pluginType: 'agent' but the runtime object's type is not in PLUGIN_TYPES"
+      ],
+      "when": ["PluginLoader validates the interface"],
+      "then": ["isSpecdPlugin returns false and PluginValidationError is thrown"]
+    },
+    {
+      "requirement": "Zod validation",
+      "name": "Agent plugin missing install method",
+      "given": [
+        "a plugin whose manifest declares pluginType: 'agent' but the runtime object lacks install or uninstall"
+      ],
+      "when": ["PluginLoader validates the interface"],
+      "then": ["isAgentPlugin returns false and PluginValidationError is thrown"]
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:e867fe0638af156894bad590221afe5c9e4ab4b58cb731678e173f9ef489c8e7",
-    "verify.md": "sha256:d4f80e0ac3e8922be5788aa8dd75245fcee9546b2778caa10398d4489920ab70"
+    "spec.md": "sha256:4ce8af69ce005ecaca8a27b60c83b37928caf0f8cf79a44b02c00c6da3925c5a",
+    "verify.md": "sha256:c35f104b8d60c48f6e8c84377761463162b0293867d57ee19992a87b032bbd46"
   },
   "generatedBy": "core"
 }

@@ -4,8 +4,9 @@ import { createRequire } from 'node:module'
 import { pathToFileURL } from 'node:url'
 import { z } from 'zod'
 import type { PluginLoader } from '../../application/ports/plugin-loader.js'
-import type { AgentPlugin } from '../../domain/types/agent-plugin.js'
 import type { SpecdPlugin } from '../../domain/types/specd-plugin.js'
+import { isSpecdPlugin } from '../../domain/types/specd-plugin.js'
+import { isAgentPlugin } from '../../domain/types/agent-plugin.js'
 import { PluginNotFoundError } from '../../domain/errors/plugin-not-found.js'
 import { PluginValidationError } from '../../domain/errors/plugin-validation.js'
 
@@ -257,39 +258,4 @@ function resolveCreateExport(moduleValue: unknown): (() => unknown) | undefined 
   }
 
   return undefined
-}
-
-/**
- * Checks whether a value satisfies the base plugin contract.
- *
- * @param value - Candidate runtime value.
- * @returns `true` when the value matches `SpecdPlugin`.
- */
-function isSpecdPlugin(value: unknown): value is SpecdPlugin {
-  if (typeof value !== 'object' || value === null) return false
-  const record = value as Record<string, unknown>
-  return (
-    typeof record['name'] === 'string' &&
-    typeof record['type'] === 'string' &&
-    typeof record['version'] === 'string' &&
-    typeof record['configSchema'] === 'object' &&
-    record['configSchema'] !== null &&
-    typeof record['init'] === 'function' &&
-    typeof record['destroy'] === 'function'
-  )
-}
-
-/**
- * Checks whether a value satisfies the agent-plugin extension contract.
- *
- * @param value - Candidate runtime value.
- * @returns `true` when the value matches `AgentPlugin`.
- */
-function isAgentPlugin(value: SpecdPlugin): value is AgentPlugin {
-  const record = value as unknown as Record<string, unknown>
-  return (
-    record['type'] === 'agent' &&
-    typeof record['install'] === 'function' &&
-    typeof record['uninstall'] === 'function'
-  )
 }

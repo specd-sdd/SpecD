@@ -23,6 +23,12 @@
       "rules": [
         "```typescript\ninterface InstallResult {\n  installed: Array<{ skill: string; path: string }>\n  skipped: Array<{ skill: string; reason: string }>\n}\n```"
       ]
+    },
+    {
+      "requirement": "isAgentPlugin type guard",
+      "rules": [
+        "The spec MUST export a pure function `isAgentPlugin(value: SpecdPlugin): value is AgentPlugin` that validates:\n\n1. `value.type` is `'agent'`\n2. `value.install` is a function\n3. `value.uninstall` is a function\n\nThis type guard lives in the domain layer so that application use cases and infrastructure adapters can import it without creating layer violations."
+      ]
     }
   ],
   "constraints": ["Agent plugins specialize the base plugin type for agent integrations."],
@@ -32,11 +38,25 @@
       "name": "Has install and uninstall",
       "when": ["an AgentPlugin is created"],
       "then": ["it has install() and uninstall() methods"]
+    },
+    {
+      "requirement": "isAgentPlugin type guard",
+      "name": "Rejects plugin without install method",
+      "given": ["a SpecdPlugin with type: 'agent' but no install method"],
+      "when": ["isAgentPlugin is called"],
+      "then": ["it returns false"]
+    },
+    {
+      "requirement": "isAgentPlugin type guard",
+      "name": "Rejects plugin with wrong type",
+      "given": ["a SpecdPlugin with install and uninstall methods but type is not 'agent'"],
+      "when": ["isAgentPlugin is called"],
+      "then": ["it returns false"]
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:12453ed34c0023d1be265e699267bcc34d16878aab467afe18492e035f9db6bb",
-    "verify.md": "sha256:88116cfb603d8292a2ee34f37b9d2281274962bd9569e413d656877c4fb9fa47"
+    "spec.md": "sha256:995e3a4cef3dd63b3b84d961a56faaa97f378fd1c672cb123bb9106da64e0fee",
+    "verify.md": "sha256:8accc0fc1b67770f5fcbac62b1f064948b370cd88c8491b4fd81480cd2f12aee"
   },
   "generatedBy": "core"
 }

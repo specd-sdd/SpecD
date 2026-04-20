@@ -1,5 +1,6 @@
 import type { PluginLoader } from '../ports/plugin-loader.js'
-import type { AgentPlugin } from '../../domain/types/agent-plugin.js'
+import { isAgentPlugin } from '../../domain/types/agent-plugin.js'
+import { PluginValidationError } from '../../domain/errors/plugin-validation.js'
 
 /**
  * Input contract for uninstalling one plugin.
@@ -40,7 +41,9 @@ export class UninstallPlugin {
    */
   async execute(input: UninstallPluginInput): Promise<void> {
     const plugin = await this.loader.load(input.pluginName)
-    const agentPlugin = plugin as AgentPlugin
-    await agentPlugin.uninstall(input.projectRoot, input.options)
+    if (!isAgentPlugin(plugin)) {
+      throw new PluginValidationError(input.pluginName, ['uninstall'])
+    }
+    await plugin.uninstall(input.projectRoot, input.options)
   }
 }
