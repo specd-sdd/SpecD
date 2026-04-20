@@ -253,7 +253,7 @@ schemaOverrides:
                 ```
           post:
             - id: archiving-create-changeset
-              run: 'node scripts/hooks/post-archive-changeset.js {{change.archivedName}}'
+              run: 'node dev/scripts/hooks/post-archive-changeset.js {{change.archivedName}}'
 
 plugins:
   agents:
