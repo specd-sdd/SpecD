@@ -27,12 +27,18 @@ type UninstallPluginOutput = void
 The use case MUST:
 
 1. Load the plugin via `PluginLoader`
-2. Call the plugin's `uninstall()` method with project root and options
-3. Return void (no config mutation)
+2. Verify the loaded plugin is an `AgentPlugin` using the `isAgentPlugin` type guard
+3. If the plugin is not an `AgentPlugin`, throw `PluginValidationError`
+4. Call the plugin's `uninstall()` method with project root and options
+5. Return void (no config mutation)
 
 ### Requirement: Error handling
 
-On failure, the use case MUST throw an appropriate error.
+On failure, the use case MUST throw an appropriate error:
+
+- `PluginNotFoundError` — when the plugin package cannot be resolved
+- `PluginValidationError` — when the plugin fails type guard validation (not an `AgentPlugin`)
+- `PluginValidationError` — when `uninstall()` throws
 
 ## Constraints
 

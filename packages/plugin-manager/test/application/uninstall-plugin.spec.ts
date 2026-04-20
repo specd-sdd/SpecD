@@ -1,14 +1,11 @@
 import { describe, expect, it, vi } from 'vitest'
-import { InstallPlugin } from '../../src/index.js'
+import { UninstallPlugin } from '../../src/index.js'
 import type { PluginLoader } from '../../src/index.js'
 import { PluginValidationError } from '../../src/index.js'
 
-describe('InstallPlugin', () => {
-  it('given a loadable agent plugin, when execute is called, then installs and returns success', async () => {
-    const install = vi.fn(async () => ({
-      installed: [{ skill: 'specd', path: '/tmp/specd.md' }],
-      skipped: [],
-    }))
+describe('UninstallPlugin', () => {
+  it('given a loadable agent plugin, when execute is called, then uninstalls successfully', async () => {
+    const uninstall = vi.fn(async () => {})
 
     const loader: PluginLoader = {
       load: vi.fn(async () => ({
@@ -18,20 +15,18 @@ describe('InstallPlugin', () => {
         configSchema: {},
         init: async () => {},
         destroy: async () => {},
-        install,
-        uninstall: async () => {},
+        install: async () => ({ installed: [], skipped: [] }),
+        uninstall,
       })),
     }
 
-    const useCase = new InstallPlugin(loader)
-    const result = await useCase.execute({
+    const useCase = new UninstallPlugin(loader)
+    await useCase.execute({
       pluginName: '@specd/plugin-agent-claude',
       projectRoot: '/tmp/project',
     })
 
-    expect(result.success).toBe(true)
-    expect(install).toHaveBeenCalledOnce()
-    expect(loader.load).toHaveBeenCalledWith('@specd/plugin-agent-claude')
+    expect(uninstall).toHaveBeenCalledOnce()
   })
 
   it('given a non-agent plugin, when execute is called, then throws PluginValidationError', async () => {
@@ -46,7 +41,7 @@ describe('InstallPlugin', () => {
       })),
     }
 
-    const useCase = new InstallPlugin(loader)
+    const useCase = new UninstallPlugin(loader)
     await expect(
       useCase.execute({
         pluginName: 'some-plugin',

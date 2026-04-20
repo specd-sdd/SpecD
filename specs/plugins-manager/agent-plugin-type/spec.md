@@ -31,6 +31,16 @@ interface InstallResult {
 }
 ```
 
+### Requirement: isAgentPlugin type guard
+
+The spec MUST export a pure function `isAgentPlugin(value: SpecdPlugin): value is AgentPlugin` that validates:
+
+1. `value.type` is `'agent'`
+2. `value.install` is a function
+3. `value.uninstall` is a function
+
+This type guard lives in the domain layer so that application use cases and infrastructure adapters can import it without creating layer violations.
+
 ## Constraints
 
 - Agent plugins specialize the base plugin type for agent integrations.

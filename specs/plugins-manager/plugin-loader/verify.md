@@ -17,3 +17,15 @@
 - **GIVEN** specd-plugin.json has invalid schema
 - **WHEN** PluginLoader loads it
 - **THEN** PluginValidationError is thrown
+
+#### Scenario: Unknown plugin type rejected at runtime
+
+- **GIVEN** a plugin whose manifest declares `pluginType: 'agent'` but the runtime object's `type` is not in `PLUGIN_TYPES`
+- **WHEN** PluginLoader validates the interface
+- **THEN** `isSpecdPlugin` returns `false` and `PluginValidationError` is thrown
+
+#### Scenario: Agent plugin missing install method
+
+- **GIVEN** a plugin whose manifest declares `pluginType: 'agent'` but the runtime object lacks `install` or `uninstall`
+- **WHEN** PluginLoader validates the interface
+- **THEN** `isAgentPlugin` returns `false` and `PluginValidationError` is thrown

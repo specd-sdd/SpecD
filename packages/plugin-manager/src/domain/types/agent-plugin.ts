@@ -57,3 +57,21 @@ export interface AgentPlugin extends SpecdPlugin {
    */
   uninstall(projectRoot: string, options?: InstallOptions): Promise<void>
 }
+
+/**
+ * Checks whether a value satisfies the agent-plugin extension contract.
+ *
+ * Validates that the plugin has `type: 'agent'` and exposes both
+ * `install` and `uninstall` methods.
+ *
+ * @param value - Candidate plugin to check.
+ * @returns `true` when the value matches {@link AgentPlugin}.
+ */
+export function isAgentPlugin(value: SpecdPlugin): value is AgentPlugin {
+  const record = value as unknown as Record<string, unknown>
+  return (
+    record['type'] === 'agent' &&
+    typeof record['install'] === 'function' &&
+    typeof record['uninstall'] === 'function'
+  )
+}

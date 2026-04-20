@@ -1,7 +1,13 @@
 /**
- * Plugin type discriminator.
+ * Known plugin types. Single source of truth for runtime validation
+ * and compile-time type derivation. Add new types here.
  */
-export type PluginType = 'agent'
+export const PLUGIN_TYPES = ['agent'] as const
+
+/**
+ * Plugin type discriminator, derived from {@link PLUGIN_TYPES}.
+ */
+export type PluginType = (typeof PLUGIN_TYPES)[number]
 
 /**
  * Single configurable entry for a plugin option.
@@ -86,4 +92,29 @@ export interface SpecdPlugin {
    * @returns A promise that resolves when cleanup finishes.
    */
   destroy(): Promise<void>
+}
+
+/**
+ * Checks whether a value satisfies the base plugin contract.
+ *
+ * Validates that the value is a non-null object with the required
+ * {@link SpecdPlugin} properties and that its `type` field is one
+ * of the known {@link PLUGIN_TYPES}.
+ *
+ * @param value - Candidate runtime value.
+ * @returns `true` when the value matches {@link SpecdPlugin}.
+ */
+export function isSpecdPlugin(value: unknown): value is SpecdPlugin {
+  if (typeof value !== 'object' || value === null) return false
+  const record = value as Record<string, unknown>
+  return (
+    typeof record['name'] === 'string' &&
+    typeof record['type'] === 'string' &&
+    typeof record['version'] === 'string' &&
+    typeof record['configSchema'] === 'object' &&
+    record['configSchema'] !== null &&
+    typeof record['init'] === 'function' &&
+    typeof record['destroy'] === 'function' &&
+    (PLUGIN_TYPES as readonly string[]).includes(record['type'])
+  )
 }
