@@ -12,23 +12,29 @@ The use case SHALL look up the `SpecRepository` for the given `workspace` name. 
 
 ### Requirement: Build context entry from metadata
 
-For each resolved spec, the use case SHALL load all artifact files and attempt to read metadata via `SpecRepository.metadata()`. When metadata exists and content hashes confirm freshness, the entry SHALL include:
+For each resolved spec, the use case SHALL load all artifact files and attempt to read metadata via `SpecRepository.metadata()`. The rendered entry shape SHALL be controlled by the resolved `contextMode`:
 
-- `spec` — display label in `workspace:capabilityPath` format.
-- `stale` — `false`.
-- `title` — from metadata, when present (included only when no section filter is active or all sections requested).
-- `description` — from metadata, when present (same inclusion rule as `title`).
-- `rules` — from metadata, when present and non-empty (included when no section filter or `'rules'` is in `sections`).
-- `constraints` — from metadata, when present and non-empty (included when no section filter or `'constraints'` is in `sections`).
-- `scenarios` — from metadata, when present and non-empty (included when no section filter or `'scenarios'` is in `sections`).
+- `list` — include only `spec`, `stale`, and mode/source metadata.
+- `summary` — include `spec`, `stale`, title, and description when available.
+- `full` — include `spec`, `stale`, title, description, rules, constraints, and scenarios when available.
+- `hybrid` — equivalent to `full` for a single-spec context command, because there is no change-scoped tier.
+
+When metadata exists and content hashes confirm freshness, the entry SHALL render from metadata according to that mode. In full mode, `rules`, `constraints`, and `scenarios` are included when no section filter is active or when the corresponding section is requested.
 
 ### Requirement: Stale or absent metadata produces minimal entry
 
-When `SpecRepository.metadata()` returns `null` or content hashes indicate staleness, the use case SHALL return a minimal entry with only `spec` (the label) and `stale: true`. No title, description, rules, constraints, or scenarios SHALL be included.
+When `SpecRepository.metadata()` returns `null` or content hashes indicate staleness, the use case SHALL emit a stale entry without pretending that full content is available.
+
+- In `list` mode, the entry contains only `spec`, `stale: true`, and mode/source metadata.
+- In `summary`, `full`, and `hybrid` modes, the entry contains `spec`, `stale: true`, and any title or description that can be safely extracted without fresh metadata.
+
+No rules, constraints, or scenarios SHALL be included from stale metadata.
 
 ### Requirement: Section filtering
 
-When `input.sections` is provided and non-empty, the entry MUST include only the listed section types (`'rules'`, `'constraints'`, `'scenarios'`). The `title` and `description` fields SHALL only be included when no section filter is active (i.e. `sections` is `undefined` or empty).
+When `input.sections` is provided and non-empty, the entry MUST include only the listed section types (`'rules'`, `'constraints'`, `'scenarios'`) for full-mode output. The `title` and `description` fields SHALL only be included in full-mode output when no section filter is active.
+
+Section filters MUST have no effect in `list` or `summary` modes. Those modes continue to emit list or summary-shaped entries regardless of requested sections.
 
 ### Requirement: Transitive dependency traversal
 
@@ -56,6 +62,8 @@ Warnings MUST be collected in the result's `warnings` array and MUST NOT interru
 - `entries` — ordered array of `SpecContextEntry` objects (root first, then dependencies in DFS order).
 - `warnings` — array of `ContextWarning` objects accumulated during resolution.
 
+Each entry MUST include the canonical spec label and its display mode. List entries contain no content fields. Summary entries contain title and description when available. Full entries contain the metadata sections allowed by the section filter.
+
 ## Constraints
 
 - The use case receives a `ReadonlyMap<string, SpecRepository>` — it MUST NOT modify the map or the repositories.
@@ -65,6 +73,8 @@ Warnings MUST be collected in the result's `warnings` array and MUST NOT interru
 
 ## Spec Dependencies
 
+- [`core:core/config`](../config/spec.md) — `contextMode` accepted values and default
+- [`core:core/compile-context`](../compile-context/spec.md) — shared display-mode vocabulary and context entry semantics
 - [`core:core/spec-metadata`](../spec-metadata/spec.md) — metadata structure, `dependsOn`, and `contentHashes`
 - [`core:core/storage`](../storage/spec.md) — `SpecRepository` contract
 - [`core:core/workspace`](../workspace/spec.md) — workspace resolution

@@ -4,12 +4,18 @@ import type {
   ContextSpecEntry,
   ProjectContextEntry,
   ContextWarning,
+  SpecSection,
 } from '../compile-context.js'
 
 /**
  * Input for fingerprint calculation.
  */
 export interface FingerprintInput {
+  readonly contextMode: 'list' | 'summary' | 'full' | 'hybrid'
+  readonly includeChangeSpecs: boolean
+  readonly followDeps: boolean
+  readonly depth?: number
+  readonly sections: readonly SpecSection[]
   readonly stepAvailable: boolean
   readonly blockingArtifacts: readonly string[]
   readonly projectContext: readonly ProjectContextEntry[]
@@ -27,6 +33,11 @@ export interface FingerprintInput {
  */
 export function compileContextFingerprint(input: FingerprintInput): string {
   const canonical = JSON.stringify({
+    contextMode: input.contextMode,
+    includeChangeSpecs: input.includeChangeSpecs,
+    followDeps: input.followDeps,
+    ...(input.depth !== undefined ? { depth: input.depth } : {}),
+    sections: [...input.sections],
     stepAvailable: input.stepAvailable,
     blockingArtifacts: [...input.blockingArtifacts],
     projectContext: input.projectContext.map((entry) =>

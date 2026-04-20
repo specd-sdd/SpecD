@@ -18,7 +18,8 @@ context:
       specs before drafting new ones. Avoid duplicates; update existing specs
       instead. Use specd's context features to include relevant specs in
       workflow steps. For example, include 'default:*' to always have global
-      specs in context.
+      specs in context. Always write artifacts, code, comments, and documentation
+      in english.
 
 workspaces:
   default:
@@ -76,15 +77,6 @@ workspaces:
     codeRoot: packages/skills
     ownership: owned
 
-  plugins:
-    prefix: plugins
-    specs:
-      adapter: fs
-      fs:
-        path: specs/plugins
-    codeRoot: packages/plugins
-    ownership: owned
-
   plugin-manager:
     specs:
       adapter: fs
@@ -115,6 +107,22 @@ workspaces:
       fs:
         path: specs/plugins-codex
     codeRoot: packages/plugin-agent-codex
+    ownership: owned
+
+  plugin-agent-opencode:
+    specs:
+      adapter: fs
+      fs:
+        path: specs/plugins-opencode
+    codeRoot: packages/plugin-agent-opencode
+    ownership: owned
+
+  specd-metapackage:
+    specs:
+      adapter: fs
+      fs:
+        path: specs/specd
+    codeRoot: packages/specd
     ownership: owned
 
   public-web:
@@ -215,8 +223,12 @@ schemaOverrides:
               instruction: >-
                 Read the proposal.md anddesign.md files in this change directory.
                 Based on their content, write a more elaborate description (2-3 sentences)
-                that summarizes the change purpose and outcomes. Update the change
-                description using `specd change edit <change-name> --description "..."`.
+                that summarizes the change purpose and outcomes.
+
+                Ask the user to review and edit this description for clarity and completeness. 
+
+                You can edit the change description using the command line after this step
+                with `specd change edit <change-name> --description "..."`.
             - id: archiving-release-info
               instruction: >-
                 Run `specd change status` to get the list of affected specs,

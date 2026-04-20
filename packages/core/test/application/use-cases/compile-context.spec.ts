@@ -179,6 +179,7 @@ function renderSubtreeRecursive(node: {
 }
 
 const noOp: CompileContextConfig = {
+  contextMode: 'full',
   contextIncludeSpecs: [],
   contextExcludeSpecs: [],
 }
@@ -197,8 +198,8 @@ function specsContain(result: CompileContextResult, text: string): boolean {
   return result.specs.some(
     (s) =>
       s.specId.includes(text) ||
-      s.title.includes(text) ||
-      s.description.includes(text) ||
+      (s.title?.includes(text) ?? false) ||
+      (s.description?.includes(text) ?? false) ||
       (s.content?.includes(text) ?? false),
   )
 }
@@ -269,6 +270,13 @@ function makeSut(opts: {
     extractorTransforms ?? new Map(),
     workspaceRoutes ?? [],
   )
+
+  const execute = sut.execute.bind(sut)
+  sut.execute = ((input) =>
+    execute({
+      includeChangeSpecs: true,
+      ...input,
+    })) as CompileContext['execute']
 
   return { sut, changeRepo, schemaProvider }
 }
@@ -762,6 +770,84 @@ describe('CompileContext', () => {
       expect(listSpecIds(result)).toContain('default:auth/login')
       const loginEntry = result.specs.find((spec) => spec.specId === 'default:auth/login')
       expect(loginEntry?.source).toBe('specIds')
+    })
+
+    it('includeChangeSpecs false skips direct change spec seed', async () => {
+      const loginSpec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
+      const loginContent = '# Login\n'
+      const loginMetadata = freshMetadata(loginContent, { description: 'Login spec.' })
+      const specRepo = makeSpecRepo([loginSpec], {
+        'auth/login/.specd-metadata.yaml': loginMetadata,
+        'auth/login/spec.md': loginContent,
+      })
+      const change = makeChange('my-change', { specIds: ['default:auth/login'] })
+      const schema = makeSchema()
+      const { sut } = makeSut({ change, schema, specRepos: new Map([['default', specRepo]]) })
+
+      const result = await sut.execute({
+        name: 'my-change',
+        step: 'designing',
+        includeChangeSpecs: false,
+        config: noOp,
+      })
+
+      expect(listSpecIds(result)).not.toContain('default:auth/login')
+    })
+
+    it('includeChangeSpecs false allows reinjection through include patterns', async () => {
+      const loginSpec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
+      const loginContent = '# Login\n'
+      const loginMetadata = freshMetadata(loginContent, { description: 'Login spec.' })
+      const specRepo = makeSpecRepo([loginSpec], {
+        'auth/login/.specd-metadata.yaml': loginMetadata,
+        'auth/login/spec.md': loginContent,
+      })
+      const change = makeChange('my-change', { specIds: ['default:auth/login'] })
+      const schema = makeSchema()
+      const { sut } = makeSut({ change, schema, specRepos: new Map([['default', specRepo]]) })
+
+      const result = await sut.execute({
+        name: 'my-change',
+        step: 'designing',
+        includeChangeSpecs: false,
+        config: {
+          contextIncludeSpecs: ['default:auth/login'],
+        },
+      })
+
+      const loginEntry = result.specs.find((spec) => spec.specId === 'default:auth/login')
+      expect(loginEntry?.source).toBe('includePattern')
+    })
+
+    it('includeChangeSpecs false allows reinjection through dependsOn traversal', async () => {
+      const startSpec = new Spec('default', SpecPath.parse('auth/start'), ['spec.md'])
+      const loginSpec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
+      const startContent = '# Start\n'
+      const loginContent = '# Login\n'
+      const startMetadata = freshMetadata(startContent, {
+        dependsOn: ['default:auth/login'],
+      })
+      const loginMetadata = freshMetadata(loginContent, { description: 'Login spec.' })
+      const specRepo = makeSpecRepo([startSpec, loginSpec], {
+        'auth/start/.specd-metadata.yaml': startMetadata,
+        'auth/start/spec.md': startContent,
+        'auth/login/.specd-metadata.yaml': loginMetadata,
+        'auth/login/spec.md': loginContent,
+      })
+      const change = makeChange('my-change', { specIds: ['default:auth/start'] })
+      const schema = makeSchema()
+      const { sut } = makeSut({ change, schema, specRepos: new Map([['default', specRepo]]) })
+
+      const result = await sut.execute({
+        name: 'my-change',
+        step: 'designing',
+        includeChangeSpecs: false,
+        followDeps: true,
+        config: noOp,
+      })
+
+      const loginEntry = result.specs.find((spec) => spec.specId === 'default:auth/login')
+      expect(loginEntry?.source).toBe('dependsOnTraversal')
     })
 
     it('specDependsOn value is seeded even without pattern matches', async () => {
@@ -1287,7 +1373,7 @@ describe('CompileContext', () => {
         name: 'my-change',
         step: 'designing',
 
-        config: { contextIncludeSpecs: ['default:auth/login'] },
+        config: { contextMode: 'full', contextIncludeSpecs: ['default:auth/login'] },
       })
 
       const specEntry = result.specs.find((s) => s.specId.includes('auth/login'))
@@ -1356,7 +1442,7 @@ describe('CompileContext', () => {
         name: 'my-change',
         step: 'designing',
 
-        config: { contextIncludeSpecs: ['default:auth/login'] },
+        config: { contextMode: 'full', contextIncludeSpecs: ['default:auth/login'] },
         sections: ['rules'],
       })
 
@@ -1572,7 +1658,7 @@ describe('CompileContext', () => {
         name: 'my-change',
         step: 'designing',
 
-        config: { contextIncludeSpecs: ['default:auth/login'] },
+        config: { contextMode: 'full', contextIncludeSpecs: ['default:auth/login'] },
       })
 
       // The spec content should be present even though output has glob pattern
@@ -1615,7 +1701,7 @@ describe('CompileContext', () => {
         name: 'my-change',
         step: 'designing',
 
-        config: { contextIncludeSpecs: ['default:auth/login'] },
+        config: { contextMode: 'full', contextIncludeSpecs: ['default:auth/login'] },
       })
 
       const specEntry = result.specs.find((s) => s.specId.includes('auth/login'))
@@ -1639,7 +1725,7 @@ describe('CompileContext', () => {
         name: 'my-change',
         step: 'designing',
 
-        config: { contextIncludeSpecs: ['default:auth/login'] },
+        config: { contextMode: 'full', contextIncludeSpecs: ['default:auth/login'] },
         sections: ['rules'],
       })
 
@@ -1664,7 +1750,7 @@ describe('CompileContext', () => {
         name: 'my-change',
         step: 'designing',
 
-        config: { contextIncludeSpecs: ['default:auth/login'] },
+        config: { contextMode: 'full', contextIncludeSpecs: ['default:auth/login'] },
         sections: ['rules', 'constraints'],
       })
 
@@ -1750,7 +1836,7 @@ describe('CompileContext', () => {
         name: 'my-change',
         step: 'designing',
 
-        config: { contextIncludeSpecs: ['default:auth/login'] },
+        config: { contextMode: 'full', contextIncludeSpecs: ['default:auth/login'] },
         sections: ['rules'],
       })
 
@@ -1779,7 +1865,7 @@ describe('CompileContext', () => {
         name: 'my-change',
         step: 'designing',
 
-        config: { contextIncludeSpecs: ['default:auth/login'] },
+        config: { contextMode: 'full', contextIncludeSpecs: ['default:auth/login'] },
         sections: ['constraints'],
       })
 
@@ -2027,8 +2113,37 @@ describe('CompileContext', () => {
     })
   })
 
-  describe('tier classification', () => {
-    it('lazy mode — specIds specs are tier 1 full', async () => {
+  describe('context display modes', () => {
+    it('summary mode is default when contextMode is omitted', async () => {
+      const loginSpec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
+      const otherSpec = new Spec('default', SpecPath.parse('auth/other'), ['spec.md'])
+      const loginContent = '# Login\n'
+      const otherContent = '# Other\n'
+      const loginMetadata = freshMetadata(loginContent, { description: 'Login spec.' })
+      const otherMetadata = freshMetadata(otherContent, { description: 'Other auth spec.' })
+
+      const specRepo = makeSpecRepo([loginSpec, otherSpec], {
+        'auth/login/.specd-metadata.yaml': loginMetadata,
+        'auth/login/spec.md': loginContent,
+        'auth/other/.specd-metadata.yaml': otherMetadata,
+        'auth/other/spec.md': otherContent,
+      })
+
+      const change = makeChange('my-change', { specIds: ['default:auth/login'] })
+      const schema = makeSchema()
+
+      const { sut } = makeSut({ change, schema, specRepos: new Map([['default', specRepo]]) })
+
+      const result = await sut.execute({
+        name: 'my-change',
+        step: 'designing',
+        config: { contextIncludeSpecs: ['default:auth/*'] },
+      })
+
+      expect(result.specs.every((entry) => entry.mode === 'summary')).toBe(true)
+    })
+
+    it('list mode emits list-only entries', async () => {
       const loginSpec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
       const loginContent = '# Login\n'
       const metadata = freshMetadata(loginContent, { description: 'Login spec.' })
@@ -2047,91 +2162,18 @@ describe('CompileContext', () => {
         name: 'my-change',
         step: 'designing',
         config: {
-          contextMode: 'lazy',
+          contextMode: 'list',
           contextIncludeSpecs: ['default:auth/login'],
         },
       })
 
-      const specEntry = result.specs.find((s) => s.specId === 'default:auth/login')
-      expect(specEntry).toBeDefined()
-      expect(specEntry!.mode).toBe('full')
-      expect(specEntry!.source).toBe('specIds')
+      expect(result.specs[0]?.mode).toBe('list')
+      expect(result.specs[0]?.title).toBeUndefined()
+      expect(result.specs[0]?.description).toBeUndefined()
+      expect(result.specs[0]?.content).toBeUndefined()
     })
 
-    it('lazy mode — specDependsOn specs are seeded but summary', async () => {
-      const sharedSpec = new Spec('default', SpecPath.parse('auth/shared'), ['spec.md'])
-      const loginSpec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
-      const sharedContent = '# Shared Auth\n'
-      const loginContent = '# Login\n'
-      const sharedMetadata = freshMetadata(sharedContent, { description: 'Shared auth utilities.' })
-      const loginMetadata = freshMetadata(loginContent, { description: 'Login spec.' })
-
-      const specRepo = makeSpecRepo([loginSpec, sharedSpec], {
-        'auth/login/.specd-metadata.yaml': loginMetadata,
-        'auth/login/spec.md': loginContent,
-        'auth/shared/.specd-metadata.yaml': sharedMetadata,
-        'auth/shared/spec.md': sharedContent,
-      })
-
-      const change = makeChange('my-change', { specIds: ['default:auth/login'] })
-      change.setSpecDependsOn('default:auth/login', ['default:auth/shared'])
-      const schema = makeSchema()
-
-      const { sut } = makeSut({ change, schema, specRepos: new Map([['default', specRepo]]) })
-
-      const result = await sut.execute({
-        name: 'my-change',
-        step: 'designing',
-        config: {
-          contextMode: 'lazy',
-          contextIncludeSpecs: ['default:auth/*'],
-        },
-      })
-
-      const sharedEntry = result.specs.find((s) => s.specId === 'default:auth/shared')
-      expect(sharedEntry).toBeDefined()
-      expect(sharedEntry!.mode).toBe('summary')
-      expect(sharedEntry).not.toHaveProperty('content')
-      expect(sharedEntry!.source).toBe('specDependsOn')
-    })
-
-    it('lazy mode — includePattern specs are tier 2 summary', async () => {
-      const loginSpec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
-      const otherSpec = new Spec('default', SpecPath.parse('auth/other'), ['spec.md'])
-      const loginContent = '# Login\n'
-      const otherContent = '# Other\n'
-      const loginMetadata = freshMetadata(loginContent, { description: 'Login spec.' })
-      const otherMetadata = freshMetadata(otherContent, { description: 'Other auth spec.' })
-
-      const specRepo = makeSpecRepo([loginSpec, otherSpec], {
-        'auth/login/.specd-metadata.yaml': loginMetadata,
-        'auth/login/spec.md': loginContent,
-        'auth/other/.specd-metadata.yaml': otherMetadata,
-        'auth/other/spec.md': otherContent,
-      })
-
-      // auth/other is NOT in specIds or specDependsOn, only matched by include pattern
-      const change = makeChange('my-change', { specIds: ['default:auth/login'] })
-      const schema = makeSchema()
-
-      const { sut } = makeSut({ change, schema, specRepos: new Map([['default', specRepo]]) })
-
-      const result = await sut.execute({
-        name: 'my-change',
-        step: 'designing',
-        config: {
-          contextMode: 'lazy',
-          contextIncludeSpecs: ['default:auth/*'],
-        },
-      })
-
-      const otherEntry = result.specs.find((s) => s.specId === 'default:auth/other')
-      expect(otherEntry).toBeDefined()
-      expect(otherEntry!.mode).toBe('summary')
-      expect(otherEntry!.content).toBeUndefined()
-    })
-
-    it('full mode — all specs are full', async () => {
+    it('full mode renders all collected entries as full', async () => {
       const loginSpec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
       const otherSpec = new Spec('default', SpecPath.parse('auth/other'), ['spec.md'])
       const loginContent = '# Login\n'
@@ -2148,7 +2190,6 @@ describe('CompileContext', () => {
 
       const change = makeChange('my-change', { specIds: ['default:auth/login'] })
       const schema = makeSchema()
-
       const { sut } = makeSut({ change, schema, specRepos: new Map([['default', specRepo]]) })
 
       const result = await sut.execute({
@@ -2160,51 +2201,11 @@ describe('CompileContext', () => {
         },
       })
 
-      for (const specEntry of result.specs) {
-        expect(specEntry.mode).toBe('full')
-      }
+      expect(result.specs.every((entry) => entry.mode === 'full')).toBe(true)
+      expect(result.specs.every((entry) => entry.content !== undefined)).toBe(true)
     })
 
-    it('lazy mode — dependsOnTraversal specs are tier 2 summary', async () => {
-      const loginSpec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
-      const jwtSpec = new Spec('default', SpecPath.parse('auth/jwt'), ['spec.md'])
-      const loginContent = '# Login\n'
-      const jwtContent = '# JWT\n'
-      const loginMetadata = freshMetadata(loginContent, {
-        description: 'Login spec.',
-        dependsOn: ['auth/jwt'],
-      })
-      const jwtMetadata = freshMetadata(jwtContent, { description: 'JWT utilities.' })
-
-      const specRepo = makeSpecRepo([loginSpec, jwtSpec], {
-        'auth/login/.specd-metadata.yaml': loginMetadata,
-        'auth/login/spec.md': loginContent,
-        'auth/jwt/.specd-metadata.yaml': jwtMetadata,
-        'auth/jwt/spec.md': jwtContent,
-      })
-
-      const change = makeChange('my-change', { specIds: ['default:auth/login'] })
-      const schema = makeSchema()
-
-      const { sut } = makeSut({ change, schema, specRepos: new Map([['default', specRepo]]) })
-
-      const result = await sut.execute({
-        name: 'my-change',
-        step: 'designing',
-        config: {
-          contextMode: 'lazy',
-          contextIncludeSpecs: ['default:auth/login'],
-        },
-        followDeps: true,
-      })
-
-      const jwtEntry = result.specs.find((s) => s.specId === 'default:auth/jwt')
-      expect(jwtEntry).toBeDefined()
-      expect(jwtEntry!.source).toBe('dependsOnTraversal')
-      expect(jwtEntry!.mode).toBe('summary')
-    })
-
-    it('default contextMode is lazy', async () => {
+    it('hybrid mode renders direct change specs in full and others as summary', async () => {
       const loginSpec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
       const otherSpec = new Spec('default', SpecPath.parse('auth/other'), ['spec.md'])
       const loginContent = '# Login\n'
@@ -2221,22 +2222,63 @@ describe('CompileContext', () => {
 
       const change = makeChange('my-change', { specIds: ['default:auth/login'] })
       const schema = makeSchema()
-
       const { sut } = makeSut({ change, schema, specRepos: new Map([['default', specRepo]]) })
 
-      // contextMode not set — should default to 'lazy'
       const result = await sut.execute({
         name: 'my-change',
         step: 'designing',
         config: {
+          contextMode: 'hybrid',
           contextIncludeSpecs: ['default:auth/*'],
         },
       })
 
-      const loginEntry = result.specs.find((s) => s.specId === 'default:auth/login')
-      const otherEntry = result.specs.find((s) => s.specId === 'default:auth/other')
-      expect(loginEntry!.mode).toBe('full') // specIds → tier 1
-      expect(otherEntry!.mode).toBe('summary') // includePattern → tier 2
+      const loginEntry = result.specs.find((entry) => entry.specId === 'default:auth/login')
+      const otherEntry = result.specs.find((entry) => entry.specId === 'default:auth/other')
+      expect(loginEntry?.mode).toBe('full')
+      expect(otherEntry?.mode).toBe('summary')
+    })
+
+    it('section flags do not change list and summary entry shapes', async () => {
+      const loginSpec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
+      const loginContent = '# Login\n'
+      const loginMetadata = freshMetadata(loginContent, {
+        description: 'Login spec.',
+        rules: [{ requirement: 'Login', rules: ['Must validate tokens'] }],
+      })
+
+      const specRepo = makeSpecRepo([loginSpec], {
+        'auth/login/.specd-metadata.yaml': loginMetadata,
+        'auth/login/spec.md': loginContent,
+      })
+
+      const change = makeChange('my-change', { specIds: ['default:auth/login'] })
+      const schema = makeSchema()
+      const { sut } = makeSut({ change, schema, specRepos: new Map([['default', specRepo]]) })
+
+      const summaryResult = await sut.execute({
+        name: 'my-change',
+        step: 'designing',
+        config: {
+          contextMode: 'summary',
+          contextIncludeSpecs: ['default:auth/login'],
+        },
+        sections: ['rules'],
+      })
+      const listResult = await sut.execute({
+        name: 'my-change',
+        step: 'designing',
+        config: {
+          contextMode: 'list',
+          contextIncludeSpecs: ['default:auth/login'],
+        },
+        sections: ['rules'],
+      })
+
+      expect(summaryResult.specs[0]?.mode).toBe('summary')
+      expect(summaryResult.specs[0]?.content).toBeUndefined()
+      expect(listResult.specs[0]?.mode).toBe('list')
+      expect(listResult.specs[0]?.content).toBeUndefined()
     })
   })
 
@@ -2401,7 +2443,7 @@ describe('CompileContext', () => {
       const result = await sut.execute({
         name: 'my-change',
         step: 'designing',
-        config: { contextIncludeSpecs: ['default:auth/login'] },
+        config: { contextMode: 'full', contextIncludeSpecs: ['default:auth/login'] },
       })
 
       const specEntry = result.specs.find((s) => s.specId === 'default:auth/login')
@@ -2445,7 +2487,7 @@ describe('CompileContext', () => {
       const result = await sut.execute({
         name: 'my-change',
         step: 'designing',
-        config: { contextIncludeSpecs: ['default:auth/login'] },
+        config: { contextMode: 'full', contextIncludeSpecs: ['default:auth/login'] },
       })
 
       const specEntry = result.specs.find((s) => s.specId === 'default:auth/login')
@@ -2483,7 +2525,7 @@ describe('CompileContext', () => {
       const result = await sut.execute({
         name: 'my-change',
         step: 'designing',
-        config: { contextIncludeSpecs: ['default:auth/login'] },
+        config: { contextMode: 'full', contextIncludeSpecs: ['default:auth/login'] },
       })
 
       const specEntry = result.specs.find((s) => s.specId === 'default:auth/login')
@@ -2572,7 +2614,7 @@ describe('CompileContext', () => {
         execute: executeMock,
       } as unknown as PreviewSpec
 
-      // auth/other is only in include pattern → lazy mode → summary → no preview call
+      // auth/other is only in include pattern → hybrid mode keeps it as summary → no preview call
       const change = makeChange('my-change', { specIds: ['default:auth/login'] })
       const schema = makeSchema()
 
@@ -2587,7 +2629,7 @@ describe('CompileContext', () => {
         name: 'my-change',
         step: 'designing',
         config: {
-          contextMode: 'lazy',
+          contextMode: 'hybrid',
           contextIncludeSpecs: ['default:auth/*'],
         },
       })
@@ -3054,6 +3096,50 @@ describe('CompileContext', () => {
 
       expect(baseResult.contextFingerprint).not.toBe(followDepsResult.contextFingerprint)
       expect(baseResult.contextFingerprint).not.toBe(rulesOnlyResult.contextFingerprint)
+    })
+
+    it('keeps the same fingerprint when section flags are ignored in summary/list modes', async () => {
+      const loginSpec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
+      const loginContent = '# Login\n'
+      const loginMetadata = freshMetadata(loginContent, {
+        description: 'Login spec.',
+        rules: [{ requirement: 'Auth', rules: ['Must authenticate users'] }],
+      })
+
+      const specRepo = makeSpecRepo([loginSpec], {
+        'auth/login/.specd-metadata.yaml': loginMetadata,
+        'auth/login/spec.md': loginContent,
+      })
+
+      const change = makeChange('my-change', { specIds: ['default:auth/login'] })
+      const schema = makeSchema()
+      const { sut } = makeSut({ change, schema, specRepos: new Map([['default', specRepo]]) })
+
+      const summaryBase = await sut.execute({
+        name: 'my-change',
+        step: 'designing',
+        config: { ...noOp, contextMode: 'summary' },
+      })
+      const summaryWithSections = await sut.execute({
+        name: 'my-change',
+        step: 'designing',
+        config: { ...noOp, contextMode: 'summary' },
+        sections: ['rules', 'constraints'],
+      })
+      expect(summaryBase.contextFingerprint).toBe(summaryWithSections.contextFingerprint)
+
+      const listBase = await sut.execute({
+        name: 'my-change',
+        step: 'designing',
+        config: { ...noOp, contextMode: 'list' },
+      })
+      const listWithSections = await sut.execute({
+        name: 'my-change',
+        step: 'designing',
+        config: { ...noOp, contextMode: 'list' },
+        sections: ['rules', 'constraints'],
+      })
+      expect(listBase.contextFingerprint).toBe(listWithSections.contextFingerprint)
     })
   })
 })

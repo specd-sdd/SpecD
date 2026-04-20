@@ -644,6 +644,32 @@ context:
   // ---------------------------------------------------------------------------
 
   describe('contextMode', () => {
+    it("accepts 'list'", async () => {
+      const configPath = await writeConfig(
+        minimalYaml(`
+contextMode: 'list'
+`),
+      )
+
+      const loader = new FsConfigLoader({ configPath })
+      const config = await loader.load()
+
+      expect(config.contextMode).toBe('list')
+    })
+
+    it("accepts 'summary'", async () => {
+      const configPath = await writeConfig(
+        minimalYaml(`
+contextMode: 'summary'
+`),
+      )
+
+      const loader = new FsConfigLoader({ configPath })
+      const config = await loader.load()
+
+      expect(config.contextMode).toBe('summary')
+    })
+
     it("accepts 'full'", async () => {
       const configPath = await writeConfig(
         minimalYaml(`
@@ -657,17 +683,17 @@ contextMode: 'full'
       expect(config.contextMode).toBe('full')
     })
 
-    it("accepts 'lazy'", async () => {
+    it("accepts 'hybrid'", async () => {
       const configPath = await writeConfig(
         minimalYaml(`
-contextMode: 'lazy'
+contextMode: 'hybrid'
 `),
       )
 
       const loader = new FsConfigLoader({ configPath })
       const config = await loader.load()
 
-      expect(config.contextMode).toBe('lazy')
+      expect(config.contextMode).toBe('hybrid')
     })
 
     it('omits contextMode from SpecdConfig when not declared', async () => {
@@ -677,6 +703,17 @@ contextMode: 'lazy'
       const config = await loader.load()
 
       expect(config.contextMode).toBeUndefined()
+    })
+
+    it('rejects legacy lazy contextMode value', async () => {
+      const configPath = await writeConfig(
+        minimalYaml(`
+contextMode: 'lazy'
+`),
+      )
+
+      const loader = new FsConfigLoader({ configPath })
+      await expect(loader.load()).rejects.toThrow()
     })
 
     it('rejects invalid contextMode value', async () => {
@@ -700,7 +737,7 @@ workspaces:
       adapter: fs
       fs:
         path: specs
-    contextMode: 'lazy'
+    contextMode: 'summary'
 storage:
   changes:
     adapter: fs

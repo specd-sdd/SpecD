@@ -222,22 +222,29 @@ specd change context <name> <step> [options]
 
 Compile the context block for a specific lifecycle step of the change. The compiled context is what an agent receives when working on that step — it includes specs, rules, constraints, scenarios, artifact instructions, and hook instructions as applicable.
 
-In `text` mode, the first line is always `Context Fingerprint: <sha256...>`. Full spec blocks include an explicit `Mode: full` label, and summary entries render an explicit `summary` mode marker in the available-context table so readers do not have to infer completeness from layout alone.
+Rendering mode is controlled by `contextMode` in `specd.yaml` (`list`, `summary`, `full`, `hybrid`; default `summary`). In `text` mode, the first line is always `Context Fingerprint: <sha256...>`. Full spec blocks include an explicit `Mode: full` label. Non-full entries are emitted under `## Available context specs` with explicit mode labels.
 
 The fingerprint follows the compiled logical result, not the presentation format. Flags such as `--follow-deps`, `--depth`, `--rules`, `--constraints`, and `--scenarios` can change the fingerprint when they change the emitted context. Switching only `--format` does not.
 
-When no section flags are provided, a full spec renders all schema artifacts with `scope: spec` in stable order: `spec.md` first when present, then the remaining files alphabetically, each labeled with its filename. When `--rules`, `--constraints`, or `--scenarios` is used, raw file rendering is replaced by metadata-derived section output; for specs in the change, those sections are derived from the merged preview artifacts so delta changes in files like `verify.md` affect the compiled context.
+When no section flags are provided, a full spec renders all schema artifacts with `scope: spec` in stable order: `spec.md` first when present, then the remaining files alphabetically, each labeled with its filename. When `--rules`, `--constraints`, or `--scenarios` is used, raw file rendering is replaced by metadata-derived section output; for specs in the change, those sections are derived from the merged preview artifacts so delta changes in files like `verify.md` affect the compiled context. In `list` and `summary` modes, section flags are accepted but do not change output shape.
 
-| Option                 | Description                                                                                                                                                         |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- | -------------- |
-| `--rules`              | Include rules extracted from spec metadata.                                                                                                                         |
-| `--constraints`        | Include constraints extracted from spec metadata.                                                                                                                   |
-| `--scenarios`          | Include scenarios extracted from spec metadata.                                                                                                                     |
-| `--follow-deps`        | Follow `dependsOn` links and include transitive specs.                                                                                                              |
-| `--depth <n>`          | Maximum depth for dependency traversal. Used with `--follow-deps`.                                                                                                  |
-| `--fingerprint <hash>` | Provide a fingerprint to skip context return if unchanged. Returns status "unchanged" without full context. Use for caching to avoid re-fetching identical context. |
-| `--format text         | json                                                                                                                                                                | toon` | Output format. |
-| `--config <path>`      | Config file path.                                                                                                                                                   |
+When non-full entries are present, the command prints guidance to use:
+
+`specd change spec-preview <change-name> <specId>`
+
+to inspect merged full content for a specific spec in this change.
+
+| Option                      | Description                                                                                                                                                         |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--rules`                   | Include rules extracted from spec metadata (full-mode rendering only).                                                                                              |
+| `--constraints`             | Include constraints extracted from spec metadata (full-mode rendering only).                                                                                        |
+| `--scenarios`               | Include scenarios extracted from spec metadata (full-mode rendering only).                                                                                          |
+| `--include-change-specs`    | Include `change.specIds` as direct context seeds. Default is `false`.                                                                                               |
+| `--follow-deps`             | Follow `dependsOn` links and include transitive specs.                                                                                                              |
+| `--depth <n>`               | Maximum depth for dependency traversal. Used with `--follow-deps`.                                                                                                  |
+| `--fingerprint <hash>`      | Provide a fingerprint to skip context return if unchanged. Returns status "unchanged" without full context. Use for caching to avoid re-fetching identical context. |
+| `--format text\|json\|toon` | Output format.                                                                                                                                                      |
+| `--config <path>`           | Config file path.                                                                                                                                                   |
 
 If `--fingerprint <hash>` matches the current compiled fingerprint, `text` mode still prints `Context Fingerprint: <sha256...>` first and then `Context unchanged since last call.`. Structured output keeps the fingerprint plus the current step availability, available steps, and warnings, while omitting the full context body.
 
@@ -548,11 +555,13 @@ specd spec context <specPath> [options]
 
 Compile the context block for a spec. Useful for inspecting what an agent would receive when asked to work with this spec directly.
 
+Rendering mode is controlled by `contextMode` in `specd.yaml` (`list`, `summary`, `full`, `hybrid`; default `summary`). `hybrid` behaves as `full` for this command. Text output includes per-entry `Mode` and `Source` labels.
+
 | Option                      | Description                                                        |
 | --------------------------- | ------------------------------------------------------------------ |
-| `--rules`                   | Include rules extracted from spec metadata.                        |
-| `--constraints`             | Include constraints extracted from spec metadata.                  |
-| `--scenarios`               | Include scenarios extracted from spec metadata.                    |
+| `--rules`                   | Include rules extracted from spec metadata (full-mode only).       |
+| `--constraints`             | Include constraints extracted from spec metadata (full-mode only). |
+| `--scenarios`               | Include scenarios extracted from spec metadata (full-mode only).   |
 | `--follow-deps`             | Follow `dependsOn` links and include transitive specs.             |
 | `--depth <n>`               | Maximum depth for dependency traversal. Used with `--follow-deps`. |
 | `--format text\|json\|toon` | Output format.                                                     |
@@ -693,15 +702,17 @@ specd project context [options]
 
 Compile the project-level context block. This is the context an agent receives when asked about the project as a whole, rather than a specific change or spec.
 
-| Option                      | Description                                            |
-| --------------------------- | ------------------------------------------------------ |
-| `--rules`                   | Include rules from project-level specs.                |
-| `--constraints`             | Include constraints from project-level specs.          |
-| `--scenarios`               | Include scenarios from project-level specs.            |
-| `--follow-deps`             | Follow `dependsOn` links and include transitive specs. |
-| `--depth <n>`               | Maximum depth for dependency traversal.                |
-| `--format text\|json\|toon` | Output format.                                         |
-| `--config <path>`           | Config file path.                                      |
+Rendering mode is controlled by `contextMode` in `specd.yaml` (`list`, `summary`, `full`, `hybrid`; default `summary`). `hybrid` behaves as `full` for this command.
+
+| Option                      | Description                                                    |
+| --------------------------- | -------------------------------------------------------------- |
+| `--rules`                   | Include rules from project-level specs (full-mode only).       |
+| `--constraints`             | Include constraints from project-level specs (full-mode only). |
+| `--scenarios`               | Include scenarios from project-level specs (full-mode only).   |
+| `--follow-deps`             | Follow `dependsOn` links and include transitive specs.         |
+| `--depth <n>`               | Maximum depth for dependency traversal.                        |
+| `--format text\|json\|toon` | Output format.                                                 |
+| `--config <path>`           | Config file path.                                              |
 
 ### project update
 

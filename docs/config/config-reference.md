@@ -42,7 +42,7 @@ Bootstrap mode is intended for initial indexing and exploratory graph queries. I
 | `context`             | array   | no       | `[]`            | Additional content injected into compiled context before spec content.                                         |
 | `contextIncludeSpecs` | array   | no       | —               | Spec patterns always included in compiled context. When absent, no project-level include patterns are applied. |
 | `contextExcludeSpecs` | array   | no       | —               | Spec patterns always excluded from compiled context.                                                           |
-| `contextMode`         | string  | no       | `'lazy'`        | Context rendering mode: `'lazy'` or `'full'`. See [`contextMode`](#contextmode).                               |
+| `contextMode`         | string  | no       | `'summary'`     | Context rendering mode: `'list'`, `'summary'`, `'full'`, or `'hybrid'`. See [`contextMode`](#contextmode).     |
 | `artifactRules`       | object  | no       | `{}`            | Per-artifact constraints added without modifying the schema.                                                   |
 | `approvals`           | object  | no       | both `false`    | Approval gate configuration.                                                                                   |
 | `llmOptimizedContext` | boolean | no       | `false`         | Opt in to LLM-enriched context operations.                                                                     |
@@ -322,18 +322,29 @@ Leave this `false` if your pipeline has no LLM access (offline CI, air-gapped en
 
 ## contextMode
 
-`contextMode` controls how `CompileContext` renders specs in the compiled context output.
+`contextMode` controls how context commands render collected specs:
 
-| Value    | Behaviour                                                                                                                                                                                                                                     |
-| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `'lazy'` | Tier-1 specs (specs directly listed in the change + their `dependsOn` specs) are rendered in full. Tier-2 specs (those matched by include patterns and transitive `dependsOn` traversal) are rendered as summaries only. This is the default. |
-| `'full'` | All collected specs are rendered with full content regardless of tier.                                                                                                                                                                        |
+- `specd change context`
+- `specd project context`
+- `specd spec context`
+
+| Value       | Behaviour                                                                                                                                                                                                                                             |
+| ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `'list'`    | Render only the spec identifier catalogue (no summary metadata, no full content).                                                                                                                                                                     |
+| `'summary'` | Render spec catalogue entries with summary metadata (`title`, `description`) but no full spec body. This is the default.                                                                                                                              |
+| `'full'`    | Render full content for every collected spec.                                                                                                                                                                                                         |
+| `'hybrid'`  | Keep tiered rendering for `change context`: specs seeded directly from `change.specIds` render as full, while include-pattern and dependency-traversal specs render as summary. For `project context` and `spec context`, `hybrid` behaves as `full`. |
 
 ```yaml
-contextMode: lazy # default
+contextMode: summary # default
 ```
 
-Use `'full'` when the agent needs complete content from all in-context specs, for example when working in a highly cross-cutting change that touches many areas. Use `'lazy'` (the default) to keep compiled context size manageable.
+Section flags (`--rules`, `--constraints`, `--scenarios`) only affect full-mode rendering. In `list` and `summary` modes those flags are accepted but have no effect on output shape.
+
+`lazy` is no longer a valid value. Migrate old configs by replacing:
+
+- `contextMode: lazy` with `contextMode: hybrid` to keep tiered behaviour.
+- `contextMode: lazy` with `contextMode: summary` to adopt the new default compact output.
 
 ## schemaPlugins
 

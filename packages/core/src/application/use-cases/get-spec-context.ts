@@ -21,6 +21,8 @@ export interface GetSpecContextInput {
   readonly followDeps?: boolean
   /** Limits dependency traversal depth. Only meaningful when `followDeps` is `true`. */
   readonly depth?: number
+  /** Display mode used to shape entries. Defaults to `summary`. */
+  readonly contextMode?: 'list' | 'summary' | 'full' | 'hybrid'
   /** When present, restricts output to the listed section types. */
   readonly sections?: ReadonlyArray<SpecContextSectionFlag>
 }
@@ -29,6 +31,10 @@ export interface GetSpecContextInput {
 export interface SpecContextEntry {
   /** Display label for the spec (e.g. `'default:auth/login'`). */
   readonly spec: string
+  /** Whether this entry is the root spec or a dependency. */
+  readonly source: 'root' | 'dependency'
+  /** Rendering shape for this entry. */
+  readonly mode: 'list' | 'summary' | 'full'
   /** Spec title from metadata. */
   readonly title?: string
   /** Spec description from metadata. */
@@ -87,6 +93,13 @@ export class GetSpecContext {
    * @returns Structured context entries and warnings
    */
   async execute(input: GetSpecContextInput): Promise<GetSpecContextResult> {
+    const mode: SpecContextEntry['mode'] =
+      input.contextMode === undefined
+        ? 'summary'
+        : input.contextMode === 'hybrid'
+          ? 'full'
+          : input.contextMode
+
     const warnings: ContextWarning[] = []
     const entries: SpecContextEntry[] = []
 
@@ -102,7 +115,18 @@ export class GetSpecContext {
 
     const rootLabel = `${input.workspace}:${input.specPath.toString()}`
     const metadata = await repo.metadata(spec)
-    entries.push(await this._buildEntry(rootLabel, repo, spec, metadata, input.sections, warnings))
+    entries.push(
+      await this._buildEntry(
+        rootLabel,
+        'root',
+        mode,
+        repo,
+        spec,
+        metadata,
+        input.sections,
+        warnings,
+      ),
+    )
 
     if (input.followDeps) {
       const maxDepth = input.depth
@@ -113,6 +137,7 @@ export class GetSpecContext {
         entries,
         seen,
         warnings,
+        mode,
         input.sections,
         maxDepth,
         0,
@@ -126,6 +151,8 @@ export class GetSpecContext {
    * Builds a context entry from a spec's metadata.
    *
    * @param specLabel - Display label for the spec
+   * @param source - Whether this spec is the root or a dependency
+   * @param mode - Context display mode for the entry
    * @param repo - Repository for artifact content resolution
    * @param spec - The spec entity
    * @param metadata - Parsed metadata, or `null` if absent
@@ -135,12 +162,18 @@ export class GetSpecContext {
    */
   private async _buildEntry(
     specLabel: string,
+    source: 'root' | 'dependency',
+    mode: SpecContextEntry['mode'],
     repo: SpecRepository,
     spec: import('../../domain/entities/spec.js').Spec,
     metadata: SpecMetadata | null,
     sections: ReadonlyArray<SpecContextSectionFlag> | undefined,
     warnings: ContextWarning[],
   ): Promise<SpecContextEntry> {
+    if (mode === 'list') {
+      return { spec: specLabel, source, mode, stale: metadata === null }
+    }
+
     const showAll = sections === undefined || sections.length === 0
 
     if (metadata !== null) {
@@ -162,8 +195,21 @@ export class GetSpecContext {
       }
 
       if (freshnessResult.allFresh) {
+        if (mode === 'summary') {
+          return {
+            spec: specLabel,
+            source,
+            mode,
+            stale: false,
+            ...(metadata.title !== undefined ? { title: metadata.title } : {}),
+            ...(metadata.description !== undefined ? { description: metadata.description } : {}),
+          }
+        }
+
         return {
           spec: specLabel,
+          source,
+          mode,
           stale: false,
           ...(showAll && metadata.title !== undefined ? { title: metadata.title } : {}),
           ...(showAll && metadata.description !== undefined
@@ -186,9 +232,29 @@ export class GetSpecContext {
             : {}),
         }
       }
+
+      if (mode === 'summary') {
+        return {
+          spec: specLabel,
+          source,
+          mode,
+          stale: true,
+          ...(metadata.title !== undefined ? { title: metadata.title } : {}),
+          ...(metadata.description !== undefined ? { description: metadata.description } : {}),
+        }
+      }
+
+      return {
+        spec: specLabel,
+        source,
+        mode,
+        stale: true,
+        ...(metadata.title !== undefined ? { title: metadata.title } : {}),
+        ...(metadata.description !== undefined ? { description: metadata.description } : {}),
+      }
     }
 
-    return { spec: specLabel, stale: true }
+    return { spec: specLabel, source, mode, stale: true }
   }
 
   /**
@@ -199,6 +265,7 @@ export class GetSpecContext {
    * @param entries - Mutable array collecting resolved entries
    * @param seen - Set of already-visited spec labels for cycle detection
    * @param warnings - Mutable array to collect warnings
+   * @param mode - Context display mode for entries
    * @param sections - Optional section filter flags
    * @param maxDepth - Maximum traversal depth, or undefined for unlimited
    * @param currentDepth - Current recursion depth
@@ -209,6 +276,7 @@ export class GetSpecContext {
     entries: SpecContextEntry[],
     seen: Set<string>,
     warnings: ContextWarning[],
+    mode: SpecContextEntry['mode'],
     sections: ReadonlyArray<SpecContextSectionFlag> | undefined,
     maxDepth: number | undefined,
     currentDepth: number,
@@ -253,7 +321,18 @@ export class GetSpecContext {
       }
 
       const depMetadata = await repo.metadata(depSpec)
-      entries.push(await this._buildEntry(depLabel, repo, depSpec, depMetadata, sections, warnings))
+      entries.push(
+        await this._buildEntry(
+          depLabel,
+          'dependency',
+          mode,
+          repo,
+          depSpec,
+          depMetadata,
+          sections,
+          warnings,
+        ),
+      )
 
       await this._traverseDeps(
         depMetadata,
@@ -261,6 +340,7 @@ export class GetSpecContext {
         entries,
         seen,
         warnings,
+        mode,
         sections,
         maxDepth,
         currentDepth + 1,

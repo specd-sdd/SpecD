@@ -385,16 +385,20 @@ References to unknown workspace qualifiers produce a warning at startup but do n
 
 ### Requirement: Context mode
 
-`specd.yaml` MUST accept an optional top-level `contextMode` field that controls how `CompileContext` renders specs in the compiled context.
+`specd.yaml` MUST accept an optional top-level `contextMode` field that controls how context commands render specs in compiled context output.
 
-Valid values:
+Accepted values:
 
-- `'lazy'` (default) — specs are split into two tiers. Tier 1 specs (those in the change's `specIds` and `specDependsOn`) are rendered with full content. Tier 2 specs (those from include patterns and `dependsOn` traversal) are rendered as summaries (spec ID, title, description only).
-- `'full'` — all collected specs are rendered with full structured content (rules, constraints, scenarios). This preserves the pre-change behaviour.
+- `'list'` — render collected specs as spec IDs and source metadata only, without descriptions or full content
+- `'summary'` (default) — render collected specs as a catalogue with spec ID, title, and description, without full content
+- `'full'` — render all collected specs with full content
+- `'hybrid'` — render direct change specs in full when the caller includes them, and render all other collected specs as summaries
+
+The legacy `'lazy'` value is removed. It MUST NOT be accepted as an alias or fallback for `hybrid`.
 
 `contextMode` is project-level only — it MUST NOT appear inside workspace entries. If declared inside a workspace, startup validation MUST reject it as an unknown field.
 
-When omitted, `contextMode` defaults to `'lazy'`.
+When omitted, `contextMode` defaults to `'summary'`.
 
 ### Requirement: Project context instructions
 
@@ -495,28 +499,19 @@ See [`core:core/config-writer-port`](../config-writer-port/spec.md) for full met
 
 ### Requirement: Startup validation
 
-`specd.yaml` MUST be validated at startup. The following conditions are **errors** that prevent startup:
+At startup, specd MUST validate the resolved configuration before constructing use cases. Validation MUST reject:
 
-- File does not exist at the discovered path (after traversal)
-- YAML parse failure
-- Missing required top-level field: `schema`
-- `schema` value does not match `<name>@<version>` format (when string) or is not a valid object with `name` and `version`
-- Duplicate workspace names (last-wins in YAML; reject if detected)
-- Unknown adapter value in any `specs`, `schemas`, or storage section
-- Required adapter-specific fields are absent (e.g. `fs.path` missing when `adapter: fs`)
-- Storage path (`changes.fs.path` or `archive.fs.path`) resolves outside the repo root
-- Invalid `contextIncludeSpecs` or `contextExcludeSpecs` pattern syntax (e.g. `*` in a disallowed position)
-- `schemaPlugins` entry is not a valid string reference
-- `schemaOverrides` has an invalid structure (unknown operation keys, wrong types)
-- `contextMode` value is not `'full'` or `'lazy'`
-- `contextMode` appears inside a workspace entry (it is project-level only)
-- `graph.respectGitignore` is present but not a boolean
-- `graph.excludePaths` is present but not an array of strings
+- missing required `schema`
+- missing required `workspaces.default`
+- unsupported storage adapters
+- invalid path values
+- invalid `contextIncludeSpecs` or `contextExcludeSpecs` pattern syntax
+- `contextMode` values other than `'list'`, `'summary'`, `'full'`, or `'hybrid'`
+- `contextMode: lazy`
+- `contextMode` inside a workspace entry
+- non-boolean `graph.respectGitignore`
 
-The following conditions emit **warnings** but allow startup to proceed:
-
-- Duplicate workspace names (YAML retains last-wins; warn about the pattern)
-- Unknown workspace qualifier in a `contextIncludeSpecs` or `contextExcludeSpecs` pattern (runtime only — `specd config validate` treats this as an error)
+Validation errors MUST surface as `ConfigValidationError`.
 
 ## Constraints
 
@@ -527,7 +522,7 @@ The following conditions emit **warnings** but allow startup to proceed:
 - All relative paths resolve from the specd.yaml directory; storage paths (fs.path in changes and archive) must remain within the repo root
 - Project-level contextIncludeSpecs defaults to \['default:\*']; project-level contextExcludeSpecs defaults to \[]
 - Workspace-level contextIncludeSpecs defaults to \['\*'] (all specs in that workspace); workspace-level contextExcludeSpecs defaults to \[]
-- contextMode is optional; defaults to 'lazy'; must be 'full' or 'lazy' — any other value is a startup validation error
+- contextMode is optional; defaults to 'summary'; must be one of 'list', 'summary', 'full', or 'hybrid' — any other value is a startup validation error
 - contextMode is project-level only; it MUST NOT appear inside workspace entries
 - llmOptimizedContext is optional; defaults to false; must be a boolean — any other type is a startup validation error
 - context is optional; each entry is an object with exactly one key: either file or instruction — no other shapes are valid

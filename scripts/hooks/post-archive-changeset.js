@@ -262,9 +262,8 @@ async function generateChangesets(changeInfo, bumpTypes, description) {
     `[changeset-hook] Packages: ${[...packages.entries()].map(([p, t]) => `${p}:${t}`).join(', ')}`,
   )
 
-  const specdHeader = `${today} - ${name}: ${description || name}`
   const specdSpecContent = [
-    specdHeader,
+    header,
     '',
     'Modified packages: ',
     ...[...packages.entries()].map(([pkg]) => `- ${pkg}`),

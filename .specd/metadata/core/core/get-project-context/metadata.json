@@ -15,13 +15,13 @@
     {
       "requirement": "Accepts GetProjectContextInput as input",
       "rules": [
-        "`execute(input)` MUST accept a `GetProjectContextInput` object with the following fields:\n\n- `config` (`CompileContextConfig`, required) — the resolved project configuration containing `context` entries, `contextIncludeSpecs`, and `contextExcludeSpecs`.\n- `followDeps` (boolean, optional) — when `true`, follows `dependsOn` links from `.specd-metadata.yaml` transitively to discover additional specs beyond those matched by include/exclude patterns. When `false` or absent, traversal is not performed.\n- `depth` (number, optional) — limits `dependsOn` traversal depth. Only meaningful when `followDeps` is `true`. `1` means direct dependencies only; absent means unlimited.\n- `sections` (`ReadonlyArray<SpecSection>`, optional) — restricts which metadata sections are rendered per spec (`\"rules\"`, `\"constraints\"`, `\"scenarios\"`). When absent, all sections are rendered including the description."
+        "`execute(input)` MUST accept a `GetProjectContextInput` object with the following fields:\n\n- `config` (`CompileContextConfig`, required) — the resolved project configuration containing `context` entries, `contextIncludeSpecs`, `contextExcludeSpecs`, and `contextMode`\n- `followDeps` (boolean, optional) — when `true`, follows `dependsOn` links from `.specd-metadata.yaml` transitively to discover additional specs beyond those matched by include/exclude patterns. When `false` or absent, traversal is not performed.\n- `depth` (number, optional) — limits `dependsOn` traversal depth. Only meaningful when `followDeps` is `true`. `1` means direct dependencies only; absent means unlimited.\n- `sections` (`ReadonlyArray<SpecSection>`, optional) — restricts which metadata sections are rendered per full-mode spec (`\"rules\"`, `\"constraints\"`, `\"scenarios\"`). It has no effect for list-mode or summary-mode entries."
       ]
     },
     {
       "requirement": "Returns GetProjectContextResult on success",
       "rules": [
-        "`execute` MUST return a `GetProjectContextResult` containing:\n\n- `contextEntries` (string\\[]) — rendered project-level context entries (instruction text or file content).\n- `specs` (`ContextSpecEntry[]`) — specs matched by include/exclude patterns, each with `specId`, `title`, `description`, `source`, `mode`, and optionally `content` fields. The `ContextSpecEntry` type is the same as defined in the `CompileContext` spec.\n- `warnings` (`ContextWarning[]`) — advisory warnings for missing files, stale metadata, unknown workspaces, etc.\n\nSince `GetProjectContext` operates without a change, it has no `specIds` or `specDependsOn` to drive tier classification. All specs MUST have `source: 'includePattern'`. The `mode` field MUST always be `'full'` — lazy mode requires an active change to determine tier 1 membership."
+        "`execute` MUST return a `GetProjectContextResult` containing:\n\n- `contextEntries` (string\\[]) — rendered project-level context entries (instruction text or file content).\n- `specs` (`ContextSpecEntry[]`) — specs matched by include/exclude patterns, each with `specId`, `source`, `mode`, and optional `title`, `description`, and `content` fields according to the display mode. The `ContextSpecEntry` type is the same as defined in the `CompileContext` spec.\n- `warnings` (`ContextWarning[]`) — advisory warnings for missing files, stale metadata, unknown workspaces, etc.\n\nSince `GetProjectContext` operates without a change, all specs MUST have `source: 'includePattern'`. The mode field is determined by `config.contextMode`: `list` emits list entries, `summary` emits summary entries, and `full` or `hybrid` emits full entries. Project context has no direct change specs, so `hybrid` is equivalent to `full`."
       ]
     },
     {
@@ -57,7 +57,7 @@
     {
       "requirement": "Renders spec content from metadata when fresh",
       "rules": [
-        "For each included spec, if `.specd-metadata.yaml` exists and its content hashes match the current artifacts (verified via `ContentHasher`), the use case MUST render from the parsed metadata. The rendered output MUST include description, rules, constraints, and scenarios as applicable, filtered by `input.sections` when provided."
+        "For each included spec, if `.specd-metadata.yaml` exists and its content hashes match the current artifacts (verified via `ContentHasher`), the use case MUST render from the parsed metadata according to `config.contextMode`.\n\n- In `list` mode, render no title, description, or content.\n- In `summary` mode, render title and description only.\n- In `full` mode, render description, rules, constraints, and scenarios as applicable, filtered by `input.sections` when provided.\n- In `hybrid` mode, render the same output as `full` because project context has no change-scoped tier.\n\nSection filters MUST NOT affect list-mode or summary-mode entries."
       ]
     },
     {
@@ -93,36 +93,44 @@
     },
     {
       "requirement": "Accepts GetProjectContextInput as input",
-      "name": "All optional fields provided",
+      "name": "Full optional input supported",
       "when": ["execute is called with followDeps: true, depth: 2, and sections: [\"rules\"]"],
       "then": ["the call succeeds and respects all optional parameters"]
+    },
+    {
+      "requirement": "Accepts GetProjectContextInput as input",
+      "name": "Sections only affect full-mode rendering",
+      "given": ["contextMode resolves to list or summary"],
+      "when": ["execute is called with section filters"],
+      "then": ["emitted entries remain list/summary shaped without full content sections"]
     },
     {
       "requirement": "Returns GetProjectContextResult on success",
       "name": "Result contains structured spec entries",
       "given": ["project-level include patterns match specs"],
       "when": ["GetProjectContext.execute is called"],
-      "then": [
-        "result.specs is an array of ContextSpecEntry objects with specId, title, description, source, mode, and content"
-      ]
+      "then": ["result.specs is an array of context entries with specId, source, and mode"]
     },
     {
       "requirement": "Returns GetProjectContextResult on success",
-      "name": "All specs are full mode without a change",
-      "given": ["no active change (project context only)"],
+      "name": "Summary mode emits summary entries",
+      "given": ["contextMode: \"summary\""],
       "when": ["GetProjectContext.execute is called"],
-      "then": ["all entries in result.specs have mode: 'full' and source: 'includePattern'"]
+      "then": ["all emitted spec entries use summary mode"]
     },
     {
       "requirement": "Returns GetProjectContextResult on success",
-      "name": "Spec entries include title and description",
-      "given": [
-        "default:_global/architecture has metadata with title: 'Architecture' and description: 'Defines the hexagonal architecture...'"
-      ],
-      "when": ["GetProjectContext.execute is called and includes this spec"],
-      "then": [
-        "the spec entry has title: 'Architecture' and description: 'Defines the hexagonal architecture...'"
-      ]
+      "name": "List mode emits list entries",
+      "given": ["contextMode: \"list\""],
+      "when": ["GetProjectContext.execute is called"],
+      "then": ["all emitted spec entries use list mode"]
+    },
+    {
+      "requirement": "Returns GetProjectContextResult on success",
+      "name": "Full and hybrid modes emit full entries in project context",
+      "given": ["contextMode: \"full\" or contextMode: \"hybrid\""],
+      "when": ["GetProjectContext.execute is called"],
+      "then": ["all emitted spec entries use full mode"]
     },
     {
       "requirement": "Resolves schema before processing",
@@ -237,19 +245,30 @@
     },
     {
       "requirement": "Renders spec content from metadata when fresh",
-      "name": "Fresh metadata rendered with all sections",
+      "name": "Fresh metadata rendered with all sections in full mode",
       "given": [
-        "a spec has fresh .specd-metadata.yaml with description, rules, constraints, and scenarios"
+        "a spec has fresh .specd-metadata.yaml with description, rules, constraints, and scenarios",
+        "AND the effective display mode is full"
       ],
       "when": ["execute is called without sections filter"],
-      "then": ["the spec's content includes all four sections"]
+      "then": ["the spec entry includes all four sections"]
     },
     {
       "requirement": "Renders spec content from metadata when fresh",
-      "name": "Sections filter restricts output",
-      "given": ["a spec has fresh metadata with rules and scenarios"],
+      "name": "Sections filter restricts full output",
+      "given": [
+        "a spec has fresh metadata with rules and scenarios",
+        "AND the effective display mode is full"
+      ],
       "when": ["execute is called with sections: [\"rules\"]"],
-      "then": ["the spec's content includes rules but not scenarios or description"]
+      "then": ["the spec entry includes rules but not scenarios or description"]
+    },
+    {
+      "requirement": "Renders spec content from metadata when fresh",
+      "name": "Sections filter does not change summary output",
+      "given": ["a spec is rendered in summary mode"],
+      "when": ["execute is called with section filters"],
+      "then": ["the summary output stays unchanged"]
     },
     {
       "requirement": "Falls back to extraction when metadata is stale or absent",
@@ -301,8 +320,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:256f556efe6e3fcb1bc69e23f060c58f243e0d00d245012c5b083aea9783019f",
-    "verify.md": "sha256:3c60957a7b86e62ce0bf97814cdfafeab7837a95a8bbd414f4b0e579b93dd1c7"
+    "spec.md": "sha256:01d19d892f1300dd1738f813f811923d768949fb9de6d011a00e73f8dc469b50",
+    "verify.md": "sha256:29fdc8a3b6c0dbf0963eee55b24f7215a11e929dde34e3e4eaf75e52fb0cb7ae"
   },
   "generatedBy": "core"
 }

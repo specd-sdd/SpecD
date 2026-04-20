@@ -1,7 +1,7 @@
 {
   "title": "Spec Context",
   "description": "Agents need structured spec content they can consume directly as context, without parsing raw Markdown themselves. The `specd spec context <workspace:capability-path>` command prints the metadata summary for a single spec as it would appear in an AI context block, with optional section filtering and dependency traversal.",
-  "dependsOn": ["cli:cli/entrypoint"],
+  "dependsOn": ["cli:cli/entrypoint", "core:core/config", "core:core/get-spec-context"],
   "context": [
     "Agents need structured spec content they can consume directly as context, without parsing raw Markdown themselves. The `specd spec context <workspace:capability-path>` command prints the metadata summary for a single spec as it would appear in an AI context block, with optional section filtering and dependency traversal."
   ],
@@ -15,13 +15,13 @@
     {
       "requirement": "Behaviour",
       "rules": [
-        "The command reads the spec's `.specd-metadata.yaml` and renders the requested sections. If the metadata is absent or stale (content hashes do not match current artifact files), the command falls back to the schema's `metadataExtraction` declarations to extract content deterministically from the spec's raw artifact files and emits a `warning:` to stderr.\n\nWhen `--follow-deps` is passed, the command recursively follows the `dependsOn` entries in each spec's `.specd-metadata.yaml`, applying the same section filtering and stale-fallback logic to each dependency. Cycles are detected and silently broken. The root spec is always listed first; dependencies follow in traversal order."
+        "The command reads the active project config and renders the requested spec according to the configured `contextMode`. It reads the spec's `.specd-metadata.yaml` and renders the requested sections only when the selected mode is full-shaped. If the metadata is absent or stale (content hashes do not match current artifact files), the command falls back to the schema's `metadataExtraction` declarations where available and emits a `warning:` to stderr.\n\nWhen `--follow-deps` is passed, the command recursively follows the `dependsOn` entries in each spec's `.specd-metadata.yaml`, applying the same display mode and stale-fallback logic to each dependency. Cycles are detected and silently broken. The root spec is always listed first; dependencies follow in traversal order."
       ]
     },
     {
       "requirement": "Output",
       "rules": [
-        "In `text` mode (default), each spec in the output is introduced by a header:\n\n```\n### Spec: <workspace>:<capability-path>\n\n<metadata content>\n```\n\nWhen `--follow-deps` is passed, each dependency appears as a subsequent `### Spec:` block after the root.\n\nIn `json` or `toon` mode, the output is (encoded in the respective format):\n\n```json\n{\n  \"specs\": [\n    {\n      \"spec\": \"workspace:cap/path\",\n      \"title\": \"...\",\n      \"description\": \"...\",\n      \"rules\": [...],\n      \"constraints\": [...],\n      \"scenarios\": [...],\n      \"stale\": false\n    }\n  ],\n  \"warnings\": []\n}\n```\n\nOnly the requested sections are included in each spec object. `description` is always included when not using section filters. When a section is requested but absent, it is omitted from the object (not `null` or `[]`). The root spec is always `specs[0]`; dependencies follow in traversal order."
+        "In `text` mode (default), each spec entry in the output is introduced by a header:\n\n```\n### Spec: <workspace>:<capability-path>\nMode: <list|summary|full>\n```\n\nList-mode entries include only the spec ID and mode/source metadata. Summary-mode entries include title and description when available. Full-mode entries include the rendered metadata content, filtered by section flags when present.\n\nWhen `--follow-deps` is passed, each dependency appears as a subsequent `### Spec:` block after the root using the same display mode.\n\nIn `json` or `toon` mode, the output includes `specs` and `warnings`. Only fields available for the selected display mode are included in each spec object. The root spec is always `specs[0]`; dependencies follow in traversal order."
       ]
     },
     {
@@ -34,7 +34,8 @@
   "constraints": [
     "This command is read-only — it never updates metadata",
     "The workspace is always explicit in the path",
-    "Section flags are additive — passing --rules --constraints includes both sections",
+    "Section flags are additive for full-mode output — passing --rules --constraints includes both sections",
+    "Section flags have no effect in list or summary modes",
     "--follow-deps traversal uses the same cycle detection as CompileContext",
     "Stale/absent metadata is never a hard error — the fallback is always attempted"
   ],
@@ -53,114 +54,79 @@
     },
     {
       "requirement": "Behaviour",
-      "name": "Fresh metadata used",
-      "given": ["default:auth/login has fresh .specd-metadata.yaml with valid content hashes"],
-      "when": ["specd spec context default:auth/login is run"],
-      "then": [
-        "stdout contains the metadata summary (description, rules, constraints, scenarios)",
-        "AND no warning is emitted to stderr",
-        "AND the process exits with code 0"
-      ]
+      "name": "Fresh metadata used in full mode",
+      "given": ["a spec has fresh metadata", "AND effective context mode is full"],
+      "when": ["specd spec context <spec-id> is run"],
+      "then": ["stdout contains full metadata-derived context"]
+    },
+    {
+      "requirement": "Behaviour",
+      "name": "Summary mode emits summary-shaped entries",
+      "given": ["effective context mode is summary"],
+      "when": ["specd spec context <spec-id> is run"],
+      "then": ["output contains summary-shaped entries without full section blocks"]
+    },
+    {
+      "requirement": "Behaviour",
+      "name": "List mode emits list-shaped entries",
+      "given": ["effective context mode is list"],
+      "when": ["specd spec context <spec-id> is run"],
+      "then": ["output contains list-shaped entries"]
     },
     {
       "requirement": "Behaviour",
       "name": "Stale metadata falls back to raw artifacts",
-      "given": ["default:auth/login has .specd-metadata.yaml with mismatched content hashes"],
-      "when": ["specd spec context default:auth/login is run"],
-      "then": [
-        "stdout contains the metadataExtraction fallback content",
-        "AND stderr contains a warning: line about stale metadata",
-        "AND the process exits with code 0"
-      ]
+      "given": ["a spec has stale metadata"],
+      "when": ["specd spec context <spec-id> is run"],
+      "then": ["stderr contains a stale-metadata warning"]
     },
     {
       "requirement": "Behaviour",
-      "name": "Section flags filter output",
-      "given": [
-        "default:auth/login has metadata with description, rules, constraints, and scenarios"
-      ],
-      "when": ["specd spec context default:auth/login --rules --scenarios is run"],
-      "then": [
-        "stdout contains the rules and scenarios sections",
-        "AND stdout does not contain the description or constraints sections"
-      ]
+      "name": "Section flags filter only full-mode output",
+      "given": ["full mode output"],
+      "when": ["specd spec context <spec-id> --rules --scenarios is run"],
+      "then": ["output includes only those sections"]
     },
     {
       "requirement": "Behaviour",
-      "name": "No section flags includes all sections",
-      "given": ["default:auth/login has metadata with all sections populated"],
-      "when": ["specd spec context default:auth/login is run without section flags"],
-      "then": ["stdout contains description, rules, constraints, and scenarios"]
+      "name": "Section flags do not affect list or summary output",
+      "given": ["list or summary mode output"],
+      "when": ["section flags are passed"],
+      "then": ["entry shape remains list/summary"]
     },
     {
       "requirement": "Behaviour",
       "name": "--follow-deps includes dependency specs",
-      "given": [
-        "default:auth/login has .specd-metadata.yaml with dependsOn: [\"default:auth/shared-errors\"]",
-        "AND default:auth/shared-errors exists with its own metadata"
-      ],
-      "when": ["specd spec context default:auth/login --follow-deps is run"],
-      "then": [
-        "stdout contains a ### Spec: default:auth/login block followed by a ### Spec: default:auth/shared-errors block"
-      ]
-    },
-    {
-      "requirement": "Behaviour",
-      "name": "--depth limits traversal",
-      "given": [
-        "default:auth/login depends on default:auth/shared-errors which depends on default:common/errors"
-      ],
-      "when": ["specd spec context default:auth/login --follow-deps --depth 1 is run"],
-      "then": [
-        "stdout contains default:auth/login and default:auth/shared-errors but not default:common/errors"
-      ]
-    },
-    {
-      "requirement": "Behaviour",
-      "name": "Cycle detection prevents infinite loop",
-      "given": ["default:a depends on default:b and default:b depends on default:a"],
-      "when": ["specd spec context default:a --follow-deps is run"],
-      "then": ["each spec appears at most once in the output", "AND the process exits with code 0"]
+      "given": ["a root spec depends on another spec"],
+      "when": ["specd spec context <spec-id> --follow-deps is run"],
+      "then": ["output contains root and dependency entries"]
     },
     {
       "requirement": "Output",
-      "name": "Text header format",
-      "when": ["specd spec context default:auth/login is run"],
-      "then": ["stdout begins with ### Spec: default:auth/login"]
+      "name": "Text output includes explicit mode label",
+      "when": ["specd spec context <spec-id> is run in text mode"],
+      "then": ["each rendered spec block includes an explicit mode label"]
     },
     {
       "requirement": "Output",
-      "name": "JSON output — all sections, no deps",
-      "given": ["default:auth/login has fresh metadata with all sections"],
-      "when": ["specd spec context default:auth/login --format json is run"],
-      "then": [
-        "stdout is valid JSON with specs array containing one entry with spec, title, description, rules, constraints, scenarios, and stale: false",
-        "AND warnings is []"
-      ]
+      "name": "JSON output — full mode includes full sections",
+      "given": ["effective mode is full"],
+      "when": ["specd spec context <spec-id> --format json is run"],
+      "then": ["JSON includes full-mode fields"]
     },
     {
       "requirement": "Output",
-      "name": "JSON output — section filter applied",
-      "when": ["specd spec context default:auth/login --constraints --format json is run"],
-      "then": [
-        "the spec entry in specs[0] contains constraints but not rules, scenarios, or description"
-      ]
+      "name": "JSON output — summary mode omits full content",
+      "given": ["effective mode is summary"],
+      "when": ["specd spec context <spec-id> --format json is run"],
+      "then": ["JSON includes summary fields and omits full content blocks"]
     },
     {
       "requirement": "Output",
-      "name": "JSON output — absent section omitted",
-      "given": ["default:auth/login has metadata with rules but no scenarios"],
-      "when": ["specd spec context default:auth/login --scenarios --format json is run"],
-      "then": ["the spec entry in specs[0] does not contain a scenarios key"]
-    },
-    {
-      "requirement": "Output",
-      "name": "JSON output — with dependencies",
-      "given": ["default:auth/login depends on default:auth/shared-errors"],
-      "when": ["specd spec context default:auth/login --follow-deps --format json is run"],
-      "then": [
-        "specs contains two entries: specs[0] for default:auth/login and specs[1] for default:auth/shared-errors"
-      ]
+      "name": "JSON output — list mode keeps minimal fields",
+      "given": ["effective mode is list"],
+      "when": ["specd spec context <spec-id> --format json is run"],
+      "then": ["JSON entries remain minimal list-shaped objects"]
     },
     {
       "requirement": "Error cases",
@@ -176,8 +142,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:6321452112e1a8a8925a3e46c2ccd4af01410486aec4147039b57d38276dd348",
-    "verify.md": "sha256:8f6ac25d68ee48399d8d01a03aa8b112453cf72378c50b075beb0b8337b70277"
+    "spec.md": "sha256:f308189bd0a4a98684a8117b687ed547633661c2bf2f750cef4dfcc95ccba1e4",
+    "verify.md": "sha256:499e5f29e7139e479e722b96b0f1ca279d1192a1728ab080e842c51f12dad5a9"
   },
   "generatedBy": "core"
 }

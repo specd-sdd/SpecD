@@ -434,27 +434,45 @@
 
 ### Requirement: Context mode
 
-#### Scenario: contextMode lazy is the default
+#### Scenario: contextMode summary is the default
 
 - **GIVEN** `specd.yaml` does not declare `contextMode`
 - **WHEN** config is loaded
-- **THEN** `config.contextMode` defaults to `'lazy'` at the use case level
+- **THEN** `config.contextMode` defaults to `"summary"` at the use case level
 
-#### Scenario: contextMode lazy is accepted
+#### Scenario: contextMode list is accepted
+
+- **GIVEN** `specd.yaml` declares `contextMode: list`
+- **WHEN** config is loaded
+- **THEN** `config.contextMode` is `"list"`
+
+#### Scenario: contextMode summary is accepted
+
+- **GIVEN** `specd.yaml` declares `contextMode: summary`
+- **WHEN** config is loaded
+- **THEN** `config.contextMode` is `"summary"`
+
+#### Scenario: contextMode full is accepted
+
+- **GIVEN** `specd.yaml` declares `contextMode: full`
+- **WHEN** config is loaded
+- **THEN** `config.contextMode` is `"full"`
+
+#### Scenario: contextMode hybrid is accepted
+
+- **GIVEN** `specd.yaml` declares `contextMode: hybrid`
+- **WHEN** config is loaded
+- **THEN** `config.contextMode` is `"hybrid"`
+
+#### Scenario: legacy lazy value is rejected
 
 - **GIVEN** `specd.yaml` declares `contextMode: lazy`
 - **WHEN** config is loaded
-- **THEN** `config.contextMode` is `'lazy'`
-
-#### Scenario: Invalid contextMode rejected at startup
-
-- **GIVEN** `specd.yaml` declares `contextMode: partial`
-- **WHEN** config is loaded
-- **THEN** startup validation fails with an error identifying the invalid value
+- **THEN** startup validation fails with an error identifying `lazy` as invalid
 
 #### Scenario: contextMode inside workspace is rejected
 
-- **GIVEN** `specd.yaml` declares `contextMode: lazy` inside a workspace entry
+- **GIVEN** `specd.yaml` declares `contextMode: summary` inside a workspace entry
 - **WHEN** config is loaded
 - **THEN** startup validation fails with an error indicating `contextMode` is project-level only
 
@@ -472,17 +490,17 @@
 - **WHEN** config is validated at startup
 - **THEN** validation fails with a `ConfigValidationError` identifying the invalid `contextMode` value
 
+#### Scenario: Legacy lazy contextMode rejected
+
+- **GIVEN** `specd.yaml` contains `contextMode: lazy`
+- **WHEN** config is validated at startup
+- **THEN** validation fails with a `ConfigValidationError` because lazy is no longer accepted
+
 #### Scenario: contextMode in workspace entry rejected
 
-- **GIVEN** `specd.yaml` contains a workspace with `contextMode: lazy`
+- **GIVEN** `specd.yaml` contains a workspace with `contextMode: summary`
 - **WHEN** config is validated at startup
 - **THEN** validation fails with a `ConfigValidationError` indicating `contextMode` is not valid inside a workspace
-
-#### Scenario: graph.respectGitignore must be boolean
-
-- **GIVEN** a workspace with `graph.respectGitignore: "yes"` (string instead of boolean)
-- **WHEN** specd starts
-- **THEN** specd exits with `ConfigValidationError`
 
 ### Requirement: Project context instructions
 

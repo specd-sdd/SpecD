@@ -20,13 +20,13 @@
     {
       "requirement": "Behaviour",
       "rules": [
-        "The command compiles the project-level context: the `context:` entries and the specs matched by the **project-level** `contextIncludeSpecs`/`contextExcludeSpecs` patterns only. Workspace-level patterns are not applied — those are conditional on a specific change having that workspace active. No `dependsOn` traversal is performed — that requires a change.\n\nConcretely:\n\n1. Project `context:` entries from `specd.yaml` are rendered (instruction text verbatim, file entries read from disk)\n2. Project-level `contextIncludeSpecs` patterns are applied across all workspaces (defaults to `['default:*']` when not declared)\n3. Project-level `contextExcludeSpecs` patterns are applied to remove specs from the set\n4. The metadata or fallback content of each included spec is rendered, using the same fresh-metadata / metadataExtraction-fallback logic as `CompileContext`"
+        "The command compiles the project-level context: the `context:` entries and the specs matched by the **project-level** `contextIncludeSpecs`/`contextExcludeSpecs` patterns only. Workspace-level patterns are not applied — those are conditional on a specific change having that workspace active.\n\nConcretely:\n\n1. Project `context:` entries from `specd.yaml` are rendered (instruction text verbatim, file entries read from disk)\n2. Project-level `contextIncludeSpecs` patterns are applied across all workspaces (defaults to `['default:*']` when not declared)\n3. Project-level `contextExcludeSpecs` patterns are applied to remove specs from the set\n4. Optional `dependsOn` traversal is applied only when `--follow-deps` is present\n5. The collected specs are rendered according to the configured `contextMode`"
       ]
     },
     {
       "requirement": "Output",
       "rules": [
-        "The CLI MUST assemble the final output from the structured `GetProjectContextResult` returned by the use case.\n\n**In `text` mode** (default):\n\n1. Project context entries are rendered first, each preceded by its source label. Entries are separated by `---`.\n2. Spec content follows under a `## Spec content` header. Each spec is rendered under a `### Spec: <specId>` heading with its full content.\n3. If nothing is configured (no `context:` entries and no specs matched), the command prints `no project context configured` and exits with code 0.\n\nSince `GetProjectContext` always returns all specs in `full` mode (no change context means no tier classification), the text output format is unchanged from the current behaviour — all specs are rendered with full content.\n\n**In `json` or `toon` mode**, the output is:\n\n```json\n{\n  \"contextEntries\": [\"...\", \"...\"],\n  \"specs\": [\n    {\n      \"specId\": \"default:_global/architecture\",\n      \"title\": \"Architecture\",\n      \"description\": \"...\",\n      \"source\": \"includePattern\",\n      \"mode\": \"full\",\n      \"content\": \"...\"\n    }\n  ],\n  \"warnings\": []\n}\n```\n\nwhere `contextEntries` are the rendered project `context:` entries, `specs` are the matched specs with their structured entry data (always `mode: 'full'`), and `warnings` lists any advisory conditions."
+        "The CLI MUST assemble the final output from the structured `GetProjectContextResult` returned by the use case.\n\n**In `text` mode** (default):\n\n1. Project context entries are rendered first, each preceded by its source label. Entries are separated by `---`.\n2. Spec entries follow:\n   - Full entries are rendered under `## Spec content` with complete content.\n   - Summary entries are rendered under `## Available context specs` with spec ID, title, and description.\n   - List entries are rendered under `## Available context specs` with spec ID only plus an explicit list-mode label.\n3. If nothing is configured (no `context:` entries and no specs matched), the command prints `no project context configured` and exits with code 0.\n\nSection flags apply only to full entries. In `list` and `summary` modes, the output remains list/summary shaped even when `--rules`, `--constraints`, or `--scenarios` are passed.\n\n**In `json` or `toon` mode**, the output includes `contextEntries`, `specs`, and `warnings`. Spec entry fields vary by mode using the shared context entry shape: list entries omit title/description/content, summary entries omit content, and full entries include content."
       ]
     },
     {
@@ -47,7 +47,8 @@
     "Only project-level contextIncludeSpecs/contextExcludeSpecs patterns are applied; workspace-level patterns are change-specific and not applied here",
     "dependsOn traversal is opt-in via --follow-deps; without the flag, deps are not followed",
     "--depth without --follow-deps is a CLI usage error (exit code 1)",
-    "Section flags (--rules, --constraints, --scenarios) only filter spec content; project context: entries are always rendered in full regardless of section flags"
+    "Section flags (--rules, --constraints, --scenarios) only filter full-mode spec content; project context: entries are always rendered in full regardless of section flags",
+    "Section flags have no effect in list or summary modes"
   ],
   "scenarios": [
     {
@@ -76,99 +77,66 @@
     },
     {
       "requirement": "Behaviour",
-      "name": "Exclude patterns remove specs from the set",
-      "given": [
-        "specd.yaml has contextIncludeSpecs: [\"*\"] and contextExcludeSpecs: [\"auth/*\"]"
-      ],
+      "name": "Context mode list renders list-style project spec entries",
+      "given": ["specd.yaml sets contextMode: list"],
       "when": ["specd project context is run"],
-      "then": ["specs under auth/ are not included in the output"]
+      "then": ["emitted spec entries are list-mode entries"]
     },
     {
       "requirement": "Behaviour",
-      "name": "Workspace-level patterns not applied",
-      "given": [
-        "workspace billing has contextIncludeSpecs: [\"billing/*\"] but no project-level contextIncludeSpecs includes billing specs"
-      ],
+      "name": "Context mode summary renders summary-style project spec entries",
+      "given": ["specd.yaml sets contextMode: summary"],
       "when": ["specd project context is run"],
-      "then": [
-        "billing specs are not included in the output (workspace-level patterns are change-specific, not applied by this command)"
-      ]
+      "then": ["emitted spec entries are summary-mode entries"]
     },
     {
       "requirement": "Behaviour",
-      "name": "dependsOn traversal not performed by default",
-      "given": [
-        "a spec included via patterns has .specd-metadata.yaml with dependsOn entries pointing to other specs"
-      ],
-      "when": ["specd project context is run without --follow-deps"],
-      "then": ["the dependent specs are not included in the output"]
-    },
-    {
-      "requirement": "Behaviour",
-      "name": "--follow-deps includes transitive dependencies",
-      "given": ["a spec included via patterns has dependsOn entries pointing to other specs"],
-      "when": ["specd project context --follow-deps is run"],
-      "then": ["the output includes content from the dependent specs as well"]
-    },
-    {
-      "requirement": "Behaviour",
-      "name": "--depth limits traversal",
-      "given": ["spec A (matched by include patterns) depends on spec B which depends on spec C"],
-      "when": ["specd project context --follow-deps --depth 1 is run"],
-      "then": ["the output includes spec A and spec B but not spec C"]
-    },
-    {
-      "requirement": "Behaviour",
-      "name": "Section flags filter spec content",
-      "given": [
-        "specs matched by include patterns have description, rules, constraints, and scenarios in their metadata"
-      ],
-      "when": ["specd project context --rules is run"],
-      "then": [
-        "only rules sections appear in the spec content output",
-        "AND description, constraints, and scenarios are not present"
-      ]
-    },
-    {
-      "requirement": "Behaviour",
-      "name": "Section flags do not affect context entries",
-      "given": ["specd.yaml has context: with an instruction: \"Follow conventions.\""],
-      "when": ["specd project context --rules is run"],
-      "then": [
-        "stdout still contains Follow conventions. (context entries are unaffected by section filters)"
-      ]
-    },
-    {
-      "requirement": "Behaviour",
-      "name": "File context entry resolved",
-      "given": ["specd.yaml has context: with file: docs/context.md containing Hello world"],
+      "name": "Context mode full renders full project spec entries",
+      "given": ["specd.yaml sets contextMode: full"],
       "when": ["specd project context is run"],
-      "then": ["stdout contains Hello world"]
+      "then": ["emitted spec entries are full-mode entries"]
+    },
+    {
+      "requirement": "Behaviour",
+      "name": "Context mode hybrid behaves as full in project context",
+      "given": ["specd.yaml sets contextMode: hybrid"],
+      "when": ["specd project context is run"],
+      "then": ["emitted spec entries are full-mode entries"]
+    },
+    {
+      "requirement": "Behaviour",
+      "name": "Section flags do not affect list or summary mode output",
+      "given": ["contextMode is list or summary"],
+      "when": ["specd project context --rules --constraints is run"],
+      "then": ["output remains list/summary shaped"]
     },
     {
       "requirement": "Output",
-      "name": "Text output — all specs rendered with full content",
-      "given": ["GetProjectContext returns specs (always mode: 'full')"],
-      "when": ["specd project context is called with --format text"],
-      "then": [
-        "output is unchanged from previous behaviour — all specs under ## Spec content with full content"
-      ]
+      "name": "Text output — full mode renders complete spec content",
+      "given": ["GetProjectContext returns full-mode specs"],
+      "when": ["specd project context --format text is called"],
+      "then": ["output renders complete spec content under ## Spec content"]
     },
     {
       "requirement": "Output",
-      "name": "JSON output — structured spec entries",
-      "given": ["GetProjectContext returns structured ContextSpecEntry objects"],
-      "when": ["specd project context is called with --format json"],
-      "then": [
-        "the JSON output includes contextEntries, specs (with specId, title, description, source, mode, content), and warnings"
-      ]
+      "name": "Text output — summary mode renders catalogue entries",
+      "given": ["GetProjectContext returns summary-mode specs"],
+      "when": ["specd project context --format text is called"],
+      "then": ["output renders a summary catalogue under ## Available context specs"]
     },
     {
       "requirement": "Output",
-      "name": "JSON output — all specs have mode full and source includePattern",
-      "given": ["GetProjectContext operates without a change"],
-      "when": ["specd project context is called with --format json"],
-      "then": ["all spec entries have mode: 'full' and source: 'includePattern'"]
+      "name": "Text output — list mode renders list entries",
+      "given": ["GetProjectContext returns list-mode specs"],
+      "when": ["specd project context --format text is called"],
+      "then": ["output renders list entries under ## Available context specs"]
+    },
+    {
+      "requirement": "Output",
+      "name": "JSON output — structured spec entries with mode",
+      "given": ["GetProjectContext returns structured entries"],
+      "when": ["specd project context --format json is called"],
+      "then": ["JSON includes each entry mode and the fields allowed by that mode"]
     },
     {
       "requirement": "Output",
@@ -199,8 +167,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:f100a7e0ff4836d75b18d50a615e61beea3f24d89e63083a4ff26c307d7bf679",
-    "verify.md": "sha256:0a227c7b8620e6ca238446cc242208e8f3f7417f2fcccaeb78fc8dbc25d73051"
+    "spec.md": "sha256:18a0424aa351b2008472c04fe45454ced90d33fc78619c85015aa1feb157150a",
+    "verify.md": "sha256:eaa5a35a9f63ac83fbfc57d0169a04b1cb1c2967d96d7a9043e67bc0818f6cdf"
   },
   "generatedBy": "core"
 }

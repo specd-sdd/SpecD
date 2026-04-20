@@ -26,14 +26,15 @@ When none of `--rules`, `--constraints`, or `--scenarios` are passed, all availa
 
 ### Requirement: Behaviour
 
-The command compiles the project-level context: the `context:` entries and the specs matched by the **project-level** `contextIncludeSpecs`/`contextExcludeSpecs` patterns only. Workspace-level patterns are not applied — those are conditional on a specific change having that workspace active. No `dependsOn` traversal is performed — that requires a change.
+The command compiles the project-level context: the `context:` entries and the specs matched by the **project-level** `contextIncludeSpecs`/`contextExcludeSpecs` patterns only. Workspace-level patterns are not applied — those are conditional on a specific change having that workspace active.
 
 Concretely:
 
 1. Project `context:` entries from `specd.yaml` are rendered (instruction text verbatim, file entries read from disk)
 2. Project-level `contextIncludeSpecs` patterns are applied across all workspaces (defaults to `['default:*']` when not declared)
 3. Project-level `contextExcludeSpecs` patterns are applied to remove specs from the set
-4. The metadata or fallback content of each included spec is rendered, using the same fresh-metadata / metadataExtraction-fallback logic as `CompileContext`
+4. Optional `dependsOn` traversal is applied only when `--follow-deps` is present
+5. The collected specs are rendered according to the configured `contextMode`
 
 ### Requirement: Output
 
@@ -42,31 +43,15 @@ The CLI MUST assemble the final output from the structured `GetProjectContextRes
 **In `text` mode** (default):
 
 1. Project context entries are rendered first, each preceded by its source label. Entries are separated by `---`.
-2. Spec content follows under a `## Spec content` header. Each spec is rendered under a `### Spec: <specId>` heading with its full content.
+2. Spec entries follow:
+   - Full entries are rendered under `## Spec content` with complete content.
+   - Summary entries are rendered under `## Available context specs` with spec ID, title, and description.
+   - List entries are rendered under `## Available context specs` with spec ID only plus an explicit list-mode label.
 3. If nothing is configured (no `context:` entries and no specs matched), the command prints `no project context configured` and exits with code 0.
 
-Since `GetProjectContext` always returns all specs in `full` mode (no change context means no tier classification), the text output format is unchanged from the current behaviour — all specs are rendered with full content.
+Section flags apply only to full entries. In `list` and `summary` modes, the output remains list/summary shaped even when `--rules`, `--constraints`, or `--scenarios` are passed.
 
-**In `json` or `toon` mode**, the output is:
-
-```json
-{
-  "contextEntries": ["...", "..."],
-  "specs": [
-    {
-      "specId": "default:_global/architecture",
-      "title": "Architecture",
-      "description": "...",
-      "source": "includePattern",
-      "mode": "full",
-      "content": "..."
-    }
-  ],
-  "warnings": []
-}
-```
-
-where `contextEntries` are the rendered project `context:` entries, `specs` are the matched specs with their structured entry data (always `mode: 'full'`), and `warnings` lists any advisory conditions.
+**In `json` or `toon` mode**, the output includes `contextEntries`, `specs`, and `warnings`. Spec entry fields vary by mode using the shared context entry shape: list entries omit title/description/content, summary entries omit content, and full entries include content.
 
 ### Requirement: Warnings
 
@@ -83,7 +68,8 @@ Any advisory conditions (missing `file:` entries, stale metadata, unknown worksp
 - Only project-level `contextIncludeSpecs`/`contextExcludeSpecs` patterns are applied; workspace-level patterns are change-specific and not applied here
 - `dependsOn` traversal is opt-in via `--follow-deps`; without the flag, deps are not followed
 - `--depth` without `--follow-deps` is a CLI usage error (exit code 1)
-- Section flags (`--rules`, `--constraints`, `--scenarios`) only filter spec content; project `context:` entries are always rendered in full regardless of section flags
+- Section flags (`--rules`, `--constraints`, `--scenarios`) only filter full-mode spec content; project `context:` entries are always rendered in full regardless of section flags
+- Section flags have no effect in `list` or `summary` modes
 
 ## Examples
 

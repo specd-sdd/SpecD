@@ -458,8 +458,11 @@ describe('project context', () => {
       contextEntries: ['You are working on specd.'],
       specs: [
         {
-          workspace: 'default',
-          path: 'arch/overview',
+          specId: 'default:arch/overview',
+          title: 'Architecture overview',
+          description: 'Overview',
+          source: 'includePattern' as const,
+          mode: 'full' as const,
           content: '### Spec: default:arch/overview\n\n**Description:** Overview',
         },
       ],
@@ -473,7 +476,7 @@ describe('project context', () => {
     const out = stdout()
     expect(out).toContain('You are working on specd.')
     expect(out).toContain('## Spec content')
-    expect(out).toContain('arch/overview')
+    expect(out).toContain('default:arch/overview')
   })
 
   it('emits warnings to stderr', async () => {
@@ -499,7 +502,14 @@ describe('project context', () => {
     kernel.project.getProjectContext.execute.mockResolvedValue({
       contextEntries: ['Follow conventions.'],
       specs: [
-        { workspace: 'default', path: 'arch/overview', content: '### Spec: default:arch/overview' },
+        {
+          specId: 'default:arch/overview',
+          title: 'Architecture overview',
+          description: 'Overview',
+          source: 'includePattern' as const,
+          mode: 'full' as const,
+          content: '### Spec: default:arch/overview',
+        },
       ],
       warnings: [],
     })
@@ -546,7 +556,16 @@ describe('project context', () => {
     const { kernel, stdout } = setup()
     kernel.project.getProjectContext.execute.mockResolvedValue({
       contextEntries: ['You are working on specd.'],
-      specs: [{ workspace: 'default', path: 'arch/overview', content: '...' }],
+      specs: [
+        {
+          specId: 'default:arch/overview',
+          title: 'Architecture overview',
+          description: 'Overview',
+          source: 'includePattern' as const,
+          mode: 'full' as const,
+          content: '...',
+        },
+      ],
       warnings: [],
     })
 
@@ -558,8 +577,8 @@ describe('project context', () => {
     expect(Array.isArray(parsed.contextEntries)).toBe(true)
     expect(parsed.contextEntries[0]).toBe('You are working on specd.')
     expect(Array.isArray(parsed.specs)).toBe(true)
-    expect(parsed.specs[0].workspace).toBe('default')
-    expect(parsed.specs[0].path).toBe('arch/overview')
+    expect(parsed.specs[0].specId).toBe('default:arch/overview')
+    expect(parsed.specs[0].mode).toBe('full')
     expect(Array.isArray(parsed.warnings)).toBe(true)
   })
 })

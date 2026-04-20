@@ -4,107 +4,83 @@
 
 ### Requirement: Context spec collection
 
-#### Scenario: Project-level include applied regardless of active workspace
+#### Scenario: includeChangeSpecs false skips direct change spec seed
 
-- **GIVEN** a project-level `contextIncludeSpecs` pattern that matches specs in multiple workspaces
-- **WHEN** `CompileContext.execute` is called for a specific workspace
-- **THEN** all specs matching the project-level pattern are included regardless of the active workspace
+- **GIVEN** a change with `specIds: ["core:core/config"]`
+- **AND** `core:core/config` is not matched by include patterns and not discovered via traversal
+- **WHEN** `CompileContext.execute` is called with `includeChangeSpecs: false`
+- **THEN** `core:core/config` is not included solely because it is in `change.specIds`
 
-#### Scenario: Workspace-level include applied only for active workspace
+#### Scenario: includeChangeSpecs true keeps direct change spec even if excluded
 
-- **GIVEN** `billing` workspace declares `contextIncludeSpecs: ['*']`
-- **AND** the current change has no spec in the `billing` workspace
+- **GIVEN** a change with `specIds: ["core:core/config"]`
+- **AND** an exclude pattern matches `core:core/config`
+- **WHEN** `CompileContext.execute` is called with `includeChangeSpecs: true`
+- **THEN** `core:core/config` remains in the collected set as a mandatory direct seed
+
+#### Scenario: includeChangeSpecs false allows reinjection through include patterns
+
+- **GIVEN** a change with `specIds: ["core:core/config"]`
+- **AND** project include patterns match `core:core/config`
+- **WHEN** `CompileContext.execute` is called with `includeChangeSpecs: false`
+- **THEN** `core:core/config` is still included through include-pattern collection
+
+#### Scenario: includeChangeSpecs false allows reinjection through traversal
+
+- **GIVEN** a change with `specIds: ["core:core/config"]`
+- **AND** another spec in traversal depends on `core:core/config`
+- **WHEN** `CompileContext.execute` is called with `includeChangeSpecs: false` and `followDeps: true`
+- **THEN** `core:core/config` is included through `dependsOn` traversal
+
+### Requirement: Context display modes
+
+#### Scenario: Summary mode is the default when contextMode is omitted
+
+- **GIVEN** `contextMode` is not declared in config
 - **WHEN** `CompileContext.execute` is called
-- **THEN** no `billing` specs are included via workspace-level patterns
+- **THEN** collected specs are emitted in summary mode unless another mode is explicitly requested
 
-#### Scenario: Project-level exclude removes spec before workspace patterns are applied
+#### Scenario: List mode emits list entries only
 
-- **GIVEN** `contextIncludeSpecs: ['default:*']` and `contextExcludeSpecs: ['default:drafts/*']`
-- **AND** `default:drafts/old-spec` was matched by the project-level include
-- **WHEN** `CompileContext.execute` applies step 2 (project-level exclude)
-- **THEN** `default:drafts/old-spec` is removed before workspace-level patterns are evaluated
-
-#### Scenario: Workspace-level exclude removes spec after workspace include
-
-- **GIVEN** `default` workspace declares `contextIncludeSpecs: ['*']` and `contextExcludeSpecs: ['internal/*']`
-- **AND** `default` is active and `default:internal/notes` was added by the workspace include (step 3)
-- **WHEN** `CompileContext.execute` applies step 4 (workspace-level exclude)
-- **THEN** `default:internal/notes` is removed from the context set
-
-#### Scenario: change specId survives matching exclude rules
-
-- **GIVEN** `change.specIds: ['default:auth/login']`
-- **AND** project-level or workspace-level exclude patterns also match `default:auth/login`
-- **WHEN** `CompileContext.execute` applies the collection pipeline
-- **THEN** `default:auth/login` remains in the collected set because change-scoped spec IDs are mandatory context members
-
-#### Scenario: specDependsOn value is seeded even without pattern matches
-
-- **GIVEN** `change.specDependsOn: { 'default:auth/login': ['default:auth/shared'] }`
-- **AND** `default:auth/shared` is not matched by any include pattern
-- **WHEN** `CompileContext.execute` is called without `followDeps`
-- **THEN** `default:auth/shared` is still included in the collected set as a seeded `specDependsOn` entry
-
-#### Scenario: dependsOn traversal adds specs beyond include set
-
-- **GIVEN** `change.specIds: ['default:auth/login']`
-- **AND** `auth/login` metadata declares `dependsOn: ['auth/jwt']`
-- **AND** `auth/jwt` was not matched by any include pattern
-- **WHEN** `CompileContext.execute` applies step 5 with `followDeps: true`
-- **THEN** `auth/jwt` is added to the context set
-
-#### Scenario: dependsOn spec not removed by exclude
-
-- **GIVEN** `contextExcludeSpecs: ['default:auth/*']`
-- **AND** `auth/jwt` is added via `dependsOn` traversal (step 5)
+- **GIVEN** `contextMode: "list"`
 - **WHEN** `CompileContext.execute` is called
-- **THEN** `auth/jwt` is not excluded — `dependsOn` traversal specs are immune to exclude rules
+- **THEN** every emitted spec entry has `mode: "list"`
+- **AND** no emitted entry contains full content
 
-#### Scenario: Spec appears only once even if seeded and matched multiple times
+#### Scenario: Summary mode emits summary entries only
 
-- **GIVEN** `change.specIds: ['default:auth/login']`
-- **AND** `contextIncludeSpecs: ['auth/login', 'auth/*']` also matches `default:auth/login`
-- **AND** `change.specDependsOn: { 'default:auth/login': ['default:auth/shared'] }`
-- **AND** `default:auth/shared` is also discovered later via `dependsOn` traversal
+- **GIVEN** `contextMode: "summary"`
 - **WHEN** `CompileContext.execute` is called
-- **THEN** each collected spec appears exactly once at the earliest qualifying position in the final `specs` array
+- **THEN** every emitted spec entry has `mode: "summary"`
+- **AND** no emitted entry contains full content
 
-### Requirement: Tier classification
+#### Scenario: Full mode emits full entries only
 
-#### Scenario: Lazy mode — specIds specs are tier 1 full
-
-- **GIVEN** `config.contextMode: 'lazy'`
-- **AND** a spec appears in `change.specIds`
+- **GIVEN** `contextMode: "full"`
 - **WHEN** `CompileContext.execute` is called
-- **THEN** that spec is emitted with `mode: 'full'`
+- **THEN** every emitted spec entry has `mode: "full"`
+- **AND** each emitted entry contains renderable content
 
-#### Scenario: Lazy mode — specDependsOn specs are seeded but summary
+#### Scenario: Hybrid mode renders direct change specs in full
 
-- **GIVEN** `config.contextMode: 'lazy'`
-- **AND** `change.specDependsOn: { 'default:auth/login': ['default:auth/shared'] }`
+- **GIVEN** `contextMode: "hybrid"`
+- **AND** `includeChangeSpecs: true`
+- **AND** a spec is in `change.specIds`
 - **WHEN** `CompileContext.execute` is called
-- **THEN** `default:auth/shared` is emitted with `source: 'specDependsOn'`
-- **AND** `mode: 'summary'`
+- **THEN** that spec is emitted in full mode
 
-#### Scenario: Lazy mode — include pattern specs are tier 2 summary
+#### Scenario: Hybrid mode renders non-direct specs as summary
 
-- **GIVEN** `config.contextMode: 'lazy'`
-- **AND** a spec is matched only by include patterns
+- **GIVEN** `contextMode: "hybrid"`
+- **AND** a spec is collected from include patterns or traversal and is not a direct included change spec
 - **WHEN** `CompileContext.execute` is called
-- **THEN** that spec is emitted with `mode: 'summary'`
+- **THEN** that spec is emitted in summary mode
 
-#### Scenario: Lazy mode — dependsOn traversal specs are tier 2 summary
+#### Scenario: Section flags do not affect list and summary entries
 
-- **GIVEN** `config.contextMode: 'lazy'`
-- **AND** a spec is discovered only through `dependsOn` traversal
-- **WHEN** `CompileContext.execute` is called
-- **THEN** that spec is emitted with `mode: 'summary'`
-
-#### Scenario: Full mode — all collected specs are tier 1 full
-
-- **GIVEN** `config.contextMode: 'full'`
-- **WHEN** `CompileContext.execute` is called
-- **THEN** every collected spec is emitted with `mode: 'full'`
+- **GIVEN** `contextMode: "list"` or `contextMode: "summary"`
+- **WHEN** `CompileContext.execute` is called with section filters
+- **THEN** emitted entries remain list/summary shaped without full content blocks
 
 ### Requirement: Cycle detection during dependsOn traversal
 
@@ -172,111 +148,29 @@
 
 ### Requirement: Structured result assembly
 
-#### Scenario: instruction entry in projectContext array
-
-- **GIVEN** `config.context: [{ instruction: "Always prefer editing existing files." }]`
-- **WHEN** `CompileContext.execute` is called
-- **THEN** `result.projectContext` contains an entry with `source: 'instruction'` and `content: "Always prefer editing existing files."`
-
-#### Scenario: file entry read via FileReader into projectContext
-
-- **GIVEN** `config.context: [{ file: "specd-bootstrap.md" }]`
-- **AND** `FileReader.read("specd-bootstrap.md")` returns `"# specd Bootstrap"`
-- **WHEN** `CompileContext.execute` is called
-- **THEN** `result.projectContext` contains an entry with `source: 'file'`, `path: "specd-bootstrap.md"`, and `content: "# specd Bootstrap"`
-
-#### Scenario: missing file entry emits a warning
-
-- **GIVEN** `config.context: [{ file: "does-not-exist.md" }]`
-- **AND** `FileReader.read("does-not-exist.md")` returns `null`
-- **WHEN** `CompileContext.execute` is called
-- **THEN** a warning is emitted identifying the missing file, the entry is absent from `projectContext`, and no error is thrown
-
-#### Scenario: multiple context entries preserve declaration order
-
-- **GIVEN** `config.context: [{ file: AGENTS.md }, { instruction: "Inline note." }, { file: specd-bootstrap.md }]`
-- **WHEN** `CompileContext.execute` is called
-- **THEN** `result.projectContext` contains entries in order: AGENTS.md file, instruction, specd-bootstrap.md file
-
 #### Scenario: availableSteps includes all workflow steps
 
-- **GIVEN** the schema declares workflow steps `['designing', 'ready', 'implementing', 'verifying', 'archiving']`
 - **WHEN** `CompileContext.execute` is called
-- **THEN** `result.availableSteps` contains an entry for each step with `available` and `blockingArtifacts`
+- **THEN** `availableSteps` includes all steps from the active schema workflow
 
-#### Scenario: Specs preserve change-scoped seed ordering ahead of discovered context
+#### Scenario: List-mode structured entry omits summary and content fields
 
-- **GIVEN** `change.specIds: ['default:auth/login']`
-- **AND** `change.specDependsOn: { 'default:auth/login': ['default:auth/shared'] }`
-- **AND** include patterns add `default:_global/architecture`
-- **AND** `dependsOn` traversal later discovers `default:auth/jwt`
-- **WHEN** `CompileContext.execute` assembles `result.specs`
-- **THEN** the entries appear in order: `default:auth/login`, `default:auth/shared`, `default:_global/architecture`, `default:auth/jwt`
-
-#### Scenario: spec source priority — specIds wins over includePattern
-
-- **GIVEN** `change.specIds: ['default:auth/login']`
-- **AND** `contextIncludeSpecs: ['default:*']` also matches `default:auth/login`
+- **GIVEN** `contextMode: "list"`
 - **WHEN** `CompileContext.execute` is called
-- **THEN** the spec entry for `default:auth/login` has `source: 'specIds'`, not `'includePattern'`
+- **THEN** each list entry includes `specId`, `source`, and `mode`
+- **AND** list entries omit full content
 
-#### Scenario: spec source priority — specDependsOn wins over dependsOnTraversal
+#### Scenario: Summary-mode structured entry omits content
 
-- **GIVEN** `change.specDependsOn: { 'default:auth/login': ['default:auth/shared'] }`
-- **AND** `default:auth/shared` is also discovered via dependsOn metadata traversal
+- **GIVEN** `contextMode: "summary"`
 - **WHEN** `CompileContext.execute` is called
-- **THEN** the spec entry for `default:auth/shared` has `source: 'specDependsOn'`, not `'dependsOnTraversal'`
+- **THEN** each summary entry omits full content
 
-#### Scenario: No artifact instructions in the result
+#### Scenario: Full-mode structured entry includes content
 
-- **GIVEN** the schema declares `artifacts[spec].instruction: 'Create specifications...'`
+- **GIVEN** `contextMode: "full"`
 - **WHEN** `CompileContext.execute` is called
-- **THEN** the result does not include the artifact instruction — artifact instructions are retrieved via `GetArtifactInstruction`
-
-#### Scenario: No instruction hooks in the result
-
-- **GIVEN** `workflow.archiving.hooks.pre` contains `{ instruction: 'Review delta specs' }`
-- **WHEN** `CompileContext.execute` is called with `step: 'archiving'`
-- **THEN** the result does not include `Review delta specs` — instruction hooks are retrieved via `GetHookInstructions`
-
-#### Scenario: metadataExtraction used as fallback for stale/absent metadata
-
-- **GIVEN** a spec is in the context set with stale or absent metadata
-- **AND** the schema declares `metadataExtraction` rules
-- **WHEN** `CompileContext.execute` is called
-- **THEN** the spec entry's `content` is produced via extraction and a staleness warning is emitted
-
-#### Scenario: Full rendering shows all spec-scoped artifacts in stable order
-
-- **GIVEN** a full-mode spec has spec-scoped artifacts `verify.md`, `spec.md`, and `examples.md`
-- **WHEN** `CompileContext.execute` is called without `sections`
-- **THEN** the rendered `content` includes all three files
-- **AND** `spec.md` appears first
-- **AND** the remaining files appear in alphabetical order
-
-#### Scenario: Full rendering does not depend on spec.md existing
-
-- **GIVEN** a full-mode spec has spec-scoped artifacts `verify.md` and `examples.md` but no `spec.md`
-- **WHEN** `CompileContext.execute` is called without `sections`
-- **THEN** the rendered `content` includes both files
-- **AND** they appear in alphabetical order
-
-#### Scenario: Merged preview content uses the same file ordering
-
-- **GIVEN** a spec in `change.specIds` has merged preview files from `PreviewSpec`
-- **AND** those files include `verify.md`, `spec.md`, and `examples.md`
-- **WHEN** `CompileContext.execute` is called without `sections`
-- **THEN** the rendered merged `content` includes all preview files
-- **AND** `spec.md` appears first
-- **AND** the remaining merged files appear in alphabetical order
-
-#### Scenario: Section filtering on merged preview derives content from merged artifacts
-
-- **GIVEN** a spec in `change.specIds` has merged preview artifacts whose merged `verify.md` adds a new scenario
-- **AND** `CompileContext.execute` is called with `sections: ['scenarios']`
-- **WHEN** the full spec entry is rendered
-- **THEN** the rendered `content` includes the scenario extracted from the merged preview artifacts
-- **AND** it does not fall back to a raw single-file preview body
+- **THEN** each full entry includes content
 
 ### Requirement: Missing spec IDs emit a warning
 
@@ -415,8 +309,8 @@
 - **THEN** `PreviewSpec` is NOT called for `default:_global/architecture`
 - **AND** `default:_global/architecture` content is rendered from its base (metadata or fallback)
 
-#### Scenario: Summary-mode specs not previewed
+#### Scenario: Non-full specs are not previewed
 
-- **GIVEN** `contextMode: 'lazy'` and a spec matched only via include pattern (tier 2 summary)
+- **GIVEN** `contextMode: "summary"` and a spec matched only via include pattern
 - **WHEN** `CompileContext.execute` is called
-- **THEN** `PreviewSpec` is NOT called for that spec — summary specs have no content to merge
+- **THEN** `PreviewSpec` is NOT called for that spec — non-full specs have no merged content to render

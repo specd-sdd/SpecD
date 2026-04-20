@@ -9,10 +9,16 @@
 - **WHEN** `execute` is called with `{ config: { context: [], contextIncludeSpecs: [] } }`
 - **THEN** the call succeeds and returns a result with empty `contextEntries`, `specs`, and `warnings`
 
-#### Scenario: All optional fields provided
+#### Scenario: Full optional input supported
 
 - **WHEN** `execute` is called with `followDeps: true`, `depth: 2`, and `sections: ["rules"]`
 - **THEN** the call succeeds and respects all optional parameters
+
+#### Scenario: Sections only affect full-mode rendering
+
+- **GIVEN** `contextMode` resolves to `list` or `summary`
+- **WHEN** `execute` is called with section filters
+- **THEN** emitted entries remain list/summary shaped without full content sections
 
 ### Requirement: Returns GetProjectContextResult on success
 
@@ -20,19 +26,25 @@
 
 - **GIVEN** project-level include patterns match specs
 - **WHEN** `GetProjectContext.execute` is called
-- **THEN** `result.specs` is an array of `ContextSpecEntry` objects with `specId`, `title`, `description`, `source`, `mode`, and `content`
+- **THEN** `result.specs` is an array of context entries with `specId`, `source`, and `mode`
 
-#### Scenario: All specs are full mode without a change
+#### Scenario: Summary mode emits summary entries
 
-- **GIVEN** no active change (project context only)
+- **GIVEN** `contextMode: "summary"`
 - **WHEN** `GetProjectContext.execute` is called
-- **THEN** all entries in `result.specs` have `mode: 'full'` and `source: 'includePattern'`
+- **THEN** all emitted spec entries use summary mode
 
-#### Scenario: Spec entries include title and description
+#### Scenario: List mode emits list entries
 
-- **GIVEN** `default:_global/architecture` has metadata with `title: 'Architecture'` and `description: 'Defines the hexagonal architecture...'`
-- **WHEN** `GetProjectContext.execute` is called and includes this spec
-- **THEN** the spec entry has `title: 'Architecture'` and `description: 'Defines the hexagonal architecture...'`
+- **GIVEN** `contextMode: "list"`
+- **WHEN** `GetProjectContext.execute` is called
+- **THEN** all emitted spec entries use list mode
+
+#### Scenario: Full and hybrid modes emit full entries in project context
+
+- **GIVEN** `contextMode: "full"` or `contextMode: "hybrid"`
+- **WHEN** `GetProjectContext.execute` is called
+- **THEN** all emitted spec entries use full mode
 
 ### Requirement: Resolves schema before processing
 
@@ -126,17 +138,25 @@
 
 ### Requirement: Renders spec content from metadata when fresh
 
-#### Scenario: Fresh metadata rendered with all sections
+#### Scenario: Fresh metadata rendered with all sections in full mode
 
 - **GIVEN** a spec has fresh `.specd-metadata.yaml` with description, rules, constraints, and scenarios
+- **AND** the effective display mode is full
 - **WHEN** `execute` is called without `sections` filter
-- **THEN** the spec's `content` includes all four sections
+- **THEN** the spec entry includes all four sections
 
-#### Scenario: Sections filter restricts output
+#### Scenario: Sections filter restricts full output
 
 - **GIVEN** a spec has fresh metadata with rules and scenarios
+- **AND** the effective display mode is full
 - **WHEN** `execute` is called with `sections: ["rules"]`
-- **THEN** the spec's `content` includes rules but not scenarios or description
+- **THEN** the spec entry includes rules but not scenarios or description
+
+#### Scenario: Sections filter does not change summary output
+
+- **GIVEN** a spec is rendered in summary mode
+- **WHEN** `execute` is called with section filters
+- **THEN** the summary output stays unchanged
 
 ### Requirement: Falls back to extraction when metadata is stale or absent
 
