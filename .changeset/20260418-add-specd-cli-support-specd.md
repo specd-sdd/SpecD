@@ -1,6 +1,5 @@
 ---
-specd: patch
-opencode: patch
+'@specd/specd': patch
 ---
 
 Add `Bash(specd *)` to frontmatter allowed-tools and add specd graph support.

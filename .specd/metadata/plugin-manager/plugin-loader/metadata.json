@@ -75,8 +75,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:72f5155c9a0ada294bb0e52789179748ddab82fc30d40d285c529cd1326ba72a",
-    "verify.md": "sha256:84bff3033b44f3f094ee706809b20768402aaaccca52547473bcc729806a5770"
+    "spec.md": "sha256:823f245feddf88664a82f1ab19c71f33c618da3e7d89433772d00daae3087eec",
+    "verify.md": "sha256:67d9d74cea183daace569fa3bc32d494f96b3eb886aa75842a85ec6b5df88db0"
   },
   "generatedBy": "core"
 }
