@@ -14,5 +14,6 @@
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true
-  }
+  },
+  "exclude": ["dev/scripts", "**/dist/**", "**/build/**", "**/node_modules/**", "**/.turbo/**"]
 }
