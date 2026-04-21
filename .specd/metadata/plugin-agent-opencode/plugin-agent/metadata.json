@@ -8,12 +8,14 @@
   "rules": [
     {
       "requirement": "Factory export",
-      "rules": ["The package MUST export `create(): AgentPlugin` as a named export."]
+      "rules": [
+        "The package MUST export `create(): AgentPlugin` as a named export.\n\nThe factory function MUST read `specd-plugin.json` at the infrastructure boundary to obtain `name` and `version`. It MUST search for the manifest in its own directory first, then the parent directory as fallback — this works both in development (source tree) and after build/publish (`dist/` with manifest at package root). The `type` field MUST remain hardcoded as `'agent'`."
+      ]
     },
     {
       "requirement": "Domain layer",
       "rules": [
-        "The domain layer MUST define:\n\n- a plugin runtime type implementing the `AgentPlugin` contract\n- an Open Code frontmatter type reflecting the supported Open Code keys\n- a per-skill frontmatter map keyed by skill name"
+        "The domain layer MUST define:\n\n- a plugin runtime type implementing the `AgentPlugin` contract, receiving `name` and `version` via constructor (not hardcoded)\n- an Open Code frontmatter type reflecting the supported Open Code keys\n- a per-skill frontmatter map keyed by skill name\n\nThe plugin class constructor MUST accept `name` and `version` as parameters. The `type` getter MUST return `'agent'` (hardcoded)."
       ]
     },
     {
@@ -62,7 +64,9 @@
   "constraints": [
     "The plugin MUST depend on @specd/skills for skill repository access.",
     "The plugin MUST implement the AgentPlugin contract defined by @specd/plugin-manager.",
-    "The plugin MUST remain an adapter package with no domain logic outside plugin orchestration concerns."
+    "The plugin MUST remain an adapter package with no domain logic outside plugin orchestration concerns.",
+    "name and version MUST be read from specd-plugin.json by the factory and passed to the plugin constructor — never hardcoded in the class.",
+    "type MUST remain hardcoded as 'agent' for type safety."
   ],
   "scenarios": [
     {
@@ -75,11 +79,28 @@
       ]
     },
     {
+      "requirement": "Factory export",
+      "name": "Factory reads manifest for name and version",
+      "given": [
+        "specd-plugin.json contains name: \"@specd/plugin-agent-opencode\" and version: \"1.0.0\""
+      ],
+      "when": ["create() is called"],
+      "then": [
+        "the returned plugin has name === \"@specd/plugin-agent-opencode\" and version === \"1.0.0\""
+      ]
+    },
+    {
+      "requirement": "Factory export",
+      "name": "Type is hardcoded",
+      "when": ["create() is called"],
+      "then": ["the returned plugin has type === 'agent'"]
+    },
+    {
       "requirement": "Domain layer",
       "name": "Domain contract defines runtime and frontmatter types",
       "when": ["domain types are inspected"],
       "then": [
-        "a plugin runtime type implementing AgentPlugin is defined",
+        "a plugin runtime type implementing AgentPlugin is defined, receiving name and version via constructor",
         "AND an Open Code frontmatter type is defined with supported keys",
         "AND a per-skill frontmatter map keyed by skill name is defined"
       ]
@@ -146,8 +167,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:d08027c368d79b9f421b8db1a6be29bb3855fdc3c8063cc14a8f8b4c92541e57",
-    "verify.md": "sha256:b37b23191915af5859cfac153e16b437e390383ba3a83b59199b67b464507d41"
+    "spec.md": "sha256:1395c6f6b30200d96149556c04105a5e5ef56a1992058cffa7ec890b71e45e59",
+    "verify.md": "sha256:043a2b8df95674f9804ecbcad06854c650e9a508cd9eb33c8aab97ab4d8e06fb"
   },
   "generatedBy": "core"
 }

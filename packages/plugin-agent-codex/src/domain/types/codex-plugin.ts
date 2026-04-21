@@ -25,33 +25,31 @@ export class CodexAgentPlugin implements AgentPlugin {
   /**
    * Creates a Codex plugin runtime.
    *
+   * @param pluginName - Plugin name from manifest.
+   * @param pluginVersion - Plugin version from manifest.
    * @param runInstall - Install operation injected by composition.
    * @param runUninstall - Uninstall operation injected by composition.
    */
   constructor(
+    private readonly pluginName: string,
+    private readonly pluginVersion: string,
     private readonly runInstall: InstallOperation,
     private readonly runUninstall: UninstallOperation,
   ) {}
 
-  /**
-   * Plugin package name.
-   */
+  /** Plugin name from manifest. */
   get name(): string {
-    return '@specd/plugin-agent-codex'
+    return this.pluginName
   }
 
-  /**
-   * Fixed plugin type.
-   */
+  /** Plugin type (always 'agent'). */
   get type(): 'agent' {
     return 'agent'
   }
 
-  /**
-   * Plugin version.
-   */
+  /** Plugin version from manifest. */
   get version(): string {
-    return '0.0.1'
+    return this.pluginVersion
   }
 
   /**

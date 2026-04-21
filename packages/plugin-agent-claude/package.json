@@ -5,7 +5,8 @@
   "private": false,
   "repository": "https://github.com/specd-sdd/specd",
   "files": [
-    "dist/"
+    "dist/",
+    "specd-plugin.json"
   ],
   "type": "module",
   "exports": {
@@ -15,7 +16,7 @@
     }
   },
   "scripts": {
-    "build": "tsup src/index.ts --format esm --dts --clean",
+    "build": "node --import tsx ../../dev/scripts/sync-plugin-manifests.ts packages/plugin-agent-claude && tsup src/index.ts --format esm --dts --clean",
     "dev": "tsup src/index.ts --format esm --dts --watch",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"

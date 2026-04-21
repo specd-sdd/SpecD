@@ -65,20 +65,57 @@ describe('createPluginLoader', () => {
     }
   })
 
-  it('given invalid manifest, when load is called, then throws PluginValidationError', async () => {
+  it('given manifest without version, when load is called, then throws PluginValidationError', async () => {
     const projectRoot = await createTempProjectRoot()
     try {
       await createLocalPackage(
         projectRoot,
-        '@local/invalid-manifest-plugin',
-        "export function create() { return { name: '@local/invalid-manifest-plugin' } }",
-        { schemaVersion: 1, name: '@local/invalid-manifest-plugin' },
+        '@local/missing-version-plugin',
+        "export function create() { return { name: '@local/missing-version-plugin' } }",
+        { schemaVersion: 1, name: '@local/missing-version-plugin', pluginType: 'agent' },
       )
 
       const loader = createPluginLoader({ projectRoot })
-      await expect(loader.load('@local/invalid-manifest-plugin')).rejects.toBeInstanceOf(
+      await expect(loader.load('@local/missing-version-plugin')).rejects.toBeInstanceOf(
         PluginValidationError,
       )
+    } finally {
+      await rm(projectRoot, { recursive: true, force: true })
+    }
+  })
+
+  it('given manifest with version, when load is called, then loads successfully', async () => {
+    const projectRoot = await createTempProjectRoot()
+    try {
+      await createLocalPackage(
+        projectRoot,
+        '@local/valid-version-plugin',
+        `export function create() {
+          return {
+            name: '@local/valid-version-plugin',
+            type: 'agent',
+            version: '1.0.0',
+            configSchema: {},
+            async init() {},
+            async destroy() {},
+            async install() { return { installed: [], skipped: [] } },
+            async uninstall() {}
+          }
+        }`,
+        {
+          schemaVersion: 1,
+          name: '@local/valid-version-plugin',
+          version: '1.0.0',
+          pluginType: 'agent',
+          minCoreVersion: '*',
+        },
+      )
+
+      const loader = createPluginLoader({ projectRoot })
+      const plugin = await loader.load('@local/valid-version-plugin')
+
+      expect(plugin.name).toBe('@local/valid-version-plugin')
+      expect(plugin.type).toBe('agent')
     } finally {
       await rm(projectRoot, { recursive: true, force: true })
     }
@@ -129,6 +166,7 @@ describe('createPluginLoader', () => {
         {
           schemaVersion: 1,
           name: '@local/valid-agent-plugin',
+          version: '1.0.0',
           pluginType: 'agent',
           minCoreVersion: '*',
         },

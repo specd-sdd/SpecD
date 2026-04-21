@@ -8,12 +8,14 @@
   "rules": [
     {
       "requirement": "Factory export",
-      "rules": ["The package MUST export `create(): AgentPlugin` as default or named export."]
+      "rules": [
+        "The package MUST export `create(): AgentPlugin` as default or named export.\n\nThe factory function MUST read `specd-plugin.json` at the infrastructure boundary to obtain `name` and `version`. It MUST search for the manifest in its own directory first, then the parent directory as fallback — this works both in development (source tree) and after build/publish (`dist/` with manifest at package root). The `type` field MUST remain hardcoded as `'agent'`."
+      ]
     },
     {
       "requirement": "Plugin runtime contract",
       "rules": [
-        "The implementation MUST return a valid `AgentPlugin` that:\n\n- has `type: 'agent'`\n- has a concrete package name and version\n- implements `install(projectRoot, options)` and `uninstall(projectRoot, options)` with real filesystem behavior\n- uses a stable frontmatter model for generated skill files"
+        "The implementation MUST return a valid `AgentPlugin` that:\n\n- has `type: 'agent'` (hardcoded for type safety)\n- has `name` and `version` sourced from `specd-plugin.json` via the factory — not hardcoded in the class\n- implements `install(projectRoot, options)` and `uninstall(projectRoot, options)` with real filesystem behavior\n- uses a stable frontmatter model for generated skill files"
       ]
     },
     {
@@ -37,7 +39,9 @@
   ],
   "constraints": [
     "The plugin MUST depend on @specd/skills for skill operations.",
-    "The plugin MUST implement concrete install and uninstall behavior."
+    "The plugin MUST implement concrete install and uninstall behavior.",
+    "name and version MUST be read from specd-plugin.json by the factory and passed to the plugin constructor — never hardcoded in the class.",
+    "type MUST remain hardcoded as 'agent' for type safety."
   ],
   "scenarios": [
     {
@@ -47,11 +51,29 @@
       "then": ["create() is available and returns an AgentPlugin"]
     },
     {
+      "requirement": "Factory export",
+      "name": "Factory reads manifest for name and version",
+      "given": [
+        "specd-plugin.json contains name: \"@specd/plugin-agent-copilot\" and version: \"1.0.0\""
+      ],
+      "when": ["create() is called"],
+      "then": [
+        "the returned plugin has name === \"@specd/plugin-agent-copilot\" and version === \"1.0.0\""
+      ]
+    },
+    {
+      "requirement": "Factory export",
+      "name": "Type is hardcoded",
+      "when": ["create() is called"],
+      "then": ["the returned plugin has type === 'agent'"]
+    },
+    {
       "requirement": "Plugin runtime contract",
       "name": "Created plugin satisfies runtime contract",
       "when": ["create() is called"],
       "then": [
-        "the returned plugin has type: 'agent', package name, and package version",
+        "the returned plugin has type: 'agent' (hardcoded)",
+        "AND the returned plugin has name and version sourced from specd-plugin.json",
         "AND the returned plugin exposes install(projectRoot, options) and uninstall(projectRoot, options) functions"
       ]
     },
@@ -83,8 +105,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:ce08d74463e90ece79211b0c2285b38a8136e2791cb74e0df3bb90890b61000c",
-    "verify.md": "sha256:8f1f75644a88f38f7b648a5e54a8ddb068fe08fe7b98b355ab40b22221e1aef4"
+    "spec.md": "sha256:eb1cc73de7dab0b860bcbc46dbbff6468442ad099a0122e696cae3a69e7577bf",
+    "verify.md": "sha256:09c668eb96f9f0bcc2e94d3714a782903bc7fa5701362be8a0d822debe7139fd"
   },
   "generatedBy": "core"
 }

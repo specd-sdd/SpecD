@@ -26,6 +26,7 @@ export interface PluginLoaderOptions {
 const manifestSchema = z.object({
   schemaVersion: z.number().int().min(1),
   name: z.string().min(1),
+  version: z.string().min(1),
   pluginType: z.enum(['agent']),
   minCoreVersion: z.string().default('*'),
   description: z.string().optional(),

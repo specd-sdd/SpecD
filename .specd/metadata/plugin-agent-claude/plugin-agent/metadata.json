@@ -8,12 +8,14 @@
   "rules": [
     {
       "requirement": "Factory export",
-      "rules": ["The package MUST export `create(): AgentPlugin` as default or named export."]
+      "rules": [
+        "The package MUST export `create(): AgentPlugin` as default or named export.\n\nThe factory function MUST read `specd-plugin.json` at the infrastructure boundary to obtain `name` and `version`. It MUST search for the manifest in its own directory first, then the parent directory as fallback — this works both in development (source tree) and after build/publish (`dist/` with manifest at package root). The `type` field MUST remain hardcoded as `'agent'`."
+      ]
     },
     {
       "requirement": "Domain layer",
       "rules": [
-        "The domain layer MUST contain:\n\n- `claude-plugin.ts` — implementation of `AgentPlugin` interface\n- `frontmatter.ts` — Frontmatter type definitions\n- `frontmatter/` — skill metadata map (`skillFrontmatter: Record<string, Frontmatter>`)"
+        "The domain layer MUST contain:\n\n- `claude-plugin.ts` — implementation of `AgentPlugin` interface, receiving `name` and `version` via constructor (not hardcoded)\n- `frontmatter.ts` — Frontmatter type definitions\n- `frontmatter/` — skill metadata map (`skillFrontmatter: Record<string, Frontmatter>`)\n\nThe plugin class constructor MUST accept `name` and `version` as parameters. The `type` getter MUST return `'agent'` (hardcoded)."
       ]
     },
     {
@@ -39,13 +41,34 @@
       "rules": ["Skills MUST be installed to `.claude/skills/` in the project root."]
     }
   ],
-  "constraints": ["This plugin depends on @specd/skills for skill operations."],
+  "constraints": [
+    "This plugin depends on @specd/skills for skill operations.",
+    "name and version MUST be read from specd-plugin.json by the factory and passed to the plugin constructor — never hardcoded in the class.",
+    "type MUST remain hardcoded as 'agent' for type safety."
+  ],
   "scenarios": [
     {
       "requirement": "Factory export",
       "name": "Exports create function",
       "when": ["the package is imported"],
       "then": ["it exports create(): AgentPlugin"]
+    },
+    {
+      "requirement": "Factory export",
+      "name": "Factory reads manifest for name and version",
+      "given": [
+        "specd-plugin.json contains name: \"@specd/plugin-agent-claude\" and version: \"1.0.0\""
+      ],
+      "when": ["create() is called"],
+      "then": [
+        "the returned plugin has name === \"@specd/plugin-agent-claude\" and version === \"1.0.0\""
+      ]
+    },
+    {
+      "requirement": "Factory export",
+      "name": "Type is hardcoded",
+      "when": ["create() is called"],
+      "then": ["the returned plugin has type === 'agent'"]
     },
     {
       "requirement": "Frontmatter injection",
@@ -61,8 +84,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:1ab21ad6d4ad42ebe70693271b2fc3c3ef734c2b5fa10a6707232b903f07c1c5",
-    "verify.md": "sha256:4b558ac30eae20126a3d561652a47152e0a50861c03f6b68494445690a81c420"
+    "spec.md": "sha256:62ff8f9d8188c90c7f8662e7f7cedb217cd04309085f4082fe773aae733f4b2c",
+    "verify.md": "sha256:d1af5bc0abde7b13c80ba6a269934e49d5de9c93d2580fbe9ccbf95af2e8bfe7"
   },
   "generatedBy": "core"
 }
