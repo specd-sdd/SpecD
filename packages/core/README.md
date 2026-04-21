@@ -14,7 +14,7 @@ pnpm add @specd/core
 
 | Concept    | Description                                                                                                                                                                    |
 | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Change** | An in-progress spec change moving through a schema-defined lifecycle (e.g. `in-progress` → `spec-approved` → `signed-off`).                                                    |
+| **Change** | An in-progress spec change moving through a schema-defined lifecycle (e.g. `drafting` → `designing` → `implementing` ⇄ `verifying` → `done`).                                  |
 | **Spec**   | A directory of artifact files that defines one capability (e.g. `default:auth/oauth`).                                                                                         |
 | **Schema** | A YAML file that declares artifact types, workflow steps, hooks, validation rules, and extraction rules for a project.                                                         |
 | **Kernel** | A fully-wired set of use cases constructed from a resolved `SpecdConfig`. The recommended way to consume the library.                                                          |
