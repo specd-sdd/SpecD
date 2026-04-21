@@ -1,5 +1,11 @@
 # @specd/schema-std
 
+## 0.1.0
+
+### Minor Changes
+
+- f9b34f8: Bump version. First package release
+
 ## 0.0.2
 
 ### Patch Changes

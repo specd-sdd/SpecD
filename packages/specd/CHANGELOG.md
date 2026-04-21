@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.1
+
+### Patch Changes
+
+- Updated dependencies [f9b34f8]
+  - @specd/schema-std@0.1.0
+  - @specd/cli@0.1.1
+
 ## 0.1.0
 
 ### Minor Changes
