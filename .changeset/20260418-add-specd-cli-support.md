@@ -1,6 +1,6 @@
 ---
-@specd/plugin-agent-claude: patch
-@specd/skills: patch
+'@specd/plugin-agent-claude': patch
+'@specd/skills': patch
 ---
 
 Add `Bash(specd *)` to frontmatter allowed-tools and add specd graph support.
