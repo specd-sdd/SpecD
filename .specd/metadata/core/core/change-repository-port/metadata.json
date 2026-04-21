@@ -99,7 +99,6 @@
     {
       "requirement": "scaffold creates artifact directories",
       "rules": [
-        "### Requirement: scaffold creates artifact directories",
         "`scaffold(change, specExists)` MUST create the directory structure needed for the change's\nartifacts. For `scope: spec` artifacts, it creates `specs/<ws>/<capPath>/` or\n`deltas/<ws>/<capPath>/` directories under the change directory. For `scope: change`\nartifacts, the root directory already exists. The `specExists` callback is an async function\nthat returns whether a spec already exists in the repository, used to determine whether\nto create spec-scoped or delta-scoped directories."
       ]
     },
@@ -112,7 +111,6 @@
     {
       "requirement": "Abstract class with abstract methods",
       "rules": [
-        "### Requirement: Abstract class with abstract methods",
         "`ChangeRepository` MUST be defined as an `abstract class`, not an `interface`. All storage\noperations (`get`, `list`, `listDrafts`, `listDiscarded`, `save`, `delete`, `artifact`,\n`saveArtifact`, `artifactExists`, `deltaExists`, `changePath`, `scaffold`, `unscaffold`)\nMUST be declared as `abstract` methods. This follows the architecture spec requirement that\nports with shared construction are abstract classes."
       ]
     }
@@ -377,7 +375,7 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:546bdfc375020cf952af4172bb9b079a413ce94249e8e694386662ef0471fb73",
+    "spec.md": "sha256:3a4f9ea6c266f61a5f6a5a5ba0c572390203192641a2b9d94a9376a8e1fa59c5",
     "verify.md": "sha256:b45e7a7e29a6a6d6570a9019167bcd0c6a2f083add37f2ff40cad9f60dc144cb"
   },
   "generatedBy": "core"

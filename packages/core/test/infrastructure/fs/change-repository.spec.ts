@@ -20,6 +20,7 @@ const actor: ActorIdentity = { name: 'Alice', email: 'alice@example.com' }
 interface RepoContext {
   repo: FsChangeRepository
   tmpDir: string
+  configPath: string
   changesPath: string
   draftsPath: string
   discardedPath: string
@@ -30,20 +31,23 @@ async function setupRepo(): Promise<RepoContext> {
   const changesPath = path.join(tmpDir, 'changes')
   const draftsPath = path.join(tmpDir, 'drafts')
   const discardedPath = path.join(tmpDir, 'discarded')
+  const configPath = path.join(tmpDir, 'config')
   await fs.mkdir(changesPath, { recursive: true })
   await fs.mkdir(draftsPath, { recursive: true })
   await fs.mkdir(discardedPath, { recursive: true })
+  await fs.mkdir(configPath, { recursive: true })
 
   const repo = new FsChangeRepository({
     workspace: 'default',
     ownership: 'owned',
     isExternal: false,
+    configPath,
     changesPath,
     draftsPath,
     discardedPath,
   })
 
-  return { repo, tmpDir, changesPath, draftsPath, discardedPath }
+  return { repo, tmpDir, configPath, changesPath, draftsPath, discardedPath }
 }
 
 async function cleanupRepo(ctx: RepoContext): Promise<void> {
@@ -290,7 +294,7 @@ describe('FsChangeRepository', () => {
       const change = makeChange('add-auth')
       await ctx.repo.save(change)
 
-      const lockDir = path.join(ctx.tmpDir, 'change-locks', 'add-auth.lock')
+      const lockDir = path.join(ctx.configPath, 'tmp', 'change-locks', 'add-auth.lock')
       await fs.mkdir(lockDir, { recursive: true })
       await fs.writeFile(
         path.join(lockDir, 'owner.json'),
@@ -843,6 +847,7 @@ describe('FsChangeRepository', () => {
         workspace: 'default',
         ownership: 'owned',
         isExternal: false,
+        configPath: '/test',
         changesPath: path.join(basePath, 'changes'),
         draftsPath: path.join(basePath, 'drafts'),
         discardedPath: path.join(basePath, 'discarded'),
@@ -948,6 +953,7 @@ describe('FsChangeRepository', () => {
         workspace: 'default',
         ownership: 'owned',
         isExternal: false,
+        configPath: '/test',
         changesPath: path.join(basePath, 'changes'),
         draftsPath: path.join(basePath, 'drafts'),
         discardedPath: path.join(basePath, 'discarded'),

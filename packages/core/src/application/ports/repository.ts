@@ -20,6 +20,12 @@ export interface RepositoryConfig {
    * the local filesystem.
    */
   readonly isExternal: boolean
+  /**
+   * Absolute path to the config directory.
+   *
+   * Used for derived paths such as change locks, graph persistence, etc.
+   */
+  readonly configPath: string
 }
 
 /**
@@ -33,16 +39,18 @@ export abstract class Repository {
   private readonly _workspace: string
   private readonly _ownership: 'owned' | 'shared' | 'readOnly'
   private readonly _isExternal: boolean
+  private readonly _configPath: string
 
   /**
    * Creates a new `Repository` instance.
    *
-   * @param config - Workspace, ownership, and locality configuration for this repository
+   * @param config - Workspace, ownership, locality, and config path for this repository
    */
   constructor(config: RepositoryConfig) {
     this._workspace = config.workspace
     this._ownership = config.ownership
     this._isExternal = config.isExternal
+    this._configPath = config.configPath
   }
 
   /**
@@ -70,5 +78,14 @@ export abstract class Repository {
    */
   isExternal(): boolean {
     return this._isExternal
+  }
+
+  /**
+   * Returns the absolute path to the config directory.
+   *
+   * @returns The config path (e.g. `/project/.specd/config`)
+   */
+  configPath(): string {
+    return this._configPath
   }
 }

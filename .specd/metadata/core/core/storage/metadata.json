@@ -71,6 +71,12 @@
       "rules": [
         "The format of `manifest.json` — its fields, event shapes, and schema version behavior — is defined in [`specs/core/change-manifest/spec.md`](../change-manifest/spec.md). `FsChangeRepository` reads and writes the manifest according to that format and must write it atomically (temp file + rename) to prevent partial reads."
       ]
+    },
+    {
+      "requirement": "Change locks directory placement",
+      "rules": [
+        "The `FsChangeRepository` implementation derives its change lock directory path internally\nfrom the `configPath` field: `{configPath}/tmp/change-locks`. This directory is distinct\nfrom the changes storage root and allows per-change lock files to be co-located with\nother config-scoped temporary artifacts.\n\nThe `configPath` field is part of the `ChangeRepositoryConfig` port contract, provided\nat construction time. The repository derives the locks directory internally as\n`path.join(configPath, 'tmp', 'change-locks')`."
+      ]
     }
   ],
   "constraints": [
@@ -271,11 +277,38 @@
       "then": [
         "manifest.json contains the fields and structure defined in the change-manifest spec"
       ]
+    },
+    {
+      "requirement": "Change locks directory placement",
+      "name": "Locks derived from configPath field",
+      "given": ["ChangeRepositoryConfig includes configPath: /project/.specd/config"],
+      "when": ["a change lock is acquired"],
+      "then": ["the lock file is created under /project/.specd/config/tmp/change-locks/"]
+    },
+    {
+      "requirement": "Change locks directory placement",
+      "name": "Default configPath",
+      "given": [
+        "specd.yaml without explicit configPath",
+        "AND config loader defaults to .specd/config"
+      ],
+      "when": ["FsChangeRepository is composed"],
+      "then": ["locks resolve to {configPath}/tmp/change-locks"]
+    },
+    {
+      "requirement": "Change locks directory placement",
+      "name": "Locks separated from changes storage",
+      "given": ["storage.changes.path: .specd/changes", "AND configPath: .specd/config (default)"],
+      "when": ["locks are acquired"],
+      "then": [
+        "lock files are under .specd/config/tmp/change-locks/",
+        "AND not under .specd/changes/"
+      ]
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:339024c45bef3bed54df513f5ad63f926bd6903fa4ef88cc81a9b60e4ae557d4",
-    "verify.md": "sha256:3c2c783958565220339bca71d52581ea591f407ccddcb812d469991cd5433cee"
+    "spec.md": "sha256:091310f9e99fbff04600246f78abb923a18212673a80e2ef16a4212ee4392bbe",
+    "verify.md": "sha256:db4f07da318763e33aa3329a8f3988c4624b3ccc805ba0cb14a1103b21bbd5cc"
   },
   "generatedBy": "core"
 }

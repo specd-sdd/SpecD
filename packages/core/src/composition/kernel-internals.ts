@@ -321,6 +321,7 @@ export async function createKernelInternals(
     workspace: defaultWs.name,
     ownership: defaultWs.ownership,
     isExternal: defaultWs.isExternal,
+    configPath: config.configPath,
   }
 
   const nodeModulesPaths = [
@@ -352,7 +353,12 @@ export async function createKernelInternals(
     specs.set(
       ws.name,
       specFactory.create(
-        { workspace: ws.name, ownership: ws.ownership, isExternal: ws.isExternal },
+        {
+          workspace: ws.name,
+          ownership: ws.ownership,
+          isExternal: ws.isExternal,
+          configPath: config.configPath,
+        },
         {
           ...ws.specsAdapter.config,
           metadataPath,
@@ -374,7 +380,12 @@ export async function createKernelInternals(
       schemaRepositories.set(
         ws.name,
         schemaFactory.create(
-          { workspace: ws.name, ownership: ws.ownership, isExternal: ws.isExternal },
+          {
+            workspace: ws.name,
+            ownership: ws.ownership,
+            isExternal: ws.isExternal,
+            configPath: config.configPath,
+          },
           ws.schemasAdapter.config,
         ),
       )

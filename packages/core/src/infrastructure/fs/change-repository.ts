@@ -108,7 +108,7 @@ export class FsChangeRepository extends ChangeRepository {
     this._changesPath = config.changesPath
     this._draftsPath = config.draftsPath
     this._discardedPath = config.discardedPath
-    this._locksPath = path.join(path.dirname(this._changesPath), 'change-locks')
+    this._locksPath = path.join(config.configPath, 'tmp', 'change-locks')
     this._artifactTypes = config.artifactTypes ?? []
     this._resolveArtifactTypes = config.resolveArtifactTypes
     this._artifactTypesResolved =

@@ -9,7 +9,8 @@
     {
       "requirement": "RepositoryConfig shape",
       "rules": [
-        "`Repository` is constructed from a `RepositoryConfig` object:\n\n```typescript\ninterface RepositoryConfig {\n  readonly workspace: string\n  readonly ownership: 'owned' | 'shared' | 'readOnly'\n  readonly isExternal: boolean\n}\n```\n\n- `workspace` — the workspace name this repository is bound to (e.g. `\"default\"`, `\"billing\"`)\n- `ownership` — the ownership level declared in `specd.yaml`:\n  - `owned` — full control, no restrictions\n  - `shared` — writes allowed but recorded in the change manifest as `touchedSharedSpecs`\n  - `readOnly` — no writes allowed; data may only be read\n- `isExternal` — whether this repository points to data outside the current git repository. External repositories may not be accessible to agents restricted to the git root."
+        "`Repository` is constructed from a `RepositoryConfig` object:\n\n```typescript\ninterface RepositoryConfig {\n  readonly workspace: string\n  readonly ownership: 'owned' | 'shared' | 'readOnly'\n  readonly isExternal: boolean\n}\n```\n\n- `workspace` — the workspace name this repository is bound to (e.g. `\"default\"`, `\"billing\"`)\n- `ownership` — the ownership level declared in `specd.yaml`:\n  - `owned` — full control, no restrictions\n  - `shared` — writes allowed but recorded in the change manifest as `touchedSharedSpecs`\n  - `readOnly` — no writes allowed; data may only be read\n- `isExternal` — whether this repository points to data outside the current git repository. External repositories may not be accessible to agents restricted to the git root.",
+        "`Repository` is constructed from a `RepositoryConfig` object:\n\n```typescript\ninterface RepositoryConfig {\n  readonly workspace: string\n  readonly ownership: 'owned' | 'shared' | 'readOnly'\n  readonly isExternal: boolean\n  readonly configPath: string\n}\n```\n\n- `workspace` — the workspace name this repository is bound to (e.g. `\"default\"`, `\"billing\"`)\n- `ownership` — the ownership level declared in `specd.yaml`:\n  - `owned` — full control, no restrictions\n  - `shared` — writes allowed but recorded in the change manifest as `touchedSharedSpecs`\n  - `readOnly` — no writes allowed; data may only be read\n- `isExternal` — whether this repository points to data outside the current git repository\n- `configPath` — absolute path to the config directory, used for derived paths (e.g. change locks)"
       ]
     },
     {
@@ -82,11 +83,20 @@
       ],
       "when": ["ReadOnlyWorkspaceError is constructed with that message"],
       "then": ["error.message equals the provided message"]
+    },
+    {
+      "requirement": "RepositoryConfig shape",
+      "name": "RepositoryConfig includes configPath",
+      "given": [
+        "a repository constructed with { workspace: \"default\", ownership: \"owned\", isExternal: false, configPath: \"/project/.specd/config\" }"
+      ],
+      "when": ["the repository is instantiated"],
+      "then": ["construction succeeds without error"]
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:d10763da75620b581e613d90a203eddfb907247f9b951c09a9ad756124243b3a",
-    "verify.md": "sha256:621d3a442f47a8b360d4649135dc1f97c9c5545445210d71314327aef9c46f3d"
+    "spec.md": "sha256:8b5304bc2d4432301c0b6455bc7bd26d99f3417b99d6154fa98c97ef2e49ee3c",
+    "verify.md": "sha256:741a220ef0ecfe766a265a3ea59747b0dfc21a9f5f68a09f850fa0fb41ff06f7"
   },
   "generatedBy": "core"
 }

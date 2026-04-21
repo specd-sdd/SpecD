@@ -14,6 +14,8 @@ export interface ArchiveRepositoryContext {
   readonly ownership: 'owned' | 'shared' | 'readOnly'
   /** Whether this repository points to data outside the current git root. */
   readonly isExternal: boolean
+  /** Absolute path to the config directory. */
+  readonly configPath: string
 }
 
 /**
@@ -58,6 +60,7 @@ export function createArchiveRepository(
         workspace: context.workspace,
         ownership: context.ownership,
         isExternal: context.isExternal,
+        configPath: context.configPath,
         changesPath: options.changesPath,
         draftsPath: options.draftsPath,
         archivePath: options.archivePath,

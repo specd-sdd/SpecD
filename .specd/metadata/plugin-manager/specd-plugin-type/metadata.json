@@ -9,7 +9,7 @@
     {
       "requirement": "PluginType",
       "rules": [
-        "The spec MUST define a runtime const array of known plugin types and derive the `PluginType` union from it:\n\n```typescript\nexport const PLUGIN_TYPES = ['agent'] as const\nexport type PluginType = typeof PLUGIN_TYPES[number]\n```\n\nAdding a new plugin type requires only adding a string to the `PLUGIN_TYPES` array — both compile-time type and runtime validation update automatically."
+        "The spec MUST define a runtime const array of known plugin types and derive the `PluginType` union from it:\n\n```typescript\nexport const PLUGIN_TYPES = ['agent'] as const\nexport type PluginType = (typeof PLUGIN_TYPES)[number]\n```\n\nAdding a new plugin type requires only adding a string to the `PLUGIN_TYPES` array — both compile-time type and runtime validation update automatically."
       ]
     },
     {
@@ -65,7 +65,7 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:195934cb7fd4272808d0461494c1047afe1d78bedf2a255193ae28a6d05b4c47",
+    "spec.md": "sha256:89ef969f556548c7fc45be170bf320e4ca5bbf84238a836315c7eedbd2f53237",
     "verify.md": "sha256:2c63caf062762f0a1fd7764df03150bb5afc4f3d1c366d99cf5896c03111e641"
   },
   "generatedBy": "core"
