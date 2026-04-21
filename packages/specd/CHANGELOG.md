@@ -1,5 +1,220 @@
 # Changelog
 
+## 0.1.0
+
+### Minor Changes
+
+- 7ac27d1: 20260418- - plugin-system-phase-1: Phase 1 introduces the plugin-based agent architecture and migrates the CLI and core flows from skills-manifest management to plugin lifecycle management. It adds the plugin-manager package, agent plugin packages (Claude/Copilot/Codex), canonical skills template/repository infrastructure, and new plugins install/list/show/update/uninstall command flows, including project init/update integration. The change also updates documentation, hooks, tests, and config persistence so plugin declarations in specd.yaml become the authoritative installation source.
+
+  Modified packages:
+  - @specd/cli
+  - @specd/core
+  - @specd/plugin-agent-claude
+  - @specd/plugin-agent-copilot
+  - @specd/plugin-agent-codex
+  - @specd/plugin-manager
+  - @specd/skills
+
+  Specs affected:
+  - `cli:cli/plugins-install`
+  - `cli:cli/plugins-list`
+  - `cli:cli/plugins-show`
+  - `cli:cli/plugins-update`
+  - `core:core/config`
+  - `core:core/config-writer-port`
+  - `cli:cli/project-init`
+  - `cli:cli/project-update`
+  - `cli:cli/plugins-uninstall`
+  - `plugin-agent-claude:plugin-agent`
+  - `plugin-agent-copilot:plugin-agent`
+  - `plugin-agent-codex:plugin-agent`
+  - `plugin-manager:install-plugin-use-case`
+  - `plugin-manager:uninstall-plugin-use-case`
+  - `plugin-manager:update-plugin-use-case`
+  - `plugin-manager:list-plugins-use-case`
+  - `plugin-manager:load-plugin-use-case`
+  - `plugin-manager:plugin-repository-port`
+  - `plugin-manager:specd-plugin-type`
+  - `plugin-manager:agent-plugin-type`
+  - `plugin-manager:plugin-errors`
+  - `plugin-manager:plugin-loader`
+  - `skills:skill`
+  - `skills:skill-bundle`
+  - `skills:skill-repository`
+  - `skills:list-skills`
+  - `skills:get-skill`
+  - `skills:resolve-bundle`
+  - `skills:skill-repository-port`
+  - `skills:skill-repository-infra`
+  - `skills:skill-templates-source`
+
+- 9225d20: 20260421 - complete-agent-plugins-codex-copilot-open-code: Replace stub Codex and Copilot agent plugins with real install/uninstall behavior at parity with Claude, create a new Open Code plugin package following the same architecture, update CLI wizard and metapackage wiring, and expand the skills template source spec to cover all four runtimes' frontmatter contracts.
+
+  Modified packages:
+  - @specd/plugin-agent-codex
+  - @specd/plugin-agent-copilot
+  - @specd/skills
+  - @specd/cli
+
+  Specs affected:
+  - `plugin-agent-codex:plugin-agent`
+  - `plugin-agent-copilot:plugin-agent`
+  - `skills:skill-templates-source`
+  - `plugin-agent-opencode:plugin-agent`
+  - `cli:cli/project-init`
+  - `specd:meta-package`
+
+### Patch Changes
+
+- 4b28916: 20260417- - change-edit-description: Implements the --description option in the specd change edit command, which was documented in the spec but never implemented. Adds description field to EditChangeInput, updateDescription() method to the Change entity, and modifies EditChange.execute() to persist the description without invalidating the change.
+
+  Modified packages:
+  - @specd/cli
+  - @specd/core
+
+  Specs affected:
+  - `cli:cli/change-edit`
+  - `core:core/edit-change`
+  - `core:core/change`
+
+- 026650f: 20260418- - add-archived-name-template-variable: Formalize change.archivedName as an officially supported template variable for archived-change flows (post-archive hooks, changeset generation). Updates run-step-hooks and template-variables specs to document the variable contract.
+
+  Modified packages:
+  - @specd/core
+
+  Specs affected:
+  - `core:core/run-step-hooks`
+  - `core:core/template-variables`
+
+- 58c75d9: Add `Bash(specd *)` to frontmatter allowed-tools and add specd graph support.
+  - Add `Bash(specd *)` to all .opencode/skills SKILL.md frontmatter
+  - Use specd CLI commands for code analysis:
+    - `specd spec list` and `specd spec show` for reading specs
+    - `specd graph search`, `specd graph impact`, `specd graph stats` for code analysis
+  - Add guardrails to specd and specd-new skills preventing code writes
+  - Update single spec mode to use `workspace:path` format instead of `specs/` paths
+
+- 58f8092: 20260418- - fix-metadata-workspace-prefix: Fix metadata storage path to include workspace name — metadata should be stored at .specd/metadata/<workspace>/<prefix>/<spec> not just .specd/metadata/<prefix>/<spec>
+
+  Modified packages:
+  - @specd/core
+
+  Specs affected:
+  - `core:core/spec-metadata`
+
+- 99f23ff: 20260418 - fix-spec-overlap-conflict: Fixes corrupted manifest error when reading changes with `spec-overlap-conflict` invalidation cause. The `INVALIDATED_CAUSES` array in `change-repository.ts` was missing the `'spec-overlap-conflict'` value, causing `change list` and other commands to fail with "Corrupted manifest: invalid invalidated cause in manifest". Also updates the `core:core/change` spec documentation to include `spec-overlap-conflict` in the list of valid invalidation causes.
+
+  Modified packages:
+  - @specd/core
+
+  Specs affected:
+  - `core:core/change`
+
+- 7942039: 20260418- - remove-archived-change-workspace: Remove redundant workspace field from ArchivedChange entity and archive index
+
+  Modified packages:
+  - @specd/core
+
+  Specs affected:
+  - `core:core/archive-change`
+
+- f70f882: 20260419- - refactor-async-spec-reference-resolution: This change refactors spec-reference normalization so metadata extraction can use repository-backed resolution asynchronously without coupling to filesystem-specific path math. It updates the extraction pipeline to await transform callbacks end-to-end and injects a shared cross-workspace resolver runtime that normalizes escaped references like ../../\_global/architecture/spec.md to default:\_global/architecture. The same awaited resolver path is applied consistently across GenerateSpecMetadata and metadata-fallback flows used by compile-context, project-context, and artifact validation.
+
+  Modified packages:
+  - @specd/core
+
+  Specs affected:
+  - `core:core/content-extraction`
+  - `core:core/generate-metadata`
+  - `core:core/spec-repository-port`
+
+- 80dbaaf: 20260420 - context-display-mode-config: Add configurable context display modes (list, summary, full, hybrid) to replace lazy/full tier model
+
+  Modified packages:
+  - @specd/core
+  - @specd/cli
+
+  Specs affected:
+  - `core:core/compile-context`
+  - `core:core/config`
+  - `cli:cli/change-context`
+  - `core:core/get-project-context`
+  - `core:core/get-spec-context`
+  - `cli:cli/project-context`
+  - `cli:cli/spec-context`
+
+- 0109e6d: 20260420 - fix-agent-plugin-type-check: The `isAgentPlugin` type guard now validates that `plugin.type === 'agent'` in addition to checking for `install` and `uninstall` methods, ensuring runtime consistency with the `AgentPlugin` interface definition.
+
+  Modified packages:
+  - @specd/plugin-manager
+
+  Specs affected:
+  - `plugin-manager:plugin-loader`
+
+- 5215349: 20260420- - plugin-type-validation: Add plugin type validation to plugin-manager. Derive PluginType from PLUGIN_TYPES const array, add isSpecdPlugin and isAgentPlugin type guards to domain, and verify AgentPlugin in use cases before install/uninstall to prevent runtime errors with unknown plugin types.
+
+  Modified packages:
+  - @specd/plugin-manager
+
+  Specs affected:
+  - `plugin-manager:specd-plugin-type`
+  - `plugin-manager:agent-plugin-type`
+  - `plugin-manager:install-plugin-use-case`
+  - `plugin-manager:uninstall-plugin-use-case`
+  - `plugin-manager:update-plugin-use-case`
+  - `plugin-manager:plugin-loader`
+
+- 4dd5db8: 20260421 - move-change-locks-to-config-tmp: Move change lock directories under configPath/tmp instead of the storage root.
+
+  Modified packages:
+  - @specd/core
+
+  Specs affected:
+  - `core:core/change-repository-port`
+  - `core:core/storage`
+  - `core:core/config`
+  - `core:core/repository-port`
+
+- aa2e957: 20260421 - plugin-manifest-version: Add version field to plugin manifests, read version from manifest in plugin factories, remove hardcoded versions from plugin classes, add sync script to build pipeline
+
+  Modified packages:
+  - @specd/plugin-manager
+  - @specd/plugin-agent-claude
+  - @specd/plugin-agent-copilot
+  - @specd/plugin-agent-codex
+
+  Specs affected:
+  - `plugin-manager:plugin-loader`
+  - `plugin-manager:specd-plugin-type`
+  - `plugin-agent-claude:plugin-agent`
+  - `plugin-agent-copilot:plugin-agent`
+  - `plugin-agent-codex:plugin-agent`
+  - `plugin-agent-opencode:plugin-agent`
+
+- Updated dependencies [4b28916]
+- Updated dependencies [026650f]
+- Updated dependencies [58c75d9]
+- Updated dependencies [58f8092]
+- Updated dependencies [99f23ff]
+- Updated dependencies [7ac27d1]
+- Updated dependencies [7942039]
+- Updated dependencies [f70f882]
+- Updated dependencies [80dbaaf]
+- Updated dependencies [0109e6d]
+- Updated dependencies [5215349]
+- Updated dependencies [9225d20]
+- Updated dependencies [4dd5db8]
+- Updated dependencies [aa2e957]
+  - @specd/cli@0.1.0
+  - @specd/core@0.1.0
+  - @specd/plugin-agent-claude@0.1.0
+  - @specd/skills@0.1.0
+  - @specd/plugin-agent-copilot@0.1.0
+  - @specd/plugin-agent-codex@0.1.0
+  - @specd/plugin-manager@0.1.0
+  - @specd/code-graph@0.0.3
+  - @specd/plugin-agent-opencode@0.0.2
+
 # @specd/specd
 
 ## 0.0.2

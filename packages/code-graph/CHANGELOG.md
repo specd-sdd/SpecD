@@ -1,5 +1,20 @@
 # @specd/code-graph
 
+## 0.0.3
+
+### Patch Changes
+
+- Updated dependencies [4b28916]
+- Updated dependencies [026650f]
+- Updated dependencies [58f8092]
+- Updated dependencies [99f23ff]
+- Updated dependencies [7ac27d1]
+- Updated dependencies [7942039]
+- Updated dependencies [f70f882]
+- Updated dependencies [80dbaaf]
+- Updated dependencies [4dd5db8]
+  - @specd/core@0.1.0
+
 ## 0.0.2
 
 ### Patch Changes
