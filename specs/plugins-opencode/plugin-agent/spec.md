@@ -10,13 +10,17 @@ Open Code support is required to keep agent-plugin behavior consistent across th
 
 The package MUST export `create(): AgentPlugin` as a named export.
 
+The factory function MUST read `specd-plugin.json` at the infrastructure boundary to obtain `name` and `version`. It MUST search for the manifest in its own directory first, then the parent directory as fallback — this works both in development (source tree) and after build/publish (`dist/` with manifest at package root). The `type` field MUST remain hardcoded as `'agent'`.
+
 ### Requirement: Domain layer
 
 The domain layer MUST define:
 
-- a plugin runtime type implementing the `AgentPlugin` contract
+- a plugin runtime type implementing the `AgentPlugin` contract, receiving `name` and `version` via constructor (not hardcoded)
 - an Open Code frontmatter type reflecting the supported Open Code keys
 - a per-skill frontmatter map keyed by skill name
+
+The plugin class constructor MUST accept `name` and `version` as parameters. The `type` getter MUST return `'agent'` (hardcoded).
 
 ### Requirement: Frontmatter type contract
 
@@ -68,6 +72,8 @@ When `options.skills` is omitted, uninstall MUST remove the full `.opencode/skil
 - The plugin MUST depend on `@specd/skills` for skill repository access.
 - The plugin MUST implement the `AgentPlugin` contract defined by `@specd/plugin-manager`.
 - The plugin MUST remain an adapter package with no domain logic outside plugin orchestration concerns.
+- `name` and `version` MUST be read from `specd-plugin.json` by the factory and passed to the plugin constructor — never hardcoded in the class.
+- `type` MUST remain hardcoded as `'agent'` for type safety.
 
 ## Spec Dependencies
 

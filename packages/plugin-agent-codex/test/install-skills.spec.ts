@@ -43,7 +43,7 @@ describe('plugin-agent-codex create()', () => {
     const projectRoot = await createTempProjectRoot()
     try {
       const { create } = await import('../src/index.js')
-      const plugin = create()
+      const plugin = await create()
       const result = await plugin.install(projectRoot, { skills: ['specd'] })
 
       expect(result.installed.length).toBe(1)
@@ -67,7 +67,7 @@ describe('plugin-agent-codex create()', () => {
     const projectRoot = await createTempProjectRoot()
     try {
       const { create } = await import('../src/index.js')
-      const plugin = create()
+      const plugin = await create()
       const result = await plugin.install(projectRoot, { skills: ['specd-verify'] })
 
       expect(result.installed.map((entry) => entry.skill)).toEqual(['specd-verify'])
@@ -81,7 +81,7 @@ describe('plugin-agent-codex create()', () => {
     const projectRoot = await createTempProjectRoot()
     try {
       const { create } = await import('../src/index.js')
-      const plugin = create()
+      const plugin = await create()
       await plugin.install(projectRoot, { skills: ['specd', 'specd-verify'] })
       await plugin.uninstall(projectRoot, { skills: ['specd'] })
 
@@ -99,7 +99,7 @@ describe('plugin-agent-codex create()', () => {
     const projectRoot = await createTempProjectRoot()
     try {
       const { create } = await import('../src/index.js')
-      const plugin = create()
+      const plugin = await create()
       await plugin.install(projectRoot, { skills: ['specd'] })
       await plugin.uninstall(projectRoot)
 
@@ -113,7 +113,7 @@ describe('plugin-agent-codex create()', () => {
 
   it('returns a valid AgentPlugin with correct name and type', async () => {
     const { create } = await import('../src/index.js')
-    const plugin = create()
+    const plugin = await create()
     expect(plugin.name).toBe('@specd/plugin-agent-codex')
     expect(plugin.type).toBe('agent')
   })

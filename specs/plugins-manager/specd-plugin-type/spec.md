@@ -21,12 +21,14 @@ Adding a new plugin type requires only adding a string to the `PLUGIN_TYPES` arr
 
 All plugins MUST implement:
 
-- `name: string` — npm package name
-- `type: PluginType` — plugin type
-- `version: string` — semver version
+- `name: string` — plugin package name, sourced from the manifest at runtime
+- `type: PluginType` — plugin type, hardcoded in the plugin class for type safety
+- `version: string` — semver version, sourced from the manifest at runtime
 - `configSchema: Record<string, ConfigSchemaEntry>` — configuration schema
 - `init(context: PluginContext): Promise<void>` — initialization
 - `destroy(): Promise<void>` — cleanup
+
+Plugins MUST NOT hardcode `name` or `version` — these fields MUST be read from `specd-plugin.json` by the factory and passed to the plugin constructor. The `type` field MUST remain hardcoded to ensure compile-time type safety.
 
 ### Requirement: PluginContext
 
@@ -66,6 +68,8 @@ The `type` check against `PLUGIN_TYPES` ensures unknown plugin types are rejecte
 - Plugins are pure — no direct I/O in the interface.
 - The `init()` and `destroy()` methods handle lifecycle.
 - `PLUGIN_TYPES` is the single source of truth for known plugin types — both compile-time (`PluginType`) and runtime validation derive from it.
+- `name` and `version` MUST be sourced from `specd-plugin.json` at runtime, not hardcoded in plugin classes. The plugin factory (`create()`) reads the manifest and passes these values to the constructor.
+- `type` MUST remain hardcoded in the plugin class — reading it from the manifest would allow invalid types at runtime.
 
 ## Spec Dependencies
 

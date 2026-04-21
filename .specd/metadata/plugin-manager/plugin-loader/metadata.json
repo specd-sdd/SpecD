@@ -9,13 +9,13 @@
     {
       "requirement": "Load workflow",
       "rules": [
-        "The loader MUST:\n\n1. **Package availability**: The package must be in node\\_modules (installed via npm/pnpm or linked as workspace)\n2. **Resolve path**: Use `import.meta.resolve()` or `require.resolve()` to get package path\n3. **Read manifest**: Read `specd-plugin.json` (no import yet)\n4. **Validate manifest**: Validate with Zod schema\n5. **Dynamic import**: `import(name)` as ESM module\n6. **Factory call**: Call `create()` factory function\n7. **Validate interface**: Use `isSpecdPlugin` and `isAgentPlugin` from the domain layer to validate the returned object"
+        "The loader MUST:\n\n1. **Package availability**: The package must be in node\\_modules (installed via npm/pnpm or linked as workspace)\n2. **Resolve path**: Use `import.meta.resolve()` or `require.resolve()` to get package path\n3. **Read manifest**: Read `specd-plugin.json` from the package root\n4. **Validate manifest**: Validate with Zod schema (including `version` field)\n5. **Dynamic import**: `import(name)` as ESM module\n6. **Factory call**: Call `create()` factory function\n7. **Validate interface**: Use `isSpecdPlugin` and `isAgentPlugin` from the domain layer to validate the returned object"
       ]
     },
     {
       "requirement": "Manifest schema",
       "rules": [
-        "```typescript\nconst SpecdPluginManifestSchema = z.object({\n  schemaVersion: z.number().min(1),\n  name: z.string().min(1),\n  description: z.string().optional(),\n  pluginType: z.enum(['agent']),\n  minCoreVersion: z.string().default('*'),\n})\n```"
+        "```typescript\nconst SpecdPluginManifestSchema = z.object({\n  schemaVersion: z.number().min(1),\n  name: z.string().min(1),\n  version: z.string().min(1),\n  description: z.string().optional(),\n  pluginType: z.enum(['agent']),\n  minCoreVersion: z.string().default('*'),\n})\n```"
       ]
     },
     {
@@ -50,6 +50,13 @@
     },
     {
       "requirement": "Zod validation",
+      "name": "Manifest missing version",
+      "given": ["specd-plugin.json has no version field"],
+      "when": ["PluginLoader loads it"],
+      "then": ["PluginValidationError is thrown"]
+    },
+    {
+      "requirement": "Zod validation",
       "name": "Unknown plugin type rejected at runtime",
       "given": [
         "a plugin whose manifest declares pluginType: 'agent' but the runtime object's type is not in PLUGIN_TYPES"
@@ -68,8 +75,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:7ce83fb11d22b8db3baf62a96558d6205fde10552b33ef62fb24b724e585a6fb",
-    "verify.md": "sha256:80e1bc428fe70e3f0c01a9b73d2e4a6795624e7e60ce00b9e63d330b5accd78f"
+    "spec.md": "sha256:72f5155c9a0ada294bb0e52789179748ddab82fc30d40d285c529cd1326ba72a",
+    "verify.md": "sha256:84bff3033b44f3f094ee706809b20768402aaaccca52547473bcc729806a5770"
   },
   "generatedBy": "core"
 }

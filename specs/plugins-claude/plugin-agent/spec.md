@@ -10,13 +10,17 @@ Claude agent plugin implementation. Exports `create(): AgentPlugin` that provide
 
 The package MUST export `create(): AgentPlugin` as default or named export.
 
+The factory function MUST read `specd-plugin.json` at the infrastructure boundary to obtain `name` and `version`. It MUST search for the manifest in its own directory first, then the parent directory as fallback — this works both in development (source tree) and after build/publish (`dist/` with manifest at package root). The `type` field MUST remain hardcoded as `'agent'`.
+
 ### Requirement: Domain layer
 
 The domain layer MUST contain:
 
-- `claude-plugin.ts` — implementation of `AgentPlugin` interface
+- `claude-plugin.ts` — implementation of `AgentPlugin` interface, receiving `name` and `version` via constructor (not hardcoded)
 - `frontmatter.ts` — Frontmatter type definitions
 - `frontmatter/` — skill metadata map (`skillFrontmatter: Record<string, Frontmatter>`)
+
+The plugin class constructor MUST accept `name` and `version` as parameters. The `type` getter MUST return `'agent'` (hardcoded).
 
 ### Requirement: Frontmatter type
 
@@ -67,6 +71,8 @@ Skills MUST be installed to `.claude/skills/` in the project root.
 ## Constraints
 
 - This plugin depends on `@specd/skills` for skill operations.
+- `name` and `version` MUST be read from `specd-plugin.json` by the factory and passed to the plugin constructor — never hardcoded in the class.
+- `type` MUST remain hardcoded as `'agent'` for type safety.
 
 ## Spec Dependencies
 

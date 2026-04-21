@@ -18,6 +18,12 @@
 - **WHEN** PluginLoader loads it
 - **THEN** PluginValidationError is thrown
 
+#### Scenario: Manifest missing version
+
+- **GIVEN** specd-plugin.json has no `version` field
+- **WHEN** PluginLoader loads it
+- **THEN** PluginValidationError is thrown
+
 #### Scenario: Unknown plugin type rejected at runtime
 
 - **GIVEN** a plugin whose manifest declares `pluginType: 'agent'` but the runtime object's `type` is not in `PLUGIN_TYPES`

@@ -9,6 +9,18 @@
 - **WHEN** a SpecdPlugin is created
 - **THEN** it has `name`, `type`, `version`, `configSchema`, `init()`, and `destroy()`
 
+#### Scenario: Name and version sourced from manifest
+
+- **GIVEN** a plugin factory reads `specd-plugin.json` with `name: "my-plugin"` and `version: "1.2.3"`
+- **WHEN** the factory creates the plugin
+- **THEN** `plugin.name` is `"my-plugin"` and `plugin.version` is `"1.2.3"`
+
+#### Scenario: Type remains hardcoded
+
+- **GIVEN** a plugin factory creates an AgentPlugin
+- **WHEN** `plugin.type` is accessed
+- **THEN** it returns `'agent'` regardless of manifest content
+
 ### Requirement: isSpecdPlugin type guard
 
 #### Scenario: Rejects unknown plugin type

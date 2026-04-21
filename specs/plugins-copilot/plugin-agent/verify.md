@@ -9,12 +9,24 @@
 - **WHEN** plugin package exports are loaded
 - **THEN** `create()` is available and returns an `AgentPlugin`
 
+#### Scenario: Factory reads manifest for name and version
+
+- **GIVEN** `specd-plugin.json` contains `name: "@specd/plugin-agent-copilot"` and `version: "1.0.0"`
+- **WHEN** `create()` is called
+- **THEN** the returned plugin has `name === "@specd/plugin-agent-copilot"` and `version === "1.0.0"`
+
+#### Scenario: Type is hardcoded
+
+- **WHEN** `create()` is called
+- **THEN** the returned plugin has `type === 'agent'`
+
 ### Requirement: Plugin runtime contract
 
 #### Scenario: Created plugin satisfies runtime contract
 
 - **WHEN** `create()` is called
-- **THEN** the returned plugin has `type: 'agent'`, package name, and package version
+- **THEN** the returned plugin has `type: 'agent'` (hardcoded)
+- **AND** the returned plugin has `name` and `version` sourced from `specd-plugin.json`
 - **AND** the returned plugin exposes `install(projectRoot, options)` and `uninstall(projectRoot, options)` functions
 
 ### Requirement: Skill installation and frontmatter injection

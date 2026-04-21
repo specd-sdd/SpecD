@@ -43,7 +43,7 @@ describe('plugin-agent-claude create()', () => {
     const projectRoot = await createTempProjectRoot()
     try {
       const { create } = await import('../src/index.js')
-      const plugin = create()
+      const plugin = await create()
       const result = await plugin.install(projectRoot, { skills: ['specd'] })
 
       expect(result.installed.length).toBe(1)
@@ -65,7 +65,7 @@ describe('plugin-agent-claude create()', () => {
     const projectRoot = await createTempProjectRoot()
     try {
       const { create } = await import('../src/index.js')
-      const plugin = create()
+      const plugin = await create()
       const result = await plugin.install(projectRoot, { skills: ['specd-verify'] })
 
       expect(result.installed.map((entry) => entry.skill)).toEqual(['specd-verify'])

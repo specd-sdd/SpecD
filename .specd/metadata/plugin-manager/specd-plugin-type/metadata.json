@@ -15,7 +15,7 @@
     {
       "requirement": "SpecdPlugin interface",
       "rules": [
-        "All plugins MUST implement:\n\n- `name: string` — npm package name\n- `type: PluginType` — plugin type\n- `version: string` — semver version\n- `configSchema: Record<string, ConfigSchemaEntry>` — configuration schema\n- `init(context: PluginContext): Promise<void>` — initialization\n- `destroy(): Promise<void>` — cleanup"
+        "All plugins MUST implement:\n\n- `name: string` — plugin package name, sourced from the manifest at runtime\n- `type: PluginType` — plugin type, hardcoded in the plugin class for type safety\n- `version: string` — semver version, sourced from the manifest at runtime\n- `configSchema: Record<string, ConfigSchemaEntry>` — configuration schema\n- `init(context: PluginContext): Promise<void>` — initialization\n- `destroy(): Promise<void>` — cleanup\n\nPlugins MUST NOT hardcode `name` or `version` — these fields MUST be read from `specd-plugin.json` by the factory and passed to the plugin constructor. The `type` field MUST remain hardcoded to ensure compile-time type safety."
       ]
     },
     {
@@ -40,7 +40,9 @@
   "constraints": [
     "Plugins are pure — no direct I/O in the interface.",
     "The init() and destroy() methods handle lifecycle.",
-    "PLUGIN_TYPES is the single source of truth for known plugin types — both compile-time (PluginType) and runtime validation derive from it."
+    "PLUGIN_TYPES is the single source of truth for known plugin types — both compile-time (PluginType) and runtime validation derive from it.",
+    "name and version MUST be sourced from specd-plugin.json at runtime, not hardcoded in plugin classes. The plugin factory (create()) reads the manifest and passes these values to the constructor.",
+    "type MUST remain hardcoded in the plugin class — reading it from the manifest would allow invalid types at runtime."
   ],
   "scenarios": [
     {
@@ -48,6 +50,22 @@
       "name": "Has required properties",
       "when": ["a SpecdPlugin is created"],
       "then": ["it has name, type, version, configSchema, init(), and destroy()"]
+    },
+    {
+      "requirement": "SpecdPlugin interface",
+      "name": "Name and version sourced from manifest",
+      "given": [
+        "a plugin factory reads specd-plugin.json with name: \"my-plugin\" and version: \"1.2.3\""
+      ],
+      "when": ["the factory creates the plugin"],
+      "then": ["plugin.name is \"my-plugin\" and plugin.version is \"1.2.3\""]
+    },
+    {
+      "requirement": "SpecdPlugin interface",
+      "name": "Type remains hardcoded",
+      "given": ["a plugin factory creates an AgentPlugin"],
+      "when": ["plugin.type is accessed"],
+      "then": ["it returns 'agent' regardless of manifest content"]
     },
     {
       "requirement": "isSpecdPlugin type guard",
@@ -65,8 +83,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:89ef969f556548c7fc45be170bf320e4ca5bbf84238a836315c7eedbd2f53237",
-    "verify.md": "sha256:2c63caf062762f0a1fd7764df03150bb5afc4f3d1c366d99cf5896c03111e641"
+    "spec.md": "sha256:06c7fd16e972818a264aab0d5718d8bcc8b8e46e89f3828ad7fc37300114983f",
+    "verify.md": "sha256:38fff1cee8d596726ee88f4523a7a3f3a6a4e9c5296b7f0618600a465c0762b4"
   },
   "generatedBy": "core"
 }

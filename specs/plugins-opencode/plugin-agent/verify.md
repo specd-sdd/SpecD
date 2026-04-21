@@ -10,12 +10,23 @@
 - **THEN** a named `create()` export is available
 - **AND** calling `create()` returns an `AgentPlugin`
 
+#### Scenario: Factory reads manifest for name and version
+
+- **GIVEN** `specd-plugin.json` contains `name: "@specd/plugin-agent-opencode"` and `version: "1.0.0"`
+- **WHEN** `create()` is called
+- **THEN** the returned plugin has `name === "@specd/plugin-agent-opencode"` and `version === "1.0.0"`
+
+#### Scenario: Type is hardcoded
+
+- **WHEN** `create()` is called
+- **THEN** the returned plugin has `type === 'agent'`
+
 ### Requirement: Domain layer
 
 #### Scenario: Domain contract defines runtime and frontmatter types
 
 - **WHEN** domain types are inspected
-- **THEN** a plugin runtime type implementing `AgentPlugin` is defined
+- **THEN** a plugin runtime type implementing `AgentPlugin` is defined, receiving `name` and `version` via constructor
 - **AND** an Open Code frontmatter type is defined with supported keys
 - **AND** a per-skill frontmatter map keyed by skill name is defined
 

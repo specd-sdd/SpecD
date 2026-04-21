@@ -10,12 +10,14 @@ This spec defines the Codex agent plugin contract for install/uninstall behavior
 
 The package MUST export `create(): AgentPlugin` as default or named export.
 
+The factory function MUST read `specd-plugin.json` at the infrastructure boundary to obtain `name` and `version`. It MUST search for the manifest in its own directory first, then the parent directory as fallback — this works both in development (source tree) and after build/publish (`dist/` with manifest at package root). The `type` field MUST remain hardcoded as `'agent'`.
+
 ### Requirement: Plugin runtime contract
 
 The implementation MUST return a valid `AgentPlugin` that:
 
-- has `type: 'agent'`
-- has a concrete package name and version
+- has `type: 'agent'` (hardcoded for type safety)
+- has `name` and `version` sourced from `specd-plugin.json` via the factory — not hardcoded in the class
 - implements `install(projectRoot, options)` and `uninstall(projectRoot, options)` with real filesystem behavior
 - uses a stable frontmatter model for generated skill files
 
@@ -47,6 +49,8 @@ Skills MUST be installed to `.codex/skills/` under the provided project root.
 
 - The plugin MUST depend on `@specd/skills` for skill operations.
 - The plugin MUST implement concrete install and uninstall behavior.
+- `name` and `version` MUST be read from `specd-plugin.json` by the factory and passed to the plugin constructor — never hardcoded in the class.
+- `type` MUST remain hardcoded as `'agent'` for type safety.
 
 ## Spec Dependencies
 

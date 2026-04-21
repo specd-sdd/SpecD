@@ -1,6 +1,7 @@
 {
   "schemaVersion": 1,
   "name": "@specd/plugin-agent-opencode",
+  "version": "0.0.1",
   "description": "Open Code agent plugin for specd skills installation",
   "pluginType": "agent",
   "minCoreVersion": "*"
