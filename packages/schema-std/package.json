@@ -4,23 +4,11 @@
   "license": "MIT",
   "private": false,
   "repository": "https://github.com/specd-sdd/SpecD",
-  "type": "module",
   "files": [
     "schema.yaml",
-    "templates/",
-    "dist/"
+    "templates/"
   ],
-  "exports": {
-    ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
-    }
-  },
   "scripts": {
-    "build": "tsup src/index.ts --format esm --dts --clean",
-    "dev": "tsup src/index.ts --format esm --dts --watch",
-    "typecheck": "tsc --noEmit",
-    "test": "vitest run",
     "release:publish": "npm publish --access public"
   }
 }
