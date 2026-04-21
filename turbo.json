@@ -11,7 +11,9 @@
       "cache": false
     },
     "typecheck": {
-      "dependsOn": ["^build"]
+      "dependsOn": ["^build"],
+      "inputs": ["src/**/*.ts", "src/**/*.js", "test/**/*.ts", "test/**/*.ts", "tsconfig.json"],
+      "outputLogs": "new-only"
     },
     "test": {
       "dependsOn": ["build"],

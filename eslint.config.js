@@ -16,9 +16,7 @@ export default tseslint.config(
       '**/.history/**',
       'packages/schema-std/**',
       'packages/mcp/**',
-      'packages/skills/**',
-      'packages/plugins/**',
-      'scripts/**',
+      'dev/scripts/**',
     ],
   },
 
@@ -107,6 +105,15 @@ export default tseslint.config(
     },
   },
 
+  // Skills package — sync use cases (no await needed)
+  {
+    files: ['packages/skills/src/**/*.ts'],
+    rules: {
+      '@typescript-eslint/require-await': 'off',
+      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+    },
+  },
+
   // Layer boundary enforcement (architecture/spec.md)
   {
     files: ['packages/*/src/domain/**/*.ts'],
@@ -179,6 +186,7 @@ export default tseslint.config(
       '@typescript-eslint/require-await': 'off',
       '@typescript-eslint/no-unused-vars': 'off',
       '@typescript-eslint/unbound-method': 'off',
+      '@typescript-eslint/await-thenable': 'off',
     },
   },
 )
