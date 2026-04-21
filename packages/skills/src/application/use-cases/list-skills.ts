@@ -4,7 +4,7 @@ import type { SkillRepository } from '../ports/skill-repository.js'
 /**
  * Input contract for list-skills use case.
  */
-export interface ListSkillsInput {}
+export type ListSkillsInput = Record<string, never>
 
 /**
  * Output contract for list-skills use case.
@@ -34,7 +34,7 @@ export class ListSkills {
    * @returns Skill collection.
    */
   async execute(_input: ListSkillsInput): Promise<ListSkillsOutput> {
-    const skills = await this.repository.list()
+    const skills = this.repository.list()
     return { skills }
   }
 }
