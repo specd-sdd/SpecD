@@ -13,6 +13,8 @@ plugins:
   agents:
     - name: '@specd/plugin-agent-claude'
     - name: '@specd/plugin-agent-copilot'
+    - name: '@specd/plugin-agent-codex'
+    - name: '@specd/plugin-agent-opencode'
       config:
         someKey: someValue
 ```

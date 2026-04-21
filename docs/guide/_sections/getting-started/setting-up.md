@@ -11,7 +11,7 @@ This creates a `specd.yaml` with a default configuration, installs skills for yo
 For a non-interactive setup:
 
 ```bash
-specd project init --schema @specd/schema-std --agent claude
+specd project init --schema @specd/schema-std --plugin @specd/plugin-agent-claude
 ```
 
 **Step 2: Start working.**

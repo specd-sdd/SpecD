@@ -36,6 +36,15 @@ In interactive mode the command presents a guided wizard:
    - Specs path (default: `specs/`)
 3. **Plugin selection** — a multi-select listing available agent plugins. The user selects which plugins to install. Selecting none is valid (plugins can be installed later with `specd plugins install`).
 
+### Requirement: Known plugin options
+
+The interactive plugin-selection wizard MUST expose this known agent plugin option set:
+
+- `@specd/plugin-agent-claude`
+- `@specd/plugin-agent-copilot`
+- `@specd/plugin-agent-codex`
+- `@specd/plugin-agent-opencode`
+
 ### Requirement: Non-interactive mode
 
 When not in interactive mode, the command uses the flag values (or defaults) directly, calls `InitProject`, optionally installs skills for agents specified via `--agent`, and prints output according to `--format`.

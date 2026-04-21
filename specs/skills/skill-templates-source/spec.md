@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Defines how skill templates are sourced, stored, and how frontmatter is handled. Templates live without frontmatter in the skills package, and agent plugins inject their specific frontmatter.
+Defines how skill templates are sourced, stored, and how frontmatter is handled across supported agent runtimes. Templates live without frontmatter in the skills package, and each agent plugin injects frontmatter that is exact for its target runtime.
 
 ## Requirements
 
@@ -21,25 +21,34 @@ Each skill directory contains `.md` files (without frontmatter).
 
 ### Requirement: Frontmatter source
 
-Original frontmatter MUST be read from `dev/ai-agents/skills/<skill-name>/SKILL.md` before stripping and stored in the appropriate agent plugin package.
+Frontmatter definitions MUST come from canonical skill metadata and vendor documentation for each target agent runtime. Plugin-specific frontmatter types and maps MUST reflect those documented contracts exactly.
 
 ### Requirement: Frontmatter injection
 
-Each agent plugin MUST inject its stored frontmatter when installing a skill. The injection happens during the install process with:
+Each agent plugin MUST inject its stored frontmatter when installing a skill.
 
-- `name` — display name
-- `description` — what it does
-- `allowed_tools` — permitted tools
-- `argument_hint` — autocomplete hint
+Injection MUST be runtime-specific: each plugin emits only fields recognized by its target runtime and excludes unsupported fields.
+
+### Requirement: Agent frontmatter matrix
+
+The plugin frontmatter models MUST cover the complete known field set per runtime:
+
+- **Codex**: `name`, `description`
+- **Copilot**: `name`, `description`, `license`, `allowed-tools`, `user-invocable`, `disable-model-invocation`
+- **Open Code**: `name`, `description`, `license`, `compatibility`, `metadata`
+
+Runtime defaults MAY emit a smaller subset, but model/type coverage MUST include each runtime's full supported set.
 
 ### Requirement: Why no frontmatter in skills package
 
-The skills package does not include frontmatter because each agent environment (Claude, Copilot, Codex) has different metadata fields. Agent plugins know their target environment and inject appropriate metadata while preserving the base skill definition.
+The skills package does not include frontmatter because each agent environment has different metadata fields and compatibility rules. Agent plugins know their target environment and inject the appropriate metadata while preserving the base skill definition.
 
 ## Constraints
 
 - Templates in skills package MUST NOT contain frontmatter YAML.
 - Each agent plugin is responsible for storing and injecting its own frontmatter.
+- Agent plugins MUST model the full supported frontmatter field set for their target runtime.
+- Agent plugins MUST NOT emit fields unsupported by their target runtime.
 
 ## Spec Dependencies
 

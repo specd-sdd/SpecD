@@ -76,7 +76,7 @@ artifactRules:
     - 'Architecture decisions must reference an ADR number.'
 
 schemaPlugins:
-  - '@specd/plugin-claude'
+  - '@specd/plugin-agent-claude'
 ```
 
 ## What this configuration does

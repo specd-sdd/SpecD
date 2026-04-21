@@ -1,9 +1,9 @@
 {
   "title": "plugin-agent-codex:plugin-agent",
-  "description": "Codex agent plugin stub. Provides the interface structure for future full implementation.",
-  "dependsOn": ["plugin-manager:agent-plugin-type"],
+  "description": "This spec defines the Codex agent plugin contract for install/uninstall behavior, install target directory, and exact frontmatter support so implementation and verification are deterministic.",
+  "dependsOn": ["plugin-manager:agent-plugin-type", "skills:skill-templates-source"],
   "context": [
-    "Codex agent plugin stub. Provides the interface structure for future full implementation."
+    "This spec defines the Codex agent plugin contract for install/uninstall behavior, install target directory, and exact frontmatter support so implementation and verification are deterministic."
   ],
   "rules": [
     {
@@ -11,33 +11,74 @@
       "rules": ["The package MUST export `create(): AgentPlugin` as default or named export."]
     },
     {
-      "requirement": "Placeholder implementation",
+      "requirement": "Plugin runtime contract",
       "rules": [
-        "This is a stub for phase 2. The implementation MUST return a valid `AgentPlugin` that:\n\n- Has `type: 'agent'`\n- Has a descriptive name and version\n- Has an empty or minimal `configSchema`"
+        "The implementation MUST return a valid `AgentPlugin` that:\n\n- has `type: 'agent'`\n- has a concrete package name and version\n- implements `install(projectRoot, options)` and `uninstall(projectRoot, options)` with real filesystem behavior\n- uses a stable frontmatter model for generated skill files"
       ]
     },
     {
-      "requirement": "Future expansion",
+      "requirement": "Skill installation and frontmatter injection",
       "rules": [
-        "When implemented in phase 2:\n\n- Will depend on `skills:skill-repository` for skill access\n- Will install to the appropriate Codex skills directory\n- Will inject Codex-specific metadata during install"
+        "The plugin MUST install skills from `@specd/skills` and inject Codex-compatible frontmatter into markdown skill files during install.\n\nInstallation flow MUST:\n\n1. load requested skills (or all skills when no filter is provided)\n2. resolve frontmatter for each skill\n3. prepend frontmatter to markdown files in the installed skill directories\n4. return an `InstallResult` with installed and skipped entries"
       ]
+    },
+    {
+      "requirement": "Frontmatter field contract",
+      "rules": [
+        "The Codex frontmatter contract MUST model and emit this exact supported set:\n\n- `name` (required)\n- `description` (required)\n\nNo other frontmatter keys are considered Codex-supported in this spec."
+      ]
+    },
+    {
+      "requirement": "Install location",
+      "rules": ["Skills MUST be installed to `.codex/skills/` under the provided project root."]
     }
   ],
   "constraints": [
-    "This is a placeholder/stub for phase 1.",
-    "Full implementation is deferred to phase 2."
+    "The plugin MUST depend on @specd/skills for skill operations.",
+    "The plugin MUST implement concrete install and uninstall behavior."
   ],
   "scenarios": [
     {
-      "requirement": "Stub implementation",
-      "name": "Returns valid AgentPlugin",
+      "requirement": "Factory export",
+      "name": "Exposes plugin factory",
+      "when": ["plugin package exports are loaded"],
+      "then": ["create() is available and returns an AgentPlugin"]
+    },
+    {
+      "requirement": "Plugin runtime contract",
+      "name": "Created plugin satisfies runtime contract",
       "when": ["create() is called"],
-      "then": ["it returns an AgentPlugin with type 'agent'"]
+      "then": [
+        "the returned plugin has type: 'agent', package name, and package version",
+        "AND the returned plugin exposes install(projectRoot, options) and uninstall(projectRoot, options) functions"
+      ]
+    },
+    {
+      "requirement": "Skill installation and frontmatter injection",
+      "name": "Install injects frontmatter and reports outcome",
+      "given": ["skills are available from @specd/skills"],
+      "when": ["install(projectRoot, options) runs with a selected skill set"],
+      "then": [
+        "installed markdown skill files include Codex-compatible frontmatter prepended before content",
+        "AND the install result reports installed and skipped entries"
+      ]
+    },
+    {
+      "requirement": "Frontmatter field contract",
+      "name": "Codex emitter limits fields to supported keys",
+      "when": ["frontmatter is generated for a skill file"],
+      "then": ["only name and description are emitted", "AND unsupported keys are excluded"]
+    },
+    {
+      "requirement": "Install location",
+      "name": "Skills are written under Codex directory",
+      "when": ["install writes skill files"],
+      "then": ["files are created only under .codex/skills/ within the target project root"]
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:8f027b9333c62e712ea5f834934f7ae6c05449cff248cfcbfeeb430e85234b4c",
-    "verify.md": "sha256:ac4c1a998b8f9aa16dae4523e9805c2875cab31377dac555d20fa80c0db0fd93"
+    "spec.md": "sha256:cd36382ac4b2b6c00792be458a34fdff136d3098e6531faa7316fa3493b6e164",
+    "verify.md": "sha256:aa7183a9974756b50134d97c0cb210b81d8b49f47d8eeba255391a824a46b75e"
   },
   "generatedBy": "core"
 }

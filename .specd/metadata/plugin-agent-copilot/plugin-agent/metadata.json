@@ -1,9 +1,9 @@
 {
   "title": "plugin-agent-copilot:plugin-agent",
-  "description": "Copilot agent plugin stub. Provides the interface structure for future full implementation.",
-  "dependsOn": ["plugin-manager:agent-plugin-type"],
+  "description": "This spec defines the Copilot plugin contract for concrete install/uninstall behavior, project install location, and exact frontmatter support so agent skills are usable directly in Copilot workflows.",
+  "dependsOn": ["plugin-manager:agent-plugin-type", "skills:skill-templates-source"],
   "context": [
-    "Copilot agent plugin stub. Provides the interface structure for future full implementation."
+    "This spec defines the Copilot plugin contract for concrete install/uninstall behavior, project install location, and exact frontmatter support so agent skills are usable directly in Copilot workflows."
   ],
   "rules": [
     {
@@ -11,33 +11,80 @@
       "rules": ["The package MUST export `create(): AgentPlugin` as default or named export."]
     },
     {
-      "requirement": "Placeholder implementation",
+      "requirement": "Plugin runtime contract",
       "rules": [
-        "This is a stub for phase 2. The implementation MUST return a valid `AgentPlugin` that:\n\n- Has `type: 'agent'`\n- Has a descriptive name and version\n- Has an empty or minimal `configSchema`"
+        "The implementation MUST return a valid `AgentPlugin` that:\n\n- has `type: 'agent'`\n- has a concrete package name and version\n- implements `install(projectRoot, options)` and `uninstall(projectRoot, options)` with real filesystem behavior\n- uses a stable frontmatter model for generated skill files"
       ]
     },
     {
-      "requirement": "Future expansion",
+      "requirement": "Skill installation and frontmatter injection",
       "rules": [
-        "When implemented in phase 2:\n\n- Will depend on `skills:skill-repository` for skill access\n- Will install to the appropriate Copilot skills directory\n- Will inject Copilot-specific metadata during install"
+        "The plugin MUST install skills from `@specd/skills` and inject Copilot-compatible frontmatter into markdown skill files during install.\n\nInstallation flow MUST:\n\n1. load requested skills (or all skills when no filter is provided)\n2. resolve frontmatter for each skill\n3. prepend frontmatter to markdown files in the installed skill directories\n4. return an `InstallResult` with installed and skipped entries"
+      ]
+    },
+    {
+      "requirement": "Frontmatter field contract",
+      "rules": [
+        "The Copilot frontmatter contract MUST model and emit this exact supported set:\n\n- required: `name`, `description`\n- optional core field: `license`\n- optional CLI-supported fields: `allowed-tools`, `user-invocable`, `disable-model-invocation`\n\nFields outside this set MUST NOT be emitted by default."
+      ]
+    },
+    {
+      "requirement": "Install location",
+      "rules": [
+        "Project-level skill installation MUST target `.github/skills/` under the provided project root."
       ]
     }
   ],
   "constraints": [
-    "This is a placeholder/stub for phase 1.",
-    "Full implementation is deferred to phase 2."
+    "The plugin MUST depend on @specd/skills for skill operations.",
+    "The plugin MUST implement concrete install and uninstall behavior."
   ],
   "scenarios": [
     {
-      "requirement": "Stub implementation",
-      "name": "Returns valid AgentPlugin",
+      "requirement": "Factory export",
+      "name": "Exposes plugin factory",
+      "when": ["plugin package exports are loaded"],
+      "then": ["create() is available and returns an AgentPlugin"]
+    },
+    {
+      "requirement": "Plugin runtime contract",
+      "name": "Created plugin satisfies runtime contract",
       "when": ["create() is called"],
-      "then": ["it returns an AgentPlugin with type 'agent'"]
+      "then": [
+        "the returned plugin has type: 'agent', package name, and package version",
+        "AND the returned plugin exposes install(projectRoot, options) and uninstall(projectRoot, options) functions"
+      ]
+    },
+    {
+      "requirement": "Skill installation and frontmatter injection",
+      "name": "Install injects frontmatter and reports outcome",
+      "given": ["skills are available from @specd/skills"],
+      "when": ["install(projectRoot, options) runs with a selected skill set"],
+      "then": [
+        "installed markdown skill files include Copilot-compatible frontmatter prepended before content",
+        "AND the install result reports installed and skipped entries"
+      ]
+    },
+    {
+      "requirement": "Frontmatter field contract",
+      "name": "Copilot emitter supports full declared field set",
+      "when": ["frontmatter is generated for a skill file"],
+      "then": [
+        "name and description are always emitted",
+        "AND license, allowed-tools, user-invocable, and disable-model-invocation are emitted only when configured",
+        "AND unsupported keys are excluded"
+      ]
+    },
+    {
+      "requirement": "Install location",
+      "name": "Skills are written under GitHub skills directory",
+      "when": ["install writes skill files"],
+      "then": ["files are created only under .github/skills/ within the target project root"]
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:01656494a13b341959cfd95b9e4358654d45dd2438e67884b0120752f958d584",
-    "verify.md": "sha256:d35a05780039746bb7383aca633f2ccb71f004ee0416e46bbc650a49801ed28b"
+    "spec.md": "sha256:ce08d74463e90ece79211b0c2285b38a8136e2791cb74e0df3bb90890b61000c",
+    "verify.md": "sha256:8f1f75644a88f38f7b648a5e54a8ddb068fe08fe7b98b355ab40b22221e1aef4"
   },
   "generatedBy": "core"
 }

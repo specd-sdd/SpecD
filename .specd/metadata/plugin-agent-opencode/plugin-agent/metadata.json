@@ -1,0 +1,153 @@
+{
+  "title": "plugin-agent-opencode:plugin-agent",
+  "description": "Open Code support is required to keep agent-plugin behavior consistent across the ecosystem and avoid a Claude-only installation path. This spec defines the Open Code plugin contract for skill install/uninstall, target install directory, and frontmatter handling so the plugin can be implemented predictably and validated against the same standards used by other agent plugins.",
+  "dependsOn": ["plugin-manager:agent-plugin-type", "skills:skill-templates-source"],
+  "context": [
+    "Open Code support is required to keep agent-plugin behavior consistent across the ecosystem and avoid a Claude-only installation path. This spec defines the Open Code plugin contract for skill install/uninstall, target install directory, and frontmatter handling so the plugin can be implemented predictably and validated against the same standards used by other agent plugins."
+  ],
+  "rules": [
+    {
+      "requirement": "Factory export",
+      "rules": ["The package MUST export `create(): AgentPlugin` as a named export."]
+    },
+    {
+      "requirement": "Domain layer",
+      "rules": [
+        "The domain layer MUST define:\n\n- a plugin runtime type implementing the `AgentPlugin` contract\n- an Open Code frontmatter type reflecting the supported Open Code keys\n- a per-skill frontmatter map keyed by skill name"
+      ]
+    },
+    {
+      "requirement": "Frontmatter type contract",
+      "rules": [
+        "The Open Code frontmatter model MUST support this exact field set:\n\n- `name` (required)\n- `description` (required)\n- `license` (optional)\n- `compatibility` (optional)\n- `metadata` (optional `Record<string, string>`)\n\nUnknown fields MUST NOT be emitted into generated `SKILL.md` files."
+      ]
+    },
+    {
+      "requirement": "Application layer",
+      "rules": [
+        "The application layer MUST include an `InstallSkills` use case that:\n\n1. reads skills from `@specd/skills`\n2. resolves the per-skill frontmatter map\n3. prepends Open Code-compatible YAML frontmatter to markdown skill files\n4. writes installed skills to the Open Code project skill directory"
+      ]
+    },
+    {
+      "requirement": "Frontmatter injection",
+      "rules": [
+        "During install, the plugin MUST prepend YAML frontmatter to each markdown skill file and include only configured fields supported by Open Code."
+      ]
+    },
+    {
+      "requirement": "Install location",
+      "rules": [
+        "Project-level skill installation MUST target `.opencode/skills/` under the provided `projectRoot`."
+      ]
+    },
+    {
+      "requirement": "Project init wizard integration",
+      "rules": [
+        "The interactive `specd project init` plugin selection MUST include `@specd/plugin-agent-opencode` in the known agent plugin options."
+      ]
+    },
+    {
+      "requirement": "Meta package inclusion",
+      "rules": [
+        "The `@specd/specd` meta package MUST declare `@specd/plugin-agent-opencode` as a workspace dependency."
+      ]
+    },
+    {
+      "requirement": "Uninstall behavior",
+      "rules": [
+        "`uninstall(projectRoot, options)` MUST remove installed skill directories from `.opencode/skills/`.\n\nWhen `options.skills` is provided, uninstall MUST remove only the selected skill directories.\n\nWhen `options.skills` is omitted, uninstall MUST remove the full `.opencode/skills/` tree."
+      ]
+    }
+  ],
+  "constraints": [
+    "The plugin MUST depend on @specd/skills for skill repository access.",
+    "The plugin MUST implement the AgentPlugin contract defined by @specd/plugin-manager.",
+    "The plugin MUST remain an adapter package with no domain logic outside plugin orchestration concerns."
+  ],
+  "scenarios": [
+    {
+      "requirement": "Factory export",
+      "name": "Exposes named create factory",
+      "when": ["plugin package exports are loaded"],
+      "then": [
+        "a named create() export is available",
+        "AND calling create() returns an AgentPlugin"
+      ]
+    },
+    {
+      "requirement": "Domain layer",
+      "name": "Domain contract defines runtime and frontmatter types",
+      "when": ["domain types are inspected"],
+      "then": [
+        "a plugin runtime type implementing AgentPlugin is defined",
+        "AND an Open Code frontmatter type is defined with supported keys",
+        "AND a per-skill frontmatter map keyed by skill name is defined"
+      ]
+    },
+    {
+      "requirement": "Frontmatter type contract",
+      "name": "Frontmatter model enforces supported field set",
+      "when": ["frontmatter is generated for an installed SKILL.md"],
+      "then": [
+        "required fields name and description are present",
+        "AND optional fields license, compatibility, and metadata are emitted only when configured",
+        "AND unknown fields are not emitted"
+      ]
+    },
+    {
+      "requirement": "Application layer",
+      "name": "InstallSkills follows required workflow",
+      "given": ["skills are available from @specd/skills"],
+      "when": ["InstallSkills runs"],
+      "then": [
+        "it reads skill templates, resolves per-skill frontmatter, prepends Open Code YAML frontmatter, and writes installed skill files"
+      ]
+    },
+    {
+      "requirement": "Frontmatter injection",
+      "name": "Install prepends only Open Code-compatible fields",
+      "when": ["skill markdown files are written during install"],
+      "then": [
+        "YAML frontmatter is prepended before markdown content",
+        "AND emitted fields are limited to the configured Open Code-supported keys"
+      ]
+    },
+    {
+      "requirement": "Install location",
+      "name": "Skills install into Open Code directory",
+      "when": ["install writes skill files"],
+      "then": ["files are created under .opencode/skills/ within the provided projectRoot"]
+    },
+    {
+      "requirement": "Project init wizard integration",
+      "name": "Wizard exposes Open Code plugin option",
+      "when": ["interactive specd project init renders plugin choices"],
+      "then": ["@specd/plugin-agent-opencode appears in the known agent plugin options"]
+    },
+    {
+      "requirement": "Meta package inclusion",
+      "name": "Meta package depends on Open Code plugin",
+      "when": ["packages/specd/package.json dependencies are inspected"],
+      "then": ["@specd/plugin-agent-opencode is declared as a workspace:* dependency"]
+    },
+    {
+      "requirement": "Uninstall behavior",
+      "name": "Uninstall removes selected skills when filter is provided",
+      "given": ["multiple skills are installed under .opencode/skills/"],
+      "when": ["uninstall(projectRoot, { skills: ['specd-design'] }) is executed"],
+      "then": ["only the selected skill directories are removed"]
+    },
+    {
+      "requirement": "Uninstall behavior",
+      "name": "Uninstall removes all skills when no filter is provided",
+      "given": ["skills are installed under .opencode/skills/"],
+      "when": ["uninstall(projectRoot, optionsWithoutSkills) is executed"],
+      "then": ["the full .opencode/skills/ tree is removed"]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:d08027c368d79b9f421b8db1a6be29bb3855fdc3c8063cc14a8f8b4c92541e57",
+    "verify.md": "sha256:b37b23191915af5859cfac153e16b437e390383ba3a83b59199b67b464507d41"
+  },
+  "generatedBy": "core"
+}

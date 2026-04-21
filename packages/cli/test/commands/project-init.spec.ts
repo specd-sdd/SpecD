@@ -88,6 +88,32 @@ describe('project init', () => {
     )
   })
 
+  it('supports --plugin with @specd/plugin-agent-opencode', async () => {
+    const { initExecute } = setup()
+    const program = makeProgram()
+    registerProjectInit(program.command('project'))
+
+    await program.parseAsync([
+      'node',
+      'specd',
+      'project',
+      'init',
+      '--workspace',
+      'default',
+      '--workspace-path',
+      'specs/',
+      '--plugin',
+      '@specd/plugin-agent-opencode',
+    ])
+
+    expect(initExecute).toHaveBeenCalledOnce()
+    expect(installPluginsWithKernel).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pluginNames: ['@specd/plugin-agent-opencode'],
+      }),
+    )
+  })
+
   it('outputs JSON with plugin results', async () => {
     const { stdout } = setup()
     vi.mocked(installPluginsWithKernel).mockResolvedValue({

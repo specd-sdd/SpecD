@@ -14,6 +14,7 @@ const AVAILABLE_AGENT_PLUGINS = [
   '@specd/plugin-agent-claude',
   '@specd/plugin-agent-copilot',
   '@specd/plugin-agent-codex',
+  '@specd/plugin-agent-opencode',
 ] as const
 
 /**

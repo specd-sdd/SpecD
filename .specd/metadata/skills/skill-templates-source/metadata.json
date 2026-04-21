@@ -1,9 +1,9 @@
 {
   "title": "skills:skill-templates-source",
-  "description": "Defines how skill templates are sourced, stored, and how frontmatter is handled. Templates live without frontmatter in the skills package, and agent plugins inject their specific frontmatter.",
+  "description": "Defines how skill templates are sourced, stored, and how frontmatter is handled across supported agent runtimes. Templates live without frontmatter in the skills package, and each agent plugin injects frontmatter that is exact for its target runtime.",
   "dependsOn": ["skills:skill"],
   "context": [
-    "Defines how skill templates are sourced, stored, and how frontmatter is handled. Templates live without frontmatter in the skills package, and agent plugins inject their specific frontmatter."
+    "Defines how skill templates are sourced, stored, and how frontmatter is handled across supported agent runtimes. Templates live without frontmatter in the skills package, and each agent plugin injects frontmatter that is exact for its target runtime."
   ],
   "rules": [
     {
@@ -21,43 +21,91 @@
     {
       "requirement": "Frontmatter source",
       "rules": [
-        "Original frontmatter MUST be read from `dev/ai-agents/skills/<skill-name>/SKILL.md` before stripping and stored in the appropriate agent plugin package."
+        "Frontmatter definitions MUST come from canonical skill metadata and vendor documentation for each target agent runtime. Plugin-specific frontmatter types and maps MUST reflect those documented contracts exactly."
       ]
     },
     {
       "requirement": "Frontmatter injection",
       "rules": [
-        "Each agent plugin MUST inject its stored frontmatter when installing a skill. The injection happens during the install process with:\n\n- `name` — display name\n- `description` — what it does\n- `allowed_tools` — permitted tools\n- `argument_hint` — autocomplete hint"
+        "Each agent plugin MUST inject its stored frontmatter when installing a skill.\n\nInjection MUST be runtime-specific: each plugin emits only fields recognized by its target runtime and excludes unsupported fields."
+      ]
+    },
+    {
+      "requirement": "Agent frontmatter matrix",
+      "rules": [
+        "The plugin frontmatter models MUST cover the complete known field set per runtime:\n\n- **Codex**: `name`, `description`\n- **Copilot**: `name`, `description`, `license`, `allowed-tools`, `user-invocable`, `disable-model-invocation`\n- **Open Code**: `name`, `description`, `license`, `compatibility`, `metadata`\n\nRuntime defaults MAY emit a smaller subset, but model/type coverage MUST include each runtime's full supported set."
       ]
     },
     {
       "requirement": "Why no frontmatter in skills package",
       "rules": [
-        "The skills package does not include frontmatter because each agent environment (Claude, Copilot, Codex) has different metadata fields. Agent plugins know their target environment and inject appropriate metadata while preserving the base skill definition."
+        "The skills package does not include frontmatter because each agent environment has different metadata fields and compatibility rules. Agent plugins know their target environment and inject the appropriate metadata while preserving the base skill definition."
       ]
     }
   ],
   "constraints": [
     "Templates in skills package MUST NOT contain frontmatter YAML.",
-    "Each agent plugin is responsible for storing and injecting its own frontmatter."
+    "Each agent plugin is responsible for storing and injecting its own frontmatter.",
+    "Agent plugins MUST model the full supported frontmatter field set for their target runtime.",
+    "Agent plugins MUST NOT emit fields unsupported by their target runtime."
   ],
   "scenarios": [
     {
-      "requirement": "Templates without frontmatter",
-      "name": "Template files are clean",
-      "when": ["files in packages/skills/templates/ are inspected"],
-      "then": ["no YAML frontmatter blocks exist in the files"]
+      "requirement": "Template source location",
+      "name": "Templates remain frontmatter-free",
+      "when": ["markdown files under packages/skills/templates/<skill-name>/ are inspected"],
+      "then": ["they do not contain YAML frontmatter blocks"]
     },
     {
-      "requirement": "Agent plugin injects frontmatter",
-      "name": "Install prepends frontmatter",
-      "when": ["an agent plugin calls install"],
-      "then": ["YAML frontmatter is prepended to each skill file"]
+      "requirement": "Template migration",
+      "name": "Migrated template tree is complete",
+      "when": ["the template source directory is validated"],
+      "then": [
+        "it contains specd/, specd-archive/, specd-design/, specd-implement/, specd-new/, specd-metadata/, specd-compliance/, and specd-verify/",
+        "AND it contains shared.md"
+      ]
+    },
+    {
+      "requirement": "Frontmatter source",
+      "name": "Runtime metadata is sourced from canonical contracts",
+      "when": ["plugin frontmatter models are reviewed"],
+      "then": [
+        "each model is derived from canonical skill metadata and the corresponding vendor documentation",
+        "AND field definitions match the documented runtime contracts"
+      ]
+    },
+    {
+      "requirement": "Frontmatter injection",
+      "name": "Injection filters by target runtime support",
+      "when": ["an agent plugin installs skills"],
+      "then": [
+        "it prepends frontmatter using only fields supported by that runtime",
+        "AND unsupported fields are excluded from emitted markdown files"
+      ]
+    },
+    {
+      "requirement": "Agent frontmatter matrix",
+      "name": "Matrix coverage includes all known runtime fields",
+      "when": ["frontmatter models are validated across runtimes"],
+      "then": [
+        "Codex coverage includes name and description",
+        "AND Copilot coverage includes name, description, license, allowed-tools, user-invocable, and disable-model-invocation",
+        "AND Open Code coverage includes name, description, license, compatibility, and metadata"
+      ]
+    },
+    {
+      "requirement": "Why no frontmatter in skills package",
+      "name": "Runtime-specific metadata stays in plugins",
+      "when": ["shared skill templates and installed skill outputs are compared"],
+      "then": [
+        "templates remain runtime-agnostic without frontmatter",
+        "AND runtime-specific frontmatter is injected by the target agent plugin during install"
+      ]
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:ea8b201ccec993308982e2a3c2f9240770a4a2719ff4e29e015e9a5312bfb6ef",
-    "verify.md": "sha256:0d7fe66c213eb85c3895924f32f00d6da6e56253d256f957c1e8d490e0dce403"
+    "spec.md": "sha256:abd41bedb6bea8486e8bbd7dd62987bd5075afebd0b3a81cc76a8279461961ba",
+    "verify.md": "sha256:afbc1d00cf08ed4c132af9d1f399f86090682c22f86d22bc33d979b6b3b4cc65"
   },
   "generatedBy": "core"
 }

@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "name": "@specd/plugin-agent-copilot",
-  "description": "Copilot agent plugin (phase-1 stub)",
+  "description": "Copilot agent plugin for specd skills installation",
   "pluginType": "agent",
   "minCoreVersion": "*"
 }

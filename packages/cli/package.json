@@ -25,6 +25,7 @@
     "@specd/plugin-agent-claude": "workspace:*",
     "@specd/plugin-agent-codex": "workspace:*",
     "@specd/plugin-agent-copilot": "workspace:*",
+    "@specd/plugin-agent-opencode": "workspace:*",
     "@specd/plugin-manager": "workspace:*",
     "@specd/schema-std": "workspace:*",
     "@toon-format/toon": "^2.1.0",
