@@ -1,5 +1,96 @@
 # @specd/cli
 
+## 0.1.0
+
+### Minor Changes
+
+- 7ac27d1: 20260418 - plugin-system-phase-1: Phase 1 introduces the plugin-based agent architecture and migrates the CLI and core flows from skills-manifest management to plugin lifecycle management. It adds the plugin-manager package, agent plugin packages (Claude/Copilot/Codex), canonical skills template/repository infrastructure, and new plugins install/list/show/update/uninstall command flows, including project init/update integration. The change also updates documentation, hooks, tests, and config persistence so plugin declarations in specd.yaml become the authoritative installation source.
+
+  Specs affected:
+  - `cli:cli/plugins-install`
+  - `cli:cli/plugins-list`
+  - `cli:cli/plugins-show`
+  - `cli:cli/plugins-update`
+  - `core:core/config`
+  - `core:core/config-writer-port`
+  - `cli:cli/project-init`
+  - `cli:cli/project-update`
+  - `cli:cli/plugins-uninstall`
+  - `plugin-agent-claude:plugin-agent`
+  - `plugin-agent-copilot:plugin-agent`
+  - `plugin-agent-codex:plugin-agent`
+  - `plugin-manager:install-plugin-use-case`
+  - `plugin-manager:uninstall-plugin-use-case`
+  - `plugin-manager:update-plugin-use-case`
+  - `plugin-manager:list-plugins-use-case`
+  - `plugin-manager:load-plugin-use-case`
+  - `plugin-manager:plugin-repository-port`
+  - `plugin-manager:specd-plugin-type`
+  - `plugin-manager:agent-plugin-type`
+  - `plugin-manager:plugin-errors`
+  - `plugin-manager:plugin-loader`
+  - `skills:skill`
+  - `skills:skill-bundle`
+  - `skills:skill-repository`
+  - `skills:list-skills`
+  - `skills:get-skill`
+  - `skills:resolve-bundle`
+  - `skills:skill-repository-port`
+  - `skills:skill-repository-infra`
+  - `skills:skill-templates-source`
+
+### Patch Changes
+
+- 4b28916: 20260417 - change-edit-description: Implements the --description option in the specd change edit command, which was documented in the spec but never implemented. Adds description field to EditChangeInput, updateDescription() method to the Change entity, and modifies EditChange.execute() to persist the description without invalidating the change.
+
+  Specs affected:
+  - `cli:cli/change-edit`
+  - `core:core/edit-change`
+  - `core:core/change`
+
+- 80dbaaf: 20260420 - context-display-mode-config: Add configurable context display modes (list, summary, full, hybrid) to replace lazy/full tier model
+
+  Specs affected:
+  - `core:core/compile-context`
+  - `core:core/config`
+  - `cli:cli/change-context`
+  - `core:core/get-project-context`
+  - `core:core/get-spec-context`
+  - `cli:cli/project-context`
+  - `cli:cli/spec-context`
+
+- 9225d20: 20260421 - complete-agent-plugins-codex-copilot-open-code: Replace stub Codex and Copilot agent plugins with real install/uninstall behavior at parity with Claude, create a new Open Code plugin package following the same architecture, update CLI wizard and metapackage wiring, and expand the skills template source spec to cover all four runtimes' frontmatter contracts.
+
+  Specs affected:
+  - `plugin-agent-codex:plugin-agent`
+  - `plugin-agent-copilot:plugin-agent`
+  - `skills:skill-templates-source`
+  - `plugin-agent-opencode:plugin-agent`
+  - `cli:cli/project-init`
+  - `specd:meta-package`
+
+- Updated dependencies [4b28916]
+- Updated dependencies [026650f]
+- Updated dependencies [58c75d9]
+- Updated dependencies [58f8092]
+- Updated dependencies [99f23ff]
+- Updated dependencies [7ac27d1]
+- Updated dependencies [7942039]
+- Updated dependencies [f70f882]
+- Updated dependencies [80dbaaf]
+- Updated dependencies [0109e6d]
+- Updated dependencies [5215349]
+- Updated dependencies [9225d20]
+- Updated dependencies [4dd5db8]
+- Updated dependencies [aa2e957]
+  - @specd/core@0.1.0
+  - @specd/plugin-agent-claude@0.1.0
+  - @specd/plugin-agent-copilot@0.1.0
+  - @specd/plugin-agent-codex@0.1.0
+  - @specd/plugin-manager@0.1.0
+  - @specd/code-graph@0.0.3
+  - @specd/plugin-agent-opencode@0.0.2
+
 ## 0.0.2
 
 ### Patch Changes
