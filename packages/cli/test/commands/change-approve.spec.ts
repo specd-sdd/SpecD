@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/unbound-method */
-
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { ChangeNotFoundError, ApprovalGateDisabledError } from '@specd/core'
 import {

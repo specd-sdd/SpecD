@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/unbound-method */
-
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { CommanderError } from 'commander'
 import {
