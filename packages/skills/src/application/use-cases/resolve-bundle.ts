@@ -44,7 +44,7 @@ export class ResolveBundle {
    * @returns Resolved bundle.
    */
   async execute(input: ResolveBundleInput): Promise<ResolveBundleOutput> {
-    const bundle = await this.repository.getBundle(input.name, input.variables ?? {})
+    const bundle = this.repository.getBundle(input.name, input.variables ?? {})
     return { bundle }
   }
 }

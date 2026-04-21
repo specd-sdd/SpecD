@@ -125,6 +125,7 @@ class FsSkillRepository implements SkillRepository {
    * @param name - Skill name.
    * @param variables - Placeholder variables.
    * @returns Resolved install bundle.
+   * @throws Error if skill is not found.
    */
   getBundle(name: string, variables: Readonly<Record<string, string>> = {}): SkillBundle {
     const skill = this.get(name)

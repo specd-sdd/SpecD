@@ -58,7 +58,7 @@ export class GetSkill {
       return { error: 'NOT_FOUND' }
     }
 
-    const skill = await this.repository.get(input.name)
+    const skill = this.repository.get(input.name)
     return skill === undefined ? { error: 'NOT_FOUND' } : { skill }
   }
 }
