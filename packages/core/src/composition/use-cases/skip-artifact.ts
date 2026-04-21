@@ -9,6 +9,7 @@ export interface SkipArtifactContext {
   readonly workspace: string
   readonly ownership: 'owned' | 'shared' | 'readOnly'
   readonly isExternal: boolean
+  readonly configPath: string
 }
 
 /** Filesystem adapter paths for `createSkipArtifact(context, options)`. */
@@ -51,7 +52,12 @@ export function createSkipArtifact(
     const config = configOrContext
     const ws = getDefaultWorkspace(config)
     return createSkipArtifact(
-      { workspace: ws.name, ownership: ws.ownership, isExternal: ws.isExternal },
+      {
+        workspace: ws.name,
+        ownership: ws.ownership,
+        isExternal: ws.isExternal,
+        configPath: config.configPath,
+      },
       {
         changesPath: config.storage.changesPath,
         draftsPath: config.storage.draftsPath,

@@ -8,6 +8,7 @@ export interface ListDraftsContext {
   readonly workspace: string
   readonly ownership: 'owned' | 'shared' | 'readOnly'
   readonly isExternal: boolean
+  readonly configPath: string
 }
 
 /** Filesystem adapter paths for `createListDrafts(context, options)`. */
@@ -50,7 +51,12 @@ export function createListDrafts(
     const config = configOrContext
     const ws = getDefaultWorkspace(config)
     return createListDrafts(
-      { workspace: ws.name, ownership: ws.ownership, isExternal: ws.isExternal },
+      {
+        workspace: ws.name,
+        ownership: ws.ownership,
+        isExternal: ws.isExternal,
+        configPath: config.configPath,
+      },
       {
         changesPath: config.storage.changesPath,
         draftsPath: config.storage.draftsPath,

@@ -33,6 +33,7 @@ export interface ArchiveChangeContext {
   readonly ownership: 'owned' | 'shared' | 'readOnly'
   /** Whether the workspace's specs live outside the current git root. */
   readonly isExternal: boolean
+  readonly configPath: string
 }
 
 /**
@@ -119,7 +120,12 @@ export function createArchiveChange(
         ws.name,
         createSpecRepository(
           'fs',
-          { workspace: ws.name, ownership: ws.ownership, isExternal: ws.isExternal },
+          {
+            workspace: ws.name,
+            ownership: ws.ownership,
+            isExternal: ws.isExternal,
+            configPath: config.configPath,
+          },
           {
             specsPath: ws.specsPath,
             metadataPath: path.join(ws.specsPath, '..', '.specd', 'metadata'),
@@ -135,7 +141,12 @@ export function createArchiveChange(
           ws.name,
           createSchemaRepository(
             'fs',
-            { workspace: ws.name, ownership: ws.ownership, isExternal: ws.isExternal },
+            {
+              workspace: ws.name,
+              ownership: ws.ownership,
+              isExternal: ws.isExternal,
+              configPath: config.configPath,
+            },
             { schemasPath: ws.schemasPath! },
           ),
         ]),
@@ -145,6 +156,7 @@ export function createArchiveChange(
         workspace: defaultWs.name,
         ownership: defaultWs.ownership,
         isExternal: defaultWs.isExternal,
+        configPath: config.configPath,
       },
       {
         changesPath: config.storage.changesPath,

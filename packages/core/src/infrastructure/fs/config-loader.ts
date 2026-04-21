@@ -481,7 +481,10 @@ export class FsConfigLoader implements ConfigLoader {
     }
 
     const data = parseResult.data
-    const resolvedConfigPath = path.resolve(configDir, data.configPath ?? '.specd/config')
+    const resolvedConfigPath = path.resolve(
+      configDir,
+      data.configPath ?? path.join('.specd', 'config'),
+    )
 
     validateContextPatterns(data, configPath)
 

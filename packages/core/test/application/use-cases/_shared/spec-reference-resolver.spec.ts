@@ -20,7 +20,7 @@ class FakeSpecRepository extends SpecRepository {
     resolveResult: ResolveFromPathResult | null,
     knownSpecs: readonly string[] = [],
   ) {
-    super({ workspace, ownership: 'owned', isExternal: false })
+    super({ workspace, ownership: 'owned', isExternal: false, configPath: '/test' })
     this._resolveResult = resolveResult
     this._knownSpecs = new Set(knownSpecs)
   }

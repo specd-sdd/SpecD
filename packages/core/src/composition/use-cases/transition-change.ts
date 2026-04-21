@@ -24,6 +24,7 @@ export interface TransitionChangeContext {
   readonly ownership: 'owned' | 'shared' | 'readOnly'
   /** Whether the workspace's specs live outside the current git root. */
   readonly isExternal: boolean
+  readonly configPath: string
 }
 
 /**
@@ -97,13 +98,23 @@ export function createTransitionChange(
           w.name,
           createSchemaRepository(
             'fs',
-            { workspace: w.name, ownership: w.ownership, isExternal: w.isExternal },
+            {
+              workspace: w.name,
+              ownership: w.ownership,
+              isExternal: w.isExternal,
+              configPath: config.configPath,
+            },
             { schemasPath: w.schemasPath! },
           ),
         ]),
     ) as ReadonlyMap<string, SchemaRepository>
     return createTransitionChange(
-      { workspace: ws.name, ownership: ws.ownership, isExternal: ws.isExternal },
+      {
+        workspace: ws.name,
+        ownership: ws.ownership,
+        isExternal: ws.isExternal,
+        configPath: config.configPath,
+      },
       {
         changesPath: config.storage.changesPath,
         draftsPath: config.storage.draftsPath,
