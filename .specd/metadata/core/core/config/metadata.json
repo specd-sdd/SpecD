@@ -56,9 +56,9 @@
       ]
     },
     {
-      "requirement": "Graph config path",
+      "requirement": "Config path and derived directories",
       "rules": [
-        "`specd.yaml` MAY declare a top-level `configPath` field for derived graph persistence and temporary graph artifacts.\n\n```yaml\nconfigPath: .specd/config\n```\n\nWhen omitted, `configPath` defaults to `.specd/config` relative to the directory containing `specd.yaml`.\n\n`configPath` is project-level only. It MUST resolve inside the project repo root and is used for tool-owned graph artifacts rather than authored project content.\n\nThe following derived directories are defined from it:\n\n- **`{configPath}/graph`** — graph persistence root used by code-graph backends\n- **`{configPath}/tmp`** — temporary scratch directory for graph/indexing artifacts\n\n`configPath` does not replace the `storage` section for changes, drafts, discarded changes, or archives. Those remain governed by `storage.*`."
+        "`specd.yaml` MAY declare a top-level `configPath` field for derived graph persistence and temporary runtime artifacts.\n\n```yaml\nconfigPath: .specd/config\n```\n\nWhen omitted, `configPath` defaults to `.specd/config` relative to the directory containing `specd.yaml`.\n\n`configPath` is project-level only. It MUST resolve inside the project repo root and is used for tool-owned artifacts rather than authored project content.\n\nThe following derived directories are defined from it:\n\n- **`{configPath}/graph`** — graph persistence root used by code-graph backends\n- **`{configPath}/tmp`** — temporary scratch directory for graph/indexing artifacts\n- **`{configPath}/tmp/change-locks`** — change lock files for serialized change mutations\n\n`configPath` does not replace the `storage` section for changes, drafts, discarded changes, or archives. Those remain governed by `storage.*`."
       ]
     },
     {
@@ -437,23 +437,33 @@
       "then": ["specd fails with a clear unknown-adapter error"]
     },
     {
-      "requirement": "Graph config path",
-      "name": "configPath defaults to repo-local graph config directory",
+      "requirement": "Config path and derived directories",
+      "name": "configPath defaults to repo-local config directory",
       "given": ["specd.yaml omits configPath"],
       "when": ["the config is loaded"],
       "then": [
         "configPath resolves to .specd/config relative to the config file",
-        "AND the derived graph directories are .specd/config/graph and .specd/config/tmp"
+        "AND the derived directories are .specd/config/graph, .specd/config/tmp, and .specd/config/tmp/change-locks"
       ]
     },
     {
-      "requirement": "Graph config path",
+      "requirement": "Config path and derived directories",
       "name": "Explicit configPath stays project-level",
       "given": ["specd.yaml declares configPath: .specd/state"],
       "when": ["the config is loaded"],
       "then": [
-        "the derived graph directories are .specd/state/graph and .specd/state/tmp",
+        "the derived directories are .specd/state/graph, .specd/state/tmp, and .specd/state/tmp/change-locks",
         "AND storage.changes, storage.drafts, storage.discarded, and storage.archive remain governed by the separate storage section"
+      ]
+    },
+    {
+      "requirement": "Config path and derived directories",
+      "name": "configPath also defines change-locks directory",
+      "given": ["configPath is set to .specd/config"],
+      "when": ["FsChangeRepository needs to acquire a change lock"],
+      "then": [
+        "the lock file is placed under {configPath}/tmp/change-locks/",
+        "AND not under the changes storage directory"
       ]
     },
     {
@@ -920,8 +930,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:0cc8680ff85ec0dc418ea064fa9a6f3c4b95ce93bcf264b59ea657aff40969fd",
-    "verify.md": "sha256:5cc118607a87e16198f70ebaef1305b4bda80c77ec3310403d9ce85dfd382ca8"
+    "spec.md": "sha256:14d565e9b3d87e3da331f83dd8e5dbc0b7c6e6e169ad54d48e6bbe14e0ba7d60",
+    "verify.md": "sha256:626d8a74e19995c748fa6a20194d3a2c36cfc3b19ba1e8a3664556a014d0b70c"
   },
   "generatedBy": "core"
 }

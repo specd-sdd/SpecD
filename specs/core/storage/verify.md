@@ -168,3 +168,26 @@
 - **THEN** `manifest.json` contains the fields and structure defined in the change-manifest spec
 
 > Full scenarios are in [`specs/core/change-manifest/verify.md`](../change-manifest/verify.md).
+
+### Requirement: Change locks directory placement
+
+#### Scenario: Locks derived from configPath field
+
+- **GIVEN** `ChangeRepositoryConfig` includes `configPath: /project/.specd/config`
+- **WHEN** a change lock is acquired
+- **THEN** the lock file is created under `/project/.specd/config/tmp/change-locks/`
+
+#### Scenario: Default configPath
+
+- **GIVEN** `specd.yaml` without explicit `configPath`
+- **AND** config loader defaults to `.specd/config`
+- **WHEN** `FsChangeRepository` is composed
+- **THEN** locks resolve to `{configPath}/tmp/change-locks`
+
+#### Scenario: Locks separated from changes storage
+
+- **GIVEN** `storage.changes.path: .specd/changes`
+- **AND** `configPath: .specd/config` (default)
+- **WHEN** locks are acquired
+- **THEN** lock files are under `.specd/config/tmp/change-locks/`
+- **AND** not under `.specd/changes/`

@@ -204,21 +204,28 @@
 - **WHEN** config validation or kernel composition resolves the workspace storage
 - **THEN** specd fails with a clear unknown-adapter error
 
-### Requirement: Graph config path
+### Requirement: Config path and derived directories
 
-#### Scenario: configPath defaults to repo-local graph config directory
+#### Scenario: configPath defaults to repo-local config directory
 
 - **GIVEN** `specd.yaml` omits `configPath`
 - **WHEN** the config is loaded
 - **THEN** `configPath` resolves to `.specd/config` relative to the config file
-- **AND** the derived graph directories are `.specd/config/graph` and `.specd/config/tmp`
+- **AND** the derived directories are `.specd/config/graph`, `.specd/config/tmp`, and `.specd/config/tmp/change-locks`
 
 #### Scenario: Explicit configPath stays project-level
 
 - **GIVEN** `specd.yaml` declares `configPath: .specd/state`
 - **WHEN** the config is loaded
-- **THEN** the derived graph directories are `.specd/state/graph` and `.specd/state/tmp`
-- **AND** `storage.changes`, `storage.drafts`, `storage.discarded`, and `storage.archive` remain governed by the separate `storage` section
+- **THEN** the derived directories are `.specd/state/graph`, `.specd/state/tmp`, and `.specd/state/tmp/change-locks`
+- **AND** `storage.changes`, `storage.drafts`, `storage.discarded`, and `storage.archive` remain governed by the separate storage section
+
+#### Scenario: configPath also defines change-locks directory
+
+- **GIVEN** `configPath` is set to `.specd/config`
+- **WHEN** `FsChangeRepository` needs to acquire a change lock
+- **THEN** the lock file is placed under `{configPath}/tmp/change-locks/`
+- **AND** not under the changes storage directory
 
 ### Requirement: Template variables
 

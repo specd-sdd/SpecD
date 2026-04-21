@@ -32,3 +32,11 @@
 - **GIVEN** a message `'Cannot write to spec "platform:auth/tokens" — workspace "platform" is readOnly.'`
 - **WHEN** `ReadOnlyWorkspaceError` is constructed with that message
 - **THEN** `error.message` equals the provided message
+
+### Requirement: RepositoryConfig shape
+
+#### Scenario: RepositoryConfig includes configPath
+
+- **GIVEN** a repository constructed with `{ workspace: "default", ownership: "owned", isExternal: false, configPath: "/project/.specd/config" }`
+- **WHEN** the repository is instantiated
+- **THEN** construction succeeds without error

@@ -109,8 +109,6 @@ The `SYSTEM_ACTOR` constant (`{ name: 'specd', email: 'system@getspecd.dev' }`) 
 
 ### Requirement: scaffold creates artifact directories
 
-### Requirement: scaffold creates artifact directories
-
 `scaffold(change, specExists)` MUST create the directory structure needed for the change's
 artifacts. For `scope: spec` artifacts, it creates `specs/<ws>/<capPath>/` or
 `deltas/<ws>/<capPath>/` directories under the change directory. For `scope: change`
@@ -129,8 +127,6 @@ spec IDs from the change directory. For each spec ID, it MUST remove:
 The operation MUST be idempotent — if a directory does not exist, it MUST be silently
 skipped. If a directory contains files, all files and subdirectories MUST be removed
 along with the directory itself.
-
-### Requirement: Abstract class with abstract methods
 
 ### Requirement: Abstract class with abstract methods
 

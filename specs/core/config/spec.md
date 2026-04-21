@@ -213,9 +213,9 @@ Workspace storage configuration SHALL support named storage adapter selection ra
 
 When a workspace selects a named storage adapter, any adapter-specific config block for that adapter SHALL be passed through as adapter-owned configuration. Referencing an adapter name that is not present in the merged built-in plus external storage registries MUST fail with a clear error.
 
-### Requirement: Graph config path
+### Requirement: Config path and derived directories
 
-`specd.yaml` MAY declare a top-level `configPath` field for derived graph persistence and temporary graph artifacts.
+`specd.yaml` MAY declare a top-level `configPath` field for derived graph persistence and temporary runtime artifacts.
 
 ```yaml
 configPath: .specd/config
@@ -223,12 +223,13 @@ configPath: .specd/config
 
 When omitted, `configPath` defaults to `.specd/config` relative to the directory containing `specd.yaml`.
 
-`configPath` is project-level only. It MUST resolve inside the project repo root and is used for tool-owned graph artifacts rather than authored project content.
+`configPath` is project-level only. It MUST resolve inside the project repo root and is used for tool-owned artifacts rather than authored project content.
 
 The following derived directories are defined from it:
 
 - **`{configPath}/graph`** — graph persistence root used by code-graph backends
 - **`{configPath}/tmp`** — temporary scratch directory for graph/indexing artifacts
+- **`{configPath}/tmp/change-locks`** — change lock files for serialized change mutations
 
 `configPath` does not replace the `storage` section for changes, drafts, discarded changes, or archives. Those remain governed by `storage.*`.
 

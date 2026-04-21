@@ -59,6 +59,17 @@ When storage selection requires workspace-specific VCS or null-VCS handling, tha
 
 The format of `manifest.json` — its fields, event shapes, and schema version behavior — is defined in [`specs/core/change-manifest/spec.md`](../change-manifest/spec.md). `FsChangeRepository` reads and writes the manifest according to that format and must write it atomically (temp file + rename) to prevent partial reads.
 
+### Requirement: Change locks directory placement
+
+The `FsChangeRepository` implementation derives its change lock directory path internally
+from the `configPath` field: `{configPath}/tmp/change-locks`. This directory is distinct
+from the changes storage root and allows per-change lock files to be co-located with
+other config-scoped temporary artifacts.
+
+The `configPath` field is part of the `ChangeRepositoryConfig` port contract, provided
+at construction time. The repository derives the locks directory internally as
+`path.join(configPath, 'tmp', 'change-locks')`.
+
 ## Constraints
 
 - Manifest files must be written atomically (write to temp file, then rename) to prevent partial reads

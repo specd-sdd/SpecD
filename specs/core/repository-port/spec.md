@@ -51,6 +51,27 @@ The constructor MUST accept a `message` string. Callers construct the message wi
 
 `ReadOnlyWorkspaceError` is a domain error because ownership is a domain concept — it represents a violated invariant, not an I/O failure or a user input error.
 
+### Requirement: RepositoryConfig shape
+
+`Repository` is constructed from a `RepositoryConfig` object:
+
+```typescript
+interface RepositoryConfig {
+  readonly workspace: string
+  readonly ownership: 'owned' | 'shared' | 'readOnly'
+  readonly isExternal: boolean
+  readonly configPath: string
+}
+```
+
+- `workspace` — the workspace name this repository is bound to (e.g. `"default"`, `"billing"`)
+- `ownership` — the ownership level declared in `specd.yaml`:
+  - `owned` — full control, no restrictions
+  - `shared` — writes allowed but recorded in the change manifest as `touchedSharedSpecs`
+  - `readOnly` — no writes allowed; data may only be read
+- `isExternal` — whether this repository points to data outside the current git repository
+- `configPath` — absolute path to the config directory, used for derived paths (e.g. change locks)
+
 ## Constraints
 
 - Repository defines no storage operations — it is purely a construction and accessor base
