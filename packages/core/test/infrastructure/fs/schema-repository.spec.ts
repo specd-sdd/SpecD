@@ -25,6 +25,7 @@ function createRepo(
     workspace: overrides.workspace ?? 'default',
     ownership: 'owned',
     isExternal: false,
+    configPath: '/test',
     schemasPath: overrides.schemasPath ?? schemasPath,
   })
 }
@@ -176,6 +177,7 @@ describe('FsSchemaRepository — workspace scoping', () => {
       workspace: 'default',
       ownership: 'shared',
       isExternal: false,
+      configPath: tmpDir,
       schemasPath,
     })
     expect(repo.ownership()).toBe('shared')
@@ -186,6 +188,7 @@ describe('FsSchemaRepository — workspace scoping', () => {
       workspace: 'default',
       ownership: 'owned',
       isExternal: true,
+      configPath: tmpDir,
       schemasPath,
     })
     expect(repo.isExternal()).toBe(true)
