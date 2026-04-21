@@ -57,7 +57,7 @@ class StubChangeRepository extends ChangeRepository {
   readonly store: Map<string, Change>
 
   constructor(changes: Change[] = []) {
-    super({ workspace: 'default', ownership: 'owned', isExternal: false })
+    super({ workspace: 'default', ownership: 'owned', isExternal: false, configPath: '/test' })
     this.store = new Map(changes.map((c) => [c.name, cloneChange(c)]))
   }
 
@@ -388,6 +388,7 @@ class StubSpecRepository extends SpecRepository {
       workspace: opts.workspace ?? 'default',
       ownership: opts.ownership ?? 'owned',
       isExternal: false,
+      configPath: '/test',
     })
     this._specs = opts.specs ?? []
     this._artifacts = opts.artifacts ?? {}
@@ -648,7 +649,7 @@ class StubArchiveRepository extends ArchiveRepository {
   readonly store: Map<string, ArchivedChange>
 
   constructor(archived: ArchivedChange[] = []) {
-    super({ workspace: 'default', ownership: 'owned', isExternal: false })
+    super({ workspace: 'default', ownership: 'owned', isExternal: false, configPath: '/test' })
     this.store = new Map(archived.map((a) => [a.name, a]))
   }
 

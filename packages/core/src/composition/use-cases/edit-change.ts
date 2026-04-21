@@ -9,6 +9,7 @@ export interface EditChangeContext {
   readonly workspace: string
   readonly ownership: 'owned' | 'shared' | 'readOnly'
   readonly isExternal: boolean
+  readonly configPath: string
 }
 
 /** Filesystem adapter paths for `createEditChange(context, options)`. */
@@ -51,7 +52,12 @@ export function createEditChange(
     const config = configOrContext
     const ws = getDefaultWorkspace(config)
     return createEditChange(
-      { workspace: ws.name, ownership: ws.ownership, isExternal: ws.isExternal },
+      {
+        workspace: ws.name,
+        ownership: ws.ownership,
+        isExternal: ws.isExternal,
+        configPath: config.configPath,
+      },
       {
         changesPath: config.storage.changesPath,
         draftsPath: config.storage.draftsPath,

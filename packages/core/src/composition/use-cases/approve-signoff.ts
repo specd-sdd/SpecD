@@ -20,6 +20,7 @@ export interface ApproveSignoffContext {
   readonly ownership: 'owned' | 'shared' | 'readOnly'
   /** Whether the workspace's specs live outside the current git root. */
   readonly isExternal: boolean
+  readonly configPath: string
 }
 
 /**
@@ -77,13 +78,23 @@ export function createApproveSignoff(
           ws2.name,
           createSchemaRepository(
             'fs',
-            { workspace: ws2.name, ownership: ws2.ownership, isExternal: ws2.isExternal },
+            {
+              workspace: ws2.name,
+              ownership: ws2.ownership,
+              isExternal: ws2.isExternal,
+              configPath: config.configPath,
+            },
             { schemasPath: ws2.schemasPath! },
           ),
         ]),
     ) as ReadonlyMap<string, SchemaRepository>
     return createApproveSignoff(
-      { workspace: ws.name, ownership: ws.ownership, isExternal: ws.isExternal },
+      {
+        workspace: ws.name,
+        ownership: ws.ownership,
+        isExternal: ws.isExternal,
+        configPath: config.configPath,
+      },
       {
         changesPath: config.storage.changesPath,
         draftsPath: config.storage.draftsPath,

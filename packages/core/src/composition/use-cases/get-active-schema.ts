@@ -60,7 +60,12 @@ export function createGetActiveSchema(
           ws.name,
           createSchemaRepository(
             'fs',
-            { workspace: ws.name, ownership: ws.ownership, isExternal: ws.isExternal },
+            {
+              workspace: ws.name,
+              ownership: ws.ownership,
+              isExternal: ws.isExternal,
+              configPath: configOrOptions.configPath,
+            },
             { schemasPath: ws.schemasPath! },
           ),
         ]),

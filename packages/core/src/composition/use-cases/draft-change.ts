@@ -14,6 +14,7 @@ export interface DraftChangeContext {
   readonly ownership: 'owned' | 'shared' | 'readOnly'
   /** Whether the workspace's specs live outside the current git root. */
   readonly isExternal: boolean
+  readonly configPath: string
 }
 
 /**
@@ -61,7 +62,12 @@ export function createDraftChange(
     const config = configOrContext
     const ws = getDefaultWorkspace(config)
     return createDraftChange(
-      { workspace: ws.name, ownership: ws.ownership, isExternal: ws.isExternal },
+      {
+        workspace: ws.name,
+        ownership: ws.ownership,
+        isExternal: ws.isExternal,
+        configPath: config.configPath,
+      },
       {
         changesPath: config.storage.changesPath,
         draftsPath: config.storage.draftsPath,

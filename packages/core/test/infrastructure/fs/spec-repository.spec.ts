@@ -27,6 +27,7 @@ async function setupRepo(): Promise<RepoContext> {
     workspace: 'default',
     ownership: 'owned',
     isExternal: false,
+    configPath: '/test',
     specsPath,
     metadataPath: path.join(tmpDir, '.specd', 'metadata'),
   })
@@ -322,6 +323,7 @@ describe('FsSpecRepository', () => {
         workspace: 'default',
         ownership: 'owned',
         isExternal: false,
+        configPath: '/test',
         specsPath,
         metadataPath: path.join(tmpDir, '.specd', 'metadata'),
         prefix: '_global',
@@ -406,6 +408,7 @@ describe('FsSpecRepository', () => {
         workspace: 'shared',
         ownership: 'readOnly',
         isExternal: false,
+        configPath: '/test',
         specsPath,
         metadataPath: path.join(tmpDir, '.specd', 'metadata'),
         prefix: 'team_1/shared',
@@ -480,6 +483,7 @@ describe('FsSpecRepository', () => {
         workspace: 'core',
         ownership: 'owned',
         isExternal: false,
+        configPath: '/test',
         specsPath,
         metadataPath: path.join(tmpDir, '.specd', 'metadata'),
         prefix: 'core',
@@ -548,6 +552,7 @@ describe('FsSpecRepository', () => {
         workspace: 'core',
         ownership: 'owned',
         isExternal: false,
+        configPath: '/test',
         specsPath,
         metadataPath: path.join(tmpDir, '.specd', 'metadata'),
         prefix: 'core',
@@ -627,6 +632,7 @@ describe('FsSpecRepository', () => {
         workspace: 'platform',
         ownership: 'readOnly',
         isExternal: false,
+        configPath: '/test',
         specsPath,
         metadataPath: path.join(tmpDir, '.specd', 'metadata'),
       })
@@ -693,6 +699,7 @@ describe('FsSpecRepository', () => {
         workspace: 'skills',
         ownership: 'owned',
         isExternal: false,
+        configPath: '/test',
         specsPath,
         metadataPath: path.join(tmpDir, '.specd', 'metadata'),
       })
@@ -700,10 +707,23 @@ describe('FsSpecRepository', () => {
       const spec = await repo.get(SpecPath.parse('get-skill'))
       expect(spec).not.toBeNull()
 
-      await repo.saveMetadata(spec!, JSON.stringify({ title: 'Get Skill', description: 'Test', contentHashes: {} }))
+      await repo.saveMetadata(
+        spec!,
+        JSON.stringify({ title: 'Get Skill', description: 'Test', contentHashes: {} }),
+      )
 
-      const metadataPath = path.join(tmpDir, '.specd', 'metadata', 'skills', 'get-skill', 'metadata.json')
-      const exists = await fs.access(metadataPath).then(() => true).catch(() => false)
+      const metadataPath = path.join(
+        tmpDir,
+        '.specd',
+        'metadata',
+        'skills',
+        'get-skill',
+        'metadata.json',
+      )
+      const exists = await fs
+        .access(metadataPath)
+        .then(() => true)
+        .catch(() => false)
       expect(exists).toBe(true)
 
       await fs.rm(tmpDir, { recursive: true, force: true })
@@ -720,6 +740,7 @@ describe('FsSpecRepository', () => {
         workspace: 'core',
         ownership: 'owned',
         isExternal: false,
+        configPath: '/test',
         specsPath,
         metadataPath: path.join(tmpDir, '.specd', 'metadata'),
         prefix: 'core',
@@ -728,10 +749,24 @@ describe('FsSpecRepository', () => {
       const spec = await repo.get(SpecPath.parse('core/config'))
       expect(spec).not.toBeNull()
 
-      await repo.saveMetadata(spec!, JSON.stringify({ title: 'Config', description: 'Test', contentHashes: {} }))
+      await repo.saveMetadata(
+        spec!,
+        JSON.stringify({ title: 'Config', description: 'Test', contentHashes: {} }),
+      )
 
-      const metadataPath = path.join(tmpDir, '.specd', 'metadata', 'core', 'core', 'config', 'metadata.json')
-      const exists = await fs.access(metadataPath).then(() => true).catch(() => false)
+      const metadataPath = path.join(
+        tmpDir,
+        '.specd',
+        'metadata',
+        'core',
+        'core',
+        'config',
+        'metadata.json',
+      )
+      const exists = await fs
+        .access(metadataPath)
+        .then(() => true)
+        .catch(() => false)
       expect(exists).toBe(true)
 
       await fs.rm(tmpDir, { recursive: true, force: true })

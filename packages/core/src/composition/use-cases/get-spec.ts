@@ -37,7 +37,12 @@ export function createGetSpec(configOrOptions: SpecdConfig | FsGetSpecOptions): 
         ws.name,
         createSpecRepository(
           'fs',
-          { workspace: ws.name, ownership: ws.ownership, isExternal: ws.isExternal },
+          {
+            workspace: ws.name,
+            ownership: ws.ownership,
+            isExternal: ws.isExternal,
+            configPath: config.configPath,
+          },
           {
             specsPath: ws.specsPath,
             metadataPath: path.join(ws.specsPath, '..', '.specd', 'metadata'),

@@ -53,7 +53,7 @@ class StubArchiveRepository extends ArchiveRepository {
   private readonly _override: ((change: Change) => ArchivedChange) | undefined
 
   constructor(override?: (change: Change) => ArchivedChange) {
-    super({ workspace: 'default', ownership: 'owned', isExternal: false })
+    super({ workspace: 'default', ownership: 'owned', isExternal: false, configPath: '/test' })
     this._override = override
   }
 

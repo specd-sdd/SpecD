@@ -8,6 +8,7 @@ export interface ListChangesContext {
   readonly workspace: string
   readonly ownership: 'owned' | 'shared' | 'readOnly'
   readonly isExternal: boolean
+  readonly configPath: string
 }
 
 /** Filesystem adapter paths for `createListChanges(context, options)`. */
@@ -50,7 +51,12 @@ export function createListChanges(
     const config = configOrContext
     const ws = getDefaultWorkspace(config)
     return createListChanges(
-      { workspace: ws.name, ownership: ws.ownership, isExternal: ws.isExternal },
+      {
+        workspace: ws.name,
+        ownership: ws.ownership,
+        isExternal: ws.isExternal,
+        configPath: config.configPath,
+      },
       {
         changesPath: config.storage.changesPath,
         draftsPath: config.storage.draftsPath,

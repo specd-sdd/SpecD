@@ -27,6 +27,7 @@ export interface ValidateArtifactsContext {
   readonly ownership: 'owned' | 'shared' | 'readOnly'
   /** Whether the workspace's specs live outside the current git root. */
   readonly isExternal: boolean
+  readonly configPath: string
 }
 
 /**
@@ -99,7 +100,12 @@ export function createValidateArtifacts(
         ws.name,
         createSpecRepository(
           'fs',
-          { workspace: ws.name, ownership: ws.ownership, isExternal: ws.isExternal },
+          {
+            workspace: ws.name,
+            ownership: ws.ownership,
+            isExternal: ws.isExternal,
+            configPath: config.configPath,
+          },
           {
             specsPath: ws.specsPath,
             metadataPath: path.join(ws.specsPath, '..', '.specd', 'metadata'),
@@ -115,7 +121,12 @@ export function createValidateArtifacts(
           ws.name,
           createSchemaRepository(
             'fs',
-            { workspace: ws.name, ownership: ws.ownership, isExternal: ws.isExternal },
+            {
+              workspace: ws.name,
+              ownership: ws.ownership,
+              isExternal: ws.isExternal,
+              configPath: config.configPath,
+            },
             { schemasPath: ws.schemasPath! },
           ),
         ]),
@@ -125,6 +136,7 @@ export function createValidateArtifacts(
         workspace: defaultWs.name,
         ownership: defaultWs.ownership,
         isExternal: defaultWs.isExternal,
+        configPath: config.configPath,
       },
       {
         changesPath: config.storage.changesPath,

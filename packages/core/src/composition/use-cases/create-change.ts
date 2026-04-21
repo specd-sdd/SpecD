@@ -17,6 +17,7 @@ export interface CreateChangeContext {
   readonly ownership: 'owned' | 'shared' | 'readOnly'
   /** Whether the workspace's specs live outside the current git root. */
   readonly isExternal: boolean
+  readonly configPath: string
 }
 
 /**
@@ -64,7 +65,12 @@ export function createCreateChange(
     const config = configOrContext
     const ws = getDefaultWorkspace(config)
     return createCreateChange(
-      { workspace: ws.name, ownership: ws.ownership, isExternal: ws.isExternal },
+      {
+        workspace: ws.name,
+        ownership: ws.ownership,
+        isExternal: ws.isExternal,
+        configPath: config.configPath,
+      },
       {
         changesPath: config.storage.changesPath,
         draftsPath: config.storage.draftsPath,
