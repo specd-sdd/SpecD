@@ -9,9 +9,10 @@ You do not typically run specd by typing CLI commands one by one. Instead, you i
 When you set up specd in a project, you install skills for your coding assistant of choice:
 
 ```bash
-specd project init --agent claude     # Install skills for Claude Code
-specd project init --agent copilot    # Install skills for GitHub Copilot
-specd project init --agent codex      # Install skills for OpenAI Codex
+specd project init --plugin @specd/plugin-agent-claude     # Install skills for Claude Code
+specd project init --plugin @specd/plugin-agent-copilot    # Install skills for GitHub Copilot
+specd project init --plugin @specd/plugin-agent-codex      # Install skills for OpenAI Codex
+specd project init --plugin @specd/plugin-agent-opencode   # Install skills for Open Code
 ```
 
 This installs slash commands that the coding assistant can invoke. The main one is `/specd`.

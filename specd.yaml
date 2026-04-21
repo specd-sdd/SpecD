@@ -18,8 +18,8 @@ context:
       specs before drafting new ones. Avoid duplicates; update existing specs
       instead. Use specd's context features to include relevant specs in
       workflow steps. For example, include 'default:*' to always have global
-      specs in context. Always write artifacts, code, comments, and documentation
-      in english.
+      specs in context. Always write artifacts, code, comments, and
+      documentation in english.
 
 workspaces:
   default:
@@ -221,16 +221,19 @@ schemaOverrides:
               run: 'pnpm lint'
             - id: archiving-edit-description
               instruction: >-
-                Read the proposal.md anddesign.md files in this change directory.
-                Based on their content, write a more elaborate description (2-3 sentences)
-                that summarizes the change purpose and outcomes.
+                Read the proposal.md anddesign.md files in this change
+                directory. Based on their content, write a more elaborate
+                description (2-3 sentences) that summarizes the change purpose
+                and outcomes.
 
-                Ask the user to review and edit this description for clarity and completeness. 
+                Ask the user to review and edit this description for clarity and
+                completeness. 
 
-                You can edit the change description using the command line after this step
-                with `specd change edit <change-name> --description "..."`.
+                You can edit the change description using the command line after
+                this step with `specd change edit <change-name> --description
+                "..."`.
             - id: archiving-release-info
-              instruction: >-
+              instruction: |
                 Run `specd change status` to get the list of affected specs,
                 then create a `.changeset-release.yaml` file in the change
                 directory with release metadata:
@@ -246,6 +249,7 @@ schemaOverrides:
                 fixes, refactors, chores (default)
 
                 Example for a change affecting 2 specs:
+
                 ```yaml
                 releases:
                   core:core/validate-artifacts: patch
@@ -258,3 +262,5 @@ schemaOverrides:
 plugins:
   agents:
     - name: '@specd/plugin-agent-claude'
+    - name: '@specd/plugin-agent-codex'
+    - name: '@specd/plugin-agent-opencode'

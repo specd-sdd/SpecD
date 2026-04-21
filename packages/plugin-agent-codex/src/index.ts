@@ -1,41 +1,18 @@
-import type {
-  AgentPlugin,
-  InstallOptions,
-  InstallResult,
-  PluginContext,
-} from '@specd/plugin-manager'
+import type { AgentPlugin } from '@specd/plugin-manager'
+import { InstallSkills } from './application/use-cases/install-skills.js'
+import { UninstallSkills } from './application/use-cases/uninstall-skills.js'
+import { CodexAgentPlugin } from './domain/types/codex-plugin.js'
 
 /**
- * Creates the Codex agent plugin stub.
+ * Creates the Codex agent plugin instance.
  *
- * @returns Contract-valid `AgentPlugin`.
+ * @returns Codex `AgentPlugin`.
  */
 export function create(): AgentPlugin {
-  return {
-    name: '@specd/plugin-agent-codex',
-    type: 'agent',
-    version: '0.0.1',
-    configSchema: {},
-    init(context: PluginContext): Promise<void> {
-      void context
-      return Promise.resolve()
-    },
-    destroy(): Promise<void> {
-      return Promise.resolve()
-    },
-    install(projectRoot: string, options?: InstallOptions): Promise<InstallResult> {
-      void options
-      return Promise.resolve({
-        installed: [],
-        skipped: [
-          { skill: '*', reason: `stub plugin: no install workflow for '${projectRoot}' yet` },
-        ],
-      })
-    },
-    uninstall(projectRoot: string, options?: InstallOptions): Promise<void> {
-      void projectRoot
-      void options
-      return Promise.resolve()
-    },
-  }
+  const installSkills = new InstallSkills()
+  const uninstallSkills = new UninstallSkills()
+  return new CodexAgentPlugin(
+    (projectRoot, options) => installSkills.execute(projectRoot, options),
+    (projectRoot, options) => uninstallSkills.execute(projectRoot, options),
+  )
 }

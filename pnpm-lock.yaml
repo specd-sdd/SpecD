@@ -23,9 +23,6 @@ importers:
       '@commitlint/types':
         specifier: ^19.8.1
         version: 19.8.1
-      '@specd/plugin-agent-claude':
-        specifier: workspace:^
-        version: link:packages/plugin-agent-claude
       '@types/node':
         specifier: ^22.19.17
         version: 22.19.17
@@ -150,6 +147,9 @@ importers:
       '@specd/plugin-agent-copilot':
         specifier: workspace:*
         version: link:../plugin-agent-copilot
+      '@specd/plugin-agent-opencode':
+        specifier: workspace:*
+        version: link:../plugin-agent-opencode
       '@specd/plugin-manager':
         specifier: workspace:*
         version: link:../plugin-manager
@@ -267,6 +267,15 @@ importers:
         specifier: workspace:*
         version: link:../skills
 
+  packages/plugin-agent-opencode:
+    dependencies:
+      '@specd/plugin-manager':
+        specifier: workspace:*
+        version: link:../plugin-manager
+      '@specd/skills':
+        specifier: workspace:*
+        version: link:../skills
+
   packages/plugin-manager:
     dependencies:
       '@specd/core':
@@ -311,6 +320,9 @@ importers:
       '@specd/plugin-agent-copilot':
         specifier: workspace:*
         version: link:../plugin-agent-copilot
+      '@specd/plugin-agent-opencode':
+        specifier: workspace:*
+        version: link:../plugin-agent-opencode
       '@specd/plugin-manager':
         specifier: workspace:*
         version: link:../plugin-manager

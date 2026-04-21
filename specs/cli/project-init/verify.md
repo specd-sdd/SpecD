@@ -17,6 +17,14 @@
 - **WHEN** the user selects plugins
 - **THEN** selected plugins are marked for installation
 
+### Requirement: Known plugin options
+
+#### Scenario: Wizard includes Open Code in known options
+
+- **GIVEN** interactive mode is active
+- **WHEN** the plugin selection options are rendered
+- **THEN** `@specd/plugin-agent-opencode` is listed as a selectable plugin option
+
 ### Requirement: Non-interactive mode
 
 #### Scenario: Default values produce a valid minimal config

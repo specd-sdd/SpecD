@@ -19,6 +19,12 @@
       ]
     },
     {
+      "requirement": "Known plugin options",
+      "rules": [
+        "The interactive plugin-selection wizard MUST expose this known agent plugin option set:\n\n- `@specd/plugin-agent-claude`\n- `@specd/plugin-agent-copilot`\n- `@specd/plugin-agent-codex`\n- `@specd/plugin-agent-opencode`"
+      ]
+    },
+    {
       "requirement": "Non-interactive mode",
       "rules": [
         "When not in interactive mode, the command uses the flag values (or defaults) directly, calls `InitProject`, optionally installs skills for agents specified via `--agent`, and prints output according to `--format`.\n\n- `text`: prints `initialized specd in <absolute-project-root-path>` followed by any skills installed.\n- `json` or `toon`: outputs `{\"result\":\"ok\",\"configPath\":\"...\",\"schema\":\"...\",\"workspaces\":[...],\"skillsInstalled\":{}}` where `skillsInstalled` maps agent ids to arrays of installed skill names."
@@ -68,6 +74,13 @@
       "given": ["interactive mode is active"],
       "when": ["the user selects plugins"],
       "then": ["selected plugins are marked for installation"]
+    },
+    {
+      "requirement": "Known plugin options",
+      "name": "Wizard includes Open Code in known options",
+      "given": ["interactive mode is active"],
+      "when": ["the plugin selection options are rendered"],
+      "then": ["@specd/plugin-agent-opencode is listed as a selectable plugin option"]
     },
     {
       "requirement": "Non-interactive mode",
@@ -148,8 +161,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:fd03ea39eac35e9b5525ad0de5e6733fa518e3eb453572f96de324b5c0e68d34",
-    "verify.md": "sha256:c8df257b20414f45eadab11aa0d4f7f5f460feaafd4c190059fb3b3b0989c6eb"
+    "spec.md": "sha256:ef42c9d3a1ef8e3fba4d7746fb03960beba47e992176b7cde8563973d0d4aac3",
+    "verify.md": "sha256:29ebdb6032324fbdc993ec5bf0c287f763046ce4b1a5e737bee9ce2be6af6dcd"
   },
   "generatedBy": "core"
 }

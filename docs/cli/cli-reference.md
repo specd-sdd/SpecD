@@ -680,18 +680,18 @@ Initialize a new SpecD project in the current directory. When run in a TTY, laun
 
 `project init` creates `specd.yaml`, adds the default storage directories to `.gitignore`, and installs skills for any declared agent plugins.
 
-| Option                      | Description                                                                            |
-| --------------------------- | -------------------------------------------------------------------------------------- |
-| `--schema <ref>`            | Schema reference to use (e.g. `@specd/schema-std`).                                    |
-| `--workspace <name>`        | Workspace name. Defaults to `default`.                                                 |
-| `--workspace-path <path>`   | Path to the specs directory for the workspace.                                         |
-| `--agent <id>`              | Install skills for this agent. Repeatable. Valid values: `claude`, `copilot`, `codex`. |
-| `--force`                   | Overwrite existing `specd.yaml` if present.                                            |
-| `--format text\|json\|toon` | Output format.                                                                         |
+| Option                      | Description                                                                                                                                                                                      |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `--schema <ref>`            | Schema reference to use (e.g. `@specd/schema-std`).                                                                                                                                              |
+| `--workspace <name>`        | Workspace name. Defaults to `default`.                                                                                                                                                           |
+| `--workspace-path <path>`   | Path to the specs directory for the workspace.                                                                                                                                                   |
+| `--plugin <name>`           | Install skills for this agent plugin. Repeatable. Valid values include `@specd/plugin-agent-claude`, `@specd/plugin-agent-copilot`, `@specd/plugin-agent-codex`, `@specd/plugin-agent-opencode`. |
+| `--force`                   | Overwrite existing `specd.yaml` if present.                                                                                                                                                      |
+| `--format text\|json\|toon` | Output format.                                                                                                                                                                                   |
 
 ```bash
 # Non-interactive init with Claude integration
-specd project init --schema @specd/schema-std --agent claude
+specd project init --schema @specd/schema-std --plugin @specd/plugin-agent-claude
 ```
 
 ### project context
