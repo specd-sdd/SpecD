@@ -45,7 +45,7 @@ For `--changed` and `--pr` modes, map changed files to specs using this algorith
    c. For each spec, check if the changed file is related:
    - **Name matching**: Does the changed file path contain the spec name or a derivative? (e.g., `change.ts` → `specs/core/change/`, `spec-loader.ts` → `specs/core/spec-loading/`)
    - **Graph mapping**: Run `specd graph impact --symbol "<exported symbol>" --direction both` to find which execution flows the changed code participates in. Map flow names to spec areas.
-   - **Broad match fallback**: If neither name nor GitNexus produces a confident match, include ALL specs for that package (better to over-audit than miss something).
+   - **Broad match fallback**: If neither name nor `specd graph impact` produces a confident match, include ALL specs for that package (better to over-audit than miss something).
 
 3. **Config/tooling changes**: If files like `tsconfig.json`, `.eslintrc.*`, `vitest.config.*`, `package.json`, or files outside `packages/` changed → include relevant global specs (`specs/_global/`).
 
@@ -80,7 +80,7 @@ If no specs are resolved (e.g., only non-code files changed), report "No specs a
 
 4. **Read-only.** Never use Edit or NotebookEdit. Only use Write for the final report to `.specd/reports/spec-compliance/`.
 
-5. **Use GitNexus for code intelligence.** This project is indexed by GitNexus. Use its tools to navigate the codebase structurally instead of relying solely on grep/glob. GitNexus understands call graphs, execution flows, and symbol relationships — use it to find all code relevant to a spec requirement, not just keyword matches.
+5. **Use `specd graph impact` for code intelligence.** This project is indexed by `specd graph`. Use its tools to navigate the codebase structurally instead of relying solely on grep/glob. `specd graph` understands call graphs, execution flows, and symbol relationships — use it to find all code relevant to a spec requirement, not just keyword matches.
 
 ---
 
@@ -186,10 +186,10 @@ Launch one subagent per batch, all in parallel. Each subagent receives:
 **For package spec subagents:**
 
 1. For each spec ID (e.g., `core:core/change`), run `specd spec show <specId>` to get the spec content
-2. **Use GitNexus first to locate relevant code:**
+2. **Use `specd graph` first to locate relevant code:**
    - `specd graph search "<spec concept>"` to find execution flows related to the spec's domain (e.g., `specd graph search "change creation lifecycle"` for the change spec). This returns symbols and files related to the query — far more precise than keyword grep.
    - `specd graph impact --symbol "<symbol>" --direction both` to get the full picture: all callers, callees, which files use the symbol. This reveals whether a requirement is implemented across multiple call sites.
-   - Fall back to Grep/Glob only when GitNexus doesn't surface the relevant code (e.g., for configuration files, static patterns, or newly added code not yet indexed).
+   - Fall back to Grep/Glob only when `specd graph` doesn't surface the relevant code (e.g., for configuration files, static patterns, or newly added code not yet indexed).
 3. Compare every requirement against the implementation
 4. Find corresponding tests in the package's `test/` directory
 5. Verify test coverage for each scenario in `verify.md`
