@@ -9,6 +9,7 @@
     "type": "git",
     "url": "https://github.com/specd-sdd/SpecD.git"
   },
+  "homepage": "https://getspecd.dev",
   "dependencies": {
     "@specd/cli": "workspace:*",
     "@specd/code-graph": "workspace:*",

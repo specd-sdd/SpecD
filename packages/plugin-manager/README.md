@@ -1,6 +1,6 @@
 # @specd/plugin-manager
 
-Plugin infrastructure for specd. Defines the base plugin contracts (`SpecdPlugin`, `AgentPlugin`) and provides loading and validation utilities consumed by the CLI and agent plugins.
+Plugin infrastructure for [specd](https://github.com/specd-sdd/SpecD). For more information, visit [getspecd.dev](https://getspecd.dev). Defines the base plugin contracts (`SpecdPlugin`, `AgentPlugin`) and provides loading and validation utilities consumed by the CLI and agent plugins.
 
 ## Exports
 
