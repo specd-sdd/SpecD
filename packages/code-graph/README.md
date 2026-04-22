@@ -1,6 +1,6 @@
 # @specd/code-graph
 
-Code graph indexing and analysis library for specd. Parses source files across
+Code graph indexing and analysis library for [specd](https://github.com/specd-sdd/SpecD). For more information, visit [getspecd.dev](https://getspecd.dev). Parses source files across
 multiple languages, extracts symbols and relationships, and stores the result in
 a persistent graph database for impact analysis, traversal, and full-text search.
 

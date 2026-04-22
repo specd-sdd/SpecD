@@ -1,6 +1,6 @@
 # @specd/cli
 
-The command-line interface for [specd](../../README.md) — a spec-driven development platform. Provides commands for managing the full change lifecycle, browsing specs, inspecting configuration and schemas, and managing agent skills.
+The command-line interface for [specd](https://github.com/specd-sdd/SpecD) — a spec-driven development platform. For more information, visit [getspecd.dev](https://getspecd.dev). Provides commands for managing the full change lifecycle, browsing specs, inspecting configuration and schemas, and managing agent skills.
 
 ## Installation
 

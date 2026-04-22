@@ -1,6 +1,6 @@
 # @specd/schema-std
 
-The default schema for [specd](../../README.md). Defines the standard artifact types, workflow steps, templates, and validation rules used by specd projects.
+The default schema for [specd](https://github.com/specd-sdd/SpecD). For more information, visit [getspecd.dev](https://getspecd.dev). Defines the standard artifact types, workflow steps, templates, and validation rules used by specd projects.
 
 ## Contents
 

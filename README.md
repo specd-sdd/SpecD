@@ -1,6 +1,6 @@
 # SpecD
 
-A spec-driven development platform for AI-native teams. SpecD compiles the specs your agent needs at every lifecycle step — so context is delivered, not discovered, and compliance is structural, not hoped for.
+A spec-driven development platform for AI-native teams. [SpecD](https://github.com/specd-sdd/SpecD) compiles the specs your agent needs at every lifecycle step — so context is delivered, not discovered, and compliance is structural, not hoped for. For more information, visit [getspecd.dev](https://getspecd.dev).
 
 ## What is SpecD?
 

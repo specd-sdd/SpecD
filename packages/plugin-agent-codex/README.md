@@ -1,6 +1,6 @@
 # @specd/plugin-agent-codex
 
-Codex agent plugin for specd. Installs specd skills into `.codex/skills/` with Codex-specific YAML frontmatter.
+Codex agent plugin for [specd](https://github.com/specd-sdd/SpecD). For more information, visit [getspecd.dev](https://getspecd.dev). Installs specd skills into `.codex/skills/` with Codex-specific YAML frontmatter.
 
 ## Install
 

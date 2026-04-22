@@ -1,6 +1,6 @@
 # @specd/plugin-agent-claude
 
-Claude agent plugin for specd. Installs specd skills into `.claude/skills/` with Claude-specific YAML frontmatter.
+Claude agent plugin for [specd](https://github.com/specd-sdd/SpecD). For more information, visit [getspecd.dev](https://getspecd.dev). Installs specd skills into `.claude/skills/` with Claude-specific YAML frontmatter.
 
 ## Install
 

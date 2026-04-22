@@ -1,6 +1,6 @@
 # @specd/core
 
-The domain library for [specd](../../README.md) — a spec-driven development platform. Contains all business logic as a self-contained, I/O-free core that the CLI, MCP server, and any other delivery mechanism build on top of.
+The domain library for [specd](https://github.com/specd-sdd/SpecD) — a spec-driven development platform. For more information, visit [getspecd.dev](https://getspecd.dev).
 
 ## Installation
 

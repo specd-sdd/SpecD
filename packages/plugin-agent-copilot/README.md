@@ -1,6 +1,6 @@
 # @specd/plugin-agent-copilot
 
-GitHub Copilot agent plugin for specd. Installs specd skills into `.github/skills/` with Copilot-specific YAML frontmatter.
+GitHub Copilot agent plugin for [specd](https://github.com/specd-sdd/SpecD). For more information, visit [getspecd.dev](https://getspecd.dev). Installs specd skills into `.github/skills/` with Copilot-specific YAML frontmatter.
 
 ## Install
 

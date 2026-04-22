@@ -1,6 +1,6 @@
 # @specd/plugin-agent-opencode
 
-Open Code agent plugin for specd. Installs specd skills into `.opencode/skills/` with Open Code-specific YAML frontmatter.
+Open Code agent plugin for [specd](https://github.com/specd-sdd/SpecD). For more information, visit [getspecd.dev](https://getspecd.dev). Installs specd skills into `.opencode/skills/` with Open Code-specific YAML frontmatter.
 
 ## Install
 

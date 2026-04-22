@@ -1,6 +1,6 @@
 # @specd/mcp
 
-MCP (Model Context Protocol) server adapter for [specd](../../README.md).
+MCP (Model Context Protocol) server adapter for [specd](https://github.com/specd-sdd/SpecD). For more information, visit [getspecd.dev](https://getspecd.dev).
 
 > **Status:** Stub -- not yet implemented.
 
