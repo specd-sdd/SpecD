@@ -40,7 +40,7 @@
     {
       "requirement": "Expansion semantics",
       "rules": [
-        "When expanding a template string:\n\n1. Each `{{namespace.key}}` token is resolved by traversing the variable map: first look up the namespace, then the key within it.\n2. If the namespace exists and the key resolves to a string, number, or boolean, the token is replaced with the value.\n3. If the namespace does not exist, the key does not exist, or the value is not a primitive, the original `{{namespace.key}}` token is preserved unchanged.\n4. Expansion is single-pass — expanded values are not re-scanned for further tokens."
+        "When expanding a template string:\n\n1. Each `{{namespace.key}}` token is resolved by traversing the variable map: first look up the namespace, then the key within it.\n2. If the namespace exists and the key resolves to a string, number, or boolean, the token is replaced with the value.\n3. If the namespace does not exist, the key does not exist, or the value is not a primitive, the original `{{namespace.key}}` token is preserved unchanged.\n4. Expansion is single-pass — expanded values are not re-scanned for further tokens.\n\nWhen a token is not resolved (step 3), `TemplateExpander` MUST invoke the `onUnknown` callback if provided at construction. The callback receives the unresolved token string. If no callback is provided, unknown tokens are silently preserved with no side effects."
       ]
     },
     {
@@ -52,7 +52,7 @@
     {
       "requirement": "TemplateExpander class",
       "rules": [
-        "`TemplateExpander` is a class (not a port) that encapsulates template expansion logic. It receives the built-in variables at construction time:\n\n```typescript\nclass TemplateExpander {\n  constructor(builtins: TemplateVariables)\n\n  expand(template: string, variables?: TemplateVariables): string\n  expandForShell(template: string, variables?: TemplateVariables): string\n}\n```\n\n- The `builtins` provided at construction (e.g. `{ project: { root: '...' } }`) are always present in every expansion.\n- `expand(template, variables?)` — merges contextual `variables` with built-ins and substitutes values verbatim. Used by `GetHookInstructions` and `GetArtifactInstruction` for instruction text.\n- `expandForShell(template, variables?)` — merges contextual `variables` with built-ins and substitutes values with shell escaping. Used by `HookRunner` for `run:` commands.\n- Contextual variables MUST NOT override built-in variables. If a contextual namespace collides with a built-in namespace, the built-in keys take precedence.\n- Both methods share the same traversal and resolution logic — only the substitution step differs.\n\nThe composition layer constructs a single `TemplateExpander` instance with built-in variables and injects it into all use cases that need expansion."
+        "`TemplateExpander` is a class (not a port) that encapsulates template expansion logic. It receives the built-in variables at construction time:\n\n```typescript\ntype OnUnknownVariable = (token: string) => void\n\nclass TemplateExpander {\n  constructor(builtins: TemplateVariables, onUnknown?: OnUnknownVariable)\n\n  expand(template: string, variables?: TemplateVariables): string\n  expandForShell(template: string, variables?: TemplateVariables): string\n}\n```\n\n- The `builtins` provided at construction (e.g. `{ project: { root: '...' } }`) are always present in every expansion.\n- `onUnknown` is an optional callback invoked when a `{{namespace.key}}` token cannot be resolved. When provided, it is called once per unresolved token. The callback is informational only — it does not affect the expansion result.\n- `expand(template, variables?)` — merges contextual `variables` with built-ins and substitutes values verbatim. Used by `GetHookInstructions` and `GetArtifactInstruction` for instruction text.\n- `expandForShell(template, variables?)` — merges contextual `variables` with built-ins and substitutes values with shell escaping. Used by `HookRunner` for `run:` commands.\n- Contextual variables MUST NOT override built-in variables. If a contextual namespace collides with a built-in namespace, the built-in keys take precedence.\n- Both methods share the same traversal and resolution logic — only the substitution step differs.\n\nThe composition layer constructs a single `TemplateExpander` instance with built-in variables and an `onUnknown` callback (typically `console.warn` or a logging adapter), and injects it into all use cases that need expansion."
       ]
     },
     {
@@ -71,6 +71,7 @@
   "constraints": [
     "Template variables are single-pass — no recursive expansion",
     "Unknown tokens are preserved unchanged, never removed or errored",
+    "When an onUnknown callback is provided, it is invoked for each unresolved token — this is informational only and does not halt or change expansion",
     "Shell escaping is only applied via expandForShell(), never in expand()",
     "The variable map is flat within each namespace — no nested objects beyond namespace.key",
     "project namespace is always present; other namespaces are optional",
@@ -127,6 +128,19 @@
       ],
       "when": ["expand() is called"],
       "then": ["the result is \"{{project.root}}\" — the expanded value is not re-scanned"]
+    },
+    {
+      "requirement": "Expansion semantics",
+      "name": "Unknown token invokes onUnknown callback",
+      "given": [
+        "a TemplateExpander constructed with onUnknown callback",
+        "AND a template \"{{unknown.key}}\""
+      ],
+      "when": ["expand() is called"],
+      "then": [
+        "the onUnknown callback is called with \"unknown.key\"",
+        "AND the result is \"{{unknown.key}}\" — the token is preserved"
+      ]
     },
     {
       "requirement": "Shell escaping for run hooks",
@@ -191,6 +205,29 @@
       "then": ["the result is \"/home/dev/myapp\" — built-in takes precedence"]
     },
     {
+      "requirement": "TemplateExpander class",
+      "name": "onUnknown callback invoked for unresolved tokens",
+      "given": [
+        "a TemplateExpander constructed with builtins and onUnknown: (token) => warnings.push(token)",
+        "AND a template \"{{foo.bar}} and {{baz.qux}}\""
+      ],
+      "when": ["expand() is called with empty contextual variables"],
+      "then": [
+        "onUnknown is called twice — with \"foo.bar\" and \"baz.qux\"",
+        "AND the result is \"{{foo.bar}} and {{baz.qux}}\""
+      ]
+    },
+    {
+      "requirement": "TemplateExpander class",
+      "name": "No onUnknown callback means silent preservation",
+      "given": [
+        "a TemplateExpander constructed with builtins only (no onUnknown)",
+        "AND a template \"{{unknown.key}}\""
+      ],
+      "when": ["expand() is called"],
+      "then": ["no callback is invoked", "AND the result is \"{{unknown.key}}\""]
+    },
+    {
       "requirement": "Variable map construction",
       "name": "Use cases build contextual variables per invocation",
       "given": ["a use case that needs template expansion"],
@@ -227,8 +264,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:836226915cf1df7b2f35c16fe62856172a7a9eec2e1983faa492d84ad092c967",
-    "verify.md": "sha256:d9f9ff99222d61ea00870420e898e6c9dddcd9e07496183e9041ece16807b78a"
+    "spec.md": "sha256:944432255b74f26ba5564b803aa22654c3cc643db5569b7bc3fdebfb1526ea1f",
+    "verify.md": "sha256:800543b9cd542f37cc210d393a23d23dce7490dffe4b0863f502714d4996bf0d"
   },
   "generatedBy": "core"
 }

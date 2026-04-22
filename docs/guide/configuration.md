@@ -527,25 +527,6 @@ SpecD also validates configuration at startup before every command that requires
 - `adapter: fs` declared but `fs.path` missing
 - A storage path that resolves outside the repository root
 
----
-
-## Artifact rules
-
-`artifactRules` is a lighter-weight alternative to `schemaOverrides` for adding per-artifact writing conventions. Keys are artifact IDs; values are arrays of rule strings injected after the schema's own artifact instruction:
-
-```yaml
-artifactRules:
-  specs:
-    - 'All requirements must use SHALL or MUST for normative statements.'
-    - 'Every requirement must have at least one WHEN/THEN scenario in verify.md.'
-  design:
-    - 'Architecture decisions must reference an ADR number.'
-```
-
-Use `artifactRules` for project-specific writing standards. Use `schemaOverrides` when you need to add hooks, change workflow behaviour, or add new artifacts.
-
----
-
 ## Where to go next
 
 | Topic                                                           | Document                                                 |

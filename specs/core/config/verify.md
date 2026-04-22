@@ -234,10 +234,19 @@
 - **WHEN** `storage.archive.fs.pattern` is `'{{year}}/{{change.archivedName}}'`
 - **THEN** a change archived in 2024 is stored at `specd/archive/2024/<archivedName>/`
 
-#### Scenario: Unknown template variable
+#### Scenario: Unknown template variable emits warning
 
-- **WHEN** a template string contains `{{unknown}}`
-- **THEN** the literal string `{{unknown}}` is used and a warning is emitted
+- **GIVEN** a `TemplateExpander` constructed with an `onUnknown` callback
+- **WHEN** a template string contains `{{unknown.variable}}`
+- **THEN** the literal string `{{unknown.variable}}` is preserved in the output
+- **AND** the `onUnknown` callback is called with `"unknown.variable"`
+
+#### Scenario: Unknown variable without callback is silent
+
+- **GIVEN** a `TemplateExpander` constructed without an `onUnknown` callback
+- **WHEN** a template string contains `{{unknown.variable}}`
+- **THEN** the literal string `{{unknown.variable}}` is preserved in the output
+- **AND** no callback is invoked
 
 ### Requirement: Schema plugins
 
@@ -306,17 +315,27 @@
 #### Scenario: Plugins section with agents array
 
 - **WHEN** `specd.yaml` has a `plugins` section
-- **THEN** it contains an `agents` array
+- **THEN** it is validated by the config loader's Zod schema at load time
 
 #### Scenario: Agent plugin entry
 
 - **GIVEN** `plugins.agents` has an entry
 - **THEN** each entry has `name` (required) and optional `config`
 
+#### Scenario: Invalid plugin structure rejected at startup
+
+- **WHEN** `specd.yaml` has `plugins.agents: [{ invalid: true }]` (missing `name`)
+- **THEN** config validation fails with `ConfigValidationError`
+
 #### Scenario: ConfigWriter.addPlugin adds to array
 
 - **WHEN** `ConfigWriter.addPlugin(configPath, 'agents', '@specd/plugin-agent-claude')` is called
 - **THEN** the plugin is added to `plugins.agents` array
+
+#### Scenario: ConfigWriter.addPlugin with config
+
+- **WHEN** `ConfigWriter.addPlugin(configPath, 'agents', '@specd/plugin-agent-claude', { commandsDir: '.claude/commands' })` is called
+- **THEN** the plugin entry includes both `name` and `config`
 
 #### Scenario: ConfigWriter.removePlugin removes from array
 
@@ -503,11 +522,23 @@
 - **WHEN** config is validated at startup
 - **THEN** validation fails with a `ConfigValidationError` because lazy is no longer accepted
 
-#### Scenario: contextMode in workspace entry rejected
+#### Scenario: contextMode in workspace entry rejected with specific message
 
 - **GIVEN** `specd.yaml` contains a workspace with `contextMode: summary`
 - **WHEN** config is validated at startup
-- **THEN** validation fails with a `ConfigValidationError` indicating `contextMode` is not valid inside a workspace
+- **THEN** validation fails with a `ConfigValidationError` with the message "`contextMode` is not valid inside a workspace — it is a project-level setting"
+
+#### Scenario: artifactRules rejected at startup
+
+- **GIVEN** `specd.yaml` contains `artifactRules: { specs: [...] }`
+- **WHEN** config is validated at startup
+- **THEN** validation fails with `ConfigValidationError` suggesting migration to `schemaOverrides`
+
+#### Scenario: skills field rejected at startup
+
+- **GIVEN** `specd.yaml` contains a `skills` field
+- **WHEN** config is validated at startup
+- **THEN** validation fails with `ConfigValidationError` explaining skills are managed via the plugin system
 
 ### Requirement: Project context instructions
 

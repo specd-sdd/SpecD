@@ -43,9 +43,9 @@ Bootstrap mode is intended for initial indexing and exploratory graph queries. I
 | `contextIncludeSpecs` | array   | no       | —               | Spec patterns always included in compiled context. When absent, no project-level include patterns are applied. |
 | `contextExcludeSpecs` | array   | no       | —               | Spec patterns always excluded from compiled context.                                                           |
 | `contextMode`         | string  | no       | `'summary'`     | Context rendering mode: `'list'`, `'summary'`, `'full'`, or `'hybrid'`. See [`contextMode`](#contextmode).     |
-| `artifactRules`       | object  | no       | `{}`            | Per-artifact constraints added without modifying the schema.                                                   |
 | `approvals`           | object  | no       | both `false`    | Approval gate configuration.                                                                                   |
 | `llmOptimizedContext` | boolean | no       | `false`         | Opt in to LLM-enriched context operations.                                                                     |
+| `plugins`             | object  | no       | —               | Installed plugins grouped by type.                                                                             |
 | `schemaPlugins`       | array   | no       | `[]`            | Schema plugin references loaded and merged into the active schema.                                             |
 | `schemaOverrides`     | object  | no       | —               | Inline schema override operations applied after plugins. See [`schemaOverrides`](#schemaoverrides).            |
 
@@ -276,20 +276,22 @@ Each item must have exactly one key: `file` or `instruction`.
 
 Entries are prepended to the compiled context in declaration order, before any spec content. File content is not parsed or transformed — markdown, plain text, and any other format are treated as opaque strings.
 
-## artifactRules
+## plugins
 
-`artifactRules` adds per-artifact constraints without forking or modifying the schema. Keys are artifact IDs as declared in the active schema; values are arrays of constraint strings. `CompileContext` injects them as a distinct block after the schema's own instruction for that artifact.
+`plugins` declares installed plugins grouped by type. The config loader validates
+this structure at startup.
 
 ```yaml
-artifactRules:
-  specs:
-    - 'All requirements must reference the relevant RFC number'
-    - 'Scenarios must use WHEN/THEN/AND format'
-  design:
-    - 'Architecture decisions must reference an ADR'
+plugins:
+  agents:
+    - name: '@specd/plugin-agent-claude'
+    - name: '@specd/plugin-agent-codex'
+      config:
+        commandsDir: .codex/commands
 ```
 
-Keys are validated against the active schema's artifact IDs at startup. Unknown keys emit a warning but do not prevent startup.
+For `plugins.agents`, each entry requires `name` and may include `config`.
+Unknown plugin types are rejected at startup validation.
 
 ## approvals
 
@@ -419,6 +421,7 @@ SpecD validates `specd.yaml` before executing any command that requires a config
 | Storage path resolves outside the repo root                                     | Paths must stay within the repository.                           |
 | Invalid `contextIncludeSpecs` or `contextExcludeSpecs` pattern syntax           | e.g. `*` in a disallowed position.                               |
 | `llmOptimizedContext` is not a boolean                                          | Any other type is a startup validation error.                    |
+| Legacy `artifactRules` field is present                                         | Use `schemaOverrides` instead.                                   |
 
 Commands that skip validation entirely: `--help`, `--version`, `specd project init`, `specd config validate`, and `specd plugin` subcommands.
 
@@ -426,7 +429,6 @@ Commands that skip validation entirely: `--help`, `--version`, `specd project in
 
 | Condition                                                       | Warning                                                    |
 | --------------------------------------------------------------- | ---------------------------------------------------------- |
-| Unknown key in `artifactRules`                                  | No matching artifact ID in the active schema.              |
 | Duplicate workspace names                                       | YAML retains last-wins; the duplicate is a likely mistake. |
 | Unknown workspace qualifier in a context pattern (runtime only) | A typo silently excludes specs.                            |
 

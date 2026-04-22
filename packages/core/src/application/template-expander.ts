@@ -14,6 +14,13 @@
 export type TemplateVariables = Record<string, Record<string, string | number | boolean>>
 
 /**
+ * Callback invoked when a template token cannot be resolved.
+ *
+ * @param token - Unresolved token path (e.g. `unknown.key`)
+ */
+export type OnUnknownVariable = (token: string) => void
+
+/**
  * Escapes a value for safe interpolation into a shell command.
  *
  * Wraps the value in single quotes and escapes any embedded single quotes
@@ -35,14 +42,17 @@ function shellEscape(value: string): string {
  */
 export class TemplateExpander {
   private readonly _builtins: TemplateVariables
+  private readonly _onUnknown: OnUnknownVariable | undefined
 
   /**
    * Creates a new `TemplateExpander` with the given built-in variables.
    *
    * @param builtins - Variables always present in every expansion (e.g. `{ project: { root: '...' } }`)
+   * @param onUnknown - Optional callback invoked when a token cannot be resolved
    */
-  constructor(builtins: TemplateVariables) {
+  constructor(builtins: TemplateVariables, onUnknown?: OnUnknownVariable) {
     this._builtins = builtins
+    this._onUnknown = onUnknown
   }
 
   /**
@@ -89,7 +99,7 @@ export class TemplateExpander {
       const keys = path.split('.')
       let current: unknown = merged
       for (const key of keys) {
-        if (current == null || typeof current !== 'object') return `{{${path}}}`
+        if (current == null || typeof current !== 'object') return this._unknown(path)
         current = (current as Record<string, unknown>)[key]
       }
       if (
@@ -100,8 +110,19 @@ export class TemplateExpander {
         const value = String(current)
         return shell ? shellEscape(value) : value
       }
-      return `{{${path}}}`
+      return this._unknown(path)
     })
+  }
+
+  /**
+   * Handles unresolved tokens by invoking the optional callback and preserving the token.
+   *
+   * @param token - Unresolved token path (without braces)
+   * @returns The original token with braces
+   */
+  private _unknown(token: string): string {
+    this._onUnknown?.(token)
+    return `{{${token}}}`
   }
 
   /**

@@ -51,10 +51,10 @@ function renderText(config: SpecdConfig): string[] {
     lines.push('', `schemaPlugins: ${config.schemaPlugins.join(', ')}`)
   }
 
-  if (config.artifactRules !== undefined) {
-    lines.push('', 'artifactRules:')
-    for (const [id, rules] of Object.entries(config.artifactRules)) {
-      lines.push(`  ${id}: ${rules.length} rules`)
+  if (config.plugins?.agents !== undefined && config.plugins.agents.length > 0) {
+    lines.push('', 'plugins:', '  agents:')
+    for (const plugin of config.plugins.agents) {
+      lines.push(`    ${plugin.name}  (present)`)
     }
   }
 

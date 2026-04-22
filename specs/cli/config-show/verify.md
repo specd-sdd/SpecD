@@ -4,46 +4,17 @@
 
 ### Requirement: Output format
 
-#### Scenario: Text output shows all sections
+#### Scenario: artifactRules not shown in text output
 
-- **GIVEN** a valid config with one workspace, storage paths, and optional fields set (`contextIncludeSpecs`, `schemaOverrides`, `llmOptimizedContext`)
-- **WHEN** `specd config show` is run
-- **THEN** stdout contains `projectRoot`, `schemaRef`, `approvals`, `workspaces`, and `storage` sections
-- **AND** stdout contains `contextIncludeSpecs` line
-- **AND** stdout contains `llmOptimizedContext` line
-- **AND** all paths are absolute
-- **AND** the process exits with code 0
+- **GIVEN** a config with `artifactRules` set
+- **WHEN** `specd config show` runs in text mode
+- **THEN** the output does not include an `artifactRules` section
 
-#### Scenario: Approval gates shown correctly
+#### Scenario: plugins shown in text output
 
-- **GIVEN** `specd.yaml` has `approvals: { spec: true, signoff: false }`
-- **WHEN** `specd config show` is run
-- **THEN** stdout shows `spec=true` and `signoff=false`
-
-#### Scenario: JSON output is full SpecdConfig including adapter bindings
-
-- **GIVEN** a config with `contextIncludeSpecs`, `context`, `llmOptimizedContext`, workspace adapter bindings, and storage adapter bindings set
-- **WHEN** `specd config show --format json` is run
-- **THEN** stdout is valid JSON containing `projectRoot`, `schemaRef`, `workspaces`, `storage`, and `approvals`
-- **AND** JSON contains `contextIncludeSpecs` array
-- **AND** JSON contains `context` array
-- **AND** JSON contains `llmOptimizedContext` boolean
-- **AND** each workspace entry includes `specsAdapter`
-- **AND** the storage entry includes `changesAdapter`, `draftsAdapter`, `discardedAdapter`, and `archiveAdapter`
-- **AND** all path values are absolute strings
-- **AND** the process exits with code 0
-
-#### Scenario: Optional fields omitted when not set
-
-- **GIVEN** a config with no `context`, `schemaOverrides`, or `schemaPlugins` set
-- **WHEN** `specd config show --format json` is run
-- **THEN** the JSON output does not contain `context`, `schemaOverrides`, or `schemaPlugins` keys
-
-#### Scenario: Multiple workspaces listed
-
-- **GIVEN** `specd.yaml` declares two workspaces `default` and `billing-ws`
-- **WHEN** `specd config show` is run
-- **THEN** both workspaces appear in the `workspaces` section with their `specsPath` and `ownership`
+- **GIVEN** a config with `plugins.agents` containing one entry
+- **WHEN** `specd config show` runs in text mode
+- **THEN** the output includes a `plugins` section listing the agent names
 
 ### Requirement: Error cases
 

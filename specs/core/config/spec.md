@@ -235,26 +235,9 @@ The following derived directories are defined from it:
 
 ### Requirement: Template variables
 
-Some configuration values support template variables that specd expands at use time. The following sets of variables are defined:
+Archive patterns and hook commands contain `{{namespace.key}}` tokens expanded at runtime. The `TemplateExpander` resolves each token against the variable map.
 
-The following variables are available in **`archivePattern`**:
-
-| Variable                  | Value                                                                                                   |
-| ------------------------- | ------------------------------------------------------------------------------------------------------- |
-| `{{change.name}}`         | The change's slug name                                                                                  |
-| `{{change.archivedName}}` | The change's full archived directory name (e.g. `2024-01-15-add-auth-flow`) — the default pattern value |
-| `{{change.workspace}}`    | The primary workspace of the change                                                                     |
-| `{{year}}`                | Four-digit current year (e.g. `2024`)                                                                   |
-| `{{date}}`                | ISO date at archive time (e.g. `2024-01-15`)                                                            |
-
-The following variables are available in **`schemaOverrides` workflow hook `run` commands** and in **schema-level workflow hook `run` commands**:
-
-| Variable               | Value                                                        |
-| ---------------------- | ------------------------------------------------------------ |
-| `{{change.name}}`      | The change's slug name                                       |
-| `{{change.workspace}}` | The primary workspace of the change                          |
-| `{{change.path}}`      | Absolute path to the change directory                        |
-| `{{project.root}}`     | Absolute path to the project root (where `specd.yaml` lives) |
+When a token does not match any registered namespace or key, the original token MUST be preserved unchanged in the output and a warning MUST be emitted. The warning identifies the unresolved token and is informational only — it does not halt processing.
 
 ### Requirement: Schema plugins
 
@@ -451,89 +434,62 @@ The first use case is spec metadata generation: with `llmOptimizedContext: false
 
 This field is a project-level opt-in. Teams that have no LLM available in their automation pipeline (e.g. offline CI, air-gapped environments) leave it `false`. Teams that want LLM-enriched output set it to `true` and ensure their tooling has access to a model.
 
-### Requirement: Skills manifest
-
-`specd.yaml` may include a `skills` section recording which skills from `@specd/skills` have been installed at the project level for each agent. This manifest is written and read by `specd skills install` and `specd skills update`.
-
-```yaml
-skills:
-  claude:
-    - specd-bootstrap
-    - specd-spec-metadata
-```
-
-Keys are agent IDs (e.g. `claude`); values are arrays of skill names. The section is optional — its absence means no skills are tracked. Skills installed globally (`--global`) are not recorded here.
-
 ### Requirement: Plugin declarations
 
-`specd.yaml` MUST include a `plugins` section declaring installed plugins, grouped by type. Each entry MUST include `name`; `config` is plugin-specific and optional.
+`specd.yaml` MUST include a `plugins` section declaring installed plugins, grouped by type. The config loader MUST validate the `plugins` field at load time using the Zod schema — structural errors MUST produce a `ConfigValidationError` before any command runs.
 
-```yaml
-plugins:
-  agents:
-    - name: '@specd/plugin-agent-claude'
-    - name: '@specd/plugin-agent-copilot'
-      config:
-        commandsDir: .github/copilot/instructions
+The validated structure is:
+
+```typescript
+plugins: {
+  agents?: Array<{ name: string; config?: Record<string, unknown> }>
+}
 ```
 
-- `plugins.agents` is an array of plugin declarations
-- Each entry has `name` (required) and optional `config` (plugin-specific)
-- ConfigWriter.addPlugin() adds to this array
-- ConfigWriter.removePlugin() removes by name
-- ConfigWriter.listPlugins() returns this array
+Each plugin entry has `name` (required) and optional `config`. Unknown plugin types are rejected at validation time.
 
 ### Requirement: Config writer port
 
-`@specd/core` exposes a `ConfigWriter` application port for all operations that mutate `specd.yaml`. Adapters (CLI, MCP) never serialise or deserialise YAML directly — they call use cases that delegate to `ConfigWriter`.
+`ConfigWriter` is an application-layer port that defines the contract for writing to `specd.yaml`. It complements the read-only `ConfigLoader` with mutation operations for project initialisation and plugin management.
 
-The port defines the following operations:
+The port MUST define the following methods:
 
-- **`initProject(options)`** — writes a new `specd.yaml` at the given path with the provided schema reference, workspace id, and workspace specs path.
-- **`addPlugin(configPath, type, name)`** — adds a plugin to `plugins.<type>` array.
-- **`removePlugin(configPath, type, name)`** — removes a plugin from `plugins.<type>` array by name.
-- **`listPlugins(configPath, type?)`** — returns declared plugins, optionally filtered by type.
+- `initProject(configPath: string, options: InitProjectOptions): Promise<InitProjectResult>` — creates a new `specd.yaml` with default content
+- `addPlugin(configPath: string, type: string, name: string, config?: Record<string, unknown>): Promise<void>` — adds a plugin entry to `plugins.<type>`, with optional config
+- `removePlugin(configPath: string, type: string, name: string): Promise<void>` — removes a plugin entry from `plugins.<type>`
+- `listPlugins(configPath: string, type: string): Promise<Array<{ name: string; config?: Record<string, unknown> }>>` — reads plugin entries from `plugins.<type>`
 
-The `FsConfigWriter` adapter implements this port.
+The `addPlugin` method accepts four parameters:
 
-See [`core:core/config-writer-port`](../config-writer-port/spec.md) for full method specifications.
+1. `configPath: string` — absolute path to the `specd.yaml` to update
+2. `type: string` — the plugin type (e.g. `"agents"`)
+3. `name: string` — the plugin package name (e.g. `"@specd/plugin-agent-claude"`)
+4. `config?: Record<string, unknown>` — optional plugin configuration
+
+It MUST return `Promise<void>`. The method MUST add the plugin to the `plugins.<type>` array in `specd.yaml`. If the plugin is already present, the method MUST NOT duplicate it.
 
 ### Requirement: Startup validation
 
-At startup, specd MUST validate the resolved configuration before constructing use cases. Validation MUST reject:
+Before constructing any use case, the config loader MUST validate the loaded config against the Zod schema. The following startup validation rules apply:
 
-- missing required `schema`
-- missing required `workspaces.default`
-- unsupported storage adapters
-- invalid path values
-- invalid `contextIncludeSpecs` or `contextExcludeSpecs` pattern syntax
-- `contextMode` values other than `'list'`, `'summary'`, `'full'`, or `'hybrid'`
-- `contextMode: lazy`
-- `contextMode` inside a workspace entry
-- non-boolean `graph.respectGitignore`
-
-Validation errors MUST surface as `ConfigValidationError`.
+- `schema` field is required — if missing, `ConfigValidationError` is thrown
+- `workspaces.default` is required — if missing, `ConfigValidationError` is thrown
+- Adapter values in storage and workspace configs MUST be recognised strings
+- `contextMode` MUST be one of `list`, `summary`, `full`, or `hybrid` — `lazy` is rejected
+- `contextMode` inside a workspace entry is rejected with the specific message: "`contextMode` is not valid inside a workspace — it is a project-level setting"
+- Pattern syntax in `contextIncludeSpecs` and `contextExcludeSpecs` MUST be valid (no mid-segment wildcards)
+- `plugins` section, if present, MUST conform to the validated structure
+- `artifactRules` is NOT accepted — if present, `ConfigValidationError` is thrown suggesting migration to `schemaOverrides`
 
 ## Constraints
 
-- specd.yaml is the single source of truth for project configuration
-- One schema reference per project — all workspaces share the same schema, with optional per-workspace schema overrides
-- adapter is required in every specs, schemas, and storage section; adapter-specific fields are nested under the adapter key
-- storage section is required and must contain both changes and archive sub-keys
-- All relative paths resolve from the specd.yaml directory; storage paths (fs.path in changes and archive) must remain within the repo root
-- Project-level contextIncludeSpecs defaults to \['default:\*']; project-level contextExcludeSpecs defaults to \[]
-- Workspace-level contextIncludeSpecs defaults to \['\*'] (all specs in that workspace); workspace-level contextExcludeSpecs defaults to \[]
-- contextMode is optional; defaults to 'summary'; must be one of 'list', 'summary', 'full', or 'hybrid' — any other value is a startup validation error
-- contextMode is project-level only; it MUST NOT appear inside workspace entries
-- llmOptimizedContext is optional; defaults to false; must be a boolean — any other type is a startup validation error
-- context is optional; each entry is an object with exactly one key: either file or instruction — no other shapes are valid
-- context file paths are resolved relative to the specd.yaml directory; absolute paths are accepted
-- approvals is optional; when present it must contain at least one of spec or signoff; each is an object with required enabled boolean and optional actor string
-- skills is optional; when present it must be an object (the manifest body); specd does not validate skill content beyond YAML structure
-- plugins is optional; each entry must contain a package string pointing to a resolvable npm package, with optional config of any shape; specd validates structure but not plugin-specific config semantics
-- graph is optional per workspace; when present, graph.respectGitignore must be boolean and graph.excludePaths must be an array of strings
-- graph.excludePaths replaces built-in defaults entirely when specified; it does not merge with them
-- graph.respectGitignore defaults to true; when true, .gitignore has absolute priority and cannot be overridden by excludePaths
+- Every field in `specd.yaml` is validated at load time by the Zod schema
+- `artifactRules` is not a valid config field — use `schemaOverrides` instead
+- `skills` is not a valid config field — skills are managed via the plugin system
+- `contextMode` is project-level only — rejected inside workspace entries
+- Unknown fields at the top level are rejected by the strict Zod schema
+- `configPath` MUST resolve inside the repository root
+- Storage paths MUST resolve inside the repository root
 
 ## Examples
 

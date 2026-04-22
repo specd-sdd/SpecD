@@ -50,9 +50,10 @@ contextExcludeSpecs: <pattern>, <pattern>, ...
 llmOptimizedContext: <true|false>
 schemaPlugins: <ref>, <ref>, ...
 
-artifactRules:
-  <artifactId>: <count> rules
-  ...
+plugins:
+  agents:
+    <name>  (present)
+    ...
 
 schemaOverrides: (present)
 ```
@@ -94,8 +95,11 @@ storage:
 contextIncludeSpecs: default:*
 llmOptimizedContext: true
 
-workflow:
-  implementing  pre: 0 hooks  post: 1 hooks
+plugins:
+  agents:
+    @specd/plugin-agent-claude  (present)
+
+schemaOverrides: (present)
 ```
 
 ## Spec Dependencies

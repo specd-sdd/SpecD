@@ -68,13 +68,6 @@ schemaOverrides:
             - id: notify-slack
               run: 'pnpm run notify-slack -- "Change {{change.name}} archived"'
 
-artifactRules:
-  specs:
-    - 'All requirements must use SHALL or MUST for normative statements.'
-    - 'Every requirement must have at least one WHEN/THEN scenario in verify.md.'
-  design:
-    - 'Architecture decisions must reference an ADR number.'
-
 schemaPlugins:
   - '@specd/plugin-agent-claude'
 ```
@@ -100,7 +93,5 @@ With `approvals.spec: true`, a human must explicitly run `specd approve spec` fo
 The `archiving` pre-hook runs `pnpm test` before the archive proceeds — if tests fail, the archive is aborted and the user is informed. The post-hook fires after the archive is complete and sends a Slack notification. `{{change.name}}` resolves to the change's slug name at runtime.
 
 `workflow` is a schema-level concept and is not a valid top-level field in `specd.yaml`. Use `schemaOverrides` to add project-specific hook entries to schema-defined steps.
-
-**Artifact rules** — the `artifactRules` entries are injected by `CompileContext` as a distinct constraints block after the schema's own instruction for each artifact. They are additive — they extend the schema's instruction without replacing it. The `specs` rules enforce the project's normative language convention and scenario coverage requirement. The `design` rule ensures architecture decisions are traceable to ADRs.
 
 **Schema plugins** — `schemaPlugins` is an array of schema reference strings. Each entry is resolved using the same rules as the top-level `schema` field. Here `@specd/plugin-claude` is an npm package that installs skill files and hooks for Claude Code. Plugin installation is managed by `specd plugin add` and `specd update` — the declaration here keeps the plugin in sync across team members.
