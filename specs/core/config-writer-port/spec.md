@@ -50,13 +50,14 @@ When `specd.yaml` already exists in `projectRoot` and `force` is not `true`, the
 
 ### Requirement: AddPlugin
 
-The `addPlugin` method MUST accept three parameters:
+The `addPlugin` method accepts four parameters:
 
 1. `configPath: string` — absolute path to the `specd.yaml` to update
 2. `type: string` — the plugin type (e.g. `"agents"`)
 3. `name: string` — the plugin package name (e.g. `"@specd/plugin-agent-claude"`)
+4. `config?: Record<string, unknown>` — optional plugin configuration (e.g. `{ commandsDir: '.claude/commands' }`)
 
-It MUST return `Promise<void>`. The method MUST add the plugin to the `plugins.<type>` array in `specd.yaml`. If the plugin is already present, the method MUST NOT duplicate it.
+It MUST return `Promise<void>`. The method MUST add the plugin to the `plugins.<type>` array in `specd.yaml`. If the plugin is already present, the method MUST NOT duplicate it. When `config` is provided, it MUST be written alongside the `name` in the plugin entry.
 
 ## Constraints
 

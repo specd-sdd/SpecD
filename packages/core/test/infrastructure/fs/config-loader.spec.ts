@@ -759,7 +759,189 @@ storage:
       )
 
       const loader = new FsConfigLoader({ configPath })
-      await expect(loader.load()).rejects.toThrow()
+      await expect(loader.load()).rejects.toThrow(
+        /`contextMode` is not valid inside a workspace — it is a project-level setting/,
+      )
+    })
+  })
+
+  describe('Requirement: Startup validation and config field parsing', () => {
+    it('rejects invalid specd.local.yaml as a standalone config', async () => {
+      await writeConfig(minimalYaml(), 'specd.yaml')
+      await writeConfig(
+        `
+workspaces:
+  default:
+    specs:
+      adapter: fs
+      fs:
+        path: specs
+storage:
+  changes:
+    adapter: fs
+    fs:
+      path: .specd/changes
+  drafts:
+    adapter: fs
+    fs:
+      path: .specd/drafts
+  discarded:
+    adapter: fs
+    fs:
+      path: .specd/discarded
+  archive:
+    adapter: fs
+    fs:
+      path: .specd/archive
+`.trim(),
+        'specd.local.yaml',
+      )
+
+      const loader = new FsConfigLoader({ startDir: tmpDir })
+      await expect(loader.load()).rejects.toThrow(/schema/)
+    })
+
+    it('parses schemaPlugins from config', async () => {
+      const configPath = await writeConfig(
+        minimalYaml(`
+schemaPlugins:
+  - '@specd/plugin-agent-claude'
+  - '#local-plugin'
+`),
+      )
+
+      const loader = new FsConfigLoader({ configPath })
+      const config = await loader.load()
+
+      expect(config.schemaPlugins).toEqual(['@specd/plugin-agent-claude', '#local-plugin'])
+    })
+
+    it('parses schemaOverrides from config', async () => {
+      const configPath = await writeConfig(
+        minimalYaml(`
+schemaOverrides:
+  append:
+    artifacts:
+      - id: specs
+`),
+      )
+
+      const loader = new FsConfigLoader({ configPath })
+      const config = await loader.load()
+
+      expect(config.schemaOverrides).toBeDefined()
+      expect(config.schemaOverrides).toMatchObject({
+        append: {
+          artifacts: [{ id: 'specs' }],
+        },
+      })
+    })
+
+    it('parses approvals booleans from config', async () => {
+      const configPath = await writeConfig(
+        minimalYaml(`
+approvals:
+  spec: true
+  signoff: false
+`),
+      )
+
+      const loader = new FsConfigLoader({ configPath })
+      const config = await loader.load()
+
+      expect(config.approvals).toEqual({ spec: true, signoff: false })
+    })
+
+    it('parses llmOptimizedContext boolean from config', async () => {
+      const configPath = await writeConfig(
+        minimalYaml(`
+llmOptimizedContext: true
+`),
+      )
+
+      const loader = new FsConfigLoader({ configPath })
+      const config = await loader.load()
+
+      expect(config.llmOptimizedContext).toBe(true)
+    })
+
+    it('rejects non-boolean llmOptimizedContext', async () => {
+      const configPath = await writeConfig(
+        minimalYaml(`
+llmOptimizedContext: "yes"
+`),
+      )
+
+      const loader = new FsConfigLoader({ configPath })
+      await expect(loader.load()).rejects.toThrow(/llmOptimizedContext/)
+    })
+
+    it('rejects legacy artifactRules field with migration guidance', async () => {
+      const configPath = await writeConfig(
+        minimalYaml(`
+artifactRules:
+  specs:
+    - "legacy"
+`),
+      )
+
+      const loader = new FsConfigLoader({ configPath })
+      await expect(loader.load()).rejects.toThrow(/schemaOverrides/)
+    })
+
+    it('rejects legacy skills field with plugin-system guidance', async () => {
+      const configPath = await writeConfig(
+        minimalYaml(`
+skills:
+  codex:
+    - specd
+`),
+      )
+
+      const loader = new FsConfigLoader({ configPath })
+      await expect(loader.load()).rejects.toThrow(/managed via the plugin system/)
+    })
+  })
+
+  describe('Requirement: plugins section validation', () => {
+    it('parses plugins.agents entries with optional config', async () => {
+      const configPath = await writeConfig(
+        minimalYaml(`
+plugins:
+  agents:
+    - name: '@specd/plugin-agent-claude'
+    - name: '@specd/plugin-agent-codex'
+      config:
+        commandsDir: .codex/commands
+`),
+      )
+
+      const loader = new FsConfigLoader({ configPath })
+      const config = await loader.load()
+
+      expect(config.plugins).toEqual({
+        agents: [
+          { name: '@specd/plugin-agent-claude' },
+          {
+            name: '@specd/plugin-agent-codex',
+            config: { commandsDir: '.codex/commands' },
+          },
+        ],
+      })
+    })
+
+    it('rejects invalid plugin entries missing required name', async () => {
+      const configPath = await writeConfig(
+        minimalYaml(`
+plugins:
+  agents:
+    - config:
+        commandsDir: .codex/commands
+`),
+      )
+
+      const loader = new FsConfigLoader({ configPath })
+      await expect(loader.load()).rejects.toThrow(/plugins\.agents\[0\]\.name/)
     })
   })
 

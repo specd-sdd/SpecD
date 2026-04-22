@@ -45,7 +45,7 @@
     {
       "requirement": "AddPlugin",
       "rules": [
-        "The `addPlugin` method MUST accept three parameters:\n\n1. `configPath: string` — absolute path to the `specd.yaml` to update\n2. `type: string` — the plugin type (e.g. `\"agents\"`)\n3. `name: string` — the plugin package name (e.g. `\"@specd/plugin-agent-claude\"`)\n\nIt MUST return `Promise<void>`. The method MUST add the plugin to the `plugins.<type>` array in `specd.yaml`. If the plugin is already present, the method MUST NOT duplicate it."
+        "The `addPlugin` method accepts four parameters:\n\n1. `configPath: string` — absolute path to the `specd.yaml` to update\n2. `type: string` — the plugin type (e.g. `\"agents\"`)\n3. `name: string` — the plugin package name (e.g. `\"@specd/plugin-agent-claude\"`)\n4. `config?: Record<string, unknown>` — optional plugin configuration (e.g. `{ commandsDir: '.claude/commands' }`)\n\nIt MUST return `Promise<void>`. The method MUST add the plugin to the `plugins.<type>` array in `specd.yaml`. If the plugin is already present, the method MUST NOT duplicate it. When `config` is provided, it MUST be written alongside the `name` in the plugin entry."
       ]
     }
   ],
@@ -110,7 +110,7 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:f33ca74ad4fc7cc625fb9ec80c7cbf78b0526aefb77cb6ef52daef680f2449a3",
+    "spec.md": "sha256:2ad8fae6259ed9abf3c9f87915dd60a90ba0e3baaef8e19d5e61f8e354df5ac5",
     "verify.md": "sha256:7279ec9fed6e624eb090150651ff088223a435a98d808b07f48910ee0b32aa97"
   },
   "generatedBy": "core"

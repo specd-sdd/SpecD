@@ -100,11 +100,11 @@ describe('Output format', () => {
     await program.parseAsync(['node', 'specd', 'config', 'show', '--format', 'json'])
 
     const parsed = JSON.parse(stdout())
-    // workflow was removed from SpecdConfig
     expect(parsed.context).toBeUndefined()
     expect(parsed.schemaOverrides).toBeUndefined()
     expect(parsed.schemaPlugins).toBeUndefined()
     expect(parsed.llmOptimizedContext).toBeUndefined()
+    expect(parsed.plugins).toBeUndefined()
   })
 
   it('Workspace entries include all fields', async () => {
@@ -177,6 +177,28 @@ describe('Output format', () => {
     expect(out).toContain('billing-ws')
     expect(out).toContain('/project/specs')
     expect(out).toContain('/project/billing/specs')
+  })
+
+  it('plugins shown in text output', async () => {
+    const config = makeMockConfig({
+      plugins: {
+        agents: [{ name: '@specd/plugin-agent-codex' }],
+      },
+    })
+    vi.mocked(loadConfig).mockResolvedValue(config)
+    const stdout = captureStdout()
+    captureStderr()
+    mockProcessExit()
+
+    const program = makeProgram()
+    registerConfigShow(program.command('config'))
+    await program.parseAsync(['node', 'specd', 'config', 'show'])
+
+    const out = stdout()
+    expect(out).toContain('plugins:')
+    expect(out).toContain('agents:')
+    expect(out).toContain('@specd/plugin-agent-codex')
+    expect(out).not.toContain('artifactRules:')
   })
 })
 

@@ -142,8 +142,6 @@ export interface SpecdConfig {
   readonly storage: SpecdStorageConfig
   /** Approval gate settings (both default to `false`). */
   readonly approvals: { readonly spec: boolean; readonly signoff: boolean }
-  /** Per-artifact constraint strings injected after the schema instruction. */
-  readonly artifactRules?: Readonly<Record<string, readonly string[]>>
   /** Freeform context entries prepended to the compiled context. */
   readonly context?: readonly SpecdContextEntry[]
   /**
@@ -172,6 +170,13 @@ export interface SpecdConfig {
   readonly schemaPlugins?: readonly string[]
   /** Inline schema override operations from `specd.yaml`. */
   readonly schemaOverrides?: SchemaOperations
+  /** Declared plugins grouped by type (currently `agents`). */
+  readonly plugins?: Readonly<{
+    agents?: ReadonlyArray<{
+      readonly name: string
+      readonly config?: Readonly<Record<string, unknown>>
+    }>
+  }>
 }
 
 /** Minimal shape check for {@link isSpecdConfig} — validates the structural signature. */

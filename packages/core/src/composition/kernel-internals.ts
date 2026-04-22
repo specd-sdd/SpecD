@@ -445,7 +445,9 @@ export async function createKernelInternals(
       : {}),
   })
 
-  const expander = new TemplateExpander({ project: { root: config.projectRoot } })
+  const expander = new TemplateExpander({ project: { root: config.projectRoot } }, (token) => {
+    console.warn(`warning: unresolved template variable '{{${token}}}'`)
+  })
 
   return {
     registry,

@@ -132,12 +132,12 @@ Each artifact may declare `rules: { pre: [], post: [] }` — arrays of `{ id, in
 
 Project-specific rules are expressed as `schemaOverrides.append.artifacts[].rules.post` (or `.pre`), which supports both pre and post positions and all five merge operations.
 
-### 14. `schemaOverrides` replaces project-level `workflow` additions in `specd.yaml` and subsumes many `artifactRules` use cases
+### 14. `schemaOverrides` replaces project-level `workflow` additions in `specd.yaml` and fully supersedes legacy `artifactRules`
 
 Two former customization patterns are addressed by `schemaOverrides`:
 
 - **Project-level `workflow` hook additions** — replaced by `schemaOverrides` targeting `workflow[].hooks`. The override model allows not just appending hooks but also removing, prepending, or replacing them.
-- **`artifactRules`** — not removed from the product, but functionally overlapped by `schemaOverrides` targeting `artifacts[].rules.post` (or `.pre`). `artifactRules` remains a lighter-weight project config mechanism for additive writing constraints, while `schemaOverrides` is the more general schema-layer customization tool.
+- **`artifactRules`** — historical mechanism retained only for migration context. Active configurations should use `schemaOverrides` targeting `artifacts[].rules.post` (or `.pre`), and new configs should not declare `artifactRules`.
 
 ### Consequences
 

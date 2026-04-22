@@ -15,7 +15,7 @@
     {
       "requirement": "Output format",
       "rules": [
-        "In `text` mode (default), the command prints the resolved config as structured key-value output:\n\n```\nprojectRoot:  <absolute-path>\nschemaRef:    <schema-ref>\napprovals:    spec=<true|false>  signoff=<true|false>\n\nworkspaces:\n  <name>  <ownership>  <specsPath>\n  ...\n\nstorage:\n  changes:   <absolute-path>\n  drafts:    <absolute-path>\n  discarded: <absolute-path>\n  archive:   <absolute-path>\n```\n\nOptional fields are shown only when present in the config:\n\n```\nstorage:\n  pattern: <archive-pattern>\n\ncontext:\n  file: <path>\n  instruction: <text>\n  ...\n\ncontextIncludeSpecs: <pattern>, <pattern>, ...\ncontextExcludeSpecs: <pattern>, <pattern>, ...\nllmOptimizedContext: <true|false>\nschemaPlugins: <ref>, <ref>, ...\n\nartifactRules:\n  <artifactId>: <count> rules\n  ...\n\nschemaOverrides: (present)\n```\n\nThe text view is intentionally summarized. It shows the resolved workspace and storage paths used by humans for diagnosis, but it does not expand the full adapter-binding structure.\n\nIn `json` or `toon` mode, the command MUST serialize the `SpecdConfig` object directly — no manual field selection. The output is the config as-is, encoded in the respective format. This ensures that new fields added to `SpecdConfig`, including named adapter bindings such as `specsAdapter`, `schemasAdapter`, `changesAdapter`, `draftsAdapter`, `discardedAdapter`, and `archiveAdapter`, appear automatically without CLI changes. Optional fields that are `undefined` are omitted by the serializer."
+        "In `text` mode (default), the command prints the resolved config as structured key-value output:\n\n```\nprojectRoot:  <absolute-path>\nschemaRef:    <schema-ref>\napprovals:    spec=<true|false>  signoff=<true|false>\n\nworkspaces:\n  <name>  <ownership>  <specsPath>\n  ...\n\nstorage:\n  changes:   <absolute-path>\n  drafts:    <absolute-path>\n  discarded: <absolute-path>\n  archive:   <absolute-path>\n```\n\nOptional fields are shown only when present in the config:\n\n```\nstorage:\n  pattern: <archive-pattern>\n\ncontext:\n  file: <path>\n  instruction: <text>\n  ...\n\ncontextIncludeSpecs: <pattern>, <pattern>, ...\ncontextExcludeSpecs: <pattern>, <pattern>, ...\nllmOptimizedContext: <true|false>\nschemaPlugins: <ref>, <ref>, ...\n\nplugins:\n  agents:\n    <name>  (present)\n    ...\n\nschemaOverrides: (present)\n```\n\nThe text view is intentionally summarized. It shows the resolved workspace and storage paths used by humans for diagnosis, but it does not expand the full adapter-binding structure.\n\nIn `json` or `toon` mode, the command MUST serialize the `SpecdConfig` object directly — no manual field selection. The output is the config as-is, encoded in the respective format. This ensures that new fields added to `SpecdConfig`, including named adapter bindings such as `specsAdapter`, `schemasAdapter`, `changesAdapter`, `draftsAdapter`, `discardedAdapter`, and `archiveAdapter`, appear automatically without CLI changes. Optional fields that are `undefined` are omitted by the serializer."
       ]
     },
     {
@@ -38,59 +38,17 @@
   "scenarios": [
     {
       "requirement": "Output format",
-      "name": "Text output shows all sections",
-      "given": [
-        "a valid config with one workspace, storage paths, and optional fields set (contextIncludeSpecs, schemaOverrides, llmOptimizedContext)"
-      ],
-      "when": ["specd config show is run"],
-      "then": [
-        "stdout contains projectRoot, schemaRef, approvals, workspaces, and storage sections",
-        "AND stdout contains contextIncludeSpecs line",
-        "AND stdout contains llmOptimizedContext line",
-        "AND all paths are absolute",
-        "AND the process exits with code 0"
-      ]
+      "name": "artifactRules not shown in text output",
+      "given": ["a config with artifactRules set"],
+      "when": ["specd config show runs in text mode"],
+      "then": ["the output does not include an artifactRules section"]
     },
     {
       "requirement": "Output format",
-      "name": "Approval gates shown correctly",
-      "given": ["specd.yaml has approvals: { spec: true, signoff: false }"],
-      "when": ["specd config show is run"],
-      "then": ["stdout shows spec=true and signoff=false"]
-    },
-    {
-      "requirement": "Output format",
-      "name": "JSON output is full SpecdConfig including adapter bindings",
-      "given": [
-        "a config with contextIncludeSpecs, context, llmOptimizedContext, workspace adapter bindings, and storage adapter bindings set"
-      ],
-      "when": ["specd config show --format json is run"],
-      "then": [
-        "stdout is valid JSON containing projectRoot, schemaRef, workspaces, storage, and approvals",
-        "AND JSON contains contextIncludeSpecs array",
-        "AND JSON contains context array",
-        "AND JSON contains llmOptimizedContext boolean",
-        "AND each workspace entry includes specsAdapter",
-        "AND the storage entry includes changesAdapter, draftsAdapter, discardedAdapter, and archiveAdapter",
-        "AND all path values are absolute strings",
-        "AND the process exits with code 0"
-      ]
-    },
-    {
-      "requirement": "Output format",
-      "name": "Optional fields omitted when not set",
-      "given": ["a config with no context, schemaOverrides, or schemaPlugins set"],
-      "when": ["specd config show --format json is run"],
-      "then": ["the JSON output does not contain context, schemaOverrides, or schemaPlugins keys"]
-    },
-    {
-      "requirement": "Output format",
-      "name": "Multiple workspaces listed",
-      "given": ["specd.yaml declares two workspaces default and billing-ws"],
-      "when": ["specd config show is run"],
-      "then": [
-        "both workspaces appear in the workspaces section with their specsPath and ownership"
-      ]
+      "name": "plugins shown in text output",
+      "given": ["a config with plugins.agents containing one entry"],
+      "when": ["specd config show runs in text mode"],
+      "then": ["the output includes a plugins section listing the agent names"]
     },
     {
       "requirement": "Error cases",
@@ -104,8 +62,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:2dde192f67a9e4281d2458904911e726529506487e8f3ab2c721de042de6e9d9",
-    "verify.md": "sha256:4865e72f808e72095ac47b2b2b4eb95171205ecaadd167ce892fd83a432b8c6a"
+    "spec.md": "sha256:e2c0bf3ddcaec336fa780e4a6bf13c2a888a463d22afaef9140b08a7d73f661d",
+    "verify.md": "sha256:35317531613c0b226b9d467bd31b1619148585fef793880bb4c17a92f17efacc"
   },
   "generatedBy": "core"
 }

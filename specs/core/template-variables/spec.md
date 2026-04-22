@@ -74,6 +74,8 @@ When expanding a template string:
 3. If the namespace does not exist, the key does not exist, or the value is not a primitive, the original `{{namespace.key}}` token is preserved unchanged.
 4. Expansion is single-pass — expanded values are not re-scanned for further tokens.
 
+When a token is not resolved (step 3), `TemplateExpander` MUST invoke the `onUnknown` callback if provided at construction. The callback receives the unresolved token string. If no callback is provided, unknown tokens are silently preserved with no side effects.
+
 ### Requirement: Shell escaping for run hooks
 
 When expanding variables in `run:` hook commands, all substituted values MUST be shell-escaped to prevent injection attacks. Values are wrapped in single quotes with embedded single quotes escaped using the `'\''` idiom.
@@ -85,8 +87,10 @@ When expanding variables in `instruction:` text or artifact instructions, values
 `TemplateExpander` is a class (not a port) that encapsulates template expansion logic. It receives the built-in variables at construction time:
 
 ```typescript
+type OnUnknownVariable = (token: string) => void
+
 class TemplateExpander {
-  constructor(builtins: TemplateVariables)
+  constructor(builtins: TemplateVariables, onUnknown?: OnUnknownVariable)
 
   expand(template: string, variables?: TemplateVariables): string
   expandForShell(template: string, variables?: TemplateVariables): string
@@ -94,12 +98,13 @@ class TemplateExpander {
 ```
 
 - The `builtins` provided at construction (e.g. `{ project: { root: '...' } }`) are always present in every expansion.
+- `onUnknown` is an optional callback invoked when a `{{namespace.key}}` token cannot be resolved. When provided, it is called once per unresolved token. The callback is informational only — it does not affect the expansion result.
 - `expand(template, variables?)` — merges contextual `variables` with built-ins and substitutes values verbatim. Used by `GetHookInstructions` and `GetArtifactInstruction` for instruction text.
 - `expandForShell(template, variables?)` — merges contextual `variables` with built-ins and substitutes values with shell escaping. Used by `HookRunner` for `run:` commands.
 - Contextual variables MUST NOT override built-in variables. If a contextual namespace collides with a built-in namespace, the built-in keys take precedence.
 - Both methods share the same traversal and resolution logic — only the substitution step differs.
 
-The composition layer constructs a single `TemplateExpander` instance with built-in variables and injects it into all use cases that need expansion.
+The composition layer constructs a single `TemplateExpander` instance with built-in variables and an `onUnknown` callback (typically `console.warn` or a logging adapter), and injects it into all use cases that need expansion.
 
 ### Requirement: Variable map construction
 
@@ -118,6 +123,7 @@ Namespace names and key names MUST be lowercase alphanumeric with hyphens allowe
 
 - Template variables are single-pass — no recursive expansion
 - Unknown tokens are preserved unchanged, never removed or errored
+- When an `onUnknown` callback is provided, it is invoked for each unresolved token — this is informational only and does not halt or change expansion
 - Shell escaping is only applied via `expandForShell()`, never in `expand()`
 - The variable map is flat within each namespace — no nested objects beyond `namespace.key`
 - `project` namespace is always present; other namespaces are optional

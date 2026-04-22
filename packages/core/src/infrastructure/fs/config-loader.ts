@@ -189,8 +189,18 @@ const WorkspaceRawZodSchema = z
     contextIncludeSpecs: z.array(z.string()).optional(),
     contextExcludeSpecs: z.array(z.string()).optional(),
     graph: WorkspaceGraphZodSchema.optional(),
+    contextMode: z.unknown().optional(),
   })
   .strict()
+  .superRefine((workspace, ctx) => {
+    if (workspace.contextMode !== undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['contextMode'],
+        message: '`contextMode` is not valid inside a workspace — it is a project-level setting',
+      })
+    }
+  })
 
 /** Permissive Zod schema for schemaOverrides — semantic validation happens at merge time. */
 const SchemaOverridesZodSchema = z
@@ -203,31 +213,46 @@ const SchemaOverridesZodSchema = z
   })
   .strict()
 
-const SpecdYamlZodSchema = z.object({
-  schema: z.string(),
-  configPath: z.string().optional(),
-  workspaces: z.record(WorkspaceRawZodSchema),
-  storage: z.object({
-    changes: AdapterBindingRawZodSchema,
-    drafts: AdapterBindingRawZodSchema,
-    discarded: AdapterBindingRawZodSchema,
-    archive: AdapterBindingRawZodSchema,
-  }),
-  approvals: z
-    .object({
-      spec: z.boolean().optional(),
-      signoff: z.boolean().optional(),
-    })
-    .optional(),
-  artifactRules: z.record(z.array(z.string())).optional(),
-  context: z.array(ContextEntryRawZodSchema).optional(),
-  contextIncludeSpecs: z.array(z.string()).optional(),
-  contextExcludeSpecs: z.array(z.string()).optional(),
-  contextMode: z.enum(['list', 'summary', 'full', 'hybrid']).optional(),
-  llmOptimizedContext: z.boolean().optional(),
-  schemaPlugins: z.array(z.string()).optional(),
-  schemaOverrides: SchemaOverridesZodSchema.optional(),
-})
+const PluginEntryZodSchema = z
+  .object({
+    name: z.string(),
+    config: z.record(z.unknown()).optional(),
+  })
+  .strict()
+
+const PluginsZodSchema = z
+  .object({
+    agents: z.array(PluginEntryZodSchema).optional(),
+  })
+  .strict()
+
+const SpecdYamlZodSchema = z
+  .object({
+    schema: z.string(),
+    configPath: z.string().optional(),
+    workspaces: z.record(WorkspaceRawZodSchema),
+    storage: z.object({
+      changes: AdapterBindingRawZodSchema,
+      drafts: AdapterBindingRawZodSchema,
+      discarded: AdapterBindingRawZodSchema,
+      archive: AdapterBindingRawZodSchema,
+    }),
+    approvals: z
+      .object({
+        spec: z.boolean().optional(),
+        signoff: z.boolean().optional(),
+      })
+      .optional(),
+    context: z.array(ContextEntryRawZodSchema).optional(),
+    contextIncludeSpecs: z.array(z.string()).optional(),
+    contextExcludeSpecs: z.array(z.string()).optional(),
+    contextMode: z.enum(['list', 'summary', 'full', 'hybrid']).optional(),
+    llmOptimizedContext: z.boolean().optional(),
+    schemaPlugins: z.array(z.string()).optional(),
+    schemaOverrides: SchemaOverridesZodSchema.optional(),
+    plugins: PluginsZodSchema.optional(),
+  })
+  .strict()
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -467,6 +492,22 @@ export class FsConfigLoader implements ConfigLoader {
       throw new ConfigValidationError(configPath, `invalid YAML: ${(err as Error).message}`)
     }
 
+    if (typeof raw === 'object' && raw !== null) {
+      const parsed = raw as Record<string, unknown>
+      if ('artifactRules' in parsed) {
+        throw new ConfigValidationError(
+          configPath,
+          "'artifactRules' is not supported; use 'schemaOverrides' instead",
+        )
+      }
+      if ('skills' in parsed) {
+        throw new ConfigValidationError(
+          configPath,
+          "'skills' is not supported; skills are managed via the plugin system",
+        )
+      }
+    }
+
     const parseResult = SpecdYamlZodSchema.safeParse(raw)
     if (!parseResult.success) {
       const issue = parseResult.error.issues[0]
@@ -474,9 +515,7 @@ export class FsConfigLoader implements ConfigLoader {
         throw new ConfigValidationError(configPath, 'config validation failed')
       }
       const location = formatZodPath(issue.path)
-      const message = location
-        ? `${location}: ${issue.message.toLowerCase()}`
-        : issue.message.toLowerCase()
+      const message = location ? `${location}: ${issue.message}` : issue.message
       throw new ConfigValidationError(configPath, message)
     }
 
@@ -651,7 +690,6 @@ export class FsConfigLoader implements ConfigLoader {
         spec: data.approvals?.spec ?? false,
         signoff: data.approvals?.signoff ?? false,
       },
-      ...(data.artifactRules !== undefined ? { artifactRules: data.artifactRules } : {}),
       ...(context !== undefined ? { context } : {}),
       ...(data.contextIncludeSpecs !== undefined
         ? { contextIncludeSpecs: data.contextIncludeSpecs }
@@ -668,6 +706,20 @@ export class FsConfigLoader implements ConfigLoader {
         ? {
             schemaOverrides:
               data.schemaOverrides as import('../../domain/services/merge-schema-layers.js').SchemaOperations,
+          }
+        : {}),
+      ...(data.plugins !== undefined
+        ? {
+            plugins: {
+              ...(data.plugins.agents !== undefined
+                ? {
+                    agents: data.plugins.agents.map((plugin) => ({
+                      name: plugin.name,
+                      ...(plugin.config !== undefined ? { config: plugin.config } : {}),
+                    })),
+                  }
+                : {}),
+            },
           }
         : {}),
     }

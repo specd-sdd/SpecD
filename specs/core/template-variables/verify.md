@@ -41,6 +41,14 @@
 - **WHEN** `expand()` is called
 - **THEN** the result is `"{{project.root}}"` — the expanded value is not re-scanned
 
+#### Scenario: Unknown token invokes onUnknown callback
+
+- **GIVEN** a `TemplateExpander` constructed with `onUnknown` callback
+- **AND** a template `"{{unknown.key}}"`
+- **WHEN** `expand()` is called
+- **THEN** the `onUnknown` callback is called with `"unknown.key"`
+- **AND** the result is `"{{unknown.key}}"` — the token is preserved
+
 ### Requirement: Shell escaping for run hooks
 
 #### Scenario: expandForShell escapes values
@@ -88,6 +96,22 @@
 - **AND** a template `"{{project.root}}"`
 - **WHEN** `expand()` is called with contextual variables `{ project: { root: "/malicious/path" } }`
 - **THEN** the result is `"/home/dev/myapp"` — built-in takes precedence
+
+#### Scenario: onUnknown callback invoked for unresolved tokens
+
+- **GIVEN** a `TemplateExpander` constructed with builtins and `onUnknown: (token) => warnings.push(token)`
+- **AND** a template `"{{foo.bar}} and {{baz.qux}}"`
+- **WHEN** `expand()` is called with empty contextual variables
+- **THEN** `onUnknown` is called twice — with `"foo.bar"` and `"baz.qux"`
+- **AND** the result is `"{{foo.bar}} and {{baz.qux}}"`
+
+#### Scenario: No onUnknown callback means silent preservation
+
+- **GIVEN** a `TemplateExpander` constructed with builtins only (no `onUnknown`)
+- **AND** a template `"{{unknown.key}}"`
+- **WHEN** `expand()` is called
+- **THEN** no callback is invoked
+- **AND** the result is `"{{unknown.key}}"`
 
 ### Requirement: Variable map construction
 
