@@ -10,7 +10,10 @@ Getting a specd project off the ground requires creating a config file, storage 
 
 ```
 specd project init [--schema <ref>] [--workspace <id>] [--workspace-path <path>] [--plugin <name>...] [--force] [--format text|json|toon]
+specd init [--schema <ref>] [--workspace <id>] [--workspace-path <path>] [--plugin <name>...] [--force] [--format text|json|toon]
 ```
+
+`specd init` is a top-level alias for `specd project init`. Both forms SHALL behave identically — same flags, same interactive wizard, same exit codes, same output.
 
 - `--schema <ref>` — optional; the schema reference to activate (e.g. `@specd/schema-std`, `./schemas/custom/schema.yaml`). Defaults to `@specd/schema-std`.
 - `--workspace <id>` — optional; the ID of the default workspace. Defaults to `default`.
@@ -82,16 +85,19 @@ If `specd.yaml` already exists and `--force` is not provided:
 
 ```
 # Interactive wizard (TTY, no flags)
+specd init
+
+# Same as above, using the full form
 specd project init
 
 # Fully non-interactive
-specd project init --schema @specd/schema-std --workspace default --workspace-path specs/ --agent claude
+specd init --schema @specd/schema-std --workspace default --workspace-path specs/ --plugin @specd/plugin-agent-claude
 
 # Overwrite without prompting
-specd project init --force
+specd init --force
 
 # Machine-readable output (always non-interactive)
-specd project init --format json
+specd init --format json
 ```
 
 ## Spec Dependencies

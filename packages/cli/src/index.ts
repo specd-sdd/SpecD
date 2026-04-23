@@ -173,6 +173,7 @@ registerProjectInit(projectCmd)
 registerProjectContext(projectCmd)
 registerProjectUpdate(projectCmd)
 registerProjectDashboard(projectCmd)
+registerProjectInit(program)
 
 // ---- config ----
 const configCmd = program

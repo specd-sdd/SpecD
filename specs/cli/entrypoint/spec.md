@@ -115,6 +115,10 @@ When `specd` is invoked with no subcommand — either as `specd` alone or as `sp
 
 This behaviour makes `specd` act as a project landing page when a project is present, rather than always showing generic help.
 
+### Requirement: Top-level init alias
+
+`specd init` SHALL be available as a top-level command that delegates to the same handler as `specd project init`. Both invocation forms MUST produce identical behaviour — same flags, interactive wizard, exit codes, and output formats. The top-level `init` command SHALL appear in the output of `specd --help` alongside other top-level commands.
+
 ## Constraints
 
 - Every leaf command must call `.allowExcessArguments(false)` so Commander rejects extra positional arguments
@@ -131,6 +135,12 @@ This behaviour makes `specd` act as a project landing page when a project is pre
 ```
 # Discovery from CWD — also auto-shows project dashboard if config is found
 specd
+
+# Initialize a new project (top-level alias)
+specd init
+
+# Same as above, using the full form
+specd project init
 
 # Global --config before subcommand
 specd --config /path/to/specd.yaml change list

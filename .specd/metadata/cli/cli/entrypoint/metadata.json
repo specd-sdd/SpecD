@@ -71,6 +71,12 @@
       "rules": [
         "When `specd` is invoked with no subcommand — either as `specd` alone or as `specd --config <path>` — the CLI attempts config discovery (or loads the provided path). If a valid config is found, the `project dashboard` command is executed automatically as if the user had run `specd project dashboard [--config <path>]`. If config discovery fails (no `specd.yaml` found), the standard help text is shown instead.\n\nThis behaviour makes `specd` act as a project landing page when a project is present, rather than always showing generic help."
       ]
+    },
+    {
+      "requirement": "Top-level init alias",
+      "rules": [
+        "`specd init` SHALL be available as a top-level command that delegates to the same handler as `specd project init`. Both invocation forms MUST produce identical behaviour — same flags, interactive wizard, exit codes, and output formats. The top-level `init` command SHALL appear in the output of `specd --help` alongside other top-level commands."
+      ]
     }
   ],
   "constraints": [
@@ -238,6 +244,32 @@
       "then": ["the standard help text is shown", "AND the process exits with code 0"]
     },
     {
+      "requirement": "Top-level init alias",
+      "name": "specd init appears in root help output",
+      "when": ["specd --help is run"],
+      "then": ["the help text includes init as a top-level command"]
+    },
+    {
+      "requirement": "Top-level init alias",
+      "name": "specd init delegates to project init handler",
+      "given": ["a clean directory with no existing specd.yaml"],
+      "when": ["specd init --workspace default is run"],
+      "then": ["the command exits with code 0", "AND specd.yaml is written to the target directory"]
+    },
+    {
+      "requirement": "Top-level init alias",
+      "name": "specd init rejects excess arguments",
+      "when": ["specd init extra-arg is run"],
+      "then": ["the command exits with code 1", "AND stderr contains a usage error"]
+    },
+    {
+      "requirement": "Top-level init alias",
+      "name": "specd init --force overwrites existing config",
+      "given": ["a specd.yaml already exists"],
+      "when": ["specd init --force --workspace default is run"],
+      "then": ["the command exits with code 0", "AND specd.yaml is overwritten"]
+    },
+    {
       "requirement": "Output format flag",
       "name": "Text format produces human-readable output",
       "when": ["a command is run with --format text (or without --format)"],
@@ -327,8 +359,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:579c61377be8f6c003dcf357912cf75140e44a2e0d9b677f8b43a350598a07f9",
-    "verify.md": "sha256:9a1a13a24111505d67b3dbab1b20fa246ed52c5072fcfa0e0ce476906fa0955a"
+    "spec.md": "sha256:f6731c175174abebcae1f95e86b51b01ec515df7a3e1bf00eb43816630b49ef6",
+    "verify.md": "sha256:6c32c733bf019cfe572909f8a1d582de3b46fce4383f0b016b9a5890a36dc752"
   },
   "generatedBy": "core"
 }

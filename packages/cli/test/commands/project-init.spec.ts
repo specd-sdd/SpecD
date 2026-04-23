@@ -144,4 +144,104 @@ describe('project init', () => {
       { name: '@specd/plugin-agent-claude', status: 'installed', detail: 'ok' },
     ])
   })
+
+  describe('specd init (top-level alias)', () => {
+    it('exits 0 and calls InitProject with specd init', async () => {
+      const { initExecute } = setup()
+      const program = makeProgram()
+      registerProjectInit(program)
+
+      await program.parseAsync([
+        'node',
+        'specd',
+        'init',
+        '--workspace',
+        'default',
+        '--workspace-path',
+        'specs/',
+      ])
+
+      expect(initExecute).toHaveBeenCalledOnce()
+      expect(initExecute).toHaveBeenCalledWith(
+        expect.objectContaining({
+          schemaRef: '@specd/schema-std',
+          workspaceId: 'default',
+          specsPath: 'specs/',
+        }),
+      )
+    })
+
+    it('produces valid JSON output with specd init --format json', async () => {
+      const { stdout } = setup()
+
+      const program = makeProgram()
+      registerProjectInit(program)
+      await program.parseAsync([
+        'node',
+        'specd',
+        'init',
+        '--workspace',
+        'default',
+        '--workspace-path',
+        'specs/',
+        '--format',
+        'json',
+      ])
+
+      const parsed = JSON.parse(stdout())
+      expect(parsed.result).toBe('ok')
+      expect(parsed.configPath).toBe('/project/specd.yaml')
+      expect(parsed.schema).toBe('@specd/schema-std')
+      expect(parsed.workspaces).toEqual(['default'])
+    })
+
+    it('exits 1 when specd.yaml exists and --force is not given', async () => {
+      const { initExecute } = setup()
+      initExecute.mockRejectedValue(new Error('already exists'))
+
+      const program = makeProgram()
+      registerProjectInit(program)
+
+      await expect(
+        program.parseAsync([
+          'node',
+          'specd',
+          'init',
+          '--workspace',
+          'default',
+          '--workspace-path',
+          'specs/',
+        ]),
+      ).rejects.toThrow()
+      expect(initExecute).toHaveBeenCalledOnce()
+    })
+
+    it('overwrites config with specd init --force', async () => {
+      const { initExecute } = setup()
+
+      const program = makeProgram()
+      registerProjectInit(program)
+      await program.parseAsync([
+        'node',
+        'specd',
+        'init',
+        '--workspace',
+        'default',
+        '--workspace-path',
+        'specs/',
+        '--force',
+      ])
+
+      expect(initExecute).toHaveBeenCalledWith(expect.objectContaining({ force: true }))
+    })
+
+    it('rejects excess positional arguments', async () => {
+      const program = makeProgram()
+      registerProjectInit(program)
+
+      await expect(program.parseAsync(['node', 'specd', 'init', 'extra-arg'])).rejects.toThrow(
+        /too many arguments/i,
+      )
+    })
+  })
 })
