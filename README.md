@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/readme-hero.png" alt="SpecD — Stop making agents guess" width="1774" height="887" style="width: 100%; height: auto">
+  <img src="assets/readme-hero.png" alt="SpecD — Stop making agents guess" width="1000" height="500" style="width: 100%; height: auto">
 </p>
 
 # SpecD
