@@ -5,7 +5,6 @@
   "private": false,
   "repository": "https://github.com/specd-sdd/SpecD",
   "homepage": "https://getspecd.dev",
-  "homepage": "https://getspecd.dev",
   "files": [
     "dist/"
   ],
