@@ -221,12 +221,12 @@ schemaOverrides:
               run: 'pnpm lint'
             - id: archiving-edit-description
               instruction: >-
-                Read the proposal.md anddesign.md files in this change
+                Read the proposal.md and design.md files in this change
                 directory. Based on their content, write a more elaborate
                 description (2-3 sentences) that summarizes the change purpose
                 and outcomes.
 
-                Ask the user to review and edit this description for clarity and
+                You MUST ask the user to review and edit this description for clarity and
                 completeness. 
 
                 You can edit the change description using the command line after
@@ -255,6 +255,43 @@ schemaOverrides:
                   core:core/validate-artifacts: patch
                   cli:cli/change-validate: minor
                 ```
+            - id: archiving-adrs
+              instruction: >-
+                Review whether this change introduced any durable decisions that may merit an ADR.
+
+                Be conservative. Prefer no ADR recommendation over ADR spam.
+
+                A design choice inside a single change is not automatically ADR-worthy. Only surface decisions likely to remain relevant beyond this change.
+
+                Before recommending a new ADR, consider whether:
+                - an existing ADR should be updated instead
+                - the decision is already sufficiently captured elsewhere
+                - the decision is too local or tactical to deserve an ADR
+
+                If you identify an ADR candidate:
+
+                - do NOT assume an ADR should be created automatically
+                - present it as a candidate for user confirmation
+                - propose an ADR filename under `docs/adr`, following the format rules in `default:_global/docs`
+                - if an existing ADR appears more appropriate to update, propose that instead
+
+                For each candidate, ask the user explicitly whether they want to:
+
+                1. create the proposed ADR
+                2. update an existing ADR
+                3. dismiss the candidate
+
+                Return the result as a concise interactive review, for example:
+
+                Potential ADR candidates detected:
+
+                1. Separate verification from approval gates  
+                Suggested file: docs/adr/0018-separate-verification-from-approval-gates.md  
+                Reason: affects lifecycle semantics for future changes.
+
+                You MUST ask the user to create this ADR, update an existing ADR, or dismiss this candidate.
+
+                Only draft ADR content if the user explicitly chooses to create or update an ADR.
           post:
             - id: archiving-create-changeset
               run: 'node dev/scripts/hooks/post-archive-changeset.js {{change.archivedName}}'
