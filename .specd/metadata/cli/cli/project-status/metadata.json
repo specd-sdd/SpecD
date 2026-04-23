@@ -1,0 +1,211 @@
+{
+  "title": "project status command",
+  "description": "The specd entry skill and other downstream tools need a consolidated way to get project state. Currently they must call multiple CLI commands (config show, spec list, change list, drafts list, project context, graph stats), creating latency and scattered output. This spec defines a new `project status` command that consolidates this information.",
+  "context": [
+    "The specd entry skill and other downstream tools need a consolidated way to get project state. Currently they must call multiple CLI commands (config show, spec list, change list, drafts list, project context, graph stats), creating latency and scattered output. This spec defines a new `project status` command that consolidates this information."
+  ],
+  "rules": [
+    {
+      "requirement": "project status command exists",
+      "rules": [
+        "The CLI MUST provide a `project status` command under the `project` subcommand that outputs consolidated project state."
+      ]
+    },
+    {
+      "requirement": "includes workspace information",
+      "rules": [
+        "The command output MUST include:\n\n- Project root path\n- Schema reference\n- Workspaces: for each, name, prefix, and ownership (owned|shared|readOnly)"
+      ]
+    },
+    {
+      "requirement": "includes spec counts",
+      "rules": [
+        "The command output MUST include:\n\n- Total spec count across all workspaces\n- Spec count per workspace"
+      ]
+    },
+    {
+      "requirement": "includes change counts",
+      "rules": [
+        "The command output MUST include:\n\n- Number of active changes\n- Number of drafts\n- Number of discarded changes"
+      ]
+    },
+    {
+      "requirement": "includes approval gates",
+      "rules": [
+        "The command output MUST include:\n\n- Spec approval enabled (boolean)\n- Signoff approval enabled (boolean)"
+      ]
+    },
+    {
+      "requirement": "includes graph freshness (always)",
+      "rules": [
+        "The command output MUST always include:\n\n- Whether the code graph is stale (boolean)\n- Last indexed timestamp (or null if never indexed)\n\nThis is included by default, not behind a flag."
+      ]
+    },
+    {
+      "requirement": "supports --graph flag",
+      "rules": [
+        "When `--graph` flag is provided, the command MUST include extended graph statistics:\n\n- Number of indexed files\n- Number of indexed symbols\n- Hotspots (if available)"
+      ]
+    },
+    {
+      "requirement": "includes config flags (always)",
+      "rules": [
+        "The command output MUST always include:\n\n- llmOptimizedContext enabled (boolean)\n- Spec approval enabled (boolean)\n- Signoff approval enabled (boolean)\n\nThis is included by default, not behind a flag."
+      ]
+    },
+    {
+      "requirement": "supports --context flag",
+      "rules": [
+        "When `--context` flag is provided, the output MUST include project context references:\n\n- Instruction entries (the directive text without reading files)\n- File entries (which files should be read without content)\n- Spec entries (which specs should be read without content)"
+      ]
+    },
+    {
+      "requirement": "defaults to text output",
+      "rules": [
+        "Without `--format` flag, output MUST be plain text formatted for readability."
+      ]
+    },
+    {
+      "requirement": "supports json and toon formats",
+      "rules": [
+        "When `--format json` is provided, output MUST be valid JSON.\nWhen `--format toon` is provided, output MUST be TOON-formatted."
+      ]
+    }
+  ],
+  "constraints": [
+    "The command MUST NOT auto-index the graph — callers decide whether to index",
+    "The --context flag defaults to off when not provided",
+    "The --graph flag defaults to off when not provided",
+    "This command does NOT replace project dashboard — they are separate commands"
+  ],
+  "scenarios": [
+    {
+      "requirement": "project status command exists",
+      "name": "Command returns consolidated project state",
+      "given": [
+        "a configured specd project"
+      ],
+      "when": [
+        "the user runs specd project status"
+      ],
+      "then": [
+        "the output includes project root, schema ref, workspaces, specs, and changes"
+      ]
+    },
+    {
+      "requirement": "includes workspace information",
+      "name": "Output includes all workspace details",
+      "given": [
+        "a project with multiple workspaces"
+      ],
+      "when": [
+        "specd project status is executed"
+      ],
+      "then": [
+        "each workspace shows name, prefix, and ownership"
+      ]
+    },
+    {
+      "requirement": "includes approval gates",
+      "name": "Output shows approval gate status",
+      "given": [
+        "a project with approval gates enabled"
+      ],
+      "when": [
+        "specd project status runs"
+      ],
+      "then": [
+        "spec approval and signoff approval status are included"
+      ]
+    },
+    {
+      "requirement": "includes graph freshness (always)",
+      "name": "Graph freshness included by default",
+      "given": [
+        "a project with an indexed code graph"
+      ],
+      "when": [
+        "specd project status runs without --graph flag"
+      ],
+      "then": [
+        "graph staleness and last indexed timestamp are included"
+      ]
+    },
+    {
+      "requirement": "supports --graph flag",
+      "name": "Extended graph stats with --graph flag",
+      "given": [
+        "a project with indexed code"
+      ],
+      "when": [
+        "specd project status --graph runs"
+      ],
+      "then": [
+        "indexed files count, symbols count, and hotspots are included"
+      ]
+    },
+    {
+      "requirement": "supports --context flag",
+      "name": "Context references with --context flag",
+      "given": [
+        "a project with context configured"
+      ],
+      "when": [
+        "specd project status --context runs"
+      ],
+      "then": [
+        "context references (instructions, files, specs) are included"
+      ]
+    },
+    {
+      "requirement": "includes config flags (always)",
+      "name": "Output always includes config flags",
+      "given": [
+        "a configured specd project"
+      ],
+      "when": [
+        "specd project status runs (without any flags)"
+      ],
+      "then": [
+        "llmOptimizedContext enabled flag is included",
+        "AND spec approval enabled flag is included",
+        "AND signoff approval enabled flag is included"
+      ]
+    },
+    {
+      "requirement": "defaults to text output",
+      "name": "Default output is text",
+      "when": [
+        "specd project status runs without --format"
+      ],
+      "then": [
+        "output is human-readable plain text"
+      ]
+    },
+    {
+      "requirement": "supports json and toon formats",
+      "name": "JSON output is valid",
+      "when": [
+        "specd project status --format json runs"
+      ],
+      "then": [
+        "output is valid JSON"
+      ]
+    },
+    {
+      "requirement": "supports json and toon formats",
+      "name": "TOON output is formatted",
+      "when": [
+        "specd project status --format toon runs"
+      ],
+      "then": [
+        "output is TOON-formatted"
+      ]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:2f77b783ccb2ba2d1de1272debba7d3277f12f43c433d0141d29b8b1e6bc438b",
+    "verify.md": "sha256:43805957dd95dc8acdca769e6444f67a336e0b9d84940a6b842a4b904342537f"
+  },
+  "generatedBy": "core"
+}

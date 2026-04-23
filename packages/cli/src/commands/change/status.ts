@@ -177,7 +177,30 @@ JSON/TOON output schema:
                 approvals: lifecycle.approvals,
                 nextArtifact: lifecycle.nextArtifact,
                 changePath: lifecycle.changePath,
-                schemaInfo: lifecycle.schemaInfo,
+                schemaInfo: lifecycle.schemaInfo !== null
+                  ? { name: lifecycle.schemaInfo.name, version: lifecycle.schemaInfo.version }
+                  : null,
+              },
+              ...(lifecycle.schemaInfo !== null
+                ? {
+                    schema: {
+                      name: lifecycle.schemaInfo.name,
+                      version: lifecycle.schemaInfo.version,
+                      artifactDag:
+                        lifecycle.schemaInfo.artifacts?.map((a) => ({
+                          id: a.id,
+                          scope: a.scope,
+                          optional: a.optional ?? false,
+                          requires: a.requires ?? [],
+                          hasTaskCompletionCheck: a.taskCompletionCheck !== undefined,
+                          output: a.output,
+                        })) ?? [],
+                    },
+                  }
+                : {}),
+              approvalGates: {
+                specEnabled: lifecycle.approvals.spec,
+                signoffEnabled: lifecycle.approvals.signoff,
               },
             },
             fmt,

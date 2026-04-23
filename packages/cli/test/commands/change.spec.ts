@@ -371,7 +371,7 @@ describe('change status', () => {
         approvals: { spec: false, signoff: false },
         nextArtifact: null,
         changePath: '.specd/changes/feat',
-        schemaInfo: { name: '@specd/schema-std', version: 1 },
+        schemaInfo: { name: '@specd/schema-std', version: 1, artifacts: [] },
       },
     })
 
@@ -400,7 +400,7 @@ describe('change status', () => {
         approvals: { spec: false, signoff: false },
         nextArtifact: null,
         changePath: '.specd/changes/feat',
-        schemaInfo: { name: '@specd/schema-std', version: 1 },
+        schemaInfo: { name: '@specd/schema-std', version: 1, artifacts: [] },
       },
     })
 
@@ -446,7 +446,7 @@ describe('change status', () => {
         approvals: { spec: false, signoff: false },
         nextArtifact: null,
         changePath: '.specd/changes/add-login',
-        schemaInfo: { name: 'std', version: 1 },
+        schemaInfo: { name: 'std', version: 1, artifacts: [] },
       },
     })
 
@@ -455,10 +455,8 @@ describe('change status', () => {
     await program.parseAsync(['node', 'specd', 'change', 'status', 'add-login', '--format', 'json'])
 
     const parsed = JSON.parse(stdout())
-    expect(parsed.schema).toEqual({ name: 'std', version: 1 })
-    expect(parsed.artifacts).toEqual([
-      { type: 'proposal', state: 'complete', effectiveStatus: 'complete', files: [] },
-    ])
+    expect(parsed.schema).toEqual({ name: 'std', version: 1, artifactDag: [] })
+    expect(parsed.approvalGates).toEqual({ specEnabled: false, signoffEnabled: false })
   })
 
   it('renders review output with absolute file paths in text mode', async () => {
@@ -497,7 +495,7 @@ describe('change status', () => {
         approvals: { spec: false, signoff: false },
         nextArtifact: null,
         changePath: '/project/.specd/changes/add-login',
-        schemaInfo: { name: '@specd/schema-std', version: 1 },
+        schemaInfo: { name: '@specd/schema-std', version: 1, artifacts: [] },
       },
     })
 
@@ -547,7 +545,7 @@ describe('change status', () => {
         approvals: { spec: false, signoff: false },
         nextArtifact: null,
         changePath: '/project/.specd/changes/add-login',
-        schemaInfo: { name: '@specd/schema-std', version: 1 },
+        schemaInfo: { name: '@specd/schema-std', version: 1, artifacts: [] },
       },
     })
 

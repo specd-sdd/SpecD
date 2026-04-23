@@ -646,14 +646,25 @@ describe('GetStatus', () => {
     })
 
     describe('schemaInfo', () => {
-      it('returns schema name and version when resolution succeeds', async () => {
+      it('returns schema name, version and artifacts when resolution succeeds', async () => {
         const change = makeChange('test')
         const repo = makeChangeRepository([change])
-        const uc = makeGetStatus(repo)
+        const schema = makeStdSchema()
+        const uc = makeGetStatus(repo, { schema })
 
         const result = await uc.execute({ name: 'test' })
 
-        expect(result.lifecycle.schemaInfo).toEqual({ name: 'test-schema', version: 1 })
+        expect(result.lifecycle.schemaInfo).toEqual({
+          name: 'test-schema',
+          version: 1,
+          artifacts: expect.arrayContaining([
+            expect.objectContaining({ id: 'proposal' }),
+            expect.objectContaining({ id: 'specs' }),
+            expect.objectContaining({ id: 'verify' }),
+            expect.objectContaining({ id: 'design' }),
+            expect.objectContaining({ id: 'tasks' }),
+          ]),
+        })
       })
 
       it('returns null when schema resolution fails', async () => {

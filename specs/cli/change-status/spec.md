@@ -144,6 +144,25 @@ The CLI command MUST NOT resolve the schema independently. It SHALL compare `cha
 
 If no change with the given name exists, the command exits with code 1 and prints an `error:` message to stderr.
 
+### Requirement: Schema-derived fields
+
+When the change uses any schema (not just schema-std), the JSON output MUST include a nested schema object with derived fields:
+
+schema:
+name: "..."
+version: 1
+artifactDag:
+\- id: "..."
+scope: "change|spec"
+optional: true|false
+requires: \["..."]
+hasTaskCompletionCheck: true|false
+output: "..."
+
+artifactDag is derived from the schemas artifacts array.
+hasTaskCompletionCheck is true when the artifact has a taskCompletionCheck declaration.
+This allows design/implement skills to replace schema show calls.
+
 ## Constraints
 
 - The output includes all artifacts declared by the schema, not only those present on disk

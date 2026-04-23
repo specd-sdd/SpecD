@@ -1,6 +1,6 @@
 # specd — entry point
 
-Read `shared.md` before doing anything.
+Read @shared.md before doing anything.
 
 ## What this does
 
@@ -9,25 +9,25 @@ This skill does NOT execute lifecycle phases — it routes to the right skill.
 
 ## Steps
 
-### 1. Read shared notes and show project welcome
+### 1. Show project welcome
 
-```
-Read shared.md
-```
 
 Then gather project info and load project context:
 
 ```bash
-specd config show --format json
-specd spec list --format json --summary
-specd change list --format json
-specd drafts list --format json
-specd project context --format text
-specd graph stats --format json
+specd project status --context --graph --format json
 ```
 
-**MUST follow** — the project context output contains binding directives (instructions
-and file content). Read and absorb them before continuing. If lazy mode returns summary
+**MUST follow** — the project status output contains workspaces (name, prefix, ownership, codeRoot),
+specs, changes, graph freshness, and approval gates. If `llmOptimizedContext` is enabled,
+also run:
+
+```bash
+specd project status --context --format json
+```
+
+The `context` field contains binding directives (instructions and file references).
+Read and absorb them before continuing. If lazy mode returns summary
 specs, evaluate and load any that are relevant (see `shared.md` — "Processing `change
 context` output").
 
@@ -66,25 +66,23 @@ Keep it compact — no more than 8-10 lines. Omit sections that are empty (e.g. 
 "Drafts" if there are none). The user cannot see tool output directly, so you MUST
 print this yourself.
 
-If the code graph is stale or not indexed, re-index it in the background:
+If the code graph is stale (`graph.stale: true`) or not indexed (`graph.freshness: null`), re-index it in the background:
 
 ```bash
 specd graph index --format json
 ```
 
 Do not wait for completion before continuing — indexing can take a few seconds and
-subsequent skills will benefit from a fresh graph. If `graph stats` failed (graph
+subsequent skills will benefit from a fresh graph. If `graph.freshness` is null (graph
 never indexed), run `graph index` to bootstrap it.
 
 ### 2. Check for existing changes
 
-```bash
-specd change list --format json
-specd drafts list --format json
-```
+The `project status` output already includes `changes.active`, `changes.drafts`, and `changes.discarded`.
 
 - If changes or drafts exist: show them with their states and ask the user
   what they want to do — continue one, start something new, or just talk.
+  For details, run `specd change list --format json`.
 - If a draft is selected: `specd drafts restore <name>`
 
 ### 3. Route based on state

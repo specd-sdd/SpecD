@@ -1,6 +1,6 @@
 # specd-design — write artifacts
 
-Read `shared.md` before doing anything.
+Read @shared.md before doing anything.
 
 ## What this does
 
@@ -78,10 +78,10 @@ Check `artifacts` array — if some are already `complete`, you're resuming mid-
 ### 2. Check workspace ownership
 
 ```bash
-specd config show --format json
+specd project status --format json
 ```
 
-From the JSON output, build a map of each workspace's `codeRoot` and `ownership`.
+From the JSON output, build a map of each workspace's `codeRoot` and `ownership` from the `workspaces` array.
 For each `specId` in the change, determine which workspace it belongs to.
 
 **If any spec targets a `readOnly` workspace:**
@@ -363,11 +363,10 @@ allowed roots, the design is not ready.
 Reload workspace config:
 
 ```bash
-specd config show --format json
+specd project status --format json
 ```
 
-Build the set of **allowed implementation roots** from the workspaces targeted by
-the change:
+Build the set of **allowed implementation roots** from the `workspaces` array in the output:
 
 - Include the `codeRoot` of each active workspace whose ownership is `owned` or `shared`
 - Exclude `readOnly` roots entirely; they are never valid implementation targets

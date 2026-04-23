@@ -1,6 +1,6 @@
 # specd-new — discover and create
 
-Read `shared.md` before doing anything.
+Read @shared.md before doing anything.
 
 ## What this does
 
@@ -77,10 +77,10 @@ is HIGH or CRITICAL, mention it — it affects how many specs should be in scope
 When the picture is clear enough, first check workspace ownership:
 
 ```bash
-specd config show --format json
+specd project status --format json
 ```
 
-From the JSON output, build a map of each workspace's `ownership`. For each spec you're
+From the JSON output, build a map of each workspace's `ownership` from the `workspaces` array. For each spec you're
 about to propose, determine which workspace it belongs to.
 
 **If any proposed spec belongs to a `readOnly` workspace**, do NOT include it. Tell the user:

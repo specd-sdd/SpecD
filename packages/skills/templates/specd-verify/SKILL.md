@@ -1,6 +1,6 @@
 # specd-verify — check implementation against specs
 
-Read `shared.md` before doing anything.
+Read @shared.md before doing anything.
 
 ## What this does
 
