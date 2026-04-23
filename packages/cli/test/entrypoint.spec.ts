@@ -18,6 +18,7 @@ vi.mock('../src/kernel.js', () => ({ createCliKernel: vi.fn() }))
 import { loadConfig } from '../src/load-config.js'
 import { createCliKernel } from '../src/kernel.js'
 import { registerProjectDashboard } from '../src/commands/project/dashboard.js'
+import { registerProjectInit } from '../src/commands/project/init.js'
 
 afterEach(() => vi.restoreAllMocks())
 
@@ -200,5 +201,23 @@ describe('auto-dashboard default action', () => {
     const dashboardCmd = projectCmd.commands.find((c) => c.name() === 'dashboard')
     expect(dashboardCmd).toBeDefined()
     expect(projectCmd.commands.find((c) => c.name() === 'overview')).toBeUndefined()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Top-level init alias
+// ---------------------------------------------------------------------------
+
+describe('top-level init alias', () => {
+  it('specd --help includes init as a top-level command', async () => {
+    const program = makeRootProgram()
+    registerProjectInit(program)
+
+    const stdout = captureStdout()
+    await program.parseAsync(['node', 'specd', '--help']).catch(() => {
+      // exitOverride causes Commander to throw on --help — that is expected
+    })
+
+    expect(stdout()).toMatch(/\binit\b/)
   })
 })

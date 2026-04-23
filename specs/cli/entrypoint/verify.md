@@ -141,6 +141,33 @@
 - **THEN** the standard help text is shown
 - **AND** the process exits with code 0
 
+### Requirement: Top-level init alias
+
+#### Scenario: specd init appears in root help output
+
+- **WHEN** `specd --help` is run
+- **THEN** the help text includes `init` as a top-level command
+
+#### Scenario: specd init delegates to project init handler
+
+- **GIVEN** a clean directory with no existing `specd.yaml`
+- **WHEN** `specd init --workspace default` is run
+- **THEN** the command exits with code 0
+- **AND** `specd.yaml` is written to the target directory
+
+#### Scenario: specd init rejects excess arguments
+
+- **WHEN** `specd init extra-arg` is run
+- **THEN** the command exits with code 1
+- **AND** stderr contains a usage error
+
+#### Scenario: specd init --force overwrites existing config
+
+- **GIVEN** a `specd.yaml` already exists
+- **WHEN** `specd init --force --workspace default` is run
+- **THEN** the command exits with code 0
+- **AND** `specd.yaml` is overwritten
+
 ### Requirement: Output format flag
 
 #### Scenario: Text format produces human-readable output

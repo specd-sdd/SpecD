@@ -9,6 +9,21 @@
 - **WHEN** `specd project init --plugin @specd/plugin-agent-claude` is invoked
 - **THEN** the plugin is selected for installation
 
+#### Scenario: specd init alias works identically to specd project init
+
+- **GIVEN** a clean directory with no existing `specd.yaml`
+- **WHEN** `specd init --workspace default --workspace-path specs/` is run
+- **THEN** `specd.yaml` is written with `schema: '@specd/schema-std'`, workspace `default` at `specs/`
+- **AND** the process exits with code 0
+- **AND** the output is identical to running `specd project init --workspace default --workspace-path specs/` with the same flags
+
+#### Scenario: specd init --format json produces identical output to specd project init --format json
+
+- **GIVEN** a clean directory with no existing `specd.yaml`
+- **WHEN** `specd init --format json` is run
+- **THEN** stdout is valid JSON with `result`, `configPath`, `schema`, and `workspaces` fields
+- **AND** the JSON output matches the output of `specd project init --format json` (same keys and structure)
+
 ### Requirement: Interactive mode
 
 #### Scenario: Plugin selection wizard

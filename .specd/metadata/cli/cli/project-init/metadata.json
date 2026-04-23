@@ -9,7 +9,7 @@
     {
       "requirement": "Command signature",
       "rules": [
-        "```\nspecd project init [--schema <ref>] [--workspace <id>] [--workspace-path <path>] [--plugin <name>...] [--force] [--format text|json|toon]\n```\n\n- `--schema <ref>` — optional; the schema reference to activate (e.g. `@specd/schema-std`, `./schemas/custom/schema.yaml`). Defaults to `@specd/schema-std`.\n- `--workspace <id>` — optional; the ID of the default workspace. Defaults to `default`.\n- `--workspace-path <path>` — optional; the specs path for the default workspace, relative to the config file. Defaults to `specs/`.\n- `--plugin <name>` — optional, repeatable; agent plugins to install after initialisation (e.g. `--plugin @specd/plugin-agent-claude`). When not provided in interactive mode, the wizard asks.\n- `--force` — optional; overwrite an existing config without prompting.\n- `--format text|json|toon` — optional; forces non-interactive mode; defaults to `text`."
+        "```\nspecd project init [--schema <ref>] [--workspace <id>] [--workspace-path <path>] [--plugin <name>...] [--force] [--format text|json|toon]\nspecd init [--schema <ref>] [--workspace <id>] [--workspace-path <path>] [--plugin <name>...] [--force] [--format text|json|toon]\n```\n\n`specd init` is a top-level alias for `specd project init`. Both forms SHALL behave identically — same flags, same interactive wizard, same exit codes, same output.\n\n- `--schema <ref>` — optional; the schema reference to activate (e.g. `@specd/schema-std`, `./schemas/custom/schema.yaml`). Defaults to `@specd/schema-std`.\n- `--workspace <id>` — optional; the ID of the default workspace. Defaults to `default`.\n- `--workspace-path <path>` — optional; the specs path for the default workspace, relative to the config file. Defaults to `specs/`.\n- `--plugin <name>` — optional, repeatable; agent plugins to install after initialisation (e.g. `--plugin @specd/plugin-agent-claude`). When not provided in interactive mode, the wizard asks.\n- `--force` — optional; overwrite an existing config without prompting.\n- `--format text|json|toon` — optional; forces non-interactive mode; defaults to `text`."
       ]
     },
     {
@@ -67,6 +67,27 @@
       "name": "--plugin flag",
       "when": ["specd project init --plugin @specd/plugin-agent-claude is invoked"],
       "then": ["the plugin is selected for installation"]
+    },
+    {
+      "requirement": "Command signature",
+      "name": "specd init alias works identically to specd project init",
+      "given": ["a clean directory with no existing specd.yaml"],
+      "when": ["specd init --workspace default --workspace-path specs/ is run"],
+      "then": [
+        "specd.yaml is written with schema: '@specd/schema-std', workspace default at specs/",
+        "AND the process exits with code 0",
+        "AND the output is identical to running specd project init --workspace default --workspace-path specs/ with the same flags"
+      ]
+    },
+    {
+      "requirement": "Command signature",
+      "name": "specd init --format json produces identical output to specd project init --format json",
+      "given": ["a clean directory with no existing specd.yaml"],
+      "when": ["specd init --format json is run"],
+      "then": [
+        "stdout is valid JSON with result, configPath, schema, and workspaces fields",
+        "AND the JSON output matches the output of specd project init --format json (same keys and structure)"
+      ]
     },
     {
       "requirement": "Interactive mode",
@@ -161,8 +182,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:ef42c9d3a1ef8e3fba4d7746fb03960beba47e992176b7cde8563973d0d4aac3",
-    "verify.md": "sha256:29ebdb6032324fbdc993ec5bf0c287f763046ce4b1a5e737bee9ce2be6af6dcd"
+    "spec.md": "sha256:21b4c26f1e7e8cd73628d2b0666d880dbf0aa185e285bb19a7d84de2b945ae9e",
+    "verify.md": "sha256:8d5454febaf20f8b42aea2e5166b63569c423e770ad62f38132bc700ae276dcf"
   },
   "generatedBy": "core"
 }
