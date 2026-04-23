@@ -94,3 +94,18 @@
 - **WHEN** `specd change status nonexistent` is run
 - **THEN** the command exits with code 1
 - **AND** stderr contains an `error:` message
+
+### Requirement: Schema-derived fields
+
+#### Scenario: JSON output includes artifactDag
+
+- **GIVEN** a change using schema-std
+- **WHEN** `specd change status <name> --format json` is run
+- **THEN** the JSON output includes `schema.artifactDag` array
+- **AND** each entry includes id, scope, optional, requires, hasTaskCompletionCheck, output
+
+#### Scenario: JSON output for non-schema-std also includes artifactDag
+
+- **GIVEN** a change using a custom schema
+- **WHEN** `specd change status <name> --format json` is run
+- **THEN** the JSON output includes `schema.artifactDag` array

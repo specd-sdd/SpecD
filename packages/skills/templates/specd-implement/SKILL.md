@@ -1,6 +1,6 @@
 # specd-implement — write code
 
-Read `shared.md` before doing anything.
+Read @shared.md before doing anything.
 
 ## What this does
 
@@ -60,10 +60,10 @@ specd change hook-instruction <name> implementing --phase pre --format text
 ### 2. Check workspace ownership
 
 ```bash
-specd config show --format json
+specd project status --format json
 ```
 
-From the JSON output, build a map of each workspace's `codeRoot` and `ownership`.
+From the JSON output, build a map of each workspace's `codeRoot` and `ownership` from the `workspaces` array.
 For each `specId` in the change, determine which workspace it belongs to.
 
 **If any spec targets a `readOnly` workspace:**

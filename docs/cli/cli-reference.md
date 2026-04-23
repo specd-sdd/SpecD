@@ -68,12 +68,19 @@ specd change status <name> [options]
 
 Show the full status of a change: associated specs, artifact file statuses, current lifecycle state, available transitions, and any blockers preventing progression.
 
-`change status` now exposes both the aggregate state of each artifact and the
+`change status` exposes both the aggregate state of each artifact and the
 state of each tracked file inside that artifact. Structured output also includes
 a `review` block so agents can route back to designing without reading the
 manifest directly. Within that block, `affectedArtifacts[].files[]` is projected
 as concrete file entries with `filename`, absolute `path`, and optional
 supplemental `key`; consumers should treat the path as the primary jump target.
+
+In JSON mode, the output includes a top-level `schema` object with an
+`artifactDag` array derived from the active schema — each entry has `id`,
+`scope`, `optional`, `requires`, `hasTaskCompletionCheck`, and `output`.
+This allows agents to understand the artifact structure without calling
+`schema show` separately. A top-level `approvalGates` object reports whether
+spec approval and signoff approval are enabled in the project config.
 
 Artifact and file states:
 
@@ -739,6 +746,39 @@ Display a project-level dashboard showing schema, workspaces, spec counts, and c
 | --------------------------- | ----------------- |
 | `--format text\|json\|toon` | Output format.    |
 | `--config <path>`           | Config file path. |
+
+### project status
+
+```text
+specd project status [options]
+```
+
+Display consolidated project state including workspaces, spec counts, change counts, graph freshness, and config flags. Designed for programmatic consumption by agents and scripts — replaces multiple calls to `config show`, `spec list`, `change list`, `graph stats`, and `project context`.
+
+By default, the output includes:
+
+- Project root path and schema reference
+- Workspaces with name, prefix, and ownership
+- Spec counts (total and per-workspace)
+- Change counts (active, drafts, discarded)
+- Graph freshness (stale boolean, last indexed timestamp) — always included
+- Approval gates (spec enabled, signoff enabled)
+- Config flags (llmOptimizedContext)
+
+| Option                      | Description                                                        |
+| --------------------------- | ------------------------------------------------------------------ |
+| `--context`                 | Include project context references (instructions, files, specs).   |
+| `--graph`                   | Include extended graph statistics (file count, symbol count, etc). |
+| `--format text\|json\|toon` | Output format.                                                     |
+| `--config <path>`           | Config file path.                                                  |
+
+```bash
+# Consolidated project state for agents
+specd project status --format json
+
+# Include graph stats and context references
+specd project status --graph --context --format json
+```
 
 ---
 

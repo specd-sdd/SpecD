@@ -1,6 +1,6 @@
 # specd-archive — finalize and archive
 
-Read `shared.md` before doing anything.
+Read @shared.md before doing anything.
 
 ## What this does
 
@@ -108,10 +108,10 @@ specd spec generate-metadata --all --write --status stale,missing
 ### 8. Check LLM optimization
 
 ```bash
-specd config show --format json
+specd project status --format json
 ```
 
-If `llmOptimizedContext` is `true`, suggest running `/specd-spec-metadata` for each
+If `approvals.llmOptimized` is `true`, suggest running `/specd-spec-metadata` for each
 spec in the change.
 
 ### 9. Done

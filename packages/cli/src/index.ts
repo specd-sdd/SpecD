@@ -55,6 +55,7 @@ import { registerProjectInit } from './commands/project/init.js'
 import { registerProjectContext } from './commands/project/context.js'
 import { registerProjectUpdate } from './commands/project/update.js'
 import { registerProjectDashboard } from './commands/project/dashboard.js'
+import { registerProjectStatus } from './commands/project/status.js'
 
 // config
 import { registerConfigShow } from './commands/config/show.js'
@@ -173,6 +174,7 @@ registerProjectInit(projectCmd)
 registerProjectContext(projectCmd)
 registerProjectUpdate(projectCmd)
 registerProjectDashboard(projectCmd)
+registerProjectStatus(projectCmd)
 registerProjectInit(program)
 
 // ---- config ----

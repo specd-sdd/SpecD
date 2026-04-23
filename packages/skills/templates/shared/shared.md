@@ -77,6 +77,14 @@ Only after `--add-spec` succeeds should you write the delta or artifact file in 
 change directory. Writing files for specs not yet added to the change will cause
 validation failures and broken state.
 
+Whenever you edit or write a delta, check the merged output with
+
+```bash
+specd change spec-preview <name> <specId>
+```
+
+If the output is not what you want, edit the delta again (make sure the delta does not remove anything needed).
+
 ## Spec scope vs spec dependencies
 
 These are two distinct operations — do not confuse them:
@@ -195,6 +203,14 @@ You MUST NOT ignore the summary catalogue. Before proceeding with your task:
 1. **Scan** every summary spec's title and description
 2. **Identify** which ones are relevant to the work you're about to do
 3. **Load** each relevant spec in full:
+
+If you are loading a spec inside a change:
+
+   ```bash
+   specd change spec-preview <change-name> <spec-id> --format text
+   ```
+
+If the spec is not in the change:
 
    ```bash
    specd spec show <spec-id> --format text

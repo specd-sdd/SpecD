@@ -1,6 +1,7 @@
 import * as path from 'node:path'
 import { type Change } from '../../domain/entities/change.js'
 import { type ArtifactStatus } from '../../domain/value-objects/artifact-status.js'
+import { type ArtifactType } from '../../domain/value-objects/artifact-type.js'
 import { type ChangeState, VALID_TRANSITIONS } from '../../domain/value-objects/change-state.js'
 import { type ChangeRepository } from '../ports/change-repository.js'
 import { type SchemaProvider } from '../ports/schema-provider.js'
@@ -100,8 +101,10 @@ export interface LifecycleContext {
   readonly nextArtifact: string | null
   /** Filesystem path to the change directory. */
   readonly changePath: string
-  /** Active schema name and version, or null when schema resolution fails. */
-  readonly schemaInfo: { readonly name: string; readonly version: number } | null
+  /** Active schema name, version and artifacts, or null when schema resolution fails. */
+  readonly schemaInfo:
+    | { readonly name: string; readonly version: number; readonly artifacts: readonly ArtifactType[] }
+    | null
 }
 
 /** Result returned by the {@link GetStatus} use case. */
@@ -191,7 +194,11 @@ export class GetStatus {
     let schemaInfo: LifecycleContext['schemaInfo'] = null
     try {
       schema = await this._schemaProvider.get()
-      schemaInfo = { name: schema.name(), version: schema.version() }
+      schemaInfo = {
+        name: schema.name(),
+        version: schema.version(),
+        artifacts: schema.artifacts(),
+      }
     } catch {
       // Schema-dependent fields will use defaults
     }
