@@ -1,6 +1,8 @@
 import { type SymbolNode } from './symbol-node.js'
 import { type Relation } from './relation.js'
 import { type ImportDeclaration } from './import-declaration.js'
+import { type BindingFact } from './binding-fact.js'
+import { type CallFact } from './call-fact.js'
 
 /**
  * Result shape for adapters that can extract symbols and namespace in one pass.
@@ -69,6 +71,32 @@ export interface LanguageAdapter {
    * @returns An array of parsed import declarations.
    */
   extractImportedNames(filePath: string, content: string): ImportDeclaration[]
+
+  /**
+   * Extracts deterministic scoped binding facts from source content.
+   * Custom adapters may omit this optional extension point.
+   * @param filePath - The path of the source file.
+   * @param content - The source file content.
+   * @param symbols - The symbols already extracted from this file.
+   * @param imports - The import declarations already extracted from this file.
+   * @returns Binding facts for shared scoped resolution.
+   */
+  extractBindingFacts?(
+    filePath: string,
+    content: string,
+    symbols: SymbolNode[],
+    imports: ImportDeclaration[],
+  ): BindingFact[]
+
+  /**
+   * Extracts normalized call facts from source content.
+   * Custom adapters may omit this optional extension point.
+   * @param filePath - The path of the source file.
+   * @param content - The source file content.
+   * @param symbols - The symbols already extracted from this file.
+   * @returns Call facts for shared scoped resolution.
+   */
+  extractCallFacts?(filePath: string, content: string, symbols: SymbolNode[]): CallFact[]
 
   /**
    * Extracts the namespace declaration from source code, if applicable.

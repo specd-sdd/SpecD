@@ -62,6 +62,44 @@ describe('Traversal services', () => {
       expect(result.levels.get(1)![0]!.name).toBe('caller')
     })
 
+    it('includes CONSTRUCTS and USES_TYPE as upstream dependency edges', async () => {
+      const target = sym('TemplateExpander', 'template.ts', 1)
+      const constructorCaller = sym('create', 'composition.ts', 1)
+      const typeUser = sym('NodeHookRunner', 'runner.ts', 1)
+
+      await store.upsertFile(file('template.ts'), [target], [])
+      await store.upsertFile(
+        file('composition.ts'),
+        [constructorCaller],
+        [
+          createRelation({
+            source: constructorCaller.id,
+            target: target.id,
+            type: RelationType.Constructs,
+          }),
+        ],
+      )
+      await store.upsertFile(
+        file('runner.ts'),
+        [typeUser],
+        [
+          createRelation({
+            source: typeUser.id,
+            target: target.id,
+            type: RelationType.UsesType,
+          }),
+        ],
+      )
+
+      const result = await getUpstream(store, target.id)
+      expect(
+        result.levels
+          .get(1)
+          ?.map((symbol) => symbol.name)
+          .sort(),
+      ).toEqual(['NodeHookRunner', 'create'])
+    })
+
     it('groups callers by depth', async () => {
       const a = sym('a', 'x.ts', 1)
       const b = sym('b', 'x.ts', 2)
@@ -206,6 +244,37 @@ describe('Traversal services', () => {
 
       const result = await getDownstream(store, caller.id)
       expect(result.totalCount).toBe(1)
+    })
+
+    it('includes CONSTRUCTS and USES_TYPE as downstream dependency edges', async () => {
+      const source = sym('create', 'composition.ts', 1)
+      const constructed = sym('TemplateExpander', 'template.ts', 1)
+      const port = sym('GraphStore', 'graph-store.ts', 1)
+
+      await store.upsertFile(
+        file('composition.ts'),
+        [source, constructed, port],
+        [
+          createRelation({
+            source: source.id,
+            target: constructed.id,
+            type: RelationType.Constructs,
+          }),
+          createRelation({
+            source: source.id,
+            target: port.id,
+            type: RelationType.UsesType,
+          }),
+        ],
+      )
+
+      const result = await getDownstream(store, source.id)
+      expect(
+        result.levels
+          .get(1)
+          ?.map((symbol) => symbol.name)
+          .sort(),
+      ).toEqual(['GraphStore', 'TemplateExpander'])
     })
 
     it('includes hierarchy targets as downstream dependencies', async () => {

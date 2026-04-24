@@ -5,6 +5,9 @@ import { tmpdir } from 'node:os'
 import { PythonLanguageAdapter } from '../../../src/infrastructure/tree-sitter/python-language-adapter.js'
 import { SymbolKind } from '../../../src/domain/value-objects/symbol-kind.js'
 import { RelationType } from '../../../src/domain/value-objects/relation-type.js'
+import { ImportDeclarationKind } from '../../../src/domain/value-objects/import-declaration-kind.js'
+import { BindingSourceKind } from '../../../src/domain/value-objects/binding-fact.js'
+import { CallForm } from '../../../src/domain/value-objects/call-fact.js'
 
 const adapter = new PythonLanguageAdapter()
 
@@ -115,6 +118,43 @@ class User(Persistable):
         (relation) => relation.type === RelationType.Implements,
       )
       expect(implementsRelation?.target).toBe('contracts.py:interface:Persistable:1:0')
+    })
+  })
+
+  describe('shared fact extraction', () => {
+    it('parses literal dynamic imports and drops variable dynamic imports', () => {
+      const code = `
+import importlib
+importlib.import_module("pkg.mod")
+importlib.import_module(name)
+__import__("pkg.other")
+`
+      const imports = adapter.extractImportedNames('main.py', code)
+      expect(imports.filter((item) => item.kind === ImportDeclarationKind.Dynamic)).toHaveLength(2)
+    })
+
+    it('emits annotation and constructor facts', () => {
+      const code = `
+from pkg import UserRepo
+class Service:
+    def __init__(self, repo: UserRepo) -> UserRepo:
+        self.repo: UserRepo = repo
+        created = UserRepo()
+`
+      const symbols = adapter.extractSymbols('main.py', code)
+      const imports = adapter.extractImportedNames('main.py', code)
+      const bindingFacts = adapter.extractBindingFacts('main.py', code, symbols, imports)
+      const callFacts = adapter.extractCallFacts('main.py', code, symbols)
+
+      expect(
+        bindingFacts.some(
+          (fact) =>
+            fact.sourceKind === BindingSourceKind.Parameter && fact.targetName === 'UserRepo',
+        ),
+      ).toBe(true)
+      expect(
+        callFacts.some((fact) => fact.form === CallForm.Constructor && fact.name === 'UserRepo'),
+      ).toBe(true)
     })
   })
 

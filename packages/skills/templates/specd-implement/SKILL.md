@@ -119,11 +119,11 @@ specd graph hotspots --min-risk MEDIUM --format json
 ```
 
 If the tasks (from the design artifact) mention specific symbols or files, check their
-downstream dependents:
+dependents:
 
 ```bash
-specd graph impact --symbol "<name>" --direction downstream --format json
-specd graph impact --file "<workspace:path>" --direction downstream --format json
+specd graph impact --symbol "<name>" --direction dependents --format json
+specd graph impact --file "<workspace:path>" --direction dependents --format json
 ```
 
 Surface HIGH or CRITICAL risk findings to the user before starting implementation.

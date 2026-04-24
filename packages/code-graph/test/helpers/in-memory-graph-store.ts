@@ -11,6 +11,21 @@ import { StoreNotOpenError } from '../../src/domain/errors/store-not-open-error.
 import { expandSymbolName } from '../../src/domain/services/expand-symbol-name.js'
 import { matchesExclude } from '../../src/domain/services/matches-exclude.js'
 
+const SYMBOL_DEPENDENCY_RELATION_TYPES = [
+  RelationType.Calls,
+  RelationType.Constructs,
+  RelationType.UsesType,
+] as const
+
+/**
+ * Returns whether a relation type is a symbol-level dependency edge.
+ * @param relationType - Relation type to inspect.
+ * @returns True for CALLS, CONSTRUCTS, and USES_TYPE.
+ */
+function isSymbolDependencyRelationType(relationType: RelationType): boolean {
+  return SYMBOL_DEPENDENCY_RELATION_TYPES.some((type) => type === relationType)
+}
+
 export class InMemoryGraphStore extends GraphStore {
   private _isOpen = false
   private files = new Map<string, FileNode>()
@@ -42,6 +57,28 @@ export class InMemoryGraphStore extends GraphStore {
    */
   private getRelationsByTarget(relationType: RelationType, target: string): Relation[] {
     return this.relations.filter((r) => r.type === relationType && r.target === target)
+  }
+
+  /**
+   * Returns all symbol dependency relations where the target matches the provided id.
+   * @param target - The target symbol identifier to match.
+   * @returns Matching dependency relations targeting the symbol.
+   */
+  private getSymbolDependencyRelationsByTarget(target: string): Relation[] {
+    return this.relations.filter(
+      (r) => isSymbolDependencyRelationType(r.type) && r.target === target,
+    )
+  }
+
+  /**
+   * Returns all symbol dependency relations where the source matches the provided id.
+   * @param source - The source symbol identifier to match.
+   * @returns Matching dependency relations originating from the source.
+   */
+  private getSymbolDependencyRelationsBySource(source: string): Relation[] {
+    return this.relations.filter(
+      (r) => isSymbolDependencyRelationType(r.type) && r.source === source,
+    )
   }
 
   private ensureOpen(): void {
@@ -150,12 +187,12 @@ export class InMemoryGraphStore extends GraphStore {
 
   async getCallers(symbolId: string): Promise<Relation[]> {
     this.ensureOpen()
-    return this.getRelationsByTarget(RelationType.Calls, symbolId)
+    return this.getSymbolDependencyRelationsByTarget(symbolId)
   }
 
   async getCallees(symbolId: string): Promise<Relation[]> {
     this.ensureOpen()
-    return this.getRelationsBySource(RelationType.Calls, symbolId)
+    return this.getSymbolDependencyRelationsBySource(symbolId)
   }
 
   async getImporters(filePath: string): Promise<Relation[]> {
@@ -350,7 +387,7 @@ export class InMemoryGraphStore extends GraphStore {
     this.ensureOpen()
     const results: Array<{ symbol: SymbolNode; callerFilePath: string }> = []
     for (const rel of this.relations) {
-      if (rel.type === RelationType.Calls) {
+      if (isSymbolDependencyRelationType(rel.type)) {
         const targetSymbol = this.symbols.get(rel.target)
         const callerSymbol = this.symbols.get(rel.source)
         if (targetSymbol && callerSymbol) {

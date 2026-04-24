@@ -114,6 +114,41 @@ describe('computeHotspots', () => {
     ])
   })
 
+  it('scores CONSTRUCTS and USES_TYPE as caller evidence', async () => {
+    const target = sym('TemplateExpander', 'ws-a:template.ts', 1)
+    const constructorCaller = sym('create', 'ws-a:composition.ts', 1)
+    const typeUser = sym('NodeHookRunner', 'ws-b:runner.ts', 1)
+
+    await store.upsertFile(file('ws-a:template.ts'), [target], [])
+    await store.upsertFile(
+      file('ws-a:composition.ts'),
+      [constructorCaller],
+      [
+        createRelation({
+          source: constructorCaller.id,
+          target: target.id,
+          type: RelationType.Constructs,
+        }),
+      ],
+    )
+    await store.upsertFile(
+      file('ws-b:runner.ts', 'ws-b'),
+      [typeUser],
+      [
+        createRelation({
+          source: typeUser.id,
+          target: target.id,
+          type: RelationType.UsesType,
+        }),
+      ],
+    )
+
+    const result = await computeHotspots(store, { minRisk: 'LOW' })
+    const entry = result.entries.find((candidate) => candidate.symbol.name === 'TemplateExpander')
+    expect(entry?.directCallers).toBe(1)
+    expect(entry?.crossWorkspaceCallers).toBe(1)
+  })
+
   it('excludes importer-only symbols from the default view', async () => {
     const importerOnly = sym('importerOnly', 'ws-a:target.ts', 1)
 

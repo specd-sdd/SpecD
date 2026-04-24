@@ -199,6 +199,63 @@ export function graphStoreContractTests(
       expect(stats.relationCounts[RelationType.Overrides]).toBe(0)
     })
 
+    it('persists and queries CONSTRUCTS and USES_TYPE as symbol dependency relations', async () => {
+      const file = createFileNode({
+        path: 'src/composition.ts',
+        language: 'typescript',
+        contentHash: 'sha256:deps',
+        workspace: '/project',
+      })
+      const source = createSymbolNode({
+        name: 'createRunner',
+        kind: SymbolKind.Function,
+        filePath: file.path,
+        line: 1,
+        column: 0,
+      })
+      const target = createSymbolNode({
+        name: 'TemplateExpander',
+        kind: SymbolKind.Class,
+        filePath: file.path,
+        line: 5,
+        column: 0,
+      })
+
+      await store.bulkLoad({
+        files: [file],
+        symbols: [source, target],
+        specs: [],
+        relations: [
+          createRelation({
+            source: source.id,
+            target: target.id,
+            type: RelationType.Constructs,
+          }),
+          createRelation({
+            source: source.id,
+            target: target.id,
+            type: RelationType.UsesType,
+          }),
+        ],
+      })
+
+      const callers = await store.getCallers(target.id)
+      expect(callers.map((relation) => relation.type).sort()).toEqual([
+        RelationType.Constructs,
+        RelationType.UsesType,
+      ])
+
+      const callees = await store.getCallees(source.id)
+      expect(callees.map((relation) => relation.type).sort()).toEqual([
+        RelationType.Constructs,
+        RelationType.UsesType,
+      ])
+
+      const stats = await store.getStatistics()
+      expect(stats.relationCounts[RelationType.Constructs]).toBe(1)
+      expect(stats.relationCounts[RelationType.UsesType]).toBe(1)
+    })
+
     it('returns incoming EXTENDS relations via getExtenders', async () => {
       const file = createFileNode({
         path: 'src/types.ts',

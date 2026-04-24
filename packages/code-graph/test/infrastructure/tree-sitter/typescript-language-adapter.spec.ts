@@ -5,6 +5,9 @@ import { tmpdir } from 'node:os'
 import { TypeScriptLanguageAdapter } from '../../../src/infrastructure/tree-sitter/typescript-language-adapter.js'
 import { SymbolKind } from '../../../src/domain/value-objects/symbol-kind.js'
 import { RelationType } from '../../../src/domain/value-objects/relation-type.js'
+import { ImportDeclarationKind } from '../../../src/domain/value-objects/import-declaration-kind.js'
+import { BindingSourceKind } from '../../../src/domain/value-objects/binding-fact.js'
+import { CallForm } from '../../../src/domain/value-objects/call-fact.js'
 
 const adapter = new TypeScriptLanguageAdapter()
 
@@ -216,10 +219,58 @@ describe('TypeScriptLanguageAdapter', () => {
       expect(imports.map((i) => i.originalName)).toContain('Config')
     })
 
-    it('skips import statements without named imports', () => {
+    it('parses side-effect imports as file-only declarations', () => {
       const code = `import './side-effect.js'`
       const imports = adapter.extractImportedNames('main.ts', code)
-      expect(imports).toHaveLength(0)
+      expect(imports).toHaveLength(1)
+      expect(imports[0]!.kind).toBe(ImportDeclarationKind.SideEffect)
+      expect(imports[0]!.localName).toBe('')
+    })
+
+    it('parses literal dynamic import and require but drops variable forms', () => {
+      const code = `
+        import('./plugin.js')
+        import(pluginName)
+        require('./legacy.js')
+        require(variableName)
+        require.resolve('./not-runtime.js')
+      `
+      const imports = adapter.extractImportedNames('main.ts', code)
+      expect(imports.map((item) => item.kind)).toEqual([
+        ImportDeclarationKind.Dynamic,
+        ImportDeclarationKind.Require,
+      ])
+    })
+  })
+
+  describe('shared fact extraction', () => {
+    it('emits constructor type and construction facts', () => {
+      const code = `
+        import { TemplateExpander } from './template-expander.js'
+        class NodeHookRunner {
+          constructor(private expander: TemplateExpander) {}
+        }
+        function create() {
+          return new TemplateExpander(builtins)
+        }
+      `
+      const symbols = adapter.extractSymbols('main.ts', code)
+      const imports = adapter.extractImportedNames('main.ts', code)
+      const bindingFacts = adapter.extractBindingFacts('main.ts', code, symbols, imports)
+      const callFacts = adapter.extractCallFacts('main.ts', code, symbols)
+
+      expect(
+        bindingFacts.some(
+          (fact) =>
+            fact.sourceKind === BindingSourceKind.Parameter &&
+            fact.targetName === 'TemplateExpander',
+        ),
+      ).toBe(true)
+      expect(
+        callFacts.some(
+          (fact) => fact.form === CallForm.Constructor && fact.targetName === 'TemplateExpander',
+        ),
+      ).toBe(true)
     })
   })
 

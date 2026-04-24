@@ -7,6 +7,10 @@ import { SymbolKind } from '../../domain/value-objects/symbol-kind.js'
 import { RelationType } from '../../domain/value-objects/relation-type.js'
 import { findManifestField } from './find-manifest-field.js'
 import { type ImportDeclaration } from '../../domain/value-objects/import-declaration.js'
+import { ImportDeclarationKind } from '../../domain/value-objects/import-declaration-kind.js'
+import { BindingSourceKind, type BindingFact } from '../../domain/value-objects/binding-fact.js'
+import { CallForm, type CallFact } from '../../domain/value-objects/call-fact.js'
+import { type SourceLocation } from '../../domain/value-objects/source-location.js'
 import { ensureLanguagesRegistered } from './register-languages.js'
 
 /**
@@ -29,6 +33,43 @@ function extractComment(node: SgNode): string | undefined {
     return prev.text()
   }
   return undefined
+}
+
+/**
+ * Computes a source location from a string offset.
+ * @param filePath - Workspace-prefixed file path.
+ * @param content - Source content.
+ * @param index - Zero-based string offset.
+ * @returns Source location for the offset.
+ */
+function locationFromIndex(filePath: string, content: string, index: number): SourceLocation {
+  const prefix = content.slice(0, Math.max(index, 0))
+  const lines = prefix.split('\n')
+  return {
+    filePath,
+    line: lines.length,
+    column: lines.at(-1)?.length ?? 0,
+    endLine: undefined,
+    endColumn: undefined,
+  }
+}
+
+/**
+ * Finds the innermost Go symbol starting before a source line.
+ * @param symbols - Symbols extracted from the current file.
+ * @param line - One-based source line.
+ * @returns Matching symbol id, or undefined.
+ */
+function findEnclosingSymbolIdByLine(
+  symbols: readonly SymbolNode[],
+  line: number,
+): string | undefined {
+  return [...symbols]
+    .filter((symbol) => symbol.line <= line)
+    .sort((left, right) => {
+      if (left.line !== right.line) return right.line - left.line
+      return right.column - left.column
+    })[0]?.id
 }
 
 /**
@@ -369,7 +410,52 @@ export class GoLanguageAdapter implements LanguageAdapter {
       }
     }
 
-    return results
+    const textImports = this.extractGoImportsFromText(content)
+    return textImports.length > 0 ? textImports : results
+  }
+
+  /**
+   * Extracts Go import declarations from source text to preserve alias, dot, and blank forms.
+   * @param content - Source file content.
+   * @returns Parsed import declarations.
+   */
+  private extractGoImportsFromText(content: string): ImportDeclaration[] {
+    const declarations: ImportDeclaration[] = []
+    const addImport = (alias: string | undefined, specifier: string): void => {
+      const lastSegment = specifier.split('/').pop() ?? specifier
+      const isBlank = alias === '_'
+      const isDot = alias === '.'
+      declarations.push({
+        originalName: lastSegment,
+        localName: isBlank ? '' : (alias ?? lastSegment),
+        specifier,
+        isRelative: false,
+        kind: isBlank
+          ? ImportDeclarationKind.Blank
+          : isDot
+            ? ImportDeclarationKind.Namespace
+            : ImportDeclarationKind.Named,
+      })
+    }
+
+    for (const block of content.matchAll(/\bimport\s*\(([\s\S]*?)\)/g)) {
+      const body = block[1] ?? ''
+      for (const line of body.split('\n')) {
+        const match = line.trim().match(/^(?:(\.|_|\w+)\s+)?["`]([^"`]+)["`]$/)
+        if (match?.[2] !== undefined) {
+          addImport(match[1], match[2])
+        }
+      }
+    }
+
+    const singleImportPattern = /^\s*import\s+(?:(\.|_|\w+)\s+)?["`]([^"`]+)["`]/gm
+    for (const match of content.matchAll(singleImportPattern)) {
+      if (match[2] !== undefined) {
+        addImport(match[1], match[2])
+      }
+    }
+
+    return declarations
   }
 
   /**
@@ -393,12 +479,135 @@ export class GoLanguageAdapter implements LanguageAdapter {
     if (!pathLiteral) return
 
     const lastSegment = pathLiteral.split('/').pop() ?? pathLiteral
+    const isBlank = alias === '_'
+    const isDot = alias === '.'
     results.push({
       originalName: lastSegment,
-      localName: alias ?? lastSegment,
+      localName: isBlank ? '' : (alias ?? lastSegment),
       specifier: pathLiteral,
       isRelative: false,
+      kind: isBlank
+        ? ImportDeclarationKind.Blank
+        : isDot
+          ? ImportDeclarationKind.Namespace
+          : ImportDeclarationKind.Named,
     })
+  }
+
+  /**
+   * Extracts deterministic Go binding facts for shared scoped resolution.
+   * @param filePath - Path to the source file.
+   * @param content - Source file content.
+   * @param _symbols - Symbols extracted from the file.
+   * @param imports - Import declarations extracted from the file.
+   * @returns Binding facts for imports and type references.
+   */
+  extractBindingFacts(
+    filePath: string,
+    content: string,
+    _symbols: SymbolNode[],
+    imports: ImportDeclaration[],
+  ): BindingFact[] {
+    const facts: BindingFact[] = []
+    const seen = new Set<string>()
+
+    const addFact = (
+      name: string,
+      sourceKind: BindingSourceKind,
+      targetName: string | undefined,
+      index: number,
+    ): void => {
+      const location = locationFromIndex(filePath, content, index)
+      const key = `${name}:${sourceKind}:${targetName ?? ''}:${location.line}:${location.column}`
+      if (seen.has(key)) return
+      seen.add(key)
+      facts.push({
+        name,
+        filePath,
+        scopeId: filePath,
+        sourceKind,
+        location,
+        targetName,
+        targetSymbolId: undefined,
+        targetFilePath: undefined,
+        metadata: undefined,
+      })
+    }
+
+    for (const declaration of imports) {
+      if (declaration.localName.length === 0) continue
+      addFact(declaration.localName, BindingSourceKind.ImportedType, declaration.originalName, 0)
+    }
+
+    const typeReferencePattern =
+      /\b(?:func\s+\w+\s*\([^)]*|type\s+\w+\s+struct\s*\{[^}]*|interface\s*\{[^}]*)\b([A-Z][A-Za-z0-9_]*)\b/gms
+    for (const match of content.matchAll(typeReferencePattern)) {
+      const targetName = match[1]
+      if (targetName === undefined) continue
+      addFact(targetName, BindingSourceKind.Parameter, targetName, match.index ?? 0)
+    }
+
+    const fieldPattern = /^\s*[A-Za-z_][A-Za-z0-9_]*\s+([A-Z][A-Za-z0-9_]*)\b/gm
+    for (const match of content.matchAll(fieldPattern)) {
+      const targetName = match[1]
+      if (targetName === undefined) continue
+      addFact(targetName, BindingSourceKind.Property, targetName, match.index ?? 0)
+    }
+
+    return facts
+  }
+
+  /**
+   * Extracts normalized Go call facts for shared scoped resolution.
+   * @param filePath - Path to the source file.
+   * @param content - Source file content.
+   * @param symbols - Symbols extracted from the file.
+   * @returns Call facts for package selectors, receiver calls, and composite literals.
+   */
+  extractCallFacts(filePath: string, content: string, symbols: SymbolNode[]): CallFact[] {
+    const facts: CallFact[] = []
+    const seen = new Set<string>()
+
+    const addFact = (
+      form: CallForm,
+      name: string,
+      receiverName: string | undefined,
+      index: number,
+    ): void => {
+      const location = locationFromIndex(filePath, content, index)
+      const key = `${form}:${receiverName ?? ''}:${name}:${location.line}:${location.column}`
+      if (seen.has(key)) return
+      seen.add(key)
+      facts.push({
+        filePath,
+        scopeId: filePath,
+        callerSymbolId: findEnclosingSymbolIdByLine(symbols, location.line),
+        form,
+        name,
+        receiverName,
+        targetName: name,
+        arity: undefined,
+        location,
+        metadata: undefined,
+      })
+    }
+
+    const selectorPattern = /\b([A-Za-z_][A-Za-z0-9_]*)\.([A-Za-z_][A-Za-z0-9_]*)\s*\(/g
+    for (const match of content.matchAll(selectorPattern)) {
+      const receiver = match[1]
+      const name = match[2]
+      if (receiver === undefined || name === undefined) continue
+      addFact(CallForm.Static, name, receiver, match.index ?? 0)
+    }
+
+    const compositePattern = /(?:^|[^\w])&?\s*([A-Z][A-Za-z0-9_]*)\s*\{/g
+    for (const match of content.matchAll(compositePattern)) {
+      const name = match[1]
+      if (name === undefined) continue
+      addFact(CallForm.Constructor, name, undefined, match.index ?? 0)
+    }
+
+    return facts
   }
 
   /**

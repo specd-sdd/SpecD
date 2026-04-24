@@ -88,6 +88,133 @@ describe('graph impact', () => {
     )
   })
 
+  describe('--direction option', () => {
+    it('maps dependents alias to upstream provider direction', async () => {
+      const { mockProvider } = setup()
+      mockProvider.analyzeFileImpact.mockResolvedValue({
+        target: 'src/auth.ts',
+        directDependents: 0,
+        indirectDependents: 0,
+        transitiveDependents: 0,
+        riskLevel: 'LOW',
+        affectedFiles: [],
+        affectedSymbols: [],
+        affectedProcesses: [],
+        symbols: [],
+      })
+
+      await makeImpactProgram().parseAsync([
+        'node',
+        'specd',
+        'graph',
+        'impact',
+        '--file',
+        'src/auth.ts',
+        '--direction',
+        'dependents',
+      ])
+
+      expect(mockProvider.analyzeFileImpact).toHaveBeenCalledWith('src/auth.ts', 'upstream', 3)
+    })
+
+    it('maps dependencies alias to downstream provider direction', async () => {
+      const { mockProvider } = setup()
+      mockProvider.analyzeFileImpact.mockResolvedValue({
+        target: 'src/auth.ts',
+        directDependents: 0,
+        indirectDependents: 0,
+        transitiveDependents: 0,
+        riskLevel: 'LOW',
+        affectedFiles: [],
+        affectedSymbols: [],
+        affectedProcesses: [],
+        symbols: [],
+      })
+
+      await makeImpactProgram().parseAsync([
+        'node',
+        'specd',
+        'graph',
+        'impact',
+        '--file',
+        'src/auth.ts',
+        '--direction',
+        'dependencies',
+      ])
+
+      expect(mockProvider.analyzeFileImpact).toHaveBeenCalledWith('src/auth.ts', 'downstream', 3)
+    })
+
+    it('keeps compatibility direction values accepted', async () => {
+      const { mockProvider } = setup()
+      mockProvider.analyzeFileImpact.mockResolvedValue({
+        target: 'src/auth.ts',
+        directDependents: 0,
+        indirectDependents: 0,
+        transitiveDependents: 0,
+        riskLevel: 'LOW',
+        affectedFiles: [],
+        affectedSymbols: [],
+        affectedProcesses: [],
+        symbols: [],
+      })
+
+      await makeImpactProgram().parseAsync([
+        'node',
+        'specd',
+        'graph',
+        'impact',
+        '--file',
+        'src/auth.ts',
+        '--direction',
+        'downstream',
+      ])
+      await makeImpactProgram().parseAsync([
+        'node',
+        'specd',
+        'graph',
+        'impact',
+        '--file',
+        'src/auth.ts',
+        '--direction',
+        'both',
+      ])
+
+      expect(mockProvider.analyzeFileImpact).toHaveBeenNthCalledWith(
+        1,
+        'src/auth.ts',
+        'downstream',
+        3,
+      )
+      expect(mockProvider.analyzeFileImpact).toHaveBeenNthCalledWith(2, 'src/auth.ts', 'both', 3)
+    })
+
+    it('rejects invalid direction before resolving graph context', async () => {
+      const { getStderr } = setup()
+
+      const program = makeImpactProgram()
+      try {
+        await program.parseAsync([
+          'node',
+          'specd',
+          'graph',
+          'impact',
+          '--file',
+          'src/auth.ts',
+          '--direction',
+          'sideways',
+        ])
+      } catch {
+        /* ExitSentinel from process.exit(1) */
+      }
+
+      expect(getStderr()).toContain('invalid direction "sideways"')
+      expect(process.exit).toHaveBeenCalledWith(1)
+      expect(resolveGraphCliContext).not.toHaveBeenCalled()
+      expect(withProvider).not.toHaveBeenCalled()
+    })
+  })
+
   describe('--depth option', () => {
     it('passes default depth 3 to analyzeFileImpact', async () => {
       const { mockProvider } = setup()

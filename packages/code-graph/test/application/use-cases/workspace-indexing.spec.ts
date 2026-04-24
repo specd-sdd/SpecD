@@ -649,4 +649,59 @@ describe('Workspace indexing', () => {
       }),
     )
   })
+
+  it('resolves TypeScript scoped facts into USES_TYPE, CONSTRUCTS, and file-only IMPORTS', async () => {
+    const root = createWorkspace(tempDir, 'core', {
+      'src/main.ts': [
+        "import './polyfill.js'",
+        'export class TemplateExpander {}',
+        'export interface GraphStore {}',
+        'export interface HookRunner {}',
+        'export class NodeHookRunner {',
+        '  constructor(expander: TemplateExpander, store: GraphStore, hook: HookRunner) {}',
+        '}',
+        'export function create() {',
+        '  return new TemplateExpander()',
+        '}',
+      ].join('\n'),
+      'src/polyfill.ts': 'export const installed = true',
+    })
+
+    provider = createCodeGraphProvider({ storagePath: tempDir })
+    await provider.open()
+
+    const result = await provider.index({
+      workspaces: [{ name: 'core', codeRoot: root, specs: async () => [] }],
+      projectRoot: tempDir,
+    })
+
+    expect(result.errors).toHaveLength(0)
+
+    const store = (provider as unknown as { store: GraphStore }).store
+    const templateExpander = (await provider.findSymbols({ name: 'TemplateExpander' }))[0]
+    const graphStore = (await provider.findSymbols({ name: 'GraphStore' }))[0]
+    const hookRunner = (await provider.findSymbols({ name: 'HookRunner' }))[0]
+
+    expect(templateExpander).toBeDefined()
+    expect(graphStore).toBeDefined()
+    expect(hookRunner).toBeDefined()
+
+    const templateRelations = await store.getCallers(templateExpander!.id)
+    expect(templateRelations.map((relation) => relation.type)).toContain(RelationType.Constructs)
+    expect(templateRelations.map((relation) => relation.type)).toContain(RelationType.UsesType)
+
+    const graphStoreRelations = await store.getCallers(graphStore!.id)
+    const hookRunnerRelations = await store.getCallers(hookRunner!.id)
+    expect(graphStoreRelations.map((relation) => relation.type)).toContain(RelationType.UsesType)
+    expect(hookRunnerRelations.map((relation) => relation.type)).toContain(RelationType.UsesType)
+
+    const importees = await store.getImportees('core:src/main.ts')
+    expect(importees).toContainEqual(
+      expect.objectContaining({
+        source: 'core:src/main.ts',
+        target: 'core:src/polyfill.ts',
+        type: RelationType.Imports,
+      }),
+    )
+  })
 })

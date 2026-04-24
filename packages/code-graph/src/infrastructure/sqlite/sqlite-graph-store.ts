@@ -21,6 +21,11 @@ import { SQLITE_SCHEMA_DDL, SQLITE_SCHEMA_VERSION } from './schema.js'
 
 type SqliteDatabase = InstanceType<typeof Database>
 type SqliteStatement = Statement
+const SYMBOL_DEPENDENCY_RELATION_TYPES = [
+  RelationType.Calls,
+  RelationType.Constructs,
+  RelationType.UsesType,
+] as const
 
 interface RelationRow {
   readonly source: string
@@ -207,11 +212,11 @@ export class SQLiteGraphStore extends GraphStore {
   }
 
   async getCallers(symbolId: string): Promise<Relation[]> {
-    return this.getRelationsByTarget(RelationType.Calls, symbolId)
+    return this.getRelationsByTargetTypes(SYMBOL_DEPENDENCY_RELATION_TYPES, symbolId)
   }
 
   async getCallees(symbolId: string): Promise<Relation[]> {
-    return this.getRelationsBySource(RelationType.Calls, symbolId)
+    return this.getRelationsBySourceTypes(SYMBOL_DEPENDENCY_RELATION_TYPES, symbolId)
   }
 
   async getImporters(filePath: string): Promise<Relation[]> {
@@ -563,10 +568,10 @@ export class SQLiteGraphStore extends GraphStore {
           FROM relations r
           INNER JOIN symbols target ON target.id = r.target
           INNER JOIN symbols caller ON caller.id = r.source
-          WHERE r.type = ?
+          WHERE r.type IN (?, ?, ?)
         `,
       )
-      .all(RelationType.Calls) as Array<{
+      .all(...SYMBOL_DEPENDENCY_RELATION_TYPES) as Array<{
       id: string
       name: string
       kind: string
@@ -861,6 +866,30 @@ export class SQLiteGraphStore extends GraphStore {
       this.statement(
         'SELECT source, target, type, metadata_json FROM relations WHERE type = ? AND target = ?',
       ).all(type, target) as RelationRow[],
+    )
+  }
+
+  private async getRelationsBySourceTypes(
+    types: readonly RelationTypeValue[],
+    source: string,
+  ): Promise<Relation[]> {
+    const placeholders = types.map(() => '?').join(', ')
+    return this.readRelations(
+      this.statement(
+        `SELECT source, target, type, metadata_json FROM relations WHERE type IN (${placeholders}) AND source = ?`,
+      ).all(...types, source) as RelationRow[],
+    )
+  }
+
+  private async getRelationsByTargetTypes(
+    types: readonly RelationTypeValue[],
+    target: string,
+  ): Promise<Relation[]> {
+    const placeholders = types.map(() => '?').join(', ')
+    return this.readRelations(
+      this.statement(
+        `SELECT source, target, type, metadata_json FROM relations WHERE type IN (${placeholders}) AND target = ?`,
+      ).all(...types, target) as RelationRow[],
     )
   }
 
