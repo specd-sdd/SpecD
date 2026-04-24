@@ -21,7 +21,7 @@ export function registerPluginsShow(parent: Command): void {
       try {
         const fmt = parseFormat(opts.format)
         const { config } = await resolveCliContext({ configPath: opts.config })
-        const loader = createPluginLoader({ projectRoot: config.projectRoot })
+        const loader = createPluginLoader({ config })
         const load = new LoadPlugin(loader)
         const { plugin } = await load.execute({ pluginName })
 

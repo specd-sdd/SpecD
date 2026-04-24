@@ -1,7 +1,8 @@
 import { mkdir, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
+import type { SpecdConfig } from '@specd/core'
 import { createSkillRepository } from '@specd/skills'
-import type { InstallOptions, InstallResult } from '@specd/plugin-manager'
+import type { AgentInstallOptions, AgentInstallResult } from '@specd/plugin-manager'
 import type { Frontmatter } from '../../domain/types/frontmatter.js'
 import { skillFrontmatter } from '../../domain/frontmatter/index.js'
 
@@ -12,11 +13,11 @@ export class InstallSkills {
   /**
    * Installs one or more skills for Codex.
    *
-   * @param projectRoot - Absolute project root.
+   * @param config - Project configuration.
    * @param options - Install options.
    * @returns Install summary.
    */
-  async execute(projectRoot: string, options?: InstallOptions): Promise<InstallResult> {
+  async execute(config: SpecdConfig, options?: AgentInstallOptions): Promise<AgentInstallResult> {
     const repository = createSkillRepository()
     const availableSkills = repository.list()
     const requestedSkills =
@@ -24,7 +25,7 @@ export class InstallSkills {
         ? options.skills
         : availableSkills.map((skill) => skill.name)
 
-    const targetDir = path.join(projectRoot, '.codex', 'skills')
+    const targetDir = path.join(config.projectRoot, '.codex', 'skills')
     await mkdir(targetDir, { recursive: true })
 
     const installed: Array<{ skill: string; path: string }> = []
@@ -37,7 +38,7 @@ export class InstallSkills {
         continue
       }
 
-      const bundle = repository.getBundle(skillName, options?.variables)
+      const bundle = repository.getBundle(skillName, options?.variables, config)
       if (bundle.files.length === 0) {
         skipped.push({ skill: skillName, reason: 'bundle has no files' })
         continue

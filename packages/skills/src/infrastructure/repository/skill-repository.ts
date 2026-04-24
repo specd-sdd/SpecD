@@ -3,6 +3,7 @@ import { readdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createRequire } from 'node:module'
+import type { SpecdConfig } from '@specd/core'
 import type { SharedFile, SkillRepository } from '../../application/ports/skill-repository.js'
 import type { Skill } from '../../domain/skill.js'
 import type { ResolvedFile, SkillBundle } from '../../domain/skill-bundle.js'
@@ -124,13 +125,28 @@ class FsSkillRepository implements SkillRepository {
    *
    * @param name - Skill name.
    * @param variables - Placeholder variables.
+   * @param config - Optional project configuration.
    * @returns Resolved install bundle.
    * @throws Error if skill is not found.
    */
-  getBundle(name: string, variables: Readonly<Record<string, string>> = {}): SkillBundle {
+  getBundle(
+    name: string,
+    variables: Readonly<Record<string, string>> = {},
+    config?: SpecdConfig,
+  ): SkillBundle {
     const skill = this.get(name)
     if (skill === undefined) {
       throw new Error(`Skill '${name}' was not found`)
+    }
+
+    let finalVariables = { ...variables }
+    if (config !== undefined) {
+      finalVariables = {
+        projectRoot: config.projectRoot,
+        configPath: config.configPath,
+        schemaRef: config.schemaRef,
+        ...finalVariables,
+      }
     }
 
     const files: ResolvedFile[] = []
@@ -140,7 +156,7 @@ class FsSkillRepository implements SkillRepository {
       const content = readFileSync(path.join(this.templatesRoot, name, template.filename), 'utf8')
       files.push({
         filename: template.filename,
-        content: applyVariables(content, variables),
+        content: applyVariables(content, finalVariables),
       })
     }
 
@@ -151,7 +167,7 @@ class FsSkillRepository implements SkillRepository {
       }
       files.push({
         filename: shared.filename,
-        content: applyVariables(shared.content, variables),
+        content: applyVariables(shared.content, finalVariables),
       })
       included.add(shared.filename)
     }
@@ -255,7 +271,7 @@ function resolveDefaultTemplatesRoot(): string {
  * Resolves templates root by package name.
  *
  * @param packageName - Package name to resolve.
- * @returns Absolute templates path, or `null` when unresolved.
+ * @returns Absolute templates path, or \`null\` when unresolved.
  */
 function resolveTemplatesRootFromPackage(packageName: string): string | null {
   try {
@@ -308,7 +324,7 @@ function derivePackageRoot(packageName: string, entryPath: string): string | nul
  * @returns Content with placeholders replaced where possible.
  */
 function applyVariables(content: string, variables: Readonly<Record<string, string>>): string {
-  return content.replaceAll(/\{\{([A-Za-z0-9_.-]+)\}\}/g, (_match, key: string) => {
+  return content.replaceAll(/\{\{\s*([A-Za-z0-9_.-]+)\s*\}\}/g, (_match, key: string) => {
     return variables[key] ?? `{{${key}}}`
   })
 }

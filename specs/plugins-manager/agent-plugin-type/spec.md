@@ -10,22 +10,24 @@ Defines the agent plugin interface that extends `SpecdPlugin` for agent integrat
 
 `AgentPlugin` MUST extend `SpecdPlugin` with `type: 'agent'` and add:
 
-- `install(projectRoot: string, options?: InstallOptions): Promise<InstallResult>`
-- `uninstall(projectRoot: string, options?: InstallOptions): Promise<void>`
+- `install(config: SpecdConfig, options?: AgentInstallOptions): Promise<AgentInstallResult>`
+- `uninstall(config: SpecdConfig, options?: AgentInstallOptions): Promise<void>`
 
-### Requirement: InstallOptions
+The `AgentPlugin` SHALL receive the full `SpecdConfig` object to ensure it has access to the project root and any necessary workspace or storage configuration.
+
+### Requirement: AgentInstallOptions
 
 ```typescript
-interface InstallOptions {
+interface AgentInstallOptions {
   skills?: string[] // specific skill names; omit = all
   variables?: Record<string, string> // variable substitution
 }
 ```
 
-### Requirement: InstallResult
+### Requirement: AgentInstallResult
 
 ```typescript
-interface InstallResult {
+interface AgentInstallResult {
   installed: Array<{ skill: string; path: string }>
   skipped: Array<{ skill: string; reason: string }>
 }
@@ -47,4 +49,5 @@ This type guard lives in the domain layer so that application use cases and infr
 
 ## Spec Dependencies
 
+- [`core:core/config`](../../core/core/config/spec.md) — defines SpecdConfig type
 - [`plugin-manager:specd-plugin-type`](../specd-plugin-type/spec.md) — base plugin interface

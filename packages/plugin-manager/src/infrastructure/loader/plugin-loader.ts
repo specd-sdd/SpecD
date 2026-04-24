@@ -3,6 +3,7 @@ import path from 'node:path'
 import { createRequire } from 'node:module'
 import { pathToFileURL } from 'node:url'
 import { z } from 'zod'
+import type { SpecdConfig } from '@specd/core'
 import type { PluginLoader } from '../../application/ports/plugin-loader.js'
 import type { SpecdPlugin } from '../../domain/types/specd-plugin.js'
 import { isSpecdPlugin } from '../../domain/types/specd-plugin.js'
@@ -15,9 +16,9 @@ import { PluginValidationError } from '../../domain/errors/plugin-validation.js'
  */
 export interface PluginLoaderOptions {
   /**
-   * Project root used as resolution anchor.
+   * Fully-resolved project configuration.
    */
-  readonly projectRoot: string
+  readonly config: SpecdConfig
 }
 
 /**
@@ -39,9 +40,9 @@ class RuntimePluginLoader implements PluginLoader {
   /**
    * Creates a loader anchored at a project root.
    *
-   * @param projectRoot - Project root path.
+   * @param config - Project configuration.
    */
-  constructor(private readonly projectRoot: string) {}
+  constructor(private readonly config: SpecdConfig) {}
 
   /**
    * Loads and validates a plugin package.
@@ -67,7 +68,7 @@ class RuntimePluginLoader implements PluginLoader {
       throw new PluginValidationError(pluginName, ['create'])
     }
 
-    const plugin = await createFunction()
+    const plugin = await createFunction({ config: this.config })
     this.validateRuntimePlugin(pluginName, plugin, manifest.pluginType)
     return plugin
   }
@@ -189,7 +190,7 @@ class RuntimePluginLoader implements PluginLoader {
    */
   private createResolvers(): readonly NodeJS.Require[] {
     return [
-      createRequire(path.join(this.projectRoot, 'package.json')),
+      createRequire(path.join(this.config.projectRoot, 'package.json')),
       createRequire(import.meta.url),
     ]
   }
@@ -232,7 +233,7 @@ class RuntimePluginLoader implements PluginLoader {
  * @returns Plugin loader instance.
  */
 export function createPluginLoader(options: PluginLoaderOptions): PluginLoader {
-  return new RuntimePluginLoader(options.projectRoot)
+  return new RuntimePluginLoader(options.config)
 }
 
 /**
@@ -241,20 +242,22 @@ export function createPluginLoader(options: PluginLoaderOptions): PluginLoader {
  * @param moduleValue - Dynamically imported module namespace.
  * @returns Factory function when available.
  */
-function resolveCreateExport(moduleValue: unknown): (() => unknown) | undefined {
+function resolveCreateExport(
+  moduleValue: unknown,
+): ((options: PluginLoaderOptions) => Promise<unknown>) | undefined {
   if (typeof moduleValue !== 'object' || moduleValue === null) return undefined
 
   const moduleObject = moduleValue as Record<string, unknown>
   const directCreate = moduleObject['create']
   if (typeof directCreate === 'function') {
-    return directCreate as () => unknown
+    return directCreate as (options: PluginLoaderOptions) => Promise<unknown>
   }
 
   const defaultExport = moduleObject['default']
   if (typeof defaultExport === 'object' && defaultExport !== null) {
     const defaultCreate = (defaultExport as Record<string, unknown>)['create']
     if (typeof defaultCreate === 'function') {
-      return defaultCreate as () => unknown
+      return defaultCreate as (options: PluginLoaderOptions) => Promise<unknown>
     }
   }
 

@@ -299,6 +299,20 @@ Schemas also declare how to extract structured metadata from artifact content â€
 
 For the full extractor syntax, see [selectors.md](selectors.md).
 
+## Skill Authoring: Built-in Variables
+
+When authoring skill templates, certain variables are automatically available for substitution. You don't need to declare them in your plugin configuration or pass them manually during installation.
+
+The following built-in variables are injected automatically by the platform during skill bundle resolution:
+
+| Variable          | Description                                              | Source               |
+| :---------------- | :------------------------------------------------------- | :------------------- |
+| `{{projectRoot}}` | The absolute path to the project root directory.         | `config.projectRoot` |
+| `{{configPath}}`  | The absolute path to the active `specd.yaml` file.       | `config.configPath`  |
+| `{{schemaRef}}`   | The schema reference string (e.g., `@specd/schema-std`). | `config.schemaRef`   |
+
+These variables are particularly useful for generating skill metadata (frontmatter) or configuring paths within the installed skill files.
+
 ## Where to go next
 
 - [selectors.md](selectors.md) â€” deep dive into selectors, extractors, and validation rules

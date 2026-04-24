@@ -6,7 +6,8 @@
 
 #### Scenario: Package available
 
-- **GIVEN** a plugin package is in node_modules
+- **GIVEN** a valid `SpecdConfig` is provided
+- **AND** a plugin package is in node_modules
 - **WHEN** PluginLoader loads it
 - **THEN** it returns the plugin instance
 

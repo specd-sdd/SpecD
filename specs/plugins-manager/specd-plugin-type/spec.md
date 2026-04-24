@@ -32,13 +32,18 @@ Plugins MUST NOT hardcode `name` or `version` — these fields MUST be read from
 
 ### Requirement: PluginContext
 
+The system SHALL pass the fully-resolved project configuration to plugins during initialization:
+
 ```typescript
 interface PluginContext {
-  projectRoot: string // absolute path
-  config: Record<string, unknown> // this plugin's config from specd.yaml
-  typeContext: unknown // type-specific context
+  /**
+   * Fully-resolved project configuration.
+   */
+  readonly config: SpecdConfig
 }
 ```
+
+The `PluginContext` MUST NOT include `projectRoot`, `typeContext`, or a separate `config` record, as these are all available through the `SpecdConfig` object.
 
 ### Requirement: ConfigSchemaEntry
 
@@ -73,4 +78,5 @@ The `type` check against `PLUGIN_TYPES` ensures unknown plugin types are rejecte
 
 ## Spec Dependencies
 
+- [`core:core/config`](../../core/core/config/spec.md) — defines SpecdConfig type
 - [`default:_global/architecture`](../default/_global/architecture/spec.md) — architecture constraints

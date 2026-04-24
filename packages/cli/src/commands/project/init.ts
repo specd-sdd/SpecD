@@ -88,7 +88,6 @@ export function registerProjectInit(parent: Command): void {
           })
 
           const installed = await installSelectedPlugins({
-            projectRoot,
             configPath: initResult.configPath,
             pluginNames: opts.plugin,
           })
@@ -125,23 +124,21 @@ export function registerProjectInit(parent: Command): void {
  * Installs selected plugins after successful initialization.
  *
  * @param input - Install input values.
- * @param input.projectRoot - Absolute project root.
  * @param input.configPath - Absolute path to `specd.yaml`.
  * @param input.pluginNames - Plugin package names to install.
  * @returns Install batch result.
  */
 async function installSelectedPlugins(input: {
-  readonly projectRoot: string
   readonly configPath: string
   readonly pluginNames: readonly string[]
 }): Promise<Awaited<ReturnType<typeof installPluginsWithKernel>>> {
   if (input.pluginNames.length === 0) {
     return { plugins: [], hasErrors: false }
   }
-  const { kernel } = await resolveCliContext({ configPath: input.configPath })
+  const { config, kernel } = await resolveCliContext({ configPath: input.configPath })
   return installPluginsWithKernel({
     kernel,
-    projectRoot: input.projectRoot,
+    config,
     configPath: input.configPath,
     pluginNames: input.pluginNames,
   })
@@ -230,7 +227,6 @@ async function runInteractiveInit(options: {
   })
 
   const installed = await installSelectedPlugins({
-    projectRoot,
     configPath: initResult.configPath,
     pluginNames: Array.isArray(selectedPlugins) ? (selectedPlugins as string[]) : [],
   })

@@ -15,7 +15,7 @@ The loader MUST:
 3. **Read manifest**: Read `specd-plugin.json` from the package root
 4. **Validate manifest**: Validate with Zod schema (including `version` field)
 5. **Dynamic import**: `import(name)` as ESM module
-6. **Factory call**: Call `create()` factory function
+6. **Factory call**: Call `create()` factory function, passing the loader options
 7. **Validate interface**: Use `isSpecdPlugin` and `isAgentPlugin` from the domain layer to validate the returned object
 
 ### Requirement: Manifest schema
@@ -41,7 +41,15 @@ Validation failures MUST throw `PluginValidationError`:
 
 ### Requirement: Factory function
 
-The npm package MUST export `create(): SpecdPlugin` as default or named export.
+The npm package MUST export `create(options: PluginLoaderOptions): SpecdPlugin` as default or named export.
+
+The `PluginLoaderOptions` SHALL contain the fully-resolved `SpecdConfig`:
+
+```typescript
+interface PluginLoaderOptions {
+  readonly config: SpecdConfig
+}
+```
 
 ## Constraints
 
@@ -50,5 +58,6 @@ The npm package MUST export `create(): SpecdPlugin` as default or named export.
 
 ## Spec Dependencies
 
+- [`core:core/config`](../../core/core/config/spec.md) — defines SpecdConfig type
 - [`plugin-manager:specd-plugin-type`](../specd-plugin-type/spec.md) — plugin type
 - [`plugin-manager:plugin-errors`](../plugin-errors/spec.md) — error classes

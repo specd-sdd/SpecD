@@ -1,7 +1,7 @@
 {
   "title": "skills:skill-repository-port",
   "description": "Abstract interface for skill storage. This port defines the contract that infrastructure implementations must fulfill.",
-  "dependsOn": ["skills:skill", "skills:skill-bundle"],
+  "dependsOn": ["core:core/config", "skills:skill", "skills:skill-bundle"],
   "context": [
     "Abstract interface for skill storage. This port defines the contract that infrastructure implementations must fulfill."
   ],
@@ -9,7 +9,7 @@
     {
       "requirement": "SkillRepositoryPort interface",
       "rules": [
-        "`SkillRepositoryPort` MUST define the same interface as `SkillRepository`:\n\n- `list(): Skill[]`\n- `get(name: string): Skill | undefined`\n- `getBundle(name: string, variables?: Record<string, string>): SkillBundle`\n- `listSharedFiles(): SharedFile[]`"
+        "`SkillRepositoryPort` MUST define the same interface as `SkillRepository`:\n\n- `list(): Skill[]`\n- `get(name: string): Skill | undefined`\n- `getBundle(name: string, variables?: Record<string, string>, config?: SpecdConfig): SkillBundle`\n- `listSharedFiles(): SharedFile[]`\n\nThe `getBundle` method SHALL support receiving a `SpecdConfig` to enable the injection of built-in variables during template resolution."
       ]
     },
     {
@@ -29,7 +29,7 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:8b9d5bc22d58e8fb9ae770bb27e04e0cb53461fb3613d81bb4e53a2573fe9549",
+    "spec.md": "sha256:2f4d33d766295ee8e71815ceb423d4ae6da6908bf498dad78b9394162ee6010c",
     "verify.md": "sha256:eb53e6e475d8132548a430491907a66833446a18cb831b2763fcdc0a3fff3209"
   },
   "generatedBy": "core"

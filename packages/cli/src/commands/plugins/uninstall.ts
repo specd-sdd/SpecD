@@ -35,7 +35,7 @@ export function registerPluginsUninstall(parent: Command): void {
           configPath: opts.config,
         })
         const configPath = configFilePath ?? `${config.projectRoot}/specd.yaml`
-        const loader = createPluginLoader({ projectRoot: config.projectRoot })
+        const loader = createPluginLoader({ config })
         const load = new LoadPlugin(loader)
         const uninstall = new UninstallPlugin(loader)
 
@@ -46,7 +46,7 @@ export function registerPluginsUninstall(parent: Command): void {
           try {
             await load.execute({ pluginName })
             const type = 'agents'
-            await uninstall.execute({ pluginName, projectRoot: config.projectRoot })
+            await uninstall.execute({ pluginName, config })
             await kernel.project.removePlugin.execute({
               configPath,
               type,

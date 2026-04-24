@@ -1,7 +1,11 @@
 {
   "title": "plugin-manager:plugin-loader",
   "description": "Infrastructure component for dynamically loading plugins. Handles package resolution, manifest validation, and plugin instantiation.",
-  "dependsOn": ["plugin-manager:specd-plugin-type", "plugin-manager:plugin-errors"],
+  "dependsOn": [
+    "core:core/config",
+    "plugin-manager:specd-plugin-type",
+    "plugin-manager:plugin-errors"
+  ],
   "context": [
     "Infrastructure component for dynamically loading plugins. Handles package resolution, manifest validation, and plugin instantiation."
   ],
@@ -9,7 +13,7 @@
     {
       "requirement": "Load workflow",
       "rules": [
-        "The loader MUST:\n\n1. **Package availability**: The package must be in node\\_modules (installed via npm/pnpm or linked as workspace)\n2. **Resolve path**: Use `import.meta.resolve()` or `require.resolve()` to get package path\n3. **Read manifest**: Read `specd-plugin.json` from the package root\n4. **Validate manifest**: Validate with Zod schema (including `version` field)\n5. **Dynamic import**: `import(name)` as ESM module\n6. **Factory call**: Call `create()` factory function\n7. **Validate interface**: Use `isSpecdPlugin` and `isAgentPlugin` from the domain layer to validate the returned object"
+        "The loader MUST:\n\n1. **Package availability**: The package must be in node\\_modules (installed via npm/pnpm or linked as workspace)\n2. **Resolve path**: Use `import.meta.resolve()` or `require.resolve()` to get package path\n3. **Read manifest**: Read `specd-plugin.json` from the package root\n4. **Validate manifest**: Validate with Zod schema (including `version` field)\n5. **Dynamic import**: `import(name)` as ESM module\n6. **Factory call**: Call `create()` factory function, passing the loader options\n7. **Validate interface**: Use `isSpecdPlugin` and `isAgentPlugin` from the domain layer to validate the returned object"
       ]
     },
     {
@@ -26,7 +30,9 @@
     },
     {
       "requirement": "Factory function",
-      "rules": ["The npm package MUST export `create(): SpecdPlugin` as default or named export."]
+      "rules": [
+        "The npm package MUST export `create(options: PluginLoaderOptions): SpecdPlugin` as default or named export.\n\nThe `PluginLoaderOptions` SHALL contain the fully-resolved `SpecdConfig`:\n\n```typescript\ninterface PluginLoaderOptions {\n  readonly config: SpecdConfig\n}\n```"
+      ]
     }
   ],
   "constraints": [
@@ -37,7 +43,7 @@
     {
       "requirement": "Load workflow",
       "name": "Package available",
-      "given": ["a plugin package is in node_modules"],
+      "given": ["a valid SpecdConfig is provided", "AND a plugin package is in node_modules"],
       "when": ["PluginLoader loads it"],
       "then": ["it returns the plugin instance"]
     },
@@ -75,8 +81,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:823f245feddf88664a82f1ab19c71f33c618da3e7d89433772d00daae3087eec",
-    "verify.md": "sha256:67d9d74cea183daace569fa3bc32d494f96b3eb886aa75842a85ec6b5df88db0"
+    "spec.md": "sha256:6464949ec351f919dc68a52a027be96add64a083db84acfd7bbfb0918cb9dab9",
+    "verify.md": "sha256:35169f806a622ce112942bbd55e8a21638854a36a07757eea5390743e502be38"
   },
   "generatedBy": "core"
 }

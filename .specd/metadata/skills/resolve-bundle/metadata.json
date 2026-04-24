@@ -1,15 +1,9 @@
 {
   "title": "skills:resolve-bundle",
   "description": "Use case for resolving a skill bundle with variable substitution.",
-  "dependsOn": ["skills:skill-bundle", "skills:skill-repository-port"],
+  "dependsOn": ["core:core/config", "skills:skill-bundle", "skills:skill-repository-port"],
   "context": ["Use case for resolving a skill bundle with variable substitution."],
   "rules": [
-    {
-      "requirement": "Input",
-      "rules": [
-        "The input MUST contain:\n\n```typescript\ninterface ResolveBundleInput {\n  name: string\n  variables?: Record<string, string>\n}\n```\n\n`variables` defaults to an empty object."
-      ]
-    },
     {
       "requirement": "Output",
       "rules": [
@@ -19,7 +13,13 @@
     {
       "requirement": "Behavior",
       "rules": [
-        "The use case MUST:\n\n1. Call `SkillRepository.getBundle(input.name, input.variables || {})`\n2. Replace `{{key}}` placeholders in each template file with values from the variables map\n3. Return the resolved bundle"
+        "The use case MUST:\n\n1. **Built-in Variable Injection**: If `config` is provided, merge built-in variables with the provided `variables` map (user-provided variables override built-ins).\n   Built-in variables SHALL include:\n   - `{{projectRoot}}`: `config.projectRoot`\n   - `{{configPath}}`: `config.configPath`\n   - `{{schemaRef}}`: `config.schemaRef`\n2. Call `SkillRepository.getBundle(input.name, mergedVariables)`\n3. Replace `{{key}}` placeholders in each template file with values from the merged variables map\n4. Return the resolved bundle"
+      ]
+    },
+    {
+      "requirement": "Input",
+      "rules": [
+        "The input MUST contain:\n\n```typescript\ninterface ResolveBundleInput {\n  name: string\n  config?: SpecdConfig\n  variables?: Record<string, string>\n}\n```\n\n`variables` defaults to an empty object."
       ]
     }
   ],
@@ -41,11 +41,18 @@
       "name": "Without variables",
       "when": ["ResolveBundle use case is executed with { name: 'skill' }"],
       "then": ["placeholders remain as-is"]
+    },
+    {
+      "requirement": "Input",
+      "name": "With SpecdConfig for built-in variables",
+      "given": ["a SpecdConfig with projectRoot: '/path/to/project'"],
+      "when": ["ResolveBundle is executed with that config"],
+      "then": ["it automatically replaces {{projectRoot}} with '/path/to/project'"]
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:149596cc7fc28c1b284c6795a33837b040ad76b9a4537e8aa7b4a7487a08f339",
-    "verify.md": "sha256:f9e50924c0df152be43a0a99a10bc112416100f55d38d788a56b3e0d5368de13"
+    "spec.md": "sha256:eb060283ce4159a319a75304b257935c4d7a54c935fc59a46b4fbe3fe2911c96",
+    "verify.md": "sha256:37f508bf19bd8b5f4c93b595fc21c0577d7c1e5062d381a6b749b5e3a6e9d5b8"
   },
   "generatedBy": "core"
 }

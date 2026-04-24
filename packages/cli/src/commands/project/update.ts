@@ -36,7 +36,7 @@ JSON/TOON output schema:
         const configPath = configFilePath ?? `${config.projectRoot}/specd.yaml`
         const result = await updatePluginsWithKernel({
           kernel,
-          projectRoot: config.projectRoot,
+          config,
           configPath,
         })
 

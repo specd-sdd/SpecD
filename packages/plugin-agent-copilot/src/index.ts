@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { PluginValidationError } from '@specd/plugin-manager'
-import type { AgentPlugin } from '@specd/plugin-manager'
+import type { AgentPlugin, PluginLoaderOptions } from '@specd/plugin-manager'
 import { InstallSkills } from './application/use-cases/install-skills.js'
 import { UninstallSkills } from './application/use-cases/uninstall-skills.js'
 import { CopilotAgentPlugin } from './domain/types/copilot-plugin.js'
@@ -33,16 +33,18 @@ async function readManifest(): Promise<{ name: string; version: string }> {
 /**
  * Creates a Copilot agent plugin instance.
  *
+ * @param _options - Loader options.
  * @returns Configured CopilotAgentPlugin instance.
  */
-export async function create(): Promise<AgentPlugin> {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export async function create(_options: PluginLoaderOptions): Promise<AgentPlugin> {
   const { name, version } = await readManifest()
   const installSkills = new InstallSkills()
   const uninstallSkills = new UninstallSkills()
   return new CopilotAgentPlugin(
     name,
     version,
-    (projectRoot, options) => installSkills.execute(projectRoot, options),
-    (projectRoot, options) => uninstallSkills.execute(projectRoot, options),
+    (targetConfig, installOptions) => installSkills.execute(targetConfig, installOptions),
+    (targetConfig, uninstallOptions) => uninstallSkills.execute(targetConfig, uninstallOptions),
   )
 }

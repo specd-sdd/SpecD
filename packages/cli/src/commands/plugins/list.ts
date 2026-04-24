@@ -43,7 +43,7 @@ export function registerPluginsList(parent: Command): void {
         const types = opts.type === undefined ? ['agents'] : [opts.type]
 
         const rows: PluginListRow[] = []
-        const loader = createPluginLoader({ projectRoot: config.projectRoot })
+        const loader = createPluginLoader({ config })
         const listRuntime = new ListRuntimePlugins(loader)
 
         for (const type of types) {

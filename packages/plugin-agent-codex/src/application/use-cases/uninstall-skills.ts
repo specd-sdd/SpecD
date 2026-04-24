@@ -1,7 +1,8 @@
 import { rm } from 'node:fs/promises'
 import path from 'node:path'
+import type { SpecdConfig } from '@specd/core'
 import { createSkillRepository } from '@specd/skills'
-import type { InstallOptions } from '@specd/plugin-manager'
+import type { AgentInstallOptions } from '@specd/plugin-manager'
 
 /**
  * Uninstalls selected or all specd skills from Codex's project-local skills directory.
@@ -10,12 +11,12 @@ export class UninstallSkills {
   /**
    * Removes installed skills from `.codex/skills`.
    *
-   * @param projectRoot - Absolute project root.
+   * @param config - Project configuration.
    * @param options - Uninstall options.
    * @returns A promise that resolves when uninstall finishes.
    */
-  async execute(projectRoot: string, options?: InstallOptions): Promise<void> {
-    const targetDir = path.join(projectRoot, '.codex', 'skills')
+  async execute(config: SpecdConfig, options?: AgentInstallOptions): Promise<void> {
+    const targetDir = path.join(config.projectRoot, '.codex', 'skills')
     if (options?.skills !== undefined && options.skills.length > 0) {
       for (const skill of options.skills) {
         await rm(path.join(targetDir, skill), { recursive: true, force: true })

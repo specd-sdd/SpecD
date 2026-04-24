@@ -1,7 +1,7 @@
 {
   "title": "plugin-agent-claude:plugin-agent",
   "description": "Claude agent plugin implementation. Exports `create(): AgentPlugin` that provides skill installation with Claude Code frontmatter injection.",
-  "dependsOn": ["plugin-manager:agent-plugin-type", "skills:skill-repository"],
+  "dependsOn": ["core:core/config", "plugin-manager:agent-plugin-type", "skills:skill-repository"],
   "context": [
     "Claude agent plugin implementation. Exports `create(): AgentPlugin` that provides skill installation with Claude Code frontmatter injection."
   ],
@@ -9,7 +9,7 @@
     {
       "requirement": "Factory export",
       "rules": [
-        "The package MUST export `create(): AgentPlugin` as default or named export.\n\nThe factory function MUST read `specd-plugin.json` at the infrastructure boundary to obtain `name` and `version`. It MUST search for the manifest in its own directory first, then the parent directory as fallback — this works both in development (source tree) and after build/publish (`dist/` with manifest at package root). The `type` field MUST remain hardcoded as `'agent'`."
+        "The package MUST export `create(options: PluginLoaderOptions): AgentPlugin` as default or named export.\n\nThe factory function MUST read `specd-plugin.json` at the infrastructure boundary to obtain `name` and `version`. It MUST search for the manifest in its own directory first, then the parent directory as fallback. The `type` field MUST remain hardcoded as `'agent'`."
       ]
     },
     {
@@ -27,7 +27,7 @@
     {
       "requirement": "Application layer",
       "rules": [
-        "The application layer MUST have `InstallSkills` use case that orchestrates:\n\n1. Get skills via `@specd/skills` repository\n2. Inject stored frontmatter to each skill template\n3. Install to `.claude/skills/` in project root"
+        "The application layer MUST have `InstallSkills` use case that orchestrates:\n\n1. Get skills via `@specd/skills` repository, passing `SpecdConfig` for built-in variable resolution\n2. Inject stored frontmatter to each skill template\n3. Install to `.claude/skills/` relative to the `projectRoot` found in `SpecdConfig`"
       ]
     },
     {
@@ -79,13 +79,14 @@
     {
       "requirement": "Install location",
       "name": "Installs to .claude/skills/",
-      "when": ["install is called with projectRoot"],
+      "given": ["a SpecdConfig with projectRoot"],
+      "when": ["install is called with that configuration"],
       "then": ["files are written to {projectRoot}/.claude/skills/"]
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:62ff8f9d8188c90c7f8662e7f7cedb217cd04309085f4082fe773aae733f4b2c",
-    "verify.md": "sha256:d1af5bc0abde7b13c80ba6a269934e49d5de9c93d2580fbe9ccbf95af2e8bfe7"
+    "spec.md": "sha256:06935de36ffac1214c33b88a2909ad41cc8e6fddf6dbf5086b97564f858ab527",
+    "verify.md": "sha256:b663f8b23562a54de99a80ba601279c877fc3f9f93b1c0ebae190e69abf85131"
   },
   "generatedBy": "core"
 }

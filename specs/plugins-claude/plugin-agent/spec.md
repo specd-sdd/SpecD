@@ -8,9 +8,9 @@ Claude agent plugin implementation. Exports `create(): AgentPlugin` that provide
 
 ### Requirement: Factory export
 
-The package MUST export `create(): AgentPlugin` as default or named export.
+The package MUST export `create(options: PluginLoaderOptions): AgentPlugin` as default or named export.
 
-The factory function MUST read `specd-plugin.json` at the infrastructure boundary to obtain `name` and `version`. It MUST search for the manifest in its own directory first, then the parent directory as fallback — this works both in development (source tree) and after build/publish (`dist/` with manifest at package root). The `type` field MUST remain hardcoded as `'agent'`.
+The factory function MUST read `specd-plugin.json` at the infrastructure boundary to obtain `name` and `version`. It MUST search for the manifest in its own directory first, then the parent directory as fallback. The `type` field MUST remain hardcoded as `'agent'`.
 
 ### Requirement: Domain layer
 
@@ -47,9 +47,9 @@ interface Frontmatter {
 
 The application layer MUST have `InstallSkills` use case that orchestrates:
 
-1. Get skills via `@specd/skills` repository
+1. Get skills via `@specd/skills` repository, passing `SpecdConfig` for built-in variable resolution
 2. Inject stored frontmatter to each skill template
-3. Install to `.claude/skills/` in project root
+3. Install to `.claude/skills/` relative to the `projectRoot` found in `SpecdConfig`
 
 ### Requirement: Frontmatter injection
 
@@ -76,5 +76,6 @@ Skills MUST be installed to `.claude/skills/` in the project root.
 
 ## Spec Dependencies
 
+- [`core:core/config`](../../core/core/config/spec.md) — defines SpecdConfig type
 - [`plugin-manager:agent-plugin-type`](../plugin-manager/agent-plugin-type/spec.md) — plugin interface
 - [`skills:skill-repository`](../skills/skill-repository/spec.md) — skill access

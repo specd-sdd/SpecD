@@ -21,6 +21,14 @@
 - **WHEN** `plugin.type` is accessed
 - **THEN** it returns `'agent'` regardless of manifest content
 
+### Requirement: PluginContext
+
+#### Scenario: Initialization with SpecdConfig
+
+- **GIVEN** a valid `SpecdConfig` is resolved
+- **WHEN** `plugin.init()` is called with a `PluginContext` containing that config
+- **THEN** the plugin has access to all project configuration fields
+
 ### Requirement: isSpecdPlugin type guard
 
 #### Scenario: Rejects unknown plugin type

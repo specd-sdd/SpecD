@@ -6,8 +6,9 @@
 
 #### Scenario: Has install and uninstall
 
-- **WHEN** an AgentPlugin is created
-- **THEN** it has `install()` and `uninstall()` methods
+- **GIVEN** a valid `SpecdConfig` is provided
+- **WHEN** `install(config, options)` or `uninstall(config, options)` is called
+- **THEN** the plugin executes the requested operation using the provided configuration
 
 ### Requirement: isAgentPlugin type guard
 

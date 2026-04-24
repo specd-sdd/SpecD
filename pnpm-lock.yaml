@@ -242,6 +242,9 @@ importers:
 
   packages/plugin-agent-claude:
     dependencies:
+      '@specd/core':
+        specifier: workspace:^
+        version: link:../core
       '@specd/plugin-manager':
         specifier: workspace:*
         version: link:../plugin-manager
@@ -251,6 +254,9 @@ importers:
 
   packages/plugin-agent-codex:
     dependencies:
+      '@specd/core':
+        specifier: workspace:^
+        version: link:../core
       '@specd/plugin-manager':
         specifier: workspace:*
         version: link:../plugin-manager
@@ -260,6 +266,9 @@ importers:
 
   packages/plugin-agent-copilot:
     dependencies:
+      '@specd/core':
+        specifier: workspace:^
+        version: link:../core
       '@specd/plugin-manager':
         specifier: workspace:*
         version: link:../plugin-manager
@@ -269,6 +278,9 @@ importers:
 
   packages/plugin-agent-opencode:
     dependencies:
+      '@specd/core':
+        specifier: workspace:^
+        version: link:../core
       '@specd/plugin-manager':
         specifier: workspace:*
         version: link:../plugin-manager

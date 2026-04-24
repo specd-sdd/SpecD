@@ -27,7 +27,7 @@
 - **WHEN** `create()` is called
 - **THEN** the returned plugin has `type: 'agent'` (hardcoded)
 - **AND** the returned plugin has `name` and `version` sourced from `specd-plugin.json`
-- **AND** the returned plugin exposes `install(projectRoot, options)` and `uninstall(projectRoot, options)` functions
+- **AND** the returned plugin exposes `install(config, options)` and `uninstall(config, options)` functions using `SpecdConfig`
 
 ### Requirement: Skill installation and frontmatter injection
 

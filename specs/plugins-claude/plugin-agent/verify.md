@@ -31,5 +31,6 @@
 
 #### Scenario: Installs to .claude/skills/
 
-- **WHEN** install is called with projectRoot
+- **GIVEN** a `SpecdConfig` with `projectRoot`
+- **WHEN** install is called with that configuration
 - **THEN** files are written to `{projectRoot}/.claude/skills/`

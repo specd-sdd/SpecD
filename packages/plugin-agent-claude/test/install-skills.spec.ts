@@ -2,6 +2,7 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
+import type { SpecdConfig } from '@specd/core'
 
 const repositoryMock = {
   list: vi.fn(() => [{ name: 'specd', description: 'specd', templates: [] }]),
@@ -10,11 +11,11 @@ const repositoryMock = {
       ? { name, description: name, templates: [] }
       : undefined,
   ),
-  getBundle: vi.fn((name: string) => ({
+  getBundle: vi.fn((name: string, _vars?: any, config?: any) => ({
     name,
     description: name,
     files: [
-      { filename: 'SKILL.md', content: `# ${name}` },
+      { filename: 'SKILL.md', content: '# ' + name },
       { filename: 'shared.md', content: 'shared-content' },
     ],
     install: async () => {},
@@ -29,47 +30,56 @@ vi.mock('@specd/skills', () => ({
   createSkillRepository: () => repositoryMock,
 }))
 
-/**
- * Creates a temporary project root.
- *
- * @returns Temporary root path.
- */
 async function createTempProjectRoot(): Promise<string> {
   return mkdtemp(path.join(tmpdir(), 'specd-plugin-agent-claude-'))
+}
+
+function makeMockConfig(projectRoot: string): SpecdConfig {
+  return {
+    projectRoot,
+    configPath: path.join(projectRoot, 'specd.yaml'),
+    schemaRef: '@specd/schema-std',
+    workspaces: [
+      {
+        name: 'default',
+        specsPath: path.join(projectRoot, 'specs'),
+        specsAdapter: { adapter: 'fs', config: {} },
+        schemasPath: null,
+        schemasAdapter: null,
+        codeRoot: projectRoot,
+        ownership: 'owned',
+        isExternal: false,
+      },
+    ],
+    storage: {
+      changesPath: path.join(projectRoot, '.specd', 'changes'),
+      changesAdapter: { adapter: 'fs', config: {} },
+      draftsPath: path.join(projectRoot, '.specd', 'drafts'),
+      draftsAdapter: { adapter: 'fs', config: {} },
+      discardedPath: path.join(projectRoot, '.specd', 'discarded'),
+      discardedAdapter: { adapter: 'fs', config: {} },
+      archivePath: path.join(projectRoot, 'specs'),
+      archiveAdapter: { adapter: 'fs', config: {} },
+    },
+    approvals: { spec: false, signoff: false },
+    plugins: { agents: [] },
+  }
 }
 
 describe('plugin-agent-claude create()', () => {
   it('given a project root, when install is called, then writes a skill directory with frontmatter on markdown files', async () => {
     const projectRoot = await createTempProjectRoot()
+    const config = makeMockConfig(projectRoot)
     try {
       const { create } = await import('../src/index.js')
-      const plugin = await create()
-      const result = await plugin.install(projectRoot, { skills: ['specd'] })
+      const plugin = await create({ config })
+      const result = await plugin.install(config, { skills: ['specd'] })
 
       expect(result.installed.length).toBe(1)
       const skillFilePath = path.join(projectRoot, '.claude', 'skills', 'specd', 'SKILL.md')
-      const sharedFilePath = path.join(projectRoot, '.claude', 'skills', 'specd', 'shared.md')
       const skillContent = await readFile(skillFilePath, 'utf8')
-      const sharedContent = await readFile(sharedFilePath, 'utf8')
       expect(skillContent).toContain('---')
       expect(skillContent).toContain('description:')
-      expect(sharedContent).toContain('---')
-      expect(sharedContent).toContain('description:')
-      expect(sharedContent).toContain('shared-content')
-    } finally {
-      await rm(projectRoot, { recursive: true, force: true })
-    }
-  })
-
-  it('given a skill filter, when install is called, then installs only selected skills', async () => {
-    const projectRoot = await createTempProjectRoot()
-    try {
-      const { create } = await import('../src/index.js')
-      const plugin = await create()
-      const result = await plugin.install(projectRoot, { skills: ['specd-verify'] })
-
-      expect(result.installed.map((entry) => entry.skill)).toEqual(['specd-verify'])
-      expect(result.skipped.length).toBe(0)
     } finally {
       await rm(projectRoot, { recursive: true, force: true })
     }

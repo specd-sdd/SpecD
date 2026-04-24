@@ -1,7 +1,11 @@
 {
   "title": "plugin-manager:uninstall-plugin-use-case",
   "description": "Use case that orchestrates plugin removal. Loads the plugin and calls its uninstall method.",
-  "dependsOn": ["plugin-manager:agent-plugin-type", "plugin-manager:plugin-loader"],
+  "dependsOn": [
+    "core:core/config",
+    "plugin-manager:agent-plugin-type",
+    "plugin-manager:plugin-loader"
+  ],
   "context": [
     "Use case that orchestrates plugin removal. Loads the plugin and calls its uninstall method."
   ],
@@ -9,7 +13,7 @@
     {
       "requirement": "Input",
       "rules": [
-        "```typescript\ninterface UninstallPluginInput {\n  readonly pluginName: string\n  readonly projectRoot: string\n  readonly options?: Record<string, unknown> // plugin-specific options\n}\n```"
+        "```typescript\ninterface UninstallPluginInput {\n  readonly pluginName: string\n  readonly config: SpecdConfig\n  readonly options?: Record<string, unknown> // plugin-specific options\n}\n```"
       ]
     },
     {
@@ -19,7 +23,7 @@
     {
       "requirement": "Behavior",
       "rules": [
-        "The use case MUST:\n\n1. Load the plugin via `PluginLoader`\n2. Verify the loaded plugin is an `AgentPlugin` using the `isAgentPlugin` type guard\n3. If the plugin is not an `AgentPlugin`, throw `PluginValidationError`\n4. Call the plugin's `uninstall()` method with project root and options\n5. Return void (no config mutation)"
+        "The use case MUST:\n\n1. Load the plugin via `PluginLoader`\n2. Verify the loaded plugin is an `AgentPlugin` using the `isAgentPlugin` type guard\n3. If the plugin is not an `AgentPlugin`, throw `PluginValidationError`\n4. Call the plugin's `uninstall()` method with the provided `SpecdConfig` and options\n5. Return void (no config mutation)"
       ]
     },
     {
@@ -36,7 +40,8 @@
     {
       "requirement": "Behavior",
       "name": "Successful uninstall",
-      "when": ["UninstallPlugin is executed"],
+      "given": ["a valid SpecdConfig is provided"],
+      "when": ["UninstallPlugin is executed with valid configuration"],
       "then": ["it returns void"]
     },
     {
@@ -48,8 +53,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:9446c27fd4954dc1a042eb53dd5c029dc6c4d59f6549c1f54b98f518693f0040",
-    "verify.md": "sha256:d29eed883e5d1e363113db8e629fe695709af9b75dcb4022f54e9352a405da6e"
+    "spec.md": "sha256:512d89678ad6cc4b8b6ff06dfb77072be8a413e6c269c7ff13316b52d21c488c",
+    "verify.md": "sha256:ee427e2aa3064f24ae80667c024db8256482c1268e0c2a86e422871313df601b"
   },
   "generatedBy": "core"
 }

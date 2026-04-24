@@ -1,3 +1,4 @@
+import type { SpecdConfig } from '@specd/core'
 import type { PluginLoader } from '../ports/plugin-loader.js'
 import { isAgentPlugin } from '../../domain/types/agent-plugin.js'
 import { PluginValidationError } from '../../domain/errors/plugin-validation.js'
@@ -12,9 +13,9 @@ export interface UninstallPluginInput {
   readonly pluginName: string
 
   /**
-   * Absolute project root path.
+   * Project configuration.
    */
-  readonly projectRoot: string
+  readonly config: SpecdConfig
 
   /**
    * Optional plugin-specific options.
@@ -44,6 +45,6 @@ export class UninstallPlugin {
     if (!isAgentPlugin(plugin)) {
       throw new PluginValidationError(input.pluginName, ['uninstall'])
     }
-    await plugin.uninstall(input.projectRoot, input.options)
+    await plugin.uninstall(input.config, input.options)
   }
 }

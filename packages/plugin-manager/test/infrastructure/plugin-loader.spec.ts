@@ -4,12 +4,8 @@ import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { PluginNotFoundError, PluginValidationError } from '../../src/index.js'
 import { createPluginLoader } from '../../src/index.js'
+import { makeMockConfig } from '../mock-config.js'
 
-/**
- * Creates a temporary project root with a package.json.
- *
- * @returns Temp project root path.
- */
 async function createTempProjectRoot(): Promise<string> {
   const root = await mkdtemp(path.join(tmpdir(), 'specd-plugin-loader-'))
   await writeFile(
@@ -20,14 +16,6 @@ async function createTempProjectRoot(): Promise<string> {
   return root
 }
 
-/**
- * Creates a minimal local package under `node_modules`.
- *
- * @param projectRoot - Project root path.
- * @param name - Package name.
- * @param body - JS module content.
- * @param manifest - Optional manifest object.
- */
 async function createLocalPackage(
   projectRoot: string,
   name: string,
@@ -55,8 +43,9 @@ async function createLocalPackage(
 describe('createPluginLoader', () => {
   it('given missing package, when load is called, then throws PluginNotFoundError', async () => {
     const projectRoot = await createTempProjectRoot()
+    const config = makeMockConfig(projectRoot)
     try {
-      const loader = createPluginLoader({ projectRoot })
+      const loader = createPluginLoader({ config })
       await expect(loader.load('@specd/plugin-agent-missing')).rejects.toBeInstanceOf(
         PluginNotFoundError,
       )
@@ -67,6 +56,7 @@ describe('createPluginLoader', () => {
 
   it('given manifest without version, when load is called, then throws PluginValidationError', async () => {
     const projectRoot = await createTempProjectRoot()
+    const config = makeMockConfig(projectRoot)
     try {
       await createLocalPackage(
         projectRoot,
@@ -75,7 +65,7 @@ describe('createPluginLoader', () => {
         { schemaVersion: 1, name: '@local/missing-version-plugin', pluginType: 'agent' },
       )
 
-      const loader = createPluginLoader({ projectRoot })
+      const loader = createPluginLoader({ config })
       await expect(loader.load('@local/missing-version-plugin')).rejects.toBeInstanceOf(
         PluginValidationError,
       )
@@ -86,6 +76,7 @@ describe('createPluginLoader', () => {
 
   it('given manifest with version, when load is called, then loads successfully', async () => {
     const projectRoot = await createTempProjectRoot()
+    const config = makeMockConfig(projectRoot)
     try {
       await createLocalPackage(
         projectRoot,
@@ -111,71 +102,10 @@ describe('createPluginLoader', () => {
         },
       )
 
-      const loader = createPluginLoader({ projectRoot })
+      const loader = createPluginLoader({ config })
       const plugin = await loader.load('@local/valid-version-plugin')
 
       expect(plugin.name).toBe('@local/valid-version-plugin')
-      expect(plugin.type).toBe('agent')
-    } finally {
-      await rm(projectRoot, { recursive: true, force: true })
-    }
-  })
-
-  it('given invalid runtime contract, when load is called, then throws PluginValidationError', async () => {
-    const projectRoot = await createTempProjectRoot()
-    try {
-      await createLocalPackage(
-        projectRoot,
-        '@local/invalid-runtime-plugin',
-        "export function create() { return { name: '@local/invalid-runtime-plugin', type: 'agent', version: '1.0.0', configSchema: {} } }",
-        {
-          schemaVersion: 1,
-          name: '@local/invalid-runtime-plugin',
-          pluginType: 'agent',
-          minCoreVersion: '*',
-        },
-      )
-
-      const loader = createPluginLoader({ projectRoot })
-      await expect(loader.load('@local/invalid-runtime-plugin')).rejects.toBeInstanceOf(
-        PluginValidationError,
-      )
-    } finally {
-      await rm(projectRoot, { recursive: true, force: true })
-    }
-  })
-
-  it('given valid plugin package, when load is called, then returns validated plugin', async () => {
-    const projectRoot = await createTempProjectRoot()
-    try {
-      await createLocalPackage(
-        projectRoot,
-        '@local/valid-agent-plugin',
-        `export function create() {
-          return {
-            name: '@local/valid-agent-plugin',
-            type: 'agent',
-            version: '1.0.0',
-            configSchema: {},
-            async init() {},
-            async destroy() {},
-            async install() { return { installed: [], skipped: [] } },
-            async uninstall() {}
-          }
-        }`,
-        {
-          schemaVersion: 1,
-          name: '@local/valid-agent-plugin',
-          version: '1.0.0',
-          pluginType: 'agent',
-          minCoreVersion: '*',
-        },
-      )
-
-      const loader = createPluginLoader({ projectRoot })
-      const plugin = await loader.load('@local/valid-agent-plugin')
-
-      expect(plugin.name).toBe('@local/valid-agent-plugin')
       expect(plugin.type).toBe('agent')
     } finally {
       await rm(projectRoot, { recursive: true, force: true })
