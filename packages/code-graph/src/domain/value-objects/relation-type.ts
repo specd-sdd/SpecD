@@ -2,6 +2,8 @@ export const RelationType = {
   Imports: 'IMPORTS',
   Defines: 'DEFINES',
   Calls: 'CALLS',
+  Constructs: 'CONSTRUCTS',
+  UsesType: 'USES_TYPE',
   Exports: 'EXPORTS',
   DependsOn: 'DEPENDS_ON',
   Covers: 'COVERS',

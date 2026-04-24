@@ -21,11 +21,25 @@
 - **THEN** it returns the same symbols and namespace information both times
 - **AND** it performs no side effects beyond parsing the provided input
 
-#### Scenario: extractRelations may emit hierarchy relations
+#### Scenario: extractRelations may emit dependency and hierarchy relations
 
 - **GIVEN** a file containing resolvable inheritance or implementation declarations
 - **WHEN** `extractRelations()` is called
-- **THEN** the result may include `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES` relations alongside the existing relation types
+- **THEN** the result may include `USES_TYPE`, `CONSTRUCTS`, `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES` relations alongside the existing relation types
+
+#### Scenario: Binding and call fact extraction are pure
+
+- **GIVEN** a built-in adapter implements `extractBindingFacts()` and `extractCallFacts()`
+- **WHEN** each method is called twice with the same file path, content, symbols, and imports
+- **THEN** each method returns equivalent facts both times
+- **AND** neither method reads from disk or mutates adapter state
+
+#### Scenario: Custom adapter may omit scoped binding extensions
+
+- **GIVEN** a custom adapter implements the existing required methods but not `extractBindingFacts()` or `extractCallFacts()`
+- **WHEN** the adapter is registered
+- **THEN** registration succeeds
+- **AND** shared scoped binding resolution skips fact extraction for that adapter
 
 ### Requirement: Language detection
 
@@ -153,6 +167,76 @@
 - **GIVEN** a call expression `init()` at module top level (not inside any function or class)
 - **WHEN** `extractRelations()` is called
 - **THEN** no `CALLS` relation is created for that call
+
+### Requirement: Scoped binding fact extraction
+
+#### Scenario: TypeScript constructor parameter type becomes binding fact
+
+- **GIVEN** TypeScript content containing `constructor(expander: TemplateExpander) {}`
+- **WHEN** `extractBindingFacts()` is called
+- **THEN** a parameter binding fact associates `expander` with target type `TemplateExpander`
+- **AND** no graph relation is emitted directly by the binding fact extraction step
+
+#### Scenario: Receiver binding fact is extracted
+
+- **GIVEN** a class method containing `this.repository.save()`
+- **WHEN** `extractBindingFacts()` and `extractCallFacts()` are called
+- **THEN** the adapter emits facts that identify `this` as the enclosing class receiver
+- **AND** the member call is represented as a call fact for shared resolution
+
+#### Scenario: Runtime-only binding is dropped
+
+- **GIVEN** source content fetches a service by a non-literal runtime identifier
+- **WHEN** `extractBindingFacts()` is called
+- **THEN** no binding fact is emitted for that service target
+
+### Requirement: Built-in multi-language dependency coverage
+
+#### Scenario: TypeScript dynamic and CommonJS imports are parsed
+
+- **GIVEN** TypeScript content containing `import('./plugin.js')`, `require('./legacy.js')`, and `import './polyfill.js'`
+- **WHEN** `extractImportedNames()` is called
+- **THEN** import declarations are returned for all three deterministic specifiers
+
+#### Scenario: TypeScript constructor injection and construction are detectable
+
+- **GIVEN** TypeScript content containing `constructor(expander: TemplateExpander)` and `new TemplateExpander(builtins)`
+- **WHEN** binding and call facts are extracted
+- **THEN** facts identify the constructor-injected `TemplateExpander` dependency as a `USES_TYPE` candidate
+- **AND** facts identify the constructor call as a `CONSTRUCTS` candidate
+
+#### Scenario: Python literal dynamic import is parsed
+
+- **GIVEN** Python content containing `importlib.import_module("acme.plugins.mailer")`
+- **WHEN** import declarations are extracted
+- **THEN** a deterministic import declaration is returned for `acme.plugins.mailer`
+
+#### Scenario: Go selector call is represented for shared resolution
+
+- **GIVEN** Go content importing `models "github.com/acme/auth/models"` and calling `models.NewUser()`
+- **WHEN** import, binding, and call facts are extracted
+- **THEN** the import alias and selector call facts are available to shared resolution
+- **AND** constructor-like/composite literal facts identify `CONSTRUCTS` candidates when present
+
+#### Scenario: PHP framework-managed binding feeds shared facts
+
+- **GIVEN** PHP content declaring `var $uses = array('Article')` and calling `$this->Article->save()`
+- **WHEN** binding and call facts are extracted
+- **THEN** the framework-managed `Article` receiver and member call are represented as shared facts
+
+### Requirement: Detectable dependency boundary
+
+#### Scenario: Literal dynamic dependency is accepted
+
+- **GIVEN** a supported adapter sees a dynamic import form with a string-literal target
+- **WHEN** dependency facts are extracted
+- **THEN** the target is included as a deterministic dependency candidate
+
+#### Scenario: Non-literal dynamic dependency is dropped
+
+- **GIVEN** a supported adapter sees a dynamic import form whose target is computed from a variable
+- **WHEN** dependency facts are extracted
+- **THEN** no persisted graph relation is created for that target
 
 ### Requirement: Hierarchy extraction
 

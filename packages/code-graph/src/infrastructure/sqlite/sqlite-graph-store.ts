@@ -788,6 +788,8 @@ export class SQLiteGraphStore extends GraphStore {
       case RelationType.Exports:
         return this.fileExists(relation.source) && this.symbolExists(relation.target)
       case RelationType.Calls:
+      case RelationType.Constructs:
+      case RelationType.UsesType:
       case RelationType.Extends:
       case RelationType.Implements:
       case RelationType.Overrides:
@@ -796,6 +798,8 @@ export class SQLiteGraphStore extends GraphStore {
         return this.specExists(relation.source) && this.specExists(relation.target)
       case RelationType.Covers:
         return this.specExists(relation.source) && this.fileExists(relation.target)
+      default:
+        return false
     }
   }
 

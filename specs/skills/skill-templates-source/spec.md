@@ -19,6 +19,16 @@ The template directory MUST contain:
 
 Each skill directory contains `.md` files (without frontmatter).
 
+### Requirement: Graph impact terminology in workflow templates
+
+Workflow skill templates that instruct agents to run `specd graph impact` SHALL use clear user-facing terminology for impact direction:
+
+- **dependents** — symbols and files that depend on the target; implemented by `--direction dependents`, with `--direction upstream` as a compatibility value
+- **dependencies** — symbols and files the target depends on; implemented by `--direction dependencies`, with `--direction downstream` as a compatibility value
+- **both** — combined dependents and dependencies analysis; implemented by `--direction both`
+
+Templates MUST NOT ask for "downstream dependents" or otherwise describe `downstream` as dependents. When a skill needs the blast radius of changing a symbol or file, it SHALL use `--direction dependents` or describe the query as dependents.
+
 ### Requirement: Frontmatter source
 
 Frontmatter definitions MUST come from canonical skill metadata and vendor documentation for each target agent runtime. Plugin-specific frontmatter types and maps MUST reflect those documented contracts exactly.
@@ -49,6 +59,7 @@ The skills package does not include frontmatter because each agent environment h
 - Each agent plugin is responsible for storing and injecting its own frontmatter.
 - Agent plugins MUST model the full supported frontmatter field set for their target runtime.
 - Agent plugins MUST NOT emit fields unsupported by their target runtime.
+- Workflow templates MUST use dependents/dependencies wording for graph impact guidance and MUST prefer `--direction dependents` / `--direction dependencies`; `upstream` / `downstream` may appear only as compatibility values.
 
 ## Spec Dependencies
 

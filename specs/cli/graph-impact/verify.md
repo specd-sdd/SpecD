@@ -17,6 +17,36 @@
 - **THEN** config discovery is ignored
 - **AND** the command analyzes impact against a synthetic single workspace `default` rooted at `/tmp/repo`
 
+#### Scenario: Direction terminology distinguishes dependents from dependencies
+
+- **WHEN** graph impact command documentation or help text describes `--direction`
+- **THEN** `dependents` is described as symbols and files that depend on the target
+- **AND** `dependencies` is described as symbols and files the target depends on
+- **AND** `upstream` is documented as a compatibility alias for dependents
+- **AND** `downstream` is documented as a compatibility alias for dependencies
+- **AND** documentation does not describe `downstream` as dependents
+
+#### Scenario: Dependents direction alias maps to upstream
+
+- **GIVEN** `src/auth.ts` is indexed in the graph with upstream dependents
+- **WHEN** `specd graph impact --file src/auth.ts --direction dependents` is run
+- **THEN** the command analyzes the same dependency direction as `--direction upstream`
+- **AND** the process exits with code 0
+
+#### Scenario: Dependencies direction alias maps to downstream
+
+- **GIVEN** `src/utils.ts` is indexed with downstream dependencies
+- **WHEN** `specd graph impact --file src/utils.ts --direction dependencies` is run
+- **THEN** the command analyzes the same dependency direction as `--direction downstream`
+- **AND** the process exits with code 0
+
+#### Scenario: Invalid direction fails before provider access
+
+- **WHEN** `specd graph impact --file src/auth.ts --direction sideways` is run
+- **THEN** the command exits with code 1
+- **AND** stderr explains that the direction value is invalid
+- **AND** no graph provider is opened
+
 ### Requirement: File impact analysis
 
 #### Scenario: Upstream file analysis with defaults
@@ -145,6 +175,12 @@
 
 - **WHEN** `specd graph impact --changes src/auth.ts --format json` is run
 - **THEN** stdout is valid JSON containing `changedFiles`, `changedSymbols`, `affectedSymbols`, `riskLevel`, and `summary`
+
+#### Scenario: Human-facing count labels match direction
+
+- **WHEN** graph impact documentation explains text output counts for omitted, `dependents`, or `upstream` direction
+- **THEN** the counts are explained as dependent counts
+- **AND** when documentation explains `--direction dependencies` or `--direction downstream`, the same fields are explained as dependency counts
 
 ### Requirement: Error cases
 

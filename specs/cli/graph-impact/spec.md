@@ -9,7 +9,7 @@ Before modifying code, developers and agents need to understand the blast radius
 ### Requirement: Command signature
 
 ```text
-specd graph impact [--file <path>] [--symbol <name>] [--changes <files...>] [--direction upstream|downstream|both] [--depth <n>] [--config <path> | --path <path>] [--format text|json|toon]
+specd graph impact [--file <path>] [--symbol <name>] [--changes <files...>] [--direction dependents|dependencies|upstream|downstream|both] [--depth <n>] [--config <path> | --path <path>] [--format text|json|toon]
 ```
 
 Exactly one of `--file`, `--symbol`, or `--changes` must be provided.
@@ -18,13 +18,19 @@ Exactly one of `--file`, `--symbol`, or `--changes` must be provided.
 - `--symbol` — analyze impact of a symbol by name. If multiple symbols match, all are analyzed and results listed
 - `--changes` — detect impact of changes to multiple files (variadic; accepts multiple space-separated paths)
 - `--direction` — optional; analysis direction, defaults to `upstream`. Values:
-  - `upstream` — find symbols and files that depend on the target
-  - `downstream` — find symbols and files that the target depends on
-  - `both` — combined upstream and downstream analysis
+  - `dependents` — find symbols and files that depend on the target; alias of `upstream`
+  - `dependencies` — find symbols and files that the target depends on; alias of `downstream`
+  - `upstream` — compatibility value for `dependents`
+  - `downstream` — compatibility value for `dependencies`
+  - `both` — combined dependents and dependencies analysis
 - `--depth` — optional; maximum traversal depth, defaults to `3`. Must be a positive integer. Passed through to `analyzeImpact`/`analyzeFileImpact` as `maxDepth`
 - `--config <path>` — optional; explicit path to `specd.yaml`, matching the standard CLI meaning
 - `--path <path>` — optional; repo-root bootstrap mode
 - `--format text|json|toon` — optional; output format, defaults to `text`
+
+The CLI SHALL normalize `dependents` to `upstream` and `dependencies` to `downstream` before calling `analyzeImpact()` or `analyzeFileImpact()`. Invalid direction values SHALL fail with a CLI usage error before opening the graph provider.
+
+User-facing documentation for this command MUST prefer the concrete aliases `dependents` and `dependencies` before the compatibility graph-theory terms `upstream` and `downstream`. Documentation MAY mention the compatibility values, but it MUST NOT describe `downstream` as dependents.
 
 `--config` and `--path` are mutually exclusive.
 
@@ -91,6 +97,8 @@ Per-symbol breakdown:
 ```
 
 When affected symbols are available, each file line shows the symbols grouped after a colon with depth indicators: `path: name:line (d=N), name:line (d=N)`. Files reached only via IMPORTS (file-level) are listed without symbols. The depth value `d=N` indicates the distance from the analysis target (1 = direct, 2 = indirect, 3+ = transitive).
+
+When `--direction` is omitted or set to `dependents` / `upstream`, human-facing documentation and help text SHOULD explain these counts as dependent counts. When `--direction dependencies` / `downstream` is used, documentation SHOULD explain that the same fields represent dependencies reached from the target.
 
 When `--depth` is not the default (3), the header line includes `(depth=N)` to show the configured depth.
 

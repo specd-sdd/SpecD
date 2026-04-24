@@ -26,7 +26,11 @@ export function registerProjectStatus(parent: Command): void {
     .description(
       'Display consolidated project status: workspaces, specs, changes, graph, and optionally context references.',
     )
-    .option('--context', 'Include project context references (instructions, files, specs to read)', false)
+    .option(
+      '--context',
+      'Include project context references (instructions, files, specs to read)',
+      false,
+    )
     .option('--graph', 'Include extended graph stats', false)
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
@@ -155,11 +159,14 @@ export function registerProjectStatus(parent: Command): void {
           return
         }
 
+        const firstContext = contextData?.[0]
         const lines = [
           `projectRoot: ${config.projectRoot}`,
           `schema: ${config.schemaRef}`,
           `workspaces:`,
-          ...config.workspaces.map((w) => `  ${w.name} (prefix: ${w.prefix ?? '-'}) [${w.ownership}]`),
+          ...config.workspaces.map(
+            (w) => `  ${w.name} (prefix: ${w.prefix ?? '-'}) [${w.ownership}]`,
+          ),
           `specs: ${specs.length} total`,
           ...Object.entries(specsByWorkspace).map(([ws, n]) => `  ${ws}: ${n}`),
           `changes: ${activeChanges.length} active, ${drafts.length} drafts, ${discarded.length} discarded`,
@@ -174,10 +181,10 @@ export function registerProjectStatus(parent: Command): void {
           `approvals.spec: ${approvals.specEnabled ? 'on' : 'off'}`,
           `approvals.signoff: ${approvals.signoffEnabled ? 'on' : 'off'}`,
           `llmOptimizedContext: ${llmOptimizedContext ? 'on' : 'off'}`,
-          ...(opts.context && contextData
+          ...(opts.context && firstContext !== undefined
             ? [
-                `context.instruction: ${contextData[0].instruction.slice(0, 80)}...`,
-                `context.specs: ${contextData[0].specs.join(', ')}`,
+                `context.instruction: ${firstContext.instruction.slice(0, 80)}...`,
+                `context.specs: ${firstContext.specs.join(', ')}`,
               ]
             : []),
         ]
@@ -195,9 +202,7 @@ export function registerProjectStatus(parent: Command): void {
  * @param config - Resolved project configuration used to create the graph provider.
  * @returns Graph statistics, or `null` when the graph is not available.
  */
-async function loadGraphStats(
-  config: SpecdConfig,
-): Promise<GraphStatistics | null> {
+async function loadGraphStats(config: SpecdConfig): Promise<GraphStatistics | null> {
   try {
     const provider = createCodeGraphProvider(config)
     await provider.open()
