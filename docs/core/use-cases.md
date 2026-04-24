@@ -553,16 +553,27 @@ interface ValidateArtifactsResult {
   passed: boolean
   failures: ValidationFailure[]
   warnings: ValidationWarning[]
+  files: ValidationFileResult[]
 }
 
 interface ValidationFailure {
   artifactId: string
   description: string
+  filename?: string
 }
 
 interface ValidationWarning {
   artifactId: string
   description: string
+}
+
+type ValidationFileStatus = 'validated' | 'missing' | 'skipped'
+
+interface ValidationFileResult {
+  artifactId: string
+  key: string
+  filename: string
+  status: ValidationFileStatus
 }
 ```
 

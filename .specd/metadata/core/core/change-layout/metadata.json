@@ -28,7 +28,13 @@
     {
       "requirement": "Delta files",
       "rules": [
-        "When a change modifies an existing spec-scoped artifact, a delta file is produced instead of rewriting the artifact in full. Delta files live under `deltas/<workspace>/<capability-path>/` and are named `<artifact-filename>.delta.yaml`.\n\n```\ndeltas/<workspace>/<capability-path>/<artifact-filename>.delta.yaml\n```\n\nExamples:\n\n- `deltas/default/core/config/spec.md.delta.yaml`\n- `deltas/default/auth/login/verify.md.delta.yaml`\n- `deltas/billing/invoices/spec.md.delta.yaml`\n\nDelta files are change artifacts — they are never synced to the permanent spec directories. The `deltas/` prefix separates them unambiguously from new spec files under `specs/`."
+        "When a change modifies an existing spec-scoped artifact whose schema artifact declares `delta: true`, a delta file is produced instead of rewriting the artifact in full. Delta files live under `deltas/<workspace>/<capability-path>/` and are named `<artifact-filename>.delta.yaml`.\n\n```text\ndeltas/<workspace>/<capability-path>/<artifact-filename>.delta.yaml\n```\n\nExamples:\n\n- `deltas/default/core/config/spec.md.delta.yaml`\n- `deltas/default/auth/login/verify.md.delta.yaml`\n- `deltas/billing/invoices/spec.md.delta.yaml`\n\nDelta files are change artifacts — they are never synced to the permanent spec directories. The `deltas/` prefix separates them unambiguously from new spec files under `specs/`.\n\nFor existing specs with delta-capable artifacts, this delta path is the expected artifact path. A same-named artifact under `specs/<workspace>/<capability-path>/` is not a valid substitute."
+      ]
+    },
+    {
+      "requirement": "Expected spec-scoped artifact path",
+      "rules": [
+        "For every spec-scoped artifact, specd MUST determine exactly one expected artifact path within the change directory before exposing that artifact through the manifest, status, validation, or artifact instructions.\n\nWhen the target spec already exists and the schema artifact declares `delta: true`, the expected path SHALL be the delta file path:\n\n```text\ndeltas/<workspace>/<capability-path>/<artifact-filename>.delta.yaml\n```\n\nWhen the target spec does not already exist, the expected path SHALL be the new spec artifact path:\n\n```text\nspecs/<workspace>/<capability-path>/<artifact-filename>\n```\n\nWhen the schema artifact does not declare `delta: true`, the expected path SHALL be the spec artifact path under `specs/<workspace>/<capability-path>/` regardless of whether the target spec already exists.\n\nTools MUST NOT treat the `specs/...` and `deltas/...` locations as interchangeable alternatives for the same artifact."
       ]
     },
     {
@@ -48,6 +54,7 @@
     "Change-scoped artifacts are always flat at the change directory root — no workspace or capability-path prefix",
     "Spec-scoped artifact files for new capabilities live under specs/<workspace>/<capability-path>/",
     "Delta files always live under deltas/<workspace>/<capability-path>/ and are named <artifact-filename>.delta.yaml",
+    "For a given spec-scoped artifact, exactly one of the specs/... or deltas/... paths is expected; tools must not accept both for the same target",
     "The workspace segment is always present in both specs/ and deltas/ subtrees — it is never omitted",
     "specs/ and deltas/ subtrees within a change directory are never synced to permanent spec directories; only ArchiveChange may move their contents",
     "No other directories or file types are valid at the change directory root besides manifest.json, schema-declared artifacts, specs/, and deltas/"
@@ -120,6 +127,48 @@
       ]
     },
     {
+      "requirement": "Delta files",
+      "name": "Direct spec file is not a substitute for an existing delta",
+      "given": [
+        "default:core/config already exists",
+        "AND spec.md is delta-capable in the active schema"
+      ],
+      "when": ["tooling resolves the expected artifact path for that spec"],
+      "then": [
+        "the expected path is deltas/default/core/config/spec.md.delta.yaml",
+        "AND specs/default/core/config/spec.md is not treated as an equivalent path"
+      ]
+    },
+    {
+      "requirement": "Expected spec-scoped artifact path",
+      "name": "Existing delta-capable spec expects a delta path",
+      "given": [
+        "default:core/config already exists",
+        "AND the schema artifact specs declares delta: true with output spec.md"
+      ],
+      "when": ["specd resolves the change artifact path for that spec"],
+      "then": ["the expected path is deltas/default/core/config/spec.md.delta.yaml"]
+    },
+    {
+      "requirement": "Expected spec-scoped artifact path",
+      "name": "New spec expects a direct specs path",
+      "given": [
+        "default:core/new-capability does not exist yet",
+        "AND the schema artifact specs declares output spec.md"
+      ],
+      "when": ["specd resolves the change artifact path for that spec"],
+      "then": ["the expected path is specs/default/core/new-capability/spec.md"]
+    },
+    {
+      "requirement": "Expected spec-scoped artifact path",
+      "name": "Specs and deltas paths are not interchangeable",
+      "given": [
+        "a spec-scoped artifact has resolved expected path deltas/default/core/config/spec.md.delta.yaml"
+      ],
+      "when": ["a direct file also exists at specs/default/core/config/spec.md"],
+      "then": ["tooling still reports and validates only the delta path"]
+    },
+    {
       "requirement": "Workspace segment is always present",
       "name": "Single workspace — segment still required",
       "when": ["a project has only one workspace named default and a change creates a new spec"],
@@ -155,8 +204,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:750369becd323d9a072f973adf65c4d3dec07d410e824730ed24215e2340f888",
-    "verify.md": "sha256:fc3b8c843d07a25e327866775cfc07ea386523fcd23d5c969b79d33be8b2b6a8"
+    "spec.md": "sha256:d94880b29191a7061236fd42876f788869fa0cb51928c76e05dfab4ce2a60ef4",
+    "verify.md": "sha256:fed8b7c229ea81dcc595a2c07859cac41c8b7565042d342428f54771ed5dbcae"
   },
   "generatedBy": "core"
 }

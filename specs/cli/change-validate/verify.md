@@ -25,20 +25,44 @@
 - **THEN** the command invokes validation for only the `proposal` artifact
 - **AND** the process exits with code 0 if `proposal` passes validation
 
+### Requirement: Behaviour
+
+#### Scenario: File path details come from validation metadata
+
+- **GIVEN** `ValidateArtifacts.execute` returns a file entry with filename `deltas/core/core/config/spec.md.delta.yaml`
+- **WHEN** `specd change validate my-change core:core/config --artifact specs` renders output
+- **THEN** the CLI prints or serializes that filename from the result metadata
+- **AND** it does not recompute a replacement path in the CLI layer
+
 ### Requirement: Output on success
 
 #### Scenario: All artifacts pass, no warnings
 
 - **GIVEN** a change where all artifacts pass validation
-- **WHEN** `specd change validate my-change default:auth/login` is run
-- **THEN** stdout contains `validated my-change/default:auth/login: all artifacts pass`
+- **AND** validation reports file `deltas/core/core/config/spec.md.delta.yaml`
+- **WHEN** `specd change validate my-change core:core/config --artifact specs` is run
+- **THEN** stdout contains `validated my-change/core:core/config: all artifacts pass`
+- **AND** stdout contains `file: deltas/core/core/config/spec.md.delta.yaml`
+- **AND** stdout contains `specd change spec-preview my-change core:core/config`
 - **AND** the process exits with code 0
 
 #### Scenario: Pass with warnings
 
 - **GIVEN** a change where artifacts pass but there are optional rule mismatches
-- **WHEN** `specd change validate my-change default:auth/login` is run
+- **AND** validation reports file `deltas/core/core/config/spec.md.delta.yaml`
+- **WHEN** `specd change validate my-change core:core/config --artifact specs` is run
 - **THEN** stdout contains a pass message and `warning:` lines for each warning
+- **AND** stdout contains `file: deltas/core/core/config/spec.md.delta.yaml`
+- **AND** stdout contains `specd change spec-preview my-change core:core/config`
+- **AND** the process exits with code 0
+
+#### Scenario: JSON output on pass includes files
+
+- **GIVEN** a change where all artifacts pass validation with no warnings
+- **AND** validation reports file `deltas/core/core/config/spec.md.delta.yaml`
+- **WHEN** `specd change validate my-change core:core/config --artifact specs --format json` is run
+- **THEN** stdout is valid JSON with `passed` equal to `true`, `failures` equal to `[]`, and `warnings` equal to `[]`
+- **AND** `files` contains an entry with `filename: "deltas/core/core/config/spec.md.delta.yaml"`
 - **AND** the process exits with code 0
 
 ### Requirement: Output on failure
@@ -46,8 +70,22 @@
 #### Scenario: Validation failures
 
 - **GIVEN** a change where a required artifact fails validation
-- **WHEN** `specd change validate my-change default:auth/login` is run
-- **THEN** stdout contains `validation failed` and `error:` lines for each failure
+- **AND** validation reports missing file `deltas/core/core/config/spec.md.delta.yaml`
+- **WHEN** `specd change validate my-change core:core/config --artifact specs` is run
+- **THEN** stdout contains `validation failed`
+- **AND** stdout contains `missing: deltas/core/core/config/spec.md.delta.yaml`
+- **AND** stdout contains `error:` lines for each failure
+- **AND** stdout contains `specd change spec-preview my-change core:core/config`
+- **AND** the process exits with code 1
+
+#### Scenario: JSON output on failure includes files
+
+- **GIVEN** a change where a required artifact fails validation
+- **AND** validation reports missing file `deltas/core/core/config/spec.md.delta.yaml`
+- **WHEN** `specd change validate my-change core:core/config --artifact specs --format json` is run
+- **THEN** stdout is valid JSON with `passed` equal to `false`
+- **AND** `failures` contains at least one entry with `artifactId`, `description`, and `filename`
+- **AND** `files` contains an entry with `filename: "deltas/core/core/config/spec.md.delta.yaml"` and missing status
 - **AND** the process exits with code 1
 
 ### Requirement: Spec ID not in change
@@ -125,21 +163,3 @@
 - **GIVEN** a change with 2 specIds, both pass
 - **WHEN** `specd change validate my-change --all --format json` is run
 - **THEN** output is `{ passed: true, total: 2, results: [...] }` with per-spec entries
-
-### Requirement: Output on success
-
-#### Scenario: JSON output on pass
-
-- **GIVEN** a change where all artifacts pass validation with no warnings
-- **WHEN** `specd change validate my-change default:auth/login --format json` is run
-- **THEN** stdout is valid JSON with `passed` equal to `true`, `failures` equal to `[]`, and `warnings` equal to `[]`
-- **AND** the process exits with code 0
-
-### Requirement: Output on failure
-
-#### Scenario: JSON output on failure
-
-- **GIVEN** a change where a required artifact fails validation
-- **WHEN** `specd change validate my-change default:auth/login --format json` is run
-- **THEN** stdout is valid JSON with `passed` equal to `false` and `failures` containing at least one entry with `artifactId` and `description`
-- **AND** the process exits with code 1

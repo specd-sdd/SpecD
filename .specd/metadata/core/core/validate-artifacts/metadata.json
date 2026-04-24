@@ -3,6 +3,8 @@
   "description": "Artifacts must be structurally valid and conflict-free before a change can progress, yet no other code path is allowed to mark an artifact complete — a single chokepoint is needed to enforce this invariant. `ValidateArtifacts` is that chokepoint: it checks a change's artifact files against the active schema, enforces required artifacts, validates structural rules, detects delta conflicts, invalidates any outstanding approval when content has changed, and is the only path through which an artifact may reach `complete` status.",
   "dependsOn": [
     "core:core/change",
+    "core:core/change-layout",
+    "core:core/change-manifest",
     "core:core/schema-format",
     "core:core/delta-format",
     "core:core/selector-model",
@@ -53,7 +55,13 @@
     {
       "requirement": "Per-file validation",
       "rules": [
-        "If the artifact file does not exist in the change directory and the artifact is not optional, validation MUST record a failure before skipping. Only optional artifacts may be silently skipped when their file is missing."
+        "If the expected artifact file does not exist in the change directory and the artifact is not optional, validation MUST record a failure before skipping. Only optional artifacts may be silently skipped when their expected file is missing.\n\nFor spec-scoped artifacts, the expected file is determined by `Requirement: Expected file path validation`. A file at the non-expected location MUST NOT satisfy this check."
+      ]
+    },
+    {
+      "requirement": "Expected file path validation",
+      "rules": [
+        "Before validating a file for a spec-scoped artifact, `ValidateArtifacts` MUST determine the artifact's expected change-directory path using the target spec's existence and the schema artifact's delta capability.\n\nFor an existing spec with a delta-capable artifact, the expected path is `deltas/<workspace>/<capability-path>/<artifact-filename>.delta.yaml`. `ValidateArtifacts` MUST validate that delta file and MUST NOT accept a direct artifact file at `specs/<workspace>/<capability-path>/<artifact-filename>` as a fallback.\n\nFor a new spec, the expected path is `specs/<workspace>/<capability-path>/<artifact-filename>`. In that case `ValidateArtifacts` MUST validate the direct artifact file and MUST NOT require a delta.\n\nFor change-scoped artifacts, the expected path remains the artifact output basename at the change directory root.\n\nIf the expected file does not exist and the artifact is not optional, validation MUST record a failure that includes the expected file path. The file MUST NOT be marked complete."
       ]
     },
     {
@@ -65,7 +73,7 @@
     {
       "requirement": "Delta application preview and conflict detection",
       "rules": [
-        "For artifacts with `delta: true` and an existing base spec in `SpecRepository`:\n\n1. Load the base artifact file from `SpecRepository` using the spec path and artifact filename.\n2. Load the delta file from the change directory at `deltas/<workspace>/<capability-path>/<filename>.delta.yaml`.\n3. Resolve the `ArtifactParser` adapter for `artifact.format`.\n4. Call `parser.parse(baseContent)` to produce the base AST.\n5. Call `parser.apply(baseAST, deltaEntries)` to produce the merged AST.\n6. If `apply` throws `DeltaApplicationError`, record it as a validation failure and do not proceed to `validations[]` or `markComplete`.\n\n**No-op bypass:** When the delta contains only `no-op` entries, steps 1–6 are skipped entirely. The delta application preview is not needed because `no-op` produces no changes. `ValidateArtifacts` proceeds directly to hash computation on the raw delta file content.\n\nThe merged AST (from `parser.serialize(mergedAST)`) is used for `validations[]` checks. The base spec in `SpecRepository` is **not modified** — archive is the step that writes the merged content.\n\nFor artifacts without a delta file (new files being created in the change), `ValidateArtifacts` validates the artifact content directly against `validations[]`."
+        "For artifacts with `delta: true` and an existing base spec in `SpecRepository`:\n\n1. Load the base artifact file from `SpecRepository` using the spec path and artifact filename.\n2. Load the expected delta file from the change directory at `deltas/<workspace>/<capability-path>/<filename>.delta.yaml`.\n3. Resolve the `ArtifactParser` adapter for `artifact.format`.\n4. Call `parser.parse(baseContent)` to produce the base AST.\n5. Call `parser.apply(baseAST, deltaEntries)` to produce the merged AST.\n6. If `apply` throws `DeltaApplicationError`, record it as a validation failure and do not proceed to `validations[]` or `markComplete`.\n\n**No-op bypass:** When the expected delta contains only `no-op` entries, steps 1–6 are skipped entirely. The delta application preview is not needed because `no-op` produces no changes. `ValidateArtifacts` proceeds directly to hash computation on the raw delta file content.\n\nThe merged AST (from `parser.serialize(mergedAST)`) is used for `validations[]` checks. The base spec in `SpecRepository` is **not modified** — archive is the step that writes the merged content.\n\nFor new files being created in the change, `ValidateArtifacts` validates the expected direct artifact file under `specs/<workspace>/<capability-path>/<filename>` against `validations[]`."
       ]
     },
     {
@@ -89,7 +97,7 @@
     {
       "requirement": "Result shape",
       "rules": [
-        "`ValidateArtifacts.execute` must return a result object — it must not throw for validation failures. The result must include:\n\n- `passed: boolean` — `true` only if all required artifacts are present and all validations pass with no errors\n- `failures: ValidationFailure[]` — one entry per failed rule, missing artifact, or `DeltaApplicationError`\n- `warnings: ValidationWarning[]` — one entry per `required: false` rule that was absent\n\nEach `ValidationFailure` must include the artifact ID, the rule or error description, and enough context for the CLI to produce a useful error message."
+        "`ValidateArtifacts.execute` must return a result object — it must not throw for validation failures. The result must include:\n\n- `passed: boolean` — `true` only if all required artifacts are present and all validations pass with no errors\n- `failures: ValidationFailure[]` — one entry per failed rule, missing artifact, or `DeltaApplicationError`\n- `warnings: ValidationWarning[]` — one entry per `required: false` rule that was absent\n- `files: ValidationFileResult[]` — one entry per artifact file considered by validation, including `artifactId`, `key`, `filename`, and whether the file was validated, skipped, or missing\n\nEach `ValidationFailure` must include the artifact ID, the rule or error description, and enough context for the CLI to produce a useful error message. Missing-file failures MUST include the expected `filename`.\n\n`ValidationFileResult.filename` MUST be the expected path used by validation. It MUST NOT report an alternate file path that was present but intentionally ignored."
       ]
     },
     {
@@ -114,7 +122,7 @@
     "preHashCleanup substitutions are applied only for hash computation, never to the actual file content on disk",
     "A missing deltaValidations[] is not an error — the step is skipped",
     "A missing validations[] is not an error — the step is skipped",
-    "A missing delta file for a delta: true artifact is not itself a validation error — the artifact may be new (no existing base spec to delta against); in that case, validate the artifact file directly against validations[]"
+    "A missing expected delta file for an existing spec with a delta: true artifact is a validation failure; direct files under specs/... are valid only for new specs or non-delta artifacts"
   ],
   "scenarios": [
     {
@@ -274,6 +282,68 @@
       "then": ["the same grouped invalidation behavior is applied"]
     },
     {
+      "requirement": "Per-file validation",
+      "name": "Missing expected non-optional file fails validation",
+      "given": [
+        "a non-optional spec-scoped artifact has expected filename deltas/core/core/config/spec.md.delta.yaml",
+        "AND that file does not exist in the change directory"
+      ],
+      "when": ["ValidateArtifacts.execute validates the artifact"],
+      "then": ["result.passed is false", "AND the file is not marked complete"]
+    },
+    {
+      "requirement": "Per-file validation",
+      "name": "Non-expected file does not satisfy the expected path",
+      "given": [
+        "a non-optional spec-scoped artifact has expected filename deltas/core/core/config/spec.md.delta.yaml",
+        "AND a direct file exists at specs/core/core/config/spec.md"
+      ],
+      "when": ["ValidateArtifacts.execute validates the artifact"],
+      "then": [
+        "validation still reports the expected delta file as missing",
+        "AND the direct file is ignored for that artifact"
+      ]
+    },
+    {
+      "requirement": "Expected file path validation",
+      "name": "Existing spec validates only the expected delta",
+      "given": [
+        "core:core/config already exists",
+        "AND the schema artifact specs declares delta: true",
+        "AND the change contains deltas/core/core/config/spec.md.delta.yaml"
+      ],
+      "when": ["ValidateArtifacts.execute validates specs for core:core/config"],
+      "then": [
+        "the delta file is parsed, applied to the base spec, and marked complete if validation passes",
+        "AND the result file metadata reports deltas/core/core/config/spec.md.delta.yaml"
+      ]
+    },
+    {
+      "requirement": "Expected file path validation",
+      "name": "Existing spec with only a direct file fails",
+      "given": [
+        "core:core/config already exists",
+        "AND the schema artifact specs declares delta: true",
+        "AND the change contains specs/core/core/config/spec.md",
+        "AND the change does not contain deltas/core/core/config/spec.md.delta.yaml"
+      ],
+      "when": ["ValidateArtifacts.execute validates specs for core:core/config"],
+      "then": [
+        "validation fails with missing filename deltas/core/core/config/spec.md.delta.yaml",
+        "AND specs/core/core/config/spec.md is not validated"
+      ]
+    },
+    {
+      "requirement": "Expected file path validation",
+      "name": "New spec validates the direct specs file",
+      "given": [
+        "core:core/new-capability does not exist",
+        "AND the change contains specs/core/core/new-capability/spec.md"
+      ],
+      "when": ["ValidateArtifacts.execute validates specs for core:core/new-capability"],
+      "then": ["validation runs against the direct specs file", "AND no delta file is required"]
+    },
+    {
       "requirement": "Delta validation",
       "name": "Delta validation failure blocks application",
       "given": [
@@ -337,11 +407,29 @@
     },
     {
       "requirement": "Delta application preview and conflict detection",
-      "name": "No delta file — artifact validated directly",
-      "given": ["an artifact with delta: true but no delta file present in the change directory"],
+      "name": "Existing spec without expected delta fails",
+      "given": [
+        "an artifact with delta: true",
+        "AND the base spec exists in SpecRepository",
+        "AND the expected delta file is missing from the change directory"
+      ],
       "when": ["ValidateArtifacts.execute is called"],
       "then": [
-        "validations[] run against the artifact file content directly, with no application preview step"
+        "validation fails with the expected delta filename",
+        "AND no direct artifact fallback is attempted"
+      ]
+    },
+    {
+      "requirement": "Delta application preview and conflict detection",
+      "name": "New file is validated directly",
+      "given": [
+        "an artifact with delta: true",
+        "AND the target spec does not exist in SpecRepository",
+        "AND the expected direct artifact file exists under specs/<workspace>/<capability-path>/"
+      ],
+      "when": ["ValidateArtifacts.execute is called"],
+      "then": [
+        "validations[] run against the direct artifact content with no application preview step"
       ]
     },
     {
@@ -349,12 +437,12 @@
       "name": "Missing non-optional artifact file causes failure",
       "given": [
         "an artifact that is NOT optional (optional: false in schema)",
-        "AND the artifact file does not exist in the change directory",
+        "AND the expected artifact file does not exist in the change directory",
         "AND the artifact belongs to the spec being validated"
       ],
       "when": ["ValidateArtifacts.execute processes the artifact"],
       "then": [
-        "validation fails with a failure indicating the missing file",
+        "validation fails with a failure indicating the missing expected file",
         "AND the artifact is NOT marked complete"
       ]
     },
@@ -363,7 +451,7 @@
       "name": "Missing optional artifact file is silently skipped",
       "given": [
         "an artifact that IS optional (optional: true in schema)",
-        "AND the artifact file does not exist in the change directory"
+        "AND the expected artifact file does not exist in the change directory"
       ],
       "when": ["ValidateArtifacts.execute processes the artifact"],
       "then": [
@@ -478,6 +566,28 @@
       "then": ["result.passed is true and result.failures is empty"]
     },
     {
+      "requirement": "Result shape",
+      "name": "files list reports the expected validated filename",
+      "given": [
+        "validation succeeds for existing spec core:core/config with delta file deltas/core/core/config/spec.md.delta.yaml"
+      ],
+      "when": ["ValidateArtifacts.execute returns"],
+      "then": [
+        "result.files contains an entry with filename: \"deltas/core/core/config/spec.md.delta.yaml\"",
+        "AND that entry status indicates the file was validated"
+      ]
+    },
+    {
+      "requirement": "Result shape",
+      "name": "files list reports the expected missing filename",
+      "given": ["validation fails because deltas/core/core/config/spec.md.delta.yaml is missing"],
+      "when": ["ValidateArtifacts.execute returns"],
+      "then": [
+        "result.files contains an entry with filename: \"deltas/core/core/config/spec.md.delta.yaml\"",
+        "AND that entry status indicates the file is missing"
+      ]
+    },
+    {
       "requirement": "Save after validation",
       "name": "Partial progress is persisted through serialized mutation",
       "given": ["one artifact passes validation (markComplete is called) and one artifact fails"],
@@ -532,8 +642,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:9b44f46e8101dc310e7a188f5cc42206e74dceb516351924a5133ee4a232c0f8",
-    "verify.md": "sha256:08522a1111cdcf5ec48d127b29ec709ee8ff4bc671fbf2c4a30d0bc63ded7223"
+    "spec.md": "sha256:13b9e7a9d68ad71fbf888c0ef80e0c5cb7bfcb7823739f49df500ae20464c191",
+    "verify.md": "sha256:18b34bc4c9f7d2b1f8c380ad11629c8c445e9d4da3cfaa697fd870c035ced984"
   },
   "generatedBy": "core"
 }

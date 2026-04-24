@@ -48,6 +48,36 @@
 - **WHEN** a change creates a brand-new capability with no existing spec
 - **THEN** no delta file exists for that capability — only the new `spec.md` under `specs/<workspace>/<path>/`
 
+#### Scenario: Direct spec file is not a substitute for an existing delta
+
+- **GIVEN** `default:core/config` already exists
+- **AND** `spec.md` is delta-capable in the active schema
+- **WHEN** tooling resolves the expected artifact path for that spec
+- **THEN** the expected path is `deltas/default/core/config/spec.md.delta.yaml`
+- **AND** `specs/default/core/config/spec.md` is not treated as an equivalent path
+
+### Requirement: Expected spec-scoped artifact path
+
+#### Scenario: Existing delta-capable spec expects a delta path
+
+- **GIVEN** `default:core/config` already exists
+- **AND** the schema artifact `specs` declares `delta: true` with output `spec.md`
+- **WHEN** specd resolves the change artifact path for that spec
+- **THEN** the expected path is `deltas/default/core/config/spec.md.delta.yaml`
+
+#### Scenario: New spec expects a direct specs path
+
+- **GIVEN** `default:core/new-capability` does not exist yet
+- **AND** the schema artifact `specs` declares output `spec.md`
+- **WHEN** specd resolves the change artifact path for that spec
+- **THEN** the expected path is `specs/default/core/new-capability/spec.md`
+
+#### Scenario: Specs and deltas paths are not interchangeable
+
+- **GIVEN** a spec-scoped artifact has resolved expected path `deltas/default/core/config/spec.md.delta.yaml`
+- **WHEN** a direct file also exists at `specs/default/core/config/spec.md`
+- **THEN** tooling still reports and validates only the delta path
+
 ### Requirement: Workspace segment is always present
 
 #### Scenario: Single workspace — segment still required

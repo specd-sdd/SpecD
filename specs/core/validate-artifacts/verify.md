@@ -118,6 +118,53 @@
 - **WHEN** `ValidateArtifacts.execute` detects the mismatch
 - **THEN** the same grouped invalidation behavior is applied
 
+### Requirement: Per-file validation
+
+#### Scenario: Missing expected non-optional file fails validation
+
+- **GIVEN** a non-optional spec-scoped artifact has expected filename `deltas/core/core/config/spec.md.delta.yaml`
+- **AND** that file does not exist in the change directory
+- **WHEN** `ValidateArtifacts.execute` validates the artifact
+- **THEN** `result.passed` is `false`
+- **AND** the file is not marked complete
+
+#### Scenario: Non-expected file does not satisfy the expected path
+
+- **GIVEN** a non-optional spec-scoped artifact has expected filename `deltas/core/core/config/spec.md.delta.yaml`
+- **AND** a direct file exists at `specs/core/core/config/spec.md`
+- **WHEN** `ValidateArtifacts.execute` validates the artifact
+- **THEN** validation still reports the expected delta file as missing
+- **AND** the direct file is ignored for that artifact
+
+### Requirement: Expected file path validation
+
+#### Scenario: Existing spec validates only the expected delta
+
+- **GIVEN** `core:core/config` already exists
+- **AND** the schema artifact `specs` declares `delta: true`
+- **AND** the change contains `deltas/core/core/config/spec.md.delta.yaml`
+- **WHEN** `ValidateArtifacts.execute` validates `specs` for `core:core/config`
+- **THEN** the delta file is parsed, applied to the base spec, and marked complete if validation passes
+- **AND** the result file metadata reports `deltas/core/core/config/spec.md.delta.yaml`
+
+#### Scenario: Existing spec with only a direct file fails
+
+- **GIVEN** `core:core/config` already exists
+- **AND** the schema artifact `specs` declares `delta: true`
+- **AND** the change contains `specs/core/core/config/spec.md`
+- **AND** the change does not contain `deltas/core/core/config/spec.md.delta.yaml`
+- **WHEN** `ValidateArtifacts.execute` validates `specs` for `core:core/config`
+- **THEN** validation fails with missing filename `deltas/core/core/config/spec.md.delta.yaml`
+- **AND** `specs/core/core/config/spec.md` is not validated
+
+#### Scenario: New spec validates the direct specs file
+
+- **GIVEN** `core:core/new-capability` does not exist
+- **AND** the change contains `specs/core/core/new-capability/spec.md`
+- **WHEN** `ValidateArtifacts.execute` validates `specs` for `core:core/new-capability`
+- **THEN** validation runs against the direct specs file
+- **AND** no delta file is required
+
 ### Requirement: Delta validation
 
 #### Scenario: Delta validation failure blocks application
@@ -162,25 +209,36 @@
 - **WHEN** `ValidateArtifacts.execute` is called
 - **THEN** the base spec file in `SpecRepository` is unchanged — the merged result is used only for `validations[]` checks
 
-#### Scenario: No delta file — artifact validated directly
+#### Scenario: Existing spec without expected delta fails
 
-- **GIVEN** an artifact with `delta: true` but no delta file present in the change directory
+- **GIVEN** an artifact with `delta: true`
+- **AND** the base spec exists in `SpecRepository`
+- **AND** the expected delta file is missing from the change directory
 - **WHEN** `ValidateArtifacts.execute` is called
-- **THEN** `validations[]` run against the artifact file content directly, with no application preview step
+- **THEN** validation fails with the expected delta filename
+- **AND** no direct artifact fallback is attempted
+
+#### Scenario: New file is validated directly
+
+- **GIVEN** an artifact with `delta: true`
+- **AND** the target spec does not exist in `SpecRepository`
+- **AND** the expected direct artifact file exists under `specs/<workspace>/<capability-path>/`
+- **WHEN** `ValidateArtifacts.execute` is called
+- **THEN** `validations[]` run against the direct artifact content with no application preview step
 
 #### Scenario: Missing non-optional artifact file causes failure
 
 - **GIVEN** an artifact that is NOT optional (`optional: false` in schema)
-- **AND** the artifact file does not exist in the change directory
+- **AND** the expected artifact file does not exist in the change directory
 - **AND** the artifact belongs to the spec being validated
 - **WHEN** `ValidateArtifacts.execute` processes the artifact
-- **THEN** validation fails with a failure indicating the missing file
+- **THEN** validation fails with a failure indicating the missing expected file
 - **AND** the artifact is NOT marked complete
 
 #### Scenario: Missing optional artifact file is silently skipped
 
 - **GIVEN** an artifact that IS optional (`optional: true` in schema)
-- **AND** the artifact file does not exist in the change directory
+- **AND** the expected artifact file does not exist in the change directory
 - **WHEN** `ValidateArtifacts.execute` processes the artifact
 - **THEN** validation continues without failure
 - **AND** no failure is recorded for the missing file
@@ -270,6 +328,20 @@
 
 - **WHEN** all non-optional artifacts are present and all validations pass
 - **THEN** `result.passed` is `true` and `result.failures` is empty
+
+#### Scenario: files list reports the expected validated filename
+
+- **GIVEN** validation succeeds for existing spec `core:core/config` with delta file `deltas/core/core/config/spec.md.delta.yaml`
+- **WHEN** `ValidateArtifacts.execute` returns
+- **THEN** `result.files` contains an entry with `filename: "deltas/core/core/config/spec.md.delta.yaml"`
+- **AND** that entry status indicates the file was validated
+
+#### Scenario: files list reports the expected missing filename
+
+- **GIVEN** validation fails because `deltas/core/core/config/spec.md.delta.yaml` is missing
+- **WHEN** `ValidateArtifacts.execute` returns
+- **THEN** `result.files` contains an entry with `filename: "deltas/core/core/config/spec.md.delta.yaml"`
+- **AND** that entry status indicates the file is missing
 
 ### Requirement: Save after validation
 
