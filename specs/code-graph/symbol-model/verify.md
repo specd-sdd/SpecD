@@ -116,6 +116,12 @@
 - **THEN** it includes `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES`
 - **AND** adding any additional hierarchy relation type still requires a spec change
 
+#### Scenario: Scoped binding relation types are part of the closed set
+
+- **WHEN** the relation type set is inspected
+- **THEN** it includes `USES_TYPE` and `CONSTRUCTS`
+- **AND** adding any additional scoped binding relation type still requires a spec change
+
 ### Requirement: Relation value object
 
 #### Scenario: Relation equality by source, target, and type
@@ -155,6 +161,68 @@
 - **GIVEN** a supported language exposes a construct whose semantics would be materially distorted by normalization
 - **WHEN** hierarchy relations are built
 - **THEN** no hierarchy relation is emitted for that construct in this iteration
+
+### Requirement: Import declaration
+
+#### Scenario: Side-effect import has no local symbol
+
+- **GIVEN** a TypeScript file containing `import './polyfill.js'`
+- **WHEN** import declarations are extracted
+- **THEN** the declaration has `specifier: './polyfill.js'`
+- **AND** `kind` is `side-effect`
+- **AND** `localName` and `originalName` are empty strings
+
+#### Scenario: Existing named import remains compatible
+
+- **GIVEN** a TypeScript file containing `import { createUser as makeUser } from './user.js'`
+- **WHEN** import declarations are extracted
+- **THEN** the declaration has `localName: 'makeUser'`
+- **AND** `originalName: 'createUser'`
+- **AND** missing `kind` is treated as `named`
+
+### Requirement: Scoped binding model
+
+#### Scenario: Binding facts are immutable analysis inputs
+
+- **GIVEN** a binding fact for a constructor parameter typed as `TemplateExpander`
+- **WHEN** the binding fact is created
+- **THEN** it records the workspace-prefixed file path, source location, binding source kind, visible name, and target type candidate
+- **AND** its properties are readonly
+
+#### Scenario: Runtime-only binding is outside the model
+
+- **GIVEN** a service lookup identified only by a runtime container string
+- **WHEN** binding facts are modeled
+- **THEN** no deterministic binding fact is created for that runtime-only lookup
+
+### Requirement: Scoped binding relation output
+
+#### Scenario: Constructor call uses CONSTRUCTS relation
+
+- **GIVEN** a function contains `new TemplateExpander(builtins)`
+- **AND** `TemplateExpander` resolves to a class symbol
+- **WHEN** scoped call resolution emits graph output
+- **THEN** a `CONSTRUCTS` relation connects the enclosing function symbol to the `TemplateExpander` class target
+
+#### Scenario: Constructor injection uses USES_TYPE relation
+
+- **GIVEN** a constructor parameter is typed as `TemplateExpander`
+- **AND** `TemplateExpander` resolves to a class symbol
+- **WHEN** scoped binding resolution emits graph output
+- **THEN** a `USES_TYPE` relation connects the constructor or owning class symbol to the `TemplateExpander` class target
+
+#### Scenario: Self-relation is not persisted
+
+- **GIVEN** a binding or call fact resolves to the same source and target symbol id
+- **WHEN** scoped binding resolution emits graph output
+- **THEN** no persisted `CALLS`, `CONSTRUCTS`, or `USES_TYPE` relation is emitted for that self-edge
+- **AND** impact analysis does not report the target symbol as its own dependent
+
+#### Scenario: Ambiguous typed dependency emits no speculative edge
+
+- **GIVEN** a parameter type annotation cannot be resolved to a known symbol
+- **WHEN** scoped binding resolution runs
+- **THEN** no persisted relation is emitted for that unresolved type
 
 ### Requirement: Immutability
 

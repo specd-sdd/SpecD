@@ -65,21 +65,25 @@ No other values are permitted. Language adapters MUST map language-specific cons
 
 Relations between nodes SHALL be represented as typed edges. Each relation has a `source`, `target`, and `type`. The following relation types are defined:
 
-| Type         | Source | Target | Meaning                                                   | Phase |
-| ------------ | ------ | ------ | --------------------------------------------------------- | ----- |
-| `IMPORTS`    | File   | File   | Source file imports from target file                      | v1.5  |
-| `DEFINES`    | File   | Symbol | File contains the symbol's declaration                    | v2    |
-| `CALLS`      | Symbol | Symbol | Source symbol invokes target symbol                       | v2    |
-| `EXPORTS`    | File   | Symbol | File exports the symbol as public API                     | v2    |
-| `DEPENDS_ON` | Spec   | Spec   | Spec depends on target spec                               | v1.5  |
-| `COVERS`     | Spec   | File   | Spec covers the target file                               | v2+   |
-| `EXTENDS`    | Symbol | Symbol | Source type extends or inherits from target type          | v2    |
-| `IMPLEMENTS` | Symbol | Symbol | Source type fulfills or implements target contract/type   | v2    |
-| `OVERRIDES`  | Symbol | Symbol | Source method overrides or concretely fulfills target one | v2    |
+| Type         | Source | Target | Meaning                                                               | Phase |
+| ------------ | ------ | ------ | --------------------------------------------------------------------- | ----- |
+| `IMPORTS`    | File   | File   | Source file imports from target file                                  | v1.5  |
+| `DEFINES`    | File   | Symbol | File contains the symbol's declaration                                | v2    |
+| `CALLS`      | Symbol | Symbol | Source symbol invokes target symbol                                   | v2    |
+| `CONSTRUCTS` | Symbol | Symbol | Source symbol constructs or instantiates target type                  | v2    |
+| `USES_TYPE`  | Symbol | Symbol | Source symbol references target type in a static signature or binding | v2    |
+| `EXPORTS`    | File   | Symbol | File exports the symbol as public API                                 | v2    |
+| `DEPENDS_ON` | Spec   | Spec   | Spec depends on target spec                                           | v1.5  |
+| `COVERS`     | Spec   | File   | Spec covers the target file                                           | v2+   |
+| `EXTENDS`    | Symbol | Symbol | Source type extends or inherits from target type                      | v2    |
+| `IMPLEMENTS` | Symbol | Symbol | Source type fulfills or implements target contract/type               | v2    |
+| `OVERRIDES`  | Symbol | Symbol | Source method overrides or concretely fulfills target one             | v2    |
 
-Relations are directional. `IMPORTS`, `DEFINES`, `CALLS`, `EXPORTS`, `DEPENDS_ON`, `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES` are populated by the indexer. `COVERS` is populated by spec-to-code mapping (deferred to v2+).
+Relations are directional. `IMPORTS`, `DEFINES`, `CALLS`, `CONSTRUCTS`, `USES_TYPE`, `EXPORTS`, `DEPENDS_ON`, `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES` are populated by the indexer. `COVERS` is populated by spec-to-code mapping (deferred to v2+).
 
-The hierarchy model for this iteration is intentionally limited to `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES`. Language-specific constructs MAY be normalized into one of those relations when doing so preserves useful impact, hotspot, and code-understanding semantics. Constructs that cannot be normalized without materially distorting their meaning are omitted rather than introducing new base relation types in this iteration.
+`CONSTRUCTS` is distinct from `CALLS`: it records instantiation or constructor-like dependency, not an ordinary invocation. `USES_TYPE` is distinct from `CALLS`: it records static type dependency in signatures, annotations, fields, or deterministic binding declarations.
+
+The hierarchy model for this iteration remains limited to `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES`. Language-specific constructs MAY be normalized into one of those relations when doing so preserves useful impact, hotspot, and code-understanding semantics. Constructs that cannot be normalized without materially distorting their meaning are omitted rather than introducing additional base relation types in this iteration.
 
 ### Requirement: Relation value object
 
@@ -106,14 +110,51 @@ Adapters MAY normalize inheritance-adjacent constructs from supported languages 
 
 ### Requirement: Import declaration
 
-An `ImportDeclaration` SHALL represent a parsed import statement extracted from source code. It contains:
+An `ImportDeclaration` SHALL represent a parsed import statement or deterministic import expression extracted from source code. It contains:
 
-- **`localName`** (`string`) — the identifier used locally in the importing file
-- **`originalName`** (`string`) — the identifier as declared in the source module
-- **`specifier`** (`string`) — the raw import specifier string
-- **`isRelative`** (`boolean`) — true if the specifier is a relative path
+- **`localName`** (`string`) — the identifier used locally in the importing file. File-only import forms use an empty string.
+- **`originalName`** (`string`) — the identifier as declared in the source module. File-only import forms use an empty string.
+- **`specifier`** (`string`) — the raw import specifier string.
+- **`isRelative`** (`boolean`) — true if the specifier is a relative path.
+- **`kind`** (`'named' | 'namespace' | 'default' | 'side-effect' | 'dynamic' | 'require' | 'blank' | undefined`) — optional import form metadata. `undefined` is equivalent to `named` for backwards compatibility.
 
 `ImportDeclaration` is a pure syntactic representation — it contains no resolution information. The indexer resolves specifiers to files and symbol ids using the adapter registry and monorepo package map.
+
+Side-effect imports, string-literal dynamic imports, CommonJS `require()` calls, and Go blank imports MUST be representable as file-only import declarations without creating fake local symbols.
+
+### Requirement: Scoped binding model
+
+The symbol model SHALL define immutable, language-agnostic value objects for deterministic scoped binding and call resolution. These value objects are analysis inputs and intermediate results that normalize source-language facts before they are converted into persisted graph relations.
+
+The shared model SHALL represent:
+
+- **Scope ownership**: file, class/type, method, function, and block scopes when the adapter can identify them deterministically.
+- **Binding facts**: source-location-aware facts that bind a visible name or receiver to a declared, constructed, imported, inherited, framework-managed, or otherwise deterministic target type or symbol candidate.
+- **Binding source kind**: local, parameter, property/field, class-managed, inherited, file/global, imported type, framework-managed, constructor call, and alias-from-known-binding.
+- **Call facts**: source-location-aware facts for free calls, member calls, static calls, and constructor calls, including the enclosing caller symbol when known.
+- **Resolution metadata**: deterministic reason strings and optional confidence or diagnostic metadata that explain why a binding or call candidate was accepted or dropped.
+
+Binding facts and call facts MUST be immutable value objects with `readonly` properties. They MUST use workspace-prefixed file paths and symbol IDs when they reference graph entities.
+
+The first iteration SHALL remain conservative. It MUST NOT model arbitrary runtime state, reflection, runtime container identifiers, interprocedural propagation, or whole-program data flow.
+
+### Requirement: Scoped binding relation output
+
+Scoped binding and call resolution SHALL emit deterministic graph relations using the persisted relation vocabulary:
+
+- `IMPORTS` for file-level dependencies that resolve to files.
+- `CALLS` for deterministic invocations from one symbol to another callable symbol.
+- `CONSTRUCTS` for deterministic constructor or constructor-like instantiation from an enclosing symbol to the constructed class/type symbol.
+- `USES_TYPE` for deterministic type references from an enclosing symbol to a referenced type, interface, enum, or class symbol.
+- `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES` for deterministic hierarchy and method-fulfillment relationships.
+
+Constructor injection, typed parameters, typed return values, typed properties/fields, and imported type annotations SHALL emit `USES_TYPE` when the referenced type symbol resolves deterministically.
+
+Constructor calls such as `new ClassName()` and language-equivalent constructor-like expressions SHALL emit `CONSTRUCTS` when the constructed target resolves deterministically.
+
+Scoped binding and call resolution SHALL NOT persist symbol-to-symbol dependency relations where the source symbol id and target symbol id are identical. Self-relations do not represent external blast radius and MUST be dropped before graph persistence.
+
+Unresolved binding facts and call facts SHALL NOT create speculative graph edges. They MAY be preserved as non-persisted diagnostics or debug metadata for tests and troubleshooting.
 
 ### Requirement: Immutability
 
@@ -138,6 +179,7 @@ Specific error subclasses include:
 - `embedding` on `FileNode` is deferred to v2+ — adapters MUST NOT populate it until the embedding pipeline is implemented
 - `COVERS` relations are deferred to v2+ — the type exists in the model but is not populated by any v1.5/v2 process
 - `DEPENDS_ON` relations are populated by the indexer in v1.5, reading from `.specd-metadata.yaml` or `spec.md`
+- `CONSTRUCTS` and `USES_TYPE` are first-class persisted relations in v2 and are part of the base graph vocabulary for supported languages
 - `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES` are first-class persisted relations in v2 and are part of the base graph vocabulary for supported languages
 
 ## Examples

@@ -15,7 +15,9 @@ Different programming languages have fundamentally different syntax for function
 - **`extractSymbols(filePath: string, content: string): SymbolNode[]`** — parses the file content and returns all symbols found
 - **`extractSymbolsWithNamespace?(filePath: string, content: string): { symbols: SymbolNode[]; namespace: string | undefined }`** — optional fast path for languages that can derive symbols and namespace from the same parse tree
 - **`extractImportedNames(filePath: string, content: string): ImportDeclaration[]`** — parses import statements and returns structured declarations without resolution
-- **`extractRelations(filePath: string, content: string, symbols: SymbolNode[], importMap: Map<string, string>): Relation[]`** — extracts relations (IMPORTS, CALLS, DEFINES, EXPORTS, DEPENDS_ON, EXTENDS, IMPLEMENTS, OVERRIDES) from the file. The `importMap` maps local import names to resolved symbol IDs, built by the indexer during Pass 2. For code-file dependencies, adapters SHOULD emit concrete relations (`IMPORTS`, `CALLS`, hierarchy relations) when targets are resolvable; `DEPENDS_ON` is reserved for spec-level dependency edges in the persisted graph model.
+- **`extractRelations(filePath: string, content: string, symbols: SymbolNode[], importMap: Map<string, string>): Relation[]`** — extracts relations (IMPORTS, CALLS, CONSTRUCTS, USES_TYPE, DEFINES, EXPORTS, DEPENDS_ON, EXTENDS, IMPLEMENTS, OVERRIDES) from the file. The `importMap` maps local import names to resolved symbol IDs, built by the indexer during Pass 2. For code-file dependencies, adapters SHOULD emit concrete relations (`IMPORTS`, `CALLS`, `CONSTRUCTS`, `USES_TYPE`, hierarchy relations) when targets are resolvable; `DEPENDS_ON` is reserved for spec-level dependency edges in the persisted graph model.
+- **`extractBindingFacts?(filePath: string, content: string, symbols: SymbolNode[], imports: ImportDeclaration[]): BindingFact[]`** — optional pure extension point for extracting deterministic binding facts used by the shared scoped binding environment.
+- **`extractCallFacts?(filePath: string, content: string, symbols: SymbolNode[]): CallFact[]`** — optional pure extension point for extracting normalized call-form facts used by shared call resolution.
 
 All extraction methods MUST be synchronous and pure — they receive content as a string, not a file path to read. They produce no side effects.
 
@@ -83,6 +85,63 @@ For `CALLS` relations, the adapter MUST extract call expressions from the AST an
 - **Callee**: resolved via the import map passed to `extractRelations`. If the called identifier is in the import map, the callee is the resolved symbol. If the identifier matches a locally defined symbol, the callee is that local symbol.
 
 Calls to identifiers that cannot be resolved (e.g. global built-ins, member expressions like `obj.method()`, dynamic expressions) SHALL be silently dropped — no relation is created, no error is thrown.
+
+### Requirement: Scoped binding fact extraction
+
+`LanguageAdapter` SHALL expose optional synchronous, pure extension points for extracting scoped binding facts and call facts from source content. Built-in adapters for TypeScript/TSX/JavaScript/JSX, Python, Go, and PHP MUST implement these extension points for the deterministic cases defined by this spec.
+
+Adapter-owned fact extraction SHALL include language-specific syntax and semantics only. Shared scope lookup, shadowing, receiver binding, and cross-language candidate filtering belong to the common code-graph pipeline, not to adapter-local full environment implementations.
+
+Adapters SHALL extract deterministic facts for:
+
+- lexical ownership of file, class/type, method, function, and block scopes where the language exposes them clearly
+- typed parameters, including constructor parameters and constructor parameter properties where applicable
+- typed properties and fields
+- explicit construction expressions such as `new X()` or language-equivalent constructor calls that can produce `CONSTRUCTS`
+- receiver identities such as `this`, `self`, `cls`, `parent`, `super`, and language equivalents when deterministic
+- local aliases whose source binding is already deterministic
+- imported or referenced type names that can produce `USES_TYPE` or affect receiver resolution
+- framework-managed bindings that the adapter can identify through deterministic, registry-based rules
+
+Adapters MUST silently drop binding facts whose target depends on runtime-only values, reflection, container identifiers, monkey patching, non-literal dynamic expressions, or whole-program data flow.
+
+### Requirement: Built-in multi-language dependency coverage
+
+Built-in adapters SHALL improve dependency and call extraction for all currently supported built-in languages, not only languages present in the current repository graph.
+
+The TypeScript adapter SHALL detect deterministic dependency signals from:
+
+- static imports, side-effect imports, dynamic `import()` with string-literal specifiers, and CommonJS `require()` with string-literal specifiers
+- constructor calls such as `new ClassName()` as `CONSTRUCTS` candidates
+- constructor parameter type annotations, ordinary parameter type annotations, return type annotations, and field/property type annotations as `USES_TYPE` candidates
+- class fields, constructor parameter properties, and `this` receiver bindings
+- member calls such as `obj.method()` and namespace/static calls such as `ns.fn()` when receiver binding or imports make the target deterministic
+- `extends` and `implements` declarations where targets resolve to known symbols
+
+The Python adapter SHALL detect deterministic dependency signals from:
+
+- `import` and `from ... import ...` declarations, including accessible local names for `import package.module`
+- string-literal `importlib.import_module()` and `__import__()` calls
+- package and submodule layouts that can be resolved without executing Python code, including common `src/` and package `__init__.py` layouts
+- constructor calls as `CONSTRUCTS`, typed parameters or attributes as `USES_TYPE` where annotations are statically available, `self` and `cls` receiver bindings, and class inheritance where targets resolve to known symbols
+
+The Go adapter SHALL detect deterministic dependency signals from:
+
+- standard, grouped, aliased, dot, and blank imports
+- file-to-file `IMPORTS` relations for resolvable package imports
+- selector expressions such as `pkg.Func()` and `obj.Method()` when package aliases or receiver bindings make the target deterministic
+- constructor-like calls and composite literals as `CONSTRUCTS` when they identify resolvable types
+- promoted methods and receiver-related composition only when they can be normalized without speculative inference
+
+The PHP adapter SHALL continue to support require/include, dynamic loader dependencies, loaded-instance calls, and framework-managed bindings, but these deterministic facts SHOULD feed the shared scoped binding model rather than remaining only in adapter-local alias maps.
+
+### Requirement: Detectable dependency boundary
+
+A dependency, type target, constructor target, or call target SHALL be considered detectable only when the adapter and shared resolver can identify it from source text, imports, manifest-backed package identity, qualified-name maps, or deterministic framework rules without executing project code.
+
+Safe static cases and deterministic dynamic cases MAY emit graph relations, including `IMPORTS`, `CALLS`, `CONSTRUCTS`, `USES_TYPE`, and hierarchy relations. Heuristic dynamic cases MUST NOT emit graph relations unless the resolver records enough deterministic evidence to avoid false positives.
+
+Unresolved binding facts, unresolved imports, ambiguous receivers, runtime service identifiers, reflection, monkey patching, and interprocedural alias flow SHALL be dropped from persisted graph output. Implementations MAY expose them through non-persisted diagnostics or test-only debug output.
 
 ### Requirement: Hierarchy extraction
 
@@ -241,6 +300,7 @@ The TypeScript adapter MUST be registered by default when the registry is create
 - LanguageAdapter is an interface, not an abstract class — adapters are stateless
 - Extraction methods are synchronous and pure — they receive content, not file handles
 - `extractSymbolsWithNamespace()` is optional and, when implemented, follows the same synchronous and pure extraction rules
+- `extractBindingFacts?()` and `extractCallFacts?()` are optional for custom adapters, required for built-in adapters, and follow the same synchronous and pure extraction rules
 - getPackageIdentity and resolveQualifiedNameToPath? are the only methods that perform I/O — both are optional and search for a manifest file on disk
 - Resolution methods (resolvePackageFromSpecifier, resolveRelativeImportPath, buildQualifiedName) are synchronous and pure
 - resolveQualifiedNameToPath? SHOULD cache the parsed autoloader map per codeRoot to avoid repeated disk reads during a single indexing run
@@ -254,6 +314,7 @@ The TypeScript adapter MUST be registered by default when the registry is create
 - Tree-sitter query patterns are internal — not part of the public API
 - The TypeScript adapter is always registered by default
 - Hierarchy relations are emitted only when their targets can be resolved deterministically
+- Scoped binding facts and call facts MUST NOT perform fuzzy or runtime inference
 - No dependency on @specd/core
 
 ## Spec Dependencies

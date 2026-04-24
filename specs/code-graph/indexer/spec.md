@@ -66,12 +66,30 @@ Evaluation order when `respectGitignore: true`:
 Extraction proceeds in two passes over the files, using an in-memory `SymbolIndex` rather than store queries during analysis:
 
 - **Pass 1 (Extract symbols, per workspace)** — For each workspace, for each file in chunks: read content, extract symbols via the language adapter, extract `ImportDeclaration` entries, and build `DEFINES` and `EXPORTS` relations. When an adapter provides `extractSymbolsWithNamespace()`, the indexer MAY use it to obtain symbols and namespace information from a single parse; otherwise it uses the adapter's separate extraction methods. Register symbols in the in-memory `SymbolIndex` (indexed by file path and by name). If the adapter provides namespace and qualified-name support, build the qualified name map for that language. No store queries are needed during extraction.
-- **Pass 2 (Resolve imports + CALLS + hierarchy, all workspaces)** — For each file across all workspaces: resolve `ImportDeclaration` entries to symbol ids using the `SymbolIndex` (not the store). All resolution is delegated to the adapter: relative imports via `adapter.resolveRelativeImportPath`, package imports via `adapter.resolvePackageFromSpecifier` (using the `packageName → workspaceName` map built from `adapter.getPackageIdentity`), and qualified names via the namespace map (built using `adapter.buildQualifiedName`). For `ImportDeclaration` entries with `isRelative: false` whose specifier is not resolved via the qualified name map, and where the adapter implements `resolveQualifiedNameToPath`, the indexer SHALL call `adapter.resolveQualifiedNameToPath(specifier, codeRoot, repoRoot)` and, if a path is returned, emit a file-to-file `IMPORTS` relation. Build the import map and call `extractRelations()` with it to get `IMPORTS`, `CALLS`, `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES` relations for code-file analysis.
+- **Pass 2 (Resolve imports + scoped bindings + CALLS + CONSTRUCTS + USES_TYPE + hierarchy, all workspaces)** — For each file across all workspaces: resolve `ImportDeclaration` entries to symbol ids using the `SymbolIndex` (not the store). All import and package resolution is delegated to the adapter: relative imports via `adapter.resolveRelativeImportPath`, package imports via `adapter.resolvePackageFromSpecifier` (using the `packageName -> workspaceName` map built from `adapter.getPackageIdentity`), and qualified names via the namespace map (built using `adapter.buildQualifiedName`). For `ImportDeclaration` entries with `isRelative: false` whose specifier is not resolved via the qualified name map, and where the adapter implements `resolveQualifiedNameToPath`, the indexer SHALL call `adapter.resolveQualifiedNameToPath(specifier, codeRoot, repoRoot)` and, if a path is returned, emit a file-to-file `IMPORTS` relation. Build the import map, collect adapter binding facts and call facts, build the scoped binding environment, and then resolve `IMPORTS`, `CALLS`, `CONSTRUCTS`, `USES_TYPE`, `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES` relations for code-file analysis. Existing adapter `extractRelations()` output remains valid, but shared scoped resolution owns cross-language receiver, type-reference, constructor, and call-candidate lookup.
 - **Specs (per workspace)** — For each workspace: call the `specs()` callback to get discovered specs. Assign the workspace name to each spec.
 - **Store commit** — After all passes complete, call `GraphStore.bulkLoad()` once with the files, symbols, specs, and relations accumulated for the run. Concrete backends MAY use native bulk import mechanisms internally, but the indexer remains coupled only to the abstract graph-store contract.
 - **Search readiness** — After bulk load, call `GraphStore.rebuildFtsIndexes()` so the active backend can bring its search indexes into a query-ready state when needed.
 
-This two-pass approach ensures all symbols exist in the index before import, call, and hierarchy resolution, while avoiding store queries during analysis.
+This two-pass approach ensures all symbols exist in the index before import, binding, call, and hierarchy resolution, while avoiding store queries during analysis.
+
+### Requirement: Scoped binding environment resolution
+
+During Pass 2, the indexer SHALL build a per-file scoped binding environment from adapter-provided binding facts, call facts, symbols, import declarations, resolved import maps, namespace maps, and the in-memory `SymbolIndex`.
+
+The scoped binding environment builder SHALL be shared code-graph logic, not adapter-local full environment logic. It SHALL provide deterministic lookup for:
+
+- source location to enclosing scope
+- lexical shadowing
+- local, parameter, property/field, class-managed, inherited, file/global, framework-managed, and imported type bindings
+- receiver identities such as `this`, `self`, `cls`, `parent`, `super`, and language equivalents when represented by adapter facts
+- free call, member call, static call, and constructor call candidates
+
+The indexer SHALL use the environment to resolve `CALLS`, `CONSTRUCTS`, `USES_TYPE`, `IMPORTS`, `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES` only when the target can be selected deterministically. It MUST NOT query the store during analysis and MUST NOT add language-specific resolution rules to `IndexCodeGraph`.
+
+The indexer SHALL drop any resolved symbol-to-symbol dependency relation whose source symbol id equals its target symbol id before staging relations for persistence.
+
+Unresolved or ambiguous binding facts SHALL NOT create persisted relations. The indexer MAY retain non-persisted diagnostics for tests, debugging, or result reporting if doing so does not change the graph-store contract.
 
 ### Requirement: Chunked processing
 
@@ -161,6 +179,10 @@ Spec indexing runs as an additional phase after source file indexing (Phase 1 an
 - Per-file errors are collected, not thrown — only infrastructure errors abort the run
 - Spec indexing uses the workspace's `specs()` callback exclusively — no filesystem fallback
 - Pass 2 depends on Pass 1 completing for ALL workspaces — they are not interleaved per workspace
+- The scoped binding environment builder MUST use only in-memory pass data and adapter-provided facts; it MUST NOT query the graph store during analysis
+- `IndexCodeGraph` MUST NOT contain language-specific binding or call-resolution rules
+- Unresolved scoped binding facts MUST NOT produce persisted graph relations
+- Resolved self-relations where the source symbol id equals the target symbol id MUST NOT be persisted
 
 ## Examples
 

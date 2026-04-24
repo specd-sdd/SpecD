@@ -14,7 +14,7 @@
     {
       "requirement": "Command signature",
       "rules": [
-        "```text\nspecd graph impact [--file <path>] [--symbol <name>] [--changes <files...>] [--direction upstream|downstream|both] [--depth <n>] [--config <path> | --path <path>] [--format text|json|toon]\n```\n\nExactly one of `--file`, `--symbol`, or `--changes` must be provided.\n\n- `--file` — analyze impact of a single file\n- `--symbol` — analyze impact of a symbol by name. If multiple symbols match, all are analyzed and results listed\n- `--changes` — detect impact of changes to multiple files (variadic; accepts multiple space-separated paths)\n- `--direction` — optional; analysis direction, defaults to `upstream`. Values:\n  - `upstream` — find symbols and files that depend on the target\n  - `downstream` — find symbols and files that the target depends on\n  - `both` — combined upstream and downstream analysis\n- `--depth` — optional; maximum traversal depth, defaults to `3`. Must be a positive integer. Passed through to `analyzeImpact`/`analyzeFileImpact` as `maxDepth`\n- `--config <path>` — optional; explicit path to `specd.yaml`, matching the standard CLI meaning\n- `--path <path>` — optional; repo-root bootstrap mode\n- `--format text|json|toon` — optional; output format, defaults to `text`\n\n`--config` and `--path` are mutually exclusive.\n\n`--path` and no-config fallback are bootstrap mechanisms for setup and early repository exploration, not the intended steady-state mode for configured projects."
+        "```text\nspecd graph impact [--file <path>] [--symbol <name>] [--changes <files...>] [--direction dependents|dependencies|upstream|downstream|both] [--depth <n>] [--config <path> | --path <path>] [--format text|json|toon]\n```\n\nExactly one of `--file`, `--symbol`, or `--changes` must be provided.\n\n- `--file` — analyze impact of a single file\n- `--symbol` — analyze impact of a symbol by name. If multiple symbols match, all are analyzed and results listed\n- `--changes` — detect impact of changes to multiple files (variadic; accepts multiple space-separated paths)\n- `--direction` — optional; analysis direction, defaults to `upstream`. Values:\n  - `dependents` — find symbols and files that depend on the target; alias of `upstream`\n  - `dependencies` — find symbols and files that the target depends on; alias of `downstream`\n  - `upstream` — compatibility value for `dependents`\n  - `downstream` — compatibility value for `dependencies`\n  - `both` — combined dependents and dependencies analysis\n- `--depth` — optional; maximum traversal depth, defaults to `3`. Must be a positive integer. Passed through to `analyzeImpact`/`analyzeFileImpact` as `maxDepth`\n- `--config <path>` — optional; explicit path to `specd.yaml`, matching the standard CLI meaning\n- `--path <path>` — optional; repo-root bootstrap mode\n- `--format text|json|toon` — optional; output format, defaults to `text`\n\nThe CLI SHALL normalize `dependents` to `upstream` and `dependencies` to `downstream` before calling `analyzeImpact()` or `analyzeFileImpact()`. Invalid direction values SHALL fail with a CLI usage error before opening the graph provider.\n\nUser-facing documentation for this command MUST prefer the concrete aliases `dependents` and `dependencies` before the compatibility graph-theory terms `upstream` and `downstream`. Documentation MAY mention the compatibility values, but it MUST NOT describe `downstream` as dependents.\n\n`--config` and `--path` are mutually exclusive.\n\n`--path` and no-config fallback are bootstrap mechanisms for setup and early repository exploration, not the intended steady-state mode for configured projects."
       ]
     },
     {
@@ -44,7 +44,7 @@
     {
       "requirement": "Output format",
       "rules": [
-        "**File impact** in `text` mode:\n\n```text\nImpact analysis for src/auth.ts (depth=5)\n  Risk level:       HIGH\n  Direct deps:      6\n  Indirect deps:    3\n  Transitive deps:  1\n  Affected files:   8\n\nAffected files:\n  src/login.ts: handleLogin:12 (d=1), validateSession:45 (d=1)\n  src/session.ts: createSession:8 (d=2)\n\nPer-symbol breakdown:\n  src/auth.ts:function:validate:10:0  risk=HIGH direct=4\n  src/auth.ts:class:AuthService:20:0  risk=MEDIUM direct=2\n```\n\nWhen affected symbols are available, each file line shows the symbols grouped after a colon with depth indicators: `path: name:line (d=N), name:line (d=N)`. Files reached only via IMPORTS (file-level) are listed without symbols. The depth value `d=N` indicates the distance from the analysis target (1 = direct, 2 = indirect, 3+ = transitive).\n\nWhen `--depth` is not the default (3), the header line includes `(depth=N)` to show the configured depth.\n\n**Symbol impact** in `text` mode:\n\n```text\nImpact analysis for function createKernel (packages/core/src/composition/kernel.ts:147) (depth=5)\n  Risk level:       CRITICAL\n  Direct deps:      1\n  Indirect deps:    1\n  Transitive deps:  38\n  Affected files:   40\n\nAffected files:\n  packages/cli/src/kernel.ts: wireKernel:5 (d=1)\n  ...\n```\n\nWhen multiple symbols match, each analysis is listed sequentially.\n\n**Change detection** in `text` mode outputs the summary string from `ChangeDetectionResult.summary` followed by the affected files list.\n\nIn `json` or `toon` mode, the full result object is output as-is. The `AffectedSymbol` entries in JSON include the `depth` field."
+        "**File impact** in `text` mode:\n\n```text\nImpact analysis for src/auth.ts (depth=5)\n  Risk level:       HIGH\n  Direct deps:      6\n  Indirect deps:    3\n  Transitive deps:  1\n  Affected files:   8\n\nAffected files:\n  src/login.ts: handleLogin:12 (d=1), validateSession:45 (d=1)\n  src/session.ts: createSession:8 (d=2)\n\nPer-symbol breakdown:\n  src/auth.ts:function:validate:10:0  risk=HIGH direct=4\n  src/auth.ts:class:AuthService:20:0  risk=MEDIUM direct=2\n```\n\nWhen affected symbols are available, each file line shows the symbols grouped after a colon with depth indicators: `path: name:line (d=N), name:line (d=N)`. Files reached only via IMPORTS (file-level) are listed without symbols. The depth value `d=N` indicates the distance from the analysis target (1 = direct, 2 = indirect, 3+ = transitive).\n\nWhen `--direction` is omitted or set to `dependents` / `upstream`, human-facing documentation and help text SHOULD explain these counts as dependent counts. When `--direction dependencies` / `downstream` is used, documentation SHOULD explain that the same fields represent dependencies reached from the target.\n\nWhen `--depth` is not the default (3), the header line includes `(depth=N)` to show the configured depth.\n\n**Symbol impact** in `text` mode:\n\n```text\nImpact analysis for function createKernel (packages/core/src/composition/kernel.ts:147) (depth=5)\n  Risk level:       CRITICAL\n  Direct deps:      1\n  Indirect deps:    1\n  Transitive deps:  38\n  Affected files:   40\n\nAffected files:\n  packages/cli/src/kernel.ts: wireKernel:5 (d=1)\n  ...\n```\n\nWhen multiple symbols match, each analysis is listed sequentially.\n\n**Change detection** in `text` mode outputs the summary string from `ChangeDetectionResult.summary` followed by the affected files list.\n\nIn `json` or `toon` mode, the full result object is output as-is. The `AffectedSymbol` entries in JSON include the `depth` field."
       ]
     },
     {
@@ -80,6 +80,48 @@
       "then": [
         "config discovery is ignored",
         "AND the command analyzes impact against a synthetic single workspace default rooted at /tmp/repo"
+      ]
+    },
+    {
+      "requirement": "Command signature",
+      "name": "Direction terminology distinguishes dependents from dependencies",
+      "when": ["graph impact command documentation or help text describes --direction"],
+      "then": [
+        "dependents is described as symbols and files that depend on the target",
+        "AND dependencies is described as symbols and files the target depends on",
+        "AND upstream is documented as a compatibility alias for dependents",
+        "AND downstream is documented as a compatibility alias for dependencies",
+        "AND documentation does not describe downstream as dependents"
+      ]
+    },
+    {
+      "requirement": "Command signature",
+      "name": "Dependents direction alias maps to upstream",
+      "given": ["src/auth.ts is indexed in the graph with upstream dependents"],
+      "when": ["specd graph impact --file src/auth.ts --direction dependents is run"],
+      "then": [
+        "the command analyzes the same dependency direction as --direction upstream",
+        "AND the process exits with code 0"
+      ]
+    },
+    {
+      "requirement": "Command signature",
+      "name": "Dependencies direction alias maps to downstream",
+      "given": ["src/utils.ts is indexed with downstream dependencies"],
+      "when": ["specd graph impact --file src/utils.ts --direction dependencies is run"],
+      "then": [
+        "the command analyzes the same dependency direction as --direction downstream",
+        "AND the process exits with code 0"
+      ]
+    },
+    {
+      "requirement": "Command signature",
+      "name": "Invalid direction fails before provider access",
+      "when": ["specd graph impact --file src/auth.ts --direction sideways is run"],
+      "then": [
+        "the command exits with code 1",
+        "AND stderr explains that the direction value is invalid",
+        "AND no graph provider is opened"
       ]
     },
     {
@@ -246,6 +288,17 @@
       ]
     },
     {
+      "requirement": "Output format",
+      "name": "Human-facing count labels match direction",
+      "when": [
+        "graph impact documentation explains text output counts for omitted, dependents, or upstream direction"
+      ],
+      "then": [
+        "the counts are explained as dependent counts",
+        "AND when documentation explains --direction dependencies or --direction downstream, the same fields are explained as dependency counts"
+      ]
+    },
+    {
       "requirement": "Error cases",
       "name": "No selector provided",
       "when": ["specd graph impact is run without any of --file, --symbol, or --changes"],
@@ -299,8 +352,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:5a7b34316651b4ac886b2cd82a47241cc33ec68c43a9c8a7cfbe993a86ed27e3",
-    "verify.md": "sha256:b97b8d9d046fc1a8511c9d183c5fc590d39cba609fcc18d172b18231024eeae2"
+    "spec.md": "sha256:888941c39de6e6319df39e9104d7d9a0413ce32fc6b8c0f97138b05dfb5e72b3",
+    "verify.md": "sha256:fba3780b01efbc8cb3a297ace361b5087276b12d24ecd106d5ab562a3c39ba4f"
   },
   "generatedBy": "core"
 }

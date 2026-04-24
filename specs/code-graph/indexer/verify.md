@@ -163,6 +163,58 @@
 - **THEN** those hierarchy relations are accumulated with the other extracted relations
 - **AND** they are included in the single bulk load
 
+#### Scenario: Binding facts are resolved after import maps
+
+- **GIVEN** a file has imported type names and adapter binding facts that reference those names
+- **WHEN** Pass 2 runs
+- **THEN** import declarations are resolved before scoped binding lookup uses those imported type candidates
+- **AND** no store query is performed during binding resolution
+
+#### Scenario: USES_TYPE and CONSTRUCTS relations are accumulated in Pass 2
+
+- **GIVEN** scoped binding resolution returns `USES_TYPE` and `CONSTRUCTS` relations for a file
+- **WHEN** Pass 2 runs
+- **THEN** those relations are accumulated with imports, calls, and hierarchy relations
+- **AND** they are included in the single bulk load
+
+### Requirement: Scoped binding environment resolution
+
+#### Scenario: Constructor injection produces upstream dependent impact
+
+- **GIVEN** `NodeHookRunner` has a constructor parameter typed as `TemplateExpander`
+- **AND** `TemplateExpander` resolves to a class symbol in the in-memory `SymbolIndex`
+- **WHEN** Pass 2 builds scoped binding environments and resolves relations
+- **THEN** a `USES_TYPE` relation is emitted toward `TemplateExpander`
+- **AND** upstream impact for `TemplateExpander` includes the `NodeHookRunner` dependent
+
+#### Scenario: Constructor call resolves through shared environment
+
+- **GIVEN** a composition function contains `new TemplateExpander(builtins)`
+- **AND** the constructed class resolves to a symbol
+- **WHEN** Pass 2 resolves call facts
+- **THEN** a `CONSTRUCTS` relation is emitted from the composition function to the `TemplateExpander` target
+
+#### Scenario: Ambiguous receiver emits no relation
+
+- **GIVEN** a call fact for `service.run()`
+- **AND** the scoped binding environment has no deterministic binding for `service`
+- **WHEN** Pass 2 resolves call facts
+- **THEN** no `CALLS` relation is emitted for that call
+
+#### Scenario: Resolved self-relation is dropped before staging
+
+- **GIVEN** scoped binding resolution returns a dependency where `sourceSymbolId` equals `targetSymbolId`
+- **WHEN** Pass 2 converts resolved dependencies into graph relations
+- **THEN** that dependency is not staged for `bulkLoad()`
+- **AND** no self-edge is persisted in the graph store
+
+#### Scenario: Indexer stays language-agnostic
+
+- **GIVEN** TypeScript, Python, Go, and PHP files provide binding facts with different receiver spellings
+- **WHEN** Pass 2 builds scoped binding environments
+- **THEN** receiver lookup uses normalized adapter facts
+- **AND** `IndexCodeGraph` does not branch on concrete language identifiers for binding semantics
+
 ### Requirement: Chunked processing
 
 #### Scenario: Files grouped by byte budget

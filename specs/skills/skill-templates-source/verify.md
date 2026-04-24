@@ -17,6 +17,26 @@
 - **THEN** it contains `specd/`, `specd-archive/`, `specd-design/`, `specd-implement/`, `specd-new/`, `specd-metadata/`, `specd-compliance/`, and `specd-verify/`
 - **AND** it contains `shared.md`
 
+### Requirement: Graph impact terminology in workflow templates
+
+#### Scenario: Workflow templates use dependents for blast-radius queries
+
+- **WHEN** workflow skill templates instruct an agent to find the blast radius of changing a symbol or file
+- **THEN** they describe the query as dependents or use `--direction dependents`
+- **AND** they do not call this query downstream impact or downstream dependents
+
+#### Scenario: Workflow templates reserve downstream for dependencies
+
+- **WHEN** workflow skill templates mention `--direction downstream`
+- **THEN** they describe it as dependencies: symbols and files the target depends on
+- **AND** combined analysis is described as both dependents and dependencies
+
+#### Scenario: Workflow templates prefer CLI direction aliases
+
+- **WHEN** workflow skill templates include concrete `specd graph impact --direction` examples for dependents or dependencies queries
+- **THEN** they prefer `--direction dependents` and `--direction dependencies`
+- **AND** `--direction upstream` and `--direction downstream` appear only as compatibility wording when needed
+
 ### Requirement: Frontmatter source
 
 #### Scenario: Runtime metadata is sourced from canonical contracts

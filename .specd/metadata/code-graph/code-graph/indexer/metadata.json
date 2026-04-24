@@ -33,7 +33,13 @@
     {
       "requirement": "Two-pass extraction with in-memory index",
       "rules": [
-        "Extraction proceeds in two passes over the files, using an in-memory `SymbolIndex` rather than store queries during analysis:\n\n- **Pass 1 (Extract symbols, per workspace)** — For each workspace, for each file in chunks: read content, extract symbols via the language adapter, extract `ImportDeclaration` entries, and build `DEFINES` and `EXPORTS` relations. When an adapter provides `extractSymbolsWithNamespace()`, the indexer MAY use it to obtain symbols and namespace information from a single parse; otherwise it uses the adapter's separate extraction methods. Register symbols in the in-memory `SymbolIndex` (indexed by file path and by name). If the adapter provides namespace and qualified-name support, build the qualified name map for that language. No store queries are needed during extraction.\n- **Pass 2 (Resolve imports + CALLS + hierarchy, all workspaces)** — For each file across all workspaces: resolve `ImportDeclaration` entries to symbol ids using the `SymbolIndex` (not the store). All resolution is delegated to the adapter: relative imports via `adapter.resolveRelativeImportPath`, package imports via `adapter.resolvePackageFromSpecifier` (using the `packageName → workspaceName` map built from `adapter.getPackageIdentity`), and qualified names via the namespace map (built using `adapter.buildQualifiedName`). For `ImportDeclaration` entries with `isRelative: false` whose specifier is not resolved via the qualified name map, and where the adapter implements `resolveQualifiedNameToPath`, the indexer SHALL call `adapter.resolveQualifiedNameToPath(specifier, codeRoot, repoRoot)` and, if a path is returned, emit a file-to-file `IMPORTS` relation. Build the import map and call `extractRelations()` with it to get `IMPORTS`, `CALLS`, `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES` relations for code-file analysis.\n- **Specs (per workspace)** — For each workspace: call the `specs()` callback to get discovered specs. Assign the workspace name to each spec.\n- **Store commit** — After all passes complete, call `GraphStore.bulkLoad()` once with the files, symbols, specs, and relations accumulated for the run. Concrete backends MAY use native bulk import mechanisms internally, but the indexer remains coupled only to the abstract graph-store contract.\n- **Search readiness** — After bulk load, call `GraphStore.rebuildFtsIndexes()` so the active backend can bring its search indexes into a query-ready state when needed.\n\nThis two-pass approach ensures all symbols exist in the index before import, call, and hierarchy resolution, while avoiding store queries during analysis."
+        "Extraction proceeds in two passes over the files, using an in-memory `SymbolIndex` rather than store queries during analysis:\n\n- **Pass 1 (Extract symbols, per workspace)** — For each workspace, for each file in chunks: read content, extract symbols via the language adapter, extract `ImportDeclaration` entries, and build `DEFINES` and `EXPORTS` relations. When an adapter provides `extractSymbolsWithNamespace()`, the indexer MAY use it to obtain symbols and namespace information from a single parse; otherwise it uses the adapter's separate extraction methods. Register symbols in the in-memory `SymbolIndex` (indexed by file path and by name). If the adapter provides namespace and qualified-name support, build the qualified name map for that language. No store queries are needed during extraction.\n- **Pass 2 (Resolve imports + scoped bindings + CALLS + CONSTRUCTS + USES\\_TYPE + hierarchy, all workspaces)** — For each file across all workspaces: resolve `ImportDeclaration` entries to symbol ids using the `SymbolIndex` (not the store). All import and package resolution is delegated to the adapter: relative imports via `adapter.resolveRelativeImportPath`, package imports via `adapter.resolvePackageFromSpecifier` (using the `packageName -> workspaceName` map built from `adapter.getPackageIdentity`), and qualified names via the namespace map (built using `adapter.buildQualifiedName`). For `ImportDeclaration` entries with `isRelative: false` whose specifier is not resolved via the qualified name map, and where the adapter implements `resolveQualifiedNameToPath`, the indexer SHALL call `adapter.resolveQualifiedNameToPath(specifier, codeRoot, repoRoot)` and, if a path is returned, emit a file-to-file `IMPORTS` relation. Build the import map, collect adapter binding facts and call facts, build the scoped binding environment, and then resolve `IMPORTS`, `CALLS`, `CONSTRUCTS`, `USES_TYPE`, `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES` relations for code-file analysis. Existing adapter `extractRelations()` output remains valid, but shared scoped resolution owns cross-language receiver, type-reference, constructor, and call-candidate lookup.\n- **Specs (per workspace)** — For each workspace: call the `specs()` callback to get discovered specs. Assign the workspace name to each spec.\n- **Store commit** — After all passes complete, call `GraphStore.bulkLoad()` once with the files, symbols, specs, and relations accumulated for the run. Concrete backends MAY use native bulk import mechanisms internally, but the indexer remains coupled only to the abstract graph-store contract.\n- **Search readiness** — After bulk load, call `GraphStore.rebuildFtsIndexes()` so the active backend can bring its search indexes into a query-ready state when needed.\n\nThis two-pass approach ensures all symbols exist in the index before import, binding, call, and hierarchy resolution, while avoiding store queries during analysis."
+      ]
+    },
+    {
+      "requirement": "Scoped binding environment resolution",
+      "rules": [
+        "During Pass 2, the indexer SHALL build a per-file scoped binding environment from adapter-provided binding facts, call facts, symbols, import declarations, resolved import maps, namespace maps, and the in-memory `SymbolIndex`.\n\nThe scoped binding environment builder SHALL be shared code-graph logic, not adapter-local full environment logic. It SHALL provide deterministic lookup for:\n\n- source location to enclosing scope\n- lexical shadowing\n- local, parameter, property/field, class-managed, inherited, file/global, framework-managed, and imported type bindings\n- receiver identities such as `this`, `self`, `cls`, `parent`, `super`, and language equivalents when represented by adapter facts\n- free call, member call, static call, and constructor call candidates\n\nThe indexer SHALL use the environment to resolve `CALLS`, `CONSTRUCTS`, `USES_TYPE`, `IMPORTS`, `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES` only when the target can be selected deterministically. It MUST NOT query the store during analysis and MUST NOT add language-specific resolution rules to `IndexCodeGraph`.\n\nThe indexer SHALL drop any resolved symbol-to-symbol dependency relation whose source symbol id equals its target symbol id before staging relations for persistence.\n\nUnresolved or ambiguous binding facts SHALL NOT create persisted relations. The indexer MAY retain non-persisted diagnostics for tests, debugging, or result reporting if doing so does not change the graph-store contract."
       ]
     },
     {
@@ -82,7 +88,11 @@
     "Pass 2 depends on Pass 1 completing for all files — they are not interleaved per file",
     "Per-file errors are collected, not thrown — only infrastructure errors abort the run",
     "Spec indexing uses the workspace's specs() callback exclusively — no filesystem fallback",
-    "Pass 2 depends on Pass 1 completing for ALL workspaces — they are not interleaved per workspace"
+    "Pass 2 depends on Pass 1 completing for ALL workspaces — they are not interleaved per workspace",
+    "The scoped binding environment builder MUST use only in-memory pass data and adapter-provided facts; it MUST NOT query the graph store during analysis",
+    "IndexCodeGraph MUST NOT contain language-specific binding or call-resolution rules",
+    "Unresolved scoped binding facts MUST NOT produce persisted graph relations",
+    "Resolved self-relations where the source symbol id equals the target symbol id MUST NOT be persisted"
   ],
   "scenarios": [
     {
@@ -301,6 +311,87 @@
       ]
     },
     {
+      "requirement": "Two-pass extraction with in-memory index",
+      "name": "Binding facts are resolved after import maps",
+      "given": [
+        "a file has imported type names and adapter binding facts that reference those names"
+      ],
+      "when": ["Pass 2 runs"],
+      "then": [
+        "import declarations are resolved before scoped binding lookup uses those imported type candidates",
+        "AND no store query is performed during binding resolution"
+      ]
+    },
+    {
+      "requirement": "Two-pass extraction with in-memory index",
+      "name": "USES_TYPE and CONSTRUCTS relations are accumulated in Pass 2",
+      "given": ["scoped binding resolution returns USES_TYPE and CONSTRUCTS relations for a file"],
+      "when": ["Pass 2 runs"],
+      "then": [
+        "those relations are accumulated with imports, calls, and hierarchy relations",
+        "AND they are included in the single bulk load"
+      ]
+    },
+    {
+      "requirement": "Scoped binding environment resolution",
+      "name": "Constructor injection produces upstream dependent impact",
+      "given": [
+        "NodeHookRunner has a constructor parameter typed as TemplateExpander",
+        "AND TemplateExpander resolves to a class symbol in the in-memory SymbolIndex"
+      ],
+      "when": ["Pass 2 builds scoped binding environments and resolves relations"],
+      "then": [
+        "a USES_TYPE relation is emitted toward TemplateExpander",
+        "AND upstream impact for TemplateExpander includes the NodeHookRunner dependent"
+      ]
+    },
+    {
+      "requirement": "Scoped binding environment resolution",
+      "name": "Constructor call resolves through shared environment",
+      "given": [
+        "a composition function contains new TemplateExpander(builtins)",
+        "AND the constructed class resolves to a symbol"
+      ],
+      "when": ["Pass 2 resolves call facts"],
+      "then": [
+        "a CONSTRUCTS relation is emitted from the composition function to the TemplateExpander target"
+      ]
+    },
+    {
+      "requirement": "Scoped binding environment resolution",
+      "name": "Ambiguous receiver emits no relation",
+      "given": [
+        "a call fact for service.run()",
+        "AND the scoped binding environment has no deterministic binding for service"
+      ],
+      "when": ["Pass 2 resolves call facts"],
+      "then": ["no CALLS relation is emitted for that call"]
+    },
+    {
+      "requirement": "Scoped binding environment resolution",
+      "name": "Resolved self-relation is dropped before staging",
+      "given": [
+        "scoped binding resolution returns a dependency where sourceSymbolId equals targetSymbolId"
+      ],
+      "when": ["Pass 2 converts resolved dependencies into graph relations"],
+      "then": [
+        "that dependency is not staged for bulkLoad()",
+        "AND no self-edge is persisted in the graph store"
+      ]
+    },
+    {
+      "requirement": "Scoped binding environment resolution",
+      "name": "Indexer stays language-agnostic",
+      "given": [
+        "TypeScript, Python, Go, and PHP files provide binding facts with different receiver spellings"
+      ],
+      "when": ["Pass 2 builds scoped binding environments"],
+      "then": [
+        "receiver lookup uses normalized adapter facts",
+        "AND IndexCodeGraph does not branch on concrete language identifiers for binding semantics"
+      ]
+    },
+    {
       "requirement": "Chunked processing",
       "name": "Files grouped by byte budget",
       "given": ["workspaces with files totaling 50 MB and a chunk budget of 20 MB"],
@@ -493,8 +584,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:686e823999f763f39bc550cf874b985496171cdfa5bf2e17e74a90db78cf6748",
-    "verify.md": "sha256:08d81a65d8431770897f04d95486147c053351c016d740fff7b0ac2d272b8b6b"
+    "spec.md": "sha256:450dd9792903f1048b4e8ee6e87665e3a69add3f009d8449c75aaab3c4d46fb1",
+    "verify.md": "sha256:8024c2b4ba888ea26601774231f7f68f602e8e1badc4c28821ec280bacc56a24"
   },
   "generatedBy": "core"
 }

@@ -33,7 +33,7 @@
     {
       "requirement": "Relation types",
       "rules": [
-        "Relations between nodes SHALL be represented as typed edges. Each relation has a `source`, `target`, and `type`. The following relation types are defined:\n\n| Type         | Source | Target | Meaning                                                   | Phase |\n| ------------ | ------ | ------ | --------------------------------------------------------- | ----- |\n| `IMPORTS`    | File   | File   | Source file imports from target file                      | v1.5  |\n| `DEFINES`    | File   | Symbol | File contains the symbol's declaration                    | v2    |\n| `CALLS`      | Symbol | Symbol | Source symbol invokes target symbol                       | v2    |\n| `EXPORTS`    | File   | Symbol | File exports the symbol as public API                     | v2    |\n| `DEPENDS_ON` | Spec   | Spec   | Spec depends on target spec                               | v1.5  |\n| `COVERS`     | Spec   | File   | Spec covers the target file                               | v2+   |\n| `EXTENDS`    | Symbol | Symbol | Source type extends or inherits from target type          | v2    |\n| `IMPLEMENTS` | Symbol | Symbol | Source type fulfills or implements target contract/type   | v2    |\n| `OVERRIDES`  | Symbol | Symbol | Source method overrides or concretely fulfills target one | v2    |\n\nRelations are directional. `IMPORTS`, `DEFINES`, `CALLS`, `EXPORTS`, `DEPENDS_ON`, `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES` are populated by the indexer. `COVERS` is populated by spec-to-code mapping (deferred to v2+).\n\nThe hierarchy model for this iteration is intentionally limited to `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES`. Language-specific constructs MAY be normalized into one of those relations when doing so preserves useful impact, hotspot, and code-understanding semantics. Constructs that cannot be normalized without materially distorting their meaning are omitted rather than introducing new base relation types in this iteration."
+        "Relations between nodes SHALL be represented as typed edges. Each relation has a `source`, `target`, and `type`. The following relation types are defined:\n\n| Type         | Source | Target | Meaning                                                   | Phase |\n| ------------ | ------ | ------ | --------------------------------------------------------- | ----- |\n| `IMPORTS`    | File   | File   | Source file imports from target file                      | v1.5  |\n| `DEFINES`    | File   | Symbol | File contains the symbol's declaration                    | v2    |\n| `CALLS`      | Symbol | Symbol | Source symbol invokes target symbol                       | v2    |\n| `CONSTRUCTS` | Symbol | Symbol | Source symbol constructs or instantiates target type      | v2    |\n| `USES_TYPE`  | Symbol | Symbol | Source symbol references target type in a static signature or binding | v2 |\n| `EXPORTS`    | File   | Symbol | File exports the symbol as public API                     | v2    |\n| `DEPENDS_ON` | Spec   | Spec   | Spec depends on target spec                               | v1.5  |\n| `COVERS`     | Spec   | File   | Spec covers the target file                               | v2+   |\n| `EXTENDS`    | Symbol | Symbol | Source type extends or inherits from target type          | v2    |\n| `IMPLEMENTS` | Symbol | Symbol | Source type fulfills or implements target contract/type   | v2    |\n| `OVERRIDES`  | Symbol | Symbol | Source method overrides or concretely fulfills target one | v2    |\n\nRelations are directional. `IMPORTS`, `DEFINES`, `CALLS`, `CONSTRUCTS`, `USES_TYPE`, `EXPORTS`, `DEPENDS_ON`, `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES` are populated by the indexer. `COVERS` is populated by spec-to-code mapping (deferred to v2+).\n\n`CONSTRUCTS` is distinct from `CALLS`: it records instantiation or constructor-like dependency, not an ordinary invocation. `USES_TYPE` is distinct from `CALLS`: it records static type dependency in signatures, annotations, fields, or deterministic binding declarations.\n\nThe hierarchy model for this iteration remains limited to `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES`. Language-specific constructs MAY be normalized into one of those relations when doing so preserves useful impact, hotspot, and code-understanding semantics. Constructs that cannot be normalized without materially distorting their meaning are omitted rather than introducing additional base relation types in this iteration."
       ]
     },
     {
@@ -51,7 +51,19 @@
     {
       "requirement": "Import declaration",
       "rules": [
-        "An `ImportDeclaration` SHALL represent a parsed import statement extracted from source code. It contains:\n\n- **`localName`** (`string`) — the identifier used locally in the importing file\n- **`originalName`** (`string`) — the identifier as declared in the source module\n- **`specifier`** (`string`) — the raw import specifier string\n- **`isRelative`** (`boolean`) — true if the specifier is a relative path\n\n`ImportDeclaration` is a pure syntactic representation — it contains no resolution information. The indexer resolves specifiers to files and symbol ids using the adapter registry and monorepo package map."
+        "An `ImportDeclaration` SHALL represent a parsed import statement or deterministic import expression extracted from source code. It contains:\n\n- **`localName`** (`string`) — the identifier used locally in the importing file. File-only import forms use an empty string.\n- **`originalName`** (`string`) — the identifier as declared in the source module. File-only import forms use an empty string.\n- **`specifier`** (`string`) — the raw import specifier string.\n- **`isRelative`** (`boolean`) — true if the specifier is a relative path.\n- **`kind`** (`'named' | 'namespace' | 'default' | 'side-effect' | 'dynamic' | 'require' | 'blank' | undefined`) — optional import form metadata. `undefined` is equivalent to `named` for backwards compatibility.\n\n`ImportDeclaration` is a pure syntactic representation — it contains no resolution information. The indexer resolves specifiers to files and symbol ids using the adapter registry and monorepo package map.\n\nSide-effect imports, string-literal dynamic imports, CommonJS `require()` calls, and Go blank imports MUST be representable as file-only import declarations without creating fake local symbols."
+      ]
+    },
+    {
+      "requirement": "Scoped binding model",
+      "rules": [
+        "The symbol model SHALL define immutable, language-agnostic value objects for deterministic scoped binding and call resolution. These value objects are analysis inputs and intermediate results that normalize source-language facts before they are converted into persisted graph relations.\n\nThe shared model SHALL represent:\n\n- **Scope ownership**: file, class/type, method, function, and block scopes when the adapter can identify them deterministically.\n- **Binding facts**: source-location-aware facts that bind a visible name or receiver to a declared, constructed, imported, inherited, framework-managed, or otherwise deterministic target type or symbol candidate.\n- **Binding source kind**: local, parameter, property/field, class-managed, inherited, file/global, imported type, framework-managed, constructor call, and alias-from-known-binding.\n- **Call facts**: source-location-aware facts for free calls, member calls, static calls, and constructor calls, including the enclosing caller symbol when known.\n- **Resolution metadata**: deterministic reason strings and optional confidence or diagnostic metadata that explain why a binding or call candidate was accepted or dropped.\n\nBinding facts and call facts MUST be immutable value objects with `readonly` properties. They MUST use workspace-prefixed file paths and symbol IDs when they reference graph entities.\n\nThe first iteration SHALL remain conservative. It MUST NOT model arbitrary runtime state, reflection, runtime container identifiers, interprocedural propagation, or whole-program data flow."
+      ]
+    },
+    {
+      "requirement": "Scoped binding relation output",
+      "rules": [
+        "Scoped binding and call resolution SHALL emit deterministic graph relations using the persisted relation vocabulary:\n\n- `IMPORTS` for file-level dependencies that resolve to files.\n- `CALLS` for deterministic invocations from one symbol to another callable symbol.\n- `CONSTRUCTS` for deterministic constructor or constructor-like instantiation from an enclosing symbol to the constructed class/type symbol.\n- `USES_TYPE` for deterministic type references from an enclosing symbol to a referenced type, interface, enum, or class symbol.\n- `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES` for deterministic hierarchy and method-fulfillment relationships.\n\nConstructor injection, typed parameters, typed return values, typed properties/fields, and imported type annotations SHALL emit `USES_TYPE` when the referenced type symbol resolves deterministically.\n\nConstructor calls such as `new ClassName()` and language-equivalent constructor-like expressions SHALL emit `CONSTRUCTS` when the constructed target resolves deterministically.\n\nScoped binding and call resolution SHALL NOT persist symbol-to-symbol dependency relations where the source symbol id and target symbol id are identical. Self-relations do not represent external blast radius and MUST be dropped before graph persistence.\n\nUnresolved binding facts and call facts SHALL NOT create speculative graph edges. They MAY be preserved as non-persisted diagnostics or debug metadata for tests and troubleshooting."
       ]
     },
     {
@@ -75,6 +87,7 @@
     "embedding on FileNode is deferred to v2+ — adapters MUST NOT populate it until the embedding pipeline is implemented",
     "COVERS relations are deferred to v2+ — the type exists in the model but is not populated by any v1.5/v2 process",
     "DEPENDS_ON relations are populated by the indexer in v1.5, reading from .specd-metadata.yaml or spec.md",
+    "CONSTRUCTS and USES_TYPE are first-class persisted relations in v2 and are part of the base graph vocabulary for supported languages",
     "EXTENDS, IMPLEMENTS, and OVERRIDES are first-class persisted relations in v2 and are part of the base graph vocabulary for supported languages"
   ],
   "scenarios": [
@@ -213,6 +226,15 @@
       ]
     },
     {
+      "requirement": "Relation types",
+      "name": "Scoped binding relation types are part of the closed set",
+      "when": ["the relation type set is inspected"],
+      "then": [
+        "it includes USES_TYPE and CONSTRUCTS",
+        "AND adding any additional scoped binding relation type still requires a spec change"
+      ]
+    },
+    {
       "requirement": "Relation value object",
       "name": "Relation equality by source, target, and type",
       "given": [
@@ -265,6 +287,86 @@
       "then": ["no hierarchy relation is emitted for that construct in this iteration"]
     },
     {
+      "requirement": "Import declaration",
+      "name": "Side-effect import has no local symbol",
+      "given": ["a TypeScript file containing import './polyfill.js'"],
+      "when": ["import declarations are extracted"],
+      "then": [
+        "the declaration has specifier: './polyfill.js'",
+        "AND kind is side-effect",
+        "AND localName and originalName are empty strings"
+      ]
+    },
+    {
+      "requirement": "Import declaration",
+      "name": "Existing named import remains compatible",
+      "given": ["a TypeScript file containing import { createUser as makeUser } from './user.js'"],
+      "when": ["import declarations are extracted"],
+      "then": [
+        "the declaration has localName: 'makeUser'",
+        "AND originalName: 'createUser'",
+        "AND missing kind is treated as named"
+      ]
+    },
+    {
+      "requirement": "Scoped binding model",
+      "name": "Binding facts are immutable analysis inputs",
+      "given": ["a binding fact for a constructor parameter typed as TemplateExpander"],
+      "when": ["the binding fact is created"],
+      "then": [
+        "it records the workspace-prefixed file path, source location, binding source kind, visible name, and target type candidate",
+        "AND its properties are readonly"
+      ]
+    },
+    {
+      "requirement": "Scoped binding model",
+      "name": "Runtime-only binding is outside the model",
+      "given": ["a service lookup identified only by a runtime container string"],
+      "when": ["binding facts are modeled"],
+      "then": ["no deterministic binding fact is created for that runtime-only lookup"]
+    },
+    {
+      "requirement": "Scoped binding relation output",
+      "name": "Constructor call uses CONSTRUCTS relation",
+      "given": [
+        "a function contains new TemplateExpander(builtins)",
+        "AND TemplateExpander resolves to a class symbol"
+      ],
+      "when": ["scoped call resolution emits graph output"],
+      "then": [
+        "a CONSTRUCTS relation connects the enclosing function symbol to the TemplateExpander class target"
+      ]
+    },
+    {
+      "requirement": "Scoped binding relation output",
+      "name": "Constructor injection uses USES_TYPE relation",
+      "given": [
+        "a constructor parameter is typed as TemplateExpander",
+        "AND TemplateExpander resolves to a class symbol"
+      ],
+      "when": ["scoped binding resolution emits graph output"],
+      "then": [
+        "a USES_TYPE relation connects the constructor or owning class symbol to the TemplateExpander class target"
+      ]
+    },
+    {
+      "requirement": "Scoped binding relation output",
+      "name": "Self-relation is not persisted",
+      "given": ["a binding or call fact resolves to the same source and target symbol id"],
+      "when": ["scoped binding resolution emits graph output"],
+      "then": [
+        "no persisted CALLS, CONSTRUCTS, or USES_TYPE relation is emitted for that self-edge",
+        "AND impact analysis does not report the target symbol as its own dependent"
+      ]
+    },
+    {
+      "requirement": "Scoped binding relation output",
+      "name": "Ambiguous typed dependency emits no speculative edge",
+      "given": ["a parameter type annotation cannot be resolved to a known symbol"],
+      "when": ["scoped binding resolution runs"],
+      "then": ["no persisted relation is emitted for that unresolved type"]
+    },
+    {
       "requirement": "Immutability",
       "name": "FileNode properties are readonly",
       "given": ["a FileNode instance"],
@@ -289,8 +391,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:64a45a78c28d92fe7312cffb8c92923c8b6754430bfb16809491cfa3a9533642",
-    "verify.md": "sha256:caae4aeb37fd0901d478a97a008a8ffb114dc5e903bb550e4b84e68cf904ed15"
+    "spec.md": "sha256:5a579c65a96ae3b8883fc324a9c91a4916d3b661f33988b448c5b65152f64fee",
+    "verify.md": "sha256:bc316031f2b3be8becc1c4c814f2ed0a08d4f3fe6c08188323fbc2c9ec1fc8fa"
   },
   "generatedBy": "core"
 }
