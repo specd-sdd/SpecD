@@ -81,6 +81,8 @@ export {
   type ValidateArtifactsInput,
   type ValidateArtifactsResult,
   type ValidationFailure,
+  type ValidationFileResult,
+  type ValidationFileStatus,
   type ValidationWarning,
 } from './validate-artifacts.js'
 export {

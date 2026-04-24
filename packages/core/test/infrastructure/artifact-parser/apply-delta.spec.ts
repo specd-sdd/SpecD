@@ -77,11 +77,11 @@ describe('applyDelta', () => {
 
       const result = applyDelta(ast, delta, parseContent, valueToNode)
 
-      expect(result.root.children).toHaveLength(2)
-      expect(result.root.children![0]!.label).toBe('name')
-      expect(result.root.children![1]!.label).toBe('version')
+      expect(result.ast.root.children).toHaveLength(2)
+      expect(result.ast.root.children![0]!.label).toBe('name')
+      expect(result.ast.root.children![1]!.label).toBe('version')
       // Must be a separate object (deep clone)
-      expect(result.root).not.toBe(ast.root)
+      expect(result.ast.root).not.toBe(ast.root)
     })
 
     it('returns deep clone for empty delta array', () => {
@@ -90,8 +90,8 @@ describe('applyDelta', () => {
 
       const result = applyDelta(ast, delta, parseContent, valueToNode)
 
-      expect(result.root.children).toHaveLength(1)
-      expect(result.root).not.toBe(ast.root)
+      expect(result.ast.root.children).toHaveLength(1)
+      expect(result.ast.root).not.toBe(ast.root)
     })
   })
 
@@ -102,8 +102,8 @@ describe('applyDelta', () => {
 
       const result = applyDelta(ast, delta, parseContent, valueToNode)
 
-      expect(result.root.children).toHaveLength(2)
-      expect(result.root.children![1]!.label).toBe('version')
+      expect(result.ast.root.children).toHaveLength(2)
+      expect(result.ast.root.children![1]!.label).toBe('version')
     })
 
     it('inserts at first position when position.first is true', () => {
@@ -118,8 +118,8 @@ describe('applyDelta', () => {
 
       const result = applyDelta(ast, delta, parseContent, valueToNode)
 
-      expect(result.root.children![0]!.label).toBe('first')
-      expect(result.root.children![1]!.label).toBe('second')
+      expect(result.ast.root.children![0]!.label).toBe('first')
+      expect(result.ast.root.children![1]!.label).toBe('second')
     })
 
     it('inserts after a sibling matching position.after', () => {
@@ -136,10 +136,10 @@ describe('applyDelta', () => {
 
       const result = applyDelta(ast, delta, parseContent, valueToNode)
 
-      expect(result.root.children).toHaveLength(3)
-      expect(result.root.children![0]!.label).toBe('a')
-      expect(result.root.children![1]!.label).toBe('b')
-      expect(result.root.children![2]!.label).toBe('c')
+      expect(result.ast.root.children).toHaveLength(3)
+      expect(result.ast.root.children![0]!.label).toBe('a')
+      expect(result.ast.root.children![1]!.label).toBe('b')
+      expect(result.ast.root.children![2]!.label).toBe('c')
     })
 
     it('inserts under a parent scope when position.parent is set', () => {
@@ -155,7 +155,7 @@ describe('applyDelta', () => {
 
       const result = applyDelta(ast, delta, parseContent, valueToNode)
 
-      const configPair = result.root.children![0]!
+      const configPair = result.ast.root.children![0]!
       const innerMapping = configPair.children![0]!
       expect(innerMapping.children).toHaveLength(2)
     })
@@ -195,8 +195,8 @@ describe('applyDelta', () => {
       const resultWith = applyDelta(ast, withDesc, parseContent, valueToNode)
       const resultWithout = applyDelta(ast, withoutDesc, parseContent, valueToNode)
 
-      expect(resultWith.root.children![0]!.value).toBe('new')
-      expect(resultWithout.root.children![0]!.value).toBe('new')
+      expect(resultWith.ast.root.children![0]!.value).toBe('new')
+      expect(resultWithout.ast.root.children![0]!.value).toBe('new')
     })
   })
 
@@ -213,8 +213,8 @@ describe('applyDelta', () => {
 
       const result = applyDelta(ast, delta, parseContent, valueToNode)
 
-      expect(result.root.children![0]!.label).toBe('new-name')
-      expect(result.root.children![0]!.value).toBe('value')
+      expect(result.ast.root.children![0]!.label).toBe('new-name')
+      expect(result.ast.root.children![0]!.value).toBe('value')
     })
 
     it('replaces node value', () => {
@@ -229,7 +229,7 @@ describe('applyDelta', () => {
 
       const result = applyDelta(ast, delta, parseContent, valueToNode)
 
-      expect(result.root.children![0]!.value).toBe('new-value')
+      expect(result.ast.root.children![0]!.value).toBe('new-value')
     })
 
     it('replaces node content (children)', () => {
@@ -244,7 +244,7 @@ describe('applyDelta', () => {
 
       const result = applyDelta(ast, delta, parseContent, valueToNode)
 
-      const block = result.root.children![0]!
+      const block = result.ast.root.children![0]!
       expect(block.label).toBe('block')
       // parseContent returns a document with one child labeled 'new-child'
       expect(block.children![0]!.label).toBe('new-child')
@@ -266,7 +266,9 @@ describe('applyDelta', () => {
       ]
 
       const result = applyDelta(ast, delta, parseContent, valueToNode)
-      expect(result.root.children![0]!._inlines).toEqual([{ type: 'inlineCode', value: 'code' }])
+      expect(result.ast.root.children![0]!._inlines).toEqual([
+        { type: 'inlineCode', value: 'code' },
+      ])
     })
   })
 
@@ -282,9 +284,9 @@ describe('applyDelta', () => {
 
       const result = applyDelta(ast, delta, parseContent, valueToNode)
 
-      expect(result.root.children).toHaveLength(2)
-      expect(result.root.children![0]!.label).toBe('keep')
-      expect(result.root.children![1]!.label).toBe('also-keep')
+      expect(result.ast.root.children).toHaveLength(2)
+      expect(result.ast.root.children![0]!.label).toBe('keep')
+      expect(result.ast.root.children![1]!.label).toBe('also-keep')
     })
   })
 

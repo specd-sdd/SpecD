@@ -907,7 +907,9 @@ describe('ArchiveChange', () => {
       const baseContent = '# Base\n\n## Req 1\nOriginal.'
       const mergedContent = '# Base\n\n## Req 1\nUpdated.'
 
-      const mdParser = makeParser({ apply: () => ({ root: { type: 'doc' } }) })
+      const mdParser = makeParser({
+        apply: () => ({ ast: { root: { type: 'doc' } }, warnings: [] }),
+      })
       const serializeSpy = vi.spyOn(mdParser, 'serialize').mockReturnValue(mergedContent)
       const yamlParser = makeParser({ parseDelta: () => [{ op: 'modified' as const }] })
 
@@ -1455,7 +1457,9 @@ describe('ArchiveChange', () => {
       const mergedContent = '# Base\n\n## Req 1\nUpdated via delta.'
       const primaryContent = '# Primary file content — should not be used'
 
-      const mdParser = makeParser({ apply: () => ({ root: { type: 'doc' } }) })
+      const mdParser = makeParser({
+        apply: () => ({ ast: { root: { type: 'doc' } }, warnings: [] }),
+      })
       vi.spyOn(mdParser, 'serialize').mockReturnValue(mergedContent)
       const yamlParser = makeParser({ parseDelta: () => [{ op: 'modified' as const }] })
 

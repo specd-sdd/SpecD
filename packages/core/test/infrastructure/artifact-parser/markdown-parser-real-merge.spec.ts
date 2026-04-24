@@ -71,7 +71,7 @@ This requirement appears after the merge target and must remain unchanged.`
     const md = new MarkdownParser()
     const yaml = new YamlParser()
     const delta = yaml.parseDelta(deltaWithAddRemove)
-    const merged = md.serialize(md.apply(md.parse(base), delta))
+    const merged = md.serialize(md.apply(md.parse(base), delta).ast)
 
     // Regression: ordered list numbering must not reset from 3 -> 1.
     expect(merged).toContain('3. For each artifact in the schema that declares `delta: false`')

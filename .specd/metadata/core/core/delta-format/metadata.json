@@ -445,6 +445,118 @@
       "then": ["apply is never called — the base artifact is not loaded or parsed"]
     },
     {
+      "requirement": "Delta application",
+      "name": "markdown all node types support applicable added modified and removed operations",
+      "given": [
+        "a markdown document containing document, section, paragraph, list, list-item, code-block, and thematic-break nodes"
+      ],
+      "when": [
+        "delta entries apply added for a new section, modified for document/section/paragraph/list-item/code-block, and removed for list/thematic-break in deterministic scope"
+      ],
+      "then": [
+        "apply succeeds",
+        "AND each operation mutates only its targeted node(s)",
+        "AND untouched siblings remain unchanged"
+      ]
+    },
+    {
+      "requirement": "Delta application",
+      "name": "markdown ambiguous selector in modified operation fails atomically",
+      "given": ["a markdown document where a selector matches multiple nodes of the same type"],
+      "when": ["a modified entry is applied without disambiguation"],
+      "then": [
+        "apply throws DeltaApplicationError",
+        "AND no changes from the delta batch are committed"
+      ]
+    },
+    {
+      "requirement": "Delta application",
+      "name": "markdown parent scoping disambiguates duplicate matches",
+      "given": ["duplicate section labels or paragraph/list-item values in different branches"],
+      "when": ["selectors include a parent constraint for the intended branch"],
+      "then": [
+        "apply resolves a unique target",
+        "AND only scoped nodes are added modified or removed"
+      ]
+    },
+    {
+      "requirement": "Delta application",
+      "name": "JSON all node types support applicable added modified and removed operations",
+      "given": [
+        "a JSON document containing document, object, property, array, and array-item nodes"
+      ],
+      "when": [
+        "delta entries apply added for new properties/array-items, modified for property/array/array-item values, and removed for properties/array-items in deterministic scope"
+      ],
+      "then": [
+        "apply succeeds",
+        "AND resulting object and array structure matches the declared operations",
+        "AND unaffected keys and items are preserved"
+      ]
+    },
+    {
+      "requirement": "Delta application",
+      "name": "JSON ambiguous selector fails atomically across mixed operations",
+      "given": [
+        "a JSON delta batch with added, modified, and removed entries",
+        "AND one modified or removed selector resolves ambiguously"
+      ],
+      "when": ["apply is executed"],
+      "then": [
+        "apply throws DeltaApplicationError",
+        "AND none of the other entries in the batch are applied"
+      ]
+    },
+    {
+      "requirement": "Delta application",
+      "name": "JSON array operations respect selector and strategy semantics",
+      "given": ["an array of scalars and an array of objects in the same JSON artifact"],
+      "when": [
+        "added, modified (append/merge-by), and removed entries target array and array-item nodes with valid selectors"
+      ],
+      "then": [
+        "arrays are updated according to strategy rules",
+        "AND non-targeted arrays remain unchanged"
+      ]
+    },
+    {
+      "requirement": "Delta application",
+      "name": "YAML all node types support applicable added modified and removed operations",
+      "given": [
+        "a YAML document containing document, mapping, pair, sequence, and sequence-item nodes"
+      ],
+      "when": [
+        "delta entries apply added for new pairs/sequence-items, modified for pair/sequence/sequence-item values, and removed for pairs/sequence-items in deterministic scope"
+      ],
+      "then": [
+        "apply succeeds",
+        "AND resulting mapping and sequence structure reflects the declared operations",
+        "AND unaffected nodes are preserved"
+      ]
+    },
+    {
+      "requirement": "Delta application",
+      "name": "YAML invalid selector combinations and ambiguous matches fail atomically",
+      "given": [
+        "YAML selectors with ambiguous matches or invalid combinations (for example index with where)"
+      ],
+      "when": ["mixed-operation deltas are applied"],
+      "then": [
+        "apply throws DeltaApplicationError",
+        "AND no partial add/modify/remove changes are committed"
+      ]
+    },
+    {
+      "requirement": "Delta application",
+      "name": "no-op operation is handled without AST mutation",
+      "given": ["a delta artifact containing only op: no-op"],
+      "when": ["artifact validation executes the delta workflow"],
+      "then": [
+        "apply-time AST mutation is skipped",
+        "AND the artifact is treated as unchanged for operation semantics"
+      ]
+    },
+    {
       "requirement": "Delta conflict detection",
       "name": "Two entries targeting the same node",
       "when": ["a delta has two modified entries whose selectors both resolve to the same node"],
@@ -498,7 +610,7 @@
   ],
   "contentHashes": {
     "spec.md": "sha256:1164fbf0486142af33b8d49e29da0e2b32c14e50fad03fbfd0d1f7952fb286e4",
-    "verify.md": "sha256:f2aa99441096b5169138463db8644a18e8613c89521d1bada916d853c5aba380"
+    "verify.md": "sha256:4edbc9bab51175085c5bad11c6172a68884fab5e1636fe1eb4feaabfacd00bf3"
   },
   "generatedBy": "core"
 }

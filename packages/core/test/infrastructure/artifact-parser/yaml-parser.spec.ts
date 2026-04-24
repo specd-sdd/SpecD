@@ -128,7 +128,7 @@ describe('YamlParser', () => {
           value: 'claude-opus-4-6',
         },
       ])
-      const pair = result.root.children![0]!
+      const pair = result.ast.root.children![0]!
       expect(pair.value).toBe('claude-opus-4-6')
     })
 
@@ -141,7 +141,7 @@ describe('YamlParser', () => {
           value: 'new-model',
         },
       ])
-      const llmPair = result.root.children![0]!
+      const llmPair = result.ast.root.children![0]!
       const modelPair = llmPair.children![0]!.children![0]!
       expect(modelPair.value).toBe('new-model')
     })
@@ -154,7 +154,7 @@ describe('YamlParser', () => {
           value: { newKey: 'newValue' },
         },
       ])
-      expect(result.root.children).toHaveLength(2)
+      expect(result.ast.root.children).toHaveLength(2)
     })
 
     it('removed: detaches a pair', () => {
@@ -165,8 +165,8 @@ describe('YamlParser', () => {
           selector: { type: 'pair', matches: 'remove' },
         },
       ])
-      expect(result.root.children).toHaveLength(1)
-      expect(result.root.children![0]!.label).toBe('keep')
+      expect(result.ast.root.children).toHaveLength(1)
+      expect(result.ast.root.children![0]!.label).toBe('keep')
     })
 
     it('throws DeltaApplicationError when selector resolves to no node', () => {
@@ -190,6 +190,347 @@ describe('YamlParser', () => {
             op: 'modified',
             selector: { type: 'sequence-item', index: 0, where: { name: 'a' } },
             value: { name: 'b' },
+          },
+        ]),
+      ).toThrow(DeltaApplicationError)
+    })
+  })
+
+  describe('apply — added operation for pair/sequence-item', () => {
+    it('added pair to document root via content', () => {
+      const ast = parser.parse('key: value')
+      const result = parser.apply(ast, [
+        {
+          op: 'added',
+          content: 'newKey: newValue\n',
+        },
+      ])
+      expect(result.ast.root.children).toHaveLength(2)
+      expect(result.ast.root.children![1]!).toMatchObject({
+        type: 'pair',
+        label: 'newKey',
+        value: 'newValue',
+      })
+    })
+
+    it('added pair to mapping via content', () => {
+      const ast = parser.parse('config:\n  debug: false')
+      const result = parser.apply(ast, [
+        {
+          op: 'added',
+          position: { parent: { type: 'mapping' } },
+          content: 'verbose: true\n',
+        },
+      ])
+      const configPair = result.ast.root.children![0]!
+      const mapping = configPair.children![0]!
+      expect(mapping.type).toBe('mapping')
+      expect(mapping.children).toHaveLength(2)
+      const verbosePair = mapping.children!.find((c) => c.label === 'verbose')
+      expect(verbosePair?.value).toBe(true)
+    })
+
+    it('added sequence-item via value into existing sequence', () => {
+      const ast = parser.parse('tags:\n  - alpha\n  - beta')
+      const result = parser.apply(ast, [
+        {
+          op: 'added',
+          position: { parent: { type: 'sequence' } },
+          value: 'gamma',
+        },
+      ])
+      const tagsPair = result.ast.root.children![0]!
+      const seq = tagsPair.children![0]!
+      expect(seq.children).toHaveLength(3)
+      expect(seq.children![2]).toMatchObject({ type: 'sequence-item', value: 'gamma' })
+    })
+
+    it('added sequence-item as scalar via value', () => {
+      const ast = parser.parse('tags:\n  - alpha')
+      const result = parser.apply(ast, [
+        {
+          op: 'added',
+          position: { parent: { type: 'sequence' } },
+          value: 'beta',
+        },
+      ])
+      const tagsPair = result.ast.root.children![0]!
+      const seq = tagsPair.children![0]!
+      expect(seq.children).toHaveLength(2)
+      expect(seq.children![1]).toMatchObject({ type: 'sequence-item', value: 'beta' })
+    })
+  })
+
+  describe('apply — modified operation across YAML node types', () => {
+    it('modified document replaces root children', () => {
+      const ast = parser.parse('old: true')
+      const result = parser.apply(ast, [
+        {
+          op: 'modified',
+          selector: { type: 'document' },
+          content: 'new: false',
+        },
+      ])
+      expect(result.ast.root.children).toHaveLength(1)
+      expect(result.ast.root.children![0]!).toMatchObject({
+        type: 'pair',
+        label: 'new',
+        value: false,
+      })
+    })
+
+    it('modified mapping replaces children via content', () => {
+      const ast = parser.parse('config:\n  old: value')
+      const result = parser.apply(ast, [
+        {
+          op: 'modified',
+          selector: { type: 'mapping' },
+          content: 'new: replaced',
+        },
+      ])
+      const configPair = result.ast.root.children![0]!
+      const mapping = configPair.children![0]!
+      expect(mapping.children).toHaveLength(1)
+      expect(mapping.children![0]!).toMatchObject({ type: 'pair', label: 'new', value: 'replaced' })
+    })
+
+    it('modified pair replaces scalar value', () => {
+      const ast = parser.parse('model: old-model\nschema: spec-driven')
+      const result = parser.apply(ast, [
+        {
+          op: 'modified',
+          selector: { type: 'pair', matches: 'model' },
+          value: 'new-model',
+        },
+      ])
+      expect(result.ast.root.children![0]!).toMatchObject({
+        type: 'pair',
+        label: 'model',
+        value: 'new-model',
+      })
+      expect(result.ast.root.children![1]!).toMatchObject({
+        type: 'pair',
+        label: 'schema',
+        value: 'spec-driven',
+      })
+    })
+
+    it('modified pair replaces with nested mapping via value', () => {
+      const ast = parser.parse('config: simple')
+      const result = parser.apply(ast, [
+        {
+          op: 'modified',
+          selector: { type: 'pair', matches: 'config' },
+          value: { debug: true, port: 3000 },
+        },
+      ])
+      const configPair = result.ast.root.children![0]!
+      expect(configPair.label).toBe('config')
+      expect(configPair.children).toHaveLength(1)
+      expect(configPair.children![0]!.type).toBe('mapping')
+    })
+
+    it('modified sequence replaces items via value', () => {
+      const ast = parser.parse('tags:\n  - alpha\n  - beta')
+      const result = parser.apply(ast, [
+        {
+          op: 'modified',
+          selector: { type: 'sequence' },
+          value: ['x', 'y'],
+        },
+      ])
+      const seq = result.ast.root.children![0]!.children![0]!
+      expect(seq.children).toHaveLength(2)
+      expect(seq.children![0]).toMatchObject({ type: 'sequence-item', value: 'x' })
+      expect(seq.children![1]).toMatchObject({ type: 'sequence-item', value: 'y' })
+    })
+
+    it('modified sequence-item via index', () => {
+      const ast = parser.parse('items:\n  - first\n  - second\n  - third')
+      const result = parser.apply(ast, [
+        {
+          op: 'modified',
+          selector: { type: 'sequence-item', index: 1 },
+          value: 'replaced',
+        },
+      ])
+      const seq = result.ast.root.children![0]!.children![0]!
+      expect(seq.children![0]!.value).toBe('first')
+      expect(seq.children![1]!.value).toBe('replaced')
+      expect(seq.children![2]!.value).toBe('third')
+    })
+
+    it('modified sequence-item via where selector', () => {
+      const ast = parser.parse(
+        'steps:\n  - name: lint\n    run: old-lint\n  - name: test\n    run: pnpm test',
+      )
+      const result = parser.apply(ast, [
+        {
+          op: 'modified',
+          selector: { type: 'sequence-item', where: { name: 'lint' } },
+          value: { name: 'lint', run: 'new-lint' },
+        },
+      ])
+      const seq = result.ast.root.children![0]!.children![0]!
+      const lintItem = seq.children![0]!
+      const lintMapping = lintItem.children![0]!
+      const runPair = lintMapping.children!.find((c) => c.label === 'run')
+      expect(runPair?.value).toBe('new-lint')
+      const testItem = seq.children![1]!
+      const testMapping = testItem.children![0]!
+      const testRun = testMapping.children!.find((c) => c.label === 'run')
+      expect(testRun?.value).toBe('pnpm test')
+    })
+
+    it('modified pair with parent disambiguates nested keys', () => {
+      const ast = parser.parse('outer:\n  name: old\ninner:\n  name: keep')
+      const result = parser.apply(ast, [
+        {
+          op: 'modified',
+          selector: { type: 'pair', matches: 'name', parent: { type: 'pair', matches: 'outer' } },
+          value: 'new',
+        },
+      ])
+      const outerPair = result.ast.root.children!.find((c) => c.label === 'outer')!
+      const outerName = outerPair.children![0]!.children![0]!
+      expect(outerName.value).toBe('new')
+      const innerPair = result.ast.root.children!.find((c) => c.label === 'inner')!
+      const innerName = innerPair.children![0]!.children![0]!
+      expect(innerName.value).toBe('keep')
+    })
+  })
+
+  describe('apply — removed operation for pair and sequence-item', () => {
+    it('removed pair from root document', () => {
+      const ast = parser.parse('keep: me\nremove: me\nalso: here')
+      const result = parser.apply(ast, [
+        {
+          op: 'removed',
+          selector: { type: 'pair', matches: 'remove' },
+        },
+      ])
+      expect(result.ast.root.children).toHaveLength(2)
+      const labels = result.ast.root.children!.map((c) => c.label)
+      expect(labels).toEqual(['keep', 'also'])
+    })
+
+    it('removed pair from nested mapping', () => {
+      const ast = parser.parse('config:\n  debug: true\n  verbose: false')
+      const result = parser.apply(ast, [
+        {
+          op: 'removed',
+          selector: {
+            type: 'pair',
+            matches: 'verbose',
+            parent: { type: 'pair', matches: 'config' },
+          },
+        },
+      ])
+      const configPair = result.ast.root.children![0]!
+      const mapping = configPair.children![0]!
+      expect(mapping.children).toHaveLength(1)
+      expect(mapping.children![0]!.label).toBe('debug')
+    })
+
+    it('removed sequence-item by index', () => {
+      const ast = parser.parse('tags:\n  - alpha\n  - beta\n  - gamma')
+      const result = parser.apply(ast, [
+        {
+          op: 'removed',
+          selector: { type: 'sequence-item', index: 1 },
+        },
+      ])
+      const seq = result.ast.root.children![0]!.children![0]!
+      expect(seq.children).toHaveLength(2)
+      expect(seq.children![0]).toMatchObject({ type: 'sequence-item', value: 'alpha' })
+      expect(seq.children![1]).toMatchObject({ type: 'sequence-item', value: 'gamma' })
+    })
+
+    it('removed sequence-item by where selector', () => {
+      const ast = parser.parse(
+        'steps:\n  - name: lint\n    run: pnpm lint\n  - name: test\n    run: pnpm test',
+      )
+      const result = parser.apply(ast, [
+        {
+          op: 'removed',
+          selector: { type: 'sequence-item', where: { name: 'lint' } },
+        },
+      ])
+      const seq = result.ast.root.children![0]!.children![0]!
+      expect(seq.children).toHaveLength(1)
+      const remaining = seq.children![0]!
+      const mapping = remaining.children![0]!
+      const namePair = mapping.children!.find((c) => c.label === 'name')
+      expect(namePair?.value).toBe('test')
+    })
+
+    it('removed entire sequence via pair', () => {
+      const ast = parser.parse('name: core\ntags:\n  - alpha\n  - beta')
+      const result = parser.apply(ast, [
+        {
+          op: 'removed',
+          selector: { type: 'pair', matches: 'tags' },
+        },
+      ])
+      expect(result.ast.root.children).toHaveLength(1)
+      expect(result.ast.root.children![0]!.label).toBe('name')
+    })
+  })
+
+  describe('apply — selector constraint and ambiguity in mixed batches', () => {
+    it('ambiguous selector in mixed added/removed batch fails atomically', () => {
+      const ast = parser.parse('keep: value\nshared: one\nnested:\n  shared: two')
+      expect(() =>
+        parser.apply(ast, [
+          {
+            op: 'removed',
+            selector: { type: 'pair', matches: 'keep' },
+          },
+          {
+            op: 'modified',
+            selector: { type: 'pair', matches: 'shared' },
+            value: 'changed',
+          },
+        ]),
+      ).toThrow(DeltaApplicationError)
+    })
+
+    it('mixed added/modified/removed succeeds with unique selectors', () => {
+      const ast = parser.parse('old: value\nkeep: unchanged')
+      const result = parser.apply(ast, [
+        {
+          op: 'removed',
+          selector: { type: 'pair', matches: 'old' },
+        },
+        {
+          op: 'modified',
+          selector: { type: 'pair', matches: 'keep' },
+          value: 'updated',
+        },
+        {
+          op: 'added',
+          content: 'new: pair\n',
+        },
+      ])
+      expect(result.ast.root.children).toHaveLength(2)
+      const keepPair = result.ast.root.children!.find((c) => c.label === 'keep')
+      expect(keepPair?.value).toBe('updated')
+      const newPair = result.ast.root.children!.find((c) => c.label === 'new')
+      expect(newPair?.value).toBe('pair')
+    })
+
+    it('index and where together in mixed batch fails atomically', () => {
+      const ast = parser.parse('steps:\n  - name: lint\n  - name: test')
+      expect(() =>
+        parser.apply(ast, [
+          {
+            op: 'removed',
+            selector: { type: 'sequence-item', index: 0 },
+          },
+          {
+            op: 'modified',
+            selector: { type: 'sequence-item', index: 1, where: { name: 'test' } },
+            value: 'changed',
           },
         ]),
       ).toThrow(DeltaApplicationError)

@@ -47,7 +47,8 @@
 
 - **GIVEN** a valid AST and delta entries whose selectors all match exactly one node
 - **WHEN** `apply` is called
-- **THEN** a new AST is returned with all operations applied
+- **THEN** it returns a `DeltaApplicationResult` whose `ast` has all operations applied
+- **AND** `warnings` is empty when no semantic issues are detected
 
 #### Scenario: One selector fails to resolve
 
@@ -149,3 +150,48 @@
 - **GIVEN** a markdown AST containing an ordered list
 - **WHEN** the corresponding `ArtifactNode` is inspected
 - **THEN** it has `ordered` set to `true`
+
+### Requirement: Node nature descriptors
+
+#### Scenario: Markdown nodeTypes include nature flags
+
+- **WHEN** `nodeTypes()` is called on the markdown adapter
+- **THEN** each `NodeTypeDescriptor` includes `isCollection`, `isSequence`, `isSequenceItem`, `isContainer`, and `isLeaf` flags
+- **AND** `document` has `isCollection: false, isSequence: false, isSequenceItem: false, isContainer: true, isLeaf: false`
+- **AND** `section` has `isCollection: false, isSequence: false, isSequenceItem: false, isContainer: true, isLeaf: false`
+- **AND** `paragraph` has `isCollection: false, isSequence: false, isSequenceItem: false, isContainer: false, isLeaf: true`
+- **AND** `list` has `isCollection: true, isSequence: true, isSequenceItem: false, isContainer: true, isLeaf: false`
+- **AND** `list-item` has `isCollection: false, isSequence: false, isSequenceItem: true, isContainer: true, isLeaf: false`
+- **AND** `code-block` has `isCollection: false, isSequence: false, isSequenceItem: false, isContainer: false, isLeaf: true`
+- **AND** `thematic-break` has `isCollection: false, isSequence: false, isSequenceItem: false, isContainer: false, isLeaf: false`
+
+#### Scenario: JSON nodeTypes include nature flags
+
+- **WHEN** `nodeTypes()` is called on the JSON adapter
+- **THEN** `document` has `isCollection: false, isSequence: false, isContainer: true, isLeaf: false`
+- **AND** `object` has `isCollection: true, isSequence: false, isContainer: true, isLeaf: false`
+- **AND** `property` has `isCollection: false, isSequence: false, isContainer: true, isLeaf: true` (identifiedBy includes "matches", so has label)
+- **AND** `array` has `isCollection: true, isSequence: true, isContainer: true, isLeaf: false`
+- **AND** `array-item` has `isCollection: false, isSequence: false, isSequenceItem: true, isContainer: true, isLeaf: true`
+
+#### Scenario: YAML nodeTypes include nature flags
+
+- **WHEN** `nodeTypes()` is called on the YAML adapter
+- **THEN** `document` has `isCollection: false, isSequence: false, isContainer: true, isLeaf: false`
+- **AND** `mapping` has `isCollection: true, isSequence: false, isContainer: true, isLeaf: false`
+- **AND** `pair` has `isCollection: false, isSequence: false, isContainer: true, isLeaf: true` (identifiedBy includes "matches", so has label)
+- **AND** `sequence` has `isCollection: true, isSequence: true, isContainer: true, isLeaf: false`
+- **AND** `sequence-item` has `isCollection: false, isSequence: false, isSequenceItem: true, isContainer: true, isLeaf: true`
+
+#### Scenario: Plaintext nodeTypes include nature flags
+
+- **WHEN** `nodeTypes()` is called on the plaintext adapter
+- **THEN** `document` has `isCollection: false, isSequence: false, isContainer: true, isLeaf: false`
+- **AND** `paragraph` has `isCollection: true, isSequence: false, isContainer: false, isLeaf: false`
+- **AND** `line` has `isCollection: false, isSequence: false, isContainer: false, isLeaf: true`
+
+#### Scenario: No hardcoded type vectors in applyDelta
+
+- **WHEN** the source of `applyDelta` is inspected
+- **THEN** there are no hardcoded arrays of type names like `['array', 'sequence', 'list']` or `['array-item', 'sequence-item', 'list-item']`
+- **AND** all collection-aware logic uses descriptor flag lookups (`isSequence`, `isSequenceItem`, `isCollection`)

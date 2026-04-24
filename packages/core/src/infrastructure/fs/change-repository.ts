@@ -17,6 +17,7 @@ import {
   type ChangeRepositoryConfig,
 } from '../../application/ports/change-repository.js'
 import { parseSpecId } from '../../domain/services/parse-spec-id.js'
+import { expectedArtifactFilename } from '../../domain/services/artifact-filename.js'
 import { type PreHashCleanup } from '../../domain/value-objects/validation-rule.js'
 import { applyPreHashCleanup } from '../../domain/services/pre-hash-cleanup.js'
 import { changeDirName } from './dir-name.js'
@@ -62,6 +63,12 @@ export interface FsChangeRepositoryConfig extends ChangeRepositoryConfig {
    * resolve schema asynchronously without requiring it at construction time.
    */
   readonly resolveArtifactTypes?: () => Promise<readonly ArtifactType[]>
+  /**
+   * Optional async resolver to check whether a spec already exists.
+   *
+   * Used to resolve expected filenames for delta-capable spec artifacts.
+   */
+  readonly resolveSpecExists?: (specId: string) => Promise<boolean>
 }
 
 /**
@@ -96,6 +103,7 @@ export class FsChangeRepository extends ChangeRepository {
   private readonly _locksPath: string
   private _artifactTypes: readonly ArtifactType[]
   private readonly _resolveArtifactTypes: (() => Promise<readonly ArtifactType[]>) | undefined
+  private readonly _resolveSpecExists: ((specId: string) => Promise<boolean>) | undefined
   private _artifactTypesResolved: boolean
 
   /**
@@ -111,6 +119,7 @@ export class FsChangeRepository extends ChangeRepository {
     this._locksPath = path.join(config.configPath, 'tmp', 'change-locks')
     this._artifactTypes = config.artifactTypes ?? []
     this._resolveArtifactTypes = config.resolveArtifactTypes
+    this._resolveSpecExists = config.resolveSpecExists
     this._artifactTypesResolved =
       config.artifactTypes !== undefined && config.artifactTypes.length > 0
   }
@@ -127,6 +136,23 @@ export class FsChangeRepository extends ChangeRepository {
       this._artifactTypesResolved = true
     }
     return this._artifactTypes
+  }
+
+  /**
+   * Resolves spec existence for the given spec IDs when a resolver is available.
+   *
+   * @param specIds - Spec IDs to resolve
+   * @returns A map of `specId -> exists`, or `undefined` when no resolver is configured
+   */
+  private async _buildSpecExistenceMap(
+    specIds: readonly string[],
+  ): Promise<ReadonlyMap<string, boolean> | undefined> {
+    if (this._resolveSpecExists === undefined) return undefined
+    const existence = new Map<string, boolean>()
+    for (const specId of specIds) {
+      existence.set(specId, await this._resolveSpecExists(specId))
+    }
+    return existence
   }
 
   /**
@@ -265,8 +291,9 @@ export class FsChangeRepository extends ChangeRepository {
    */
   override async save(change: Change): Promise<void> {
     const artifactTypes = await this._ensureArtifactTypes()
+    const specExistence = await this._buildSpecExistenceMap(change.specIds)
     if (artifactTypes.length > 0) {
-      change.syncArtifacts(artifactTypes)
+      change.syncArtifacts(artifactTypes, specExistence)
     }
     const manifest = changeToManifest(change)
     const dirName = changeDirName(change.name, change.createdAt)
@@ -443,26 +470,13 @@ export class FsChangeRepository extends ChangeRepository {
       if (artifactType.scope !== 'spec') continue
 
       for (const specId of change.specIds) {
-        const { workspace, capPath } = parseSpecId(specId)
         const exists = await specExists(specId)
-
-        if (artifactType.delta && exists) {
-          // Delta directory for existing specs
-          const deltaDir =
-            capPath.length > 0
-              ? path.join(dir, 'deltas', workspace, capPath)
-              : path.join(dir, 'deltas', workspace)
-          await fs.mkdir(deltaDir, { recursive: true })
-        }
-
-        // Spec artifact directory (for new specs or non-delta artifacts)
-        if (!artifactType.delta || !exists) {
-          const specDir =
-            capPath.length > 0
-              ? path.join(dir, 'specs', workspace, capPath)
-              : path.join(dir, 'specs', workspace)
-          await fs.mkdir(specDir, { recursive: true })
-        }
+        const filename = expectedArtifactFilename({
+          artifactType,
+          key: specId,
+          specExists: exists,
+        })
+        await fs.mkdir(path.dirname(path.join(dir, filename)), { recursive: true })
       }
     }
   }
@@ -846,45 +860,47 @@ export class FsChangeRepository extends ChangeRepository {
     const artifactMap = new Map<string, ChangeArtifact>()
     const artifactTypes = await this._ensureArtifactTypes()
     const artifactTypeMap = new Map(artifactTypes.map((t) => [t.id, t]))
+    const specExistence = await this._buildSpecExistenceMap(manifest.specIds)
+    let manifestNormalized = false
 
     for (const raw of manifest.artifacts) {
       const artType = artifactTypeMap.get(raw.type)
       const filesMap = new Map<string, ArtifactFile>()
       for (const rawFile of raw.files) {
+        let resolvedFilename = rawFile.filename
+        if (artType !== undefined) {
+          if (artType.scope === 'change') {
+            resolvedFilename = expectedArtifactFilename({
+              artifactType: artType,
+              key: rawFile.key,
+            })
+          } else if (specExistence !== undefined) {
+            const specExists = specExistence.get(rawFile.key)
+            resolvedFilename = expectedArtifactFilename({
+              artifactType: artType,
+              key: rawFile.key,
+              ...(specExists !== undefined ? { specExists } : {}),
+            })
+          }
+        }
+        if (resolvedFilename !== rawFile.filename) {
+          manifestNormalized = true
+        }
+        const resolvedRawFile: ManifestArtifactFile = {
+          key: rawFile.key,
+          filename: resolvedFilename,
+          ...(rawFile.state !== undefined ? { state: rawFile.state } : {}),
+          validatedHash: rawFile.validatedHash,
+        }
         const cleanup = artType?.preHashCleanup ?? []
         let status =
-          rawFile.state ?? (await this._deriveFileStatus(rawFile, dir, raw.optional, cleanup))
+          resolvedRawFile.state ??
+          (await this._deriveFileStatus(resolvedRawFile, dir, raw.optional, cleanup))
         if (rawFile.validatedHash === SKIPPED_SENTINEL && !raw.optional) {
           status = 'in-progress'
         }
         if (rawFile.validatedHash === null && (status === 'missing' || status === 'in-progress')) {
-          status = await this._deriveFileStatus(rawFile, dir, raw.optional, cleanup)
-        }
-        let resolvedFilename = rawFile.filename
-
-        // For delta-capable spec-scoped artifacts, check the delta file if the primary is missing
-        if (status === 'missing' && artType?.delta && artType.scope === 'spec') {
-          const { workspace: ws, capPath: cp } = parseSpecId(rawFile.key)
-          const basename = path.basename(rawFile.filename)
-          const deltaPath =
-            cp.length > 0
-              ? `deltas/${ws}/${cp}/${basename}.delta.yaml`
-              : `deltas/${ws}/${basename}.delta.yaml`
-          const deltaStatus = await this._deriveFileStatus(
-            {
-              key: rawFile.key,
-              filename: deltaPath,
-              ...(rawFile.state !== undefined ? { state: rawFile.state } : {}),
-              validatedHash: rawFile.validatedHash,
-            },
-            dir,
-            raw.optional,
-            cleanup,
-          )
-          if (deltaStatus !== 'missing') {
-            status = deltaStatus
-            resolvedFilename = deltaPath
-          }
+          status = await this._deriveFileStatus(resolvedRawFile, dir, raw.optional, cleanup)
         }
 
         filesMap.set(
@@ -931,10 +947,9 @@ export class FsChangeRepository extends ChangeRepository {
     // Sync artifacts against schema to reconcile with current artifact types and specIds
     // (artifactTypes already resolved above for manifest loading)
     if (artifactTypes.length > 0) {
-      const changed = change.syncArtifacts(artifactTypes)
+      const changed = change.syncArtifacts(artifactTypes, specExistence)
 
       // Re-derive status for files added by sync (they default to 'missing' but may exist on disk)
-      // For delta-capable artifacts, also check the delta file path
       const artifactTypeMap = new Map(artifactTypes.map((t) => [t.id, t]))
 
       for (const [typeId, artifact] of change.artifacts) {
@@ -943,40 +958,12 @@ export class FsChangeRepository extends ChangeRepository {
 
         for (const [, file] of artifact.files) {
           if (file.status === 'missing' && file.validatedHash === undefined) {
-            // First check the primary file path (specs/<ws>/<capPath>/<basename>)
-            let derivedStatus = await this._deriveFileStatus(
+            const derivedStatus = await this._deriveFileStatus(
               { key: file.key, filename: file.filename, validatedHash: null },
               dir,
               artifact.optional,
               syncCleanup,
             )
-
-            // For delta-capable spec-scoped artifacts, also check the delta file path
-            if (derivedStatus === 'missing' && artType?.delta && artType.scope === 'spec') {
-              const { workspace: ws, capPath: cp } = parseSpecId(file.key)
-              const basename = path.basename(file.filename)
-              const deltaPath =
-                cp.length > 0
-                  ? `deltas/${ws}/${cp}/${basename}.delta.yaml`
-                  : `deltas/${ws}/${basename}.delta.yaml`
-              derivedStatus = await this._deriveFileStatus(
-                { key: file.key, filename: deltaPath, validatedHash: null },
-                dir,
-                artifact.optional,
-                syncCleanup,
-              )
-              if (derivedStatus !== 'missing') {
-                // Delta file exists — update filename to the delta path
-                artifact.setFile(
-                  new ArtifactFile({
-                    key: file.key,
-                    filename: deltaPath,
-                    status: derivedStatus,
-                  }),
-                )
-                continue
-              }
-            }
 
             if (derivedStatus !== 'missing') {
               artifact.setFile(
@@ -991,8 +978,8 @@ export class FsChangeRepository extends ChangeRepository {
         }
       }
 
-      // Persist the manifest if sync produced changes
-      if (changed) {
+      // Persist the manifest if sync produced changes or legacy filenames were normalized
+      if (changed || manifestNormalized) {
         await this._writeManifestAtomic(dir, changeToManifest(change))
       }
     }

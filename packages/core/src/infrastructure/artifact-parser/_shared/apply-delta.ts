@@ -1,7 +1,12 @@
 import {
   type ArtifactAST,
   type ArtifactNode,
+  type DeltaApplicationResult,
   type DeltaEntry,
+  type NodeTypeDescriptor,
+  validateContent,
+  validateValue,
+  validateRename,
 } from '../../../application/ports/artifact-parser.js'
 import { DeltaApplicationError } from '../../../domain/errors/delta-application-error.js'
 import { nodeMatches } from '../../../domain/services/selector-matching.js'
@@ -180,18 +185,28 @@ function countPlacementHints(pos: NonNullable<DeltaEntry['position']>): number {
  * or is a single-child wrapper around one.
  *
  * @param node - The node to test
+ * @param descriptors - Map of node type names to their descriptors
  * @returns Whether the node is array-like
  */
-function isArrayLike(node: ArtifactNode): boolean {
-  const arrayTypes = ['array', 'sequence', 'list']
-  if (arrayTypes.includes(node.type)) return true
+function isArrayLike(
+  node: ArtifactNode,
+  descriptors?: ReadonlyMap<string, NodeTypeDescriptor>,
+): boolean {
+  const descriptor = descriptors?.get(node.type)
+  if (descriptor?.isSequence) return true
   if (Array.isArray(node.value)) return true
   if (node.children && node.children.length > 0) {
-    const itemTypes = ['array-item', 'sequence-item', 'list-item']
-    // All-items check
-    if (node.children.every((c) => itemTypes.some((t) => c.type === t))) return true
-    // Single child that is an array/sequence/list (e.g. property wrapping an array)
-    if (node.children.length === 1 && arrayTypes.includes(node.children[0]!.type)) return true
+    if (
+      node.children.every((c) => {
+        const childDescriptor = descriptors?.get(c.type)
+        return childDescriptor?.isSequenceItem === true
+      })
+    )
+      return true
+    if (node.children.length === 1) {
+      const childDescriptor = descriptors?.get(node.children[0]!.type)
+      if (childDescriptor?.isSequence) return true
+    }
   }
   return false
 }
@@ -272,7 +287,8 @@ function findInChildren(children: readonly ArtifactNode[], sel: Selector): numbe
  * @param delta - The ordered list of delta entries to apply
  * @param parseContent - A format-specific parser for the `content` field of `added`/`modified` entries
  * @param valueToNode - A format-specific converter from raw `value` objects to AST nodes
- * @returns A new AST with all delta operations applied
+ * @param descriptors - Map of node type names to their descriptors for semantic validation
+ * @returns A DeltaApplicationResult with the new AST and any warnings
  * @throws {DeltaApplicationError} When any selector fails to resolve, is ambiguous, or a structural rule is violated
  */
 export function applyDelta(
@@ -280,11 +296,14 @@ export function applyDelta(
   delta: readonly DeltaEntry[],
   parseContent: (content: string) => ArtifactAST,
   valueToNode: (value: unknown, ctx: { nodeType: string; parentType: string }) => ArtifactNode,
-): ArtifactAST {
+  descriptors?: ReadonlyMap<string, NodeTypeDescriptor>,
+): DeltaApplicationResult {
+  const warnings: string[] = []
+
   // Defensive guard: no-op entries should never reach apply (ValidateArtifacts
   // bypasses), but if they do, return a deep clone with no modifications.
   if (delta.length === 0 || delta.every((e) => e.op === 'no-op')) {
-    return { root: deepCloneNode(ast.root) }
+    return { ast: { root: deepCloneNode(ast.root) }, warnings }
   }
 
   // Phase 1 — Validate structural rules and resolve selectors against ORIGINAL AST
@@ -356,6 +375,21 @@ export function applyDelta(
       const path = paths[0]!
       resolvedModifiedRemoved.push({ entry, path })
 
+      // Semantic validation: validate content/value/rename against node type
+      if (descriptors) {
+        const node = getNodeAtPath(ast.root, path)
+        const nodeType = node.type
+
+        const contentError = validateContent(descriptors, entry, nodeType, warnings)
+        if (contentError) throw new DeltaApplicationError(contentError)
+
+        const valueError = validateValue(descriptors, entry, nodeType, warnings)
+        if (valueError) throw new DeltaApplicationError(valueError)
+
+        const renameError = validateRename(descriptors, entry, nodeType, warnings)
+        if (renameError) throw new DeltaApplicationError(renameError)
+      }
+
       // For modified with rename: check no sibling already has that label
       if (entry.op === 'modified' && entry.rename !== undefined) {
         const parentPath = path.slice(0, -1)
@@ -420,7 +454,7 @@ export function applyDelta(
       const res = resolvedModifiedRemoved.find((r) => r.entry === entry)
       if (res) {
         const node = getNodeAtPath(ast.root, res.path)
-        if (!isArrayLike(node)) {
+        if (!isArrayLike(node, descriptors)) {
           throw new DeltaApplicationError(
             `\`strategy\` is only valid on array/sequence/list nodes, but got type "${node.type}"`,
           )
@@ -472,7 +506,20 @@ export function applyDelta(
         // Apply content: parse and replace children (body only — identifier preserved/renamed above)
         if (entry.content !== undefined) {
           const parsed = parseContent(entry.content)
-          const bodyChildren = parsed.root.children ?? []
+          let bodyChildren = parsed.root.children ?? []
+
+          // Unwrap: if parsed content is a single child matching the target's
+          // container type, treat its children as the body. This handles cases
+          // like markdown list content "- New X" parsing as a list node when the
+          // target is already a list.
+          if (
+            bodyChildren.length === 1 &&
+            bodyChildren[0]!.type === updated.type &&
+            bodyChildren[0]!.children !== undefined
+          ) {
+            bodyChildren = bodyChildren[0]!.children!
+          }
+
           updated = setChildren(updated, bodyChildren)
         }
 
@@ -491,7 +538,9 @@ export function applyDelta(
             for (const [k, v] of Object.entries(updated)) {
               if (k !== 'value' && k !== 'children') clone[k] = v
             }
-            if (newNode.children !== undefined) {
+            if (newNode.type !== updated.type && newNode.children !== undefined) {
+              clone['children'] = [newNode]
+            } else if (newNode.children !== undefined) {
               clone['children'] = newNode.children
             } else {
               clone['value'] = newNode.value
@@ -504,7 +553,7 @@ export function applyDelta(
             })
             const newItems = newNode.children ?? []
             // If node is a wrapper (e.g. property containing array), apply to inner array
-            const innerArray = getInnerArrayNode(updated)
+            const innerArray = getInnerArrayNode(updated, descriptors)
             if (innerArray) {
               const merged = setChildren(innerArray, [...(innerArray.children ?? []), ...newItems])
               updated = setChildren(updated, [merged])
@@ -520,7 +569,7 @@ export function applyDelta(
             })
             const newItems = newNode.children ?? []
             // If node is a wrapper, apply to inner array
-            const innerArray = getInnerArrayNode(updated)
+            const innerArray = getInnerArrayNode(updated, descriptors)
             const existingChildren = [...((innerArray ?? updated).children ?? [])]
 
             // Build map of new items by mergeKey value
@@ -574,14 +623,31 @@ export function applyDelta(
         scopePath = paths[0]!
       }
 
-      // Build new node
+      // Build new node(s)
       let newNode: ArtifactNode
+      let extraNodes: ArtifactNode[] = []
       if (entry.content !== undefined) {
         const parsed = parseContent(entry.content)
-        // For added, content starts with the identifying line — take first child
         const firstChild = parsed.root.children?.[0]
         if (firstChild !== undefined) {
-          newNode = firstChild
+          const scopeNode = scopePath.length === 0 ? newRoot : getNodeAtPath(newRoot, scopePath)
+          const scopeDescriptor = descriptors?.get(scopeNode.type)
+          const shouldUnwrap = scopeDescriptor?.isCollection === true
+          if (
+            shouldUnwrap &&
+            firstChild.type === scopeNode.type &&
+            firstChild.children !== undefined
+          ) {
+            const items = firstChild.children
+            if (items.length > 0) {
+              newNode = items[0]!
+              extraNodes = items.slice(1)
+            } else {
+              newNode = parsed.root
+            }
+          } else {
+            newNode = firstChild
+          }
         } else {
           newNode = parsed.root
         }
@@ -599,27 +665,27 @@ export function applyDelta(
       newRoot = updateNodeInTree(newRoot, scopePath, (scopeNode) => {
         const children = [...(scopeNode.children ?? [])]
         const pos = entry.position
+        const allNew = [newNode, ...extraNodes]
 
         if (pos?.first === true) {
-          children.unshift(newNode)
+          children.unshift(...allNew)
         } else if (pos?.after !== undefined) {
           const idx = findInChildren(children, pos.after)
           if (idx === -1) {
-            // Fallback: append at end
-            children.push(newNode)
+            children.push(...allNew)
           } else {
-            children.splice(idx + 1, 0, newNode)
+            children.splice(idx + 1, 0, ...allNew)
           }
         } else if (pos?.before !== undefined) {
           const idx = findInChildren(children, pos.before)
           if (idx === -1) {
-            children.push(newNode)
+            children.push(...allNew)
           } else {
-            children.splice(idx, 0, newNode)
+            children.splice(idx, 0, ...allNew)
           }
         } else {
           // last or no hint: append
-          children.push(newNode)
+          children.push(...allNew)
         }
 
         return setChildren(scopeNode, children)
@@ -627,7 +693,7 @@ export function applyDelta(
     }
   }
 
-  return { root: newRoot }
+  return { ast: { root: newRoot }, warnings }
 }
 
 /**
@@ -651,12 +717,16 @@ function getMergeKeyValue(item: ArtifactNode, mergeKey: string): string | null {
  * returns that inner array node. Otherwise returns null.
  *
  * @param node - The node to inspect
+ * @param descriptors - Map of node type names to their descriptors
  * @returns The inner array/sequence/list node, or `null` if the node is not a single-child wrapper
  */
-function getInnerArrayNode(node: ArtifactNode): ArtifactNode | null {
-  const arrayTypes = ['array', 'sequence', 'list']
-  if (node.children?.length === 1 && arrayTypes.includes(node.children[0]!.type)) {
-    return node.children[0]!
+function getInnerArrayNode(
+  node: ArtifactNode,
+  descriptors?: ReadonlyMap<string, NodeTypeDescriptor>,
+): ArtifactNode | null {
+  if (node.children?.length === 1) {
+    const childDescriptor = descriptors?.get(node.children[0]!.type)
+    if (childDescriptor?.isSequence) return node.children[0]!
   }
   return null
 }

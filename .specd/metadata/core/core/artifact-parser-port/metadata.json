@@ -14,7 +14,7 @@
     {
       "requirement": "ArtifactParser interface shape",
       "rules": [
-        "The port MUST be declared as a TypeScript `interface` named `ArtifactParser`. It SHALL define the following members:\n\n- `fileExtensions: readonly string[]` — the file extensions this adapter handles\n- `parse(content: string): ArtifactAST` — parse content into a normalised AST\n- `apply(ast: ArtifactAST, delta: readonly DeltaEntry[]): ArtifactAST` — apply delta entries to an AST\n- `serialize(ast: ArtifactAST): string` — serialise an AST back to native format\n- `renderSubtree(node: ArtifactNode): string` — serialise a single node and its descendants\n- `nodeTypes(): readonly NodeTypeDescriptor[]` — describe addressable node types for the format\n- `outline(ast: ArtifactAST): readonly OutlineEntry[]` — produce a navigable summary of addressable nodes\n- `deltaInstructions(): string` — return format-specific static text for delta generation context\n- `parseDelta(content: string): readonly DeltaEntry[]` — parse a YAML delta file into typed entries"
+        "The port MUST be declared as a TypeScript `interface` named `ArtifactParser`. It SHALL define the following members:\n\n- `fileExtensions: readonly string[]` — the file extensions this adapter handles\n- `parse(content: string): ArtifactAST` — parse content into a normalised AST\n- `apply(ast: ArtifactAST, delta: readonly DeltaEntry[]): DeltaApplicationResult` — apply delta entries to an AST, returning the modified AST plus any semantic validation warnings\n- `serialize(ast: ArtifactAST): string` — serialise an AST back to native format\n- `renderSubtree(node: ArtifactNode): string` — serialise a single node and its descendants\n- `nodeTypes(): readonly NodeTypeDescriptor[]` — describe addressable node types for the format\n- `outline(ast: ArtifactAST): readonly OutlineEntry[]` — produce a navigable summary of addressable nodes\n- `deltaInstructions(): string` — return format-specific static text for delta generation context\n- `parseDelta(content: string): readonly DeltaEntry[]` — parse a YAML delta file into typed entries"
       ]
     },
     {
@@ -38,7 +38,7 @@
     {
       "requirement": "Apply contract — atomic selector resolution",
       "rules": [
-        "The `apply` method MUST resolve all selectors before applying any operation. If any selector fails to resolve (no match or ambiguous match), the entire application MUST be rejected with a `DeltaApplicationError`. Partial application SHALL NOT occur."
+        "The `apply` method MUST resolve all selectors before applying any operation. If any selector fails to resolve (no match or ambiguous match), the entire application MUST be rejected with a `DeltaApplicationError`. Partial application SHALL NOT occur.\n\nThe method returns a `DeltaApplicationResult` containing the modified AST and any semantic validation warnings. Callers MUST check `result.warnings` for ambiguity warnings on hybrid node types."
       ]
     },
     {
@@ -57,6 +57,12 @@
       "requirement": "NodeTypes contract",
       "rules": [
         "The `nodeTypes` method MUST return a static array of `NodeTypeDescriptor` entries describing every addressable node type for the format. Each descriptor MUST include `type`, `identifiedBy`, and `description`."
+      ]
+    },
+    {
+      "requirement": "Node nature descriptors",
+      "rules": [
+        "Each `NodeTypeDescriptor` returned by `nodeTypes()` MUST include boolean flags that declaratively describe the nature of the node type. These flags drive the `applyDelta` engine's collection-aware logic and semantic validation — they MUST accurately reflect the AST structure that the parser produces.\n\n#### Structural flags\n\n- `isContainer: boolean` — the node has or can have a `children` array. True for any node that can hold child nodes, regardless of whether those children are homogeneous or heterogeneous. Examples: `document` (holds sections, paragraphs, lists...), `section` (holds paragraphs, lists, nested sections...), `list` (holds `list-item` nodes), `object` (holds `property` nodes).\n- `isLeaf: boolean` — the node has or can have a scalar `value` field (`string | number | boolean | null`). True for nodes that represent atomic data, not structural containers. Examples: `paragraph` (text content), `code-block` (source code), `line` (single line of text). A node that wraps a complex value (e.g. JSON `property` wrapping an object) can be BOTH `isContainer: true` AND `isLeaf: true` — these are hybrid types.\n- A node that is neither container nor leaf (e.g. markdown `thematic-break`) is a void node — it has neither `children` nor `value`. All three flags being `false` is valid but means the node cannot be meaningfully modified by delta operations.\n\n#### Collection flags\n\n- `isCollection: boolean` — the node's children are homogeneous: ALL children are of the same type (or the same small set of closely related types). For example: `list` always has `list-item` children, `object` always has `property` children, `array` always has `array-item` children. Contrast with `section` which has heterogeneous children (paragraphs, lists, code blocks, nested sections) — `section` is `isContainer: true` but `isCollection: false`. Controls same-type unwrapping in `added` entries: when the parent scope is a collection and parsed content starts with the same type, the engine unwraps to the inner children instead of nesting.\n- `isSequence: boolean` — the node is an ordered sequential collection where position matters and items can be appended, reordered, or merged by key. This is a subset of `isCollection`: `list`, `array`, and `sequence` are sequences, but `object` and `mapping` are NOT (their children are key-value pairs identified by name, not by position). Controls whether `strategy` (append/merge-by) is valid and whether the node is treated as \"array-like\" by the delta engine.\n- `isSequenceItem: boolean` — the node is a positional item within a sequential collection. True for `list-item`, `array-item`, and `sequence-item`. These nodes may themselves be hybrids (e.g. an `array-item` can wrap a scalar value or an entire object). Used for \"all children are sequence items\" detection and for finding inner array nodes wrapped inside property/pair containers.\n\n#### Example flag assignments\n\n| Node | isCollection | isSequence | isSequenceItem | isContainer | isLeaf | Why |\n|------|:---:|:---:|:---:|:---:|:---:|-----|\n| `document` (md) | F | F | F | T | F | Has heterogeneous children (sections, paragraphs...) |\n| `section` (md) | F | F | F | T | F | Has heterogeneous children (paragraphs, lists...) |\n| `list` (md) | T | T | F | T | F | Homogeneous ordered children (list-items), supports strategy |\n| `list-item` (md) | F | F | T | T | F | Item within a list, may have nested lists as children |\n| `paragraph` (md) | F | F | F | F | T | Scalar text value, no children |\n| `object` (json) | T | F | F | T | F | Homogeneous children (properties), but keyed not ordered |\n| `property` (json) | F | F | F | T | T | Hybrid: wraps scalar value OR object/array as child |\n| `array` (json) | T | T | F | T | F | Homogeneous ordered children (array-items), supports strategy |\n| `array-item` (json) | F | F | T | T | T | Hybrid item: scalar value OR object/array as child |\n| `thematic-break` (md) | F | F | F | F | F | Void: no children, no value |\n\nThe shared `applyDelta` engine MUST use these flags instead of hardcoded type vectors for all collection-aware logic."
       ]
     },
     {
@@ -96,7 +102,7 @@
     {
       "requirement": "Supporting type shapes",
       "rules": [
-        "- `NodeTypeDescriptor` MUST contain `type: string`, `identifiedBy: readonly string[]`, and `description: string`.\n- `OutlineEntry` MUST contain `type: string`, `label: string`, `depth: number`, and optional `children: readonly OutlineEntry[]`."
+        "- `NodeTypeDescriptor` MUST contain `type: string`, `identifiedBy: readonly string[]`, `description: string`, `isCollection: boolean`, `isSequence: boolean`, `isSequenceItem: boolean`, `isContainer: boolean`, and `isLeaf: boolean`.\n- `OutlineEntry` MUST contain `type: string`, `label: string`, `depth: number`, and optional `children: readonly OutlineEntry[]`."
       ]
     }
   ],
@@ -152,7 +158,10 @@
       "name": "All selectors resolve successfully",
       "given": ["a valid AST and delta entries whose selectors all match exactly one node"],
       "when": ["apply is called"],
-      "then": ["a new AST is returned with all operations applied"]
+      "then": [
+        "it returns a DeltaApplicationResult whose ast has all operations applied",
+        "AND warnings is empty when no semantic issues are detected"
+      ]
     },
     {
       "requirement": "Apply contract — atomic selector resolution",
@@ -273,11 +282,69 @@
       "given": ["a markdown AST containing an ordered list"],
       "when": ["the corresponding ArtifactNode is inspected"],
       "then": ["it has ordered set to true"]
+    },
+    {
+      "requirement": "Node nature descriptors",
+      "name": "Markdown nodeTypes include nature flags",
+      "when": ["nodeTypes() is called on the markdown adapter"],
+      "then": [
+        "each NodeTypeDescriptor includes isCollection, isSequence, isSequenceItem, isContainer, and isLeaf flags",
+        "AND document has isCollection: false, isSequence: false, isSequenceItem: false, isContainer: true, isLeaf: false",
+        "AND section has isCollection: false, isSequence: false, isSequenceItem: false, isContainer: true, isLeaf: false",
+        "AND paragraph has isCollection: false, isSequence: false, isSequenceItem: false, isContainer: false, isLeaf: true",
+        "AND list has isCollection: true, isSequence: true, isSequenceItem: false, isContainer: true, isLeaf: false",
+        "AND list-item has isCollection: false, isSequence: false, isSequenceItem: true, isContainer: true, isLeaf: false",
+        "AND code-block has isCollection: false, isSequence: false, isSequenceItem: false, isContainer: false, isLeaf: true",
+        "AND thematic-break has isCollection: false, isSequence: false, isSequenceItem: false, isContainer: false, isLeaf: false"
+      ]
+    },
+    {
+      "requirement": "Node nature descriptors",
+      "name": "JSON nodeTypes include nature flags",
+      "when": ["nodeTypes() is called on the JSON adapter"],
+      "then": [
+        "document has isCollection: false, isSequence: false, isContainer: true, isLeaf: false",
+        "AND object has isCollection: true, isSequence: false, isContainer: true, isLeaf: false",
+        "AND property has isCollection: false, isSequence: false, isContainer: true, isLeaf: true (identifiedBy includes \"matches\", so has label)",
+        "AND array has isCollection: true, isSequence: true, isContainer: true, isLeaf: false",
+        "AND array-item has isCollection: false, isSequence: false, isSequenceItem: true, isContainer: true, isLeaf: true"
+      ]
+    },
+    {
+      "requirement": "Node nature descriptors",
+      "name": "YAML nodeTypes include nature flags",
+      "when": ["nodeTypes() is called on the YAML adapter"],
+      "then": [
+        "document has isCollection: false, isSequence: false, isContainer: true, isLeaf: false",
+        "AND mapping has isCollection: true, isSequence: false, isContainer: true, isLeaf: false",
+        "AND pair has isCollection: false, isSequence: false, isContainer: true, isLeaf: true (identifiedBy includes \"matches\", so has label)",
+        "AND sequence has isCollection: true, isSequence: true, isContainer: true, isLeaf: false",
+        "AND sequence-item has isCollection: false, isSequence: false, isSequenceItem: true, isContainer: true, isLeaf: true"
+      ]
+    },
+    {
+      "requirement": "Node nature descriptors",
+      "name": "Plaintext nodeTypes include nature flags",
+      "when": ["nodeTypes() is called on the plaintext adapter"],
+      "then": [
+        "document has isCollection: false, isSequence: false, isContainer: true, isLeaf: false",
+        "AND paragraph has isCollection: true, isSequence: false, isContainer: false, isLeaf: false",
+        "AND line has isCollection: false, isSequence: false, isContainer: false, isLeaf: true"
+      ]
+    },
+    {
+      "requirement": "Node nature descriptors",
+      "name": "No hardcoded type vectors in applyDelta",
+      "when": ["the source of applyDelta is inspected"],
+      "then": [
+        "there are no hardcoded arrays of type names like ['array', 'sequence', 'list'] or ['array-item', 'sequence-item', 'list-item']",
+        "AND all collection-aware logic uses descriptor flag lookups (isSequence, isSequenceItem, isCollection)"
+      ]
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:a7cef0fef49ab202646a08a411821a996b910868560cde78024cf20a810bbf7c",
-    "verify.md": "sha256:ea39277bf69e7cbf5e6084d6cfa1e3a8c93d5851229687d8fb90290396c42ad2"
+    "spec.md": "sha256:bd947899b24f04948fa77811dbbe2fa2d75003b04042a2913203dbd028dcaf7c",
+    "verify.md": "sha256:fabccd4b4ff94192cdc8cb4ca68009bc5d5b4957b5e7483ac7fd694f50a0db99"
   },
   "generatedBy": "core"
 }

@@ -2,6 +2,7 @@ import {
   type ArtifactAST,
   type ArtifactNode,
   type ArtifactParser,
+  type DeltaApplicationResult,
   type DeltaEntry,
   type NodeTypeDescriptor,
   type OutlineEntry,
@@ -156,8 +157,9 @@ export class JsonParser implements ArtifactParser {
    * @param delta - The ordered list of delta entries
    * @returns A new AST with all delta operations applied
    */
-  apply(ast: ArtifactAST, delta: readonly DeltaEntry[]): ArtifactAST {
-    return applyDelta(ast, delta, (c) => this.parse(c), jsonValueToNode)
+  apply(ast: ArtifactAST, delta: readonly DeltaEntry[]): DeltaApplicationResult {
+    const descriptorMap = new Map(this.nodeTypes().map((d) => [d.type, d]))
+    return applyDelta(ast, delta, (c) => this.parse(c), jsonValueToNode, descriptorMap)
   }
 
   /**
@@ -193,27 +195,52 @@ export class JsonParser implements ArtifactParser {
         type: 'document',
         identifiedBy: [],
         description: 'Root node of a JSON document.',
+        isCollection: false,
+        isSequence: false,
+        isSequenceItem: false,
+        isContainer: true,
+        isLeaf: false,
       },
       {
         type: 'object',
         identifiedBy: [],
         description: 'A JSON object containing property nodes.',
+        isCollection: true,
+        isSequence: false,
+        isSequenceItem: false,
+        isContainer: true,
+        isLeaf: false,
       },
       {
         type: 'property',
         identifiedBy: ['matches'],
         description: 'A key–value entry in a JSON object. `matches` targets the key name.',
+        isCollection: false,
+        isSequence: false,
+        isSequenceItem: false,
+        isContainer: true,
+        isLeaf: true,
       },
       {
         type: 'array',
         identifiedBy: [],
         description: 'A JSON array containing array-item nodes.',
+        isCollection: true,
+        isSequence: true,
+        isSequenceItem: false,
+        isContainer: true,
+        isLeaf: false,
       },
       {
         type: 'array-item',
         identifiedBy: ['index', 'where'],
         description:
           'An item in a JSON array. Use `index` for zero-based position or `where` for object items.',
+        isCollection: false,
+        isSequence: false,
+        isSequenceItem: true,
+        isContainer: true,
+        isLeaf: true,
       },
     ]
   }

@@ -169,7 +169,7 @@ describe('MarkdownParser', () => {
           content: 'New body.\n',
         },
       ])
-      const section = result.root.children![0]!
+      const section = result.ast.root.children![0]!
       expect(section.label).toBe('Requirement: Login')
       const para = section.children![0]!
       expect(para).toMatchObject({ type: 'paragraph', value: 'New body.' })
@@ -184,7 +184,7 @@ describe('MarkdownParser', () => {
           rename: 'Requirement: Authentication',
         },
       ])
-      const section = result.root.children![0]!
+      const section = result.ast.root.children![0]!
       expect(section.label).toBe('Requirement: Authentication')
     })
 
@@ -198,7 +198,7 @@ describe('MarkdownParser', () => {
           content: 'New body.\n',
         },
       ])
-      const section = result.root.children![0]!
+      const section = result.ast.root.children![0]!
       expect(section.label).toBe('Requirement: Authentication')
       expect(section.children![0]!).toMatchObject({ type: 'paragraph', value: 'New body.' })
     })
@@ -239,8 +239,8 @@ describe('MarkdownParser', () => {
           content: '## New Section\n\nBody.\n',
         },
       ])
-      expect(result.root.children).toHaveLength(2)
-      expect(result.root.children![1]!.label).toBe('New Section')
+      expect(result.ast.root.children).toHaveLength(2)
+      expect(result.ast.root.children![1]!.label).toBe('New Section')
     })
 
     it('added with position.parent appends as last child', () => {
@@ -252,7 +252,7 @@ describe('MarkdownParser', () => {
           content: '### Requirement: B\n\nNew requirement.\n',
         },
       ])
-      const reqs = result.root.children![0]!
+      const reqs = result.ast.root.children![0]!
       expect(reqs.children).toHaveLength(2)
       expect(reqs.children![1]!.label).toBe('Requirement: B')
     })
@@ -269,7 +269,7 @@ describe('MarkdownParser', () => {
           content: '### Requirement: B\n\nInserted.\n',
         },
       ])
-      const reqs = result.root.children![0]!
+      const reqs = result.ast.root.children![0]!
       expect(reqs.children).toHaveLength(3)
       expect(reqs.children![0]!.label).toBe('Requirement: A')
       expect(reqs.children![1]!.label).toBe('Requirement: B')
@@ -289,7 +289,7 @@ describe('MarkdownParser', () => {
           content: '### Requirement: B\n\nFallback.\n',
         },
       ])
-      const reqs = result.root.children![0]!
+      const reqs = result.ast.root.children![0]!
       expect(reqs.children).toHaveLength(2)
       expect(reqs.children![1]!.label).toBe('Requirement: B')
     })
@@ -306,7 +306,7 @@ describe('MarkdownParser', () => {
           content: '### Requirement: New\n\nFirst.\n',
         },
       ])
-      const reqs = result.root.children![0]!
+      const reqs = result.ast.root.children![0]!
       expect(reqs.children![0]!.label).toBe('Requirement: New')
     })
 
@@ -322,7 +322,7 @@ describe('MarkdownParser', () => {
           content: '### Requirement: Z\n\nLast.\n',
         },
       ])
-      const reqs = result.root.children![0]!
+      const reqs = result.ast.root.children![0]!
       expect(reqs.children![reqs.children!.length - 1]!.label).toBe('Requirement: Z')
     })
 
@@ -349,7 +349,7 @@ describe('MarkdownParser', () => {
           selector: { type: 'section', matches: 'Requirement: Logout' },
         },
       ])
-      const reqs = result.root.children![0]!
+      const reqs = result.ast.root.children![0]!
       expect(reqs.children).toHaveLength(1)
       expect(reqs.children![0]!.label).toBe('Requirement: Login')
     })
@@ -368,7 +368,7 @@ describe('MarkdownParser', () => {
           rename: 'Requirement: Beta',
         },
       ])
-      const reqs = result.root.children![0]!
+      const reqs = result.ast.root.children![0]!
       expect(reqs.children![0]!.label).toBe('Requirement: Alpha')
       expect(reqs.children![1]!.label).toBe('Requirement: Beta')
     })
@@ -389,7 +389,7 @@ describe('MarkdownParser', () => {
           content: '### Requirement: C\n\nNew.\n',
         },
       ])
-      const reqs = result.root.children![0]!
+      const reqs = result.ast.root.children![0]!
       expect(reqs.children).toHaveLength(2)
       expect(reqs.children![0]!.label).toBe('Requirement: A')
       expect(reqs.children![1]!.label).toBe('Requirement: C')
@@ -436,7 +436,7 @@ describe('MarkdownParser', () => {
         },
       ])
 
-      const serialized = parser.serialize(result)
+      const serialized = parser.serialize(result.ast)
       expect(serialized).toContain('`specd change validate <name>`')
       expect(serialized).not.toContain('\\<name\\>')
     })
@@ -452,7 +452,7 @@ describe('MarkdownParser', () => {
           content: 'New text.\n',
         },
       ])
-      const serialized = parser.serialize(result)
+      const serialized = parser.serialize(result.ast)
       expect(serialized).toContain('\n---\n')
       expect(serialized).not.toContain('\n***\n')
     })
@@ -469,7 +469,7 @@ describe('MarkdownParser', () => {
         },
       ])
 
-      const serialized = parser.serialize(result)
+      const serialized = parser.serialize(result.ast)
       expect(serialized).toContain('> Warning line')
       expect(serialized).not.toContain('\\> Warning line')
     })
@@ -485,7 +485,7 @@ describe('MarkdownParser', () => {
           content: 'New text.\n',
         },
       ])
-      const serialized = parser.serialize(result)
+      const serialized = parser.serialize(result.ast)
       expect(serialized).toContain('3. Keep as three')
       expect(serialized).toContain('4. Keep as four')
       expect(serialized).not.toContain('1. Keep as three')
@@ -537,7 +537,7 @@ describe('MarkdownParser', () => {
           rename: 'Requirement: Load configuration',
         },
       ])
-      const reqs = result.root.children![0]!
+      const reqs = result.ast.root.children![0]!
       expect(reqs.children![0]!.label).toBe('Requirement: Load configuration')
     })
 
@@ -550,7 +550,7 @@ describe('MarkdownParser', () => {
           selector: { type: 'section', matches: '^Requirement:' },
         },
       ])
-      const reqs = result.root.children![0]!
+      const reqs = result.ast.root.children![0]!
       expect(reqs.children).toHaveLength(1)
       expect(reqs.children![0]!.label).toBe('Auth: Other')
     })
@@ -571,8 +571,8 @@ describe('MarkdownParser', () => {
           rename: 'Requirement: Authentication',
         },
       ])
-      const requirementsSection = result.root.children![0]!
-      const constraintsSection = result.root.children![1]!
+      const requirementsSection = result.ast.root.children![0]!
+      const constraintsSection = result.ast.root.children![1]!
       expect(requirementsSection.children![0]!.label).toBe('Requirement: Authentication')
       expect(constraintsSection.children![0]!.label).toBe('Requirement: Login')
     })
@@ -615,11 +615,396 @@ describe('MarkdownParser', () => {
           selector: { type: 'paragraph', contains: 'SHALL authenticate' },
         },
       ])
-      expect(result.root.children).toHaveLength(1)
-      expect(result.root.children![0]!).toMatchObject({
+      expect(result.ast.root.children).toHaveLength(1)
+      expect(result.ast.root.children![0]!).toMatchObject({
         type: 'paragraph',
         value: 'Other paragraph.',
       })
+    })
+
+    it('paragraph modified with unique selector replaces only target paragraph', () => {
+      const ast = parser.parse(
+        '## Requirement: Target section\n\nParagraph with unique marker.\n\n## Requirement: Other section\n\nParagraph that must remain unchanged.\n',
+      )
+      const result = parser.apply(ast, [
+        {
+          op: 'modified',
+          selector: { type: 'paragraph', contains: 'unique marker' },
+          value: 'Replacement paragraph text.',
+        },
+      ])
+
+      const targetSection = result.ast.root.children![0]!
+      const otherSection = result.ast.root.children![1]!
+      expect(targetSection.children![0]!).toMatchObject({
+        type: 'paragraph',
+        value: 'Replacement paragraph text.',
+      })
+      expect(otherSection.children![0]!).toMatchObject({
+        type: 'paragraph',
+        value: 'Paragraph that must remain unchanged.',
+      })
+    })
+
+    it('paragraph modified with ambiguous selector fails atomically', () => {
+      const ast = parser.parse(
+        '## Requirement: A\n\nShared paragraph text.\n\n## Requirement: B\n\nShared paragraph text.\n',
+      )
+      expect(() =>
+        parser.apply(ast, [
+          {
+            op: 'modified',
+            selector: { type: 'paragraph', contains: '^Shared paragraph text\\.$' },
+            content: 'Should not be applied.\n',
+          },
+        ]),
+      ).toThrow(DeltaApplicationError)
+
+      const sectionA = ast.root.children![0]!
+      const sectionB = ast.root.children![1]!
+      expect(sectionA.children![0]!).toMatchObject({
+        type: 'paragraph',
+        value: 'Shared paragraph text.',
+      })
+      expect(sectionB.children![0]!).toMatchObject({
+        type: 'paragraph',
+        value: 'Shared paragraph text.',
+      })
+    })
+
+    it('paragraph modified with parent selector resolves ambiguity', () => {
+      const ast = parser.parse(
+        '## Requirement: Target section\n\nShared paragraph text.\n\n## Requirement: Other section\n\nShared paragraph text.\n',
+      )
+      const result = parser.apply(ast, [
+        {
+          op: 'modified',
+          selector: {
+            type: 'paragraph',
+            contains: '^Shared paragraph text\\.$',
+            parent: { type: 'section', matches: '^Requirement: Target section$' },
+          },
+          value: 'Scoped replacement text.',
+        },
+      ])
+
+      const targetSection = result.ast.root.children![0]!
+      const otherSection = result.ast.root.children![1]!
+      expect(targetSection.children![0]!).toMatchObject({
+        type: 'paragraph',
+        value: 'Scoped replacement text.',
+      })
+      expect(otherSection.children![0]!).toMatchObject({
+        type: 'paragraph',
+        value: 'Shared paragraph text.',
+      })
+    })
+  })
+
+  describe('apply — added operation for all node types', () => {
+    it('added section with parent.after placement', () => {
+      const ast = parser.parse('## Requirements\n\n### Requirement: A\n\nBody A.\n')
+      const result = parser.apply(ast, [
+        {
+          op: 'added',
+          position: {
+            parent: { type: 'section', matches: 'Requirements' },
+            after: { type: 'section', matches: 'Requirement: A' },
+          },
+          content: '### Requirement: B\n\nBody B.\n',
+        },
+      ])
+      const reqs = result.ast.root.children![0]!
+      expect(reqs.children).toHaveLength(2)
+      expect(reqs.children![0]!.label).toBe('Requirement: A')
+      expect(reqs.children![1]!.label).toBe('Requirement: B')
+    })
+
+    it('added list as child of section via position.parent', () => {
+      const ast = parser.parse('## Section\n\nParagraph.\n')
+      const result = parser.apply(ast, [
+        {
+          op: 'added',
+          position: { parent: { type: 'section', matches: 'Section' } },
+          content: '- Item one\n- Item two\n',
+        },
+      ])
+      const section = result.ast.root.children![0]!
+      expect(section.children).toHaveLength(2)
+      expect(section.children![1]!.type).toBe('list')
+      expect(section.children![1]!.children).toHaveLength(2)
+    })
+
+    it('added code-block at document root', () => {
+      const ast = parser.parse('Existing paragraph.\n')
+      const result = parser.apply(ast, [
+        {
+          op: 'added',
+          content: '```ts\nconsole.log("hello")\n```\n',
+        },
+      ])
+      expect(result.ast.root.children).toHaveLength(2)
+      expect(result.ast.root.children![1]!.type).toBe('code-block')
+      expect(result.ast.root.children![1]!.value).toBe('console.log("hello")')
+    })
+
+    it('added list-item via content under existing list', () => {
+      const ast = parser.parse('- Alpha\n- Beta\n')
+      const result = parser.apply(ast, [
+        {
+          op: 'added',
+          position: { parent: { type: 'list' } },
+          content: '- Gamma\n',
+        },
+      ])
+      const list = result.ast.root.children![0]!
+      expect(list.type).toBe('list')
+      expect(list.children).toHaveLength(3)
+      expect(list.children![2]!.type).toBe('list-item')
+      expect(list.children![2]!.label).toBe('Gamma')
+    })
+
+    it('added thematic-break between sections', () => {
+      const ast = parser.parse('## A\n\n## B\n')
+      const result = parser.apply(ast, [
+        {
+          op: 'added',
+          position: {
+            after: { type: 'section', matches: '^A$' },
+          },
+          content: '---\n',
+        },
+      ])
+      expect(result.ast.root.children).toHaveLength(3)
+      expect(result.ast.root.children![1]!.type).toBe('thematic-break')
+      expect(result.ast.root.children![0]!.label).toBe('A')
+      expect(result.ast.root.children![2]!.label).toBe('B')
+    })
+  })
+
+  describe('apply — modified operation for all node types', () => {
+    it('modified document replaces root children', () => {
+      const ast = parser.parse('## Old\n\nOld body.\n')
+      const result = parser.apply(ast, [
+        {
+          op: 'modified',
+          selector: { type: 'document' },
+          content: '## New\n\nNew body.\n',
+        },
+      ])
+      expect(result.ast.root.children).toHaveLength(1)
+      expect(result.ast.root.children![0]!.label).toBe('New')
+    })
+
+    it('modified section replaces body only', () => {
+      const ast = parser.parse('## Section\n\nOld body.\n')
+      const result = parser.apply(ast, [
+        {
+          op: 'modified',
+          selector: { type: 'section', matches: 'Section' },
+          content: 'New body.\n',
+        },
+      ])
+      const section = result.ast.root.children![0]!
+      expect(section.label).toBe('Section')
+      expect(section.children![0]!).toMatchObject({ type: 'paragraph', value: 'New body.' })
+    })
+
+    it('modified paragraph replaces value via value', () => {
+      const ast = parser.parse('## S\n\nOld paragraph text.\n')
+      const result = parser.apply(ast, [
+        {
+          op: 'modified',
+          selector: { type: 'paragraph', contains: 'Old paragraph' },
+          value: 'New paragraph text.',
+        },
+      ])
+      const section = result.ast.root.children![0]!
+      expect(section.children![0]!).toMatchObject({
+        type: 'paragraph',
+        value: 'New paragraph text.',
+      })
+    })
+
+    it('modified list replaces children', () => {
+      const ast = parser.parse('- Old A\n- Old B\n')
+      const result = parser.apply(ast, [
+        {
+          op: 'modified',
+          selector: { type: 'list' },
+          content: '- New X\n',
+        },
+      ])
+      const list = result.ast.root.children![0]!
+      expect(list.type).toBe('list')
+      expect(list.children).toHaveLength(1)
+      expect(list.children![0]!).toMatchObject({ type: 'list-item', label: 'New X' })
+    })
+
+    it('modified list-item via rename updates label', () => {
+      const ast = parser.parse('- Alpha\n- Beta\n- Gamma\n')
+      const result = parser.apply(ast, [
+        {
+          op: 'modified',
+          selector: { type: 'list-item', matches: 'Beta' },
+          rename: 'Replaced Beta',
+        },
+      ])
+      const list = result.ast.root.children![0]!
+      expect(list.children![0]!).toMatchObject({ type: 'list-item', label: 'Alpha' })
+      expect(list.children![1]!).toMatchObject({ type: 'list-item', label: 'Replaced Beta' })
+      expect(list.children![2]!).toMatchObject({ type: 'list-item', label: 'Gamma' })
+    })
+
+    it('modified code-block replaces value via value', () => {
+      const ast = parser.parse('```typescript\nconst x = 1\n```\n')
+      const result = parser.apply(ast, [
+        {
+          op: 'modified',
+          selector: { type: 'code-block', matches: 'typescript' },
+          value: 'const y = 2',
+        },
+      ])
+      const codeBlock = result.ast.root.children![0]!
+      expect(codeBlock.type).toBe('code-block')
+      expect(codeBlock.label).toBe('typescript')
+      expect(codeBlock.value).toBe('const y = 2')
+    })
+
+    it('modified section preserves untouched sibling section', () => {
+      const ast = parser.parse('## A\n\nBody A.\n\n## B\n\nBody B.\n')
+      const result = parser.apply(ast, [
+        {
+          op: 'modified',
+          selector: { type: 'section', matches: '^A$' },
+          content: 'Updated A.\n',
+        },
+      ])
+      const sectionA = result.ast.root.children![0]!
+      const sectionB = result.ast.root.children![1]!
+      expect(sectionA.children![0]!).toMatchObject({ type: 'paragraph', value: 'Updated A.' })
+      expect(sectionB.children![0]!).toMatchObject({ type: 'paragraph', value: 'Body B.' })
+    })
+  })
+
+  describe('apply — removed operation for all node types', () => {
+    it('removed section detaches heading and body', () => {
+      const ast = parser.parse('## Keep\n\nKeep body.\n\n## Remove\n\nRemove body.\n')
+      const result = parser.apply(ast, [
+        {
+          op: 'removed',
+          selector: { type: 'section', matches: 'Remove' },
+        },
+      ])
+      expect(result.ast.root.children).toHaveLength(1)
+      expect(result.ast.root.children![0]!.label).toBe('Keep')
+    })
+
+    it('removed paragraph leaves sibling paragraphs intact', () => {
+      const ast = parser.parse('## S\n\nFirst.\n\nSecond.\n\nThird.\n')
+      const result = parser.apply(ast, [
+        {
+          op: 'removed',
+          selector: { type: 'paragraph', contains: 'Second' },
+        },
+      ])
+      const section = result.ast.root.children![0]!
+      expect(section.children).toHaveLength(2)
+      expect(section.children![0]!).toMatchObject({ type: 'paragraph', value: 'First.' })
+      expect(section.children![1]!).toMatchObject({ type: 'paragraph', value: 'Third.' })
+    })
+
+    it('removed list detaches entire list node', () => {
+      const ast = parser.parse('Paragraph.\n\n- Item 1\n- Item 2\n\nOther paragraph.\n')
+      const result = parser.apply(ast, [
+        {
+          op: 'removed',
+          selector: { type: 'list' },
+        },
+      ])
+      expect(result.ast.root.children).toHaveLength(2)
+      expect(result.ast.root.children![0]!.type).toBe('paragraph')
+      expect(result.ast.root.children![1]!.type).toBe('paragraph')
+    })
+
+    it('removed list-item detaches only targeted item', () => {
+      const ast = parser.parse('- Alpha\n- Beta\n- Gamma\n')
+      const result = parser.apply(ast, [
+        {
+          op: 'removed',
+          selector: { type: 'list-item', matches: 'Beta' },
+        },
+      ])
+      const list = result.ast.root.children![0]!
+      expect(list.children).toHaveLength(2)
+      expect(list.children![0]!).toMatchObject({ type: 'list-item', label: 'Alpha' })
+      expect(list.children![1]!).toMatchObject({ type: 'list-item', label: 'Gamma' })
+    })
+
+    it('removed code-block detaches code node', () => {
+      const ast = parser.parse('Paragraph.\n\n```js\ncode\n```\n\nOther.\n')
+      const result = parser.apply(ast, [
+        {
+          op: 'removed',
+          selector: { type: 'code-block', matches: 'js' },
+        },
+      ])
+      expect(result.ast.root.children).toHaveLength(2)
+      expect(result.ast.root.children![0]!.type).toBe('paragraph')
+      expect(result.ast.root.children![1]!.type).toBe('paragraph')
+    })
+
+    it('removed thematic-break detaches rule node', () => {
+      const ast = parser.parse('Before.\n\n---\n\nAfter.\n')
+      const result = parser.apply(ast, [
+        {
+          op: 'removed',
+          selector: { type: 'thematic-break' },
+        },
+      ])
+      expect(result.ast.root.children).toHaveLength(2)
+      expect(result.ast.root.children![0]!).toMatchObject({ type: 'paragraph', value: 'Before.' })
+      expect(result.ast.root.children![1]!).toMatchObject({ type: 'paragraph', value: 'After.' })
+    })
+  })
+
+  describe('apply — mixed-operation batch atomicity', () => {
+    it('ambiguous selector in mixed added/modified batch fails atomically', () => {
+      const ast = parser.parse('## Section A\n\nShared text.\n\n## Section B\n\nShared text.\n')
+      expect(() =>
+        parser.apply(ast, [
+          {
+            op: 'removed',
+            selector: { type: 'section', matches: 'Section A' },
+          },
+          {
+            op: 'modified',
+            selector: { type: 'paragraph', contains: 'Shared text' },
+            content: 'Should not apply.\n',
+          },
+        ]),
+      ).toThrow(DeltaApplicationError)
+
+      const sectionA = ast.root.children![0]!
+      expect(sectionA.label).toBe('Section A')
+    })
+
+    it('mixed added/removed batch succeeds when selectors are unique', () => {
+      const ast = parser.parse('## A\n\nRemove me.\n\n## B\n\nKeep me.\n')
+      const result = parser.apply(ast, [
+        {
+          op: 'removed',
+          selector: { type: 'section', matches: '^A$' },
+        },
+        {
+          op: 'added',
+          position: { parent: { type: 'section', matches: 'B' } },
+          content: 'New paragraph.\n',
+        },
+      ])
+      expect(result.ast.root.children).toHaveLength(1)
+      expect(result.ast.root.children![0]!.label).toBe('B')
+      expect(result.ast.root.children![0]!.children).toHaveLength(2)
     })
   })
 

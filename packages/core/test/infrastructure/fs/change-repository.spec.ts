@@ -814,6 +814,128 @@ describe('FsChangeRepository', () => {
     })
   })
 
+  describe('expected artifact filenames', () => {
+    function makeSpecsArtifactType(): ArtifactType {
+      return new ArtifactType({
+        id: 'specs',
+        scope: 'spec',
+        output: 'specs/**/spec.md',
+        delta: true,
+        requires: [],
+        validations: [],
+        deltaValidations: [],
+        preHashCleanup: [],
+      })
+    }
+
+    function makeRepoWithArtifactSync(
+      resolveSpecExists?: (specId: string) => Promise<boolean>,
+    ): FsChangeRepository {
+      return new FsChangeRepository({
+        workspace: 'default',
+        ownership: 'owned',
+        isExternal: false,
+        configPath: ctx.configPath,
+        changesPath: ctx.changesPath,
+        draftsPath: ctx.draftsPath,
+        discardedPath: ctx.discardedPath,
+        artifactTypes: [makeSpecsArtifactType()],
+        ...(resolveSpecExists !== undefined ? { resolveSpecExists } : {}),
+      })
+    }
+
+    function makeScopedChange(name: string, specIds: readonly string[]): Change {
+      const at = new Date('2024-01-15T10:00:00.000Z')
+      return new Change({
+        name,
+        createdAt: at,
+        specIds,
+        history: [
+          {
+            type: 'created',
+            at,
+            by: actor,
+            specIds,
+            schemaName: '@specd/schema-std',
+            schemaVersion: 1,
+          },
+        ],
+      })
+    }
+
+    it('persists delta filenames in manifest for existing specs', async () => {
+      const repo = makeRepoWithArtifactSync(async (specId) => specId === 'default:auth/login')
+      const change = makeScopedChange('existing-spec', ['default:auth/login'])
+
+      await repo.save(change)
+
+      const manifestPath = path.join(
+        ctx.changesPath,
+        '20240115-100000-existing-spec',
+        'manifest.json',
+      )
+      const manifest = JSON.parse(await fs.readFile(manifestPath, 'utf8')) as {
+        artifacts: Array<{ type: string; files: Array<{ filename: string }> }>
+      }
+      const specs = manifest.artifacts.find((artifact) => artifact.type === 'specs')
+      expect(specs?.files[0]?.filename).toBe('deltas/default/auth/login/spec.md.delta.yaml')
+    })
+
+    it('normalizes legacy stale manifest filenames on load', async () => {
+      const repo = makeRepoWithArtifactSync(async () => true)
+      const change = makeScopedChange('legacy-stale', ['default:auth/login'])
+
+      await repo.save(change)
+
+      const manifestPath = path.join(
+        ctx.changesPath,
+        '20240115-100000-legacy-stale',
+        'manifest.json',
+      )
+      const stale = JSON.parse(await fs.readFile(manifestPath, 'utf8')) as {
+        artifacts: Array<{ type: string; files: Array<{ filename: string }> }>
+      }
+      const specs = stale.artifacts.find((artifact) => artifact.type === 'specs')
+      if (specs === undefined || specs.files[0] === undefined) {
+        throw new Error('missing specs artifact in manifest fixture')
+      }
+      specs.files[0].filename = 'specs/default/auth/login/spec.md'
+      await fs.writeFile(manifestPath, `${JSON.stringify(stale, null, 2)}\n`, 'utf8')
+
+      const loaded = await repo.get('legacy-stale')
+      expect(loaded?.getArtifact('specs')?.getFile('default:auth/login')?.filename).toBe(
+        'deltas/default/auth/login/spec.md.delta.yaml',
+      )
+
+      const normalized = JSON.parse(await fs.readFile(manifestPath, 'utf8')) as {
+        artifacts: Array<{ type: string; files: Array<{ filename: string }> }>
+      }
+      const normalizedSpecs = normalized.artifacts.find((artifact) => artifact.type === 'specs')
+      expect(normalizedSpecs?.files[0]?.filename).toBe(
+        'deltas/default/auth/login/spec.md.delta.yaml',
+      )
+    })
+
+    it('scaffold creates directories from expected filenames', async () => {
+      const repo = makeRepoWithArtifactSync()
+      const change = makeScopedChange('scaffold-expected', [
+        'default:auth/login',
+        'default:auth/register',
+      ])
+
+      await repo.save(change)
+      await repo.scaffold(change, async (specId) => specId === 'default:auth/login')
+
+      const baseDir = path.join(ctx.changesPath, '20240115-100000-scaffold-expected')
+      await expect(
+        fs.access(path.join(baseDir, 'deltas', 'default', 'auth', 'login')),
+      ).resolves.toBeUndefined()
+      await expect(
+        fs.access(path.join(baseDir, 'specs', 'default', 'auth', 'register')),
+      ).resolves.toBeUndefined()
+    })
+  })
+
   describe('preHashCleanup in status derivation', () => {
     function makeArtifactTypeWithCleanup(): ArtifactType {
       return new ArtifactType({

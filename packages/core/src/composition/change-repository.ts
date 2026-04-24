@@ -44,6 +44,13 @@ export interface FsChangeRepositoryOptions {
    * at construction time (e.g. kernel-level repo created before schema is resolved).
    */
   readonly resolveArtifactTypes?: () => Promise<readonly ArtifactType[]>
+  /**
+   * Async resolver to determine whether a spec already exists.
+   *
+   * Used by fs-backed manifests to resolve expected filenames for
+   * delta-capable spec artifacts.
+   */
+  readonly resolveSpecExists?: (specId: string) => Promise<boolean>
 }
 
 /**
@@ -80,6 +87,9 @@ export function createChangeRepository(
         ...(options.artifactTypes !== undefined ? { artifactTypes: options.artifactTypes } : {}),
         ...(options.resolveArtifactTypes !== undefined
           ? { resolveArtifactTypes: options.resolveArtifactTypes }
+          : {}),
+        ...(options.resolveSpecExists !== undefined
+          ? { resolveSpecExists: options.resolveSpecExists }
           : {}),
       })
   }

@@ -182,7 +182,10 @@ describe('PreviewSpec', () => {
       })
       const mdParser = makeParser({
         parse: (c) => ({ root: { type: 'doc', value: c } }),
-        apply: (_ast, _delta) => ({ root: { type: 'doc', value: mergedContent } }),
+        apply: (_ast, _delta) => ({
+          ast: { root: { type: 'doc', value: mergedContent } },
+          warnings: [] as readonly string[],
+        }),
         serialize: () => mergedContent,
       })
 
@@ -231,7 +234,10 @@ describe('PreviewSpec', () => {
 
       const yamlParser = makeParser({ parseDelta: () => [deltaEntry] })
       const mdParser = makeParser({
-        apply: () => ({ root: { type: 'doc', value: mergedContent } }),
+        apply: () => ({
+          ast: { root: { type: 'doc', value: mergedContent } },
+          warnings: [] as readonly string[],
+        }),
         serialize: () => mergedContent,
       })
       const parsers: ArtifactParserRegistry = new Map([
@@ -276,7 +282,10 @@ describe('PreviewSpec', () => {
 
       const yamlParser = makeParser({ parseDelta: () => [deltaEntry] })
       const mdParser = makeParser({
-        apply: () => ({ root: { type: 'doc', value: mergedContent } }),
+        apply: () => ({
+          ast: { root: { type: 'doc', value: mergedContent } },
+          warnings: [] as readonly string[],
+        }),
         serialize: () => mergedContent,
       })
       const parsers: ArtifactParserRegistry = new Map([

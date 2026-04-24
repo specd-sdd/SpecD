@@ -8,7 +8,7 @@ import { ChangeArtifact } from './change-artifact.js'
 import { ArtifactFile } from '../value-objects/artifact-file.js'
 import { type ArtifactType } from '../value-objects/artifact-type.js'
 import { parseSpecId } from '../services/parse-spec-id.js'
-import * as path from 'node:path'
+import { expectedArtifactFilename } from '../services/artifact-filename.js'
 
 /** Kebab-case pattern for change names: lowercase alphanumeric segments separated by hyphens. */
 const CHANGE_NAME_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
@@ -655,13 +655,12 @@ export class Change {
    *
    * For each artifact type:
    * - Creates the `ChangeArtifact` if missing
-   * - For `scope: 'change'`: ensures one `ArtifactFile` keyed by the type id,
-   *   filename = basename from `artifactType.output`
-   * - For `scope: 'spec'`: ensures one `ArtifactFile` per specId,
-   *   filename = basename from `artifactType.output`
+   * - For `scope: 'change'`: ensures one `ArtifactFile` keyed by the type id
+   * - For `scope: 'spec'`: ensures one `ArtifactFile` per specId
    * - Removes files for specIds no longer in the change
    * - Removes artifacts for types no longer in the schema
-   * - Preserves existing `validatedHash` and `state` for surviving entries
+   * - Preserves existing `validatedHash` and `state` for surviving entries,
+   *   including filename normalization
    *
    * If the sync produces any changes, an `artifacts-synced` event is appended
    * to the history.
@@ -670,14 +669,19 @@ export class Change {
    * and `save()` to keep the artifact map in sync with schema x specIds.
    *
    * @param artifactTypes - The resolved artifact types from the active schema
+   * @param specExistence - Optional precomputed spec-existence map by specId
    * @returns `true` if any changes were made, `false` if the artifact map was already in sync
    */
-  syncArtifacts(artifactTypes: readonly ArtifactType[]): boolean {
+  syncArtifacts(
+    artifactTypes: readonly ArtifactType[],
+    specExistence?: ReadonlyMap<string, boolean>,
+  ): boolean {
     const typeIds = new Set(artifactTypes.map((t) => t.id))
     const typesAdded: string[] = []
     const typesRemoved: string[] = []
     const filesAdded: Array<{ type: string; key: string }> = []
     const filesRemoved: Array<{ type: string; key: string }> = []
+    let filesRenamed = false
 
     // Remove artifacts for types no longer in schema
     for (const existingType of this._artifacts.keys()) {
@@ -701,38 +705,61 @@ export class Change {
         typesAdded.push(artifactType.id)
       }
 
-      const outputBasename = path.basename(artifactType.output)
-
       if (artifactType.scope === 'change') {
-        // One file keyed by type id, filename = basename (lives in change root)
+        // One file keyed by type id
         if (artifact.getFile(artifactType.id) === undefined) {
           artifact.setFile(
             new ArtifactFile({
               key: artifactType.id,
-              filename: outputBasename,
+              filename: expectedArtifactFilename({
+                artifactType,
+                key: artifactType.id,
+              }),
             }),
           )
           filesAdded.push({ type: artifactType.id, key: artifactType.id })
         }
       } else {
-        // scope: 'spec' — one file per specId, filename = full relative path
-        // e.g. specs/core/retry-policy/spec.md
+        // scope: 'spec' — one file per specId
 
         // Add files for new specIds
         for (const specId of this._specIds) {
           if (artifact.getFile(specId) === undefined) {
-            const { workspace: ws, capPath: cp } = parseSpecId(specId)
-            const relPath =
-              cp.length > 0
-                ? `specs/${ws}/${cp}/${outputBasename}`
-                : `specs/${ws}/${outputBasename}`
+            const specExists = specExistence?.get(specId)
             artifact.setFile(
               new ArtifactFile({
                 key: specId,
-                filename: relPath,
+                filename: expectedArtifactFilename({
+                  artifactType,
+                  key: specId,
+                  ...(specExists !== undefined ? { specExists } : {}),
+                }),
               }),
             )
             filesAdded.push({ type: artifactType.id, key: specId })
+          } else if (specExistence !== undefined) {
+            const existing = artifact.getFile(specId)
+            if (existing !== undefined) {
+              const specExists = specExistence.get(specId)
+              const expectedFilename = expectedArtifactFilename({
+                artifactType,
+                key: specId,
+                ...(specExists !== undefined ? { specExists } : {}),
+              })
+              if (existing.filename !== expectedFilename) {
+                artifact.setFile(
+                  new ArtifactFile({
+                    key: existing.key,
+                    filename: expectedFilename,
+                    status: existing.status,
+                    ...(existing.validatedHash !== undefined
+                      ? { validatedHash: existing.validatedHash }
+                      : {}),
+                  }),
+                )
+                filesRenamed = true
+              }
+            }
           }
         }
 
@@ -750,7 +777,8 @@ export class Change {
       typesAdded.length > 0 ||
       typesRemoved.length > 0 ||
       filesAdded.length > 0 ||
-      filesRemoved.length > 0
+      filesRemoved.length > 0 ||
+      filesRenamed
 
     if (changed) {
       this._history.push({

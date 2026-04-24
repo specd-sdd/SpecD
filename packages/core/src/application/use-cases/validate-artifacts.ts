@@ -18,10 +18,10 @@ import { type MetadataExtractorEntry } from '../../domain/value-objects/metadata
 import { applyPreHashCleanup } from '../../domain/services/pre-hash-cleanup.js'
 import { SpecPath } from '../../domain/value-objects/spec-path.js'
 import { parseSpecId } from '../../domain/services/parse-spec-id.js'
+import { expectedArtifactFilename } from '../../domain/services/artifact-filename.js'
 import { evaluateRules } from '../../domain/services/rule-evaluator.js'
 import { inferFormat } from '../../domain/services/format-inference.js'
 import { type ContentHasher } from '../ports/content-hasher.js'
-import { SpecArtifact } from '../../domain/value-objects/spec-artifact.js'
 import {
   extractMetadata,
   type ExtractedMetadata,
@@ -57,6 +57,8 @@ export interface ValidationFailure {
   readonly artifactId: string
   /** Human-readable description suitable for CLI output. */
   readonly description: string
+  /** Expected artifact filename when the failure is file-path specific. */
+  readonly filename?: string
 }
 
 /** A non-fatal rule mismatch (`required: false` rule that was absent). */
@@ -65,6 +67,21 @@ export interface ValidationWarning {
   readonly artifactId: string
   /** Human-readable description suitable for CLI output. */
   readonly description: string
+}
+
+/** Structured status of the expected file path considered during validation. */
+export type ValidationFileStatus = 'validated' | 'missing' | 'skipped'
+
+/** Per-file validation metadata for adapter output. */
+export interface ValidationFileResult {
+  /** The artifact type ID this file belongs to. */
+  readonly artifactId: string
+  /** File key (artifact id for scope:change, specId for scope:spec). */
+  readonly key: string
+  /** Expected filename inside the change directory. */
+  readonly filename: string
+  /** Validation status for this expected file path. */
+  readonly status: ValidationFileStatus
 }
 
 /** Result returned by {@link ValidateArtifacts.execute}. */
@@ -78,6 +95,8 @@ export interface ValidateArtifactsResult {
   readonly failures: ValidationFailure[]
   /** One entry per `required: false` rule that was absent. */
   readonly warnings: ValidationWarning[]
+  /** One entry per expected file considered during validation. */
+  readonly files: ValidationFileResult[]
 }
 
 /**
@@ -166,6 +185,7 @@ export class ValidateArtifacts {
             },
           ],
           warnings: [],
+          files: [],
         }
       }
     }
@@ -173,6 +193,7 @@ export class ValidateArtifacts {
     const actor: ActorIdentity = await this._actor.identity()
     const failures: ValidationFailure[] = []
     const warnings: ValidationWarning[] = []
+    const files: ValidationFileResult[] = []
     const completedValidations: Array<{
       readonly artifactId: string
       readonly fileKey: string
@@ -182,6 +203,11 @@ export class ValidateArtifacts {
 
     const { workspace, capPath: capabilityPath } = parseSpecId(input.specPath)
     const specRepo = this._specs.get(workspace)
+    const existingSpec =
+      specRepo !== undefined && capabilityPath.length > 0
+        ? await specRepo.get(SpecPath.parse(capabilityPath))
+        : null
+    const specExists = existingSpec !== null
     let resolveSpecReference: ReturnType<typeof createSpecReferenceResolver> | undefined = undefined
     try {
       resolveSpecReference = createSpecReferenceResolver({
@@ -222,8 +248,7 @@ export class ValidateArtifacts {
         }
         for (const [fileKey, file] of changeArtifact.files) {
           if (file.status === 'missing' || file.status === 'skipped') continue
-          const diskPath = this._resolveFilePath(file.filename)
-          const artifactContent = await this._changes.artifact(change, diskPath)
+          const artifactContent = await this._changes.artifact(change, file.filename)
           if (artifactContent === null) continue
           const cleanedContent = this._applyCleanup(
             artifactContent.content,
@@ -248,8 +273,6 @@ export class ValidateArtifacts {
     // --- Per-artifact validation ---
     for (const artifactType of schema.artifacts()) {
       if (input.artifactId !== undefined && artifactType.id !== input.artifactId) continue
-      const effectiveStatus = change.effectiveStatus(artifactType.id)
-      if (effectiveStatus === 'skipped' || effectiveStatus === 'missing') continue
 
       const blockedBy = artifactType.requires.find((reqId) => {
         const depStatus = change.effectiveStatus(reqId)
@@ -263,119 +286,137 @@ export class ValidateArtifacts {
         continue
       }
 
-      const changeArtifact = change.getArtifact(artifactType.id)
-      if (changeArtifact === null) continue
-
-      // Determine which file(s) to validate for this specPath
       const fileKey = artifactType.scope === 'change' ? artifactType.id : input.specPath
-      const file = changeArtifact.getFile(fileKey)
-      if (file === undefined || file.status === 'missing' || file.status === 'skipped') continue
+      const expectedFilename = expectedArtifactFilename({
+        artifactType,
+        key: fileKey,
+        ...(artifactType.scope === 'spec' ? { specExists } : {}),
+      })
 
-      // Detect whether the tracked file is a delta or a primary artifact.
-      // When the repo resolved a delta path (e.g. deltas/.../spec.md.delta.yaml),
-      // the filename ends with .delta.yaml — in that case, read it as the delta file
-      // directly rather than looking for a separate delta alongside a primary.
-      const isDeltaFile = file.filename.endsWith('.delta.yaml')
+      const changeArtifact = change.getArtifact(artifactType.id)
+      const trackedFile = changeArtifact?.getFile(fileKey)
+      if (trackedFile?.status === 'skipped') {
+        files.push({
+          artifactId: artifactType.id,
+          key: fileKey,
+          filename: expectedFilename,
+          status: 'skipped',
+        })
+        continue
+      }
+
+      const expectedFile = await this._changes.artifact(change, expectedFilename)
+      if (expectedFile === null) {
+        files.push({
+          artifactId: artifactType.id,
+          key: fileKey,
+          filename: expectedFilename,
+          status: 'missing',
+        })
+        if (!artifactType.optional) {
+          failures.push({
+            artifactId: artifactType.id,
+            description: `Expected artifact file '${expectedFilename}' is missing`,
+            filename: expectedFilename,
+          })
+        }
+        continue
+      }
+
+      files.push({
+        artifactId: artifactType.id,
+        key: fileKey,
+        filename: expectedFilename,
+        status: 'validated',
+      })
+
       const outputBasename = path.basename(artifactType.output)
       const format = artifactType.format ?? inferFormat(outputBasename)
       const parser = format !== undefined ? this._parsers.get(format) : undefined
       const yamlParser = this._parsers.get('yaml')
+      const shouldApplyDelta = artifactType.delta && artifactType.scope === 'spec' && specExists
 
-      let validationContent: string | null = null
+      let validationContent: string | null = shouldApplyDelta ? null : expectedFile.content
       let artifactFailed = false
       let extractedMetadataForArtifact: ExtractedMetadata | undefined
 
-      // --- Delta processing ---
-      if (artifactType.delta) {
-        // Resolve the delta file — either the tracked file IS the delta, or look for it alongside
-        let deltaFile: SpecArtifact | null = null
-        if (isDeltaFile) {
-          deltaFile = await this._changes.artifact(change, file.filename)
-        } else {
-          const fileBasename = path.basename(file.filename)
-          const deltaFilename =
-            capabilityPath.length > 0
-              ? `deltas/${workspace}/${capabilityPath}/${fileBasename}.delta.yaml`
-              : `deltas/${workspace}/${fileBasename}.delta.yaml`
-          deltaFile = await this._changes.artifact(change, deltaFilename)
+      if (shouldApplyDelta) {
+        if (yamlParser !== undefined) {
+          const deltaEntries = yamlParser.parseDelta(expectedFile.content)
+          if (deltaEntries.length > 0 && deltaEntries.every((entry) => entry.op === 'no-op')) {
+            const cleanedContent = this._applyCleanup(
+              expectedFile.content,
+              artifactType.preHashCleanup,
+            )
+            completedValidations.push({
+              artifactId: artifactType.id,
+              fileKey,
+              validatedHash: this._sha256(cleanedContent),
+            })
+            continue
+          }
         }
 
-        if (deltaFile !== null) {
-          // --- No-op bypass ---
-          // If the delta contains only no-op entries, skip deltaValidations,
-          // delta application, and structural validation. Go straight to markComplete.
-          if (yamlParser !== undefined) {
-            const deltaEntries = yamlParser.parseDelta(deltaFile.content)
-            if (deltaEntries.length > 0 && deltaEntries.every((e) => e.op === 'no-op')) {
-              const cleanedContent = this._applyCleanup(
-                deltaFile.content,
-                artifactType.preHashCleanup,
-              )
-              completedValidations.push({
-                artifactId: artifactType.id,
-                fileKey,
-                validatedHash: this._sha256(cleanedContent),
-              })
-              continue
-            }
-          }
+        if (artifactType.deltaValidations.length > 0 && yamlParser !== undefined) {
+          const deltaAST = yamlParser.parse(expectedFile.content)
+          const result = evaluateRules(
+            artifactType.deltaValidations,
+            deltaAST.root,
+            artifactType.id,
+            yamlParser,
+          )
+          failures.push(...result.failures)
+          warnings.push(...result.warnings)
+          if (result.failures.length > 0) artifactFailed = true
+        }
 
-          if (artifactType.deltaValidations.length > 0 && yamlParser !== undefined) {
-            const deltaAST = yamlParser.parse(deltaFile.content)
-            const result = evaluateRules(
-              artifactType.deltaValidations,
-              deltaAST.root,
-              artifactType.id,
-              yamlParser,
-            )
-            failures.push(...result.failures)
-            warnings.push(...result.warnings)
-            if (result.failures.length > 0) artifactFailed = true
-          }
-
-          if (!artifactFailed && parser !== undefined && yamlParser !== undefined) {
-            if (specRepo !== undefined && capabilityPath.length > 0) {
-              try {
-                const specPath = SpecPath.parse(capabilityPath)
-                const spec = await specRepo.get(specPath)
-                if (spec !== null) {
-                  const actualBasename = isDeltaFile
-                    ? path.basename(file.filename).replace(/\.delta\.yaml$/, '')
-                    : path.basename(file.filename)
-                  const baseArtifact = await specRepo.artifact(spec, actualBasename)
-                  if (baseArtifact !== null) {
-                    const baseAST = parser.parse(baseArtifact.content)
-                    const deltaEntries = yamlParser.parseDelta(deltaFile.content)
-                    const mergedAST = parser.apply(baseAST, deltaEntries)
-                    validationContent = parser.serialize(mergedAST)
-                  }
-                }
-              } catch (err) {
-                if (err instanceof DeltaApplicationError) {
-                  failures.push({
-                    artifactId: artifactType.id,
-                    description: `Delta application failed: ${err.message}`,
-                  })
-                  artifactFailed = true
-                } else {
-                  throw err
+        if (!artifactFailed && parser !== undefined && yamlParser !== undefined) {
+          if (specRepo !== undefined && existingSpec !== null) {
+            try {
+              const baseArtifact = await specRepo.artifact(existingSpec, outputBasename)
+              if (baseArtifact === null) {
+                failures.push({
+                  artifactId: artifactType.id,
+                  description: `Base artifact '${outputBasename}' is missing for spec '${input.specPath}'`,
+                  filename: expectedFilename,
+                })
+                artifactFailed = true
+              } else {
+                const baseAST = parser.parse(baseArtifact.content)
+                const deltaEntries = yamlParser.parseDelta(expectedFile.content)
+                const mergedResult = parser.apply(baseAST, deltaEntries)
+                const mergedAST = mergedResult.ast
+                validationContent = parser.serialize(mergedAST)
+                for (const w of mergedResult.warnings) {
+                  warnings.push({ artifactId: artifactType.id, description: w })
                 }
               }
+            } catch (err) {
+              if (err instanceof DeltaApplicationError) {
+                failures.push({
+                  artifactId: artifactType.id,
+                  description: `Delta application failed: ${err.message}`,
+                  filename: expectedFilename,
+                })
+                artifactFailed = true
+              } else {
+                throw err
+              }
             }
+          } else {
+            failures.push({
+              artifactId: artifactType.id,
+              description: `Cannot apply delta for '${input.specPath}' because the base spec is unavailable`,
+              filename: expectedFilename,
+            })
+            artifactFailed = true
           }
         }
       }
 
-      // For non-delta artifacts or when no delta was found, read the primary file
-      if (validationContent === null && !isDeltaFile) {
-        const primaryFile = await this._changes.artifact(change, file.filename)
-        if (primaryFile !== null) {
-          validationContent = primaryFile.content
-        }
+      if (validationContent === null) {
+        continue
       }
-
-      // Nothing to validate — skip
-      if (validationContent === null) continue
 
       // --- Structural validation ---
       if (!artifactFailed && artifactType.validations.length > 0 && parser !== undefined) {
@@ -390,7 +431,6 @@ export class ValidateArtifacts {
       if (!artifactFailed) {
         const extraction = schema.metadataExtraction()
         if (extraction !== undefined) {
-          // Check if this artifact has any extraction rules targeting it
           const hasExtractionRules = Object.values(extraction).some((entry) => {
             if (entry === undefined) return false
             if (Array.isArray(entry)) {
@@ -399,9 +439,7 @@ export class ValidateArtifacts {
             return (entry as MetadataExtractorEntry).artifact === artifactType.id
           })
 
-          if (!hasExtractionRules) {
-            // No extraction rules for this artifact, skip
-          } else if (parser !== undefined) {
+          if (hasExtractionRules && parser !== undefined) {
             try {
               const astsByArtifact = new Map<string, { root: SelectorNode }>()
               const renderers = new Map<string, SubtreeRenderer>()
@@ -420,7 +458,7 @@ export class ValidateArtifacts {
                     ? input.specPath.slice(input.specPath.indexOf(':') + 1)
                     : input.specPath,
                   artifactType.id,
-                  path.basename(file.filename),
+                  path.basename(expectedFilename),
                   {
                     ...(resolveSpecReference !== undefined ? { resolveSpecReference } : {}),
                   },
@@ -444,6 +482,7 @@ export class ValidateArtifacts {
                 failures.push({
                   artifactId: artifactType.id,
                   description: `MetadataExtraction validation failed: ${validationResult.error.message}`,
+                  filename: expectedFilename,
                 })
                 artifactFailed = true
               }
@@ -451,6 +490,7 @@ export class ValidateArtifacts {
               failures.push({
                 artifactId: artifactType.id,
                 description: `MetadataExtraction validation failed: ${(err as Error).message}`,
+                filename: expectedFilename,
               })
               artifactFailed = true
             }
@@ -460,11 +500,7 @@ export class ValidateArtifacts {
 
       // --- Mark complete ---
       if (!artifactFailed) {
-        // For delta files, hash the raw delta content (what's on disk) so that
-        // _deriveFileStatus can compare against it. For primary files, hash the
-        // validation content (which may be merged or cleaned).
-        const rawFile = await this._changes.artifact(change, file.filename)
-        const contentToHash = rawFile !== null ? rawFile.content : validationContent
+        const contentToHash = shouldApplyDelta ? expectedFile.content : validationContent
         const cleanedContent = this._applyCleanup(contentToHash, artifactType.preHashCleanup)
         completedValidations.push({
           artifactId: artifactType.id,
@@ -511,20 +547,7 @@ export class ValidateArtifacts {
       })
     }
 
-    return { passed: failures.length === 0, failures, warnings }
-  }
-
-  /**
-   * Returns the on-disk filename (relative to change dir) for a file within
-   * an artifact. For scope:change this is the basename (e.g. `"proposal.md"`);
-   * for scope:spec this is the full relative path computed by `syncArtifacts`
-   * (e.g. `"specs/core/retry-policy/spec.md"`).
-   *
-   * @param filename - The filename stored on the `ArtifactFile`
-   * @returns Relative path within the change directory
-   */
-  private _resolveFilePath(filename: string): string {
-    return filename
+    return { passed: failures.length === 0, failures, warnings, files }
   }
 
   /**
