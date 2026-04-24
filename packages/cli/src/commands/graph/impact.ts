@@ -6,6 +6,9 @@ import { resolveGraphCliContext } from './resolve-graph-cli-context.js'
 import { withProvider } from './with-provider.js'
 import { assertGraphIndexUnlocked } from './graph-index-lock.js'
 
+/** Provider-supported graph impact traversal directions. */
+type ImpactDirection = 'upstream' | 'downstream' | 'both'
+
 /**
  * Formats an impact result as text lines.
  * @param label - The label for the analysis target.
@@ -78,6 +81,31 @@ function formatImpact(
 }
 
 /**
+ * Parses user-facing graph impact direction aliases into provider direction values.
+ * @param raw - Raw direction option value.
+ * @param format - Raw output format, used for structured CLI errors.
+ * @returns The normalized provider direction.
+ */
+function parseImpactDirection(raw: string | undefined, format: string): ImpactDirection {
+  switch (raw ?? 'dependents') {
+    case 'dependents':
+    case 'upstream':
+      return 'upstream'
+    case 'dependencies':
+    case 'downstream':
+      return 'downstream'
+    case 'both':
+      return 'both'
+    default:
+      cliError(
+        `invalid direction "${raw}". Expected one of: dependents, dependencies, upstream, downstream, both`,
+        format,
+        1,
+      )
+  }
+}
+
+/**
  * Registers the `graph impact` command.
  * @param parent - The parent commander command.
  */
@@ -90,9 +118,10 @@ export function registerGraphImpact(parent: Command): void {
     .option('--symbol <name>', 'analyze impact of a symbol by name')
     .option('--changes <files...>', 'detect impact of changes to multiple files')
     .addOption(
-      new Option('--direction <dir>', 'traversal direction')
-        .choices(['upstream', 'downstream', 'both'])
-        .default('upstream'),
+      new Option(
+        '--direction <dir>',
+        'impact direction: dependents|dependencies|upstream|downstream|both',
+      ).default('dependents'),
     )
     .option('--depth <n>', 'max traversal depth (positive integer)', '3')
     .option('--config <path>', 'path to specd.yaml')
@@ -132,7 +161,7 @@ JSON/TOON output schema:
         format: string
       }) => {
         const fmt = parseFormat(opts.format)
-        const direction = opts.direction as 'upstream' | 'downstream' | 'both'
+        const direction = parseImpactDirection(opts.direction, opts.format)
         const maxDepth = parseInt(opts.depth, 10)
         if (Number.isNaN(maxDepth) || maxDepth <= 0) {
           cliError('--depth must be a positive integer', opts.format, 1)

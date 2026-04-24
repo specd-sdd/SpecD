@@ -206,15 +206,15 @@ You MUST NOT ignore the summary catalogue. Before proceeding with your task:
 
 If you are loading a spec inside a change:
 
-   ```bash
-   specd change spec-preview <change-name> <spec-id> --format text
-   ```
+```bash
+specd change spec-preview <change-name> <spec-id> --format text
+```
 
 If the spec is not in the change:
 
-   ```bash
-   specd spec show <spec-id> --format text
-   ```
+```bash
+specd spec show <spec-id> --format text
+```
 
 4. **Follow** the loaded spec content with the same weight as full-mode specs
 
@@ -299,12 +299,15 @@ specd graph search "<query>" --specs --spec-content --format json
 **Impact analysis** — understand blast radius before making changes:
 
 ```bash
-specd graph impact --symbol "<name>" --direction both --format json
-specd graph impact --file "<workspace:path>" --format json
+specd graph impact --symbol "<name>" --direction dependents --format json
+specd graph impact --file "<workspace:path>" --direction dependents --format json
+specd graph impact --symbol "<name>" --direction dependencies --format json
 specd graph impact --changes <workspace:path1> <workspace:path2> --format json
 ```
 
-Returns `riskLevel` (LOW/MEDIUM/HIGH/CRITICAL), affected files, and affected symbols.
+Use `dependents` for blast-radius analysis (who is affected by a change) and
+`dependencies` when you need to inspect what the target consumes. Returns `riskLevel`
+(LOW/MEDIUM/HIGH/CRITICAL), affected files, and affected symbols.
 
 **Hotspots** — find high-coupling symbols that need careful handling:
 

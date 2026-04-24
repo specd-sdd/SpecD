@@ -5,6 +5,9 @@ import { tmpdir } from 'node:os'
 import { PhpLanguageAdapter } from '../../../src/infrastructure/tree-sitter/php-language-adapter.js'
 import { SymbolKind } from '../../../src/domain/value-objects/symbol-kind.js'
 import { RelationType } from '../../../src/domain/value-objects/relation-type.js'
+import { ImportDeclarationKind } from '../../../src/domain/value-objects/import-declaration-kind.js'
+import { BindingSourceKind } from '../../../src/domain/value-objects/binding-fact.js'
+import { CallForm } from '../../../src/domain/value-objects/call-fact.js'
 
 const adapter = new PhpLanguageAdapter()
 
@@ -111,6 +114,51 @@ class UserService extends BaseService {}`
       )
       const extendsRelation = relations.find((relation) => relation.type === RelationType.Extends)
       expect(extendsRelation?.target).toBe('src/BaseService.php:class:BaseService:1:0')
+    })
+  })
+
+  describe('shared fact extraction', () => {
+    it('emits require, use alias, construction, type, and framework facts', () => {
+      const code = `<?php
+use App\\Service as Svc;
+require_once 'literal.php';
+class ArticlesController {
+  var $uses = array('Article');
+  private Svc $svc;
+  public function save(Svc $svc): Svc {
+    $created = new Svc();
+    $this->Article->save();
+    return $created;
+  }
+}`
+      const symbols = adapter.extractSymbols('Controller.php', code)
+      const imports = adapter.extractImportedNames('Controller.php', code)
+      const bindingFacts = adapter.extractBindingFacts('Controller.php', code, symbols, imports)
+      const callFacts = adapter.extractCallFacts('Controller.php', code, symbols)
+
+      expect(imports.some((item) => item.kind === ImportDeclarationKind.Require)).toBe(true)
+      expect(
+        bindingFacts.some(
+          (fact) => fact.sourceKind === BindingSourceKind.ImportedType && fact.name === 'Svc',
+        ),
+      ).toBe(true)
+      expect(
+        bindingFacts.some(
+          (fact) =>
+            fact.sourceKind === BindingSourceKind.FrameworkManaged && fact.targetName === 'Article',
+        ),
+      ).toBe(true)
+      expect(
+        callFacts.some((fact) => fact.form === CallForm.Constructor && fact.name === 'Svc'),
+      ).toBe(true)
+      expect(
+        callFacts.some(
+          (fact) =>
+            fact.form === CallForm.Member &&
+            fact.receiverName === 'Article' &&
+            fact.name === 'save',
+        ),
+      ).toBe(true)
     })
   })
 

@@ -14,7 +14,14 @@ import {
 } from '../../domain/value-objects/index-result.js'
 import { type AdapterRegistryPort } from '../../domain/ports/adapter-registry-port.js'
 import { type ImportDeclaration } from '../../domain/value-objects/import-declaration.js'
+import { ImportDeclarationKind } from '../../domain/value-objects/import-declaration-kind.js'
 import { type LanguageAdapter } from '../../domain/value-objects/language-adapter.js'
+import { BindingScopeKind, type BindingScope } from '../../domain/value-objects/binding-fact.js'
+import {
+  buildScopedBindingEnvironment,
+  resolveDependencyFacts,
+  type SymbolLookup,
+} from '../../domain/services/scoped-binding-environment.js'
 import { discoverFiles } from './discover-files.js'
 import { computeContentHash } from './compute-content-hash.js'
 
@@ -88,6 +95,72 @@ class SymbolIndex {
   entries(): Array<[string, SymbolNode[]]> {
     return [...this.byFile.entries()]
   }
+}
+
+/**
+ * Creates the domain-level symbol lookup adapter over the in-memory symbol index.
+ * @param index - In-memory index populated during Pass 1.
+ * @returns Symbol lookup used by scoped binding resolution.
+ */
+function createSymbolLookup(index: SymbolIndex): SymbolLookup {
+  return {
+    findByName: (name, filePrefix) => index.findByName(name, filePrefix),
+    findByFile: (filePath) => index.findByFile(filePath),
+  }
+}
+
+/**
+ * Returns whether an import declaration is file-only and must not populate importMap.
+ * @param declaration - Import declaration to inspect.
+ * @returns True for side-effect, dynamic, require, and blank import forms.
+ */
+function isFileOnlyImport(declaration: ImportDeclaration): boolean {
+  return (
+    declaration.kind === ImportDeclarationKind.SideEffect ||
+    declaration.kind === ImportDeclarationKind.Dynamic ||
+    declaration.kind === ImportDeclarationKind.Require ||
+    declaration.kind === ImportDeclarationKind.Blank
+  )
+}
+
+/**
+ * Creates the default file scope used when adapters do not expose richer scopes.
+ * @param filePath - Workspace-prefixed file path.
+ * @returns A root file scope for scoped lookup.
+ */
+function createDefaultFileScope(filePath: string): BindingScope {
+  return {
+    id: filePath,
+    kind: BindingScopeKind.File,
+    filePath,
+    parentId: undefined,
+    ownerSymbolId: undefined,
+    start: {
+      filePath,
+      line: 1,
+      column: 0,
+      endLine: undefined,
+      endColumn: undefined,
+    },
+    end: undefined,
+  }
+}
+
+/**
+ * Removes duplicate relations while preserving distinct relation semantics.
+ * @param relations - Relations to de-duplicate.
+ * @returns Relations unique by source/type/target.
+ */
+function deduplicateRelations(relations: readonly Relation[]): Relation[] {
+  const seen = new Set<string>()
+  const unique: Relation[] = []
+  for (const relation of relations) {
+    const key = `${relation.source}:${relation.type}:${relation.target}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    unique.push(relation)
+  }
+  return unique
 }
 
 /**
@@ -480,6 +553,7 @@ export class IndexCodeGraph {
       }
 
       const ownershipIndex = this.buildMethodOwnershipIndex(symbolIndex, fileLanguages)
+      const symbolLookup = createSymbolLookup(symbolIndex)
 
       // ── Pass 2: Resolve imports + extract relations (50-80%) ──
       const workspaceByName = new Map(options.workspaces.map((ws) => [ws.name, ws]))
@@ -519,6 +593,25 @@ export class IndexCodeGraph {
               ws?.codeRoot,
               ws?.repoRoot,
             )
+            const bindingFacts =
+              adapter.extractBindingFacts?.(prefixedPath, content, symbols, imports) ?? []
+            const callFacts = adapter.extractCallFacts?.(prefixedPath, content, symbols) ?? []
+            const scopedEnvironment = buildScopedBindingEnvironment({
+              filePath: prefixedPath,
+              symbols,
+              imports,
+              importMap,
+              scopes: [createDefaultFileScope(prefixedPath)],
+              facts: bindingFacts,
+              symbolLookup,
+            })
+            const resolvedDependencies = resolveDependencyFacts({
+              environment: scopedEnvironment,
+              bindingFacts,
+              callFacts,
+              symbols,
+              symbolLookup,
+            })
             const relations = adapter.extractRelations(
               prefixedPath,
               content,
@@ -527,6 +620,20 @@ export class IndexCodeGraph {
             )
 
             chunkRelations.push(...relations)
+            for (const dependency of resolvedDependencies) {
+              chunkRelations.push(
+                createRelation({
+                  source: dependency.sourceSymbolId,
+                  target: dependency.targetSymbolId,
+                  type: dependency.relationType,
+                  metadata: {
+                    reason: dependency.reason,
+                    line: dependency.location.line,
+                    column: dependency.location.column,
+                  },
+                }),
+              )
+            }
             for (const targetPath of fileImports) {
               chunkRelations.push(
                 createRelation({
@@ -546,9 +653,10 @@ export class IndexCodeGraph {
           }
         }
         const stageFile = `pass2-${String(chunkIndex).padStart(5, '0')}.json`
-        writeStageChunk(stageDir, stageFile, { relations: chunkRelations })
+        const uniqueRelations = deduplicateRelations(chunkRelations)
+        writeStageChunk(stageDir, stageFile, { relations: uniqueRelations })
         pass2ChunkFiles.push(stageFile)
-        stagedRelationCount += chunkRelations.length
+        stagedRelationCount += uniqueRelations.length
       }
 
       // ── Specs (80-83%) — per workspace ──
@@ -775,6 +883,14 @@ export class IndexCodeGraph {
     const knownPackages = [...packageToWorkspace.keys()]
 
     for (const imp of imports) {
+      if (isFileOnlyImport(imp)) {
+        const resolved = this.resolveFileImport(imp, filePath, adapter, index, codeRoot, repoRoot)
+        if (resolved !== undefined) {
+          fileImports.push(resolved)
+        }
+        continue
+      }
+
       if (imp.isRelative) {
         // Delegate path resolution to the adapter
         if (adapter.resolveRelativeImportPath) {
@@ -822,6 +938,37 @@ export class IndexCodeGraph {
     }
 
     return { importMap, fileImports }
+  }
+
+  /**
+   * Resolves a file-only import declaration to a workspace file when deterministic.
+   * @param imp - Import declaration to resolve.
+   * @param filePath - Importing file path.
+   * @param adapter - Language adapter.
+   * @param index - In-memory symbol index.
+   * @param codeRoot - Optional workspace code root.
+   * @param repoRoot - Optional repository root.
+   * @returns Target file path, or undefined when unresolved.
+   */
+  private resolveFileImport(
+    imp: ImportDeclaration,
+    filePath: string,
+    adapter: LanguageAdapter,
+    index: SymbolIndex,
+    codeRoot?: string,
+    repoRoot?: string,
+  ): string | undefined {
+    if (imp.isRelative && adapter.resolveRelativeImportPath) {
+      const resolved = adapter.resolveRelativeImportPath(filePath, imp.specifier)
+      const candidates = Array.isArray(resolved) ? resolved : [resolved]
+      return candidates.find((candidatePath) => index.findByFile(candidatePath).length > 0)
+    }
+
+    if (!imp.isRelative && adapter.resolveQualifiedNameToPath && codeRoot) {
+      return adapter.resolveQualifiedNameToPath(imp.specifier, codeRoot, repoRoot)
+    }
+
+    return undefined
   }
 
   /**

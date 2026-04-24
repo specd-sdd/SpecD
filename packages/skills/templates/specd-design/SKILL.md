@@ -153,10 +153,10 @@ you identify high-coupling symbols that the design should handle carefully — i
 will modify a CRITICAL hotspot, the design should note the risk and suggest extra testing.
 
 When writing the **design** or **tasks** artifact, if you know specific files or symbols
-that will be modified, check their impact:
+that will be modified, check their dependent impact:
 
 ```bash
-specd graph impact --symbol "<name>" --direction downstream --format json
+specd graph impact --symbol "<name>" --direction dependents --format json
 ```
 
 Include impact findings in the design artifact so the implementer knows what's at stake.
@@ -333,7 +333,7 @@ Follow guidance. If hooks fail, fix and re-run.
 
 ### 10b. Blast radius check
 
-Use the code graph to assess the downstream impact of the planned implementation.
+Use the code graph to assess the dependent impact of the planned implementation.
 This surfaces hidden risks early, when the design can still be adjusted.
 
 ```bash

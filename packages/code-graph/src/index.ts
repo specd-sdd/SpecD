@@ -18,6 +18,20 @@ export { RelationType } from './domain/value-objects/relation-type.js'
 export { type SymbolQuery } from './domain/value-objects/symbol-query.js'
 export { type GraphStatistics } from './domain/value-objects/graph-statistics.js'
 export { type LanguageAdapter } from './domain/value-objects/language-adapter.js'
+export { type ImportDeclaration } from './domain/value-objects/import-declaration.js'
+export { ImportDeclarationKind } from './domain/value-objects/import-declaration-kind.js'
+export { type SourceLocation } from './domain/value-objects/source-location.js'
+export {
+  BindingScopeKind,
+  BindingSourceKind,
+  type BindingScope,
+  type BindingFact,
+} from './domain/value-objects/binding-fact.js'
+export {
+  CallForm,
+  type CallFact,
+  type ResolvedDependency,
+} from './domain/value-objects/call-fact.js'
 
 // Indexer types
 export {

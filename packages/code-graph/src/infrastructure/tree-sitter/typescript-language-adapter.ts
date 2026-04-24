@@ -2,6 +2,10 @@ import { parse, Lang } from '@ast-grep/napi'
 import { type SgNode } from '@ast-grep/napi'
 import { type LanguageAdapter } from '../../domain/value-objects/language-adapter.js'
 import { type ImportDeclaration } from '../../domain/value-objects/import-declaration.js'
+import { ImportDeclarationKind } from '../../domain/value-objects/import-declaration-kind.js'
+import { BindingSourceKind, type BindingFact } from '../../domain/value-objects/binding-fact.js'
+import { CallForm, type CallFact } from '../../domain/value-objects/call-fact.js'
+import { type SourceLocation } from '../../domain/value-objects/source-location.js'
 import { type SymbolNode, createSymbolNode } from '../../domain/value-objects/symbol-node.js'
 import { type Relation, createRelation } from '../../domain/value-objects/relation.js'
 import { SymbolKind } from '../../domain/value-objects/symbol-kind.js'
@@ -113,6 +117,81 @@ function parseTypeNames(clauseText: string | undefined): string[] {
     .split(',')
     .map((entry) => normalizeTypeReference(entry))
     .filter((entry) => entry.length > 0)
+}
+
+const BUILTIN_TYPE_NAMES = new Set([
+  'Array',
+  'BigInt',
+  'Boolean',
+  'Date',
+  'Error',
+  'Map',
+  'Number',
+  'Object',
+  'Promise',
+  'Record',
+  'Set',
+  'String',
+  'boolean',
+  'number',
+  'string',
+  'symbol',
+  'unknown',
+  'void',
+])
+
+/**
+ * Computes a source location from a string offset.
+ * @param filePath - Workspace-prefixed file path.
+ * @param content - Source content.
+ * @param index - Zero-based string offset.
+ * @returns Source location for the offset.
+ */
+function locationFromIndex(filePath: string, content: string, index: number): SourceLocation {
+  const prefix = content.slice(0, Math.max(index, 0))
+  const lines = prefix.split('\n')
+  return {
+    filePath,
+    line: lines.length,
+    column: lines.at(-1)?.length ?? 0,
+    endLine: undefined,
+    endColumn: undefined,
+  }
+}
+
+/**
+ * Extracts project type names from a TypeScript type expression.
+ * @param typeText - Raw type expression.
+ * @returns Unique non-built-in candidate type names.
+ */
+function extractTypeReferenceNames(typeText: string): string[] {
+  const names = new Set<string>()
+  const matches = typeText.matchAll(/[A-Za-z_$][\w$]*/g)
+  for (const match of matches) {
+    const name = match[0]
+    if (!BUILTIN_TYPE_NAMES.has(name)) {
+      names.add(name)
+    }
+  }
+  return [...names]
+}
+
+/**
+ * Finds the innermost symbol starting before a source line.
+ * @param symbols - Symbols extracted from the current file.
+ * @param line - One-based source line.
+ * @returns Matching symbol id, or undefined.
+ */
+function findEnclosingSymbolIdByLine(
+  symbols: readonly SymbolNode[],
+  line: number,
+): string | undefined {
+  return [...symbols]
+    .filter((symbol) => symbol.line <= line)
+    .sort((left, right) => {
+      if (left.line !== right.line) return right.line - left.line
+      return right.column - left.column
+    })[0]?.id
 }
 
 /**
@@ -317,6 +396,14 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
     const lang = langForFile(filePath)
     const root = parse(lang, content).root()
     const results: ImportDeclaration[] = []
+    const seen = new Set<string>()
+
+    const addImport = (declaration: ImportDeclaration): void => {
+      const key = `${declaration.kind ?? ImportDeclarationKind.Named}:${declaration.localName}:${declaration.originalName}:${declaration.specifier}`
+      if (seen.has(key)) return
+      seen.add(key)
+      results.push(declaration)
+    }
 
     for (const child of root.children()) {
       if (nodeKind(child) !== 'import_statement') continue
@@ -325,9 +412,11 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
       if (!sourceNode) continue
       const specifier = sourceNode.text().replace(/['"]/g, '')
       const isRelative = specifier.startsWith('.')
+      let hasClause = false
 
       for (const importChild of child.children()) {
         if (nodeKind(importChild) === 'import_clause') {
+          hasClause = true
           for (const clauseChild of importChild.children()) {
             const clauseKind = nodeKind(clauseChild)
             if (clauseKind === 'named_imports') {
@@ -336,32 +425,35 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
                   const nameNode = spec.field('name')
                   const aliasNode = spec.field('alias')
                   if (nameNode) {
-                    results.push({
+                    addImport({
                       originalName: nameNode.text(),
                       localName: aliasNode ? aliasNode.text() : nameNode.text(),
                       specifier,
                       isRelative,
+                      kind: ImportDeclarationKind.Named,
                     })
                   }
                 }
               }
             } else if (clauseKind === 'identifier') {
               // Default import: import Foo from '...'
-              results.push({
+              addImport({
                 originalName: 'default',
                 localName: clauseChild.text(),
                 specifier,
                 isRelative,
+                kind: ImportDeclarationKind.Default,
               })
             } else if (clauseKind === 'namespace_import') {
               // Namespace import: import * as Foo from '...'
               for (const nsChild of clauseChild.children()) {
                 if (nodeKind(nsChild) === 'identifier') {
-                  results.push({
+                  addImport({
                     originalName: '*',
                     localName: nsChild.text(),
                     specifier,
                     isRelative,
+                    kind: ImportDeclarationKind.Namespace,
                   })
                   break
                 }
@@ -370,9 +462,327 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
           }
         }
       }
+
+      if (!hasClause) {
+        addImport({
+          originalName: '',
+          localName: '',
+          specifier,
+          isRelative,
+          kind: ImportDeclarationKind.SideEffect,
+        })
+      }
+    }
+
+    const dynamicImportPattern = /\bimport\s*\(\s*(['"])([^'"]+)\1\s*\)/g
+    for (const match of content.matchAll(dynamicImportPattern)) {
+      const specifier = match[2]
+      if (specifier === undefined) continue
+      addImport({
+        originalName: '',
+        localName: '',
+        specifier,
+        isRelative: specifier.startsWith('.'),
+        kind: ImportDeclarationKind.Dynamic,
+      })
+    }
+
+    const requirePattern = /(?<!\.)\brequire\s*\(\s*(['"])([^'"]+)\1\s*\)/g
+    for (const match of content.matchAll(requirePattern)) {
+      const specifier = match[2]
+      if (specifier === undefined) continue
+      addImport({
+        originalName: '',
+        localName: '',
+        specifier,
+        isRelative: specifier.startsWith('.'),
+        kind: ImportDeclarationKind.Require,
+      })
     }
 
     return results
+  }
+
+  /**
+   * Extracts deterministic TypeScript binding facts for shared scoped resolution.
+   * @param filePath - Path to the source file.
+   * @param content - Source file content.
+   * @param symbols - Symbols extracted from the file.
+   * @param imports - Import declarations extracted from the file.
+   * @returns Binding facts for type uses, receivers, imports, and construction aliases.
+   */
+  extractBindingFacts(
+    filePath: string,
+    content: string,
+    symbols: SymbolNode[],
+    imports: ImportDeclaration[],
+  ): BindingFact[] {
+    const facts: BindingFact[] = []
+    const seen = new Set<string>()
+
+    const addFact = (
+      name: string,
+      sourceKind: BindingSourceKind,
+      targetName: string | undefined,
+      index: number,
+      metadata?: Readonly<Record<string, unknown>>,
+    ): void => {
+      if (targetName !== undefined && BUILTIN_TYPE_NAMES.has(targetName)) return
+      const location = locationFromIndex(filePath, content, index)
+      const key = `${name}:${sourceKind}:${targetName ?? ''}:${location.line}:${location.column}`
+      if (seen.has(key)) return
+      seen.add(key)
+      facts.push({
+        name,
+        filePath,
+        scopeId: filePath,
+        sourceKind,
+        location,
+        targetName,
+        targetSymbolId: undefined,
+        targetFilePath: undefined,
+        metadata,
+      })
+    }
+
+    for (const declaration of imports) {
+      if (declaration.localName.length === 0) continue
+      const targetName =
+        declaration.originalName === '*' || declaration.originalName === 'default'
+          ? declaration.localName
+          : declaration.originalName
+      addFact(declaration.localName, BindingSourceKind.ImportedType, targetName, 0, {
+        specifier: declaration.specifier,
+        kind: declaration.kind ?? ImportDeclarationKind.Named,
+      })
+    }
+
+    this.extractClassReceiverFacts(filePath, content, addFact)
+    this.extractTypedParameterFacts(content, addFact)
+    this.extractReturnTypeFacts(content, addFact)
+    this.extractPropertyTypeFacts(content, addFact)
+    this.extractConstructionAliasFacts(content, addFact)
+
+    return facts
+  }
+
+  /**
+   * Extracts normalized TypeScript call facts for shared scoped resolution.
+   * @param filePath - Path to the source file.
+   * @param content - Source file content.
+   * @param symbols - Symbols extracted from the file.
+   * @returns Call facts for free, member/static, and constructor calls.
+   */
+  extractCallFacts(filePath: string, content: string, symbols: SymbolNode[]): CallFact[] {
+    const facts: CallFact[] = []
+    const seen = new Set<string>()
+
+    const addFact = (
+      form: CallForm,
+      name: string,
+      receiverName: string | undefined,
+      index: number,
+    ): void => {
+      const location = locationFromIndex(filePath, content, index)
+      const key = `${form}:${receiverName ?? ''}:${name}:${location.line}:${location.column}`
+      if (seen.has(key)) return
+      seen.add(key)
+      facts.push({
+        filePath,
+        scopeId: filePath,
+        callerSymbolId: findEnclosingSymbolIdByLine(symbols, location.line),
+        form,
+        name,
+        receiverName,
+        targetName: name,
+        arity: undefined,
+        location,
+        metadata: undefined,
+      })
+    }
+
+    const constructorPattern =
+      /\bnew\s+(?:(?<receiver>[A-Za-z_$][\w$]*)\.)?(?<name>[A-Za-z_$][\w$]*)\s*\(/g
+    for (const match of content.matchAll(constructorPattern)) {
+      const name = match.groups?.name
+      if (name === undefined) continue
+      addFact(CallForm.Constructor, name, match.groups?.receiver, match.index ?? 0)
+    }
+
+    const memberPattern = /\b(?<receiver>[A-Za-z_$][\w$]*)\??\.\s*(?<name>[A-Za-z_$][\w$]*)\s*\(/g
+    for (const match of content.matchAll(memberPattern)) {
+      const receiver = match.groups?.receiver
+      const name = match.groups?.name
+      if (receiver === undefined || name === undefined) continue
+      const form = /^[A-Z]/.test(receiver) ? CallForm.Static : CallForm.Member
+      addFact(form, name, receiver, match.index ?? 0)
+    }
+
+    const freePattern = /(?<![.\w$])(?<name>[A-Za-z_$][\w$]*)\s*\(/g
+    for (const match of content.matchAll(freePattern)) {
+      const name = match.groups?.name
+      if (name === undefined || this.isExcludedFreeCall(content, match.index ?? 0, name)) continue
+      addFact(CallForm.Free, name, undefined, match.index ?? 0)
+    }
+
+    return facts
+  }
+
+  /**
+   * Extracts `this` receiver bindings for class declarations.
+   * @param filePath - Path to the source file.
+   * @param content - Source file content.
+   * @param addFact - Fact accumulator callback.
+   */
+  private extractClassReceiverFacts(
+    filePath: string,
+    content: string,
+    addFact: (
+      name: string,
+      sourceKind: BindingSourceKind,
+      targetName: string | undefined,
+      index: number,
+      metadata?: Readonly<Record<string, unknown>>,
+    ) => void,
+  ): void {
+    const classPattern = /\bclass\s+([A-Za-z_$][\w$]*)/g
+    for (const match of content.matchAll(classPattern)) {
+      const className = match[1]
+      if (className === undefined) continue
+      addFact('this', BindingSourceKind.Receiver, className, match.index ?? 0, {
+        filePath,
+      })
+    }
+  }
+
+  /**
+   * Extracts typed parameter facts from parameters and constructor parameter properties.
+   * @param content - Source file content.
+   * @param addFact - Fact accumulator callback.
+   */
+  private extractTypedParameterFacts(
+    content: string,
+    addFact: (
+      name: string,
+      sourceKind: BindingSourceKind,
+      targetName: string | undefined,
+      index: number,
+      metadata?: Readonly<Record<string, unknown>>,
+    ) => void,
+  ): void {
+    const parameterPattern =
+      /(?:^|[,(]\s*)(?:public|private|protected|readonly|static|\s)*([A-Za-z_$][\w$]*)\??\s*:\s*([^,)=;{}]+)/gm
+    for (const match of content.matchAll(parameterPattern)) {
+      const name = match[1]
+      const typeText = match[2]
+      if (name === undefined || typeText === undefined) continue
+      for (const targetName of extractTypeReferenceNames(typeText)) {
+        addFact(name, BindingSourceKind.Parameter, targetName, match.index ?? 0)
+      }
+    }
+  }
+
+  /**
+   * Extracts return type references.
+   * @param content - Source file content.
+   * @param addFact - Fact accumulator callback.
+   */
+  private extractReturnTypeFacts(
+    content: string,
+    addFact: (
+      name: string,
+      sourceKind: BindingSourceKind,
+      targetName: string | undefined,
+      index: number,
+      metadata?: Readonly<Record<string, unknown>>,
+    ) => void,
+  ): void {
+    const returnPattern = /\)\s*:\s*([^={;]+)\s*(?:=>|\{)/g
+    for (const match of content.matchAll(returnPattern)) {
+      const typeText = match[1]
+      if (typeText === undefined) continue
+      for (const targetName of extractTypeReferenceNames(typeText)) {
+        addFact(targetName, BindingSourceKind.ReturnType, targetName, match.index ?? 0)
+      }
+    }
+  }
+
+  /**
+   * Extracts class or object property type references.
+   * @param content - Source file content.
+   * @param addFact - Fact accumulator callback.
+   */
+  private extractPropertyTypeFacts(
+    content: string,
+    addFact: (
+      name: string,
+      sourceKind: BindingSourceKind,
+      targetName: string | undefined,
+      index: number,
+      metadata?: Readonly<Record<string, unknown>>,
+    ) => void,
+  ): void {
+    const propertyPattern =
+      /(?:^|\n)\s*(?:public|private|protected|readonly|static|\s)*([A-Za-z_$][\w$]*)\??\s*:\s*([^=;,\n]+)/g
+    for (const match of content.matchAll(propertyPattern)) {
+      const name = match[1]
+      const typeText = match[2]
+      if (name === undefined || typeText === undefined) continue
+      for (const targetName of extractTypeReferenceNames(typeText)) {
+        addFact(name, BindingSourceKind.Property, targetName, match.index ?? 0)
+      }
+    }
+  }
+
+  /**
+   * Extracts aliases created by deterministic constructor calls.
+   * @param content - Source file content.
+   * @param addFact - Fact accumulator callback.
+   */
+  private extractConstructionAliasFacts(
+    content: string,
+    addFact: (
+      name: string,
+      sourceKind: BindingSourceKind,
+      targetName: string | undefined,
+      index: number,
+      metadata?: Readonly<Record<string, unknown>>,
+    ) => void,
+  ): void {
+    const aliasPattern =
+      /\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*new\s+(?:(?:[A-Za-z_$][\w$]*)\.)?([A-Za-z_$][\w$]*)\s*\(/g
+    for (const match of content.matchAll(aliasPattern)) {
+      const name = match[1]
+      const targetName = match[2]
+      if (name === undefined || targetName === undefined) continue
+      addFact(name, BindingSourceKind.ConstructorCall, targetName, match.index ?? 0)
+    }
+  }
+
+  /**
+   * Returns whether a regex free-call match is syntax that should not be modeled as a call.
+   * @param content - Source content.
+   * @param index - Match start offset.
+   * @param name - Candidate callee name.
+   * @returns True when the candidate should be ignored.
+   */
+  private isExcludedFreeCall(content: string, index: number, name: string): boolean {
+    const before = content.slice(Math.max(index - 16, 0), index)
+    return (
+      [
+        'if',
+        'for',
+        'while',
+        'switch',
+        'catch',
+        'function',
+        'constructor',
+        'import',
+        'require',
+      ].includes(name) ||
+      /\b(function|class|new)\s+$/.test(before) ||
+      /\brequire\.resolve\s*$/.test(before)
+    )
   }
 
   /**

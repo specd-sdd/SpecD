@@ -930,20 +930,24 @@ If a graph index is currently running, this command fails fast with: `The code g
 specd graph impact [options]
 ```
 
-Analyze the downstream or upstream impact of a symbol or file. Context resolution follows the same configured-vs-bootstrap rules as `graph index`.
+Analyze dependents or dependencies of a symbol or file. Context resolution follows the same configured-vs-bootstrap rules as `graph index`.
 
 If a graph index is currently running, this command fails fast with: `The code graph is currently being indexed. Try again in a few seconds.`
 
-| Option                                   | Description                                                    |
-| ---------------------------------------- | -------------------------------------------------------------- |
-| `--symbol <name>`                        | Symbol name to analyze.                                        |
-| `--file <path>`                          | File path to analyze.                                          |
-| `--changes <files...>`                   | Analyze impact of a set of changed files.                      |
-| `--direction upstream\|downstream\|both` | Impact direction (default: `upstream`).                        |
-| `--depth <n>`                            | Maximum traversal depth (default: `3`).                        |
-| `--config <path>`                        | Config file path. Mutually exclusive with `--path`.            |
-| `--path <path>`                          | Repository root bootstrap path. Ignores any discovered config. |
-| `--format text\|json\|toon`              | Output format.                                                 |
+| Option                                                             | Description                                                    |
+| ------------------------------------------------------------------ | -------------------------------------------------------------- |
+| `--symbol <name>`                                                  | Symbol name to analyze.                                        |
+| `--file <path>`                                                    | File path to analyze.                                          |
+| `--changes <files...>`                                             | Analyze impact of a set of changed files.                      |
+| `--direction dependents\|dependencies\|upstream\|downstream\|both` | Impact direction (default: `dependents`).                      |
+| `--depth <n>`                                                      | Maximum traversal depth (default: `3`).                        |
+| `--config <path>`                                                  | Config file path. Mutually exclusive with `--path`.            |
+| `--path <path>`                                                    | Repository root bootstrap path. Ignores any discovered config. |
+| `--format text\|json\|toon`                                        | Output format.                                                 |
+
+`dependents` is the preferred name for blast-radius analysis: it reports code that
+depends on the target. `dependencies` reports code the target depends on. The legacy
+values `upstream` and `downstream` remain accepted aliases for compatibility.
 
 ---
 

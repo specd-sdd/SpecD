@@ -7,6 +7,10 @@ import { SymbolKind } from '../../domain/value-objects/symbol-kind.js'
 import { RelationType } from '../../domain/value-objects/relation-type.js'
 import { findManifestField } from './find-manifest-field.js'
 import { type ImportDeclaration } from '../../domain/value-objects/import-declaration.js'
+import { ImportDeclarationKind } from '../../domain/value-objects/import-declaration-kind.js'
+import { BindingSourceKind, type BindingFact } from '../../domain/value-objects/binding-fact.js'
+import { CallForm, type CallFact } from '../../domain/value-objects/call-fact.js'
+import { type SourceLocation } from '../../domain/value-objects/source-location.js'
 import { ensureLanguagesRegistered } from './register-languages.js'
 
 /**
@@ -51,6 +55,43 @@ function isMethod(node: SgNode): boolean {
  */
 function normalizePythonTypeName(reference: string): string {
   return reference.trim().split('.').at(-1) ?? reference.trim()
+}
+
+/**
+ * Computes a source location from a string offset.
+ * @param filePath - Workspace-prefixed file path.
+ * @param content - Source content.
+ * @param index - Zero-based string offset.
+ * @returns Source location for the offset.
+ */
+function locationFromIndex(filePath: string, content: string, index: number): SourceLocation {
+  const prefix = content.slice(0, Math.max(index, 0))
+  const lines = prefix.split('\n')
+  return {
+    filePath,
+    line: lines.length,
+    column: lines.at(-1)?.length ?? 0,
+    endLine: undefined,
+    endColumn: undefined,
+  }
+}
+
+/**
+ * Finds the innermost symbol starting before a source line.
+ * @param symbols - Symbols extracted from the current file.
+ * @param line - One-based source line.
+ * @returns Matching symbol id, or undefined.
+ */
+function findEnclosingSymbolIdByLine(
+  symbols: readonly SymbolNode[],
+  line: number,
+): string | undefined {
+  return [...symbols]
+    .filter((symbol) => symbol.line <= line)
+    .sort((left, right) => {
+      if (left.line !== right.line) return right.line - left.line
+      return right.column - left.column
+    })[0]?.id
 }
 
 /**
@@ -290,6 +331,14 @@ export class PythonLanguageAdapter implements LanguageAdapter {
     ensureLanguagesRegistered()
     const root = parse('python', content).root()
     const results: ImportDeclaration[] = []
+    const seen = new Set<string>()
+
+    const addImport = (declaration: ImportDeclaration): void => {
+      const key = `${declaration.kind ?? ImportDeclarationKind.Named}:${declaration.localName}:${declaration.originalName}:${declaration.specifier}`
+      if (seen.has(key)) return
+      seen.add(key)
+      results.push(declaration)
+    }
 
     for (const child of root.children()) {
       const kind = nodeKind(child)
@@ -299,22 +348,24 @@ export class PythonLanguageAdapter implements LanguageAdapter {
         for (const nameChild of child.children()) {
           if (nodeKind(nameChild) === 'dotted_name') {
             const name = nameChild.text()
-            results.push({
+            addImport({
               originalName: name,
-              localName: name,
+              localName: name.split('.')[0] ?? name,
               specifier: name,
               isRelative: false,
+              kind: ImportDeclarationKind.Namespace,
             })
           } else if (nodeKind(nameChild) === 'aliased_import') {
             const dottedName = nameChild.child(0)
             const alias = nameChild.field('alias')
             if (dottedName) {
               const name = dottedName.text()
-              results.push({
+              addImport({
                 originalName: name,
                 localName: alias ? alias.text() : name,
                 specifier: name,
                 isRelative: false,
+                kind: ImportDeclarationKind.Namespace,
               })
             }
           }
@@ -337,22 +388,24 @@ export class PythonLanguageAdapter implements LanguageAdapter {
             // Skip the module name (before 'import' keyword)
             if (!seenImportKeyword || nameChild.id() === moduleNodeId) continue
             const name = nameChild.text()
-            results.push({
+            addImport({
               originalName: name,
               localName: name,
               specifier,
               isRelative,
+              kind: ImportDeclarationKind.Named,
             })
           } else if (nodeKind(nameChild) === 'aliased_import') {
             const dottedName = nameChild.child(0)
             const alias = nameChild.field('alias')
             if (dottedName) {
               const name = dottedName.text()
-              results.push({
+              addImport({
                 originalName: name,
                 localName: alias ? alias.text() : name,
                 specifier,
                 isRelative,
+                kind: ImportDeclarationKind.Named,
               })
             }
           }
@@ -360,7 +413,177 @@ export class PythonLanguageAdapter implements LanguageAdapter {
       }
     }
 
+    const literalDynamicImportPattern =
+      /\b(?:importlib\.import_module|__import__)\s*\(\s*(['"])([^'"]+)\1/g
+    for (const match of content.matchAll(literalDynamicImportPattern)) {
+      const specifier = match[2]
+      if (specifier === undefined) continue
+      addImport({
+        originalName: '',
+        localName: '',
+        specifier,
+        isRelative: specifier.startsWith('.'),
+        kind: ImportDeclarationKind.Dynamic,
+      })
+    }
+
     return results
+  }
+
+  /**
+   * Extracts deterministic Python binding facts for shared scoped resolution.
+   * @param filePath - Path to the source file.
+   * @param content - Source file content.
+   * @param symbols - Symbols extracted from the file.
+   * @param imports - Import declarations extracted from the file.
+   * @returns Binding facts for imports, receivers, annotations, and simple aliases.
+   */
+  extractBindingFacts(
+    filePath: string,
+    content: string,
+    symbols: SymbolNode[],
+    imports: ImportDeclaration[],
+  ): BindingFact[] {
+    const facts: BindingFact[] = []
+    const seen = new Set<string>()
+
+    const addFact = (
+      name: string,
+      sourceKind: BindingSourceKind,
+      targetName: string | undefined,
+      index: number,
+    ): void => {
+      const location = locationFromIndex(filePath, content, index)
+      const key = `${name}:${sourceKind}:${targetName ?? ''}:${location.line}:${location.column}`
+      if (seen.has(key)) return
+      seen.add(key)
+      facts.push({
+        name,
+        filePath,
+        scopeId: filePath,
+        sourceKind,
+        location,
+        targetName,
+        targetSymbolId: undefined,
+        targetFilePath: undefined,
+        metadata: undefined,
+      })
+    }
+
+    for (const declaration of imports) {
+      if (declaration.localName.length === 0) continue
+      addFact(
+        declaration.localName,
+        BindingSourceKind.ImportedType,
+        normalizePythonTypeName(declaration.originalName),
+        0,
+      )
+    }
+
+    for (const symbol of symbols) {
+      if (symbol.kind === SymbolKind.Method) {
+        const receiverName = symbol.name === '__new__' ? 'cls' : 'self'
+        addFact(receiverName, BindingSourceKind.Receiver, undefined, 0)
+      }
+    }
+
+    const annotationPattern = /\b([A-Za-z_]\w*)\s*:\s*([A-Za-z_][\w.]*)/g
+    for (const match of content.matchAll(annotationPattern)) {
+      const name = match[1]
+      const targetName = match[2]
+      if (name === undefined || targetName === undefined) continue
+      addFact(
+        name,
+        BindingSourceKind.Parameter,
+        normalizePythonTypeName(targetName),
+        match.index ?? 0,
+      )
+    }
+
+    const returnPattern = /->\s*([A-Za-z_][\w.]*)/g
+    for (const match of content.matchAll(returnPattern)) {
+      const targetName = match[1]
+      if (targetName === undefined) continue
+      addFact(
+        normalizePythonTypeName(targetName),
+        BindingSourceKind.ReturnType,
+        normalizePythonTypeName(targetName),
+        match.index ?? 0,
+      )
+    }
+
+    const aliasPattern = /\b([A-Za-z_]\w*)\s*=\s*([A-Z][A-Za-z_]\w*)\s*\(/g
+    for (const match of content.matchAll(aliasPattern)) {
+      const name = match[1]
+      const targetName = match[2]
+      if (name === undefined || targetName === undefined) continue
+      addFact(name, BindingSourceKind.ConstructorCall, targetName, match.index ?? 0)
+    }
+
+    return facts
+  }
+
+  /**
+   * Extracts normalized Python call facts for shared scoped resolution.
+   * @param filePath - Path to the source file.
+   * @param content - Source file content.
+   * @param symbols - Symbols extracted from the file.
+   * @returns Call facts for free, member, and constructor-like calls.
+   */
+  extractCallFacts(filePath: string, content: string, symbols: SymbolNode[]): CallFact[] {
+    const facts: CallFact[] = []
+    const seen = new Set<string>()
+
+    const addFact = (
+      form: CallForm,
+      name: string,
+      receiverName: string | undefined,
+      index: number,
+    ): void => {
+      const location = locationFromIndex(filePath, content, index)
+      const key = `${form}:${receiverName ?? ''}:${name}:${location.line}:${location.column}`
+      if (seen.has(key)) return
+      seen.add(key)
+      facts.push({
+        filePath,
+        scopeId: filePath,
+        callerSymbolId: findEnclosingSymbolIdByLine(symbols, location.line),
+        form,
+        name,
+        receiverName,
+        targetName: name,
+        arity: undefined,
+        location,
+        metadata: undefined,
+      })
+    }
+
+    const memberPattern = /\b([A-Za-z_]\w*)\.([A-Za-z_]\w*)\s*\(/g
+    for (const match of content.matchAll(memberPattern)) {
+      const receiver = match[1]
+      const name = match[2]
+      if (receiver === undefined || name === undefined || receiver === 'importlib') continue
+      addFact(CallForm.Member, name, receiver, match.index ?? 0)
+    }
+
+    const freePattern = /(?<![.\w])([A-Za-z_]\w*)\s*\(/g
+    for (const match of content.matchAll(freePattern)) {
+      const name = match[1]
+      if (
+        name === undefined ||
+        ['def', 'class', 'if', 'for', 'while', 'return', 'getattr', '__import__'].includes(name)
+      ) {
+        continue
+      }
+      addFact(
+        /^[A-Z]/.test(name) ? CallForm.Constructor : CallForm.Free,
+        name,
+        undefined,
+        match.index ?? 0,
+      )
+    }
+
+    return facts
   }
 
   /**

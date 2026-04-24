@@ -14,6 +14,8 @@ import { expandSymbolName } from '../../domain/services/expand-symbol-name.js'
 import { mkdirSync, existsSync, writeFileSync, unlinkSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 
+const SYMBOL_DEPENDENCY_RELATION_TYPES = [RT.Calls, RT.Constructs, RT.UsesType] as const
+
 /**
  * Unwraps a query result (or array of results) into an array of row records.
  * @param result - A single query result or an array of query results.
@@ -609,7 +611,12 @@ export class LadybugGraphStore extends GraphStore {
    * @returns An array of caller relations.
    */
   async getCallers(symbolId: string): Promise<Relation[]> {
-    return this.getIncomingSymbolRelations(RT.Calls, symbolId)
+    const batches = await Promise.all(
+      SYMBOL_DEPENDENCY_RELATION_TYPES.map((type) =>
+        this.getIncomingSymbolRelations(type, symbolId),
+      ),
+    )
+    return batches.flat()
   }
 
   /**
@@ -618,7 +625,12 @@ export class LadybugGraphStore extends GraphStore {
    * @returns An array of callee relations.
    */
   async getCallees(symbolId: string): Promise<Relation[]> {
-    return this.getOutgoingSymbolRelations(RT.Calls, symbolId)
+    const batches = await Promise.all(
+      SYMBOL_DEPENDENCY_RELATION_TYPES.map((type) =>
+        this.getOutgoingSymbolRelations(type, symbolId),
+      ),
+    )
+    return batches.flat()
   }
 
   /**
@@ -1049,7 +1061,7 @@ export class LadybugGraphStore extends GraphStore {
     this.ensureOpen()
     const rows = await exec(
       this.conn!,
-      `MATCH (caller:Symbol)-[:CALLS]->(s:Symbol) RETURN s.id AS id, s.name AS name, s.kind AS kind, s.filePath AS filePath, s.line AS line, s.col AS col, s.comment AS comment, caller.filePath AS callerFilePath`,
+      `MATCH (caller:Symbol)-[:CALLS|CONSTRUCTS|USES_TYPE]->(s:Symbol) RETURN s.id AS id, s.name AS name, s.kind AS kind, s.filePath AS filePath, s.line AS line, s.col AS col, s.comment AS comment, caller.filePath AS callerFilePath`,
     )
     return rows.map((r) => ({
       symbol: this.rowToSymbol(r),
@@ -1085,6 +1097,8 @@ export class LadybugGraphStore extends GraphStore {
       'IMPORTS',
       'DEFINES',
       'CALLS',
+      'CONSTRUCTS',
+      'USES_TYPE',
       'EXPORTS',
       'DEPENDS_ON',
       'COVERS',
@@ -1142,6 +1156,16 @@ export class LadybugGraphStore extends GraphStore {
       case RT.Calls:
         await conn.query(
           `MATCH (a:Symbol {id: '${this.escape(rel.source)}'}), (b:Symbol {id: '${this.escape(rel.target)}'}) CREATE (a)-[:CALLS]->(b)`,
+        )
+        break
+      case RT.Constructs:
+        await conn.query(
+          `MATCH (a:Symbol {id: '${this.escape(rel.source)}'}), (b:Symbol {id: '${this.escape(rel.target)}'}) CREATE (a)-[:CONSTRUCTS]->(b)`,
+        )
+        break
+      case RT.UsesType:
+        await conn.query(
+          `MATCH (a:Symbol {id: '${this.escape(rel.source)}'}), (b:Symbol {id: '${this.escape(rel.target)}'}) CREATE (a)-[:USES_TYPE]->(b)`,
         )
         break
       case RT.Exports:

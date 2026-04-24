@@ -5,6 +5,9 @@ import { tmpdir } from 'node:os'
 import { GoLanguageAdapter } from '../../../src/infrastructure/tree-sitter/go-language-adapter.js'
 import { SymbolKind } from '../../../src/domain/value-objects/symbol-kind.js'
 import { RelationType } from '../../../src/domain/value-objects/relation-type.js'
+import { ImportDeclarationKind } from '../../../src/domain/value-objects/import-declaration-kind.js'
+import { BindingSourceKind } from '../../../src/domain/value-objects/binding-fact.js'
+import { CallForm } from '../../../src/domain/value-objects/call-fact.js'
 
 const adapter = new GoLanguageAdapter()
 
@@ -108,6 +111,56 @@ func (f *FileReader) Read() {}
       const symbols = adapter.extractSymbols('main.go', code)
       const relations = adapter.extractRelations('main.go', code, symbols, new Map())
       expect(relations.some((relation) => relation.type === RelationType.Implements)).toBe(true)
+    })
+  })
+
+  describe('shared fact extraction', () => {
+    it('classifies grouped alias, dot, and blank imports', () => {
+      const code = `package main
+import (
+  models "github.com/acme/auth/models"
+  . "github.com/acme/auth/helpers"
+  _ "github.com/acme/auth/driver"
+)`
+      const imports = adapter.extractImportedNames('main.go', code)
+      expect(imports.map((item) => item.localName)).toEqual(['models', '.', ''])
+      expect(imports.map((item) => item.kind)).toEqual([
+        ImportDeclarationKind.Named,
+        ImportDeclarationKind.Namespace,
+        ImportDeclarationKind.Blank,
+      ])
+    })
+
+    it('emits selector, composite literal, and type-reference facts', () => {
+      const code = `package main
+import models "github.com/acme/auth/models"
+type Service struct { Repo UserRepo }
+func New(repo UserRepo) UserRepo {
+  models.NewUser()
+  return UserRepo{}
+}`
+      const symbols = adapter.extractSymbols('main.go', code)
+      const imports = adapter.extractImportedNames('main.go', code)
+      const bindingFacts = adapter.extractBindingFacts('main.go', code, symbols, imports)
+      const callFacts = adapter.extractCallFacts('main.go', code, symbols)
+
+      expect(
+        bindingFacts.some(
+          (fact) =>
+            fact.sourceKind === BindingSourceKind.Property && fact.targetName === 'UserRepo',
+        ),
+      ).toBe(true)
+      expect(
+        callFacts.some(
+          (fact) =>
+            fact.form === CallForm.Static &&
+            fact.receiverName === 'models' &&
+            fact.name === 'NewUser',
+        ),
+      ).toBe(true)
+      expect(
+        callFacts.some((fact) => fact.form === CallForm.Constructor && fact.name === 'UserRepo'),
+      ).toBe(true)
     })
   })
 

@@ -8,7 +8,7 @@ a persistent graph database for impact analysis, traversal, and full-text search
 
 - **Multi-language indexing** — TypeScript, Go, Python, and PHP via ast-grep
 - **Symbol extraction** — functions, classes, methods, variables, types, interfaces, and enums
-- **Relationship tracking** — imports, exports, calls, defines, depends_on, covers
+- **Relationship tracking** — imports, exports, calls, construction, type usage, hierarchy, defines, depends_on, covers
 - **Incremental updates** — content-hash diffing skips unchanged files on re-index
 - **Impact analysis** — blast-radius queries by symbol or file, with upstream/downstream direction
 - **Hotspot detection** — ranks symbols by how many dependents they have
@@ -27,7 +27,9 @@ The graph has three node types:
 | `SymbolNode` | `id`, `name`, `kind`, `filePath`, `line`, `column`                   | A declared symbol within a file.                    |
 | `SpecNode`   | `specId`, `path`, `title`, `description`, `contentHash`, `dependsOn` | A specd spec document.                              |
 
-Relations between nodes are typed by `RelationType`: `IMPORTS`, `EXPORTS`, `CALLS`, `DEFINES`, `DEPENDS_ON`, `COVERS`.
+Relations between nodes are typed by `RelationType`: `IMPORTS`, `EXPORTS`, `CALLS`, `CONSTRUCTS`, `USES_TYPE`, `DEFINES`, `DEPENDS_ON`, `COVERS`, `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES`.
+
+`CONSTRUCTS` records deterministic instantiation or constructor-like dependencies. `USES_TYPE` records static type dependencies in signatures, annotations, fields, or deterministic binding declarations. Both are included in traversal, impact analysis, and hotspot scoring alongside `CALLS`.
 
 Symbol kinds are: `function`, `class`, `method`, `variable`, `type`, `interface`, `enum`.
 
@@ -48,6 +50,27 @@ createCodeGraphProvider(config)
 
 Language adapters implement the `LanguageAdapter` interface and can be registered
 externally for additional language support.
+
+Built-in TypeScript/TSX/JavaScript/JSX, Python, Go, and PHP adapters also emit
+deterministic binding and call facts for shared scoped resolution. These facts
+cover conservative static cases such as constructor injection, typed parameters,
+typed properties, literal dynamic imports, package selector calls, and
+constructor-like expressions. Runtime-only values, reflection, service locator
+ids, monkey-patching, and non-literal dynamic expressions are intentionally
+dropped rather than guessed.
+
+Custom adapters can keep implementing the original required methods. The scoped
+binding extension points are optional:
+
+```ts
+extractBindingFacts?(filePath, content, symbols, imports)
+extractCallFacts?(filePath, content, symbols)
+```
+
+The shared indexer builds a scoped binding environment from these facts and the
+in-memory symbol index, then emits deterministic `CALLS`, `CONSTRUCTS`, and
+`USES_TYPE` relations without adding language-specific resolution rules to
+`IndexCodeGraph`.
 
 ## Usage
 
