@@ -31,6 +31,8 @@ import { BUILTIN_VCS_PROVIDERS, createVcsAdapter } from './vcs-adapter.js'
 import { getDefaultWorkspace } from './get-default-workspace.js'
 import { type KernelOptions } from './kernel.js'
 import { createBuiltinExtractorTransforms } from './extractor-transforms/index.js'
+import { SpecPath } from '../domain/value-objects/spec-path.js'
+import { parseSpecId } from '../domain/services/parse-spec-id.js'
 import {
   type ArchiveStorageFactory,
   type ChangeStorageFactory,
@@ -115,6 +117,19 @@ function readResolveArtifactTypes(
     : undefined
 }
 
+/**
+ * Reads an optional async spec-existence resolver from opaque factory options.
+ *
+ * @param options - Adapter-owned resolved options
+ * @returns The resolver function when present
+ */
+function readResolveSpecExists(
+  options: Readonly<Record<string, unknown>>,
+): ((specId: string) => Promise<boolean>) | undefined {
+  const value = options.resolveSpecExists
+  return typeof value === 'function' ? (value as (specId: string) => Promise<boolean>) : undefined
+}
+
 /** Built-in `fs` factory for spec repositories. */
 const FS_SPEC_STORAGE_FACTORY: SpecStorageFactory = {
   create(context, options): SpecRepository {
@@ -142,11 +157,13 @@ const FS_CHANGE_STORAGE_FACTORY: ChangeStorageFactory = {
     const drafts = readRecordOption(options, 'drafts')
     const discarded = readRecordOption(options, 'discarded')
     const resolveArtifactTypes = readResolveArtifactTypes(options)
+    const resolveSpecExists = readResolveSpecExists(options)
     return createChangeRepository('fs', context, {
       changesPath: readStringOption(options, 'path'),
       draftsPath: readStringOption(drafts, 'path'),
       discardedPath: readStringOption(discarded, 'path'),
       ...(resolveArtifactTypes !== undefined ? { resolveArtifactTypes } : {}),
+      ...(resolveSpecExists !== undefined ? { resolveSpecExists } : {}),
     })
   },
 }
@@ -434,6 +451,13 @@ export async function createKernelInternals(
       const schema = await schemas.resolve(config.schemaRef)
       return schema !== null ? schema.artifacts() : []
     },
+    resolveSpecExists: async (specId: string) => {
+      const { workspace, capPath } = parseSpecId(specId)
+      const specRepo = specs.get(workspace)
+      if (specRepo === undefined) return false
+      const spec = await specRepo.get(SpecPath.parse(capPath))
+      return spec !== null
+    },
   })
 
   const archive = archiveFactory.create(wsContext, {
@@ -445,9 +469,7 @@ export async function createKernelInternals(
       : {}),
   })
 
-  const expander = new TemplateExpander({ project: { root: config.projectRoot } }, (token) => {
-    console.warn(`warning: unresolved template variable '{{${token}}}'`)
-  })
+  const expander = new TemplateExpander({ project: { root: config.projectRoot } })
 
   return {
     registry,
