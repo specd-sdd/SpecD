@@ -1,3 +1,5 @@
+import type { SpecdConfig } from '@specd/core'
+
 /**
  * Known plugin types. Single source of truth for runtime validation
  * and compile-time type derivation. Add new types here.
@@ -39,19 +41,9 @@ export interface ConfigSchemaEntry {
  */
 export interface PluginContext {
   /**
-   * Absolute project root path.
+   * Fully-resolved project configuration.
    */
-  readonly projectRoot: string
-
-  /**
-   * Plugin-specific config section from `specd.yaml`.
-   */
-  readonly config: Record<string, unknown>
-
-  /**
-   * Type-specific context payload.
-   */
-  readonly typeContext: unknown
+  readonly config: SpecdConfig
 }
 
 /**

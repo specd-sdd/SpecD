@@ -1,9 +1,10 @@
+import type { SpecdConfig } from '@specd/core'
 import type { SpecdPlugin } from './specd-plugin.js'
 
 /**
  * Options used during plugin install and uninstall operations.
  */
-export interface InstallOptions {
+export interface AgentInstallOptions {
   /**
    * Optional skill-name filter. When omitted, install all skills.
    */
@@ -18,7 +19,7 @@ export interface InstallOptions {
 /**
  * Result returned by an agent-plugin install operation.
  */
-export interface InstallResult {
+export interface AgentInstallResult {
   /**
    * Successfully installed skills and output paths.
    */
@@ -42,20 +43,20 @@ export interface AgentPlugin extends SpecdPlugin {
   /**
    * Installs agent assets into a project root.
    *
-   * @param projectRoot - Absolute project root path.
+   * @param config - Project configuration.
    * @param options - Install options.
    * @returns Install summary.
    */
-  install(projectRoot: string, options?: InstallOptions): Promise<InstallResult>
+  install(config: SpecdConfig, options?: AgentInstallOptions): Promise<AgentInstallResult>
 
   /**
    * Uninstalls agent assets from a project root.
    *
-   * @param projectRoot - Absolute project root path.
+   * @param config - Project configuration.
    * @param options - Uninstall options.
    * @returns A promise that resolves when uninstall completes.
    */
-  uninstall(projectRoot: string, options?: InstallOptions): Promise<void>
+  uninstall(config: SpecdConfig, options?: AgentInstallOptions): Promise<void>
 }
 
 /**

@@ -1,7 +1,8 @@
+import type { SpecdConfig } from '@specd/core'
 import type {
   AgentPlugin,
-  InstallOptions,
-  InstallResult,
+  AgentInstallOptions,
+  AgentInstallResult,
   PluginContext,
 } from '@specd/plugin-manager'
 
@@ -9,14 +10,17 @@ import type {
  * Install operation used by the plugin runtime.
  */
 export type InstallOperation = (
-  projectRoot: string,
-  options?: InstallOptions,
-) => Promise<InstallResult>
+  config: SpecdConfig,
+  options?: AgentInstallOptions,
+) => Promise<AgentInstallResult>
 
 /**
  * Uninstall operation used by the plugin runtime.
  */
-export type UninstallOperation = (projectRoot: string, options?: InstallOptions) => Promise<void>
+export type UninstallOperation = (
+  config: SpecdConfig,
+  options?: AgentInstallOptions,
+) => Promise<void>
 
 /**
  * Copilot implementation of the agent-plugin contract.
@@ -80,22 +84,22 @@ export class CopilotAgentPlugin implements AgentPlugin {
   /**
    * Installs Copilot skills into `.github/skills`.
    *
-   * @param projectRoot - Absolute project root.
+   * @param config - Project configuration.
    * @param options - Install options.
    * @returns Install summary.
    */
-  async install(projectRoot: string, options?: InstallOptions): Promise<InstallResult> {
-    return this.runInstall(projectRoot, options)
+  async install(config: SpecdConfig, options?: AgentInstallOptions): Promise<AgentInstallResult> {
+    return this.runInstall(config, options)
   }
 
   /**
    * Uninstalls Copilot skills from `.github/skills`.
    *
-   * @param projectRoot - Absolute project root.
+   * @param config - Project configuration.
    * @param options - Optional skill filter.
-   * @returns A promise that resolves when uninstall finishes.
+   * @returns A promise that resolves when uninstall completes.
    */
-  async uninstall(projectRoot: string, options?: InstallOptions): Promise<void> {
-    return this.runUninstall(projectRoot, options)
+  async uninstall(config: SpecdConfig, options?: AgentInstallOptions): Promise<void> {
+    return this.runUninstall(config, options)
   }
 }

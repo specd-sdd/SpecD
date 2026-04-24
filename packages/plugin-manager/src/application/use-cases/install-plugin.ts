@@ -1,3 +1,4 @@
+import type { SpecdConfig } from '@specd/core'
 import type { PluginLoader } from '../ports/plugin-loader.js'
 import { isAgentPlugin } from '../../domain/types/agent-plugin.js'
 import { PluginValidationError } from '../../domain/errors/plugin-validation.js'
@@ -12,9 +13,9 @@ export interface InstallPluginInput {
   readonly pluginName: string
 
   /**
-   * Absolute project root path.
+   * Project configuration.
    */
-  readonly projectRoot: string
+  readonly config: SpecdConfig
 
   /**
    * Optional plugin-specific options.
@@ -64,7 +65,7 @@ export class InstallPlugin {
     if (!isAgentPlugin(plugin)) {
       throw new PluginValidationError(input.pluginName, ['install'])
     }
-    const data = await plugin.install(input.projectRoot, input.options)
+    const data = await plugin.install(input.config, input.options)
     return {
       success: true,
       message: `Installed '${input.pluginName}'`,

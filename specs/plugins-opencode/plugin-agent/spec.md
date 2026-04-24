@@ -8,9 +8,9 @@ Open Code support is required to keep agent-plugin behavior consistent across th
 
 ### Requirement: Factory export
 
-The package MUST export `create(): AgentPlugin` as a named export.
+The package MUST export `create(options: PluginLoaderOptions): AgentPlugin` as a named export.
 
-The factory function MUST read `specd-plugin.json` at the infrastructure boundary to obtain `name` and `version`. It MUST search for the manifest in its own directory first, then the parent directory as fallback — this works both in development (source tree) and after build/publish (`dist/` with manifest at package root). The `type` field MUST remain hardcoded as `'agent'`.
+The factory function MUST read `specd-plugin.json` at the infrastructure boundary to obtain `name` and `version`. It MUST search for the manifest in its own directory first, then the parent directory as fallback. The `type` field MUST remain hardcoded as `'agent'`.
 
 ### Requirement: Domain layer
 
@@ -38,10 +38,10 @@ Unknown fields MUST NOT be emitted into generated `SKILL.md` files.
 
 The application layer MUST include an `InstallSkills` use case that:
 
-1. reads skills from `@specd/skills`
+1. reads skills from `@specd/skills`, passing `SpecdConfig` for built-in variable resolution
 2. resolves the per-skill frontmatter map
 3. prepends Open Code-compatible YAML frontmatter to markdown skill files
-4. writes installed skills to the Open Code project skill directory
+4. writes installed skills to the Open Code project skill directory under the `projectRoot` provided in `SpecdConfig`
 
 ### Requirement: Frontmatter injection
 
@@ -49,7 +49,7 @@ During install, the plugin MUST prepend YAML frontmatter to each markdown skill 
 
 ### Requirement: Install location
 
-Project-level skill installation MUST target `.opencode/skills/` under the provided `projectRoot`.
+Project-level skill installation MUST target `.opencode/skills/` under the `projectRoot` provided in `SpecdConfig`.
 
 ### Requirement: Project init wizard integration
 
@@ -61,7 +61,7 @@ The `@specd/specd` meta package MUST declare `@specd/plugin-agent-opencode` as a
 
 ### Requirement: Uninstall behavior
 
-`uninstall(projectRoot, options)` MUST remove installed skill directories from `.opencode/skills/`.
+`uninstall(config: SpecdConfig, options?: AgentInstallOptions)` MUST remove installed skill directories from `.opencode/skills/` relative to `config.projectRoot`.
 
 When `options.skills` is provided, uninstall MUST remove only the selected skill directories.
 
@@ -77,5 +77,6 @@ When `options.skills` is omitted, uninstall MUST remove the full `.opencode/skil
 
 ## Spec Dependencies
 
+- [`core:core/config`](../../core/core/config/spec.md) — defines SpecdConfig type
 - [`plugin-manager:agent-plugin-type`](../../plugins-manager/agent-plugin-type/spec.md) — defines the `AgentPlugin` install/uninstall contract
 - [`skills:skill-templates-source`](../../skills/skill-templates-source/spec.md) — defines template source and plugin-side frontmatter injection responsibility

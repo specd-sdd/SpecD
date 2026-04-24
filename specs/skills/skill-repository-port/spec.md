@@ -12,8 +12,10 @@ Abstract interface for skill storage. This port defines the contract that infras
 
 - `list(): Skill[]`
 - `get(name: string): Skill | undefined`
-- `getBundle(name: string, variables?: Record<string, string>): SkillBundle`
+- `getBundle(name: string, variables?: Record<string, string>, config?: SpecdConfig): SkillBundle`
 - `listSharedFiles(): SharedFile[]`
+
+The `getBundle` method SHALL support receiving a `SpecdConfig` to enable the injection of built-in variables during template resolution.
 
 ### Requirement: Port abstraction
 
@@ -25,5 +27,6 @@ The port is an abstract interface. Concrete implementations (e.g., using node:fs
 
 ## Spec Dependencies
 
+- [`core:core/config`](../../core/core/config/spec.md) — defines SpecdConfig type
 - [`skills:skill`](../skill/spec.md) — domain types
 - [`skills:skill-bundle`](../skill-bundle/spec.md) — bundle type

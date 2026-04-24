@@ -1,5 +1,5 @@
 import { type Command } from 'commander'
-import type { Kernel } from '@specd/core'
+import type { Kernel, SpecdConfig } from '@specd/core'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat, type OutputFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'
@@ -37,18 +37,18 @@ export interface PluginInstallBatchResult {
  *
  * @param input - Installation input.
  * @param input.kernel - CLI kernel.
- * @param input.projectRoot - Absolute project root.
+ * @param input.config - Fully-resolved project configuration.
  * @param input.configPath - Absolute path to `specd.yaml`.
  * @param input.pluginNames - Plugin package names to process.
  * @returns Batch result entries and aggregate error state.
  */
 export async function installPluginsWithKernel(input: {
   readonly kernel: Kernel
-  readonly projectRoot: string
+  readonly config: SpecdConfig
   readonly configPath: string
   readonly pluginNames: readonly string[]
 }): Promise<PluginInstallBatchResult> {
-  const loader = createPluginLoader({ projectRoot: input.projectRoot })
+  const loader = createPluginLoader({ config: input.config })
   const install = new InstallPlugin(loader)
   const load = new LoadPlugin(loader)
   const declared = await input.kernel.project.listPlugins.execute({
@@ -86,7 +86,7 @@ export async function installPluginsWithKernel(input: {
       const loaded = await load.execute({ pluginName })
       const installResult: InstallPluginOutput = await install.execute({
         pluginName,
-        projectRoot: input.projectRoot,
+        config: input.config,
       })
       const pluginBucket = toPluginBucket(loaded.plugin.type)
       await input.kernel.project.addPlugin.execute({
@@ -134,7 +134,7 @@ export function registerPluginsInstall(parent: Command): void {
         const configPath = configFilePath ?? `${config.projectRoot}/specd.yaml`
         const result = await installPluginsWithKernel({
           kernel,
-          projectRoot: config.projectRoot,
+          config,
           configPath,
           pluginNames,
         })

@@ -1,3 +1,4 @@
+import type { SpecdConfig } from '@specd/core'
 import type { SkillBundle } from '../../domain/skill-bundle.js'
 import type { SkillRepository } from '../ports/skill-repository.js'
 
@@ -9,6 +10,11 @@ export interface ResolveBundleInput {
    * Skill identifier.
    */
   readonly name: string
+
+  /**
+   * Optional project configuration for built-in variables.
+   */
+  readonly config?: SpecdConfig
 
   /**
    * Optional placeholder-substitution variables.
@@ -44,7 +50,18 @@ export class ResolveBundle {
    * @returns Resolved bundle.
    */
   async execute(input: ResolveBundleInput): Promise<ResolveBundleOutput> {
-    const bundle = this.repository.getBundle(input.name, input.variables ?? {})
+    let variables = input.variables ?? {}
+
+    if (input.config) {
+      variables = {
+        projectRoot: input.config.projectRoot,
+        configPath: input.config.configPath,
+        schemaRef: input.config.schemaRef,
+        ...variables,
+      }
+    }
+
+    const bundle = this.repository.getBundle(input.name, variables, input.config)
     return { bundle }
   }
 }

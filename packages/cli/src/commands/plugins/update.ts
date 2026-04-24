@@ -1,5 +1,5 @@
 import { type Command } from 'commander'
-import type { Kernel } from '@specd/core'
+import type { Kernel, SpecdConfig } from '@specd/core'
 import { UpdatePlugin, createPluginLoader } from '@specd/plugin-manager'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat, type OutputFormat } from '../../formatter.js'
@@ -32,14 +32,14 @@ export interface PluginUpdateBatchResult {
  *
  * @param input - Update input.
  * @param input.kernel - CLI kernel.
- * @param input.projectRoot - Absolute project root.
+ * @param input.config - Fully-resolved project configuration.
  * @param input.configPath - Absolute path to `specd.yaml`.
  * @param input.pluginNames - Optional plugin-name filter.
  * @returns Batch update results.
  */
 export async function updatePluginsWithKernel(input: {
   readonly kernel: Kernel
-  readonly projectRoot: string
+  readonly config: SpecdConfig
   readonly configPath: string
   readonly pluginNames?: readonly string[]
 }): Promise<PluginUpdateBatchResult> {
@@ -54,7 +54,7 @@ export async function updatePluginsWithKernel(input: {
       ? [...input.pluginNames]
       : declared.map((plugin) => plugin.name)
 
-  const loader = createPluginLoader({ projectRoot: input.projectRoot })
+  const loader = createPluginLoader({ config: input.config })
   const update = new UpdatePlugin(loader)
   const plugins: PluginUpdateEntry[] = []
   let hasErrors = false
@@ -73,7 +73,7 @@ export async function updatePluginsWithKernel(input: {
     try {
       await update.execute({
         pluginName,
-        projectRoot: input.projectRoot,
+        config: input.config,
         ...(declaration.config !== undefined ? { options: declaration.config } : {}),
       })
       plugins.push({
@@ -115,7 +115,7 @@ export function registerPluginsUpdate(parent: Command): void {
         const configPath = configFilePath ?? `${config.projectRoot}/specd.yaml`
         const result = await updatePluginsWithKernel({
           kernel,
-          projectRoot: config.projectRoot,
+          config,
           configPath,
           ...(pluginNames.length > 0 ? { pluginNames } : {}),
         })

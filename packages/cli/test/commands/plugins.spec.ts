@@ -8,6 +8,8 @@ import {
   mockProcessExit,
 } from './helpers.js'
 
+const mockInstall = vi.fn().mockResolvedValue({ success: true, message: 'ok' })
+
 vi.mock('../../src/helpers/cli-context.js', () => ({
   resolveCliContext: vi.fn(),
 }))
@@ -15,7 +17,7 @@ vi.mock('../../src/helpers/cli-context.js', () => ({
 vi.mock('@specd/plugin-manager', () => ({
   createPluginLoader: vi.fn().mockReturnValue({}),
   InstallPlugin: vi.fn().mockImplementation(() => ({
-    execute: vi.fn().mockResolvedValue({ success: true, message: 'ok' }),
+    execute: mockInstall,
   })),
   UpdatePlugin: vi.fn().mockImplementation(() => ({
     execute: vi.fn().mockResolvedValue({ success: true, message: 'ok' }),
@@ -58,28 +60,35 @@ import { registerPluginsUninstall } from '../../src/commands/plugins/uninstall.j
 
 function setup() {
   const kernel = makeMockKernel()
+  const config = makeMockConfig()
   kernel.project.listPlugins.execute.mockResolvedValue([])
   vi.mocked(resolveCliContext).mockResolvedValue({
-    config: makeMockConfig(),
+    config,
     configFilePath: '/project/specd.yaml',
     kernel,
   })
   const stdout = captureStdout()
   const stderr = captureStderr()
   mockProcessExit()
-  return { kernel, stdout, stderr }
+  return { kernel, config, stdout, stderr }
 }
 
 afterEach(() => vi.clearAllMocks())
 
 describe('plugins install', () => {
   it('installs plugin and persists declaration', async () => {
-    const { kernel } = setup()
+    const { kernel, config } = setup()
     const program = makeProgram()
     registerPluginsInstall(program.command('plugins'))
 
     await program.parseAsync(['node', 'specd', 'plugins', 'install', '@specd/plugin-agent-claude'])
 
+    expect(mockInstall).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pluginName: '@specd/plugin-agent-claude',
+        config,
+      }),
+    )
     expect(kernel.project.addPlugin.execute).toHaveBeenCalledWith(
       expect.objectContaining({
         type: 'agents',

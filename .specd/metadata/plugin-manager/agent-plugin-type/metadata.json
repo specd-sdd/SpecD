@@ -1,7 +1,7 @@
 {
   "title": "plugin-manager:agent-plugin-type",
   "description": "Defines the agent plugin interface that extends `SpecdPlugin` for agent integrations (Claude, Copilot, Codex, etc.).",
-  "dependsOn": ["plugin-manager:specd-plugin-type"],
+  "dependsOn": ["core:core/config", "plugin-manager:specd-plugin-type"],
   "context": [
     "Defines the agent plugin interface that extends `SpecdPlugin` for agent integrations (Claude, Copilot, Codex, etc.)."
   ],
@@ -9,19 +9,19 @@
     {
       "requirement": "AgentPlugin extends SpecdPlugin",
       "rules": [
-        "`AgentPlugin` MUST extend `SpecdPlugin` with `type: 'agent'` and add:\n\n- `install(projectRoot: string, options?: InstallOptions): Promise<InstallResult>`\n- `uninstall(projectRoot: string, options?: InstallOptions): Promise<void>`"
+        "`AgentPlugin` MUST extend `SpecdPlugin` with `type: 'agent'` and add:\n\n- `install(config: SpecdConfig, options?: AgentInstallOptions): Promise<AgentInstallResult>`\n- `uninstall(config: SpecdConfig, options?: AgentInstallOptions): Promise<void>`\n\nThe `AgentPlugin` SHALL receive the full `SpecdConfig` object to ensure it has access to the project root and any necessary workspace or storage configuration."
       ]
     },
     {
-      "requirement": "InstallOptions",
+      "requirement": "AgentInstallOptions",
       "rules": [
-        "```typescript\ninterface InstallOptions {\n  skills?: string[] // specific skill names; omit = all\n  variables?: Record<string, string> // variable substitution\n}\n```"
+        "```typescript\ninterface AgentInstallOptions {\n  skills?: string[] // specific skill names; omit = all\n  variables?: Record<string, string> // variable substitution\n}\n```"
       ]
     },
     {
-      "requirement": "InstallResult",
+      "requirement": "AgentInstallResult",
       "rules": [
-        "```typescript\ninterface InstallResult {\n  installed: Array<{ skill: string; path: string }>\n  skipped: Array<{ skill: string; reason: string }>\n}\n```"
+        "```typescript\ninterface AgentInstallResult {\n  installed: Array<{ skill: string; path: string }>\n  skipped: Array<{ skill: string; reason: string }>\n}\n```"
       ]
     },
     {
@@ -36,8 +36,9 @@
     {
       "requirement": "AgentPlugin extends SpecdPlugin",
       "name": "Has install and uninstall",
-      "when": ["an AgentPlugin is created"],
-      "then": ["it has install() and uninstall() methods"]
+      "given": ["a valid SpecdConfig is provided"],
+      "when": ["install(config, options) or uninstall(config, options) is called"],
+      "then": ["the plugin executes the requested operation using the provided configuration"]
     },
     {
       "requirement": "isAgentPlugin type guard",
@@ -55,8 +56,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:995e3a4cef3dd63b3b84d961a56faaa97f378fd1c672cb123bb9106da64e0fee",
-    "verify.md": "sha256:8accc0fc1b67770f5fcbac62b1f064948b370cd88c8491b4fd81480cd2f12aee"
+    "spec.md": "sha256:63daec08e878746c81e94ca2033f3d7b208dd23b3f08e9fe969cb98d03044904",
+    "verify.md": "sha256:9c69a8d95806f821535d36c0b7a2110c990e19155d6380665d0548f2de117672"
   },
   "generatedBy": "core"
 }

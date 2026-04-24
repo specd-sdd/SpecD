@@ -59,8 +59,9 @@
 
 #### Scenario: Skills install into Open Code directory
 
+- **GIVEN** a `SpecdConfig` with `projectRoot`
 - **WHEN** install writes skill files
-- **THEN** files are created under `.opencode/skills/` within the provided `projectRoot`
+- **THEN** files are created under `.opencode/skills/` within the provided project root
 
 ### Requirement: Project init wizard integration
 
@@ -80,12 +81,12 @@
 
 #### Scenario: Uninstall removes selected skills when filter is provided
 
-- **GIVEN** multiple skills are installed under `.opencode/skills/`
-- **WHEN** `uninstall(projectRoot, { skills: ['specd-design'] })` is executed
+- **GIVEN** a `SpecdConfig` and multiple skills installed under `.opencode/skills/`
+- **WHEN** `uninstall(config, { skills: ['specd-design'] })` is executed
 - **THEN** only the selected skill directories are removed
 
 #### Scenario: Uninstall removes all skills when no filter is provided
 
-- **GIVEN** skills are installed under `.opencode/skills/`
-- **WHEN** `uninstall(projectRoot, optionsWithoutSkills)` is executed
+- **GIVEN** a `SpecdConfig` and skills installed under `.opencode/skills/`
+- **WHEN** `uninstall(config, optionsWithoutSkills)` is executed
 - **THEN** the full `.opencode/skills/` tree is removed

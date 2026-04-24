@@ -1,3 +1,4 @@
+import type { SpecdConfig } from '@specd/core'
 import type { Skill } from '../../domain/skill.js'
 import type { SkillBundle } from '../../domain/skill-bundle.js'
 
@@ -45,9 +46,14 @@ export interface SkillRepository {
    *
    * @param name - Skill name.
    * @param variables - Placeholder substitution values.
+   * @param config - Optional project configuration for built-in variables.
    * @returns Resolved install bundle.
    */
-  getBundle(name: string, variables?: Readonly<Record<string, string>>): SkillBundle
+  getBundle(
+    name: string,
+    variables?: Readonly<Record<string, string>>,
+    config?: SpecdConfig,
+  ): SkillBundle
 
   /**
    * Lists shared files declared under `templates/shared`.

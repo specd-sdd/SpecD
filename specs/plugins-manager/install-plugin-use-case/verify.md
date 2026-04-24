@@ -4,15 +4,16 @@
 
 ### Requirement: Behavior
 
-#### Scenario: Successful install
-
-- **WHEN** InstallPlugin is executed with valid plugin
-- **THEN** it returns success with message
-
 #### Scenario: Plugin not found
 
 - **WHEN** InstallPlugin is executed with non-existent plugin
 - **THEN** PluginNotFoundError is thrown
+
+#### Scenario: Successful install
+
+- **GIVEN** a valid `SpecdConfig` is provided
+- **WHEN** InstallPlugin is executed with valid plugin and configuration
+- **THEN** it returns success with message
 
 ### Requirement: Error handling
 

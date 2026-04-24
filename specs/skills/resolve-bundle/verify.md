@@ -13,3 +13,9 @@
 
 - **WHEN** `ResolveBundle` use case is executed with `{ name: 'skill' }`
 - **THEN** placeholders remain as-is
+
+#### Scenario: With SpecdConfig for built-in variables
+
+- **GIVEN** a `SpecdConfig` with `projectRoot: '/path/to/project'`
+- **WHEN** `ResolveBundle` is executed with that config
+- **THEN** it automatically replaces `{{projectRoot}}` with '/path/to/project'

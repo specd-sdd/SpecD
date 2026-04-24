@@ -6,7 +6,8 @@
 
 #### Scenario: Successful uninstall
 
-- **WHEN** UninstallPlugin is executed
+- **GIVEN** a valid `SpecdConfig` is provided
+- **WHEN** UninstallPlugin is executed with valid configuration
 - **THEN** it returns void
 
 ### Requirement: Error handling

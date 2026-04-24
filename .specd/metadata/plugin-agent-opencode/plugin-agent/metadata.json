@@ -1,7 +1,11 @@
 {
   "title": "plugin-agent-opencode:plugin-agent",
   "description": "Open Code support is required to keep agent-plugin behavior consistent across the ecosystem and avoid a Claude-only installation path. This spec defines the Open Code plugin contract for skill install/uninstall, target install directory, and frontmatter handling so the plugin can be implemented predictably and validated against the same standards used by other agent plugins.",
-  "dependsOn": ["plugin-manager:agent-plugin-type", "skills:skill-templates-source"],
+  "dependsOn": [
+    "core:core/config",
+    "plugin-manager:agent-plugin-type",
+    "skills:skill-templates-source"
+  ],
   "context": [
     "Open Code support is required to keep agent-plugin behavior consistent across the ecosystem and avoid a Claude-only installation path. This spec defines the Open Code plugin contract for skill install/uninstall, target install directory, and frontmatter handling so the plugin can be implemented predictably and validated against the same standards used by other agent plugins."
   ],
@@ -9,7 +13,7 @@
     {
       "requirement": "Factory export",
       "rules": [
-        "The package MUST export `create(): AgentPlugin` as a named export.\n\nThe factory function MUST read `specd-plugin.json` at the infrastructure boundary to obtain `name` and `version`. It MUST search for the manifest in its own directory first, then the parent directory as fallback — this works both in development (source tree) and after build/publish (`dist/` with manifest at package root). The `type` field MUST remain hardcoded as `'agent'`."
+        "The package MUST export `create(options: PluginLoaderOptions): AgentPlugin` as a named export.\n\nThe factory function MUST read `specd-plugin.json` at the infrastructure boundary to obtain `name` and `version`. It MUST search for the manifest in its own directory first, then the parent directory as fallback. The `type` field MUST remain hardcoded as `'agent'`."
       ]
     },
     {
@@ -27,7 +31,7 @@
     {
       "requirement": "Application layer",
       "rules": [
-        "The application layer MUST include an `InstallSkills` use case that:\n\n1. reads skills from `@specd/skills`\n2. resolves the per-skill frontmatter map\n3. prepends Open Code-compatible YAML frontmatter to markdown skill files\n4. writes installed skills to the Open Code project skill directory"
+        "The application layer MUST include an `InstallSkills` use case that:\n\n1. reads skills from `@specd/skills`, passing `SpecdConfig` for built-in variable resolution\n2. resolves the per-skill frontmatter map\n3. prepends Open Code-compatible YAML frontmatter to markdown skill files\n4. writes installed skills to the Open Code project skill directory under the `projectRoot` provided in `SpecdConfig`"
       ]
     },
     {
@@ -39,7 +43,7 @@
     {
       "requirement": "Install location",
       "rules": [
-        "Project-level skill installation MUST target `.opencode/skills/` under the provided `projectRoot`."
+        "Project-level skill installation MUST target `.opencode/skills/` under the `projectRoot` provided in `SpecdConfig`."
       ]
     },
     {
@@ -57,7 +61,7 @@
     {
       "requirement": "Uninstall behavior",
       "rules": [
-        "`uninstall(projectRoot, options)` MUST remove installed skill directories from `.opencode/skills/`.\n\nWhen `options.skills` is provided, uninstall MUST remove only the selected skill directories.\n\nWhen `options.skills` is omitted, uninstall MUST remove the full `.opencode/skills/` tree."
+        "`uninstall(config: SpecdConfig, options?: AgentInstallOptions)` MUST remove installed skill directories from `.opencode/skills/` relative to `config.projectRoot`.\n\nWhen `options.skills` is provided, uninstall MUST remove only the selected skill directories.\n\nWhen `options.skills` is omitted, uninstall MUST remove the full `.opencode/skills/` tree."
       ]
     }
   ],
@@ -136,8 +140,9 @@
     {
       "requirement": "Install location",
       "name": "Skills install into Open Code directory",
+      "given": ["a SpecdConfig with projectRoot"],
       "when": ["install writes skill files"],
-      "then": ["files are created under .opencode/skills/ within the provided projectRoot"]
+      "then": ["files are created under .opencode/skills/ within the provided project root"]
     },
     {
       "requirement": "Project init wizard integration",
@@ -154,21 +159,21 @@
     {
       "requirement": "Uninstall behavior",
       "name": "Uninstall removes selected skills when filter is provided",
-      "given": ["multiple skills are installed under .opencode/skills/"],
-      "when": ["uninstall(projectRoot, { skills: ['specd-design'] }) is executed"],
+      "given": ["a SpecdConfig and multiple skills installed under .opencode/skills/"],
+      "when": ["uninstall(config, { skills: ['specd-design'] }) is executed"],
       "then": ["only the selected skill directories are removed"]
     },
     {
       "requirement": "Uninstall behavior",
       "name": "Uninstall removes all skills when no filter is provided",
-      "given": ["skills are installed under .opencode/skills/"],
-      "when": ["uninstall(projectRoot, optionsWithoutSkills) is executed"],
+      "given": ["a SpecdConfig and skills installed under .opencode/skills/"],
+      "when": ["uninstall(config, optionsWithoutSkills) is executed"],
       "then": ["the full .opencode/skills/ tree is removed"]
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:1395c6f6b30200d96149556c04105a5e5ef56a1992058cffa7ec890b71e45e59",
-    "verify.md": "sha256:043a2b8df95674f9804ecbcad06854c650e9a508cd9eb33c8aab97ab4d8e06fb"
+    "spec.md": "sha256:fbc38ba20fcf97deeeebe96aa0c73691f0ba010f991d05589934b5742b95bd45",
+    "verify.md": "sha256:b26e9ecf0fbcdbb2c798eb7955259127770e29c1d125e9665d116cb233668e64"
   },
   "generatedBy": "core"
 }

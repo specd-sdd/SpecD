@@ -8,12 +8,12 @@ Use case that orchestrates plugin update. This is an idempotent reinstall that d
 
 ### Requirement: Input
 
-Same as `InstallPluginInput`:
+Same as `InstallPluginInput` (using `SpecdConfig`):
 
 ```typescript
 interface UpdatePluginInput {
   readonly pluginName: string
-  readonly projectRoot: string
+  readonly config: SpecdConfig
   readonly options?: Record<string, unknown>
 }
 ```
@@ -37,7 +37,7 @@ The use case MUST:
 1. Load the plugin via `PluginLoader`
 2. Verify the loaded plugin is an `AgentPlugin` using the `isAgentPlugin` type guard
 3. If the plugin is not an `AgentPlugin`, throw `PluginValidationError`
-4. Call the plugin's `install()` method (same as install, but no config mutation)
+4. Call the plugin's `install()` method with the provided `SpecdConfig` (same as install, but no config mutation)
 5. Return a generic result
 
 ### Requirement: Idempotency
@@ -59,5 +59,6 @@ On failure, the use case MUST throw an appropriate error:
 
 ## Spec Dependencies
 
+- [`core:core/config`](../../core/core/config/spec.md) — defines SpecdConfig type
 - [`plugin-manager:agent-plugin-type`](../agent-plugin-type/spec.md) — plugin interface
 - [`plugin-manager:plugin-loader`](../plugin-loader/spec.md) — loads plugins

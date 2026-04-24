@@ -1,7 +1,7 @@
 {
   "title": "plugin-manager:specd-plugin-type",
   "description": "Defines the base plugin interface (`SpecdPlugin`) that all specd plugins must implement. This is the foundation for extensible plugin types.",
-  "dependsOn": ["default:_global/architecture"],
+  "dependsOn": ["core:core/config", "default:_global/architecture"],
   "context": [
     "Defines the base plugin interface (`SpecdPlugin`) that all specd plugins must implement. This is the foundation for extensible plugin types."
   ],
@@ -21,7 +21,7 @@
     {
       "requirement": "PluginContext",
       "rules": [
-        "```typescript\ninterface PluginContext {\n  projectRoot: string // absolute path\n  config: Record<string, unknown> // this plugin's config from specd.yaml\n  typeContext: unknown // type-specific context\n}\n```"
+        "The system SHALL pass the fully-resolved project configuration to plugins during initialization:\n\n```typescript\ninterface PluginContext {\n  /**\n   * Fully-resolved project configuration.\n   */\n  readonly config: SpecdConfig\n}\n```\n\nThe `PluginContext` MUST NOT include `projectRoot`, `typeContext`, or a separate `config` record, as these are all available through the `SpecdConfig` object."
       ]
     },
     {
@@ -68,6 +68,13 @@
       "then": ["it returns 'agent' regardless of manifest content"]
     },
     {
+      "requirement": "PluginContext",
+      "name": "Initialization with SpecdConfig",
+      "given": ["a valid SpecdConfig is resolved"],
+      "when": ["plugin.init() is called with a PluginContext containing that config"],
+      "then": ["the plugin has access to all project configuration fields"]
+    },
+    {
       "requirement": "isSpecdPlugin type guard",
       "name": "Rejects unknown plugin type",
       "given": ["a value with all SpecdPlugin properties but type is 'unknown-type'"],
@@ -83,8 +90,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:06c7fd16e972818a264aab0d5718d8bcc8b8e46e89f3828ad7fc37300114983f",
-    "verify.md": "sha256:38fff1cee8d596726ee88f4523a7a3f3a6a4e9c5296b7f0618600a465c0762b4"
+    "spec.md": "sha256:2e5cc9297d7b38c42d366bd1bc296c720205e476e1fec32524b359d1aa5b1f75",
+    "verify.md": "sha256:9a8c42abc2354d044d3efd96517465ebf448c533ac9a736d5989dfe6e5ad6e04"
   },
   "generatedBy": "core"
 }

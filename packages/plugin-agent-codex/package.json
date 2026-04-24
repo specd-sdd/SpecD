@@ -23,6 +23,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@specd/core": "workspace:^",
     "@specd/plugin-manager": "workspace:*",
     "@specd/skills": "workspace:*"
   }

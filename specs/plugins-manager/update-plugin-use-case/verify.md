@@ -6,7 +6,8 @@
 
 #### Scenario: Multiple updates produce same result
 
-- **WHEN** UpdatePlugin is executed twice
+- **GIVEN** a valid `SpecdConfig` is provided
+- **WHEN** UpdatePlugin is executed twice with same configuration
 - **THEN** both return the same result
 
 ### Requirement: Error handling

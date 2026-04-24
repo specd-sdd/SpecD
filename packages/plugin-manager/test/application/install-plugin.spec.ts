@@ -2,6 +2,9 @@ import { describe, expect, it, vi } from 'vitest'
 import { InstallPlugin } from '../../src/index.js'
 import type { PluginLoader } from '../../src/index.js'
 import { PluginValidationError } from '../../src/index.js'
+import { makeMockConfig } from '../mock-config.js'
+
+const mockConfig = makeMockConfig()
 
 describe('InstallPlugin', () => {
   it('given a loadable agent plugin, when execute is called, then installs and returns success', async () => {
@@ -26,11 +29,11 @@ describe('InstallPlugin', () => {
     const useCase = new InstallPlugin(loader)
     const result = await useCase.execute({
       pluginName: '@specd/plugin-agent-claude',
-      projectRoot: '/tmp/project',
+      config: mockConfig,
     })
 
     expect(result.success).toBe(true)
-    expect(install).toHaveBeenCalledOnce()
+    expect(install).toHaveBeenCalledWith(mockConfig, undefined)
     expect(loader.load).toHaveBeenCalledWith('@specd/plugin-agent-claude')
   })
 
@@ -50,7 +53,7 @@ describe('InstallPlugin', () => {
     await expect(
       useCase.execute({
         pluginName: 'some-plugin',
-        projectRoot: '/tmp/project',
+        config: mockConfig,
       }),
     ).rejects.toThrow(PluginValidationError)
   })

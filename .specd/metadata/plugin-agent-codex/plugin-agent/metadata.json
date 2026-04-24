@@ -1,7 +1,11 @@
 {
   "title": "plugin-agent-codex:plugin-agent",
   "description": "This spec defines the Codex agent plugin contract for install/uninstall behavior, install target directory, and exact frontmatter support so implementation and verification are deterministic.",
-  "dependsOn": ["plugin-manager:agent-plugin-type", "skills:skill-templates-source"],
+  "dependsOn": [
+    "core:core/config",
+    "plugin-manager:agent-plugin-type",
+    "skills:skill-templates-source"
+  ],
   "context": [
     "This spec defines the Codex agent plugin contract for install/uninstall behavior, install target directory, and exact frontmatter support so implementation and verification are deterministic."
   ],
@@ -9,13 +13,13 @@
     {
       "requirement": "Factory export",
       "rules": [
-        "The package MUST export `create(): AgentPlugin` as default or named export.\n\nThe factory function MUST read `specd-plugin.json` at the infrastructure boundary to obtain `name` and `version`. It MUST search for the manifest in its own directory first, then the parent directory as fallback — this works both in development (source tree) and after build/publish (`dist/` with manifest at package root). The `type` field MUST remain hardcoded as `'agent'`."
+        "The package MUST export `create(options: PluginLoaderOptions): AgentPlugin` as default or named export.\n\nThe factory function MUST read `specd-plugin.json` at the infrastructure boundary to obtain `name` and `version`. It MUST search for the manifest in its own directory first, then the parent directory as fallback. The `type` field MUST remain hardcoded as `'agent'`."
       ]
     },
     {
       "requirement": "Plugin runtime contract",
       "rules": [
-        "The implementation MUST return a valid `AgentPlugin` that:\n\n- has `type: 'agent'` (hardcoded for type safety)\n- has `name` and `version` sourced from `specd-plugin.json` via the factory — not hardcoded in the class\n- implements `install(projectRoot, options)` and `uninstall(projectRoot, options)` with real filesystem behavior\n- uses a stable frontmatter model for generated skill files"
+        "The implementation MUST return a valid `AgentPlugin` that:\n\n- has `type: 'agent'` (hardcoded for type safety)\n- has `name` and `version` sourced from `specd-plugin.json` via the factory — not hardcoded in the class\n- implements `install(config, options)` and `uninstall(config, options)` with real filesystem behavior, using the provided `SpecdConfig`\n- uses a stable frontmatter model for generated skill files"
       ]
     },
     {
@@ -32,7 +36,9 @@
     },
     {
       "requirement": "Install location",
-      "rules": ["Skills MUST be installed to `.codex/skills/` under the provided project root."]
+      "rules": [
+        "Skills MUST be installed to `.codex/skills/` under the `projectRoot` provided in `SpecdConfig`."
+      ]
     }
   ],
   "constraints": [
@@ -72,7 +78,7 @@
       "then": [
         "the returned plugin has type: 'agent' (hardcoded)",
         "AND the returned plugin has name and version sourced from specd-plugin.json",
-        "AND the returned plugin exposes install(projectRoot, options) and uninstall(projectRoot, options) functions"
+        "AND the returned plugin exposes install(config, options) and uninstall(config, options) functions using SpecdConfig"
       ]
     },
     {
@@ -99,8 +105,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:0a179764024fedf5b187ff4c82fa15f240aeb0aa86da73ce99e71ab9d12d5d9b",
-    "verify.md": "sha256:900c7d0d44afb32290a3c8783f637dce9b4e0a45c397f1970da7ba1107df0ee6"
+    "spec.md": "sha256:69dc246deedb136f1a839ce7ac79c8a14edc4ae8a1298123965190a93f983db0",
+    "verify.md": "sha256:f0db2a68f8f96b667fc6ef17e28537b20936ea2164c722e10e4bc7173e9c094b"
   },
   "generatedBy": "core"
 }
