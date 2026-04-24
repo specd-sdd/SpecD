@@ -38,9 +38,9 @@ This layout mirrors the permanent spec directory structure so that the files can
 
 ### Requirement: Delta files
 
-When a change modifies an existing spec-scoped artifact, a delta file is produced instead of rewriting the artifact in full. Delta files live under `deltas/<workspace>/<capability-path>/` and are named `<artifact-filename>.delta.yaml`.
+When a change modifies an existing spec-scoped artifact whose schema artifact declares `delta: true`, a delta file is produced instead of rewriting the artifact in full. Delta files live under `deltas/<workspace>/<capability-path>/` and are named `<artifact-filename>.delta.yaml`.
 
-```
+```text
 deltas/<workspace>/<capability-path>/<artifact-filename>.delta.yaml
 ```
 
@@ -51,6 +51,28 @@ Examples:
 - `deltas/billing/invoices/spec.md.delta.yaml`
 
 Delta files are change artifacts — they are never synced to the permanent spec directories. The `deltas/` prefix separates them unambiguously from new spec files under `specs/`.
+
+For existing specs with delta-capable artifacts, this delta path is the expected artifact path. A same-named artifact under `specs/<workspace>/<capability-path>/` is not a valid substitute.
+
+### Requirement: Expected spec-scoped artifact path
+
+For every spec-scoped artifact, specd MUST determine exactly one expected artifact path within the change directory before exposing that artifact through the manifest, status, validation, or artifact instructions.
+
+When the target spec already exists and the schema artifact declares `delta: true`, the expected path SHALL be the delta file path:
+
+```text
+deltas/<workspace>/<capability-path>/<artifact-filename>.delta.yaml
+```
+
+When the target spec does not already exist, the expected path SHALL be the new spec artifact path:
+
+```text
+specs/<workspace>/<capability-path>/<artifact-filename>
+```
+
+When the schema artifact does not declare `delta: true`, the expected path SHALL be the spec artifact path under `specs/<workspace>/<capability-path>/` regardless of whether the target spec already exists.
+
+Tools MUST NOT treat the `specs/...` and `deltas/...` locations as interchangeable alternatives for the same artifact.
 
 ### Requirement: Workspace segment is always present
 
@@ -90,6 +112,7 @@ A change that only creates new specs has no `deltas/` subtree. A change that onl
 - Change-scoped artifacts are always flat at the change directory root — no workspace or capability-path prefix
 - Spec-scoped artifact files for new capabilities live under `specs/<workspace>/<capability-path>/`
 - Delta files always live under `deltas/<workspace>/<capability-path>/` and are named `<artifact-filename>.delta.yaml`
+- For a given spec-scoped artifact, exactly one of the `specs/...` or `deltas/...` paths is expected; tools must not accept both for the same target
 - The workspace segment is always present in both `specs/` and `deltas/` subtrees — it is never omitted
 - `specs/` and `deltas/` subtrees within a change directory are never synced to permanent spec directories; only `ArchiveChange` may move their contents
 - No other directories or file types are valid at the change directory root besides `manifest.json`, schema-declared artifacts, `specs/`, and `deltas/`

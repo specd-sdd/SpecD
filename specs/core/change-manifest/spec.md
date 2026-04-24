@@ -145,6 +145,16 @@ The JSON serialization of each event type is:
 
 On read, the manifest loader MUST also accept legacy historical invalidation events that persisted `"cause": "artifact-change"`. That legacy value is a backward-compatible alias for `"artifact-drift"` and MUST be normalized to the current domain cause during deserialization instead of being treated as corruption.
 
+### Requirement: Artifact filenames use expected paths
+
+Every `ManifestArtifactFile.filename` MUST be the expected change-directory path for that artifact, as defined by `core:core/change-layout`.
+
+When a change is created or its spec scope changes, persisted spec-scoped artifact filenames MUST be resolved using the target spec's existence and the schema artifact's delta capability before the manifest is written. Existing specs with delta-capable artifacts MUST be persisted as `deltas/<workspace>/<capability-path>/<artifact-filename>.delta.yaml`; new specs MUST be persisted as `specs/<workspace>/<capability-path>/<artifact-filename>`.
+
+The manifest MUST NOT initially persist a `specs/...` filename for an existing delta-capable spec and rely on a later read, validation, or delta creation pass to repair it. The manifest is a user- and agent-visible contract from creation time.
+
+When loading older manifests that contain a stale `specs/...` filename for an existing delta-capable spec, the repository MAY normalize the filename to the expected `deltas/...` path while preserving the file state and validation hash semantics.
+
 ### Requirement: Schema version
 
 `schema.name` is the value of the `schema` field from `specd.yaml` at creation time. `schema.version` is the `version` integer from the schema's `schema.yaml`. Both are written once at change creation and never updated.
@@ -168,6 +178,7 @@ The manifest must be written atomically — by writing to a temporary file and t
 ## Spec Dependencies
 
 - [`core:core/change`](../change/spec.md) — change event model and lifecycle derivation
+- [`core:core/change-layout`](../change-layout/spec.md) — expected artifact paths for new spec files and delta files
 - [`core:core/storage`](../storage/spec.md) — repository writes and atomic manifest handling
 - [`core:core/spec-metadata`](../spec-metadata/spec.md) — metadata files referenced by the manifest model
 - [`core:core/spec-id-format`](../spec-id-format/spec.md) — canonical `workspace:capabilityPath` identifiers

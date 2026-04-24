@@ -22,44 +22,67 @@ specd change validate <name> [workspace:capability-path] [--all] [--artifact <ar
 
 The command invokes the `ValidateArtifacts` use case, passing the change name, spec ID, and optionally the artifact ID from `--artifact`.
 
+The command MUST render file path details from the use case's structured file result metadata instead of recomputing expected paths in the CLI layer.
+
 ### Requirement: Output on success
 
-In `text` mode (default), when all artifacts pass:
+In `text` mode (default), when all artifacts pass, the command prints the validated artifact paths:
 
-```
+```text
 validated <name>/<workspace:capability-path>: all artifacts pass
+  file: <path>
+  file: <path>
+note: inspect merged spec output with `specd change spec-preview <name> <workspace:capability-path>`
 ```
 
 In `text` mode, when there are warnings but no failures:
 
-```
+```text
 validated <name>/<workspace:capability-path>: pass (N warning(s))
+  file: <path>
 warning: <artifactId> — <description>
 ...
+note: inspect merged spec output with `specd change spec-preview <name> <workspace:capability-path>`
 ```
 
-In `json` or `toon` mode, the output is (encoded in the respective format):
+The listed file paths MUST come from `ValidateArtifacts` result metadata and MUST be the exact paths validated for the requested spec/artifact.
+
+In `json` or `toon` mode, the output is encoded in the respective format and includes the structured validation result:
 
 ```json
-{ "passed": true, "failures": [], "warnings": [{ "artifactId": "...", "description": "..." }] }
+{
+  "passed": true,
+  "failures": [],
+  "warnings": [{ "artifactId": "...", "description": "..." }],
+  "files": [{ "artifactId": "...", "key": "...", "filename": "...", "status": "validated" }]
+}
 ```
 
 ### Requirement: Output on failure
 
-In `text` mode, the command prints each failure to stdout, exits with code 1:
+In `text` mode, the command prints each failure to stdout, exits with code 1, and includes any expected file paths that could not be validated:
 
-```
+```text
 validation failed <name>/<workspace:capability-path>:
+  missing: <path>
   error: <artifactId> — <description>
   ...
   warning: <artifactId> — <description>
   ...
+note: inspect merged spec output with `specd change spec-preview <name> <workspace:capability-path>`
 ```
 
-In `json` or `toon` mode, the output is (encoded in the respective format):
+Missing path lines MUST be derived from `ValidateArtifacts` result metadata. For an existing spec with a delta-capable artifact, this path is the expected `deltas/.../*.delta.yaml` file, even if a direct `specs/...` file exists.
+
+In `json` or `toon` mode, the output is encoded in the respective format and includes the structured validation result:
 
 ```json
-{"passed": false, "failures": [{"artifactId": "...", "description": "..."}], "warnings": [...]}
+{
+  "passed": false,
+  "failures": [{ "artifactId": "...", "description": "...", "filename": "..." }],
+  "warnings": [],
+  "files": [{ "artifactId": "...", "key": "...", "filename": "...", "status": "missing" }]
+}
 ```
 
 The process exits with code 1 when `passed` is `false`, regardless of format.
@@ -110,4 +133,5 @@ specd change validate update-billing default:billing/invoices --artifact specs
 
 - [`cli:cli/entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
 - [`core:core/change`](../../core/change/spec.md) — artifact status, validation, approval invalidation
+- [`core:core/validate-artifacts`](../../core/validate-artifacts/spec.md) — validation result shape and expected artifact file paths
 - [`core:core/spec-id-format`](../../core/spec-id-format/spec.md) — canonical `workspace:capabilityPath` format

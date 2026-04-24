@@ -35,13 +35,26 @@ afterEach(() => vi.restoreAllMocks())
 describe('change validate', () => {
   it('prints success message when no failures or warnings', async () => {
     const { kernel, stdout } = setup()
-    kernel.changes.validate.execute.mockResolvedValue({ failures: [], warnings: [] })
+    kernel.changes.validate.execute.mockResolvedValue({
+      failures: [],
+      warnings: [],
+      files: [
+        {
+          artifactId: 'specs',
+          key: 'default:auth/login',
+          filename: 'deltas/default/auth/login/spec.md.delta.yaml',
+          status: 'validated',
+        },
+      ],
+    })
 
     const program = makeProgram()
     registerChangeValidate(program.command('change'))
     await program.parseAsync(['node', 'specd', 'change', 'validate', 'feat', 'auth/login'])
 
     expect(stdout()).toContain('validated feat/default:auth/login: all artifacts pass')
+    expect(stdout()).toContain('file: deltas/default/auth/login/spec.md.delta.yaml')
+    expect(stdout()).toContain('specd change spec-preview feat default:auth/login')
   })
 
   it('prints failures and exits 1 when validation fails', async () => {
@@ -49,6 +62,14 @@ describe('change validate', () => {
     kernel.changes.validate.execute.mockResolvedValue({
       failures: [{ artifactId: 'spec', description: 'missing required section' }],
       warnings: [],
+      files: [
+        {
+          artifactId: 'spec',
+          key: 'default:auth/login',
+          filename: 'deltas/default/auth/login/spec.md.delta.yaml',
+          status: 'missing',
+        },
+      ],
     })
 
     const program = makeProgram()
@@ -59,7 +80,9 @@ describe('change validate', () => {
 
     expect(process.exitCode).toBe(1)
     expect(stdout()).toContain('validation failed')
+    expect(stdout()).toContain('missing: deltas/default/auth/login/spec.md.delta.yaml')
     expect(stdout()).toContain('missing required section')
+    expect(stdout()).toContain('specd change spec-preview feat default:auth/login')
   })
 
   it('writes warnings to stdout with pass message', async () => {
@@ -67,6 +90,7 @@ describe('change validate', () => {
     kernel.changes.validate.execute.mockResolvedValue({
       failures: [],
       warnings: [{ artifactId: 'design', description: 'incomplete section' }],
+      files: [],
     })
 
     const program = makeProgram()
@@ -81,7 +105,7 @@ describe('change validate', () => {
 
   it('outputs JSON with passed flag', async () => {
     const { kernel, stdout } = setup()
-    kernel.changes.validate.execute.mockResolvedValue({ failures: [], warnings: [] })
+    kernel.changes.validate.execute.mockResolvedValue({ failures: [], warnings: [], files: [] })
 
     const program = makeProgram()
     registerChangeValidate(program.command('change'))
@@ -100,6 +124,7 @@ describe('change validate', () => {
     expect(parsed.passed).toBe(true)
     expect(Array.isArray(parsed.failures)).toBe(true)
     expect(Array.isArray(parsed.warnings)).toBe(true)
+    expect(Array.isArray(parsed.files)).toBe(true)
     expect(parsed.name).toBeUndefined()
   })
 
@@ -149,6 +174,7 @@ describe('change validate', () => {
     kernel.changes.validate.execute.mockResolvedValue({
       failures: [{ artifactId: 'spec', description: 'missing section' }],
       warnings: [],
+      files: [],
     })
 
     const program = makeProgram()
@@ -161,6 +187,7 @@ describe('change validate', () => {
     expect(parsed.passed).toBe(false)
     expect(parsed.failures.length).toBeGreaterThan(0)
     expect(parsed.failures[0].artifactId).toBe('spec')
+    expect(Array.isArray(parsed.files)).toBe(true)
     expect(process.exitCode).toBe(1)
   })
 
@@ -186,7 +213,7 @@ describe('change validate', () => {
       artifactStatuses: [],
       lifecycle: {},
     })
-    kernel.changes.validate.execute.mockResolvedValue({ failures: [], warnings: [] })
+    kernel.changes.validate.execute.mockResolvedValue({ failures: [], warnings: [], files: [] })
 
     const program = makeProgram()
     registerChangeValidate(program.command('change'))
@@ -207,10 +234,11 @@ describe('change validate', () => {
       lifecycle: {},
     })
     kernel.changes.validate.execute
-      .mockResolvedValueOnce({ failures: [], warnings: [] })
+      .mockResolvedValueOnce({ failures: [], warnings: [], files: [] })
       .mockResolvedValueOnce({
         failures: [{ artifactId: 'specs', description: 'missing delta' }],
         warnings: [],
+        files: [],
       })
 
     const program = makeProgram()
@@ -233,7 +261,7 @@ describe('change validate', () => {
       artifactStatuses: [],
       lifecycle: {},
     })
-    kernel.changes.validate.execute.mockResolvedValue({ failures: [], warnings: [] })
+    kernel.changes.validate.execute.mockResolvedValue({ failures: [], warnings: [], files: [] })
 
     const program = makeProgram()
     registerChangeValidate(program.command('change'))
@@ -263,7 +291,7 @@ describe('change validate', () => {
       artifactStatuses: [],
       lifecycle: {},
     })
-    kernel.changes.validate.execute.mockResolvedValue({ failures: [], warnings: [] })
+    kernel.changes.validate.execute.mockResolvedValue({ failures: [], warnings: [], files: [] })
 
     const program = makeProgram()
     registerChangeValidate(program.command('change'))
@@ -284,6 +312,7 @@ describe('change validate', () => {
     expect(parsed.results).toHaveLength(1)
     expect(parsed.results[0].spec).toBe('default:auth/login')
     expect(parsed.results[0].passed).toBe(true)
+    expect(Array.isArray(parsed.results[0].files)).toBe(true)
   })
 
   it('allows --artifact without specPath for change-scoped artifacts', async () => {
@@ -299,7 +328,7 @@ describe('change validate', () => {
         artifacts: () => [{ id: 'design', scope: 'change', output: 'design.md' }],
       },
     })
-    kernel.changes.validate.execute.mockResolvedValue({ failures: [], warnings: [] })
+    kernel.changes.validate.execute.mockResolvedValue({ failures: [], warnings: [], files: [] })
 
     const program = makeProgram()
     registerChangeValidate(program.command('change'))

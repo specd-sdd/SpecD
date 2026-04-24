@@ -186,6 +186,33 @@ Validate the artifacts for a change. When `<specPath>` is given, validates only 
 
 For change-scoped artifacts (e.g., `design`, `tasks`), `<specPath>` can be omitted when using `--artifact` — the command will infer the specPath from the change's first spec.
 
+Text output includes per-file path lines from core validation metadata:
+
+- `file: <path>` for expected files that were validated or skipped
+- `missing: <path>` for expected files that were required but absent
+
+Single-spec and batch text output always append a preview hint:
+
+`note: verify merged output with: specd change spec-preview <change> <specId>`
+
+Structured output (`json` / `toon`) includes a `files` array for each result entry:
+
+```json
+{
+  "passed": true,
+  "failures": [],
+  "warnings": [],
+  "files": [
+    {
+      "artifactId": "specs",
+      "key": "core:core/change-manifest",
+      "filename": "deltas/core/core/change-manifest/spec.md.delta.yaml",
+      "status": "validated"
+    }
+  ]
+}
+```
+
 | Option                      | Description                                     |
 | --------------------------- | ----------------------------------------------- |
 | `--all`                     | Validate artifacts for all specs in the change. |

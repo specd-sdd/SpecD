@@ -68,7 +68,21 @@ That invalidation rolls the change back to `designing`, preserves `drifted-pendi
 
 ### Requirement: Per-file validation
 
-If the artifact file does not exist in the change directory and the artifact is not optional, validation MUST record a failure before skipping. Only optional artifacts may be silently skipped when their file is missing.
+If the expected artifact file does not exist in the change directory and the artifact is not optional, validation MUST record a failure before skipping. Only optional artifacts may be silently skipped when their expected file is missing.
+
+For spec-scoped artifacts, the expected file is determined by `Requirement: Expected file path validation`. A file at the non-expected location MUST NOT satisfy this check.
+
+### Requirement: Expected file path validation
+
+Before validating a file for a spec-scoped artifact, `ValidateArtifacts` MUST determine the artifact's expected change-directory path using the target spec's existence and the schema artifact's delta capability.
+
+For an existing spec with a delta-capable artifact, the expected path is `deltas/<workspace>/<capability-path>/<artifact-filename>.delta.yaml`. `ValidateArtifacts` MUST validate that delta file and MUST NOT accept a direct artifact file at `specs/<workspace>/<capability-path>/<artifact-filename>` as a fallback.
+
+For a new spec, the expected path is `specs/<workspace>/<capability-path>/<artifact-filename>`. In that case `ValidateArtifacts` MUST validate the direct artifact file and MUST NOT require a delta.
+
+For change-scoped artifacts, the expected path remains the artifact output basename at the change directory root.
+
+If the expected file does not exist and the artifact is not optional, validation MUST record a failure that includes the expected file path. The file MUST NOT be marked complete.
 
 ### Requirement: Delta validation
 
@@ -95,17 +109,17 @@ A rule passes vacuously when zero nodes are selected. If any `required: true` de
 For artifacts with `delta: true` and an existing base spec in `SpecRepository`:
 
 1. Load the base artifact file from `SpecRepository` using the spec path and artifact filename.
-2. Load the delta file from the change directory at `deltas/<workspace>/<capability-path>/<filename>.delta.yaml`.
+2. Load the expected delta file from the change directory at `deltas/<workspace>/<capability-path>/<filename>.delta.yaml`.
 3. Resolve the `ArtifactParser` adapter for `artifact.format`.
 4. Call `parser.parse(baseContent)` to produce the base AST.
 5. Call `parser.apply(baseAST, deltaEntries)` to produce the merged AST.
 6. If `apply` throws `DeltaApplicationError`, record it as a validation failure and do not proceed to `validations[]` or `markComplete`.
 
-**No-op bypass:** When the delta contains only `no-op` entries, steps 1–6 are skipped entirely. The delta application preview is not needed because `no-op` produces no changes. `ValidateArtifacts` proceeds directly to hash computation on the raw delta file content.
+**No-op bypass:** When the expected delta contains only `no-op` entries, steps 1–6 are skipped entirely. The delta application preview is not needed because `no-op` produces no changes. `ValidateArtifacts` proceeds directly to hash computation on the raw delta file content.
 
 The merged AST (from `parser.serialize(mergedAST)`) is used for `validations[]` checks. The base spec in `SpecRepository` is **not modified** — archive is the step that writes the merged content.
 
-For artifacts without a delta file (new files being created in the change), `ValidateArtifacts` validates the artifact content directly against `validations[]`.
+For new files being created in the change, `ValidateArtifacts` validates the expected direct artifact file under `specs/<workspace>/<capability-path>/<filename>` against `validations[]`.
 
 ### Requirement: Structural validation
 
@@ -149,8 +163,11 @@ If any validation step fails, `markComplete` must not be called for that file, a
 - `passed: boolean` — `true` only if all required artifacts are present and all validations pass with no errors
 - `failures: ValidationFailure[]` — one entry per failed rule, missing artifact, or `DeltaApplicationError`
 - `warnings: ValidationWarning[]` — one entry per `required: false` rule that was absent
+- `files: ValidationFileResult[]` — one entry per artifact file considered by validation, including `artifactId`, `key`, `filename`, and whether the file was validated, skipped, or missing
 
-Each `ValidationFailure` must include the artifact ID, the rule or error description, and enough context for the CLI to produce a useful error message.
+Each `ValidationFailure` must include the artifact ID, the rule or error description, and enough context for the CLI to produce a useful error message. Missing-file failures MUST include the expected `filename`.
+
+`ValidationFileResult.filename` MUST be the expected path used by validation. It MUST NOT report an alternate file path that was present but intentionally ignored.
 
 ### Requirement: Save after validation
 
@@ -174,23 +191,13 @@ If metadataExtraction validation fails, `ValidateArtifacts` MUST record the fail
 - `preHashCleanup` substitutions are applied only for hash computation, never to the actual file content on disk
 - A missing `deltaValidations[]` is not an error — the step is skipped
 - A missing `validations[]` is not an error — the step is skipped
-- A missing delta file for a `delta: true` artifact is not itself a validation error — the artifact may be new (no existing base spec to delta against); in that case, validate the artifact file directly against `validations[]`
-
-### Requirement: Automatic dependsOn extraction
-
-After successfully validating a `scope: spec` artifact, the use case extracts `dependsOn` from the validated content using the schema's `metadataExtraction` declarations. For delta artifacts, the extraction runs against the merged content (base + delta), ensuring dependencies added via deltas are captured.
-
-That extraction uses the same shared extractor-transform registry and caller-owned origin context bag as metadata validation. If the schema declares a transform such as `resolveSpecPath`, the extracted dependency values are already normalized by the time they are returned from `extractMetadata()`.
-
-`ValidateArtifacts` does not perform a separate field-specific `dependsOn` repair step after extraction. If dependencies are found, the already-transformed spec IDs are registered on the change via `change.setSpecDependsOn(specId, deps)`.
-
-If extraction finds dependency values but transform execution cannot normalize them, validation fails for that artifact. It must not silently drop those found values and continue as if the artifact had no dependencies.
-
-This removes the need for agents or users to manually call `change deps --add` and also removes the prior hardcoded `dependsOn` normalization path.
+- A missing expected delta file for an existing spec with a `delta: true` artifact is a validation failure; direct files under `specs/...` are valid only for new specs or non-delta artifacts
 
 ## Spec Dependencies
 
 - [`core:core/change`](../change/spec.md) — change entity, approval invalidation, and artifact state
+- [`core:core/change-layout`](../change-layout/spec.md) — expected file paths for new spec artifacts and delta artifacts
+- [`core:core/change-manifest`](../change-manifest/spec.md) — persisted artifact filenames used by validation
 - [`core:core/schema-format`](../schema-format/spec.md) — artifact definition, validations, delta behavior, and pre-hash cleanup
 - [`core:core/delta-format`](../delta-format/spec.md) — parser contract and delta application errors
 - [`core:core/selector-model`](../selector-model/spec.md) — selector rules for validations and delta validations

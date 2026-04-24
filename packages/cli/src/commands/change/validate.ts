@@ -4,6 +4,113 @@ import { handleError, cliError } from '../../handle-error.js'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { parseSpecId } from '../../helpers/spec-path.js'
 
+/** Validation file states emitted by `change validate`. */
+type ValidationFileStatus = 'validated' | 'missing' | 'skipped'
+
+/** Structured validation failure entry emitted by core validation. */
+interface ValidateFailure {
+  readonly artifactId: string
+  readonly description: string
+  readonly filename?: string
+}
+
+/** Structured validation warning entry emitted by core validation. */
+interface ValidateWarning {
+  readonly artifactId: string
+  readonly description: string
+}
+
+/** Structured per-file validation metadata emitted by core validation. */
+interface ValidationFileEntry {
+  readonly artifactId: string
+  readonly key: string
+  readonly filename: string
+  readonly status: ValidationFileStatus
+}
+
+/** Normalized validation response consumed by CLI rendering paths. */
+interface ValidateResult {
+  readonly passed: boolean
+  readonly failures: ValidateFailure[]
+  readonly warnings: ValidateWarning[]
+  readonly files: ValidationFileEntry[]
+}
+
+/**
+ * Returns true when the value is a plain object record.
+ *
+ * @param value - Value to test
+ * @returns Whether the value is a non-null object
+ */
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
+/**
+ * Normalizes unknown kernel output into a safe `ValidateResult`.
+ *
+ * @param value - Raw value returned by the kernel
+ * @returns Normalized validation result
+ */
+function toValidateResult(value: unknown): ValidateResult {
+  if (!isRecord(value)) {
+    return { passed: false, failures: [], warnings: [], files: [] }
+  }
+
+  const failures: ValidateFailure[] = Array.isArray(value['failures'])
+    ? value['failures']
+        .map((entry): ValidateFailure | null => {
+          if (!isRecord(entry)) return null
+          const artifactId = entry['artifactId']
+          const description = entry['description']
+          if (typeof artifactId !== 'string' || typeof description !== 'string') return null
+          const filename = entry['filename']
+          return typeof filename === 'string'
+            ? { artifactId, description, filename }
+            : { artifactId, description }
+        })
+        .filter((entry): entry is ValidateFailure => entry !== null)
+    : []
+
+  const warnings: ValidateWarning[] = Array.isArray(value['warnings'])
+    ? value['warnings']
+        .map((entry): ValidateWarning | null => {
+          if (!isRecord(entry)) return null
+          const artifactId = entry['artifactId']
+          const description = entry['description']
+          if (typeof artifactId !== 'string' || typeof description !== 'string') return null
+          return { artifactId, description }
+        })
+        .filter((entry): entry is ValidateWarning => entry !== null)
+    : []
+
+  const files: ValidationFileEntry[] = Array.isArray(value['files'])
+    ? value['files']
+        .map((entry): ValidationFileEntry | null => {
+          if (!isRecord(entry)) return null
+          const artifactId = entry['artifactId']
+          const key = entry['key']
+          const filename = entry['filename']
+          const status = entry['status']
+          if (
+            typeof artifactId !== 'string' ||
+            typeof key !== 'string' ||
+            typeof filename !== 'string'
+          ) {
+            return null
+          }
+          if (status !== 'validated' && status !== 'missing' && status !== 'skipped') {
+            return null
+          }
+          return { artifactId, key, filename, status }
+        })
+        .filter((entry): entry is ValidationFileEntry => entry !== null)
+    : []
+
+  const passed = typeof value['passed'] === 'boolean' ? value['passed'] : failures.length === 0
+  return { passed, failures, warnings, files }
+}
+
 /**
  * Registers the `change validate` subcommand on the given parent command.
  *
@@ -26,8 +133,9 @@ export function registerChangeValidate(parent: Command): void {
 JSON/TOON output schema:
   {
     passed: boolean
-    failures: Array<{ artifactId: string, description: string }>
+    failures: Array<{ artifactId: string, description: string, filename?: string }>
     warnings: Array<{ artifactId: string, description: string }>
+    files: Array<{ artifactId: string, key: string, filename: string, status: "validated" | "missing" | "skipped" }>
   }
 `,
     )
@@ -107,34 +215,44 @@ async function executeSingle(
   const parsed = parseSpecId(specPath, config)
   const fullSpecPath = `${parsed.workspace}:${parsed.capabilityPath}`
 
-  const result = await kernel.changes.validate.execute({
-    name,
-    specPath: fullSpecPath,
-    ...(opts.artifact !== undefined ? { artifactId: opts.artifact } : {}),
-  })
+  const result = toValidateResult(
+    await kernel.changes.validate.execute({
+      name,
+      specPath: fullSpecPath,
+      ...(opts.artifact !== undefined ? { artifactId: opts.artifact } : {}),
+    }),
+  )
 
   const fmt = parseFormat(opts.format)
   const passed = result.failures.length === 0
 
   if (fmt === 'text') {
+    const fileLines = result.files.map((file) =>
+      file.status === 'missing' ? `missing: ${file.filename}` : `file: ${file.filename}`,
+    )
+    const previewNote = `note: verify merged output with: specd change spec-preview ${name} ${fullSpecPath}`
+
     if (passed) {
       if (result.warnings.length > 0) {
         const warningLines = result.warnings.map(
           (w) => `warning: ${w.artifactId} — ${w.description}`,
         )
         output(
-          `validated ${name}/${fullSpecPath}: pass (${result.warnings.length} warning(s))\n${warningLines.join('\n')}`,
+          `validated ${name}/${fullSpecPath}: pass (${result.warnings.length} warning(s))\n${[...fileLines, ...warningLines, previewNote].join('\n')}`,
           'text',
         )
       } else {
-        output(`validated ${name}/${fullSpecPath}: all artifacts pass`, 'text')
+        output(
+          `validated ${name}/${fullSpecPath}: all artifacts pass\n${[...fileLines, previewNote].join('\n')}`,
+          'text',
+        )
       }
     } else {
       const errorLines = result.failures.map((f) => `  error: ${f.artifactId} — ${f.description}`)
       const warningLines = result.warnings.map(
         (w) => `  warning: ${w.artifactId} — ${w.description}`,
       )
-      const allLines = [...errorLines, ...warningLines]
+      const allLines = [...fileLines, ...errorLines, ...warningLines, previewNote]
       output(`validation failed ${name}/${fullSpecPath}:\n${allLines.join('\n')}`, 'text')
       process.exitCode = 1
     }
@@ -144,6 +262,7 @@ async function executeSingle(
         passed,
         failures: result.failures,
         warnings: result.warnings,
+        files: result.files,
       },
       fmt,
     )
@@ -183,17 +302,20 @@ async function executeBatch(
   const results: Array<{
     spec: string
     passed: boolean
-    failures: Array<{ artifactId: string; description: string }>
-    warnings: Array<{ artifactId: string; description: string }>
+    failures: ValidateFailure[]
+    warnings: ValidateWarning[]
+    files: readonly ValidationFileEntry[]
   }> = []
   let totalPassed = 0
 
   for (const specId of specIds) {
-    const result = await kernel.changes.validate.execute({
-      name,
-      specPath: specId,
-      ...(opts.artifact !== undefined ? { artifactId: opts.artifact } : {}),
-    })
+    const result = toValidateResult(
+      await kernel.changes.validate.execute({
+        name,
+        specPath: specId,
+        ...(opts.artifact !== undefined ? { artifactId: opts.artifact } : {}),
+      }),
+    )
 
     const passed = result.failures.length === 0
     if (passed) totalPassed++
@@ -202,6 +324,7 @@ async function executeBatch(
       passed,
       failures: result.failures,
       warnings: result.warnings,
+      files: result.files,
     })
   }
 
@@ -210,20 +333,28 @@ async function executeBatch(
 
   if (fmt === 'text') {
     for (const r of results) {
+      const fileLines = r.files.map((file) =>
+        file.status === 'missing' ? `missing: ${file.filename}` : `file: ${file.filename}`,
+      )
+      const previewNote = `note: verify merged output with: specd change spec-preview ${name} ${r.spec}`
+
       if (r.passed) {
         if (r.warnings.length > 0) {
           const warningLines = r.warnings.map((w) => `warning: ${w.artifactId} — ${w.description}`)
           output(
-            `validated ${name}/${r.spec}: pass (${r.warnings.length} warning(s))\n${warningLines.join('\n')}`,
+            `validated ${name}/${r.spec}: pass (${r.warnings.length} warning(s))\n${[...fileLines, ...warningLines, previewNote].join('\n')}`,
             'text',
           )
         } else {
-          output(`validated ${name}/${r.spec}: all artifacts pass`, 'text')
+          output(
+            `validated ${name}/${r.spec}: all artifacts pass\n${[...fileLines, previewNote].join('\n')}`,
+            'text',
+          )
         }
       } else {
         const errorLines = r.failures.map((f) => `  error: ${f.artifactId} — ${f.description}`)
         const warningLines = r.warnings.map((w) => `  warning: ${w.artifactId} — ${w.description}`)
-        const allLines = [...errorLines, ...warningLines]
+        const allLines = [...fileLines, ...errorLines, ...warningLines, previewNote]
         output(`validation failed ${name}/${r.spec}:\n${allLines.join('\n')}`, 'text')
       }
     }

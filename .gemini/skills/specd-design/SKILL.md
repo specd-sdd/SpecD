@@ -1,0 +1,548 @@
+---
+name: 'specd-design'
+description: 'Write or revise specd design artifacts for an active change.'
+---
+
+# specd-design — write artifacts
+
+Read @shared.md before doing anything.
+
+## What this does
+
+Writes ONE artifact for the change, validates it, and stops. If the user says
+"all at once", or passes `--ff`, writes ALL remaining artifacts
+without stopping (fast-forward mode).
+
+## Execution discipline
+
+These rules constrain **how** you execute the workflow; they do not change the
+schema or lifecycle semantics.
+
+- Treat the current artifact from `change artifact-instruction` as the **only**
+  writable scope. Do not prepare or write files for later artifacts.
+- Execute artifact work **sequentially**. Avoid large shell commands that create
+  or write multiple artifact files in one shot.
+- Do not manually create change artifact directory structure with `mkdir` unless
+  the current artifact cannot be written otherwise. Prefer writing the target file
+  directly and let normal file creation happen as part of that write.
+- If the current artifact requires scope changes (for example `change edit --add-spec`
+  before writing spec deltas), perform those CLI writes first, then re-check state
+  sequentially before writing artifact files.
+- In **one-at-a-time** mode, once the current artifact is validated, stop immediately.
+  Do not fetch the next artifact, do not modify scope for the next artifact, and do
+  not write any additional files until the user explicitly tells you to continue.
+
+## Steps
+
+### 1. Load change state
+
+```bash
+specd change status <name> --format json
+```
+
+Store `lifecycle.changePath`, `specIds`, and `review` from the response.
+
+If `review.required` is `true`, enter **artifact review mode**:
+
+- Treat `review.affectedArtifacts` as the first review scope
+- Review those artifact files against the latest user conversation and the
+  current change state before deciding what to rewrite
+- Do NOT revalidate or rewrite downstream artifacts blindly just because they
+  are marked `pending-review`; first confirm whether the upstream change really
+  requires a content update
+- If `review.reason` is `artifact-drift`, inspect the drifted files first and
+  use them to decide which other artifacts actually need edits
+
+If state is `drafting` or `designing`, transition to `designing`:
+
+```bash
+specd change run-hooks <name> designing --phase pre
+specd change hook-instruction <name> designing --phase pre --format text
+```
+
+Follow guidance.
+
+```bash
+specd change transition <name> designing --skip-hooks all
+```
+
+If state is not `drafting` or `designing`, this is the wrong skill. Suggest based on state:
+
+- `implementing` / `spec-approved` → `/specd-implement <name>`
+- `verifying` → `/specd-verify <name>`
+- `done` / `signed-off` → `/specd-verify <name>` (handles done→archivable transition)
+- `pending-signoff` → "Signoff pending. Run: `specd change approve signoff <name> --reason ...`"
+- `archivable` → `/specd-archive <name>`
+- `pending-spec-approval` → "Approval pending. Run: `specd change approve spec <name> --reason ...`"
+- `ready` → Review artifacts, then `/specd-implement <name>` if approved
+
+**Stop — do not continue.**
+
+Check `artifacts` array — if some are already `complete`, you're resuming mid-design.
+
+### 2. Check workspace ownership
+
+```bash
+specd project status --format json
+```
+
+From the JSON output, build a map of each workspace's `codeRoot` and `ownership` from the `workspaces` array.
+For each `specId` in the change, determine which workspace it belongs to.
+
+**If any spec targets a `readOnly` workspace:**
+
+> **Blocked.** The following specs belong to readOnly workspaces and cannot be modified:
+>
+> | Spec | Workspace | codeRoot |
+> | ---- | --------- | -------- |
+> | ...  | ...       | ...      |
+>
+> Remove them from the change or update the workspace ownership in `specd.yaml`.
+
+**Stop — do not continue.**
+
+**Continuous guard — applies throughout the entire design session:**
+
+ReadOnly workspaces are off-limits for both specs AND code. You must NOT:
+
+- Write or modify specs belonging to a readOnly workspace
+- Design artifacts that prescribe changes to code under a readOnly `codeRoot`
+- Include tasks, proposals, or instructions that require modifying files under a readOnly `codeRoot`
+
+If during artifact writing you realize the design needs changes in a readOnly workspace's
+code or specs, **stop and surface it to the user** — do not write the artifact assuming
+those changes can be made. The user must either change the ownership in `specd.yaml` or
+adjust the design to work within owned/shared boundaries.
+
+External workspaces remain valid read targets during design:
+
+- Read **specs** through specd CLI commands only. Do NOT inspect specs directly from
+  `specsPath`, whether the workspace is local or external.
+- Read **code** directly from a workspace's `codeRoot` when you need implementation
+  context, architecture evidence, or impact analysis, even if that `codeRoot` is
+  outside the current git root.
+- `isExternal` changes location only. `ownership` still governs writes.
+
+### 3. Load schema
+
+```bash
+specd schema show --format json
+```
+
+Note the artifact DAG from the `artifacts` array.
+
+### 4. Load context
+
+```bash
+specd change context <name> designing --follow-deps --depth 1 --rules --constraints --format json [--fingerprint <stored-value>]
+```
+
+Pass `--fingerprint <stored-value>` if you have a `contextFingerprint` from a previous `change context` call in this conversation (see `shared.md` — "Fingerprint mechanism"). Extract and store the `contextFingerprint` from the response. If you passed a fingerprint and the response is `status: "unchanged"`, use the context already in memory. If `status: "changed"`, update your stored context and fingerprint with the new response.
+
+**MUST follow** — project context entries are binding directives. If lazy mode returns
+summary specs, evaluate each one and load any that are relevant to the artifact you're
+about to write (see `shared.md` — "Processing `change context` output").
+
+#### Use code graph to enrich context
+
+When the change targets specific code areas, use the graph to find related symbols and
+assess complexity — this is mandatory, not optional:
+
+```bash
+specd graph search "<keyword from spec>" --specs --format json
+specd graph hotspots --min-risk MEDIUM --format json
+```
+
+Graph search helps you discover specs you might need to load as context. Hotspots help
+you identify high-coupling symbols that the design should handle carefully — if a task
+will modify a CRITICAL hotspot, the design should note the risk and suggest extra testing.
+
+When writing the **design** or **tasks** artifact, if you know specific files or symbols
+that will be modified, check their dependent impact:
+
+```bash
+specd graph impact --symbol "<name>" --direction dependents --format json
+```
+
+Include impact findings in the design artifact so the implementer knows what's at stake.
+
+#### Load exploration context
+
+Check if `<changePath>/.specd-exploration.md` exists. If it does, read it — it contains
+the full discovery context from `/specd-new` (problem statement, approach, decisions,
+affected areas, codebase observations, etc.). Use it to inform every artifact you write.
+
+**Staleness check — mandatory.** The exploration file is a snapshot from a past
+conversation. Code, specs, and project state may have changed since it was written.
+Before trusting its content:
+
+- Verify that **file paths and spec IDs** mentioned in the exploration still exist
+  (quick glob/grep). If something was renamed or removed, note the discrepancy.
+- Cross-check **design decisions and agreements** against current code — if the codebase
+  already moved in a different direction, flag it to the user rather than following
+  the outdated plan blindly.
+- If the exploration references **specific behavior or patterns** in code, spot-check
+  them — they may have been refactored.
+
+If you find significant drift, briefly summarize what changed and ask the user whether
+the original plan still holds or needs adjustment before writing artifacts.
+
+If the file does not exist, **you almost certainly lack sufficient context to write
+artifacts.** The change name and one-line description from `change status` are NOT
+enough — they are too vague to make design decisions.
+
+**Do NOT proceed to writing artifacts based only on the change name and description.**
+Instead, stop and tell the user you're missing the exploration context. Then have a
+natural conversation to fill in the gaps — don't fire off a list of questions like a
+questionnaire. Start with one good question based on what you can infer from the change
+name, description, and specs. Let the user's answers guide your follow-ups. Keep it
+flowing until you understand the problem, the approach, what's affected, and any
+decisions or constraints. Once you have enough, write a `<changePath>/.specd-exploration.md` yourself
+to capture what you learned, then continue with step 5.
+
+If `review.required` is `true`, use the stored `review.reason` and
+`review.affectedArtifacts` together with the current context to decide what
+actually needs revision. Review the current artifact files before editing them,
+and only rewrite the artifacts whose content no longer matches the conversation
+or the updated change context.
+
+### 5. Show context summary
+
+Before asking the user about review mode, show a brief summary so they know what's
+about to happen:
+
+> **Change:** `<name>` — `<description>`
+>
+> **Specs:** `<specId1>`, `<specId2>`, ...
+>
+> **What we're building:** <1-2 sentence summary of the change's purpose, drawn from
+> exploration context or change description>
+>
+> **Artifacts to write:** <list artifact IDs from the schema DAG, marking any already
+> `complete` as done>
+>
+> **Next up:** `<nextArtifactId>` — <brief description of what this artifact covers>
+
+This gives the user orientation before they choose a review mode. Keep it concise.
+
+### 6. Choose mode — MANDATORY
+
+**You MUST ask the user this question. Do NOT skip it. Do NOT assume a mode.**
+
+If the user already said "all at once", "fast-forward", or `--ff` in
+their invocation → use fast-forward mode and mark the `Choose review mode` task
+as done immediately. Otherwise:
+
+1. Create (or update) the `Choose review mode` task to `in_progress`
+2. Ask:
+
+> How would you like to review artifacts?
+>
+> 1. **One at a time** — I write one, you review, then we continue
+> 2. **All at once** — I write everything, you review at the end
+
+3. **STOP. End your response here.** Do not write any more text or call any tools.
+   The `Choose review mode` task stays `in_progress` — that is your reminder that
+   you are waiting. Only mark it done and continue when the user replies.
+
+### 7. Get next artifact
+
+```bash
+specd change artifact-instruction <name> --format json
+```
+
+Returns `artifactId`, `instruction`, `template`, `delta`, `rulesPre`, `rulesPost`.
+
+If `lifecycle.nextArtifact` is `null` → all artifacts done, go to step 10.
+
+### 8. Write the artifact
+
+**`rulesPre`, `instruction`, and `rulesPost` are a single mandatory block.** You MUST
+read and follow all three, in this exact order: rulesPre → instruction → rulesPost.
+They are not optional or advisory — treat them as binding composition directives.
+
+Key rules:
+
+- **Optional artifact** (`optional: true`): ask the user if needed. If not, skip:
+
+  ```bash
+  specd change skip-artifact <name> <artifactId>
+  ```
+
+- **Delta** (`delta` is not null and `delta.outlines` has entries): the spec already
+  exists — write a delta file, NOT a new file. Use `delta.formatInstructions` for
+  the YAML format and `delta.outlines` to see existing structure.
+
+- **New artifact** (`delta` is null or outlines empty): write from scratch using
+  `template` as scaffolding if provided.
+
+After writing, check if the artifact implies scope changes:
+
+```bash
+specd spec list --format text --summary
+```
+
+If new specs should be added or existing ones removed, surface to the user.
+
+**Operational guardrails while writing**
+
+- Keep writes tightly scoped to the current artifact. Do not batch-create files for
+  multiple specs or future artifacts in one shell command.
+- If you must add spec scope with `change edit --add-spec`, do it as a separate,
+  sequential CLI step before writing the affected spec artifact files.
+- After any scope-changing CLI write, re-read change state or artifact instruction
+  sequentially before continuing with artifact file writes.
+
+### 9. Validate
+
+Check the artifact's `scope` (from the schema JSON loaded in step 3):
+
+- **`scope: change`** (e.g. proposal, design, tasks): validate ONCE, using any specId
+  from the change — the result is the same regardless of which specId you pick because
+  the artifact is not spec-specific.
+
+  ```bash
+  specd change validate <name> <anySpecId> --artifact <artifactId>
+  ```
+
+- **`scope: spec`** (e.g. specs, verify): validate ONCE PER specId, because each spec
+  has its own artifact file.
+
+  ```bash
+  specd change validate <name> <specId> --artifact <artifactId>
+  ```
+
+If validation fails: fix and re-validate. Do not proceed until it passes.
+
+**One-at-a-time mode:** show what was written, ask:
+
+> `<artifactId>` done. Review it, request changes, or continue?
+
+Wait for user response. Stop completely until the user replies. Do not call tools for
+the next artifact while waiting. Then go to step 7.
+
+**Fast-forward mode:** show a one-line summary and go to step 7.
+
+### 10. All artifacts done — run exit hooks immediately
+
+**Trigger:** the moment the last artifact passes validation, run the post-designing
+hooks. Do NOT wait, do NOT ask the user anything first — the hooks fire on completion
+of all design artifacts, before any review conversation.
+
+```bash
+specd change run-hooks <name> designing --phase post
+specd change hook-instruction <name> designing --phase post --format text
+```
+
+Follow guidance. If hooks fail, fix and re-run.
+
+### 10b. Blast radius check
+
+Use the code graph to assess the dependent impact of the planned implementation.
+This surfaces hidden risks early, when the design can still be adjusted.
+
+```bash
+specd graph impact --changes <workspace:path1> <workspace:path2> ... --format json
+```
+
+File paths must use the `{workspace}:{relativePath}` format (e.g. `core:src/auth.ts`,
+`cli:src/commands/context.ts`). Map each implementation target from the design artifacts
+to its workspace-prefixed path using the workspace config loaded in step 10c.
+
+If `riskLevel` is HIGH or CRITICAL, surface it to the user:
+
+> **Impact analysis:** the planned implementation touches symbols with `<riskLevel>` risk.
+> `<N>` files affected downstream. Consider whether the design needs additional
+> constraints or scenarios to cover the blast radius.
+
+If risk is HIGH or CRITICAL, confirm with the user before continuing. The user
+may choose to adjust the design, add scenarios, or accept the risk and continue.
+
+### 10c. Implementation scope guard — mandatory before `ready`
+
+Before entering `ready`, verify that the implementation described by the design
+stays inside the change's writable workspace code roots. This is the enforcement
+point for implementation scope: if the planned code changes fall outside the
+allowed roots, the design is not ready.
+
+Reload workspace config:
+
+```bash
+specd project status --format json
+```
+
+Build the set of **allowed implementation roots** from the `workspaces` array in the output:
+
+- Include the `codeRoot` of each active workspace whose ownership is `owned` or `shared`
+- Exclude `readOnly` roots entirely; they are never valid implementation targets
+- Do NOT treat the whole repository as implicitly writable just because a path does
+  not belong to another workspace
+
+Then inspect the written change artifacts that describe or constrain the planned
+implementation scope for concrete implementation targets. Use the active schema
+and the artifacts written in this change; do not assume specific filenames:
+
+- Repository-relative file paths
+- Paths in code fences, bullet lists, checklists, or inline code
+- Explicitly named files the tasks say to create, modify, move, or delete
+- Concrete code locations surfaced by graph analysis and called out in the design
+
+Normalize those candidate paths against the project root and classify each one:
+
+- **Allowed** — falls within one of the active writable `codeRoot` directories
+- **Blocked (readOnly)** — falls within a `readOnly` workspace `codeRoot`
+- **Out of scope** — falls outside every active writable `codeRoot`, even if it is
+  not inside another workspace
+
+Classification precedence is strict:
+
+- If **any** target is `Blocked (readOnly)`, the entire change is blocked before
+  `ready`, even if other targets are merely `Out of scope`
+- Only when there are **no** `Blocked (readOnly)` targets may `Out of scope`
+  targets be surfaced for user decision
+
+If any target is **Blocked (readOnly)**, do NOT transition to `ready`. Show the
+user a concise table like:
+
+> **Blocked before `ready`.** The current design includes implementation targets
+> outside the change's writable workspace roots.
+>
+> | Path | Classification          | Allowed roots |
+> | ---- | ----------------------- | ------------- |
+> | ...  | out of scope / readOnly | ...           |
+>
+> Adjust the design/tasks, add the correct workspace/spec scope, or change
+> workspace ownership in `specd.yaml` before continuing.
+
+If any target is **Out of scope** (but not `readOnly`), do NOT transition to
+`ready` autonomously. Show the user the out-of-scope paths and ask whether to:
+
+1. update the change scope/workspaces first, or
+2. continue with the current design anyway
+
+Stop and wait for the user's decision. Do not assume out-of-scope paths are okay,
+but do not hard-fail them without user confirmation.
+
+Do not "mentally waive" a path because it seems harmless. If the design says to
+touch a concrete file outside the active writable `codeRoot` set, surface it
+explicitly before `ready`.
+
+### 10d. Enter `ready`
+
+Run ready pre-hooks, then transition:
+
+```bash
+specd change run-hooks <name> ready --phase pre
+specd change hook-instruction <name> ready --phase pre --format text
+```
+
+Follow guidance.
+
+```bash
+specd change transition <name> ready --skip-hooks all
+```
+
+### 11. Mandatory review stop
+
+Show summary of all artifacts and specs in the change.
+
+> **Design complete.** All artifacts written and validated.
+>
+> | Artifact | Status |
+> | -------- | ------ |
+> | ...      | ...    |
+>
+> Want to review anything, or continue to implementation?
+
+**Do NOT proceed until the user confirms.**
+
+Run ready post hooks:
+
+```bash
+specd change run-hooks <name> ready --phase post
+specd change hook-instruction <name> ready --phase post --format text
+```
+
+### 12. Handle approval gate
+
+```bash
+specd change status <name> --format json
+```
+
+Check `lifecycle.approvals.spec`:
+
+**If `false`:** no approval needed — the change is ready to implement. Tell user:
+
+Suggest: `/specd-implement <name>`
+
+**If `true`:** transition reroutes to `pending-spec-approval`. Tell user:
+
+> Approval required. Run: `specd change approve spec <name> --reason "..."`
+> Then: `/specd-implement <name>`
+
+**Stop.**
+
+## Session tasks
+
+Create tasks at the start for session visibility. Update them as you go.
+
+1. `Load state & hooks` — mark done after step 1
+2. `Load schema & context` — mark done after step 4
+3. `Choose review mode` — mark done ONLY after the user responds (not when you ask)
+4. For each artifact: `Write <artifactId>` — mark done after validation passes
+5. `Transition to ready` — mark done after step 10
+6. `Review & approval gate` — mark done after step 12
+
+Create task 3 before asking the question in step 6. Its status must stay `in_progress`
+until the user answers — this is your signal to STOP and wait. Do not create artifact
+tasks (step 4) until the user has chosen a mode.
+
+In fast-forward mode, create all artifact tasks upfront (from the schema's artifact DAG).
+In one-at-a-time mode, create each artifact task as you reach it.
+
+## Handling failed transitions
+
+Any `change transition` command may fail with:
+
+```
+Cannot transition from '<current>' to '<target>'
+```
+
+If this happens, the change is in a different state than expected. Extract `<current>`
+from the error message and redirect using this table:
+
+| Current state                    | Suggest                                                                    |
+| -------------------------------- | -------------------------------------------------------------------------- |
+| `drafting` / `designing`         | You're already in the right skill — re-read status and retry               |
+| `implementing` / `spec-approved` | `/specd-implement <name>`                                                  |
+| `verifying`                      | `/specd-verify <name>`                                                     |
+| `done` / `signed-off`            | `/specd-verify <name>` (handles done→archivable transition)                |
+| `pending-signoff`                | "Signoff pending. Run: `specd change approve signoff <name> --reason ...`" |
+| `archivable`                     | `/specd-archive <name>`                                                    |
+| `pending-spec-approval`          | "Approval pending. Run: `specd change approve spec <name> --reason ...`"   |
+| `ready`                          | Review artifacts, then `/specd-implement <name>` if approved               |
+
+**Stop — do not continue after redirecting.**
+
+## Registering spec dependencies
+
+When a schema rule or artifact instruction tells you to register spec dependencies,
+use `change deps` (see shared.md — "Spec scope vs spec dependencies" for the distinction
+with `change edit --add-spec`):
+
+```bash
+specd change deps <name> <specId> --add <depId> --add <depId>
+```
+
+This typically happens after writing the proposal (the schema's `register-spec-deps`
+post-rule) and after writing specs (when `## Spec Dependencies` sections are added).
+Dependencies must be registered before downstream artifacts are written — they affect
+context compilation.
+
+## Guardrails
+
+- Always validate after writing — validation marks artifacts as `complete`
+- Delta, not rewrite — when outlines exist, always write a delta
+- One spec at a time for `scope: spec` artifacts
+- Never guess spec IDs — look them up from `spec list --format text --summary`
+- If context is unclear, ask the user — don't guess
