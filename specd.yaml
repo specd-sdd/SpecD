@@ -205,6 +205,8 @@ schemaOverrides:
               run: 'pnpm test'
             - id: implementing-run-lint
               run: 'pnpm lint'
+            - id: implementing-run-typecheck
+              run: 'pnpm typecheck'
       - step: verifying
         hooks:
           pre:
@@ -212,6 +214,8 @@ schemaOverrides:
               run: 'pnpm test'
             - id: verifying-run-lint
               run: 'pnpm lint'
+            - id: verifying-run-typecheck
+              run: 'pnpm typecheck'
       - step: archiving
         hooks:
           pre:
