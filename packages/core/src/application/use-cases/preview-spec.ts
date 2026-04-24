@@ -155,7 +155,8 @@ export class PreviewSpec {
           }
 
           const baseAst = parser.parse(baseArtifact.content)
-          const mergedAst = parser.apply(baseAst, deltaEntries)
+          const mergedResult = parser.apply(baseAst, deltaEntries)
+          const mergedAst = mergedResult.ast
           const merged = parser.serialize(mergedAst)
 
           files.push({

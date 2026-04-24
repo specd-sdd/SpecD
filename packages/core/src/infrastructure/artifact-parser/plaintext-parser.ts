@@ -2,6 +2,7 @@ import {
   type ArtifactAST,
   type ArtifactNode,
   type ArtifactParser,
+  type DeltaApplicationResult,
   type DeltaEntry,
   type NodeTypeDescriptor,
   type OutlineEntry,
@@ -43,7 +44,8 @@ export class PlaintextParser implements ArtifactParser {
    * @param delta - The ordered list of delta entries
    * @returns A new AST with all delta operations applied
    */
-  apply(ast: ArtifactAST, delta: readonly DeltaEntry[]): ArtifactAST {
+  apply(ast: ArtifactAST, delta: readonly DeltaEntry[]): DeltaApplicationResult {
+    const descriptorMap = new Map(this.nodeTypes().map((d) => [d.type, d]))
     return applyDelta(
       ast,
       delta,
@@ -54,6 +56,7 @@ export class PlaintextParser implements ArtifactParser {
         }
         return { type: 'paragraph', value: String(value) }
       },
+      descriptorMap,
     )
   }
 
@@ -100,16 +103,31 @@ export class PlaintextParser implements ArtifactParser {
         type: 'document',
         identifiedBy: [],
         description: 'Root node of a plain text document.',
+        isCollection: false,
+        isSequence: false,
+        isSequenceItem: false,
+        isContainer: true,
+        isLeaf: false,
       },
       {
         type: 'paragraph',
         identifiedBy: ['contains'],
         description: 'A block of text separated from other blocks by blank lines.',
+        isCollection: true,
+        isSequence: false,
+        isSequenceItem: false,
+        isContainer: false,
+        isLeaf: false,
       },
       {
         type: 'line',
         identifiedBy: ['contains'],
         description: 'A single line of text within a document.',
+        isCollection: false,
+        isSequence: false,
+        isSequenceItem: false,
+        isContainer: false,
+        isLeaf: true,
       },
     ]
   }

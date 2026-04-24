@@ -7,6 +7,7 @@ import { InvalidChangeError } from '../../../src/domain/errors/invalid-change-er
 import { HistoricalImplementationGuardError } from '../../../src/domain/errors/historical-implementation-guard-error.js'
 import type { ActorIdentity, ChangeEvent } from '../../../src/domain/entities/change.js'
 import type { ArtifactStatus } from '../../../src/domain/value-objects/artifact-status.js'
+import { ArtifactType } from '../../../src/domain/value-objects/artifact-type.js'
 
 const actor: ActorIdentity = { name: 'Alice', email: 'alice@example.com' }
 const otherActor: ActorIdentity = { name: 'Bob', email: 'bob@example.com' }
@@ -864,6 +865,102 @@ describe('Change', () => {
       c.setArtifact(a1)
       c.setArtifact(a2)
       expect(c.getArtifact('proposal')).toBe(a2)
+    })
+  })
+
+  describe('syncArtifacts', () => {
+    function makeSpecsArtifactType(): ArtifactType {
+      return new ArtifactType({
+        id: 'specs',
+        scope: 'spec',
+        output: 'specs/**/spec.md',
+        delta: true,
+        requires: [],
+        validations: [],
+        deltaValidations: [],
+        preHashCleanup: [],
+      })
+    }
+
+    it('normalizes stale filenames for existing specs and preserves status/hash', () => {
+      const c = new Change({
+        name: 'sync-artifacts',
+        createdAt: new Date('2024-01-01T00:00:00Z'),
+        specIds: ['default:auth/login', 'default:auth/register'],
+        history: [],
+        artifacts: new Map([
+          [
+            'specs',
+            new ChangeArtifact({
+              type: 'specs',
+              files: new Map([
+                [
+                  'default:auth/login',
+                  new ArtifactFile({
+                    key: 'default:auth/login',
+                    filename: 'specs/default/auth/login/spec.md',
+                    status: 'complete',
+                    validatedHash: 'sha256:abc',
+                  }),
+                ],
+              ]),
+            }),
+          ],
+        ]),
+      })
+
+      const changed = c.syncArtifacts(
+        [makeSpecsArtifactType()],
+        new Map([
+          ['default:auth/login', true],
+          ['default:auth/register', false],
+        ]),
+      )
+
+      expect(changed).toBe(true)
+      const artifact = c.getArtifact('specs')
+      expect(artifact).not.toBeNull()
+      const existing = artifact?.getFile('default:auth/login')
+      expect(existing?.filename).toBe('deltas/default/auth/login/spec.md.delta.yaml')
+      expect(existing?.status).toBe('complete')
+      expect(existing?.validatedHash).toBe('sha256:abc')
+      expect(artifact?.getFile('default:auth/register')?.filename).toBe(
+        'specs/default/auth/register/spec.md',
+      )
+    })
+
+    it('does not rename existing filenames when spec existence data is absent', () => {
+      const c = new Change({
+        name: 'sync-artifacts-no-existence',
+        createdAt: new Date('2024-01-01T00:00:00Z'),
+        specIds: ['default:auth/login'],
+        history: [],
+        artifacts: new Map([
+          [
+            'specs',
+            new ChangeArtifact({
+              type: 'specs',
+              files: new Map([
+                [
+                  'default:auth/login',
+                  new ArtifactFile({
+                    key: 'default:auth/login',
+                    filename: 'specs/default/auth/login/spec.md',
+                    status: 'in-progress',
+                  }),
+                ],
+              ]),
+            }),
+          ],
+        ]),
+      })
+
+      const changed = c.syncArtifacts([makeSpecsArtifactType()])
+
+      expect(changed).toBe(false)
+      expect(c.getArtifact('specs')?.getFile('default:auth/login')?.filename).toBe(
+        'specs/default/auth/login/spec.md',
+      )
     })
   })
 

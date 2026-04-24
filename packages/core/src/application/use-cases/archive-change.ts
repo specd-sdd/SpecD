@@ -303,7 +303,8 @@ export class ArchiveChange {
             const baseArtifact = await specRepo.artifact(spec, outputBasename)
             const baseContent = baseArtifact?.content ?? ''
             const baseAst = formatParser.parse(baseContent)
-            const mergedAst = formatParser.apply(baseAst, deltaEntries)
+            const mergedResult = formatParser.apply(baseAst, deltaEntries)
+            const mergedAst = mergedResult.ast
             const mergedContent = formatParser.serialize(mergedAst)
 
             await specRepo.save(spec, new SpecArtifact(outputBasename, mergedContent), {

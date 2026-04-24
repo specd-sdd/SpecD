@@ -5,6 +5,7 @@ import {
   type ArtifactAST,
   type ArtifactNode,
   type ArtifactParser,
+  type DeltaApplicationResult,
   type DeltaEntry,
   type NodeTypeDescriptor,
   type OutlineEntry,
@@ -347,8 +348,9 @@ export class YamlParser implements ArtifactParser {
    * @param delta - The ordered list of delta entries
    * @returns A new AST with all delta operations applied
    */
-  apply(ast: ArtifactAST, delta: readonly DeltaEntry[]): ArtifactAST {
-    return applyDelta(ast, delta, (c) => this.parse(c), yamlValueToNode)
+  apply(ast: ArtifactAST, delta: readonly DeltaEntry[]): DeltaApplicationResult {
+    const descriptorMap = new Map(this.nodeTypes().map((d) => [d.type, d]))
+    return applyDelta(ast, delta, (c) => this.parse(c), yamlValueToNode, descriptorMap)
   }
 
   /**
@@ -392,27 +394,52 @@ export class YamlParser implements ArtifactParser {
         type: 'document',
         identifiedBy: [],
         description: 'Root node of a YAML document.',
+        isCollection: false,
+        isSequence: false,
+        isSequenceItem: false,
+        isContainer: true,
+        isLeaf: false,
       },
       {
         type: 'mapping',
         identifiedBy: [],
         description: 'A YAML mapping (object) containing pair children.',
+        isCollection: true,
+        isSequence: false,
+        isSequenceItem: false,
+        isContainer: true,
+        isLeaf: false,
       },
       {
         type: 'pair',
         identifiedBy: ['matches'],
         description: 'A key–value entry in a YAML mapping. `matches` targets the key name.',
+        isCollection: false,
+        isSequence: false,
+        isSequenceItem: false,
+        isContainer: true,
+        isLeaf: true,
       },
       {
         type: 'sequence',
         identifiedBy: [],
         description: 'A YAML sequence (array) containing sequence-item children.',
+        isCollection: true,
+        isSequence: true,
+        isSequenceItem: false,
+        isContainer: true,
+        isLeaf: false,
       },
       {
         type: 'sequence-item',
         identifiedBy: ['index', 'where'],
         description:
           'An item in a YAML sequence. Use `index` for position or `where` for object items.',
+        isCollection: false,
+        isSequence: false,
+        isSequenceItem: true,
+        isContainer: true,
+        isLeaf: true,
       },
     ]
   }

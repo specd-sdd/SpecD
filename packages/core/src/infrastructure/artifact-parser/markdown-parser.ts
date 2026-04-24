@@ -4,6 +4,7 @@ import {
   type ArtifactAST,
   type ArtifactNode,
   type ArtifactParser,
+  type DeltaApplicationResult,
   type DeltaEntry,
   type NodeTypeDescriptor,
   type OutlineEntry,
@@ -388,13 +389,16 @@ export class MarkdownParser implements ArtifactParser {
    * @param delta - The ordered list of delta entries
    * @returns A new AST with all delta operations applied
    */
-  apply(ast: ArtifactAST, delta: readonly DeltaEntry[]): ArtifactAST {
-    return applyDelta(
+  apply(ast: ArtifactAST, delta: readonly DeltaEntry[]): DeltaApplicationResult {
+    const descriptorMap = new Map(this.nodeTypes().map((d) => [d.type, d]))
+    const result = applyDelta(
       ast,
       delta,
       (c) => this.parse(c),
       (v) => ({ type: 'paragraph', value: String(v) }),
+      descriptorMap,
     )
+    return result
   }
 
   /**
@@ -582,37 +586,72 @@ export class MarkdownParser implements ArtifactParser {
         type: 'document',
         identifiedBy: [],
         description: 'Root node of a markdown document.',
+        isCollection: false,
+        isSequence: false,
+        isSequenceItem: false,
+        isContainer: true,
+        isLeaf: false,
       },
       {
         type: 'section',
         identifiedBy: ['matches'],
         description:
           'A heading and all content until the next heading of equal or lesser depth. `matches` targets the heading text.',
+        isCollection: false,
+        isSequence: false,
+        isSequenceItem: false,
+        isContainer: true,
+        isLeaf: false,
       },
       {
         type: 'paragraph',
         identifiedBy: ['contains'],
         description: 'A prose block. `contains` matches against paragraph text.',
+        isCollection: false,
+        isSequence: false,
+        isSequenceItem: false,
+        isContainer: false,
+        isLeaf: true,
       },
       {
         type: 'list',
         identifiedBy: [],
         description: 'A bullet or numbered list.',
+        isCollection: true,
+        isSequence: true,
+        isSequenceItem: false,
+        isContainer: true,
+        isLeaf: false,
       },
       {
         type: 'list-item',
         identifiedBy: ['matches'],
         description: 'An individual list entry. `matches` targets the item text.',
+        isCollection: false,
+        isSequence: false,
+        isSequenceItem: true,
+        isContainer: true,
+        isLeaf: false,
       },
       {
         type: 'code-block',
         identifiedBy: ['matches'],
         description: 'A fenced code block. `matches` targets the language identifier.',
+        isCollection: false,
+        isSequence: false,
+        isSequenceItem: false,
+        isContainer: false,
+        isLeaf: true,
       },
       {
         type: 'thematic-break',
         identifiedBy: [],
         description: 'A horizontal rule.',
+        isCollection: false,
+        isSequence: false,
+        isSequenceItem: false,
+        isContainer: false,
+        isLeaf: false,
       },
     ]
   }

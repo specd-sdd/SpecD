@@ -157,7 +157,7 @@ function freshMetadata(
 const stubParser: ArtifactParser = {
   fileExtensions: ['.md'],
   parse: () => ({ root: { type: 'document', children: [] } }),
-  apply: (ast) => ast,
+  apply: (ast) => ({ ast, warnings: [] }),
   serialize: () => '',
   renderSubtree: () => '',
   nodeTypes: () => [],

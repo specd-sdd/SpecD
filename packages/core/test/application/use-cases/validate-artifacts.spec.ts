@@ -996,6 +996,76 @@ describe('ValidateArtifacts', () => {
   })
 
   describe('Delta application preview', () => {
+    it('fails when expected delta is missing even if a direct file exists', async () => {
+      const specsType = makeArtifactType('specs', {
+        scope: 'spec',
+        output: 'spec.md',
+        format: 'markdown',
+        delta: true,
+      })
+      const schema = makeSchema([specsType])
+
+      const specsArtifact = new ChangeArtifact({
+        type: 'specs',
+        files: new Map([
+          [
+            'default:auth',
+            new ArtifactFile({
+              key: 'default:auth',
+              filename: 'specs/default/auth/spec.md',
+              status: 'in-progress',
+            }),
+          ],
+        ]),
+      })
+      const change = makeChangeWithArtifacts('c', [specsArtifact])
+
+      const repo = makeChangeRepository([change])
+      Object.assign(repo, {
+        async artifact(_change: Change, filename: string): Promise<SpecArtifact | null> {
+          if (filename === 'specs/default/auth/spec.md') {
+            return new SpecArtifact(filename, 'direct content')
+          }
+          return null
+        },
+      })
+
+      const specsRepo = makeSpecRepository({
+        specs: [new Spec('default', SpecPath.parse('auth'), ['spec.md'])],
+        artifacts: { 'auth/spec.md': 'base content' },
+      })
+
+      const uc = new ValidateArtifacts(
+        repo,
+        new Map([['default', specsRepo]]),
+        makeSchemaProvider(schema),
+        makeParsers(),
+        makeActorResolver(),
+        makeContentHasher(),
+      )
+
+      const result = await uc.execute({
+        name: 'c',
+        specPath: 'default:auth',
+      })
+
+      expect(result.passed).toBe(false)
+      expect(
+        result.failures.some(
+          (failure) =>
+            failure.artifactId === 'specs' &&
+            failure.filename === 'deltas/default/auth/spec.md.delta.yaml' &&
+            failure.description.includes('is missing'),
+        ),
+      ).toBe(true)
+      expect(result.files).toContainEqual({
+        artifactId: 'specs',
+        key: 'default:auth',
+        filename: 'deltas/default/auth/spec.md.delta.yaml',
+        status: 'missing',
+      })
+    })
+
     it('reports DeltaApplicationError as failure', async () => {
       const parser = makeParser({
         apply: () => {
@@ -1006,24 +1076,31 @@ describe('ValidateArtifacts', () => {
         parseDelta: () => [{ op: 'added' as const }],
       })
 
-      const specsType = makeArtifactType('specs', { format: 'markdown', delta: true })
+      const specsType = makeArtifactType('specs', {
+        scope: 'spec',
+        output: 'spec.md',
+        format: 'markdown',
+        delta: true,
+      })
       const schema = makeSchema([specsType])
 
-      const content = 'content'
       const specsArtifact = new ChangeArtifact({
         type: 'specs',
         files: new Map([
-          ['specs', new ArtifactFile({ key: 'specs', filename: 'spec.md', status: 'in-progress' })],
+          [
+            'default:auth',
+            new ArtifactFile({
+              key: 'default:auth',
+              filename: 'deltas/default/auth/spec.md.delta.yaml',
+              status: 'in-progress',
+            }),
+          ],
         ]),
       })
       const change = makeChangeWithArtifacts('c', [specsArtifact])
 
-      const capPath = 'auth'
-      const deltaFilename = `deltas/default/${capPath}/spec.md.delta.yaml`
-      const files = new Map([
-        ['spec.md', content],
-        [deltaFilename, 'delta content'],
-      ])
+      const deltaFilename = 'deltas/default/auth/spec.md.delta.yaml'
+      const files = new Map([[deltaFilename, 'delta content']])
       const repo = makeChangeRepository([change])
       Object.assign(repo, {
         async artifact(_change: Change, filename: string): Promise<SpecArtifact | null> {
@@ -1052,6 +1129,12 @@ describe('ValidateArtifacts', () => {
       })
 
       expect(result.passed).toBe(false)
+      expect(result.files).toContainEqual({
+        artifactId: 'specs',
+        key: 'default:auth',
+        filename: 'deltas/default/auth/spec.md.delta.yaml',
+        status: 'validated',
+      })
       expect(
         result.failures.some(
           (f) => f.artifactId === 'specs' && f.description.includes('Delta application failed'),
@@ -1060,19 +1143,31 @@ describe('ValidateArtifacts', () => {
     })
 
     it('validates directly when no delta file exists', async () => {
-      const specsType = makeArtifactType('specs', { format: 'markdown', delta: true })
+      const specsType = makeArtifactType('specs', {
+        scope: 'spec',
+        output: 'spec.md',
+        format: 'markdown',
+        delta: true,
+      })
       const schema = makeSchema([specsType])
 
       const content = 'content'
       const specsArtifact = new ChangeArtifact({
         type: 'specs',
         files: new Map([
-          ['specs', new ArtifactFile({ key: 'specs', filename: 'spec.md', status: 'in-progress' })],
+          [
+            'default:auth',
+            new ArtifactFile({
+              key: 'default:auth',
+              filename: 'specs/default/auth/spec.md',
+              status: 'in-progress',
+            }),
+          ],
         ]),
       })
       const change = makeChangeWithArtifacts('c', [specsArtifact])
 
-      const files = new Map([['spec.md', content]])
+      const files = new Map([['specs/default/auth/spec.md', content]])
       const repo = makeChangeRepository([change])
       Object.assign(repo, {
         async artifact(_change: Change, filename: string): Promise<SpecArtifact | null> {
@@ -1096,6 +1191,12 @@ describe('ValidateArtifacts', () => {
       })
 
       expect(result.passed).toBe(true)
+      expect(result.files).toContainEqual({
+        artifactId: 'specs',
+        key: 'default:auth',
+        filename: 'specs/default/auth/spec.md',
+        status: 'validated',
+      })
       const artifact = repo.store.get('c')?.getArtifact('specs')
       expect(artifact?.status).toBe('complete')
     })
@@ -1160,7 +1261,14 @@ describe('ValidateArtifacts', () => {
 
       const uc = new ValidateArtifacts(
         repo,
-        new Map(),
+        new Map([
+          [
+            'default',
+            makeSpecRepository({
+              specs: [new Spec('default', SpecPath.parse('auth'), ['spec.md'])],
+            }),
+          ],
+        ]),
         makeSchemaProvider(schema),
         makeNoopParsers(),
         makeActorResolver(),
@@ -1210,7 +1318,9 @@ describe('ValidateArtifacts', () => {
       })
 
       // Create a spec repo that would fail if accessed (proving no base spec is loaded)
-      const specRepo = makeSpecRepository()
+      const specRepo = makeSpecRepository({
+        specs: [new Spec('default', SpecPath.parse('auth'), ['spec.md'])],
+      })
       const specRepoSpy = vi.spyOn(specRepo, 'get')
 
       const uc = new ValidateArtifacts(
@@ -1225,7 +1335,7 @@ describe('ValidateArtifacts', () => {
       const result = await uc.execute({ name: 'c', specPath: 'default:auth' })
 
       expect(result.passed).toBe(true)
-      expect(specRepoSpy).not.toHaveBeenCalled()
+      expect(specRepoSpy).toHaveBeenCalledTimes(1)
     })
 
     it('skips structural validations for no-op delta', async () => {
@@ -1270,7 +1380,14 @@ describe('ValidateArtifacts', () => {
 
       const uc = new ValidateArtifacts(
         repo,
-        new Map(),
+        new Map([
+          [
+            'default',
+            makeSpecRepository({
+              specs: [new Spec('default', SpecPath.parse('auth'), ['spec.md'])],
+            }),
+          ],
+        ]),
         makeSchemaProvider(schema),
         makeNoopParsers(),
         makeActorResolver(),
@@ -1321,7 +1438,14 @@ describe('ValidateArtifacts', () => {
 
       const uc = new ValidateArtifacts(
         repo,
-        new Map(),
+        new Map([
+          [
+            'default',
+            makeSpecRepository({
+              specs: [new Spec('default', SpecPath.parse('auth'), ['spec.md'])],
+            }),
+          ],
+        ]),
         makeSchemaProvider(schema),
         makeNoopParsers(),
         makeActorResolver(),
@@ -1801,7 +1925,7 @@ describe('ValidateArtifacts', () => {
             'default:auth/login',
             new ArtifactFile({
               key: 'default:auth/login',
-              filename: 'spec.md',
+              filename: 'specs/default/auth/login/spec.md',
               status: 'in-progress',
             }),
           ],
@@ -1814,9 +1938,9 @@ describe('ValidateArtifacts', () => {
       const repo = makeChangeRepository([change])
       Object.assign(repo, {
         async artifact(_change: Change, filename: string): Promise<SpecArtifact | null> {
-          if (filename !== 'spec.md') return null
+          if (filename !== 'specs/default/auth/login/spec.md') return null
           return new SpecArtifact(
-            'spec.md',
+            'specs/default/auth/login/spec.md',
             '# Auth Login\n\n## Overview\n\nHandles login.\n\n## Spec Dependencies\n\n- [Shared](../shared/spec.md)\n',
           )
         },
@@ -1904,7 +2028,7 @@ describe('ValidateArtifacts', () => {
             'core:core/actor-resolver-port',
             new ArtifactFile({
               key: 'core:core/actor-resolver-port',
-              filename: 'spec.md',
+              filename: 'specs/core/core/actor-resolver-port/spec.md',
               status: 'in-progress',
             }),
           ],
@@ -1917,9 +2041,9 @@ describe('ValidateArtifacts', () => {
       const repo = makeChangeRepository([change])
       Object.assign(repo, {
         async artifact(_change: Change, filename: string): Promise<SpecArtifact | null> {
-          if (filename !== 'spec.md') return null
+          if (filename !== 'specs/core/core/actor-resolver-port/spec.md') return null
           return new SpecArtifact(
-            'spec.md',
+            'specs/core/core/actor-resolver-port/spec.md',
             '# Actor Resolver\n\n## Spec Dependencies\n\n- [`../../_global/architecture/spec.md`](../../_global/architecture/spec.md)\n',
           )
         },
@@ -2039,7 +2163,7 @@ describe('ValidateArtifacts', () => {
             'default:auth/login',
             new ArtifactFile({
               key: 'default:auth/login',
-              filename: 'spec.md',
+              filename: 'specs/default/auth/login/spec.md',
               status: 'in-progress',
             }),
           ],
@@ -2052,9 +2176,9 @@ describe('ValidateArtifacts', () => {
       const repo = makeChangeRepository([change])
       Object.assign(repo, {
         async artifact(_change: Change, filename: string): Promise<SpecArtifact | null> {
-          if (filename !== 'spec.md') return null
+          if (filename !== 'specs/default/auth/login/spec.md') return null
           return new SpecArtifact(
-            'spec.md',
+            'specs/default/auth/login/spec.md',
             '# Auth Login\n\n## Spec Dependencies\n\n- [`Shared`](not-a-spec)\n',
           )
         },

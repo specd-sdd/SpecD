@@ -22,6 +22,7 @@ export {
   type ArtifactNode,
   type ArtifactAST,
   type DeltaEntry,
+  type DeltaApplicationResult,
   type NodeTypeDescriptor,
   type OutlineEntry,
   type ArtifactParser,

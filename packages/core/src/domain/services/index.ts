@@ -1,4 +1,8 @@
 export { applyPreHashCleanup } from './pre-hash-cleanup.js'
+export {
+  expectedArtifactFilename,
+  type ExpectedArtifactFilenameInput,
+} from './artifact-filename.js'
 export { hashFiles } from './hash-files.js'
 export {
   specMetadataSchema,

@@ -26,6 +26,7 @@ import {
   type ArtifactParserRegistry,
   type ArtifactAST,
   type ArtifactNode,
+  type DeltaApplicationResult,
   type DeltaEntry,
 } from '../../../src/application/ports/artifact-parser.js'
 import { type FileReader } from '../../../src/application/ports/file-reader.js'
@@ -98,7 +99,7 @@ class StubChangeRepository extends ChangeRepository {
   }
 
   override async artifact(_change: Change, _filename: string): Promise<SpecArtifact | null> {
-    throw new Error('not implemented')
+    return null
   }
 
   override async saveArtifact(
@@ -106,7 +107,7 @@ class StubChangeRepository extends ChangeRepository {
     _artifact: SpecArtifact,
     _options?: { force?: boolean },
   ): Promise<void> {
-    throw new Error('not implemented')
+    // no-op in tests unless overridden
   }
 
   override changePath(change: Change): string {
@@ -547,10 +548,11 @@ export function makeHookRunner(exitCode = 0, stderr = ''): HookRunner {
  * Pass any `ArtifactTypeProps` partial to override.
  */
 export function makeArtifactType(id: string, extra: Partial<ArtifactTypeProps> = {}): ArtifactType {
+  const defaultOutput = id === 'specs' ? 'spec.md' : id === 'verify' ? 'verify.md' : `${id}.md`
   return new ArtifactType({
     id,
     scope: 'change',
-    output: `${id}.md`,
+    output: defaultOutput,
     requires: [],
     validations: [],
     deltaValidations: [],
@@ -596,7 +598,7 @@ export function makeSchema(
 export function makeParser(
   opts: {
     parse?: (content: string) => ArtifactAST
-    apply?: (ast: ArtifactAST, delta: readonly DeltaEntry[]) => ArtifactAST
+    apply?: (ast: ArtifactAST, delta: readonly DeltaEntry[]) => DeltaApplicationResult
     serialize?: (ast: ArtifactAST) => string
     renderSubtree?: (node: ArtifactNode) => string
     parseDelta?: (content: string) => readonly DeltaEntry[]
@@ -607,7 +609,7 @@ export function makeParser(
   return {
     fileExtensions: ['.md'],
     parse: opts.parse ?? (() => trivialAST),
-    apply: opts.apply ?? ((ast) => ast),
+    apply: opts.apply ?? ((ast) => ({ ast, warnings: [] })),
     serialize: opts.serialize ?? (() => 'serialized'),
     renderSubtree: opts.renderSubtree ?? (() => 'rendered'),
     nodeTypes: () => [],

@@ -12,7 +12,7 @@ The port MUST be declared as a TypeScript `interface` named `ArtifactParser`. It
 
 - `fileExtensions: readonly string[]` — the file extensions this adapter handles
 - `parse(content: string): ArtifactAST` — parse content into a normalised AST
-- `apply(ast: ArtifactAST, delta: readonly DeltaEntry[]): ArtifactAST` — apply delta entries to an AST
+- `apply(ast: ArtifactAST, delta: readonly DeltaEntry[]): DeltaApplicationResult` — apply delta entries to an AST, returning the modified AST plus any semantic validation warnings
 - `serialize(ast: ArtifactAST): string` — serialise an AST back to native format
 - `renderSubtree(node: ArtifactNode): string` — serialise a single node and its descendants
 - `nodeTypes(): readonly NodeTypeDescriptor[]` — describe addressable node types for the format
@@ -38,6 +38,8 @@ The `parse` method MUST accept a `content: string` parameter and return an `Arti
 
 The `apply` method MUST resolve all selectors before applying any operation. If any selector fails to resolve (no match or ambiguous match), the entire application MUST be rejected with a `DeltaApplicationError`. Partial application SHALL NOT occur.
 
+The method returns a `DeltaApplicationResult` containing the modified AST and any semantic validation warnings. Callers MUST check `result.warnings` for ambiguity warnings on hybrid node types.
+
 ### Requirement: Serialize round-trip
 
 Calling `serialize(parse(content))` MUST produce output that, when parsed again, yields an equivalent AST. Implementations SHOULD preserve formatting where practical, but semantic equivalence is the binding constraint.
@@ -55,6 +57,39 @@ The `renderSubtree` method MUST accept a single `ArtifactNode` and return the na
 ### Requirement: NodeTypes contract
 
 The `nodeTypes` method MUST return a static array of `NodeTypeDescriptor` entries describing every addressable node type for the format. Each descriptor MUST include `type`, `identifiedBy`, and `description`.
+
+### Requirement: Node nature descriptors
+
+Each `NodeTypeDescriptor` returned by `nodeTypes()` MUST include boolean flags that declaratively describe the nature of the node type. These flags drive the `applyDelta` engine's collection-aware logic and semantic validation — they MUST accurately reflect the AST structure that the parser produces.
+
+#### Structural flags
+
+- `isContainer: boolean` — the node has or can have a `children` array. True for any node that can hold child nodes, regardless of whether those children are homogeneous or heterogeneous. Examples: `document` (holds sections, paragraphs, lists...), `section` (holds paragraphs, lists, nested sections...), `list` (holds `list-item` nodes), `object` (holds `property` nodes).
+- `isLeaf: boolean` — the node has or can have a scalar `value` field (`string | number | boolean | null`). True for nodes that represent atomic data, not structural containers. Examples: `paragraph` (text content), `code-block` (source code), `line` (single line of text). A node that wraps a complex value (e.g. JSON `property` wrapping an object) can be BOTH `isContainer: true` AND `isLeaf: true` — these are hybrid types.
+- A node that is neither container nor leaf (e.g. markdown `thematic-break`) is a void node — it has neither `children` nor `value`. All three flags being `false` is valid but means the node cannot be meaningfully modified by delta operations.
+
+#### Collection flags
+
+- `isCollection: boolean` — the node's children are homogeneous: ALL children are of the same type (or the same small set of closely related types). For example: `list` always has `list-item` children, `object` always has `property` children, `array` always has `array-item` children. Contrast with `section` which has heterogeneous children (paragraphs, lists, code blocks, nested sections) — `section` is `isContainer: true` but `isCollection: false`. Controls same-type unwrapping in `added` entries: when the parent scope is a collection and parsed content starts with the same type, the engine unwraps to the inner children instead of nesting.
+- `isSequence: boolean` — the node is an ordered sequential collection where position matters and items can be appended, reordered, or merged by key. This is a subset of `isCollection`: `list`, `array`, and `sequence` are sequences, but `object` and `mapping` are NOT (their children are key-value pairs identified by name, not by position). Controls whether `strategy` (append/merge-by) is valid and whether the node is treated as "array-like" by the delta engine.
+- `isSequenceItem: boolean` — the node is a positional item within a sequential collection. True for `list-item`, `array-item`, and `sequence-item`. These nodes may themselves be hybrids (e.g. an `array-item` can wrap a scalar value or an entire object). Used for "all children are sequence items" detection and for finding inner array nodes wrapped inside property/pair containers.
+
+#### Example flag assignments
+
+| Node                  | isCollection | isSequence | isSequenceItem | isContainer | isLeaf | Why                                                           |
+| --------------------- | :----------: | :--------: | :------------: | :---------: | :----: | ------------------------------------------------------------- |
+| `document` (md)       |      F       |     F      |       F        |      T      |   F    | Has heterogeneous children (sections, paragraphs...)          |
+| `section` (md)        |      F       |     F      |       F        |      T      |   F    | Has heterogeneous children (paragraphs, lists...)             |
+| `list` (md)           |      T       |     T      |       F        |      T      |   F    | Homogeneous ordered children (list-items), supports strategy  |
+| `list-item` (md)      |      F       |     F      |       T        |      T      |   F    | Item within a list, may have nested lists as children         |
+| `paragraph` (md)      |      F       |     F      |       F        |      F      |   T    | Scalar text value, no children                                |
+| `object` (json)       |      T       |     F      |       F        |      T      |   F    | Homogeneous children (properties), but keyed not ordered      |
+| `property` (json)     |      F       |     F      |       F        |      T      |   T    | Hybrid: wraps scalar value OR object/array as child           |
+| `array` (json)        |      T       |     T      |       F        |      T      |   F    | Homogeneous ordered children (array-items), supports strategy |
+| `array-item` (json)   |      F       |     F      |       T        |      T      |   T    | Hybrid item: scalar value OR object/array as child            |
+| `thematic-break` (md) |      F       |     F      |       F        |      F      |   F    | Void: no children, no value                                   |
+
+The shared `applyDelta` engine MUST use these flags instead of hardcoded type vectors for all collection-aware logic.
 
 ### Requirement: Outline contract
 
@@ -102,7 +137,7 @@ Each `DeltaEntry` MUST contain:
 
 ### Requirement: Supporting type shapes
 
-- `NodeTypeDescriptor` MUST contain `type: string`, `identifiedBy: readonly string[]`, and `description: string`.
+- `NodeTypeDescriptor` MUST contain `type: string`, `identifiedBy: readonly string[]`, `description: string`, `isCollection: boolean`, `isSequence: boolean`, `isSequenceItem: boolean`, `isContainer: boolean`, and `isLeaf: boolean`.
 - `OutlineEntry` MUST contain `type: string`, `label: string`, `depth: number`, and optional `children: readonly OutlineEntry[]`.
 
 ## Constraints

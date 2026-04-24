@@ -78,8 +78,8 @@ describe('PlaintextParser', () => {
           content: 'Second.',
         },
       ])
-      expect(result.root.children).toHaveLength(2)
-      expect(parser.serialize(result)).toBe('First.\n\nSecond.')
+      expect(result.ast.root.children).toHaveLength(2)
+      expect(parser.serialize(result.ast)).toBe('First.\n\nSecond.')
     })
 
     it('removed: detaches a matched paragraph', () => {
@@ -90,12 +90,12 @@ describe('PlaintextParser', () => {
           selector: { type: 'paragraph', contains: 'Remove me' },
         },
       ])
-      expect(result.root.children).toHaveLength(2)
-      expect(result.root.children![0]).toMatchObject({
+      expect(result.ast.root.children).toHaveLength(2)
+      expect(result.ast.root.children![0]).toMatchObject({
         type: 'paragraph',
         children: [{ type: 'line', value: 'Keep me.' }],
       })
-      expect(result.root.children![1]).toMatchObject({
+      expect(result.ast.root.children![1]).toMatchObject({
         type: 'paragraph',
         children: [{ type: 'line', value: 'Also keep.' }],
       })

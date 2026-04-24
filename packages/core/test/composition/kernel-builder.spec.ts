@@ -72,7 +72,7 @@ async function makeConfig(): Promise<SpecdConfig> {
 const TOML_PARSER: ArtifactParser = {
   fileExtensions: ['.toml'],
   parse: () => ({ root: { type: 'document', children: [] } }),
-  apply: (ast) => ast,
+  apply: (ast) => ({ ast, warnings: [] }),
   serialize: () => '',
   renderSubtree: () => '',
   nodeTypes: () => [],

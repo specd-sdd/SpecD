@@ -89,7 +89,7 @@ describe('JsonParser', () => {
           value: '2.0.0',
         },
       ])
-      const prop = result.root.children![0]!.children![0]!
+      const prop = result.ast.root.children![0]!.children![0]!
       expect(prop.value).toBe('2.0.0')
     })
 
@@ -103,7 +103,7 @@ describe('JsonParser', () => {
           value: ['artifacts'],
         },
       ])
-      const arr = result.root.children![0]!.children![0]!.children![0]!
+      const arr = result.ast.root.children![0]!.children![0]!.children![0]!
       expect(arr.children).toHaveLength(3)
       expect(arr.children![2]).toMatchObject({ type: 'array-item', value: 'artifacts' })
     })
@@ -126,7 +126,7 @@ describe('JsonParser', () => {
           value: [{ name: 'a', val: 'new' }],
         },
       ])
-      const arr = result.root.children![0]!.children![0]!.children![0]!
+      const arr = result.ast.root.children![0]!.children![0]!.children![0]!
       expect(arr.children).toHaveLength(2)
       // First item (a) should be updated
       const firstItem = arr.children![0]!
@@ -149,7 +149,7 @@ describe('JsonParser', () => {
           value: 'c',
         },
       ])
-      const arr = result.root.children![0]!.children![0]!.children![0]!
+      const arr = result.ast.root.children![0]!.children![0]!.children![0]!
       expect(arr.children).toHaveLength(3)
       expect(arr.children![2]).toMatchObject({ type: 'array-item', value: 'c' })
     })
@@ -162,7 +162,7 @@ describe('JsonParser', () => {
           selector: { type: 'property', matches: 'private' },
         },
       ])
-      const obj = result.root.children![0]!
+      const obj = result.ast.root.children![0]!
       expect(obj.children).toHaveLength(1)
       expect(obj.children![0]!.label).toBe('name')
     })
@@ -222,6 +222,331 @@ describe('JsonParser', () => {
           },
         ]),
       ).toThrow(DeltaApplicationError)
+    })
+  })
+
+  describe('apply — added operation for object/property/array', () => {
+    it('added property to root object via content', () => {
+      const ast = parser.parse('{"name": "core"}')
+      const result = parser.apply(ast, [
+        {
+          op: 'added',
+          position: { parent: { type: 'object' } },
+          content: '{"version": "1.0.0"}',
+        },
+      ])
+      const obj = result.ast.root.children![0]!
+      expect(obj.children).toHaveLength(2)
+      expect(obj.children![1]!).toMatchObject({
+        type: 'property',
+        label: 'version',
+        value: '1.0.0',
+      })
+    })
+
+    it('added property with position.parent targeting object', () => {
+      const ast = parser.parse('{"config": {"debug": false}}')
+      const result = parser.apply(ast, [
+        {
+          op: 'added',
+          position: { parent: { type: 'object' } },
+          value: { verbose: true },
+        },
+      ])
+      const rootObj = result.ast.root.children![0]!
+      expect(rootObj.children).toHaveLength(2)
+    })
+
+    it('added array-item via value into existing array', () => {
+      const ast = parser.parse('{"tags": ["alpha"]}')
+      const result = parser.apply(ast, [
+        {
+          op: 'added',
+          position: { parent: { type: 'array' } },
+          value: 'beta',
+        },
+      ])
+      const arr = result.ast.root.children![0]!.children![0]!.children![0]!
+      expect(arr.children).toHaveLength(2)
+      expect(arr.children![1]).toMatchObject({ type: 'array-item', value: 'beta' })
+    })
+
+    it('added array-item as scalar via value into array', () => {
+      const ast = parser.parse('{"tags": ["alpha"]}')
+      const result = parser.apply(ast, [
+        {
+          op: 'added',
+          position: { parent: { type: 'array' } },
+          value: 'beta',
+        },
+      ])
+      const arr = result.ast.root.children![0]!.children![0]!.children![0]!
+      expect(arr.children).toHaveLength(2)
+      expect(arr.children![1]).toMatchObject({ type: 'array-item', value: 'beta' })
+    })
+  })
+
+  describe('apply — modified operation across JSON node types', () => {
+    it('modified document replaces root children', () => {
+      const ast = parser.parse('{"old": true}')
+      const result = parser.apply(ast, [
+        {
+          op: 'modified',
+          selector: { type: 'document' },
+          content: '{"new": true}',
+        },
+      ])
+      const obj = result.ast.root.children![0]!
+      expect(obj.children).toHaveLength(1)
+      expect(obj.children![0]!.label).toBe('new')
+    })
+
+    it('modified object replaces children via content', () => {
+      const ast = parser.parse('{"a": 1, "b": 2}')
+      const result = parser.apply(ast, [
+        {
+          op: 'modified',
+          selector: { type: 'object' },
+          content: '{"x": 99}',
+        },
+      ])
+      const obj = result.ast.root.children![0]!
+      expect(obj.children).toHaveLength(1)
+      expect(obj.children![0]!).toMatchObject({ type: 'property', label: 'x', value: 99 })
+    })
+
+    it('modified property replaces scalar value', () => {
+      const ast = parser.parse('{"version": "1.0.0", "name": "core"}')
+      const result = parser.apply(ast, [
+        {
+          op: 'modified',
+          selector: { type: 'property', matches: 'version' },
+          value: '2.0.0',
+        },
+      ])
+      const obj = result.ast.root.children![0]!
+      const versionProp = obj.children!.find((c) => c.label === 'version')
+      expect(versionProp?.value).toBe('2.0.0')
+      const nameProp = obj.children!.find((c) => c.label === 'name')
+      expect(nameProp?.value).toBe('core')
+    })
+
+    it('modified property replaces with nested object via value', () => {
+      const ast = parser.parse('{"config": "old"}')
+      const result = parser.apply(ast, [
+        {
+          op: 'modified',
+          selector: { type: 'property', matches: 'config' },
+          value: { debug: true, port: 3000 },
+        },
+      ])
+      const configProp = result.ast.root.children![0]!.children![0]!
+      expect(configProp.label).toBe('config')
+      expect(configProp.children).toHaveLength(1)
+      expect(configProp.children![0]!.type).toBe('object')
+    })
+
+    it('modified array replaces items via value', () => {
+      const ast = parser.parse('{"tags": ["a", "b"]}')
+      const result = parser.apply(ast, [
+        {
+          op: 'modified',
+          selector: { type: 'array' },
+          value: ['x', 'y', 'z'],
+        },
+      ])
+      const arr = result.ast.root.children![0]!.children![0]!.children![0]!
+      expect(arr.type).toBe('array')
+      expect(arr.children).toHaveLength(3)
+      expect(arr.children![0]).toMatchObject({ type: 'array-item', value: 'x' })
+      expect(arr.children![2]).toMatchObject({ type: 'array-item', value: 'z' })
+    })
+
+    it('modified array-item via index selector', () => {
+      const ast = parser.parse('{"items": [10, 20, 30]}')
+      const result = parser.apply(ast, [
+        {
+          op: 'modified',
+          selector: { type: 'array-item', index: 1 },
+          value: 99,
+        },
+      ])
+      const arr = result.ast.root.children![0]!.children![0]!.children![0]!
+      expect(arr.children![0]!.value).toBe(10)
+      expect(arr.children![1]!.value).toBe(99)
+      expect(arr.children![2]!.value).toBe(30)
+    })
+
+    it('modified array-item via where selector', () => {
+      const ast = parser.parse(
+        JSON.stringify({
+          users: [
+            { name: 'alice', role: 'user' },
+            { name: 'bob', role: 'user' },
+          ],
+        }),
+      )
+      const result = parser.apply(ast, [
+        {
+          op: 'modified',
+          selector: { type: 'array-item', where: { name: 'bob' } },
+          value: { name: 'bob', role: 'admin' },
+        },
+      ])
+      const arr = result.ast.root.children![0]!.children![0]!.children![0]!
+      expect(arr.children).toHaveLength(2)
+      const bobItem = arr.children![1]!
+      const bobMapping = bobItem.children![0]!
+      const roleProp = bobMapping.children!.find((c) => c.label === 'role')
+      expect(roleProp?.value).toBe('admin')
+      const aliceItem = arr.children![0]!
+      const aliceMapping = aliceItem.children![0]!
+      const aliceRole = aliceMapping.children!.find((c) => c.label === 'role')
+      expect(aliceRole?.value).toBe('user')
+    })
+
+    it('modified property with strategy append adds to inner array', () => {
+      const ast = parser.parse('{"tags": ["a"]}')
+      const result = parser.apply(ast, [
+        {
+          op: 'modified',
+          selector: { type: 'property', matches: 'tags' },
+          strategy: 'append',
+          value: ['b', 'c'],
+        },
+      ])
+      const arr = result.ast.root.children![0]!.children![0]!.children![0]!
+      expect(arr.children).toHaveLength(3)
+      expect(arr.children![1]).toMatchObject({ type: 'array-item', value: 'b' })
+      expect(arr.children![2]).toMatchObject({ type: 'array-item', value: 'c' })
+    })
+
+    it('modified property with strategy merge-by updates matched items', () => {
+      const ast = parser.parse(
+        JSON.stringify({
+          plugins: [
+            { name: 'lint', enabled: false },
+            { name: 'test', enabled: false },
+          ],
+        }),
+      )
+      const result = parser.apply(ast, [
+        {
+          op: 'modified',
+          selector: { type: 'property', matches: 'plugins' },
+          strategy: 'merge-by',
+          mergeKey: 'name',
+          value: [{ name: 'lint', enabled: true }],
+        },
+      ])
+      const arr = result.ast.root.children![0]!.children![0]!.children![0]!
+      expect(arr.children).toHaveLength(2)
+      const lintItem = arr.children![0]!
+      const lintMapping = lintItem.children![0]!
+      const enabledProp = lintMapping.children!.find((c) => c.label === 'enabled')
+      expect(enabledProp?.value).toBe(true)
+      const testItem = arr.children![1]!
+      const testMapping = testItem.children![0]!
+      const testEnabled = testMapping.children!.find((c) => c.label === 'enabled')
+      expect(testEnabled?.value).toBe(false)
+    })
+
+    it('modified property with parent selector disambiguates nested keys', () => {
+      const ast = parser.parse('{"outer": {"name": "old"}, "inner": {"name": "keep"}}')
+      const result = parser.apply(ast, [
+        {
+          op: 'modified',
+          selector: {
+            type: 'property',
+            matches: 'name',
+            parent: { type: 'property', matches: 'outer' },
+          },
+          value: 'new',
+        },
+      ])
+      const outerProp = result.ast.root.children![0]!.children!.find((c) => c.label === 'outer')!
+      const innerProp = result.ast.root.children![0]!.children!.find((c) => c.label === 'inner')!
+      const outerName = outerProp.children![0]!.children![0]!
+      expect(outerName.value).toBe('new')
+      const innerName = innerProp.children![0]!.children![0]!
+      expect(innerName.value).toBe('keep')
+    })
+  })
+
+  describe('apply — removed operation for property and array-item', () => {
+    it('removed property from root object', () => {
+      const ast = parser.parse('{"keep": 1, "remove": 2, "also-keep": 3}')
+      const result = parser.apply(ast, [
+        {
+          op: 'removed',
+          selector: { type: 'property', matches: 'remove' },
+        },
+      ])
+      const obj = result.ast.root.children![0]!
+      expect(obj.children).toHaveLength(2)
+      const labels = obj.children!.map((c) => c.label)
+      expect(labels).toEqual(['keep', 'also-keep'])
+    })
+
+    it('removed property from nested object', () => {
+      const ast = parser.parse('{"config": {"debug": true, "verbose": false}}')
+      const result = parser.apply(ast, [
+        {
+          op: 'removed',
+          selector: {
+            type: 'property',
+            matches: 'verbose',
+            parent: { type: 'property', matches: 'config' },
+          },
+        },
+      ])
+      const configProp = result.ast.root.children![0]!.children![0]!
+      const configObj = configProp.children![0]!
+      expect(configObj.children).toHaveLength(1)
+      expect(configObj.children![0]!.label).toBe('debug')
+    })
+
+    it('removed array-item by index', () => {
+      const ast = parser.parse('{"items": ["a", "b", "c"]}')
+      const result = parser.apply(ast, [
+        {
+          op: 'removed',
+          selector: { type: 'array-item', index: 1 },
+        },
+      ])
+      const arr = result.ast.root.children![0]!.children![0]!.children![0]!
+      expect(arr.children).toHaveLength(2)
+      expect(arr.children![0]).toMatchObject({ type: 'array-item', value: 'a' })
+      expect(arr.children![1]).toMatchObject({ type: 'array-item', value: 'c' })
+    })
+
+    it('removed array-item by where selector', () => {
+      const ast = parser.parse(JSON.stringify({ users: [{ name: 'alice' }, { name: 'bob' }] }))
+      const result = parser.apply(ast, [
+        {
+          op: 'removed',
+          selector: { type: 'array-item', where: { name: 'alice' } },
+        },
+      ])
+      const arr = result.ast.root.children![0]!.children![0]!.children![0]!
+      expect(arr.children).toHaveLength(1)
+      const remainingItem = arr.children![0]!
+      const mapping = remainingItem.children![0]!
+      const nameProp = mapping.children!.find((c) => c.label === 'name')
+      expect(nameProp?.value).toBe('bob')
+    })
+
+    it('removed entire array via property', () => {
+      const ast = parser.parse('{"name": "core", "tags": ["a", "b"]}')
+      const result = parser.apply(ast, [
+        {
+          op: 'removed',
+          selector: { type: 'property', matches: 'tags' },
+        },
+      ])
+      const obj = result.ast.root.children![0]!
+      expect(obj.children).toHaveLength(1)
+      expect(obj.children![0]!.label).toBe('name')
     })
   })
 

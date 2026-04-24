@@ -263,6 +263,73 @@
 - **WHEN** the caller (e.g. `ValidateArtifacts`) processes this delta
 - **THEN** `apply` is never called — the base artifact is not loaded or parsed
 
+#### Scenario: markdown all node types support applicable added modified and removed operations
+
+- **GIVEN** a markdown document containing `document`, `section`, `paragraph`, `list`, `list-item`, `code-block`, and `thematic-break` nodes
+- **WHEN** delta entries apply `added` for a new section, `modified` for document/section/paragraph/list-item/code-block, and `removed` for list/thematic-break in deterministic scope
+- **THEN** `apply` succeeds
+- **AND** each operation mutates only its targeted node(s)
+- **AND** untouched siblings remain unchanged
+
+#### Scenario: markdown ambiguous selector in modified operation fails atomically
+
+- **GIVEN** a markdown document where a selector matches multiple nodes of the same type
+- **WHEN** a `modified` entry is applied without disambiguation
+- **THEN** `apply` throws `DeltaApplicationError`
+- **AND** no changes from the delta batch are committed
+
+#### Scenario: markdown parent scoping disambiguates duplicate matches
+
+- **GIVEN** duplicate section labels or paragraph/list-item values in different branches
+- **WHEN** selectors include a `parent` constraint for the intended branch
+- **THEN** `apply` resolves a unique target
+- **AND** only scoped nodes are added modified or removed
+
+#### Scenario: JSON all node types support applicable added modified and removed operations
+
+- **GIVEN** a JSON document containing `document`, `object`, `property`, `array`, and `array-item` nodes
+- **WHEN** delta entries apply `added` for new properties/array-items, `modified` for property/array/array-item values, and `removed` for properties/array-items in deterministic scope
+- **THEN** `apply` succeeds
+- **AND** resulting object and array structure matches the declared operations
+- **AND** unaffected keys and items are preserved
+
+#### Scenario: JSON ambiguous selector fails atomically across mixed operations
+
+- **GIVEN** a JSON delta batch with `added`, `modified`, and `removed` entries
+- **AND** one `modified` or `removed` selector resolves ambiguously
+- **WHEN** `apply` is executed
+- **THEN** `apply` throws `DeltaApplicationError`
+- **AND** none of the other entries in the batch are applied
+
+#### Scenario: JSON array operations respect selector and strategy semantics
+
+- **GIVEN** an array of scalars and an array of objects in the same JSON artifact
+- **WHEN** `added`, `modified` (`append`/`merge-by`), and `removed` entries target array and array-item nodes with valid selectors
+- **THEN** arrays are updated according to strategy rules
+- **AND** non-targeted arrays remain unchanged
+
+#### Scenario: YAML all node types support applicable added modified and removed operations
+
+- **GIVEN** a YAML document containing `document`, `mapping`, `pair`, `sequence`, and `sequence-item` nodes
+- **WHEN** delta entries apply `added` for new pairs/sequence-items, `modified` for pair/sequence/sequence-item values, and `removed` for pairs/sequence-items in deterministic scope
+- **THEN** `apply` succeeds
+- **AND** resulting mapping and sequence structure reflects the declared operations
+- **AND** unaffected nodes are preserved
+
+#### Scenario: YAML invalid selector combinations and ambiguous matches fail atomically
+
+- **GIVEN** YAML selectors with ambiguous matches or invalid combinations (for example `index` with `where`)
+- **WHEN** mixed-operation deltas are applied
+- **THEN** `apply` throws `DeltaApplicationError`
+- **AND** no partial add/modify/remove changes are committed
+
+#### Scenario: no-op operation is handled without AST mutation
+
+- **GIVEN** a delta artifact containing only `op: no-op`
+- **WHEN** artifact validation executes the delta workflow
+- **THEN** apply-time AST mutation is skipped
+- **AND** the artifact is treated as unchanged for operation semantics
+
 ### Requirement: Delta conflict detection
 
 #### Scenario: Two entries targeting the same node
