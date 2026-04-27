@@ -44,11 +44,13 @@ artifacts:
   - id: spec
     scope: spec
     output: spec.md
+    hasTasks: true
 workflow:
   - step: designing
 `
     const data = parseSchemaYaml('#full', yaml)
     expect(data.description).toBe('A test schema')
+    expect(data.artifacts![0]!.hasTasks).toBe(true)
     expect(data.workflow).toHaveLength(1)
   })
 

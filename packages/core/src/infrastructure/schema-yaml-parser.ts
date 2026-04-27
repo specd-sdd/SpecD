@@ -172,6 +172,7 @@ const ArtifactZodSchema = z
     scope: z.enum(['spec', 'change']),
     output: z.string(),
     description: z.string().optional(),
+    hasTasks: z.boolean().optional(),
     template: z.string().optional(),
     instruction: z.string().optional(),
     requires: z.array(z.string()).optional(),

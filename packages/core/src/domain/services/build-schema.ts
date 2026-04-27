@@ -126,6 +126,7 @@ export interface ArtifactYamlData {
   scope: 'spec' | 'change'
   output: string
   description?: string | undefined
+  hasTasks?: boolean | undefined
   template?: string | undefined
   instruction?: string | undefined
   requires?: readonly string[] | undefined
@@ -330,6 +331,14 @@ function buildArtifactType(
     }
   }
 
+  // Inject default markdown checkbox patterns if hasTasks is true and patterns are missing
+  if (raw.hasTasks === true) {
+    taskCompletionCheck = {
+      incompletePattern: taskCompletionCheck?.incompletePattern ?? '^\\s*-\\s+\\[ \\]',
+      completePattern: taskCompletionCheck?.completePattern ?? '^\\s*-\\s+\\[x\\]',
+    }
+  }
+
   return new ArtifactType({
     id: raw.id,
     scope: raw.scope as ArtifactScope,
@@ -340,6 +349,7 @@ function buildArtifactType(
     ...(raw.instruction !== undefined ? { instruction: raw.instruction } : {}),
     requires: raw.requires ?? [],
     optional: raw.optional ?? false,
+    hasTasks: raw.hasTasks ?? false,
     ...(raw.format !== undefined ? { format: raw.format as ArtifactFormat } : {}),
     delta: raw.delta ?? false,
     ...(raw.deltaInstruction !== undefined ? { deltaInstruction: raw.deltaInstruction } : {}),
@@ -521,7 +531,7 @@ export function buildSchema(
   }
 
   // Semantic validation: requiresTaskCompletion must be subset of requires
-  // and reference artifacts with taskCompletionCheck
+  // and reference artifacts with task capability (hasTasks: true)
   const artifactIndex = new Map(artifacts.map((a) => [a.id, a]))
   for (const step of workflow) {
     for (const id of step.requiresTaskCompletion ?? []) {
@@ -532,10 +542,10 @@ export function buildSchema(
         )
       }
       const artifactType = artifactIndex.get(id)
-      if (artifactType === undefined || artifactType.taskCompletionCheck === undefined) {
+      if (artifactType === undefined || !artifactType.hasTasks) {
         throw new SchemaValidationError(
           ref,
-          `workflow step '${step.step}': requiresTaskCompletion entry '${id}' does not have taskCompletionCheck`,
+          `workflow step '${step.step}': requiresTaskCompletion entry '${id}' does not have task capability (hasTasks: true)`,
         )
       }
     }

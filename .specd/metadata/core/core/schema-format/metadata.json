@@ -38,7 +38,13 @@
     {
       "requirement": "Artifact definition",
       "rules": [
-        "Each entry in `artifacts` must include:\n\n- `id` (string, required) — unique identifier within the schema, e.g. `proposal`, `specs`, `design`, `tasks`\n- `scope` (`spec` | `change`, required) — declares where this artifact lives after the change is archived. `spec` means the artifact file is synced to the `SpecRepository` (e.g. `spec.md`, `verify.md` — files that become part of the project's permanent spec record). `change` means the artifact stays only in the change directory and is never synced (e.g. `proposal.md`, `tasks.md` — working documents used during the change process).\n- `optional` (boolean, optional, default `false`) — when `false`, `ValidateArtifacts` requires this artifact to be present in the change before validation can pass. When `true`, the artifact may be absent without failing validation; if present, it is validated and (for `scope: spec` artifacts) synced normally. `scope` and `optional` are independent.\n- `output` (string or glob, required) — path pattern for the artifact's files **relative to the change directory**, e.g. `proposal.md` or `specs/**/spec.md`. When creating a new artifact file within a change, the filename is derived from the last literal segment of the glob (e.g. `spec.md` from `specs/**/spec.md`); if the last segment is a wildcard, the filename falls back to the template filename (e.g. `spec.md` from `template: templates/spec.md`). If neither the glob nor the template yields a determinate filename, `SchemaRegistry.resolve()` must throw a `SchemaValidationError`. The final location of these files in the project repo after syncing is configured separately and may differ.\n- `description` (string, optional) — human-readable summary for tooling\n- `template` (string, optional) — path to a template file, relative to the schema directory; see Requirement: Template resolution\n- `instruction` (string, optional) — AI instruction text assembled by `GetArtifactInstruction`\n- `requires` (array of artifact IDs, optional) — artifacts that must be resolved before this one; used to compute `Change.effectiveStatus()`. A dependency is resolved when its status is `complete` or `skipped`. `skipped` is only reachable for `optional: true` artifacts. Any other state (`missing`, `in-progress`) blocks the dependent artifact.\n- `format` (`markdown` | `json` | `yaml` | `plaintext`, optional) — declares the file format of this artifact. Used by `GetArtifactInstruction` to select the correct `ArtifactParser` adapter when injecting delta instructions. If omitted, the format is inferred from the file extension of the derived output filename (`.md` → `markdown`, `.json` → `json`, `.yaml` / `.yml` → `yaml`); any other extension defaults to `plaintext`. Must be declared explicitly when the extension is ambiguous or non-standard.\n- `delta` (boolean, optional, default `false`) — declares that this artifact supports delta files. Only valid when `scope: spec`; `SchemaRegistry.resolve()` must throw a `SchemaValidationError` if `delta: true` is combined with `scope: change`. When `true`, a delta file for this artifact (`deltas/<workspace>/<capability-path>/<filename>.delta.yaml`) may be present in the change directory. When `false`, delta files for this artifact are rejected at validation time.\n- `deltaInstruction` (string, optional) — domain-specific guidance injected by `GetArtifactInstruction` alongside the format-level delta instructions when `delta: true`. Describes which domain concepts to add, modify, or remove (e.g. requirements, scenarios) without repeating the technical delta format, which is provided automatically by the `ArtifactParser` adapter. Only valid when `delta: true`.\n- `deltaValidations` (array, optional) — structural validation rules checked against the normalized YAML AST of the delta file before application; see Requirement: Delta validation rules. Only valid when `delta: true`.\n- `validations` (array, optional) — structural validation rules for the base artifact (after delta application); see Requirement: Validation rules\n- `metadataExtraction` (object, optional) — top-level declaration of how to extract metadata fields from artifact content; see Requirement: Metadata extraction\n- `rules` (object, optional) — constraint blocks injected by `GetArtifactInstruction` around the artifact's `instruction`. Rules exist as a **schema composition mechanism**: they allow extending schemas and schema plugins to wrap an artifact's instruction with additional constraints without overriding the `instruction` field itself. A base schema defines the core instruction; child schemas or plugins add `rules.pre`/`rules.post` entries to augment it.\n  - `pre` (array, optional) — entries injected **before** the instruction. Each entry: `{ id: string, instruction: string }`.\n  - `post` (array, optional) — entries injected **after** the instruction. Each entry: `{ id: string, instruction: string }`.\n    `id` follows the standard array entry identity format. `instruction` is injected verbatim as a constraint block.\n- `preHashCleanup` (array, optional) — list of regex substitutions applied to the artifact content before computing any hash (both `validatedHash` for `ArtifactStatus` and the approval hash). Each entry has `id` (string, required — standard array entry identity format), `pattern` (regex string), and `replacement` (string, may be empty). Substitutions are applied in declaration order. Use this to normalize progress markers or other volatile content that should not affect hash comparisons.\n- `taskCompletionCheck` (object, optional) — declares how to detect task completion within this artifact's file content. Used to gate the `implementing → verifying` transition: if the artifact is listed in the `implementing` step's `requires`, all items matching `incompletePattern` must be absent (zero matches) before the transition is allowed. Both fields are optional and default to markdown checkbox syntax: When both patterns are present, the CLI can report progress (e.g. `3/5 tasks complete`) by counting matches of each. If `taskCompletionCheck` is omitted entirely, the defaults apply.\n  - `incompletePattern` (string, regex, default `^\\s*-\\s+\\[ \\]`) — matches an incomplete task item\n  - `completePattern` (string, regex, default `^\\s*-\\s+\\[x\\]`, case-insensitive) — matches a complete task item"
+        "Each entry in `artifacts` must include:\n\n- `id` (string, required) — unique identifier within the schema, e.g. `proposal`, `specs`, `design`, `tasks`\n- `scope` (`spec` | `change`, required) — declares where this artifact lives after the change is archived. `spec` means the artifact file is synced to the `SpecRepository` (e.g. `spec.md`, `verify.md` — files that become part of the project's permanent spec record). `change` means the artifact stays only in the change directory and is never synced (e.g. `proposal.md`, `tasks.md` — working documents used during the change process).\n- `optional` (boolean, optional, default `false`) — when `false`, `ValidateArtifacts` requires this artifact to be present in the change before validation can pass. When `true`, the artifact may be absent without failing validation; if present, it is validated and (for `scope: spec` artifacts) synced normally. `scope` and `optional` are independent.\n- `hasTasks` (boolean, optional, default `false`) — when `true`, the artifact is explicitly marked as containing trackable tasks. This is the **master switch** for task capability: it enables task completion checks and displays the `[hasTasks]` indicator in CLI status. If omitted or `false`, task capability is disabled even if `taskCompletionCheck` patterns are defined.\n- `output` (string or glob, required) — path pattern for the artifact's files **relative to the change directory**, e.g. `proposal.md` or `specs/**/spec.md`. When creating a new artifact file within a change, the filename is derived from the last literal segment of the glob (e.g. `spec.md` from `specs/**/spec.md`); if the last segment is a wildcard, the filename falls back to the template filename (e.g. `spec.md` from `template: templates/spec.md`). If neither the glob nor the template yields a determinate filename, `SchemaRegistry.resolve()` must throw a `SchemaValidationError`. The final location of these files in the project repo after syncing is configured separately and may differ.\n- `description` (string, optional) — human-readable summary for tooling\n- `template` (string, optional) — path to a template file, relative to the schema directory; see Requirement: Template resolution\n- `instruction` (string, optional) — AI instruction text assembled by `GetArtifactInstruction`\n- `requires` (array of artifact IDs, optional) — artifacts that must be resolved before this one; used to compute `Change.effectiveStatus()`. A dependency is resolved when its status is `complete` or `skipped`. `skipped` is only reachable for `optional: true` artifacts. Any other state (`missing`, `in-progress`) blocks the dependent artifact.\n- `format` (`markdown` | `json` | `yaml` | `plaintext`, optional) — declares the file format of this artifact. Used by `GetArtifactInstruction` to select the correct `ArtifactParser` adapter when injecting delta instructions. If omitted, the format is inferred from the file extension of the derived output filename (`.md` → `markdown`, `.json` → `json`, `.yaml` / `.yml` → `yaml`); any other extension defaults to `plaintext`. Must be declared explicitly when the extension is ambiguous or non-standard.\n- `delta` (boolean, optional, default `false`) — declares that this artifact supports delta files. Only valid when `scope: spec`; `SchemaRegistry.resolve()` must throw a `SchemaValidationError` if `delta: true` is combined with `scope: change`. When `true`, a delta file for this artifact (`deltas/<workspace>/<capability-path>/<filename>.delta.yaml`) may be present in the change directory. When `false`, delta files for this artifact are rejected at validation time.\n- `deltaInstruction` (string, optional) — domain-specific guidance injected by `GetArtifactInstruction` alongside the format-level delta instructions when `delta: true`. Describes which domain concepts to add, modify, or remove (e.g. requirements, scenarios) without repeating the technical delta format, which is provided automatically by the `ArtifactParser` adapter. Only valid when `delta: true`.\n- `deltaValidations` (array, optional) — structural validation rules checked against the normalized YAML AST of the delta file before application; see Requirement: Delta validation rules. Only valid when `delta: true`.\n- `validations` (array, optional) — structural validation rules for the base artifact (after delta application); see Requirement: Validation rules\n- `metadataExtraction` (object, optional) — top-level declaration of how to extract metadata fields from artifact content; see Requirement: Metadata extraction\n- `rules` (object, optional) — constraint blocks injected by `GetArtifactInstruction` around the artifact's `instruction`. Rules exist as a **schema composition mechanism**: they allow extending schemas and schema plugins to wrap an artifact's instruction with additional constraints without overriding the `instruction` field itself. A base schema defines the core instruction; child schemas or plugins add `rules.pre`/`rules.post` entries to augment it.\n  - `pre` (array, optional) — entries injected **before** the instruction. Each entry: `{ id: string, instruction: string }`.\n  - `post` (array, optional) — entries injected **after** the instruction. Each entry: `{ id: string, instruction: string }`.\n    `id` follows the standard array entry identity format. `instruction` is injected verbatim as a constraint block.\n- `preHashCleanup` (array, optional) — list of regex substitutions applied to the artifact content before computing any hash (both `validatedHash` for `ArtifactStatus` and the approval hash). Each entry has `id` (string, required — standard array entry identity format), `pattern` (regex string), and `replacement` (string, may be empty). Substitutions are applied in declaration order. Use this to normalize progress markers or other volatile content that should not affect hash comparisons.\n- `taskCompletionCheck` (object, optional) — declares patterns for detecting checkboxes; see Requirement: taskCompletionCheck."
+      ]
+    },
+    {
+      "requirement": "taskCompletionCheck",
+      "rules": [
+        "`taskCompletionCheck` defines how the system identifies incomplete tasks within an artifact's file. This requirement is only active when `hasTasks: true` is set for the artifact.\n\nThe fields are optional and default to standard markdown checkbox syntax:\n\n- `incompletePattern` (string, regex, default `^\\s*-\\s+\\[ \\]`) — matches an incomplete task item\n- `completePattern` (string, regex, default `^\\s*-\\s+\\[x\\]`, case-insensitive) — matches a complete task item"
       ]
     },
     {
@@ -80,7 +86,7 @@
     {
       "requirement": "Workflow",
       "rules": [
-        "`workflow` is an array of named lifecycle phase definitions for a change. Each entry describes a distinct phase — such as designing specs, applying changes, verifying work, or archiving — and declares what artifact conditions must be met for that phase to become active, along with any hooks to run at phase boundaries.\n\nSteps are not limited to AI agent invocations. They may represent human review phases, automated checks, artifact generation, or any recurring activity in the change lifecycle. `CompileContext` uses step definitions to gate context compilation and evaluate step availability.\n\nA step's `requires` array serves as a defensive gate: `CompileContext` evaluates whether all required artifacts are `complete` (or `skipped`) to determine step availability. If any required artifact is missing or incomplete, the step is blocked. This prevents the agent from entering a phase when prerequisites have been deleted or corrupted. Steps that need all artifacts intact (e.g. implementing, archiving) SHOULD require all artifacts. Steps that focus on a specific concern (e.g. verifying) MAY require only the relevant artifacts.\n\nNote: `CompileContext` does NOT include change artifact content (proposal.md, design.md, tasks.md) in the compiled context block — it only includes spec content and project context. The agent reads change artifacts directly from disk, guided by hook instructions.\n\nEntries must include:\n\n- `step` (string, required) — step name identifying a phase of the change lifecycle\n- `requires` (array of artifact IDs, optional) — artifacts that must be `complete` before this step is available; empty or omitted means always available\n- `requiresTaskCompletion` (array of artifact IDs, optional) — subset of `requires` for which task completion gating is enforced on this step. Each listed artifact ID must be present in `requires` and must reference an artifact type that declares `taskCompletionCheck`. When present, the transition system checks the artifact's file content for incomplete task items (matching `incompletePattern`) before allowing the transition. When absent or empty, no task completion gating applies to this step.\n- `hooks` (object, optional) — hooks for this step's boundaries; each key is `pre` or `post`, each value is an array of `instruction:` or `run:` hook entries\n\nEvery hook entry must include an `id` field (standard array entry identity format) and exactly one of:\n\n- `{ id: string, instruction: string }` — AI context injected when this step is compiled; used to guide agent behaviour during this phase\n- `{ id: string, run: string }` — shell command executed at the phase boundary; supports template variables `{{change.name}}`, `{{change.path}}`, `{{project.root}}`\n\n**`pre` hook failure** — if a `run:` hook exits with a non-zero code, the step is aborted and the user is informed of the failure. The agent should offer to attempt to fix the problem before retrying.\n\n**`post` hook failure** — the step has already completed, so the operation is not rolled back. After each failing `run:` hook, the user is prompted to choose: continue with the remaining hooks, or stop.\n\nThe order of entries in `workflow` is the intended progression of the change lifecycle and is used by tooling to display status. It does not enforce sequential blocking between consecutive steps — each step is independently gated by its own `requires`.\n\nProject-level hook additions are no longer declared via a `workflow` section in `specd.yaml`. Instead, they are expressed as `schemaOverrides` targeting `workflow[].hooks` — see [`specs/core/config/spec.md`](../config/spec.md)."
+        "A `workflow` defines the sequence of steps a change follows. Each entry must include:\n\n- `step` (string, required) — name of the phase (e.g., `designing`, `implementing`)\n- `requires` (array of strings, optional) — IDs of artifacts that must be `complete` before the step is available\n- `requiresTaskCompletion` (array of strings, optional) — IDs of artifacts where all tasks MUST be complete before the step can be finished. **Invariant**: Every artifact ID listed here MUST have `hasTasks: true` declared in its artifact definition. `SchemaRegistry.resolve()` SHALL throw a `SchemaValidationError` if this invariant is violated.\n- `hooks` (object, optional) — `pre` and `post` hooks for the step"
       ]
     },
     {
@@ -122,6 +128,8 @@
     "Array entry id must match /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/, 1–64 characters, unique within its immediate array",
     "artifact.scope must be spec or change; it is required and has no default",
     "artifact.optional defaults to false; a non-optional artifact with scope: spec must be present in every spec directory and every change",
+    "artifact.hasTasks is optional and defaults to false",
+    "workflow[].requiresTaskCompletion MUST ONLY reference artifacts with hasTasks: true",
     "artifact.rules.pre and artifact.rules.post are optional arrays of { id, instruction } entries",
     "workflow[].step must be unique — duplicate step names in the same workflow array are a schema validation error",
     "Every hook entry must include an id field alongside its instruction or run field",
@@ -326,6 +334,20 @@
     },
     {
       "requirement": "Artifact definition",
+      "name": "hasTasks enables task capability",
+      "given": ["an artifact declares hasTasks: true"],
+      "when": ["the schema is resolved"],
+      "then": ["the ArtifactType has hasTasks: true"]
+    },
+    {
+      "requirement": "Artifact definition",
+      "name": "hasTasks defaults to false",
+      "given": ["an artifact omits hasTasks"],
+      "when": ["the schema is resolved"],
+      "then": ["the ArtifactType has hasTasks: false"]
+    },
+    {
+      "requirement": "Artifact definition",
       "name": "Artifact with no requirements",
       "when": ["an artifact omits requires"],
       "then": ["its effective status depends only on its own validated hash"]
@@ -363,6 +385,67 @@
       "name": "deltaValidations on non-delta artifact",
       "when": ["an artifact declares delta: false and also declares deltaValidations"],
       "then": ["SchemaRegistry.resolve() must throw a SchemaValidationError"]
+    },
+    {
+      "requirement": "Artifact definition",
+      "name": "format inferred from output extension",
+      "when": ["an artifact omits format and its derived output filename ends in .md"],
+      "then": ["the resolved artifact has format: markdown"]
+    },
+    {
+      "requirement": "Artifact definition",
+      "name": "format indeterminate requires explicit declaration",
+      "when": [
+        "an artifact omits format and its derived output filename has an extension not in .md, .json, .yaml, .yml"
+      ],
+      "then": ["the resolved artifact uses format: plaintext"]
+    },
+    {
+      "requirement": "Artifact definition",
+      "name": "preHashCleanup entry requires id",
+      "when": ["a preHashCleanup entry omits the id field"],
+      "then": ["SchemaRegistry.resolve() must throw a SchemaValidationError"]
+    },
+    {
+      "requirement": "taskCompletionCheck",
+      "name": "hasTasks is the master switch over patterns",
+      "given": ["an artifact has hasTasks: false", "AND it defines taskCompletionCheck patterns"],
+      "when": ["the schema is resolved"],
+      "then": ["the ArtifactType has hasTasks: false", "AND task completion checks remain disabled"]
+    },
+    {
+      "requirement": "taskCompletionCheck",
+      "name": "Default patterns detect markdown checkboxes",
+      "given": [
+        "an artifact with hasTasks: true and no taskCompletionCheck declared",
+        "AND its file contains - [ ] pending and - [x] done"
+      ],
+      "when": ["the CLI checks task completion"],
+      "then": [
+        "incompletePattern defaults to ^\\s*-\\s+\\[ \\] and matches - [ ] pending",
+        "AND completePattern defaults to ^\\s*-\\s+\\[x\\] (case-insensitive) and matches - [x] done"
+      ]
+    },
+    {
+      "requirement": "taskCompletionCheck",
+      "name": "Custom patterns override defaults",
+      "given": [
+        "an artifact with hasTasks: true",
+        "AND it declares taskCompletionCheck.incompletePattern: '^\\s*TODO:' and taskCompletionCheck.completePattern: '^\\s*DONE:'",
+        "AND its file contains TODO: implement login and DONE: implement logout"
+      ],
+      "when": ["the CLI checks task completion"],
+      "then": ["incompletePattern matches TODO: implement login and the transition is blocked"]
+    },
+    {
+      "requirement": "taskCompletionCheck",
+      "name": "All tasks complete — no incomplete matches",
+      "given": [
+        "an artifact with hasTasks: true",
+        "AND a file where all checkboxes are checked and none are unchecked"
+      ],
+      "when": ["the implementing → verifying transition is attempted"],
+      "then": ["incompletePattern matches zero lines and the transition is allowed"]
     },
     {
       "requirement": "Delta validation rules",
@@ -724,6 +807,16 @@
       "then": ["SchemaRegistry.resolve() must throw a SchemaValidationError"]
     },
     {
+      "requirement": "Workflow",
+      "name": "requiresTaskCompletion references artifact without hasTasks",
+      "given": [
+        "a workflow step declares requiresTaskCompletion: [\"proposal\"]",
+        "AND artifact proposal has hasTasks: false"
+      ],
+      "when": ["the schema is resolved"],
+      "then": ["SchemaRegistry.resolve() must throw a SchemaValidationError"]
+    },
+    {
       "requirement": "Explicit external hook entries",
       "name": "External hook entry declares nested type and opaque config",
       "given": ["a workflow hook entry with id and an external object containing type and config"],
@@ -744,12 +837,6 @@
         "specd fails with a clear unknown external hook type error",
         "AND the hook is not treated as a no-op"
       ]
-    },
-    {
-      "requirement": "Artifact definition",
-      "name": "preHashCleanup entry requires id",
-      "when": ["a preHashCleanup entry omits the id field"],
-      "then": ["SchemaRegistry.resolve() must throw a SchemaValidationError"]
     },
     {
       "requirement": "Schema plugin kind",
@@ -837,8 +924,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:89351edf8e828fd5db7f5a19fc2b6a402f2eca2ca1ddcd53ab5094aebf146b4d",
-    "verify.md": "sha256:31ea057346da14dc5ee7b1694f081f2aca71a5d700053957add08bea820a6fbb"
+    "spec.md": "sha256:40cd398610aac5d2bfe73d995daa730e63a9624a1f588865b8e48b74c313206a",
+    "verify.md": "sha256:3b9216d7731ae6e2cc2331e6282b44675674ce768b87e23134ac5c949bd7daeb"
   },
   "generatedBy": "core"
 }

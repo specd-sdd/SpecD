@@ -435,9 +435,9 @@ describe('Artifact DAG rendering', () => {
           name: 'test-schema',
           version: 1,
           artifacts: [
-            { id: 'proposal', scope: 'change', requires: [] },
-            { id: 'design', scope: 'spec', requires: ['proposal'] },
-            { id: 'tasks', scope: 'spec', requires: ['design'] },
+            { id: 'proposal', scope: 'change', hasTasks: false, requires: [] },
+            { id: 'design', scope: 'spec', hasTasks: false, requires: ['proposal'] },
+            { id: 'tasks', scope: 'spec', hasTasks: true, requires: ['design'] },
           ],
         },
       },
@@ -457,7 +457,7 @@ describe('Artifact DAG rendering', () => {
 
     expect(dagLines[0]).toMatch(/\[✓\] proposal \[scope: change\]/)
     expect(dagLines[1]).toMatch(/└── \[✓\] design \[scope: spec\]/)
-    expect(dagLines[2]).toMatch(/    └── \[ \] tasks \[scope: spec\]/)
+    expect(dagLines[2]).toMatch(/    └── \[ \] tasks \[scope: spec\] \[hasTasks\]/)
   })
 
   it('renders multiple roots and branches correctly', async () => {

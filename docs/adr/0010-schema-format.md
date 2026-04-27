@@ -139,6 +139,17 @@ Two former customization patterns are addressed by `schemaOverrides`:
 - **Project-level `workflow` hook additions** — replaced by `schemaOverrides` targeting `workflow[].hooks`. The override model allows not just appending hooks but also removing, prepending, or replacing them.
 - **`artifactRules`** — historical mechanism retained only for migration context. Active configurations should use `schemaOverrides` targeting `artifacts[].rules.post` (or `.pre`), and new configs should not declare `artifactRules`.
 
+### 15. Explicit `hasTasks` master switch for task capability
+
+Artifacts that contain trackable tasks (markdown checkboxes) must explicitly declare it via `hasTasks: true` in the schema. This field serves as the **master switch** for the task tracking system:
+
+- **Explicit Intent**: Detección of tasks is no longer implicit based on hardcoded rules or pattern presence. If `hasTasks` is omitted or `false`, task completion checks are disabled even if `taskCompletionCheck` patterns are defined.
+- **Semantic Validation**: To prevent configuration errors, `workflow[].requiresTaskCompletion` MUST ONLY reference artifacts that have `hasTasks: true`. `SchemaRegistry.resolve()` enforces this invariant at load time.
+- **Runtime Safety**: The `TransitionChange` use case performs a defensive check before running task gating, ensuring the target artifact explicitly supports tasks.
+- **Default Patterns**: When `hasTasks: true` is set, SpecD provides standard markdown checkbox patterns (`- [ ]` and `- [x]`) by default if `taskCompletionCheck` is omitted, simplifying common implementations.
+
+This decision moves task tracking from a "magic" derivation to a declarative capability, improving schema readability and providing early failure for invalid workflows.
+
 ### Consequences
 
 - Good, because `mergeSpecs` and `ValidateSpec` are fully schema-driven with no hardcoded section names, patterns, or keywords

@@ -64,14 +64,19 @@ The use case MUST emit a `requires-check` progress event per artifact checked, r
 
 After workflow requires enforcement passes, if the target workflow step declares a non-empty `requiresTaskCompletion` array, the use case MUST check each listed artifact for incomplete task items:
 
-1. Look up the `ArtifactType` from the schema to obtain `taskCompletionCheck.incompletePattern`.
-2. Get the `ChangeArtifact` via `change.getArtifact(artifactId)`. If it does not exist, skip it.
-3. Iterate the artifact's `files` map. For each `ArtifactFile`, load the file content via `ChangeRepository.artifact(change, file.filename)`.
-4. If the file does not exist (returns `null`), skip it.
-5. Compile `incompletePattern` using `safeRegex` with the `'gm'` flags.
-6. If the regex is valid and matches any line in the file content, throw `InvalidStateTransitionError` with reason `incomplete-tasks`, including the artifact ID, incomplete count (lines matching `incompletePattern`), and complete count (lines matching `completePattern` if declared).
+1. Look up the `ArtifactType` from the schema.
+2. **Defensive Check**: If the `ArtifactType` has `hasTasks: false`, the use case MUST throw `InvalidStateTransitionError` with reason `missing-task-capability`. This represents an invariant violation where a completion-gated step references an artifact that does not support tasks.
+3. If `hasTasks: true`, proceed with content check.
+4. Get the `ChangeArtifact` via `change.getArtifact(artifactId)`. If it does not exist, skip it.
+5. Iterate the artifact's `files` map. For each `ArtifactFile`, load the file content via `ChangeRepository.artifact(change, file.filename)`.
+6. If the file does not exist (returns `null`), skip it.
+7. Use standard markdown checkbox patterns if `taskCompletionCheck` patterns are omitted in the schema:
+   - `incompletePattern`: `^\s*-\s+\[ \]`
+   - `completePattern`: `^\s*-\s+\[x\]`
+8. Compile the patterns using `safeRegex` with the `'gm'` flags.
+9. If the incomplete regex matches any line in the file content, throw `InvalidStateTransitionError` with reason `incomplete-tasks`, including the artifact ID and counts.
 
-Only artifacts listed in `requiresTaskCompletion` are content-checked. Other artifacts in `requires` are checked only via `effectiveStatus`. When `requiresTaskCompletion` is absent or empty, no task completion gating applies.
+Only artifacts listed in `requiresTaskCompletion` are content-checked. When `requiresTaskCompletion` is absent or empty, no task completion gating applies.
 
 ### Requirement: Artifact validation clearing on verifying to implementing
 
@@ -165,7 +170,7 @@ The previous `postHookFailures` field is removed because both hook phases are no
 - The use case MUST NOT bypass the Change entity's transition validation — it only resolves the effective target and delegates
 - Task completion checks are controlled by `requiresTaskCompletion` on the workflow step — only listed artifacts are content-checked
 - Task completion checks use `safeRegex` to compile patterns; patterns that fail compilation or contain nested quantifiers are treated as non-matching (no error thrown)
-- `InvalidStateTransitionError` carries a structured `reason` field: `'incomplete-artifact'`, `'incomplete-tasks'`, `'invalid-transition'`, or `'approval-required'`
+- `InvalidStateTransitionError` carries a structured `reason` field: `'incomplete-artifact'`, `'incomplete-tasks'`, `'missing-task-capability'`, `'invalid-transition'`, or `'approval-required'`
 - Approval-gate routing is purely input-driven — the use case does not read configuration directly
 - Pre-hook failure aborts the transition — no state change occurs
 - Post-hook failure aborts the transition — no state change occurs (both phases are fail-fast)

@@ -236,7 +236,7 @@ JSON/TOON output schema:
                           scope: a.scope,
                           optional: a.optional ?? false,
                           requires: a.requires ?? [],
-                          hasTaskCompletionCheck: a.taskCompletionCheck !== undefined,
+                          hasTasks: a.hasTasks,
                           output: a.output,
                         })) ?? [],
                     },
@@ -299,7 +299,8 @@ function renderDag(
     const scope = `[scope: ${artifact.scope}]`
 
     const connector = isRoot ? '' : isLast ? '└── ' : '├── '
-    lines.push(`${prefix}${connector}${symbol} ${id} ${scope}`)
+    const taskTag = artifact.hasTasks ? ' [hasTasks]' : ''
+    lines.push(`${prefix}${connector}${symbol} ${id} ${scope}${taskTag}`)
 
     const children = artifactTypes.filter((a) => a.requires && a.requires.includes(id))
     const newPrefix = isRoot ? prefix : prefix + (isLast ? '    ' : '│   ')
