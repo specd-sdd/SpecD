@@ -12,14 +12,11 @@ apps/public-web/.generated/
 .specd/*
 !.specd/metadata/
 
-# Claude Code
+# AI Agents
 .claude/
-
-# Codex
 .codex/
-
-# OpenCode
 .opencode/
+.gemini/
 
 # Environment
 .env
