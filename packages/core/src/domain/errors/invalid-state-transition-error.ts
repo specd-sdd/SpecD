@@ -17,6 +17,10 @@ export type TransitionFailureReason =
       readonly total: number
     }
   | {
+      readonly type: 'missing-task-capability'
+      readonly artifactId: string
+    }
+  | {
       readonly type: 'approval-required'
       readonly gate: 'spec' | 'signoff'
     }
@@ -95,6 +99,8 @@ function buildMessage(from: string, to: string, reason?: TransitionFailureReason
     }
     case 'incomplete-tasks':
       return `${base}: ${reason.artifactId} has incomplete items (${reason.complete}/${reason.total} tasks complete)`
+    case 'missing-task-capability':
+      return `${base}: artifact '${reason.artifactId}' is not marked as containing tasks (hasTasks: true)`
     case 'invalid-transition':
       return base
     default: {

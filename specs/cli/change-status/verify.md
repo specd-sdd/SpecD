@@ -43,10 +43,11 @@
 
 #### Scenario: Text output renders Artifact DAG tree
 
-- **WHEN** `specd change status <name>` is run in text mode
+- **GIVEN** a change with an artifact that has `hasTasks: true`
+- **WHEN** `specd change status <name>` is run
 - **THEN** stdout includes an `artifacts (DAG):` section
 - **AND** it renders the artifact dependency tree using ASCII characters
-- **AND** each node includes a status symbol (e.g., `[✓]`, `[~]`) and a scope label (e.g., `[scope: change]`)
+- **AND** each node includes a status symbol (e.g., `[✓]`, `[~]`), a scope label (e.g., `[scope: change]`), and the `[hasTasks]` tag if enabled
 
 ### Requirement: spec-overlap-conflict review reason display
 
@@ -106,10 +107,11 @@
 
 #### Scenario: JSON output includes artifactDag
 
-- **GIVEN** a change using schema-std
+- **GIVEN** a change using a schema where one artifact has `hasTasks: true`
 - **WHEN** `specd change status <name> --format json` is run
 - **THEN** the JSON output includes `schema.artifactDag` array
-- **AND** each entry includes id, scope, optional, requires, hasTaskCompletionCheck, output
+- **AND** each entry includes id, scope, optional, requires, hasTasks, output
+- **AND** the `hasTasks` boolean reflects the schema definition
 
 #### Scenario: JSON output for non-schema-std also includes artifactDag
 

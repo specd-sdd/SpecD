@@ -57,7 +57,7 @@
     {
       "requirement": "Task completion check during requires enforcement",
       "rules": [
-        "After workflow requires enforcement passes, if the target workflow step declares a non-empty `requiresTaskCompletion` array, the use case MUST check each listed artifact for incomplete task items:\n\n1. Look up the `ArtifactType` from the schema to obtain `taskCompletionCheck.incompletePattern`.\n2. Get the `ChangeArtifact` via `change.getArtifact(artifactId)`. If it does not exist, skip it.\n3. Iterate the artifact's `files` map. For each `ArtifactFile`, load the file content via `ChangeRepository.artifact(change, file.filename)`.\n4. If the file does not exist (returns `null`), skip it.\n5. Compile `incompletePattern` using `safeRegex` with the `'gm'` flags.\n6. If the regex is valid and matches any line in the file content, throw `InvalidStateTransitionError` with reason `incomplete-tasks`, including the artifact ID, incomplete count (lines matching `incompletePattern`), and complete count (lines matching `completePattern` if declared).\n\nOnly artifacts listed in `requiresTaskCompletion` are content-checked. Other artifacts in `requires` are checked only via `effectiveStatus`. When `requiresTaskCompletion` is absent or empty, no task completion gating applies."
+        "After workflow requires enforcement passes, if the target workflow step declares a non-empty `requiresTaskCompletion` array, the use case MUST check each listed artifact for incomplete task items:\n\n1. Look up the `ArtifactType` from the schema.\n2. **Defensive Check**: If the `ArtifactType` has `hasTasks: false`, the use case MUST throw `InvalidStateTransitionError` with reason `missing-task-capability`. This represents an invariant violation where a completion-gated step references an artifact that does not support tasks.\n3. If `hasTasks: true`, proceed with content check.\n4. Get the `ChangeArtifact` via `change.getArtifact(artifactId)`. If it does not exist, skip it.\n5. Iterate the artifact's `files` map. For each `ArtifactFile`, load the file content via `ChangeRepository.artifact(change, file.filename)`.\n6. If the file does not exist (returns `null`), skip it.\n7. Use standard markdown checkbox patterns if `taskCompletionCheck` patterns are omitted in the schema:\n   - `incompletePattern`: `^\\s*-\\s+\\[ \\]`\n   - `completePattern`: `^\\s*-\\s+\\[x\\]`\n8. Compile the patterns using `safeRegex` with the `'gm'` flags.\n9. If the incomplete regex matches any line in the file content, throw `InvalidStateTransitionError` with reason `incomplete-tasks`, including the artifact ID and counts.\n\nOnly artifacts listed in `requiresTaskCompletion` are content-checked. When `requiresTaskCompletion` is absent or empty, no task completion gating applies."
       ]
     },
     {
@@ -125,7 +125,7 @@
     "The use case MUST NOT bypass the Change entity's transition validation — it only resolves the effective target and delegates",
     "Task completion checks are controlled by requiresTaskCompletion on the workflow step — only listed artifacts are content-checked",
     "Task completion checks use safeRegex to compile patterns; patterns that fail compilation or contain nested quantifiers are treated as non-matching (no error thrown)",
-    "InvalidStateTransitionError carries a structured reason field: 'incomplete-artifact', 'incomplete-tasks', 'invalid-transition', or 'approval-required'",
+    "InvalidStateTransitionError carries a structured reason field: 'incomplete-artifact', 'incomplete-tasks', 'missing-task-capability', 'invalid-transition', or 'approval-required'",
     "Approval-gate routing is purely input-driven — the use case does not read configuration directly",
     "Pre-hook failure aborts the transition — no state change occurs",
     "Post-hook failure aborts the transition — no state change occurs (both phases are fail-fast)",
@@ -207,6 +207,16 @@
       ],
       "when": ["execute is called with to: 'verifying'"],
       "then": ["it throws InvalidStateTransitionError with reason incomplete-tasks"]
+    },
+    {
+      "requirement": "Task completion check during requires enforcement",
+      "name": "Transition blocked by missing task capability (defensive check)",
+      "given": [
+        "a workflow step declares requiresTaskCompletion: [proposal]",
+        "AND artifact proposal has hasTasks: false"
+      ],
+      "when": ["execute is called"],
+      "then": ["it throws InvalidStateTransitionError with reason missing-task-capability"]
     },
     {
       "requirement": "Task completion check during requires enforcement",
@@ -471,8 +481,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:8703436ac14f347a2c0d0b436d26127fa2d1151f6fcb9ef8619f60f949b9b3a8",
-    "verify.md": "sha256:2e7f83599c8d3994ffb6d6e32139a2176bfe4d72f3082be95939ebe32922e2e5"
+    "spec.md": "sha256:40da00d58274a22afcfd6d85410732291e6fed99d484a77116c7c18ebd59e8e6",
+    "verify.md": "sha256:33693a0a13f0f07cd6bc19eed7fb479f6d8d5296007ec922174fb9a3fc3aa3c6"
   },
   "generatedBy": "core"
 }

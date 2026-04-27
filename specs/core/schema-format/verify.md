@@ -134,6 +134,18 @@
 - **WHEN** an artifact declares `output: "specs/**/*.md"` and omits `template`
 - **THEN** `SchemaRegistry.resolve()` must throw a `SchemaValidationError` identifying the artifact
 
+#### Scenario: hasTasks enables task capability
+
+- **GIVEN** an artifact declares `hasTasks: true`
+- **WHEN** the schema is resolved
+- **THEN** the `ArtifactType` has `hasTasks: true`
+
+#### Scenario: hasTasks defaults to false
+
+- **GIVEN** an artifact omits `hasTasks`
+- **WHEN** the schema is resolved
+- **THEN** the `ArtifactType` has `hasTasks: false`
+
 #### Scenario: Artifact with no requirements
 
 - **WHEN** an artifact omits `requires`
@@ -163,6 +175,54 @@
 
 - **WHEN** an artifact declares `delta: false` and also declares `deltaValidations`
 - **THEN** `SchemaRegistry.resolve()` must throw a `SchemaValidationError`
+
+#### Scenario: format inferred from output extension
+
+- **WHEN** an artifact omits `format` and its derived output filename ends in `.md`
+- **THEN** the resolved artifact has `format: markdown`
+
+#### Scenario: format indeterminate requires explicit declaration
+
+- **WHEN** an artifact omits `format` and its derived output filename has an extension not in `.md`, `.json`, `.yaml`, `.yml`
+- **THEN** the resolved artifact uses `format: plaintext`
+
+#### Scenario: preHashCleanup entry requires id
+
+- **WHEN** a `preHashCleanup` entry omits the `id` field
+- **THEN** `SchemaRegistry.resolve()` must throw a `SchemaValidationError`
+
+### Requirement: taskCompletionCheck
+
+#### Scenario: hasTasks is the master switch over patterns
+
+- **GIVEN** an artifact has `hasTasks: false`
+- **AND** it defines `taskCompletionCheck` patterns
+- **WHEN** the schema is resolved
+- **THEN** the `ArtifactType` has `hasTasks: false`
+- **AND** task completion checks remain disabled
+
+#### Scenario: Default patterns detect markdown checkboxes
+
+- **GIVEN** an artifact with `hasTasks: true` and no `taskCompletionCheck` declared
+- **AND** its file contains `- [ ] pending` and `- [x] done`
+- **WHEN** the CLI checks task completion
+- **THEN** `incompletePattern` defaults to `^\s*-\s+\[ \]` and matches `- [ ] pending`
+- **AND** `completePattern` defaults to `^\s*-\s+\[x\]` (case-insensitive) and matches `- [x] done`
+
+#### Scenario: Custom patterns override defaults
+
+- **GIVEN** an artifact with `hasTasks: true`
+- **AND** it declares `taskCompletionCheck.incompletePattern: '^\s*TODO:'` and `taskCompletionCheck.completePattern: '^\s*DONE:'`
+- **AND** its file contains `TODO: implement login` and `DONE: implement logout`
+- **WHEN** the CLI checks task completion
+- **THEN** `incompletePattern` matches `TODO: implement login` and the transition is blocked
+
+#### Scenario: All tasks complete — no incomplete matches
+
+- **GIVEN** an artifact with `hasTasks: true`
+- **AND** a file where all checkboxes are checked and none are unchecked
+- **WHEN** the `implementing → verifying` transition is attempted
+- **THEN** `incompletePattern` matches zero lines and the transition is allowed
 
 ### Requirement: Delta validation rules
 
@@ -432,6 +492,13 @@
 - **WHEN** a `workflow[].hooks.pre` entry omits the `id` field
 - **THEN** `SchemaRegistry.resolve()` must throw a `SchemaValidationError`
 
+#### Scenario: requiresTaskCompletion references artifact without hasTasks
+
+- **GIVEN** a workflow step declares `requiresTaskCompletion: ["proposal"]`
+- **AND** artifact `proposal` has `hasTasks: false`
+- **WHEN** the schema is resolved
+- **THEN** `SchemaRegistry.resolve()` must throw a `SchemaValidationError`
+
 ### Requirement: Explicit external hook entries
 
 #### Scenario: External hook entry declares nested type and opaque config
@@ -447,13 +514,6 @@
 - **WHEN** the workflow is resolved for execution
 - **THEN** specd fails with a clear unknown external hook type error
 - **AND** the hook is not treated as a no-op
-
-### Requirement: Artifact definition
-
-#### Scenario: preHashCleanup entry requires id
-
-- **WHEN** a `preHashCleanup` entry omits the `id` field
-- **THEN** `SchemaRegistry.resolve()` must throw a `SchemaValidationError`
 
 ### Requirement: Schema plugin kind
 

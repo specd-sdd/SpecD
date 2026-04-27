@@ -376,6 +376,7 @@ describe('TransitionChange', () => {
       return makeSchema({
         artifacts: [
           makeArtifactType('tasks', {
+            hasTasks: true,
             taskCompletionCheck: { incompletePattern: '^\\s*-\\s+\\[ \\]' },
           }),
           makeArtifactType('verify'),
@@ -519,6 +520,7 @@ describe('TransitionChange', () => {
       const schema = makeSchema({
         artifacts: [
           makeArtifactType('tasks', {
+            hasTasks: true,
             taskCompletionCheck: { incompletePattern: '^\\s*-\\s+\\[ \\]' },
           }),
         ],
@@ -563,6 +565,7 @@ describe('TransitionChange', () => {
       const schema = makeSchema({
         artifacts: [
           makeArtifactType('tasks', {
+            hasTasks: true,
             taskCompletionCheck: { incompletePattern: '^\\s*-\\s+\\[ \\]' },
           }),
           makeArtifactType('verify'),
@@ -601,6 +604,7 @@ describe('TransitionChange', () => {
       const schema = makeSchema({
         artifacts: [
           makeArtifactType('tasks', {
+            hasTasks: true,
             taskCompletionCheck: {
               incompletePattern: '^\\s*-\\s+\\[ \\]',
               completePattern: '^\\s*-\\s+\\[x\\]',

@@ -370,6 +370,7 @@ artifacts:
   # ── tasks ──────────────────────────────────────────────────────────────────
   - id: tasks
     scope: change
+    hasTasks: true
     output: tasks.md
     description: Implementation checklist with trackable tasks
     template: templates/tasks.md

@@ -200,7 +200,17 @@ export class TransitionChange {
     if (workflowStep !== null && workflowStep.requiresTaskCompletion.length > 0) {
       for (const artifactId of workflowStep.requiresTaskCompletion) {
         const artifactType = schema.artifact(artifactId)
-        if (artifactType?.taskCompletionCheck === undefined) continue
+
+        // Defensive check: invariant violation
+        if (artifactType === null || !artifactType.hasTasks) {
+          throw new InvalidStateTransitionError(fromState, effectiveTarget, {
+            type: 'missing-task-capability',
+            artifactId,
+          })
+        }
+
+        if (artifactType.taskCompletionCheck === undefined) continue
+
         await this._checkTaskCompletionForArtifact(
           change,
           artifactId,

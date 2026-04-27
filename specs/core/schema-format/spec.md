@@ -67,6 +67,7 @@ Each entry in `artifacts` must include:
 - `id` (string, required) — unique identifier within the schema, e.g. `proposal`, `specs`, `design`, `tasks`
 - `scope` (`spec` | `change`, required) — declares where this artifact lives after the change is archived. `spec` means the artifact file is synced to the `SpecRepository` (e.g. `spec.md`, `verify.md` — files that become part of the project's permanent spec record). `change` means the artifact stays only in the change directory and is never synced (e.g. `proposal.md`, `tasks.md` — working documents used during the change process).
 - `optional` (boolean, optional, default `false`) — when `false`, `ValidateArtifacts` requires this artifact to be present in the change before validation can pass. When `true`, the artifact may be absent without failing validation; if present, it is validated and (for `scope: spec` artifacts) synced normally. `scope` and `optional` are independent.
+- `hasTasks` (boolean, optional, default `false`) — when `true`, the artifact is explicitly marked as containing trackable tasks. This is the **master switch** for task capability: it enables task completion checks and displays the `[hasTasks]` indicator in CLI status. If omitted or `false`, task capability is disabled even if `taskCompletionCheck` patterns are defined.
 - `output` (string or glob, required) — path pattern for the artifact's files **relative to the change directory**, e.g. `proposal.md` or `specs/**/spec.md`. When creating a new artifact file within a change, the filename is derived from the last literal segment of the glob (e.g. `spec.md` from `specs/**/spec.md`); if the last segment is a wildcard, the filename falls back to the template filename (e.g. `spec.md` from `template: templates/spec.md`). If neither the glob nor the template yields a determinate filename, `SchemaRegistry.resolve()` must throw a `SchemaValidationError`. The final location of these files in the project repo after syncing is configured separately and may differ.
 - `description` (string, optional) — human-readable summary for tooling
 - `template` (string, optional) — path to a template file, relative to the schema directory; see Requirement: Template resolution
@@ -83,9 +84,16 @@ Each entry in `artifacts` must include:
   - `post` (array, optional) — entries injected **after** the instruction. Each entry: `{ id: string, instruction: string }`.
     `id` follows the standard array entry identity format. `instruction` is injected verbatim as a constraint block.
 - `preHashCleanup` (array, optional) — list of regex substitutions applied to the artifact content before computing any hash (both `validatedHash` for `ArtifactStatus` and the approval hash). Each entry has `id` (string, required — standard array entry identity format), `pattern` (regex string), and `replacement` (string, may be empty). Substitutions are applied in declaration order. Use this to normalize progress markers or other volatile content that should not affect hash comparisons.
-- `taskCompletionCheck` (object, optional) — declares how to detect task completion within this artifact's file content. Used to gate the `implementing → verifying` transition: if the artifact is listed in the `implementing` step's `requires`, all items matching `incompletePattern` must be absent (zero matches) before the transition is allowed. Both fields are optional and default to markdown checkbox syntax: When both patterns are present, the CLI can report progress (e.g. `3/5 tasks complete`) by counting matches of each. If `taskCompletionCheck` is omitted entirely, the defaults apply.
-  - `incompletePattern` (string, regex, default `^\s*-\s+\[ \]`) — matches an incomplete task item
-  - `completePattern` (string, regex, default `^\s*-\s+\[x\]`, case-insensitive) — matches a complete task item
+- `taskCompletionCheck` (object, optional) — declares patterns for detecting checkboxes; see Requirement: taskCompletionCheck.
+
+### Requirement: taskCompletionCheck
+
+`taskCompletionCheck` defines how the system identifies incomplete tasks within an artifact's file. This requirement is only active when `hasTasks: true` is set for the artifact.
+
+The fields are optional and default to standard markdown checkbox syntax:
+
+- `incompletePattern` (string, regex, default `^\s*-\s+\[ \]`) — matches an incomplete task item
+- `completePattern` (string, regex, default `^\s*-\s+\[x\]`, case-insensitive) — matches a complete task item
 
 ### Requirement: Template resolution
 
@@ -222,33 +230,12 @@ Supported metadata fields: `title`, `description`, `dependsOn`, `keywords` (sing
 
 ### Requirement: Workflow
 
-`workflow` is an array of named lifecycle phase definitions for a change. Each entry describes a distinct phase — such as designing specs, applying changes, verifying work, or archiving — and declares what artifact conditions must be met for that phase to become active, along with any hooks to run at phase boundaries.
+A `workflow` defines the sequence of steps a change follows. Each entry must include:
 
-Steps are not limited to AI agent invocations. They may represent human review phases, automated checks, artifact generation, or any recurring activity in the change lifecycle. `CompileContext` uses step definitions to gate context compilation and evaluate step availability.
-
-A step's `requires` array serves as a defensive gate: `CompileContext` evaluates whether all required artifacts are `complete` (or `skipped`) to determine step availability. If any required artifact is missing or incomplete, the step is blocked. This prevents the agent from entering a phase when prerequisites have been deleted or corrupted. Steps that need all artifacts intact (e.g. implementing, archiving) SHOULD require all artifacts. Steps that focus on a specific concern (e.g. verifying) MAY require only the relevant artifacts.
-
-Note: `CompileContext` does NOT include change artifact content (proposal.md, design.md, tasks.md) in the compiled context block — it only includes spec content and project context. The agent reads change artifacts directly from disk, guided by hook instructions.
-
-Entries must include:
-
-- `step` (string, required) — step name identifying a phase of the change lifecycle
-- `requires` (array of artifact IDs, optional) — artifacts that must be `complete` before this step is available; empty or omitted means always available
-- `requiresTaskCompletion` (array of artifact IDs, optional) — subset of `requires` for which task completion gating is enforced on this step. Each listed artifact ID must be present in `requires` and must reference an artifact type that declares `taskCompletionCheck`. When present, the transition system checks the artifact's file content for incomplete task items (matching `incompletePattern`) before allowing the transition. When absent or empty, no task completion gating applies to this step.
-- `hooks` (object, optional) — hooks for this step's boundaries; each key is `pre` or `post`, each value is an array of `instruction:` or `run:` hook entries
-
-Every hook entry must include an `id` field (standard array entry identity format) and exactly one of:
-
-- `{ id: string, instruction: string }` — AI context injected when this step is compiled; used to guide agent behaviour during this phase
-- `{ id: string, run: string }` — shell command executed at the phase boundary; supports template variables `{{change.name}}`, `{{change.path}}`, `{{project.root}}`
-
-**`pre` hook failure** — if a `run:` hook exits with a non-zero code, the step is aborted and the user is informed of the failure. The agent should offer to attempt to fix the problem before retrying.
-
-**`post` hook failure** — the step has already completed, so the operation is not rolled back. After each failing `run:` hook, the user is prompted to choose: continue with the remaining hooks, or stop.
-
-The order of entries in `workflow` is the intended progression of the change lifecycle and is used by tooling to display status. It does not enforce sequential blocking between consecutive steps — each step is independently gated by its own `requires`.
-
-Project-level hook additions are no longer declared via a `workflow` section in `specd.yaml`. Instead, they are expressed as `schemaOverrides` targeting `workflow[].hooks` — see [`specs/core/config/spec.md`](../config/spec.md).
+- `step` (string, required) — name of the phase (e.g., `designing`, `implementing`)
+- `requires` (array of strings, optional) — IDs of artifacts that must be `complete` before the step is available
+- `requiresTaskCompletion` (array of strings, optional) — IDs of artifacts where all tasks MUST be complete before the step can be finished. **Invariant**: Every artifact ID listed here MUST have `hasTasks: true` declared in its artifact definition. `SchemaRegistry.resolve()` SHALL throw a `SchemaValidationError` if this invariant is violated.
+- `hooks` (object, optional) — `pre` and `post` hooks for the step
 
 ### Requirement: Explicit external hook entries
 
@@ -339,6 +326,8 @@ The `verify` artifact in the schema should declare `requires: [spec]` — scenar
 - Array entry `id` must match `/^[a-z][a-z0-9]*(-[a-z0-9]+)*$/`, 1–64 characters, unique within its immediate array
 - `artifact.scope` must be `spec` or `change`; it is required and has no default
 - `artifact.optional` defaults to `false`; a non-optional artifact with `scope: spec` must be present in every spec directory and every change
+- `artifact.hasTasks` is optional and defaults to `false`
+- `workflow[].requiresTaskCompletion` MUST ONLY reference artifacts with `hasTasks: true`
 - `artifact.rules.pre` and `artifact.rules.post` are optional arrays of `{ id, instruction }` entries
 - `workflow[].step` must be unique — duplicate step names in the same `workflow` array are a schema validation error
 - Every hook entry must include an `id` field alongside its `instruction` or `run` field
@@ -450,6 +439,7 @@ artifacts:
   - id: tasks
     scope: change
     output: tasks.md
+    hasTasks: true
     description: Implementation checklist with trackable tasks
     template: templates/tasks.md
     requires:
@@ -471,6 +461,7 @@ workflow:
     requires: []
   - step: implementing
     requires: [tasks]
+    requiresTaskCompletion: [tasks]
     hooks:
       pre:
         - id: read-tasks

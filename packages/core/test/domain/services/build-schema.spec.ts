@@ -357,7 +357,7 @@ describe('buildSchema', () => {
     expect(() => buildSchema('#test', data, new Map())).toThrow("'tasks' is not in requires")
   })
 
-  it('rejects requiresTaskCompletion entry referencing artifact without taskCompletionCheck', () => {
+  it('rejects requiresTaskCompletion entry referencing artifact without task capability (hasTasks: true)', () => {
     const data = {
       ...minimalData(),
       artifacts: [{ id: 'specs', scope: 'spec' as const, output: 'spec.md' }],
@@ -371,7 +371,9 @@ describe('buildSchema', () => {
       ],
     }
     expect(() => buildSchema('#test', data, new Map())).toThrow(SchemaValidationError)
-    expect(() => buildSchema('#test', data, new Map())).toThrow('does not have taskCompletionCheck')
+    expect(() => buildSchema('#test', data, new Map())).toThrow(
+      'does not have task capability (hasTasks: true)',
+    )
   })
 
   it('accepts valid requiresTaskCompletion', () => {
@@ -383,6 +385,7 @@ describe('buildSchema', () => {
           id: 'tasks',
           scope: 'change' as const,
           output: 'tasks.md',
+          hasTasks: true,
           taskCompletionCheck: { incompletePattern: '^\\s*-\\s+\\[ \\]' },
         },
       ],
@@ -398,5 +401,62 @@ describe('buildSchema', () => {
     const schema = buildSchema('#test', data, new Map())
     const ws = schema.workflowStep('verifying')
     expect(ws?.requiresTaskCompletion).toEqual(['tasks'])
+  })
+
+  it('rejects requiresTaskCompletion referencing artifact without hasTasks', () => {
+    const data = {
+      kind: 'schema' as const,
+      name: 'test',
+      version: 1,
+      artifacts: [
+        { id: 'spec', scope: 'spec' as const, output: 'spec.md' },
+        { id: 'tasks', scope: 'change' as const, output: 'tasks.md', hasTasks: false },
+      ],
+      workflow: [
+        {
+          step: 'implementing',
+          requires: ['tasks'],
+          requiresTaskCompletion: ['tasks'],
+          hooks: { pre: [], post: [] },
+        },
+      ],
+    }
+    expect(() => buildSchema('#test', data, new Map())).toThrow(SchemaValidationError)
+  })
+
+  it('accepts requiresTaskCompletion referencing artifact with hasTasks: true', () => {
+    const data = {
+      kind: 'schema' as const,
+      name: 'test',
+      version: 1,
+      artifacts: [
+        { id: 'spec', scope: 'spec' as const, output: 'spec.md' },
+        { id: 'tasks', scope: 'change' as const, output: 'tasks.md', hasTasks: true },
+      ],
+      workflow: [
+        {
+          step: 'implementing',
+          requires: ['tasks'],
+          requiresTaskCompletion: ['tasks'],
+          hooks: { pre: [], post: [] },
+        },
+      ],
+    }
+    expect(() => buildSchema('#test', data, new Map())).not.toThrow()
+  })
+
+  it('injects default patterns when hasTasks is true and patterns are missing', () => {
+    const data = {
+      kind: 'schema' as const,
+      name: 'test',
+      version: 1,
+      artifacts: [{ id: 'tasks', scope: 'change' as const, output: 'tasks.md', hasTasks: true }],
+    }
+    const schema = buildSchema('#test', data, new Map())
+    const artifact = schema.artifact('tasks')!
+    expect(artifact.hasTasks).toBe(true)
+    expect(artifact.taskCompletionCheck).toBeDefined()
+    expect(artifact.taskCompletionCheck!.incompletePattern).toBe('^\\s*-\\s+\\[ \\]')
+    expect(artifact.taskCompletionCheck!.completePattern).toBe('^\\s*-\\s+\\[x\\]')
   })
 })

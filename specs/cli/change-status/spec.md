@@ -32,7 +32,7 @@ artifacts (DAG):                      ← ASCII tree rendering
   └─ [~] specs [scope: spec]
      ├─ [~] verify [scope: spec]
      │  └─ [~] design [scope: change]
-     │     └─ [!] tasks [scope: change]
+     │     └─ [!] tasks [scope: change] [hasTasks]
 
 blockers:                             ← High-visibility section for errors
   ! <CODE>: <message>
@@ -69,7 +69,7 @@ artifacts (details):                  ← Detailed file list
 
 The `description:` line is omitted when no description is set on the change.
 
-The `artifacts (DAG):` section renders an ASCII tree of the artifact dependency hierarchy. Each node MUST include a status symbol from the legend and an explicit `[scope: change]` or `[scope: spec]` label. The legend MUST be printed at the top of the DAG.
+The `artifacts (DAG):` section renders an ASCII tree of the artifact dependency hierarchy. Each node MUST include a status symbol from the legend, an explicit `[scope: change]` or `[scope: spec]` label, and an optional `[hasTasks]` label if the artifact has task capability enabled. The legend MUST be printed at the top of the DAG.
 
 The status symbols map to aggregate artifact states:
 
@@ -111,6 +111,7 @@ In `json` or `toon` mode, the output is:
     {
       "id": "...",
       "scope": "change|spec",
+      "hasTasks": true,
       "state": "...",
       "requires": ["..."],
       "children": ["..."]
@@ -187,20 +188,22 @@ If no change with the given name exists, the command exits with code 1 and print
 
 When the change uses any schema (not just schema-std), the JSON output MUST include a nested schema object with derived fields:
 
+```
 schema:
-name: "..."
-version: 1
-artifactDag:
-\- id: "..."
-scope: "change|spec"
-optional: true|false
-requires: \["..."]
-hasTaskCompletionCheck: true|false
-output: "..."
+  name: "..."
+  version: 1
+  artifactDag:
+    - id: "..."
+      scope: "change|spec"
+      optional: true|false
+      requires: ["..."]
+      hasTasks: true|false
+      output: "..."
+```
 
-artifactDag is derived from the schemas artifacts array.
-hasTaskCompletionCheck is true when the artifact has a taskCompletionCheck declaration.
-This allows design/implement skills to replace schema show calls.
+`artifactDag` is derived from the schema's `artifacts` array.
+`hasTasks` is true when the artifact has `hasTasks: true` explicitly or has a `taskCompletionCheck` declaration.
+This allows design/implement skills to replace `schema show` calls.
 
 ## Constraints
 

@@ -69,6 +69,13 @@
 - **WHEN** `execute` is called with `to: 'verifying'`
 - **THEN** it throws `InvalidStateTransitionError` with reason `incomplete-tasks`
 
+#### Scenario: Transition blocked by missing task capability (defensive check)
+
+- **GIVEN** a workflow step declares `requiresTaskCompletion: [proposal]`
+- **AND** artifact `proposal` has `hasTasks: false`
+- **WHEN** `execute` is called
+- **THEN** it throws `InvalidStateTransitionError` with reason `missing-task-capability`
+
 #### Scenario: Transition allowed when all tasks complete
 
 - **GIVEN** a change in `implementing` state

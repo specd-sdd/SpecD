@@ -56,6 +56,11 @@ export interface ArtifactTypeProps {
    */
   readonly optional?: boolean
   /**
+   * When `true`, the artifact is explicitly marked as containing trackable tasks.
+   * This is the master switch for task capability.
+   */
+  readonly hasTasks?: boolean
+  /**
    * Declared file format. When omitted, inferred from the output extension.
    */
   readonly format?: ArtifactFormat
@@ -109,6 +114,7 @@ export class ArtifactType {
   private readonly _instruction: string | undefined
   private readonly _requires: readonly string[]
   private readonly _optional: boolean
+  private readonly _hasTasks: boolean
   private readonly _format: ArtifactFormat | undefined
   private readonly _delta: boolean
   private readonly _deltaInstruction: string | undefined
@@ -133,6 +139,7 @@ export class ArtifactType {
     this._instruction = props.instruction
     this._requires = [...props.requires]
     this._optional = props.optional ?? false
+    this._hasTasks = props.hasTasks ?? false
     this._format = props.format
     this._delta = props.delta ?? false
     this._deltaInstruction = props.deltaInstruction
@@ -186,6 +193,11 @@ export class ArtifactType {
   /** `true` if this artifact may be absent without failing validation. */
   get optional(): boolean {
     return this._optional
+  }
+
+  /** `true` if the artifact is explicitly marked as containing trackable tasks. */
+  get hasTasks(): boolean {
+    return this._hasTasks
   }
 
   /** The declared file format, or `undefined` if inferred from the output extension. */
