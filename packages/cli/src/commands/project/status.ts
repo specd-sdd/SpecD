@@ -125,6 +125,7 @@ export function registerProjectStatus(parent: Command): void {
             prefix: w.prefix ?? null,
             ownership: w.ownership,
             codeRoot: w.codeRoot,
+            isExternal: w.isExternal,
           }))
 
           output(
@@ -165,7 +166,10 @@ export function registerProjectStatus(parent: Command): void {
           `schema: ${config.schemaRef}`,
           `workspaces:`,
           ...config.workspaces.map(
-            (w) => `  ${w.name} (prefix: ${w.prefix ?? '-'}) [${w.ownership}]`,
+            (w) =>
+              `  ${w.name} (prefix: ${w.prefix ?? '-'}) [${w.ownership}, ${
+                w.isExternal ? 'external' : 'local'
+              }, codeRoot: ${w.codeRoot}]`,
           ),
           `specs: ${specs.length} total`,
           ...Object.entries(specsByWorkspace).map(([ws, n]) => `  ${ws}: ${n}`),

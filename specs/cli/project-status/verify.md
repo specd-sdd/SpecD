@@ -16,7 +16,7 @@
 
 - **GIVEN** a project with multiple workspaces
 - **WHEN** `specd project status` is executed
-- **THEN** each workspace shows name, prefix, and ownership
+- **THEN** each workspace shows name, prefix, ownership, isExternal status, and codeRoot path
 
 ### Requirement: includes approval gates
 

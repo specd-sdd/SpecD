@@ -13,19 +13,22 @@ The CLI MUST provide a `project status` command under the `project` subcommand t
 ### Requirement: includes workspace information
 
 The command output MUST include:
+
 - Project root path
 - Schema reference
-- Workspaces: for each, name, prefix, and ownership (owned|shared|readOnly)
+- Workspaces: for each, name, prefix, ownership (owned|shared|readOnly), isExternal (boolean), and codeRoot (absolute path)
 
 ### Requirement: includes spec counts
 
 The command output MUST include:
+
 - Total spec count across all workspaces
 - Spec count per workspace
 
 ### Requirement: includes change counts
 
 The command output MUST include:
+
 - Number of active changes
 - Number of drafts
 - Number of discarded changes
@@ -33,12 +36,14 @@ The command output MUST include:
 ### Requirement: includes approval gates
 
 The command output MUST include:
+
 - Spec approval enabled (boolean)
 - Signoff approval enabled (boolean)
 
 ### Requirement: includes graph freshness (always)
 
 The command output MUST always include:
+
 - Whether the code graph is stale (boolean)
 - Last indexed timestamp (or null if never indexed)
 
@@ -47,6 +52,7 @@ This is included by default, not behind a flag.
 ### Requirement: supports --graph flag
 
 When `--graph` flag is provided, the command MUST include extended graph statistics:
+
 - Number of indexed files
 - Number of indexed symbols
 - Hotspots (if available)
@@ -54,6 +60,7 @@ When `--graph` flag is provided, the command MUST include extended graph statist
 ### Requirement: includes config flags (always)
 
 The command output MUST always include:
+
 - llmOptimizedContext enabled (boolean)
 - Spec approval enabled (boolean)
 - Signoff approval enabled (boolean)
@@ -63,6 +70,7 @@ This is included by default, not behind a flag.
 ### Requirement: supports --context flag
 
 When `--context` flag is provided, the output MUST include project context references:
+
 - Instruction entries (the directive text without reading files)
 - File entries (which files should be read without content)
 - Spec entries (which specs should be read without content)
