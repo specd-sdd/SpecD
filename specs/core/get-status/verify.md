@@ -35,6 +35,13 @@
 - **THEN** `review.required` is `false`
 - **AND** `review.route` is `null`
 
+#### Scenario: Result includes blockers array
+
+- **GIVEN** a change with artifact drift
+- **WHEN** `execute()` is called
+- **THEN** the result includes a `blockers` array
+- **AND** it contains at least one entry with `code: 'ARTIFACT_DRIFT'`
+
 ### Requirement: Throws ChangeNotFoundError for unknown changes
 
 #### Scenario: Change does not exist

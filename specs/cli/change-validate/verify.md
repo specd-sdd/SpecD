@@ -36,7 +36,7 @@
 
 ### Requirement: Output on success
 
-#### Scenario: All artifacts pass, no warnings
+#### Scenario: All artifacts pass, no notes
 
 - **GIVEN** a change where all artifacts pass validation
 - **AND** validation reports file `deltas/core/core/config/spec.md.delta.yaml`
@@ -46,46 +46,46 @@
 - **AND** stdout contains `specd change spec-preview my-change core:core/config`
 - **AND** the process exits with code 0
 
-#### Scenario: Pass with warnings
+#### Scenario: Pass with notes
 
-- **GIVEN** a change where artifacts pass but there are optional rule mismatches
+- **GIVEN** a change where artifacts pass but there are optimization notes
 - **AND** validation reports file `deltas/core/core/config/spec.md.delta.yaml`
 - **WHEN** `specd change validate my-change core:core/config --artifact specs` is run
-- **THEN** stdout contains a pass message and `warning:` lines for each warning
+- **THEN** stdout contains a pass message with `pass (N note(s))`
+- **AND** stdout contains `note:` lines for each note
 - **AND** stdout contains `file: deltas/core/core/config/spec.md.delta.yaml`
 - **AND** stdout contains `specd change spec-preview my-change core:core/config`
 - **AND** the process exits with code 0
 
-#### Scenario: JSON output on pass includes files
+#### Scenario: JSON output on pass includes notes and files
 
-- **GIVEN** a change where all artifacts pass validation with no warnings
+- **GIVEN** a change where all artifacts pass validation with optimization notes
 - **AND** validation reports file `deltas/core/core/config/spec.md.delta.yaml`
 - **WHEN** `specd change validate my-change core:core/config --artifact specs --format json` is run
-- **THEN** stdout is valid JSON with `passed` equal to `true`, `failures` equal to `[]`, and `warnings` equal to `[]`
-- **AND** `files` contains an entry with `filename: "deltas/core/core/config/spec.md.delta.yaml"`
+- **THEN** stdout is valid JSON with `passed` equal to `true`, `failures` equal to `[]`, and a `notes` array
+- **AND** `files` contains an entry with `filename: \"deltas/core/core/config/spec.md.delta.yaml\"`
 - **AND** the process exits with code 0
 
 ### Requirement: Output on failure
 
-#### Scenario: Validation failures
+#### Scenario: Validation failures with notes
 
-- **GIVEN** a change where a required artifact fails validation
+- **GIVEN** a change where a required artifact fails validation and has optimization notes
 - **AND** validation reports missing file `deltas/core/core/config/spec.md.delta.yaml`
 - **WHEN** `specd change validate my-change core:core/config --artifact specs` is run
 - **THEN** stdout contains `validation failed`
 - **AND** stdout contains `missing: deltas/core/core/config/spec.md.delta.yaml`
 - **AND** stdout contains `error:` lines for each failure
-- **AND** stdout contains `specd change spec-preview my-change core:core/config`
+- **AND** stdout contains `note:` lines for each note
 - **AND** the process exits with code 1
 
-#### Scenario: JSON output on failure includes files
+#### Scenario: JSON output on failure includes notes and files
 
-- **GIVEN** a change where a required artifact fails validation
-- **AND** validation reports missing file `deltas/core/core/config/spec.md.delta.yaml`
+- **GIVEN** a change where a required artifact fails validation and has notes
 - **WHEN** `specd change validate my-change core:core/config --artifact specs --format json` is run
 - **THEN** stdout is valid JSON with `passed` equal to `false`
-- **AND** `failures` contains at least one entry with `artifactId`, `description`, and `filename`
-- **AND** `files` contains an entry with `filename: "deltas/core/core/config/spec.md.delta.yaml"` and missing status
+- **AND** `failures` contains at least one entry
+- **AND** `notes` contains the optimization suggestions
 - **AND** the process exits with code 1
 
 ### Requirement: Spec ID not in change

@@ -17,6 +17,8 @@ On success, `execute()` MUST return a `GetStatusResult` containing:
 - `change` — the loaded `Change` entity with its current artifact state
 - `artifactStatuses` — an array of `ArtifactStatusEntry` objects, one per artifact attached to the change
 - `review` — a derived review summary for agents and CLI serializers
+- `blockers` — an array of active blockers preventing progress
+- `nextAction` — a recommended next action to guide the actor
 
 Each `ArtifactStatusEntry` MUST contain:
 
@@ -36,8 +38,21 @@ The `review` object MUST contain:
 
 - `required: boolean`
 - `route: 'designing' | null`
-- `reason: 'artifact-drift' | 'artifact-review-required' | null`
+- `reason: 'artifact-drift' | 'artifact-review-required' | 'spec-overlap-conflict' | null`
 - `affectedArtifacts` — a grouped list of artifact IDs with concrete affected files currently in `pending-review` or `drifted-pending-review`
+- `overlapDetail` — details about overlapping changes when reason is `spec-overlap-conflict`
+
+A `Blocker` object MUST contain:
+
+- `code` — a unique machine-readable error code (e.g. `'ARTIFACT_DRIFT'`, `'MISSING_ARTIFACT'`)
+- `message` — a human-readable description of the blocker
+
+The `nextAction` object MUST contain:
+
+- `targetStep` — the lifecycle step this action targets
+- `actionType` — `'cognitive'` (requires human/agent thought) or `'mechanical'` (can be automated)
+- `reason` — a short human-readable reason for the recommendation
+- `command` — the recommended CLI command to run
 
 Each review file entry inside `affectedArtifacts` MUST contain:
 
@@ -50,7 +65,8 @@ Each review file entry inside `affectedArtifacts` MUST contain:
 `review.reason` is:
 
 - `'artifact-drift'` when at least one file is `drifted-pending-review`
-- `'artifact-review-required'` when no file is drifted, but at least one file is `pending-review`
+- `'spec-overlap-conflict'` when no file is drifted, but unhandled overlap invalidations exist
+- `'artifact-review-required'` when no file is drifted or overlapping, but at least one file is `pending-review`
 - `null` when `review.required` is `false`
 
 `review.route` is `'designing'` whenever `review.required` is `true`, otherwise `null`.
@@ -98,6 +114,17 @@ When `reason` is `'spec-overlap-conflict'`, `ReviewSummary` MUST additionally in
     The array is ordered newest-first (matching the reverse scan order). This preserves the full picture when multiple changes were archived with overlapping specs before the current change was able to address any of them.
 
 When `reason` is not `'spec-overlap-conflict'`, `overlapDetail` MUST be an empty array.
+
+### Requirement: Identifies blockers
+
+`GetStatus` MUST identify explicit blockers that prevent lifecycle progression.
+
+Blockers MUST be collected for:
+
+- **Artifact Drift**: code `'ARTIFACT_DRIFT'` if `review.reason` is `'artifact-drift'`.
+- **Review Required**: code `'REVIEW_REQUIRED'` if `review.reason` is `'artifact-review-required'`.
+- **Overlap Conflict**: code `'OVERLAP_CONFLICT'` if `review.reason` is `'spec-overlap-conflict'`.
+- **Missing Artifacts**: code `'MISSING_ARTIFACT'` for each artifact in the current state's `requires` list that is in `missing` or `in-progress` state.
 
 ### Requirement: Graceful degradation when schema resolution fails
 

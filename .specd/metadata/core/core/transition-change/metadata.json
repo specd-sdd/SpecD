@@ -51,7 +51,7 @@
     {
       "requirement": "Workflow requires enforcement",
       "rules": [
-        "After resolving the effective target, the use case MUST obtain the active schema via `SchemaProvider` and look up the workflow step for the effective target via `schema.workflowStep(effectiveTarget)`. If the step declares a non-empty `requires` array, the use case MUST check `change.effectiveStatus(artifactId)` for each required artifact ID. If any required artifact has an effective status other than `complete` or `skipped`, the use case MUST throw `InvalidStateTransitionError` with reason `incomplete-artifact` and the blocking artifact ID.\n\nIf no workflow step exists for the effective target (the schema does not declare one), or the schema cannot be resolved, the requires check is skipped.\n\nThe use case MUST emit a `requires-check` progress event per artifact checked, reporting whether the requirement was satisfied."
+        "After resolving the effective target, the use case MUST obtain the active schema via `SchemaProvider` and look up the workflow step for the effective target via `schema.workflowStep(effectiveTarget)`. If the step declares a non-empty `requires` array, the use case MUST check `change.effectiveStatus(artifactId)` for each required artifact ID. If any required artifact has an effective status other than `complete` or `skipped`, the use case MUST throw `InvalidStateTransitionError` with a structured reason explaining the block.\n\nThe error reason MUST include:\n\n- `type`: `'incomplete-artifact'`\n- `artifactId`: The ID of the blocking artifact.\n- `status`: The artifact's current effective status (e.g. `'drifted-pending-review'`, `'pending-parent-artifact-review'`).\n- `blockedBy`: (Optional) If the status is `'pending-parent-artifact-review'`, this MUST include the ID and status of the first upstream parent in the DAG that is causing the recursive block.\n\nIf no workflow step exists for the effective target (the schema does not declare one), or the schema cannot be resolved, the requires check is skipped.\n\nThe use case MUST emit a `requires-check` progress event per artifact checked, reporting whether the requirement was satisfied."
       ]
     },
     {
@@ -269,6 +269,21 @@
       ]
     },
     {
+      "requirement": "Workflow requires enforcement",
+      "name": "Transition blocked by recursive parent review",
+      "given": [
+        "a workflow step requires artifact design",
+        "AND design is complete but depends on specs which is pending-review",
+        "AND design effective status is 'pending-parent-artifact-review'"
+      ],
+      "when": ["execute is called"],
+      "then": [
+        "it throws InvalidStateTransitionError",
+        "AND the error reason includes status: 'pending-parent-artifact-review'",
+        "AND it includes blockedBy: { artifactId: 'specs', status: 'pending-review' }"
+      ]
+    },
+    {
       "requirement": "Artifact validation clearing on verifying to implementing",
       "name": "Implementation-only retry preserves validated artifacts",
       "given": [
@@ -456,8 +471,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:9dfea41867b640e354186fca704d493ef94b9536e9d9494498a1055a42a55b9e",
-    "verify.md": "sha256:53d2a7d0eea6ea5514bb44fe8821e5fb1c80cc8d59646fddc291c5c4a7c61caa"
+    "spec.md": "sha256:8703436ac14f347a2c0d0b436d26127fa2d1151f6fcb9ef8619f60f949b9b3a8",
+    "verify.md": "sha256:2e7f83599c8d3994ffb6d6e32139a2176bfe4d72f3082be95939ebe32922e2e5"
   },
   "generatedBy": "core"
 }

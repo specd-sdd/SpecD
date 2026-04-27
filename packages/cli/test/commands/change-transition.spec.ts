@@ -221,6 +221,13 @@ describe('Invalid transition error', () => {
     kernel.changes.status.execute.mockResolvedValue({
       change: makeMockChange({ name: 'my-change', state: 'drafting' }),
       artifactStatuses: [],
+      blockers: [],
+      nextAction: {
+        targetStep: 'designing',
+        actionType: 'cognitive',
+        reason: '...',
+        command: '/specd-design',
+      },
     })
     kernel.changes.transition.execute.mockRejectedValue(
       new InvalidStateTransitionError('drafting', 'done'),
@@ -236,11 +243,58 @@ describe('Invalid transition error', () => {
     expect(stderr()).toMatch(/error:/)
   })
 
+  it('renders Repair Guide on InvalidStateTransitionError', async () => {
+    const { kernel, stderr } = setup()
+    kernel.changes.status.execute.mockResolvedValueOnce({
+      change: makeMockChange({ name: 'my-change', state: 'designing' }),
+      artifactStatuses: [],
+    })
+    kernel.changes.transition.execute.mockRejectedValue(
+      new InvalidStateTransitionError('designing', 'ready', {
+        type: 'incomplete-artifact',
+        artifactId: 'specs',
+      }),
+    )
+    kernel.changes.status.execute.mockResolvedValueOnce({
+      change: makeMockChange({ name: 'my-change', state: 'designing' }),
+      artifactStatuses: [],
+      blockers: [{ code: 'MISSING_ARTIFACT', message: "Required artifact 'specs' is incomplete" }],
+      nextAction: {
+        targetStep: 'designing',
+        actionType: 'cognitive',
+        reason: 'Missing specs',
+        command: '/specd-design',
+      },
+    })
+
+    const program = makeProgram()
+    registerChangeTransition(program.command('change'))
+    await program
+      .parseAsync(['node', 'specd', 'change', 'transition', 'my-change', 'ready'])
+      .catch(() => {})
+
+    const err = stderr()
+    expect(err).toContain("Cannot transition from 'designing' to 'ready'")
+    expect(err).toContain("artifact 'specs' is not complete")
+    expect(err).toContain("! MISSING_ARTIFACT: Required artifact 'specs' is incomplete")
+    expect(err).toContain('repair guide:')
+    expect(err).toContain('target:  designing')
+    expect(err).toContain('command: /specd-design')
+    expect(err).toContain('reason:  Missing specs')
+  })
+
   it('surfaces approval-required message for blocked signoff transition', async () => {
     const { kernel, stderr } = setup()
     kernel.changes.status.execute.mockResolvedValue({
       change: makeMockChange({ name: 'my-change', state: 'pending-signoff' }),
       artifactStatuses: [],
+      blockers: [],
+      nextAction: {
+        targetStep: 'designing',
+        actionType: 'cognitive',
+        reason: 'Approval required',
+        command: '/specd-design',
+      },
     })
     kernel.changes.transition.execute.mockRejectedValue(
       new InvalidStateTransitionError('pending-signoff', 'signed-off', {

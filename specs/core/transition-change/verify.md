@@ -114,6 +114,16 @@
 - **WHEN** `execute` is called
 - **THEN** `InvalidStateTransitionError` is thrown with reason `incomplete-artifact` and blocking artifact `specs`
 
+#### Scenario: Transition blocked by recursive parent review
+
+- **GIVEN** a workflow step requires artifact `design`
+- **AND** `design` is `complete` but depends on `specs` which is `pending-review`
+- **AND** `design` effective status is `'pending-parent-artifact-review'`
+- **WHEN** `execute` is called
+- **THEN** it throws `InvalidStateTransitionError`
+- **AND** the error reason includes `status: 'pending-parent-artifact-review'`
+- **AND** it includes `blockedBy: { artifactId: 'specs', status: 'pending-review' }`
+
 ### Requirement: Artifact validation clearing on verifying to implementing
 
 #### Scenario: Implementation-only retry preserves validated artifacts

@@ -26,13 +26,13 @@
     {
       "requirement": "Output on success",
       "rules": [
-        "In `text` mode (default), when all artifacts pass, the command prints the validated artifact paths:\n\n```text\nvalidated <name>/<workspace:capability-path>: all artifacts pass\n  file: <path>\n  file: <path>\nnote: inspect merged spec output with `specd change spec-preview <name> <workspace:capability-path>`\n```\n\nIn `text` mode, when there are warnings but no failures:\n\n```text\nvalidated <name>/<workspace:capability-path>: pass (N warning(s))\n  file: <path>\nwarning: <artifactId> — <description>\n...\nnote: inspect merged spec output with `specd change spec-preview <name> <workspace:capability-path>`\n```\n\nThe listed file paths MUST come from `ValidateArtifacts` result metadata and MUST be the exact paths validated for the requested spec/artifact.\n\nIn `json` or `toon` mode, the output is encoded in the respective format and includes the structured validation result:\n\n```json\n{\n  \"passed\": true,\n  \"failures\": [],\n  \"warnings\": [{ \"artifactId\": \"...\", \"description\": \"...\" }],\n  \"files\": [{ \"artifactId\": \"...\", \"key\": \"...\", \"filename\": \"...\", \"status\": \"validated\" }]\n}\n```"
+        "In `text` mode (default), when all artifacts pass, the command prints the validated artifact paths:\n\n```text\nvalidated <name>/<workspace:capability-path>: all artifacts pass\n  file: <path>\n  file: <path>\nnote: inspect merged spec output with `specd change spec-preview <name> <workspace:capability-path>`\n```\n\nIn `text` mode, when there are notes but no failures:\n\n```text\nvalidated <name>/<workspace:capability-path>: pass (N note(s))\n  file: <path>\nnote: <artifactId> — <description>\n...\nnote: inspect merged spec output with `specd change spec-preview <name> <workspace:capability-path>`\n```\n\nThe listed file paths MUST come from `ValidateArtifacts` result metadata and MUST be the exact paths validated for the requested spec/artifact. Any non-blocking suggestion MUST be labeled as a `note`.\n\nIn `json` or `toon` mode, the output includes a `notes` array:\n\n```json\n{\n  \"passed\": true,\n  \"failures\": [],\n  \"notes\": [{ \"artifactId\": \"...\", \"description\": \"...\" }],\n  \"files\": [{ \"artifactId\": \"...\", \"key\": \"...\", \"filename\": \"...\", \"status\": \"validated\" }]\n}\n```\n\nThe process exits with code 0 when `passed` is `true`."
       ]
     },
     {
       "requirement": "Output on failure",
       "rules": [
-        "In `text` mode, the command prints each failure to stdout, exits with code 1, and includes any expected file paths that could not be validated:\n\n```text\nvalidation failed <name>/<workspace:capability-path>:\n  missing: <path>\n  error: <artifactId> — <description>\n  ...\n  warning: <artifactId> — <description>\n  ...\nnote: inspect merged spec output with `specd change spec-preview <name> <workspace:capability-path>`\n```\n\nMissing path lines MUST be derived from `ValidateArtifacts` result metadata. For an existing spec with a delta-capable artifact, this path is the expected `deltas/.../*.delta.yaml` file, even if a direct `specs/...` file exists.\n\nIn `json` or `toon` mode, the output is encoded in the respective format and includes the structured validation result:\n\n```json\n{\n  \"passed\": false,\n  \"failures\": [{ \"artifactId\": \"...\", \"description\": \"...\", \"filename\": \"...\" }],\n  \"warnings\": [],\n  \"files\": [{ \"artifactId\": \"...\", \"key\": \"...\", \"filename\": \"...\", \"status\": \"missing\" }]\n}\n```\n\nThe process exits with code 1 when `passed` is `false`, regardless of format."
+        "In `text` mode, the command prints each failure to stdout, exits with code 1, and includes any expected file paths that could not be validated:\n\n```text\nvalidation failed <name>/<workspace:capability-path>:\n  missing: <path>\n    error: <artifactId> — <description>\n    ...\n    note: <artifactId> — <description>\n    ...\n  note: inspect merged spec output with `specd change spec-preview <name> <workspace:capability-path>`\n```\n\nMissing path lines MUST be derived from `ValidateArtifacts` result metadata. For an existing spec with a delta-capable artifact, this path is the expected `deltas/.../*.delta.yaml` file, even if a direct `specs/...` file exists.\n\nIn `json` or `toon` mode:\n\n```json\n{\n  \"passed\": false,\n  \"failures\": [{ \"artifactId\": \"...\", \"description\": \"...\", \"filename\": \"...\" }],\n  \"notes\": [],\n  \"files\": [{ \"artifactId\": \"...\", \"key\": \"...\", \"filename\": \"...\", \"status\": \"missing\" }]\n}\n```\n\nThe process exits with code 1 when `passed` is `false`, regardless of format."
       ]
     },
     {
@@ -112,7 +112,7 @@
     },
     {
       "requirement": "Output on success",
-      "name": "All artifacts pass, no warnings",
+      "name": "All artifacts pass, no notes",
       "given": [
         "a change where all artifacts pass validation",
         "AND validation reports file deltas/core/core/config/spec.md.delta.yaml"
@@ -127,14 +127,15 @@
     },
     {
       "requirement": "Output on success",
-      "name": "Pass with warnings",
+      "name": "Pass with notes",
       "given": [
-        "a change where artifacts pass but there are optional rule mismatches",
+        "a change where artifacts pass but there are optimization notes",
         "AND validation reports file deltas/core/core/config/spec.md.delta.yaml"
       ],
       "when": ["specd change validate my-change core:core/config --artifact specs is run"],
       "then": [
-        "stdout contains a pass message and warning: lines for each warning",
+        "stdout contains a pass message with pass (N note(s))",
+        "AND stdout contains note: lines for each note",
         "AND stdout contains file: deltas/core/core/config/spec.md.delta.yaml",
         "AND stdout contains specd change spec-preview my-change core:core/config",
         "AND the process exits with code 0"
@@ -142,25 +143,25 @@
     },
     {
       "requirement": "Output on success",
-      "name": "JSON output on pass includes files",
+      "name": "JSON output on pass includes notes and files",
       "given": [
-        "a change where all artifacts pass validation with no warnings",
+        "a change where all artifacts pass validation with optimization notes",
         "AND validation reports file deltas/core/core/config/spec.md.delta.yaml"
       ],
       "when": [
         "specd change validate my-change core:core/config --artifact specs --format json is run"
       ],
       "then": [
-        "stdout is valid JSON with passed equal to true, failures equal to [], and warnings equal to []",
-        "AND files contains an entry with filename: \"deltas/core/core/config/spec.md.delta.yaml\"",
+        "stdout is valid JSON with passed equal to true, failures equal to [], and a notes array",
+        "AND files contains an entry with filename: \\\"deltas/core/core/config/spec.md.delta.yaml\\\"",
         "AND the process exits with code 0"
       ]
     },
     {
       "requirement": "Output on failure",
-      "name": "Validation failures",
+      "name": "Validation failures with notes",
       "given": [
-        "a change where a required artifact fails validation",
+        "a change where a required artifact fails validation and has optimization notes",
         "AND validation reports missing file deltas/core/core/config/spec.md.delta.yaml"
       ],
       "when": ["specd change validate my-change core:core/config --artifact specs is run"],
@@ -168,24 +169,21 @@
         "stdout contains validation failed",
         "AND stdout contains missing: deltas/core/core/config/spec.md.delta.yaml",
         "AND stdout contains error: lines for each failure",
-        "AND stdout contains specd change spec-preview my-change core:core/config",
+        "AND stdout contains note: lines for each note",
         "AND the process exits with code 1"
       ]
     },
     {
       "requirement": "Output on failure",
-      "name": "JSON output on failure includes files",
-      "given": [
-        "a change where a required artifact fails validation",
-        "AND validation reports missing file deltas/core/core/config/spec.md.delta.yaml"
-      ],
+      "name": "JSON output on failure includes notes and files",
+      "given": ["a change where a required artifact fails validation and has notes"],
       "when": [
         "specd change validate my-change core:core/config --artifact specs --format json is run"
       ],
       "then": [
         "stdout is valid JSON with passed equal to false",
-        "AND failures contains at least one entry with artifactId, description, and filename",
-        "AND files contains an entry with filename: \"deltas/core/core/config/spec.md.delta.yaml\" and missing status",
+        "AND failures contains at least one entry",
+        "AND notes contains the optimization suggestions",
         "AND the process exits with code 1"
       ]
     },
@@ -285,8 +283,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:dc64423aed18a3500721ac6ccf7ebab3280e73a4416f452f1e9a9e6ce259e3f6",
-    "verify.md": "sha256:6ea8f93c8ab11afbc52266c3d0bfa837369bc6004c40ce291fc00a39598a90aa"
+    "spec.md": "sha256:ee36ab9f5f61fafe3a45f3e2d19880e9f2d4bb719159de24cb04f91e171db239",
+    "verify.md": "sha256:00ba35fe27a3ab4b926c34494dd0ac36f388a5c15d1d402bb883e9c4d1d18254"
   },
   "generatedBy": "core"
 }

@@ -380,6 +380,10 @@ export class Change {
    * as `in-progress` if any artifact in its `requires` chain is neither
    * `complete` nor `skipped`.
    *
+   * If a required dependency is in a review state (`pending-review` or
+   * `drifted-pending-review`), this artifact reports as
+   * `pending-parent-artifact-review`.
+   *
    * Includes cycle detection to prevent infinite recursion on circular
    * artifact dependencies.
    *
@@ -388,6 +392,43 @@ export class Change {
    */
   effectiveStatus(type: string): ArtifactStatus {
     return this._effectiveStatus(type, new Set())
+  }
+
+  /**
+   * Finds the first upstream parent artifact that is causing a recursive block
+   * for the given artifact type.
+   *
+   * @param type - The artifact type ID to evaluate
+   * @returns The ID and status of the blocking parent, or null if not recursively blocked
+   */
+  findBlockingParent(type: string): { artifactId: string; status: ArtifactStatus } | null {
+    return this._findBlockingParent(type, new Set())
+  }
+
+  /**
+   * Internal recursive helper for `findBlockingParent`.
+   *
+   * @param type - The artifact type ID to evaluate
+   * @param visiting - Set of IDs currently being visited to detect cycles
+   * @returns The ID and status of the blocking parent, or null if not recursively blocked
+   */
+  private _findBlockingParent(
+    type: string,
+    visiting: Set<string>,
+  ): { artifactId: string; status: ArtifactStatus } | null {
+    const artifact = this._artifacts.get(type)
+    if (!artifact || visiting.has(type)) return null
+
+    visiting.add(type)
+    for (const req of artifact.requires) {
+      const reqStatus = this.effectiveStatus(req)
+      if (reqStatus === 'pending-review' || reqStatus === 'drifted-pending-review') {
+        return { artifactId: req, status: reqStatus }
+      }
+      const parent = this._findBlockingParent(req, visiting)
+      if (parent) return parent
+    }
+    return null
   }
 
   /**
@@ -404,14 +445,27 @@ export class Change {
     if (visiting.has(type)) return 'in-progress'
 
     visiting.add(type)
+    let blockedByReview = false
     for (const req of artifact.requires) {
       const reqStatus = this._effectiveStatus(req, visiting)
       if (reqStatus !== 'complete' && reqStatus !== 'skipped') {
-        visiting.delete(type)
-        return 'in-progress'
+        if (
+          reqStatus === 'pending-review' ||
+          reqStatus === 'drifted-pending-review' ||
+          reqStatus === 'pending-parent-artifact-review'
+        ) {
+          blockedByReview = true
+        } else {
+          // If any dependency is just missing/in-progress (not review),
+          // we stay in-progress and don't care about review blocks.
+          visiting.delete(type)
+          return 'in-progress'
+        }
       }
     }
     visiting.delete(type)
+
+    if (blockedByReview) return 'pending-parent-artifact-review'
 
     return artifact.status
   }

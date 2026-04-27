@@ -5,6 +5,7 @@ import {
   type TransitionProgressEvent,
   type OnTransitionProgress,
   VALID_TRANSITIONS,
+  InvalidStateTransitionError,
 } from '@specd/core'
 import { createSpinner, type Spinner } from 'nanospinner'
 import { resolveCliContext } from '../../helpers/cli-context.js'
@@ -190,11 +191,12 @@ export function registerChangeTransition(parent: Command): void {
       `
 JSON/TOON output schema:
   {
-    result: "ok"
+    result: "ok" | "failure"
     name: string
     from: string
     to: string
-    postHookFailures: string[]
+    blockers?: Array<{ code: string, message: string }>
+    nextAction?: { targetStep: string, actionType: string, reason: string, command: string | null }
   }
 `,
     )
@@ -204,6 +206,7 @@ JSON/TOON output schema:
         step: string | undefined,
         opts: { format: string; config?: string; next?: boolean; skipHooks?: string },
       ) => {
+        const fmt = parseFormat(opts.format)
         try {
           validateRequestedTarget(step, opts.next ?? false, opts.format)
 
@@ -213,7 +216,6 @@ JSON/TOON output schema:
               : new Set<HookPhaseSelector>()
 
           const { config, kernel } = await resolveCliContext({ configPath: opts.config })
-          const fmt = parseFormat(opts.format)
 
           const { change: statusBefore } = await kernel.changes.status.execute({ name })
           const fromState = statusBefore.state
@@ -226,29 +228,62 @@ JSON/TOON output schema:
 
           const { onProgress } = makeProgressRenderer(fmt === 'text')
 
-          const result = await kernel.changes.transition.execute(
-            {
-              name,
-              to: requestedTarget,
-              approvalsSpec: config.approvals.spec,
-              approvalsSignoff: config.approvals.signoff,
-              skipHookPhases,
-            },
-            onProgress,
-          )
-
-          if (fmt === 'text') {
-            output(`transitioned ${name}: ${fromState} → ${result.change.state}`, 'text')
-          } else {
-            output(
+          try {
+            const result = await kernel.changes.transition.execute(
               {
-                result: 'ok',
                 name,
-                from: fromState,
-                to: result.change.state,
+                to: requestedTarget,
+                approvalsSpec: config.approvals.spec,
+                approvalsSignoff: config.approvals.signoff,
+                skipHookPhases,
               },
-              fmt,
+              onProgress,
             )
+
+            if (fmt === 'text') {
+              output(`transitioned ${name}: ${fromState} → ${result.change.state}`, 'text')
+            } else {
+              output(
+                {
+                  result: 'ok',
+                  name,
+                  from: fromState,
+                  to: result.change.state,
+                },
+                fmt,
+              )
+            }
+          } catch (err) {
+            if (err instanceof InvalidStateTransitionError) {
+              const status = await kernel.changes.status.execute({ name })
+
+              if (fmt === 'text') {
+                process.stderr.write(`error: ${err.message}\n`)
+                for (const b of status.blockers) {
+                  process.stderr.write(`! ${b.code}: ${b.message}\n`)
+                }
+                process.stderr.write('\n')
+                process.stderr.write('repair guide:\n')
+                process.stderr.write(`  target:  ${status.nextAction.targetStep}\n`)
+                process.stderr.write(`  command: ${status.nextAction.command ?? '(none)'}\n`)
+                process.stderr.write(`  reason:  ${status.nextAction.reason}\n`)
+                process.exit(1)
+              } else {
+                output(
+                  {
+                    result: 'failure',
+                    name,
+                    from: fromState,
+                    to: requestedTarget,
+                    blockers: status.blockers,
+                    nextAction: status.nextAction,
+                  },
+                  fmt,
+                )
+                process.exit(1)
+              }
+            }
+            throw err
           }
         } catch (err) {
           handleError(err, opts.format)

@@ -732,8 +732,9 @@ describe('TransitionChange', () => {
         expect(error.reason).toEqual({
           type: 'incomplete-artifact',
           artifactId: 'tasks',
+          status: 'missing',
         })
-        expect(error.message).toContain("artifact 'tasks' is not complete")
+        expect(error.message).toContain("artifact 'tasks' is missing")
       }
     })
 

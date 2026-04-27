@@ -59,14 +59,14 @@ different repository directory.
 When the user describes affected areas, use graph search to find related symbols and specs:
 
 ```bash
-specd graph search "<keyword>" --format json
+specd graph search "<keyword>" --format toon
 ```
 
 If the user mentions specific files or symbols, check their impact to understand scope:
 
 ```bash
-specd graph impact --file "<workspace:path>" --direction both --format json
-specd graph impact --symbol "<name>" --direction both --format json
+specd graph impact --file "<workspace:path>" --direction both --format toon
+specd graph impact --symbol "<name>" --direction both --format toon
 ```
 
 This helps you surface specs and code areas the user may not have considered. If `riskLevel`
@@ -77,10 +77,10 @@ is HIGH or CRITICAL, mention it — it affects how many specs should be in scope
 When the picture is clear enough, first check workspace ownership:
 
 ```bash
-specd project status --format json
+specd project status --format toon
 ```
 
-From the JSON output, build a map of each workspace's `ownership` from the `workspaces` array. For each spec you're
+From the response, build a map of each workspace's `ownership` from the `workspaces` array. For each spec you're
 about to propose, determine which workspace it belongs to.
 
 **If any proposed spec belongs to a `readOnly` workspace**, do NOT include it. Tell the user:
@@ -104,27 +104,33 @@ Wait for confirmation.
 ### 4. Create
 
 ```bash
-specd change create <name> --spec <workspace:path> --description "<desc>" --format json
+specd change create <name> --spec <workspace:path> --description "<desc>" --format toon
 ```
 
 The response includes `changePath` — the directory where artifacts will be written.
 
 If `change create` fails with `Change '<name>' already exists`, the change is already
-in progress. Load its status and redirect:
+in progress. Load its status in **text mode** for diagnostics and **toon mode** for extraction:
 
 ```bash
-specd change status <name> --format json
+specd change status <name> --format text
+specd change status <name> --format toon
 ```
 
-Read `state` and `review` from the response.
+Read `state`, `blockers`, `nextAction`, and `review` from the response.
+
+**Always prioritize high-visibility blockers.** If `blockers` is not empty,
+identify which ones are blocking progress (e.g. `ARTIFACT_DRIFT`, `OVERLAP_CONFLICT`,
+`REVIEW_REQUIRED`) and inform the user. Follow the `nextAction.command`
+recommendation.
 
 If `review.required` is `true`, suggest `/specd-design <name>` regardless of
 the lifecycle state. Summarize `review.reason` and `review.affectedArtifacts`,
 then stop.
 
-If `review.required` is `false`, suggest based on `state`:
+If `review.required` is `false`, suggest based on `nextAction.targetStep`:
 
-| State                            | Suggest                                                                    |
+| targetStep                       | Suggest                                                                    |
 | -------------------------------- | -------------------------------------------------------------------------- |
 | `drafting` / `designing`         | `/specd-design <name>`                                                     |
 | `ready`                          | Review artifacts, then `/specd-implement <name>` if approved               |
@@ -223,7 +229,8 @@ Follow guidance if any.
 ### 9. Show status and stop
 
 ```bash
-specd change status <name> --format json
+specd change status <name> --format text
+specd change status <name> --format toon
 ```
 
 Show the change state and suggest next step:

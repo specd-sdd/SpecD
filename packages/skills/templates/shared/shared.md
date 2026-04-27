@@ -18,9 +18,19 @@ add it to the change's specIds and write a delta (or `no-op` if unchanged).
 A change may include specs that **already exist and don't need modification** — the spec
 defines the behaviour and the change implements the code for it. Use `op: no-op` deltas.
 
-## CLI
+## CLI Formats: Diagnostic Priority & Data Extraction
 
-Use `specd` for ALL commands.
+You MUST prioritize formats according to the following rules:
+
+- **Diagnostic Priority**: Always use **`--format text`** (or default) for lifecycle
+  status checks (`change status`), transition attempts (`change transition`), and
+  validation commands (`change validate` / `spec validate`). This ensures high
+  visibility of human-readable blockers, the Artifact DAG, and Repair Guides.
+- **Data Extraction**: Use machine-optimized formats **`--format toon`** (preferred)
+  strictly when structured data extraction is required for subsequent tool calls
+  (e.g., getting `lifecycle.changePath` or `specIds`).
+
+Never use `--format json` unless `toon` is unavailable or explicitly requested.
 
 ## Command sequencing — no write-then-read parallelism
 
@@ -45,10 +55,56 @@ concluding there's a bug. The most common cause is accidental parallelism.
 
 ## changePath
 
-Every skill starts by running `change status <name> --format json`. The response
-includes `lifecycle.changePath` — the absolute path to the change directory. **Always
-extract and store this.** All artifacts (proposal.md, design.md, tasks.md, deltas/)
-live there. Never guess the path.
+Skills that need structural data start by running `change status <name> --format toon`.
+The response includes `lifecycle.changePath` — the absolute path to the change
+directory. **Always extract and store this.** All artifacts (proposal.md, design.md,
+tasks.md, deltas/) live there. Never guess the path.
+
+## High-visibility blockers
+
+The `change status` response includes a `blockers` array (in `toon` mode) or a
+dedicated "blockers:" section (in `text` mode).
+
+When blockers exist, progress is physically gated by the CLI. You MUST:
+
+1. **Identify** all blockers from the output
+2. **Prioritize** resolving them according to the `nextAction` recommendation
+3. **Inform** the user about the blockers if they require human intervention
+
+## Next Action engine
+
+The `change status` response also includes a `nextAction` object:
+
+- `targetStep`: the lifecycle step to aim for
+- `actionType`: `cognitive` (needs thinking/editing) or `mechanical` (just run a command)
+- `reason`: short explanation of why this action is recommended
+- `command`: the exact CLI or skill command to run
+
+**Always prefer the `nextAction` recommendation** over manual state derivation.
+It accounts for both structural blockers and the logical workflow progression.
+
+## Repair Guide for failed transitions
+
+When `change transition` fails in `text` mode, it renders a **Repair Guide**,
+providing the blocker codes and the exact command to resolve them.
+
+If a transition fails, do not guess why. Read the blockers and follow the Repair
+Guide. Usually, this means redirecting to the recommended skill or performing
+the recommended repair command.
+
+## Artifact and File states
+
+SpecD uses several states to track artifacts and files:
+
+- `missing`: file is not present on disk
+- `in-progress`: file exists but has not been validated
+- `complete`: file has been validated and matches the schema
+- `skipped`: optional artifact was intentionally omitted
+- `pending-review`: content changed and needs human/agent review
+- `drifted-pending-review`: disk content changed after validation, needs review
+- `pending-parent-artifact-review`: **recursive block** — this artifact is fine,
+  but an upstream dependency (parent in the DAG) requires review. You MUST resolve
+  the parent's review before this artifact can be progressed.
 
 ## Spec IDs
 
@@ -111,8 +167,8 @@ is available while writing it.
 **Always use the CLI.** Never guess filesystem paths.
 
 - Discover: `spec list --format text --summary`
-- Read content: `spec show <specId> --format json`
-- Read metadata: `spec metadata <specId> --format json`
+- Read content: `spec show <specId> --format toon`
+- Read metadata: `spec metadata <specId> --format toon`
 
 ## Context loading is mandatory
 
@@ -136,7 +192,7 @@ skill transitions within the same conversation:
 
 1. **No fingerprint stored** (first call in conversation, or new step without prior context):
    `change context <name> <step> --format text`
-   - Parse the `contextFingerprint` from the JSON response
+   - Parse the `contextFingerprint` from the response
    - Store it in the conversation window
 2. **Fingerprint stored** (any subsequent call, including after transitioning to a new skill):
    `change context <name> <step> --format text --fingerprint <value>`
@@ -272,13 +328,13 @@ been indexed yet, index it before proceeding. Only fall back to manual file expl
 Before using graph queries, check freshness:
 
 ```bash
-specd graph stats --format json
+specd graph stats --format toon
 ```
 
 If `stale` is `true` (or the graph has never been indexed), re-index before querying:
 
 ```bash
-specd graph index --format json
+specd graph index --format toon
 ```
 
 Incremental indexing is fast (only changed files are re-processed). Use `--force` only
@@ -291,18 +347,18 @@ fresh graph.
 **Search** — find symbols or specs by keyword (BM25 scoring):
 
 ```bash
-specd graph search "<query>" --format json
-specd graph search "<query>" --symbols --kind function --format json
-specd graph search "<query>" --specs --spec-content --format json
+specd graph search "<query>" --format toon
+specd graph search "<query>" --symbols --kind function --format toon
+specd graph search "<query>" --specs --spec-content --format toon
 ```
 
 **Impact analysis** — understand blast radius before making changes:
 
 ```bash
-specd graph impact --symbol "<name>" --direction dependents --format json
-specd graph impact --file "<workspace:path>" --direction dependents --format json
-specd graph impact --symbol "<name>" --direction dependencies --format json
-specd graph impact --changes <workspace:path1> <workspace:path2> --format json
+specd graph impact --symbol "<name>" --direction dependents --format toon
+specd graph impact --file "<workspace:path>" --direction dependents --format toon
+specd graph impact --symbol "<name>" --direction dependencies --format toon
+specd graph impact --changes <workspace:path1> <workspace:path2> --format toon
 ```
 
 Use `dependents` for blast-radius analysis (who is affected by a change) and
@@ -312,8 +368,8 @@ Use `dependents` for blast-radius analysis (who is affected by a change) and
 **Hotspots** — find high-coupling symbols that need careful handling:
 
 ```bash
-specd graph hotspots --format json
-specd graph hotspots --min-risk HIGH --format json
+specd graph hotspots --format toon
+specd graph hotspots --min-risk HIGH --format toon
 ```
 
 Score = `(sameWsCallers × 3) + (crossWsCallers × 5) + fileImporters`.

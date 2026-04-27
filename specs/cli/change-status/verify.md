@@ -41,6 +41,13 @@
 - **WHEN** `specd change status <name>` is run in text mode
 - **THEN** stdout omits the `review:` section
 
+#### Scenario: Text output renders Artifact DAG tree
+
+- **WHEN** `specd change status <name>` is run in text mode
+- **THEN** stdout includes an `artifacts (DAG):` section
+- **AND** it renders the artifact dependency tree using ASCII characters
+- **AND** each node includes a status symbol (e.g., `[✓]`, `[~]`) and a scope label (e.g., `[scope: change]`)
+
 ### Requirement: spec-overlap-conflict review reason display
 
 #### Scenario: Text output shows overlap entries when reason is spec-overlap-conflict

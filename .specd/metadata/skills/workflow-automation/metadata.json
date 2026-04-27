@@ -1,0 +1,62 @@
+{
+  "title": "Workflow Automation",
+  "description": "To ensure consistent and efficient agent interactions across the SpecD lifecycle by defining policies for diagnostic output and data extraction. This spec minimizes \"AI blindness\" by mandating human-optimized text for status checks and machine-optimized formats for data-intensive operations.",
+  "context": [
+    "To ensure consistent and efficient agent interactions across the SpecD lifecycle by defining policies for diagnostic output and data extraction. This spec minimizes \"AI blindness\" by mandating human-optimized text for status checks and machine-optimized formats for data-intensive operations."
+  ],
+  "rules": [
+    {
+      "requirement": "Diagnostic Priority",
+      "rules": [
+        "AI agents SHALL prioritize text-based output (`--format text`) for all lifecycle status checks, transition attempts, and validation commands to ensure visibility of human-readable blockers and notes."
+      ]
+    },
+    {
+      "requirement": "Data Extraction",
+      "rules": [
+        "AI agents SHALL use machine-optimized formats (`--format json`, `--format toon`) strictly when structured data extraction is required for subsequent tool calls or internal state management."
+      ]
+    },
+    {
+      "requirement": "Repair Strategy",
+      "rules": [
+        "Agents SHALL follow the \"Next Action\" recommendations provided in command outputs before attempting to repeat a failed lifecycle operation."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "Diagnostic Priority",
+      "name": "Agent chooses text format for status checks",
+      "when": ["an AI agent needs to check the current status of a change"],
+      "then": [
+        "it SHALL use specd change status <name> --format text",
+        "AND it MUST NOT use --format json as the primary diagnostic tool"
+      ]
+    },
+    {
+      "requirement": "Data Extraction",
+      "name": "Agent chooses JSON for tool-call preparation",
+      "given": ["an agent needs to retrieve a list of spec IDs to pass to another tool"],
+      "when": ["it executes the status check"],
+      "then": [
+        "it SHALL use --format json or --format toon to ensure robust parsing of the spec ID array"
+      ]
+    },
+    {
+      "requirement": "Repair Strategy",
+      "name": "Agent follows repair guide after transition failure",
+      "given": ["a transition from designing to ready fails with MISSING_ARTIFACT"],
+      "when": ["the CLI output provides a Repair Guide"],
+      "then": [
+        "the agent SHALL execute the recommended command (e.g., /specd-design)",
+        "AND it MUST NOT attempt to force the transition again without addressing the blocker"
+      ]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:67801b77776c7d323676f910c6dad0208632d582e85989c5b8223e6b8a096ae6",
+    "verify.md": "sha256:2602a1f39d36d912c0de8098e73fe70f575fae98a99a7df7e9a77a95b74d6707"
+  },
+  "generatedBy": "core"
+}

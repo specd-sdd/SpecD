@@ -12,28 +12,23 @@ transitions to `done`. If any fail, loops back to implementing.
 ### 1. Load change state
 
 ```bash
-specd change status <name> --format json
+specd change status <name> --format text
 ```
 
-Store `lifecycle.changePath`, `specIds`, and `review` from the response.
+Identify any high-visibility blockers from the **blockers:** section (e.g. `ARTIFACT_DRIFT`,
+`OVERLAP_CONFLICT`, `REVIEW_REQUIRED`) and inform the user. Follow the **next action:**
+command recommendation.
 
-If `review.required` is `true`, this change has artifacts that require review
-before verification can continue. Summarize `review.reason` and
-`review.affectedArtifacts`, then tell the user:
+Extract the `path:` field from the "lifecycle:" section.
+
+If the status output shows `review: required: yes`, tell the user:
 
 > Artifacts need review before verification can continue. Run `/specd-design <name>`.
 
 **Stop — do not continue.**
 
-If not in `implementing`, `verifying`, or `done`, this is the wrong skill. Suggest based on state:
-
-- `drafting` / `designing` → `/specd-design <name>`
-- `ready` → Review artifacts, then approve or continue designing with `/specd-design <name>`
-- `spec-approved` → `/specd-implement <name>`
-- `signed-off` → Check signoff gate and transition to archivable
-- `pending-signoff` → "Signoff pending. Run: `specd change approve signoff <name> --reason ...`"
-- `archivable` → `/specd-archive <name>`
-- `pending-spec-approval` → "Approval pending. Run: `specd change approve spec <name> --reason ...`"
+If not in `implementing`, `verifying`, or `done`, this is the wrong skill.
+Redirect based on the **next action:** `target` recommendation.
 
 **Stop — do not continue.**
 
@@ -54,12 +49,7 @@ Follow guidance.
 specd change transition <name> verifying --skip-hooks all
 ```
 
-If it fails (incomplete tasks), show which items are still `- [ ]` and **stop**, tell the user:
-
-> Cannot transition to verifying — incomplete tasks.
-> Run `/specd-implement <name>` to finish them.
-
-**Stop — do not continue until tasks are done.**
+If it fails, follow the **Repair Guide** output.
 
 **If in `verifying`** (resuming): run pre-hooks but skip the transition:
 
@@ -75,10 +65,10 @@ Continue to step 3.
 ### 3. Load verification context
 
 ```bash
-specd change context <name> verifying --follow-deps --depth 1 --scenarios --format json [--fingerprint <stored-value>]
+specd change context <name> verifying --follow-deps --depth 1 --scenarios --format text [--fingerprint <stored-value>]
 ```
 
-Pass `--fingerprint <stored-value>` if you have a `contextFingerprint` from a previous `change context` call in this conversation (see `shared.md` — "Fingerprint mechanism"). Extract and store the `contextFingerprint` from the response. If you passed a fingerprint and the response is `status: "unchanged"`, use the context already in memory. If `status: "changed"`, update your stored context and fingerprint with the new response.
+Pass `--fingerprint <stored-value>` if you have a `contextFingerprint` from a previous `change context` call in this conversation (see `shared.md` — "Fingerprint mechanism"). If output says `unchanged`, use the context already in memory.
 
 **MUST follow** — project context entries are binding directives. If lazy mode returns
 summary specs, evaluate each one and load any that are relevant to the scenarios you're
@@ -87,29 +77,21 @@ about to verify (see `shared.md` — "Processing `change context` output").
 ### 3b. Get merged specs with deltas applied
 
 For each spec in the change, use `spec-preview` to get the final merged spec content
-with deltas applied. This shows the spec exactly as it will be after archiving:
+with deltas applied:
 
 ```bash
-specd change spec-preview <name> <specId> --format json
+specd change spec-preview <name> <specId> --format toon
 ```
 
-For each spec in `specIds`, run this command and store the result. The merged content
-includes:
-
-- All requirements from the original spec
-- Modifications from the change's deltas
-- New requirements added by the change
-
-This merged view is what you should verify against — not the raw spec files, since
-the deltas change what the final spec will contain.
+This merged view is what you should verify against.
 
 ### 4. Verify each scenario
 
 For each spec in the change, read the merged spec content from step 3b. Then verify
 each scenario against:
 
-1. The **merged spec** (from `spec-preview`) — this shows the final requirements after deltas
-2. The **verification scenarios** in the merged `verify.md` — these define the pass/fail conditions
+1. The **merged spec** (from `spec-preview`)
+2. The **verification scenarios** in the merged `verify.md`
 
 For each scenario:
 
@@ -119,8 +101,7 @@ For each scenario:
 
 ### 5. Run exit hooks — immediately after last scenario verified
 
-The moment all scenarios have been evaluated, run the post-verifying hooks before
-presenting anything to the user or transitioning:
+The moment all scenarios have been evaluated, run the post-verifying hooks:
 
 ```bash
 specd change run-hooks <name> verifying --phase post
@@ -131,36 +112,23 @@ Follow guidance. If hooks fail, fix and re-run.
 
 ### 6. Report results and transition
 
-Present findings to the user:
-
-> **Verification results for `<name>`:**
->
-> | Spec | Scenario | Result    |
-> | ---- | -------- | --------- |
-> | ...  | ...      | PASS/FAIL |
->
-> N/M scenarios pass.
+Present findings to the user.
 
 **If any fail:**
 
 First classify the failure:
 
-- **Implementation-only failure** — the artifacts still describe the desired
-  behavior correctly, and fixing the issue does not require new or changed
-  tasks or design artifacts
-- **Artifact review required** — the desired behavior changed, the artifacts are
-  wrong or incomplete, or fixing the issue requires new or changed tasks,
-  specs, verify scenarios, design, or proposal content
+- **Implementation-only failure** —artifacts still correct
+- **Artifact review required** — desired behavior changed or artifacts wrong
 
 Before choosing a transition, reload status:
 
 ```bash
-specd change status <name> --format json
+specd change status <name> --format text
 ```
 
-If the fresh status shows `review.required = true`, do NOT route back to
-`implementing`. Summarize `review.reason` and `review.affectedArtifacts`, then
-direct the user to `/specd-design <name>` and **stop**.
+If the fresh status shows `review: required: yes`, do NOT route back to
+`implementing`. Tell the user to run `/specd-design <name>` and **stop**.
 
 If this is an implementation-only failure:
 
@@ -168,11 +136,7 @@ If this is an implementation-only failure:
 specd change transition <name> implementing --skip-hooks all
 ```
 
-Tell the user which scenarios failed and suggest:
-
-> Some scenarios failed, but the artifacts remain correct. Run `/specd-implement <name>` to fix the implementation.
-
-**Stop.**
+Tell the user to run `/specd-implement <name>` to fix the implementation. **Stop.**
 
 If this is artifact review required:
 
@@ -180,11 +144,7 @@ If this is artifact review required:
 specd change transition <name> designing --skip-hooks all
 ```
 
-Tell the user which scenarios revealed the issue and suggest:
-
-> Verification showed the artifacts need revision. Run `/specd-design <name>` to review and update them.
-
-**Stop.**
+Tell the user to run `/specd-design <name>` to update them. **Stop.**
 
 **If all pass:** transition through `done` and the signoff gate to reach `archivable`.
 
@@ -212,13 +172,9 @@ specd change hook-instruction <name> done --phase post --format text
 
 #### 6b. Handle signoff gate
 
-```bash
-specd change status <name> --format json
-```
+Run `change status <name> --format text` and check `approvals:` line.
 
-Check `lifecycle.approvals.signoff`:
-
-**If `false`:** no signoff needed — run archivable hooks and transition:
+**If signoff=off:** no signoff needed — run archivable hooks and transition:
 
 ```bash
 specd change run-hooks <name> archivable --phase pre
@@ -236,9 +192,7 @@ specd change run-hooks <name> archivable --phase post
 specd change hook-instruction <name> archivable --phase post --format text
 ```
 
-Follow guidance.
-
-**If `true`:** the transition will route to `pending-signoff`. Tell user:
+**If signoff=on:** transition routes to `pending-signoff`. Tell user:
 
 > Signoff required. Run: `specd change approve signoff <name> --reason "..."`
 > Then: `/specd-archive <name>`
@@ -251,44 +205,22 @@ Follow guidance.
 
 ## Session tasks
 
-Create tasks at the start for session visibility. Update them as you go.
-
-1. `Load state & hooks` — mark done after step 2
-2. `Load verification context` — mark done after step 3
-3. For each spec: `Verify: <specId>` — mark done after all its scenarios are checked
-4. `Report results & transition` — mark done after step 6
-
-Create the per-spec items (step 3) after loading context in step 3.
+1. `Load state & hooks`
+2. `Load verification context`
+3. For each spec: `Verify: <specId>`
+4. `Report results & transition`
 
 ## Handling failed transitions
 
-Any `change transition` command may fail with:
-
-```
-Cannot transition from '<current>' to '<target>'
-```
-
-If this happens, the change is in a different state than expected. Extract `<current>`
-from the error message and redirect using this table:
-
-| Current state                    | Suggest                                                                          |
-| -------------------------------- | -------------------------------------------------------------------------------- |
-| `drafting` / `designing`         | `/specd-design <name>`                                                           |
-| `ready`                          | Review artifacts, then approve or continue designing with `/specd-design <name>` |
-| `implementing` / `spec-approved` | `/specd-implement <name>`                                                        |
-| `verifying`                      | You're already in the right skill — re-read status and retry                     |
-| `done` / `signed-off`            | Check signoff gate and transition to archivable                                  |
-| `pending-signoff`                | "Signoff pending. Run: `specd change approve signoff <name> --reason ...`"       |
-| `archivable`                     | `/specd-archive <name>`                                                          |
-| `pending-spec-approval`          | "Approval pending. Run: `specd change approve spec <name> --reason ...`"         |
+When `change transition` fails, it renders a **Repair Guide** in text mode.
+Follow the recommended repair command based on the target recommendation.
 
 **Stop — do not continue after redirecting.**
 
 ## Returning to design
 
-If during verification you discover that the specs or design are wrong (not just the
-implementation), do not just fail scenarios — surface the root cause to the user. If
-the artifacts themselves need revision and the user agrees:
+If during verification you discover that the artifacts need revision, stop and explain.
+If the user agrees:
 
 ```bash
 specd change transition <name> designing --skip-hooks all
@@ -300,8 +232,7 @@ specd change transition <name> designing --skip-hooks all
 
 ## Guardrails
 
-- Verify against scenarios from the compiled context, not from memory
-- Run actual tests where applicable — don't just inspect code
-- Report each failing scenario with specifics so the user can fix it
-- Any time a fresh `change status` shows `review.required = true`, stop
+- Verify against scenarios from the compiled context
+- Run actual tests where applicable
+- Any time a fresh `change status` shows `review: required: yes`, stop
   verification and redirect to `/specd-design <name>`
