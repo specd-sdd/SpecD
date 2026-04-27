@@ -1035,6 +1035,49 @@ describe('Change', () => {
       c.setArtifact(makeArtifact('tasks', 'complete', ['design']))
       expect(c.effectiveStatus('tasks')).toBe('complete')
     })
+
+    it('returns pending-parent-artifact-review when a dependency is in a review state', () => {
+      const c = makeChange()
+      const proposal = makeArtifact('proposal', 'pending-review')
+      const specs = makeArtifact('specs', 'complete', ['proposal'])
+      c.setArtifact(proposal)
+      c.setArtifact(specs)
+      expect(c.effectiveStatus('specs')).toBe('pending-parent-artifact-review')
+    })
+
+    it('returns pending-parent-artifact-review when a dependency is recursively in review', () => {
+      const c = makeChange()
+      const proposal = makeArtifact('proposal', 'drifted-pending-review')
+      const specs = makeArtifact('specs', 'complete', ['proposal'])
+      const verify = makeArtifact('verify', 'complete', ['specs'])
+      c.setArtifact(proposal)
+      c.setArtifact(specs)
+      c.setArtifact(verify)
+      expect(c.effectiveStatus('verify')).toBe('pending-parent-artifact-review')
+    })
+
+    it('findBlockingParent returns the root cause of a recursive review block', () => {
+      const c = makeChange()
+      const proposal = makeArtifact('proposal', 'pending-review')
+      const specs = makeArtifact('specs', 'complete', ['proposal'])
+      const verify = makeArtifact('verify', 'complete', ['specs'])
+      c.setArtifact(proposal)
+      c.setArtifact(specs)
+      c.setArtifact(verify)
+
+      const blocker = c.findBlockingParent('verify')
+      expect(blocker).toEqual({ artifactId: 'proposal', status: 'pending-review' })
+    })
+
+    it('findBlockingParent returns null if not recursively blocked by review', () => {
+      const c = makeChange()
+      const proposal = makeArtifact('proposal', 'in-progress')
+      const specs = makeArtifact('specs', 'complete', ['proposal'])
+      c.setArtifact(proposal)
+      c.setArtifact(specs)
+
+      expect(c.findBlockingParent('specs')).toBeNull()
+    })
   })
 
   describe('recordArtifactSkipped', () => {

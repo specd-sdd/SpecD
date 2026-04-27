@@ -25,10 +25,23 @@ state:       <state>
 specs:       <specId>, <specId>, ...
 description: <description>            ← only if set
 
-artifacts:
-  <type>  <state>
-    <file-key>  <file-state>  <filename>
+artifacts (DAG):                      ← ASCII tree rendering
+  [✓] complete  [ ] missing  [!] drifted  [~] needs review  [?] in-progress
+
+  [~] proposal [scope: change]
+  └─ [~] specs [scope: spec]
+     ├─ [~] verify [scope: spec]
+     │  └─ [~] design [scope: change]
+     │     └─ [!] tasks [scope: change]
+
+blockers:                             ← High-visibility section for errors
+  ! <CODE>: <message>
   ...
+
+next action:                          ← Direct recommendation
+  target:  <targetStep>
+  command: <command>
+  reason:  <reason>
 
 lifecycle:
   transitions:  <available1>, <available2>, ...    ← only availableTransitions
@@ -47,26 +60,36 @@ review:
     <artifact-type>:
       - <absolute-path>
       - <absolute-path>
+
+artifacts (details):                  ← Detailed file list
+  <type>  <state>
+    <file-key>  <file-state>  <filename>
+  ...
 ```
 
 The `description:` line is omitted when no description is set on the change.
 
-Each artifact line shows the artifact type ID and its persisted aggregate `state`. Under each artifact, the command prints every tracked file with its file key, persisted file `state`, and relative filename. Artifacts are listed in schema-declared order, with file rows in artifact order.
+The `artifacts (DAG):` section renders an ASCII tree of the artifact dependency hierarchy. Each node MUST include a status symbol from the legend and an explicit `[scope: change]` or `[scope: spec]` label. The legend MUST be printed at the top of the DAG.
+
+The status symbols map to aggregate artifact states:
+
+- `[✓]` -> `complete` or `skipped`
+- `[ ]` -> `missing`
+- `[!]` -> `drifted-pending-review`
+- `[~]` -> `pending-review` or `pending-parent-artifact-review`
+- `[?]` -> `in-progress`
+
+The `blockers:` section is a high-visibility list of the `blockers` array returned by `GetStatus`. It lists every blocker code and its descriptive message. This section is omitted when there are no blockers.
+
+The `next action:` section presents the `nextAction` object from `GetStatus`. The `command:` line uses formatting that highlights the command for easy copy-pasting. This section is always present.
 
 The `lifecycle:` section is always present. The `transitions:` line shows only `availableTransitions` (transitions that would succeed now). It is omitted when the list is empty. The `next artifact:` line is omitted when `nextArtifact` is `null`.
-
-If there are blockers, they are shown after the lifecycle section:
-
-```
-blockers:
-  → <transition>: <reason> — <blocking1>, <blocking2>, ...
-```
-
-The `blockers:` section is omitted when there are no blockers.
 
 The `review:` section is omitted when `review.required` is `false`. When present, it summarizes why the change must return through design review. Within that section, affected files are rendered using their absolute paths so an operator or agent can jump directly to the file that needs review. If supplemental `key` data is present, it is secondary and must not replace the path-first rendering.
 
 When `review.reason` is `'spec-overlap-conflict'`, the review section additionally shows an `overlap:` subsection listing each unhandled overlap entry as a bullet with the archived change name and overlapping spec IDs. This subsection is omitted for all other reasons. Multiple entries (from multiple archived changes) are listed newest-first.
+
+The `artifacts (details):` section provides the granular file-level statuses. Each artifact line shows the artifact type ID and its persisted aggregate `state`. Under each artifact, the command prints every tracked file with its file key, persisted file `state`, and relative filename. Artifacts are listed in schema-declared order, with file rows in artifact order.
 
 In `json` or `toon` mode, the output is:
 
@@ -77,6 +100,22 @@ In `json` or `toon` mode, the output is:
   "specIds": ["..."],
   "schema": { "name": "...", "version": 1 },
   "description": "...",
+  "blockers": [{ "code": "...", "message": "..." }],
+  "nextAction": {
+    "targetStep": "...",
+    "actionType": "...",
+    "reason": "...",
+    "command": "..."
+  },
+  "artifactDag": [
+    {
+      "id": "...",
+      "scope": "change|spec",
+      "state": "...",
+      "requires": ["..."],
+      "children": ["..."]
+    }
+  ],
   "artifacts": [
     {
       "type": "...",

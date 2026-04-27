@@ -207,8 +207,8 @@ export class ChangeArtifact {
    * Recomputes the aggregate artifact status from the tracked file states.
    *
    * `drifted-pending-review` takes precedence over `pending-review`, followed
-   * by the steady-state aggregation for skipped, complete, missing, and
-   * in-progress files.
+   * by `pending-parent-artifact-review`, and then the steady-state aggregation
+   * for skipped, complete, missing, and in-progress files.
    */
   private _recomputeStatus(): void {
     if (this._files.size === 0) {
@@ -223,6 +223,10 @@ export class ChangeArtifact {
     }
     if (states.some((state) => state === 'pending-review')) {
       this._status = 'pending-review'
+      return
+    }
+    if (states.some((state) => state === 'pending-parent-artifact-review')) {
+      this._status = 'pending-parent-artifact-review'
       return
     }
     if (states.every((state) => state === 'skipped')) {

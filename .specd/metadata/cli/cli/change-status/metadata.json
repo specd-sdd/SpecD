@@ -1,11 +1,7 @@
 {
   "title": "Change Status",
   "description": "Users and agents need a quick way to see where a change stands — its lifecycle state and which artifacts are done, in progress, or missing. `specd change status <name>` reports the current lifecycle state and artifact statuses of a named change.",
-  "dependsOn": [
-    "cli:cli/entrypoint",
-    "core:core/change",
-    "core:core/get-status"
-  ],
+  "dependsOn": ["cli:cli/entrypoint", "core:core/change", "core:core/get-status"],
   "context": [
     "Users and agents need a quick way to see where a change stands — its lifecycle state and which artifacts are done, in progress, or missing. `specd change status <name>` reports the current lifecycle state and artifact statuses of a named change."
   ],
@@ -19,7 +15,7 @@
     {
       "requirement": "Output format",
       "rules": [
-        "In `text` mode (default), the command prints a structured summary to stdout:\n\n```\nchange:      <name>\nstate:       <state>\nspecs:       <specId>, <specId>, ...\ndescription: <description>            ← only if set\n\nartifacts:\n  <type>  <state>\n    <file-key>  <file-state>  <filename>\n  ...\n\nlifecycle:\n  transitions:  <available1>, <available2>, ...    ← only availableTransitions\n  next artifact: <artifactId>                      ← omitted when null\n  approvals:     spec=on|off  signoff=on|off\n  path:          <changePath>\n\nreview:\n  required:  yes|no\n  route:     designing\n  reason:    artifact-drift|artifact-review-required|spec-overlap-conflict\n  overlap:                                         ← only when reason is spec-overlap-conflict\n    - archived: <name1>, specs: <specId1>, <specId2>\n    - archived: <name2>, specs: <specId3>\n  affected:\n    <artifact-type>:\n      - <absolute-path>\n      - <absolute-path>\n```\n\nThe `description:` line is omitted when no description is set on the change.\n\nEach artifact line shows the artifact type ID and its persisted aggregate `state`. Under each artifact, the command prints every tracked file with its file key, persisted file `state`, and relative filename. Artifacts are listed in schema-declared order, with file rows in artifact order.\n\nThe `lifecycle:` section is always present. The `transitions:` line shows only `availableTransitions` (transitions that would succeed now). It is omitted when the list is empty. The `next artifact:` line is omitted when `nextArtifact` is `null`.\n\nIf there are blockers, they are shown after the lifecycle section:\n\n```\nblockers:\n  → <transition>: <reason> — <blocking1>, <blocking2>, ...\n```\n\nThe `blockers:` section is omitted when there are no blockers.\n\nThe `review:` section is omitted when `review.required` is `false`. When present, it summarizes why the change must return through design review. Within that section, affected files are rendered using their absolute paths so an operator or agent can jump directly to the file that needs review. If supplemental `key` data is present, it is secondary and must not replace the path-first rendering.\n\nWhen `review.reason` is `'spec-overlap-conflict'`, the review section additionally shows an `overlap:` subsection listing each unhandled overlap entry as a bullet with the archived change name and overlapping spec IDs. This subsection is omitted for all other reasons. Multiple entries (from multiple archived changes) are listed newest-first.\n\nIn `json` or `toon` mode, the output is:\n\n```json\n{\n  \"name\": \"...\",\n  \"state\": \"...\",\n  \"specIds\": [\"...\"],\n  \"schema\": { \"name\": \"...\", \"version\": 1 },\n  \"description\": \"...\",\n  \"artifacts\": [\n    {\n      \"type\": \"...\",\n      \"state\": \"pending-review\",\n      \"effectiveStatus\": \"pending-review\",\n      \"files\": [\n        {\n          \"key\": \"...\",\n          \"filename\": \"...\",\n          \"state\": \"drifted-pending-review\"\n        }\n      ]\n    }\n  ],\n  \"review\": {\n    \"required\": true,\n    \"route\": \"designing\",\n    \"reason\": \"artifact-drift|artifact-review-required|spec-overlap-conflict\",\n    \"overlapDetail\": [],\n    \"affectedArtifacts\": [\n      {\n        \"type\": \"specs\",\n        \"files\": [\n          {\n            \"key\": \"core:core/change\",\n            \"filename\": \"deltas/core/core/change/spec.md.delta.yaml\",\n            \"path\": \"/abs/path/.specd/changes/<change>/deltas/core/core/change/spec.md.delta.yaml\"\n          }\n        ]\n      }\n    ]\n  },\n  \"lifecycle\": {\n    \"validTransitions\": [\"...\"],\n    \"availableTransitions\": [\"...\"],\n    \"blockers\": [{ \"transition\": \"...\", \"reason\": \"requires\", \"blocking\": [\"...\"] }],\n    \"approvals\": { \"spec\": false, \"signoff\": false },\n    \"nextArtifact\": \"...\",\n    \"changePath\": \"...\",\n    \"schemaInfo\": { \"name\": \"...\", \"version\": 1 }\n  }\n}\n```\n\n`description` is omitted from the JSON object when not set. The `lifecycle` object is always present. `nextArtifact` is `null` (not omitted) when all artifacts are done.\n\n`overlapDetail` is always present in the JSON `review` object:\n\n- When `review.reason` is `'spec-overlap-conflict'`: an array of `{ archivedChangeName, overlappingSpecIds }` entries ordered newest-first\n- For all other reasons: an empty array `[]`"
+        "In `text` mode (default), the command prints a structured summary to stdout:\n\n```\nchange:      <name>\nstate:       <state>\nspecs:       <specId>, <specId>, ...\ndescription: <description>            ← only if set\n\nartifacts (DAG):                      ← ASCII tree rendering\n  [✓] complete  [ ] missing  [!] drifted  [~] needs review  [?] in-progress\n\n  [~] proposal [scope: change]\n  └─ [~] specs [scope: spec]\n     ├─ [~] verify [scope: spec]\n     │  └─ [~] design [scope: change]\n     │     └─ [!] tasks [scope: change]\n\nblockers:                             ← High-visibility section for errors\n  ! <CODE>: <message>\n  ...\n\nnext action:                          ← Direct recommendation\n  target:  <targetStep>\n  command: <command>\n  reason:  <reason>\n\nlifecycle:\n  transitions:  <available1>, <available2>, ...    ← only availableTransitions\n  next artifact: <artifactId>                      ← omitted when null\n  approvals:     spec=on|off  signoff=on|off\n  path:          <changePath>\n\nreview:\n  required:  yes|no\n  route:     designing\n  reason:    artifact-drift|artifact-review-required|spec-overlap-conflict\n  overlap:                                         ← only when reason is spec-overlap-conflict\n    - archived: <name1>, specs: <specId1>, <specId2>\n    - archived: <name2>, specs: <specId3>\n  affected:\n    <artifact-type>:\n      - <absolute-path>\n      - <absolute-path>\n\nartifacts (details):                  ← Detailed file list\n  <type>  <state>\n    <file-key>  <file-state>  <filename>\n  ...\n```\n\nThe `description:` line is omitted when no description is set on the change.\n\nThe `artifacts (DAG):` section renders an ASCII tree of the artifact dependency hierarchy. Each node MUST include a status symbol from the legend and an explicit `[scope: change]` or `[scope: spec]` label. The legend MUST be printed at the top of the DAG.\n\nThe status symbols map to aggregate artifact states:\n\n- `[✓]` -> `complete` or `skipped`\n- `[ ]` -> `missing`\n- `[!]` -> `drifted-pending-review`\n- `[~]` -> `pending-review` or `pending-parent-artifact-review`\n- `[?]` -> `in-progress`\n\nThe `blockers:` section is a high-visibility list of the `blockers` array returned by `GetStatus`. It lists every blocker code and its descriptive message. This section is omitted when there are no blockers.\n\nThe `next action:` section presents the `nextAction` object from `GetStatus`. The `command:` line uses formatting that highlights the command for easy copy-pasting. This section is always present.\n\nThe `lifecycle:` section is always present. The `transitions:` line shows only `availableTransitions` (transitions that would succeed now). It is omitted when the list is empty. The `next artifact:` line is omitted when `nextArtifact` is `null`.\n\nThe `review:` section is omitted when `review.required` is `false`. When present, it summarizes why the change must return through design review. Within that section, affected files are rendered using their absolute paths so an operator or agent can jump directly to the file that needs review. If supplemental `key` data is present, it is secondary and must not replace the path-first rendering.\n\nWhen `review.reason` is `'spec-overlap-conflict'`, the review section additionally shows an `overlap:` subsection listing each unhandled overlap entry as a bullet with the archived change name and overlapping spec IDs. This subsection is omitted for all other reasons. Multiple entries (from multiple archived changes) are listed newest-first.\n\nThe `artifacts (details):` section provides the granular file-level statuses. Each artifact line shows the artifact type ID and its persisted aggregate `state`. Under each artifact, the command prints every tracked file with its file key, persisted file `state`, and relative filename. Artifacts are listed in schema-declared order, with file rows in artifact order.\n\nIn `json` or `toon` mode, the output is:\n\n```json\n{\n  \"name\": \"...\",\n  \"state\": \"...\",\n  \"specIds\": [\"...\"],\n  \"schema\": { \"name\": \"...\", \"version\": 1 },\n  \"description\": \"...\",\n  \"blockers\": [\n    { \"code\": \"...\", \"message\": \"...\" }\n  ],\n  \"nextAction\": {\n    \"targetStep\": \"...\",\n    \"actionType\": \"...\",\n    \"reason\": \"...\",\n    \"command\": \"...\"\n  },\n  \"artifactDag\": [\n    {\n      \"id\": \"...\",\n      \"scope\": \"change|spec\",\n      \"state\": \"...\",\n      \"requires\": [\"...\"],\n      \"children\": [\"...\"]\n    }\n  ],\n  \"artifacts\": [\n    {\n      \"type\": \"...\",\n      \"state\": \"pending-review\",\n      \"effectiveStatus\": \"pending-review\",\n      \"files\": [\n        {\n          \"key\": \"...\",\n          \"filename\": \"...\",\n          \"state\": \"drifted-pending-review\"\n        }\n      ]\n    }\n  ],\n  \"review\": {\n    \"required\": true,\n    \"route\": \"designing\",\n    \"reason\": \"artifact-drift|artifact-review-required|spec-overlap-conflict\",\n    \"overlapDetail\": [],\n    \"affectedArtifacts\": [\n      {\n        \"type\": \"specs\",\n        \"files\": [\n          {\n            \"key\": \"core:core/change\",\n            \"filename\": \"deltas/core/core/change/spec.md.delta.yaml\",\n            \"path\": \"/abs/path/.specd/changes/<change>/deltas/core/core/change/spec.md.delta.yaml\"\n          }\n        ]\n      }\n    ]\n  },\n  \"lifecycle\": {\n    \"validTransitions\": [\"...\"],\n    \"availableTransitions\": [\"...\"],\n    \"blockers\": [{ \"transition\": \"...\", \"reason\": \"requires\", \"blocking\": [\"...\"] }],\n    \"approvals\": { \"spec\": false, \"signoff\": false },\n    \"nextArtifact\": \"...\",\n    \"changePath\": \"...\",\n    \"schemaInfo\": { \"name\": \"...\", \"version\": 1 }\n  }\n}\n```\n\n`description` is omitted from the JSON object when not set. The `lifecycle` object is always present. `nextArtifact` is `null` (not omitted) when all artifacts are done.\n\n`overlapDetail` is always present in the JSON `review` object:\n\n- When `review.reason` is `'spec-overlap-conflict'`: an array of `{ archivedChangeName, overlappingSpecIds }` entries ordered newest-first\n- For all other reasons: an empty array `[]`"
       ]
     },
     {
@@ -51,12 +47,8 @@
     {
       "requirement": "Command signature",
       "name": "Missing name argument",
-      "when": [
-        "specd change status is run without a positional name"
-      ],
-      "then": [
-        "the command exits with code 1 and prints a usage error to stderr"
-      ]
+      "when": ["specd change status is run without a positional name"],
+      "then": ["the command exits with code 1 and prints a usage error to stderr"]
     },
     {
       "requirement": "Output format",
@@ -65,9 +57,7 @@
         "a change with artifact specs in pending-review",
         "AND one file under specs is drifted-pending-review"
       ],
-      "when": [
-        "specd change status <name> is run"
-      ],
+      "when": ["specd change status <name> is run"],
       "then": [
         "stdout shows the artifact aggregate state",
         "AND it lists the individual file row with drifted-pending-review"
@@ -76,12 +66,8 @@
     {
       "requirement": "Output format",
       "name": "Text output shows review section when review is required",
-      "given": [
-        "GetStatus returns review.required: true"
-      ],
-      "when": [
-        "specd change status <name> is run in text mode"
-      ],
+      "given": ["GetStatus returns review.required: true"],
+      "when": ["specd change status <name> is run in text mode"],
       "then": [
         "stdout includes a review: section",
         "AND it shows the route, reason, and affected absolute file paths"
@@ -90,12 +76,8 @@
     {
       "requirement": "Output format",
       "name": "JSON output includes review and file state",
-      "given": [
-        "a change in designing"
-      ],
-      "when": [
-        "specd change status <name> --format json is run"
-      ],
+      "given": ["a change in designing"],
+      "when": ["specd change status <name> --format json is run"],
       "then": [
         "stdout includes artifacts[].state",
         "AND each artifact includes files[].state",
@@ -106,14 +88,18 @@
     {
       "requirement": "Output format",
       "name": "Review section omitted when not required",
-      "given": [
-        "GetStatus returns review.required: false"
-      ],
-      "when": [
-        "specd change status <name> is run in text mode"
-      ],
+      "given": ["GetStatus returns review.required: false"],
+      "when": ["specd change status <name> is run in text mode"],
+      "then": ["stdout omits the review: section"]
+    },
+    {
+      "requirement": "Output format",
+      "name": "Text output renders Artifact DAG tree",
+      "when": ["specd change status <name> is run in text mode"],
       "then": [
-        "stdout omits the review: section"
+        "stdout includes an artifacts (DAG): section",
+        "AND it renders the artifact dependency tree using ASCII characters",
+        "AND each node includes a status symbol (e.g., [✓], [~]) and a scope label (e.g., [scope: change])"
       ]
     },
     {
@@ -123,9 +109,7 @@
         "GetStatus returns review.required: true with reason: 'spec-overlap-conflict'",
         "AND review.overlapDetail has two entries: [{ archivedChangeName: 'beta', overlappingSpecIds: ['core:core/config'] }, { archivedChangeName: 'alpha', overlappingSpecIds: ['core:core/kernel'] }]"
       ],
-      "when": [
-        "specd change status <name> is run"
-      ],
+      "when": ["specd change status <name> is run"],
       "then": [
         "the review section shows reason: spec-overlap-conflict",
         "AND an overlap: subsection lists both entries as bullets"
@@ -138,12 +122,8 @@
         "GetStatus returns review.required: true with reason: 'spec-overlap-conflict'",
         "AND review.overlapDetail has one entry"
       ],
-      "when": [
-        "specd change status <name> is run"
-      ],
-      "then": [
-        "the overlap subsection shows one bullet with the archived change name and specs"
-      ]
+      "when": ["specd change status <name> is run"],
+      "then": ["the overlap subsection shows one bullet with the archived change name and specs"]
     },
     {
       "requirement": "spec-overlap-conflict review reason display",
@@ -152,9 +132,7 @@
         "GetStatus returns review.required: true with reason: 'spec-overlap-conflict'",
         "AND review.overlapDetail has two entries"
       ],
-      "when": [
-        "specd change status <name> --format json is run"
-      ],
+      "when": ["specd change status <name> --format json is run"],
       "then": [
         "review.overlapDetail is an array with two entries ordered newest-first",
         "AND each entry has archivedChangeName and overlappingSpecIds"
@@ -163,38 +141,22 @@
     {
       "requirement": "spec-overlap-conflict review reason display",
       "name": "JSON output has empty overlapDetail array for other reasons",
-      "given": [
-        "GetStatus returns review.required: true with reason: 'artifact-drift'"
-      ],
-      "when": [
-        "specd change status <name> --format json is run"
-      ],
-      "then": [
-        "review.overlapDetail is []"
-      ]
+      "given": ["GetStatus returns review.required: true with reason: 'artifact-drift'"],
+      "when": ["specd change status <name> --format json is run"],
+      "then": ["review.overlapDetail is []"]
     },
     {
       "requirement": "spec-overlap-conflict review reason display",
       "name": "Overlap subsection omitted in text when reason is not spec-overlap-conflict",
-      "given": [
-        "GetStatus returns review.required: true with reason: 'artifact-review-required'"
-      ],
-      "when": [
-        "specd change status <name> is run"
-      ],
-      "then": [
-        "no overlap: subsection appears in the review section"
-      ]
+      "given": ["GetStatus returns review.required: true with reason: 'artifact-review-required'"],
+      "when": ["specd change status <name> is run"],
+      "then": ["no overlap: subsection appears in the review section"]
     },
     {
       "requirement": "Schema version warning",
       "name": "Schema mismatch",
-      "given": [
-        "the change was created with schema version 1 and the active schema is version 2"
-      ],
-      "when": [
-        "specd change status <name> is run"
-      ],
+      "given": ["the change was created with schema version 1 and the active schema is version 2"],
+      "when": ["specd change status <name> is run"],
       "then": [
         "stderr contains a warning: line mentioning both schema versions",
         "AND the process exits with code 0"
@@ -203,23 +165,14 @@
     {
       "requirement": "Change not found",
       "name": "Unknown change name",
-      "when": [
-        "specd change status nonexistent is run"
-      ],
-      "then": [
-        "the command exits with code 1",
-        "AND stderr contains an error: message"
-      ]
+      "when": ["specd change status nonexistent is run"],
+      "then": ["the command exits with code 1", "AND stderr contains an error: message"]
     },
     {
       "requirement": "Schema-derived fields",
       "name": "JSON output includes artifactDag",
-      "given": [
-        "a change using schema-std"
-      ],
-      "when": [
-        "specd change status <name> --format json is run"
-      ],
+      "given": ["a change using schema-std"],
+      "when": ["specd change status <name> --format json is run"],
       "then": [
         "the JSON output includes schema.artifactDag array",
         "AND each entry includes id, scope, optional, requires, hasTaskCompletionCheck, output"
@@ -228,20 +181,14 @@
     {
       "requirement": "Schema-derived fields",
       "name": "JSON output for non-schema-std also includes artifactDag",
-      "given": [
-        "a change using a custom schema"
-      ],
-      "when": [
-        "specd change status <name> --format json is run"
-      ],
-      "then": [
-        "the JSON output includes schema.artifactDag array"
-      ]
+      "given": ["a change using a custom schema"],
+      "when": ["specd change status <name> --format json is run"],
+      "then": ["the JSON output includes schema.artifactDag array"]
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:084803161d10c3159caae6f8744fa32db60d8858cc467634ef665407a60c8301",
-    "verify.md": "sha256:cb712c93a575c6239abb98718630e564c65c3e74605a587d6151100159be16c8"
+    "spec.md": "sha256:6d6ebe098a0c4c2bdca648f23b390312ce21b7b3e69d6ab59f8224859a3368d9",
+    "verify.md": "sha256:f5d77000488cfa68385b7e346ed64d21fb1c76f98b92ab5a91fa8a2fd381a1df"
   },
   "generatedBy": "core"
 }

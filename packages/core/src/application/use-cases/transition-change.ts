@@ -185,9 +185,12 @@ export class TransitionChange {
         const satisfied = status === 'complete' || status === 'skipped'
         onProgress?.({ type: 'requires-check', artifactId, satisfied })
         if (!satisfied) {
+          const blockedBy = change.findBlockingParent(artifactId)
           throw new InvalidStateTransitionError(change.state, effectiveTarget, {
             type: 'incomplete-artifact',
             artifactId,
+            status,
+            ...(blockedBy ? { blockedBy } : {}),
           })
         }
       }

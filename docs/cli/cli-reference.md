@@ -68,19 +68,15 @@ specd change status <name> [options]
 
 Show the full status of a change: associated specs, artifact file statuses, current lifecycle state, available transitions, and any blockers preventing progression.
 
-`change status` exposes both the aggregate state of each artifact and the
-state of each tracked file inside that artifact. Structured output also includes
-a `review` block so agents can route back to designing without reading the
-manifest directly. Within that block, `affectedArtifacts[].files[]` is projected
-as concrete file entries with `filename`, absolute `path`, and optional
-supplemental `key`; consumers should treat the path as the primary jump target.
+`change status` provides high-visibility diagnostics including:
 
-In JSON mode, the output includes a top-level `schema` object with an
-`artifactDag` array derived from the active schema — each entry has `id`,
-`scope`, `optional`, `requires`, `hasTaskCompletionCheck`, and `output`.
-This allows agents to understand the artifact structure without calling
-`schema show` separately. A top-level `approvalGates` object reports whether
-spec approval and signoff approval are enabled in the project config.
+- **Artifact DAG**: An ASCII tree rendering of the artifact dependency hierarchy, showing the status and scope of each artifact.
+- **Blockers**: A dedicated section listing explicit conditions preventing progress (e.g. `ARTIFACT_DRIFT`, `MISSING_ARTIFACT`).
+- **Next Action**: A direct recommendation of the next step to take, including the suggested command and rationale.
+
+It also exposes both the aggregate state of each artifact and the state of each tracked file inside that artifact. Structured output includes an `artifactDag` array for structural analysis and a `review` block for identifying artifacts that require attention.
+
+In JSON mode, the output includes a `nextAction` object and a `blockers` array. A top-level `approvalGates` object reports whether spec approval and signoff approval are enabled in the project config.
 
 Artifact and file states:
 
@@ -90,6 +86,7 @@ Artifact and file states:
 - `skipped`
 - `pending-review`
 - `drifted-pending-review`
+- `pending-parent-artifact-review` (blocked by upstream review)
 
 | Option                      | Description       |
 | --------------------------- | ----------------- |
@@ -107,6 +104,8 @@ Transition the change to a new lifecycle state. You can either provide an explic
 `<step>` or use `--next` to resolve the next logical forward transition from the
 change's current state.
 
+When a transition fails (e.g. due to missing artifacts or drifted content), the command renders a **Repair Guide** to stdout, providing the blocker codes and a recommended next command to resolve the issue.
+
 `--next` currently resolves:
 
 - `drafting -> designing`
@@ -120,13 +119,6 @@ change's current state.
 The resolved target still goes through the normal `TransitionChange` flow, so
 approval-gate routing, `requires` checks, task completion gating, and hook
 execution behave exactly as they do for an explicit target.
-
-`--next` is not available when the next user action is not another lifecycle
-transition. In particular:
-
-- `pending-spec-approval` fails with an explanation that human spec approval is pending
-- `pending-signoff` fails with an explanation that human signoff is pending
-- `archivable` fails with an explanation that archiving is not a lifecycle transition
 
 | Option                      | Description                                                                                                        |
 | --------------------------- | ------------------------------------------------------------------------------------------------------------------ |
@@ -182,36 +174,21 @@ Edit the spec scope or description of an existing change. At least one of the op
 specd change validate <name> [specPath] [options]
 ```
 
-Validate the artifacts for a change. When `<specPath>` is given, validates only the artifacts for that spec. When `--all` is given, validates every spec in the change. When `--artifact` is given, validates only that artifact.
+Validate the artifacts for a change against the active schema, reporting any violations and marking passing artifacts as complete.
 
-For change-scoped artifacts (e.g., `design`, `tasks`), `<specPath>` can be omitted when using `--artifact` — the command will infer the specPath from the change's first spec.
+For change-scoped artifacts (e.g. `design`, `tasks`), `<specPath>` can be omitted when using `--artifact` — the command will infer the specPath from the change's first spec.
 
-Text output includes per-file path lines from core validation metadata:
+Text output includes per-file status lines:
 
 - `file: <path>` for expected files that were validated or skipped
 - `missing: <path>` for expected files that were required but absent
+- `note: <artifactId> — <description>` for non-blocking optimization hints (e.g. AST/Delta suggestions)
 
 Single-spec and batch text output always append a preview hint:
 
 `note: verify merged output with: specd change spec-preview <change> <specId>`
 
-Structured output (`json` / `toon`) includes a `files` array for each result entry:
-
-```json
-{
-  "passed": true,
-  "failures": [],
-  "warnings": [],
-  "files": [
-    {
-      "artifactId": "specs",
-      "key": "core:core/change-manifest",
-      "filename": "deltas/core/core/change-manifest/spec.md.delta.yaml",
-      "status": "validated"
-    }
-  ]
-}
-```
+Structured output (`json` / `toon`) includes a `notes` array for non-blocking hints and a `files` array for each result entry.
 
 | Option                      | Description                                     |
 | --------------------------- | ----------------------------------------------- |

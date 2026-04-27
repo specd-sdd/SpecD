@@ -82,6 +82,22 @@ Since both hook phases (source.post and target.pre) are fail-fast, a hook failur
 
 If the transition is not valid from the current state, the command exits with code 1 and prints an `error:` message to stderr.
 
+When the transition fails (e.g. `InvalidStateTransitionError`, `HookFailedError`), the command MUST render a **Repair Guide** to stdout:
+
+```
+error: cannot transition to <step>
+! <CODE>: <message>
+
+repair guide:
+  target:  <targetStep>
+  command: <command>
+  reason:  <reason>
+```
+
+The repair guide uses the `nextAction` data from the `GetStatusResult` (which the command SHOULD fetch internally on failure to provide better diagnostics). The `! <CODE>` line uses the blocker codes identified in the `GetStatus` spec (e.g., `MISSING_ARTIFACT`, `ARTIFACT_DRIFT`).
+
+When `format` is `json` or `toon`, the output MUST include a `blockers` array and the `nextAction` object, mirroring the `change status` format.
+
 When the underlying `InvalidStateTransitionError` carries a structured reason explaining that the change is blocked on human approval or signoff, the command MUST surface that explanation in the stderr message rather than collapsing it to a generic invalid-transition message.
 
 When `--next` is invoked from a state where no transition-driven next action exists, the stderr message MUST explain why the command cannot advance automatically from that state.

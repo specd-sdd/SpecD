@@ -3,7 +3,12 @@ import { SpecdError } from './specd-error.js'
 /** Structured reason for why a state transition failed. */
 export type TransitionFailureReason =
   | { readonly type: 'invalid-transition' }
-  | { readonly type: 'incomplete-artifact'; readonly artifactId: string }
+  | {
+      readonly type: 'incomplete-artifact'
+      readonly artifactId: string
+      readonly status?: string
+      readonly blockedBy?: { readonly artifactId: string; readonly status: string }
+    }
   | {
       readonly type: 'incomplete-tasks'
       readonly artifactId: string
@@ -67,8 +72,27 @@ function buildMessage(from: string, to: string, reason?: TransitionFailureReason
       return `${base}: ${approvalRequiredMessage(reason.gate)}`
     case 'gate-not-required':
       return `${base}: ${gateNotRequiredMessage(reason.gate)}`
-    case 'incomplete-artifact':
-      return `${base}: artifact '${reason.artifactId}' is not complete`
+    case 'incomplete-artifact': {
+      const artifact = `'${reason.artifactId}'`
+      switch (reason.status) {
+        case 'missing':
+          return `${base}: artifact ${artifact} is missing`
+        case 'in-progress':
+          return `${base}: artifact ${artifact} is in-progress`
+        case 'pending-review':
+          return `${base}: artifact ${artifact} requires review`
+        case 'drifted-pending-review':
+          return `${base}: artifact ${artifact} content drifted and requires review`
+        case 'pending-parent-artifact-review': {
+          const parent = reason.blockedBy
+            ? `parent '${reason.blockedBy.artifactId}' (${reason.blockedBy.status})`
+            : 'an upstream dependency'
+          return `${base}: artifact ${artifact} is blocked by review of ${parent}`
+        }
+        default:
+          return `${base}: artifact ${artifact} is not complete [status: ${reason.status ?? 'unknown'}]`
+      }
+    }
     case 'incomplete-tasks':
       return `${base}: ${reason.artifactId} has incomplete items (${reason.complete}/${reason.total} tasks complete)`
     case 'invalid-transition':

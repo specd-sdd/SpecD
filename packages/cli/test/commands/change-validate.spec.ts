@@ -85,11 +85,11 @@ describe('change validate', () => {
     expect(stdout()).toContain('specd change spec-preview feat default:auth/login')
   })
 
-  it('writes warnings to stdout with pass message', async () => {
+  it('writes notes to stdout with pass message', async () => {
     const { kernel, stdout } = setup()
     kernel.changes.validate.execute.mockResolvedValue({
       failures: [],
-      warnings: [{ artifactId: 'design', description: 'incomplete section' }],
+      notes: [{ artifactId: 'design', description: 'incomplete section' }],
       files: [],
     })
 
@@ -98,14 +98,14 @@ describe('change validate', () => {
     await program.parseAsync(['node', 'specd', 'change', 'validate', 'feat', 'auth/login'])
 
     const out = stdout()
-    expect(out).toContain('pass (1 warning(s))')
-    expect(out).toContain('warning: design')
+    expect(out).toContain('pass (1 note(s))')
+    expect(out).toContain('note: design')
     expect(out).toContain('incomplete section')
   })
 
   it('outputs JSON with passed flag', async () => {
     const { kernel, stdout } = setup()
-    kernel.changes.validate.execute.mockResolvedValue({ failures: [], warnings: [], files: [] })
+    kernel.changes.validate.execute.mockResolvedValue({ failures: [], notes: [], files: [] })
 
     const program = makeProgram()
     registerChangeValidate(program.command('change'))
@@ -123,7 +123,7 @@ describe('change validate', () => {
     const parsed = JSON.parse(stdout())
     expect(parsed.passed).toBe(true)
     expect(Array.isArray(parsed.failures)).toBe(true)
-    expect(Array.isArray(parsed.warnings)).toBe(true)
+    expect(Array.isArray(parsed.notes)).toBe(true)
     expect(Array.isArray(parsed.files)).toBe(true)
     expect(parsed.name).toBeUndefined()
   })

@@ -77,6 +77,26 @@ export interface ReviewSummary {
   readonly overlapDetail: readonly ReviewOverlapEntry[]
 }
 
+/** Describes a specific condition blocking lifecycle progress. */
+export interface Blocker {
+  /** Machine-readable blocker code (e.g. 'ARTIFACT_DRIFT', 'MISSING_ARTIFACT'). */
+  readonly code: string
+  /** Human-readable explanation of the blocker. */
+  readonly message: string
+}
+
+/** A recommended next step for the user or agent. */
+export interface NextAction {
+  /** The lifecycle step this action targets. */
+  readonly targetStep: ChangeState
+  /** Whether the action requires human/agent thought or is purely mechanical. */
+  readonly actionType: 'cognitive' | 'mechanical'
+  /** Human-readable rationale for the recommendation. */
+  readonly reason: string
+  /** The recommended CLI command or skill to run. */
+  readonly command: string | null
+}
+
 /** Describes why a structurally valid transition is not currently available. */
 export interface TransitionBlocker {
   /** The blocked target state. */
@@ -102,9 +122,11 @@ export interface LifecycleContext {
   /** Filesystem path to the change directory. */
   readonly changePath: string
   /** Active schema name, version and artifacts, or null when schema resolution fails. */
-  readonly schemaInfo:
-    | { readonly name: string; readonly version: number; readonly artifacts: readonly ArtifactType[] }
-    | null
+  readonly schemaInfo: {
+    readonly name: string
+    readonly version: number
+    readonly artifacts: readonly ArtifactType[]
+  } | null
 }
 
 /** Result returned by the {@link GetStatus} use case. */
@@ -117,6 +139,10 @@ export interface GetStatusResult {
   readonly lifecycle: LifecycleContext
   /** Whether validated artifacts require review before continuing. */
   readonly review: ReviewSummary
+  /** High-visibility blockers preventing progress. */
+  readonly blockers: readonly Blocker[]
+  /** Recommended next action. */
+  readonly nextAction: NextAction
 }
 
 /**
@@ -205,7 +231,7 @@ export class GetStatus {
 
     // 3. Available transitions and blockers
     const availableTransitions: ChangeState[] = []
-    const blockers: TransitionBlocker[] = []
+    const transitionBlockers: TransitionBlocker[] = []
 
     if (schema !== null) {
       for (const target of validTransitions) {
@@ -224,7 +250,7 @@ export class GetStatus {
         if (blocking.length === 0) {
           availableTransitions.push(target)
         } else {
-          blockers.push({ transition: target, reason: 'requires', blocking })
+          transitionBlockers.push({ transition: target, reason: 'requires', blocking })
         }
       }
     }
@@ -251,14 +277,132 @@ export class GetStatus {
     const lifecycle: LifecycleContext = {
       validTransitions,
       availableTransitions,
-      blockers,
+      blockers: transitionBlockers,
       approvals: this._approvals,
       nextArtifact,
       changePath,
       schemaInfo,
     }
 
-    return { change, artifactStatuses, lifecycle, review }
+    const blockers = this._deriveBlockers(review, transitionBlockers, change)
+    const nextAction = this._deriveNextAction(change.state, review, availableTransitions)
+
+    return { change, artifactStatuses, lifecycle, review, blockers, nextAction }
+  }
+
+  /**
+   * Identifies explicit blockers that prevent lifecycle progression.
+   *
+   * @param review - Current review summary
+   * @param transitionBlockers - Structural transition blockers
+   * @param change - Loaded change entity
+   * @returns Array of active blockers
+   */
+  private _deriveBlockers(
+    review: ReviewSummary,
+    transitionBlockers: TransitionBlocker[],
+    change: Change,
+  ): Blocker[] {
+    const blockers: Blocker[] = []
+
+    if (review.reason === 'artifact-drift') {
+      blockers.push({
+        code: 'ARTIFACT_DRIFT',
+        message: 'Validated artifact content drifted from disk',
+      })
+    } else if (review.reason === 'spec-overlap-conflict') {
+      blockers.push({
+        code: 'OVERLAP_CONFLICT',
+        message: 'Conflict detected with archived overlapping specs',
+      })
+    } else if (review.reason === 'artifact-review-required') {
+      blockers.push({
+        code: 'REVIEW_REQUIRED',
+        message: 'Artifacts require review before proceeding',
+      })
+    }
+
+    // Identify missing required artifacts for next step
+    const nextStepBlocker = transitionBlockers.find((b) => b.reason === 'requires')
+    if (nextStepBlocker) {
+      for (const artifactId of nextStepBlocker.blocking) {
+        const artifact = change.getArtifact(artifactId)
+        if (!artifact || artifact.status === 'missing' || artifact.status === 'in-progress') {
+          blockers.push({
+            code: 'MISSING_ARTIFACT',
+            message: `Required artifact '${artifactId}' is incomplete`,
+          })
+        }
+      }
+    }
+
+    return blockers
+  }
+
+  /**
+   * Recommends the next action to guide the agent or user.
+   *
+   * @param state - Current change state
+   * @param review - Current review summary
+   * @param availableTransitions - Transitions currently available
+   * @returns NextAction recommendation
+   */
+  private _deriveNextAction(
+    state: ChangeState,
+    review: ReviewSummary,
+    availableTransitions: ChangeState[],
+  ): NextAction {
+    if (review.required) {
+      return {
+        targetStep: state,
+        actionType: 'cognitive',
+        reason: review.reason ?? 'Review required',
+        command: '/specd-design',
+      }
+    }
+
+    if (state === 'drafting' || state === 'designing') {
+      return {
+        targetStep: 'designing',
+        actionType: 'cognitive',
+        reason: 'Elaborating design artifacts',
+        command: '/specd-design',
+      }
+    }
+
+    if (state === 'ready' && availableTransitions.includes('implementing')) {
+      return {
+        targetStep: 'implementing',
+        actionType: 'mechanical',
+        reason: 'Design complete, ready to implement',
+        command: '/specd-implement',
+      }
+    }
+
+    if (state === 'implementing') {
+      return {
+        targetStep: 'implementing',
+        actionType: 'cognitive',
+        reason: 'Implementing planned tasks',
+        command: '/specd-implement',
+      }
+    }
+
+    if (state === 'verifying') {
+      return {
+        targetStep: 'verifying',
+        actionType: 'mechanical',
+        reason: 'Verifying implementation against scenarios',
+        command: '/specd-verify',
+      }
+    }
+
+    return {
+      targetStep: state,
+      actionType: 'cognitive',
+      reason: 'Proceed to next lifecycle step',
+      command: null,
+    }
   }
 
   /**

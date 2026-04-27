@@ -47,7 +47,14 @@ When neither approval-gate routing condition is met, the use case MUST transitio
 
 ### Requirement: Workflow requires enforcement
 
-After resolving the effective target, the use case MUST obtain the active schema via `SchemaProvider` and look up the workflow step for the effective target via `schema.workflowStep(effectiveTarget)`. If the step declares a non-empty `requires` array, the use case MUST check `change.effectiveStatus(artifactId)` for each required artifact ID. If any required artifact has an effective status other than `complete` or `skipped`, the use case MUST throw `InvalidStateTransitionError` with reason `incomplete-artifact` and the blocking artifact ID.
+After resolving the effective target, the use case MUST obtain the active schema via `SchemaProvider` and look up the workflow step for the effective target via `schema.workflowStep(effectiveTarget)`. If the step declares a non-empty `requires` array, the use case MUST check `change.effectiveStatus(artifactId)` for each required artifact ID. If any required artifact has an effective status other than `complete` or `skipped`, the use case MUST throw `InvalidStateTransitionError` with a structured reason explaining the block.
+
+The error reason MUST include:
+
+- `type`: `'incomplete-artifact'`
+- `artifactId`: The ID of the blocking artifact.
+- `status`: The artifact's current effective status (e.g. `'drifted-pending-review'`, `'pending-parent-artifact-review'`).
+- `blockedBy`: (Optional) If the status is `'pending-parent-artifact-review'`, this MUST include the ID and status of the first upstream parent in the DAG that is causing the recursive block.
 
 If no workflow step exists for the effective target (the schema does not declare one), or the schema cannot be resolved, the requires check is skipped.
 

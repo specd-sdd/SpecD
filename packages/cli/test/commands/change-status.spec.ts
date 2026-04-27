@@ -25,7 +25,14 @@ const defaultLifecycle = {
   approvals: { spec: false, signoff: false },
   nextArtifact: null,
   changePath: '.specd/changes/20260115-100000-my-change',
-  schemaInfo: { name: '@specd/schema-std', version: 1 },
+  schemaInfo: { name: '@specd/schema-std', version: 1, artifacts: [] },
+}
+
+const defaultNextAction = {
+  targetStep: 'designing',
+  actionType: 'cognitive',
+  reason: '...',
+  command: '/specd-design',
 }
 
 function setup() {
@@ -66,6 +73,8 @@ describe('Output format', () => {
         { type: 'proposal', state: 'complete', effectiveStatus: 'complete', files: [] },
       ],
       lifecycle: { ...defaultLifecycle, nextArtifact: 'specs' },
+      blockers: [],
+      nextAction: defaultNextAction,
     })
 
     const program = makeProgram()
@@ -95,6 +104,8 @@ describe('Output format', () => {
         { type: 'spec', state: 'in-progress', effectiveStatus: 'in-progress', files: [] },
       ],
       lifecycle: defaultLifecycle,
+      blockers: [],
+      nextAction: defaultNextAction,
     })
 
     const program = makeProgram()
@@ -103,8 +114,9 @@ describe('Output format', () => {
 
     const out = stdout()
     const lines = out.split('\n')
-    const specLine = lines.find((l: string) => l.includes('spec') && !l.includes('specs:'))
-    expect(specLine).toContain('in-progress')
+    // Look for the artifact detail line, not the next action command
+    const artifactLine = lines.find((l: string) => l.startsWith('  spec  '))
+    expect(artifactLine).toContain('in-progress')
   })
 
   it('Text output shows available transitions', async () => {
@@ -114,6 +126,8 @@ describe('Output format', () => {
       change,
       artifactStatuses: [],
       lifecycle: { ...defaultLifecycle, availableTransitions: ['ready', 'designing'] },
+      blockers: [],
+      nextAction: defaultNextAction,
     })
 
     const program = makeProgram()
@@ -132,6 +146,8 @@ describe('Output format', () => {
       change,
       artifactStatuses: [],
       lifecycle: { ...defaultLifecycle, availableTransitions: [] },
+      blockers: [],
+      nextAction: defaultNextAction,
     })
 
     const program = makeProgram()
@@ -152,6 +168,8 @@ describe('Output format', () => {
         ...defaultLifecycle,
         blockers: [{ transition: 'ready', reason: 'requires', blocking: ['specs', 'verify'] }],
       },
+      blockers: [{ code: 'MISSING_ARTIFACT', message: "Required artifact 'specs' is missing" }],
+      nextAction: defaultNextAction,
     })
 
     const program = makeProgram()
@@ -160,9 +178,8 @@ describe('Output format', () => {
 
     const out = stdout()
     expect(out).toContain('blockers:')
-    expect(out).toContain('ready')
-    expect(out).toContain('requires')
-    expect(out).toContain('specs, verify')
+    expect(out).toContain('! MISSING_ARTIFACT')
+    expect(out).toContain("Required artifact 'specs' is missing")
   })
 
   it('Text output shows next artifact', async () => {
@@ -172,6 +189,8 @@ describe('Output format', () => {
       change,
       artifactStatuses: [],
       lifecycle: { ...defaultLifecycle, nextArtifact: 'specs' },
+      blockers: [],
+      nextAction: defaultNextAction,
     })
 
     const program = makeProgram()
@@ -189,6 +208,8 @@ describe('Output format', () => {
       change,
       artifactStatuses: [],
       lifecycle: { ...defaultLifecycle, nextArtifact: null },
+      blockers: [],
+      nextAction: defaultNextAction,
     })
 
     const program = makeProgram()
@@ -218,6 +239,8 @@ describe('Output format', () => {
         nextArtifact: 'specs',
         blockers: [{ transition: 'ready', reason: 'requires', blocking: ['specs'] }],
       },
+      blockers: [],
+      nextAction: defaultNextAction,
     })
 
     const program = makeProgram()
@@ -253,8 +276,10 @@ describe('Schema version warning', () => {
       artifactStatuses: [],
       lifecycle: {
         ...defaultLifecycle,
-        schemaInfo: { name: '@specd/schema-std', version: 2 },
+        schemaInfo: { name: '@specd/schema-std', version: 2, artifacts: [] },
       },
+      blockers: [],
+      nextAction: defaultNextAction,
     })
 
     const program = makeProgram()
@@ -290,6 +315,8 @@ describe('Overlap conflict display', () => {
       change,
       artifactStatuses: [],
       lifecycle: defaultLifecycle,
+      blockers: [],
+      nextAction: defaultNextAction,
       review: {
         required: true,
         route: 'designing',
@@ -324,6 +351,8 @@ describe('Overlap conflict display', () => {
       change,
       artifactStatuses: [],
       lifecycle: defaultLifecycle,
+      blockers: [],
+      nextAction: defaultNextAction,
       review: {
         required: true,
         route: 'designing',
@@ -358,6 +387,8 @@ describe('Overlap conflict display', () => {
       change,
       artifactStatuses: [],
       lifecycle: defaultLifecycle,
+      blockers: [],
+      nextAction: defaultNextAction,
       review: {
         required: false,
         route: null,
@@ -381,5 +412,88 @@ describe('Overlap conflict display', () => {
 
     const parsed = JSON.parse(stdout())
     expect(parsed.review.overlapDetail).toEqual([])
+  })
+})
+
+describe('Artifact DAG rendering', () => {
+  it('renders a simple tree with correct indentation and connectors', async () => {
+    const { kernel, stdout } = setup()
+    const change = makeMockChange({ name: 'my-change', state: 'designing' })
+
+    kernel.changes.status.execute.mockResolvedValue({
+      change,
+      artifactStatuses: [
+        { type: 'proposal', state: 'complete', effectiveStatus: 'complete', files: [] },
+        { type: 'design', state: 'complete', effectiveStatus: 'complete', files: [] },
+        { type: 'tasks', state: 'missing', effectiveStatus: 'missing', files: [] },
+      ],
+      blockers: [],
+      nextAction: defaultNextAction,
+      lifecycle: {
+        ...defaultLifecycle,
+        schemaInfo: {
+          name: 'test-schema',
+          version: 1,
+          artifacts: [
+            { id: 'proposal', scope: 'change', requires: [] },
+            { id: 'design', scope: 'spec', requires: ['proposal'] },
+            { id: 'tasks', scope: 'spec', requires: ['design'] },
+          ],
+        },
+      },
+    })
+
+    const program = makeProgram()
+    registerChangeStatus(program.command('change'))
+    await program.parseAsync(['node', 'specd', 'change', 'status', 'my-change'])
+
+    const out = stdout()
+    expect(out).toContain('artifacts (DAG):')
+
+    // Check tree structure
+    const lines = out.split('\n')
+    const dagStart = lines.findIndex((l: string) => l.includes('artifacts (DAG):'))
+    const dagLines = lines.slice(dagStart + 3, dagStart + 6)
+
+    expect(dagLines[0]).toMatch(/\[✓\] proposal \[scope: change\]/)
+    expect(dagLines[1]).toMatch(/└── \[✓\] design \[scope: spec\]/)
+    expect(dagLines[2]).toMatch(/    └── \[ \] tasks \[scope: spec\]/)
+  })
+
+  it('renders multiple roots and branches correctly', async () => {
+    const { kernel, stdout } = setup()
+    const change = makeMockChange({ name: 'my-change', state: 'designing' })
+
+    kernel.changes.status.execute.mockResolvedValue({
+      change,
+      artifactStatuses: [
+        { type: 'A', state: 'complete', effectiveStatus: 'complete', files: [] },
+        { type: 'B', state: 'complete', effectiveStatus: 'complete', files: [] },
+        { type: 'C', state: 'complete', effectiveStatus: 'complete', files: [] },
+      ],
+      blockers: [],
+      nextAction: defaultNextAction,
+      lifecycle: {
+        ...defaultLifecycle,
+        schemaInfo: {
+          name: 'test-schema',
+          version: 1,
+          artifacts: [
+            { id: 'A', scope: 'change', requires: [] },
+            { id: 'B', scope: 'change', requires: [] },
+            { id: 'C', scope: 'spec', requires: ['A'] },
+          ],
+        },
+      },
+    })
+
+    const program = makeProgram()
+    registerChangeStatus(program.command('change'))
+    await program.parseAsync(['node', 'specd', 'change', 'status', 'my-change'])
+
+    const out = stdout()
+    expect(out).toMatch(/\[✓\] A \[scope: change\]/)
+    expect(out).toMatch(/└── \[✓\] C \[scope: spec\]/)
+    expect(out).toMatch(/\[✓\] B \[scope: change\]/)
   })
 })

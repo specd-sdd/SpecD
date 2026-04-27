@@ -98,6 +98,14 @@
 - **THEN** the command exits with code 1
 - **AND** stderr contains an `error:` message explaining that the change is waiting for human signoff
 
+#### Scenario: Transition failure renders Repair Guide
+
+- **GIVEN** a transition to `ready` fails because an artifact is missing
+- **WHEN** the command is run in text mode
+- **THEN** it prints an error message to stderr
+- **AND** it renders a `repair guide:` section to stdout
+- **AND** the guide includes the blocker code (e.g., `! MISSING_ARTIFACT`) and the recommended command
+
 ### Requirement: Incomplete tasks error
 
 #### Scenario: Unchecked checkboxes block verifying

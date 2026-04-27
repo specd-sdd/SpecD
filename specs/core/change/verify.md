@@ -190,6 +190,13 @@
 - **THEN** the file state becomes `complete`
 - **AND** the parent artifact state is recomputed
 
+#### Scenario: Artifact aggregate status is pending-parent-artifact-review
+
+- **GIVEN** an artifact with all files in `complete` state
+- **AND** the artifact depends on a parent artifact that is `pending-review`
+- **WHEN** the artifact aggregate state is computed
+- **THEN** the artifact state SHALL be `pending-parent-artifact-review`
+
 ### Requirement: History and event sourcing
 
 #### Scenario: History is append-only

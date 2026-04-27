@@ -14,8 +14,8 @@ interface ValidateFailure {
   readonly filename?: string
 }
 
-/** Structured validation warning entry emitted by core validation. */
-interface ValidateWarning {
+/** Structured validation note entry emitted by core validation. */
+interface ValidateNote {
   readonly artifactId: string
   readonly description: string
 }
@@ -32,7 +32,7 @@ interface ValidationFileEntry {
 interface ValidateResult {
   readonly passed: boolean
   readonly failures: ValidateFailure[]
-  readonly warnings: ValidateWarning[]
+  readonly notes: ValidateNote[]
   readonly files: ValidationFileEntry[]
 }
 
@@ -54,7 +54,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  */
 function toValidateResult(value: unknown): ValidateResult {
   if (!isRecord(value)) {
-    return { passed: false, failures: [], warnings: [], files: [] }
+    return { passed: false, failures: [], notes: [], files: [] }
   }
 
   const failures: ValidateFailure[] = Array.isArray(value['failures'])
@@ -72,17 +72,18 @@ function toValidateResult(value: unknown): ValidateResult {
         .filter((entry): entry is ValidateFailure => entry !== null)
     : []
 
-  const warnings: ValidateWarning[] = Array.isArray(value['warnings'])
-    ? value['warnings']
-        .map((entry): ValidateWarning | null => {
-          if (!isRecord(entry)) return null
-          const artifactId = entry['artifactId']
-          const description = entry['description']
-          if (typeof artifactId !== 'string' || typeof description !== 'string') return null
-          return { artifactId, description }
-        })
-        .filter((entry): entry is ValidateWarning => entry !== null)
-    : []
+  const notes: ValidateNote[] =
+    Array.isArray(value['warnings']) || Array.isArray(value['notes'])
+      ? ((value['notes'] ?? value['warnings']) as unknown[])
+          .map((entry): ValidateNote | null => {
+            if (!isRecord(entry)) return null
+            const artifactId = entry['artifactId']
+            const description = entry['description']
+            if (typeof artifactId !== 'string' || typeof description !== 'string') return null
+            return { artifactId, description }
+          })
+          .filter((entry): entry is ValidateNote => entry !== null)
+      : []
 
   const files: ValidationFileEntry[] = Array.isArray(value['files'])
     ? value['files']
@@ -108,7 +109,7 @@ function toValidateResult(value: unknown): ValidateResult {
     : []
 
   const passed = typeof value['passed'] === 'boolean' ? value['passed'] : failures.length === 0
-  return { passed, failures, warnings, files }
+  return { passed, failures, notes, files }
 }
 
 /**
@@ -134,7 +135,7 @@ JSON/TOON output schema:
   {
     passed: boolean
     failures: Array<{ artifactId: string, description: string, filename?: string }>
-    warnings: Array<{ artifactId: string, description: string }>
+    notes: Array<{ artifactId: string, description: string }>
     files: Array<{ artifactId: string, key: string, filename: string, status: "validated" | "missing" | "skipped" }>
   }
 `,
@@ -233,12 +234,10 @@ async function executeSingle(
     const previewNote = `note: verify merged output with: specd change spec-preview ${name} ${fullSpecPath}`
 
     if (passed) {
-      if (result.warnings.length > 0) {
-        const warningLines = result.warnings.map(
-          (w) => `warning: ${w.artifactId} — ${w.description}`,
-        )
+      if (result.notes.length > 0) {
+        const noteLines = result.notes.map((n) => `note: ${n.artifactId} — ${n.description}`)
         output(
-          `validated ${name}/${fullSpecPath}: pass (${result.warnings.length} warning(s))\n${[...fileLines, ...warningLines, previewNote].join('\n')}`,
+          `validated ${name}/${fullSpecPath}: pass (${result.notes.length} note(s))\n${[...fileLines, ...noteLines, previewNote].join('\n')}`,
           'text',
         )
       } else {
@@ -249,10 +248,8 @@ async function executeSingle(
       }
     } else {
       const errorLines = result.failures.map((f) => `  error: ${f.artifactId} — ${f.description}`)
-      const warningLines = result.warnings.map(
-        (w) => `  warning: ${w.artifactId} — ${w.description}`,
-      )
-      const allLines = [...fileLines, ...errorLines, ...warningLines, previewNote]
+      const noteLines = result.notes.map((n) => `  note: ${n.artifactId} — ${n.description}`)
+      const allLines = [...fileLines, ...errorLines, ...noteLines, previewNote]
       output(`validation failed ${name}/${fullSpecPath}:\n${allLines.join('\n')}`, 'text')
       process.exitCode = 1
     }
@@ -261,7 +258,7 @@ async function executeSingle(
       {
         passed,
         failures: result.failures,
-        warnings: result.warnings,
+        notes: result.notes,
         files: result.files,
       },
       fmt,
@@ -303,7 +300,7 @@ async function executeBatch(
     spec: string
     passed: boolean
     failures: ValidateFailure[]
-    warnings: ValidateWarning[]
+    notes: ValidateNote[]
     files: readonly ValidationFileEntry[]
   }> = []
   let totalPassed = 0
@@ -323,7 +320,7 @@ async function executeBatch(
       spec: specId,
       passed,
       failures: result.failures,
-      warnings: result.warnings,
+      notes: result.notes,
       files: result.files,
     })
   }
@@ -339,10 +336,10 @@ async function executeBatch(
       const previewNote = `note: verify merged output with: specd change spec-preview ${name} ${r.spec}`
 
       if (r.passed) {
-        if (r.warnings.length > 0) {
-          const warningLines = r.warnings.map((w) => `warning: ${w.artifactId} — ${w.description}`)
+        if (r.notes.length > 0) {
+          const noteLines = r.notes.map((n) => `note: ${n.artifactId} — ${n.description}`)
           output(
-            `validated ${name}/${r.spec}: pass (${r.warnings.length} warning(s))\n${[...fileLines, ...warningLines, previewNote].join('\n')}`,
+            `validated ${name}/${r.spec}: pass (${r.notes.length} note(s))\n${[...fileLines, ...noteLines, previewNote].join('\n')}`,
             'text',
           )
         } else {
@@ -353,8 +350,8 @@ async function executeBatch(
         }
       } else {
         const errorLines = r.failures.map((f) => `  error: ${f.artifactId} — ${f.description}`)
-        const warningLines = r.warnings.map((w) => `  warning: ${w.artifactId} — ${w.description}`)
-        const allLines = [...fileLines, ...errorLines, ...warningLines, previewNote]
+        const noteLines = r.notes.map((n) => `  note: ${n.artifactId} — ${n.description}`)
+        const allLines = [...fileLines, ...errorLines, ...noteLines, previewNote]
         output(`validation failed ${name}/${r.spec}:\n${allLines.join('\n')}`, 'text')
       }
     }

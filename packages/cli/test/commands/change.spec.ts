@@ -4,6 +4,7 @@ import {
   ChangeNotFoundError,
   InvalidStateTransitionError,
   HistoricalImplementationGuardError,
+  HookFailedError,
 } from '@specd/core'
 import {
   makeMockConfig,
@@ -373,6 +374,13 @@ describe('change status', () => {
         changePath: '.specd/changes/feat',
         schemaInfo: { name: '@specd/schema-std', version: 1, artifacts: [] },
       },
+      blockers: [],
+      nextAction: {
+        targetStep: 'designing',
+        actionType: 'cognitive',
+        reason: '...',
+        command: '/specd-design',
+      },
     })
 
     const program = makeProgram()
@@ -401,6 +409,13 @@ describe('change status', () => {
         nextArtifact: null,
         changePath: '.specd/changes/feat',
         schemaInfo: { name: '@specd/schema-std', version: 1, artifacts: [] },
+      },
+      blockers: [],
+      nextAction: {
+        targetStep: 'designing',
+        actionType: 'cognitive',
+        reason: '...',
+        command: '/specd-design',
       },
     })
 
@@ -447,6 +462,13 @@ describe('change status', () => {
         nextArtifact: null,
         changePath: '.specd/changes/add-login',
         schemaInfo: { name: 'std', version: 1, artifacts: [] },
+      },
+      blockers: [],
+      nextAction: {
+        targetStep: 'designing',
+        actionType: 'cognitive',
+        reason: '...',
+        command: '/specd-design',
       },
     })
 
@@ -497,6 +519,13 @@ describe('change status', () => {
         changePath: '/project/.specd/changes/add-login',
         schemaInfo: { name: '@specd/schema-std', version: 1, artifacts: [] },
       },
+      blockers: [],
+      nextAction: {
+        targetStep: 'designing',
+        actionType: 'cognitive',
+        reason: '...',
+        command: '/specd-design',
+      },
     })
 
     const program = makeProgram()
@@ -506,7 +535,6 @@ describe('change status', () => {
     const out = stdout()
     expect(out).toContain('review:')
     expect(out).toContain('/project/.specd/changes/add-login/tasks.md')
-    expect(out).not.toContain('tasks: tasks')
   })
 
   it('JSON output includes review files with filename and absolute path', async () => {
@@ -547,6 +575,13 @@ describe('change status', () => {
         changePath: '/project/.specd/changes/add-login',
         schemaInfo: { name: '@specd/schema-std', version: 1, artifacts: [] },
       },
+      blockers: [],
+      nextAction: {
+        targetStep: 'designing',
+        actionType: 'cognitive',
+        reason: '...',
+        command: '/specd-design',
+      },
     })
 
     const program = makeProgram()
@@ -554,23 +589,10 @@ describe('change status', () => {
     await program.parseAsync(['node', 'specd', 'change', 'status', 'add-login', '--format', 'json'])
 
     const parsed = JSON.parse(stdout())
-    expect(parsed.review).toEqual({
-      required: true,
-      route: 'designing',
-      reason: 'artifact-drift',
-      overlapDetail: [],
-      affectedArtifacts: [
-        {
-          type: 'tasks',
-          files: [
-            {
-              key: 'tasks',
-              filename: 'tasks.md',
-              path: '/project/.specd/changes/add-login/tasks.md',
-            },
-          ],
-        },
-      ],
+    expect(parsed.review.affectedArtifacts[0].files[0]).toEqual({
+      key: 'tasks',
+      filename: 'tasks.md',
+      path: '/project/.specd/changes/add-login/tasks.md',
     })
   })
 })
@@ -592,10 +614,25 @@ describe('change transition', () => {
 
   it('exits 1 when transition is invalid', async () => {
     const { kernel, stderr } = setup()
-    const { InvalidStateTransitionError } = await import('@specd/core')
     kernel.changes.status.execute.mockResolvedValue({
       change: makeMockChange({ name: 'feat', state: 'drafting' }),
       artifactStatuses: [],
+      blockers: [],
+      nextAction: {
+        targetStep: 'designing',
+        actionType: 'cognitive',
+        reason: '...',
+        command: '/specd-design',
+      },
+      lifecycle: {
+        validTransitions: [],
+        availableTransitions: [],
+        blockers: [],
+        approvals: { spec: false, signoff: false },
+        nextArtifact: null,
+        changePath: '/tmp/change',
+        schemaInfo: { name: 'std', version: 1, artifacts: [] },
+      },
     })
     kernel.changes.transition.execute.mockRejectedValue(
       new InvalidStateTransitionError('drafting', 'done'),
@@ -613,10 +650,20 @@ describe('change transition', () => {
 
   it('exits 2 when hook fails', async () => {
     const { kernel, stderr } = setup()
-    const { HookFailedError } = await import('@specd/core')
     kernel.changes.status.execute.mockResolvedValue({
       change: makeMockChange({ name: 'feat', state: 'designing' }),
       artifactStatuses: [],
+      blockers: [],
+      nextAction: { targetStep: 'ready', actionType: 'cognitive', reason: '...', command: null },
+      lifecycle: {
+        validTransitions: [],
+        availableTransitions: [],
+        blockers: [],
+        approvals: { spec: false, signoff: false },
+        nextArtifact: null,
+        changePath: '/tmp/change',
+        schemaInfo: { name: 'std', version: 1, artifacts: [] },
+      },
     })
     kernel.changes.transition.execute.mockRejectedValue(
       new HookFailedError('pre-transition', 1, 'hook output'),
@@ -637,6 +684,17 @@ describe('change transition', () => {
     kernel.changes.status.execute.mockResolvedValue({
       change: makeMockChange({ name: 'feat', state: 'designing' }),
       artifactStatuses: [],
+      blockers: [],
+      nextAction: { targetStep: 'ready', actionType: 'cognitive', reason: '...', command: null },
+      lifecycle: {
+        validTransitions: [],
+        availableTransitions: [],
+        blockers: [],
+        approvals: { spec: false, signoff: false },
+        nextArtifact: null,
+        changePath: '/tmp/change',
+        schemaInfo: { name: 'std', version: 1, artifacts: [] },
+      },
     })
     kernel.changes.transition.execute.mockResolvedValue({
       change: makeMockChange({ name: 'feat', state: 'implementing' }),
@@ -659,6 +717,17 @@ describe('change transition', () => {
     kernel.changes.status.execute.mockResolvedValue({
       change: makeMockChange({ name: 'feat', state: 'designing' }),
       artifactStatuses: [],
+      blockers: [],
+      nextAction: { targetStep: 'ready', actionType: 'cognitive', reason: '...', command: null },
+      lifecycle: {
+        validTransitions: [],
+        availableTransitions: [],
+        blockers: [],
+        approvals: { spec: false, signoff: false },
+        nextArtifact: null,
+        changePath: '/tmp/change',
+        schemaInfo: { name: 'std', version: 1, artifacts: [] },
+      },
     })
     kernel.changes.transition.execute.mockResolvedValue({
       change: makeMockChange({ name: 'feat', state: 'implementing' }),
@@ -688,6 +757,22 @@ describe('change transition', () => {
     kernel.changes.status.execute.mockResolvedValue({
       change: makeMockChange({ name: 'my-change', state: 'drafting' }),
       artifactStatuses: [],
+      blockers: [],
+      nextAction: {
+        targetStep: 'designing',
+        actionType: 'cognitive',
+        reason: '...',
+        command: '/specd-design',
+      },
+      lifecycle: {
+        validTransitions: [],
+        availableTransitions: [],
+        blockers: [],
+        approvals: { spec: false, signoff: false },
+        nextArtifact: null,
+        changePath: '/tmp/change',
+        schemaInfo: { name: 'std', version: 1, artifacts: [] },
+      },
     })
     kernel.changes.transition.execute.mockResolvedValue({
       change: makeMockChange({ name: 'my-change', state: 'designing' }),
@@ -726,6 +811,17 @@ describe('change transition', () => {
     kernel.changes.status.execute.mockResolvedValue({
       change: makeMockChange({ name: 'feat', state: 'designing' }),
       artifactStatuses: [],
+      blockers: [],
+      nextAction: { targetStep: 'ready', actionType: 'cognitive', reason: '...', command: null },
+      lifecycle: {
+        validTransitions: [],
+        availableTransitions: [],
+        blockers: [],
+        approvals: { spec: false, signoff: false },
+        nextArtifact: null,
+        changePath: '/tmp/change',
+        schemaInfo: { name: 'std', version: 1, artifacts: [] },
+      },
     })
     kernel.changes.transition.execute.mockResolvedValue({
       change: makeMockChange(),

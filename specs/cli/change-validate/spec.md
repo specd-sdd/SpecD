@@ -35,28 +35,30 @@ validated <name>/<workspace:capability-path>: all artifacts pass
 note: inspect merged spec output with `specd change spec-preview <name> <workspace:capability-path>`
 ```
 
-In `text` mode, when there are warnings but no failures:
+In `text` mode, when there are notes but no failures:
 
 ```text
-validated <name>/<workspace:capability-path>: pass (N warning(s))
+validated <name>/<workspace:capability-path>: pass (N note(s))
   file: <path>
-warning: <artifactId> — <description>
+note: <artifactId> — <description>
 ...
 note: inspect merged spec output with `specd change spec-preview <name> <workspace:capability-path>`
 ```
 
-The listed file paths MUST come from `ValidateArtifacts` result metadata and MUST be the exact paths validated for the requested spec/artifact.
+The listed file paths MUST come from `ValidateArtifacts` result metadata and MUST be the exact paths validated for the requested spec/artifact. Any non-blocking suggestion MUST be labeled as a `note`.
 
-In `json` or `toon` mode, the output is encoded in the respective format and includes the structured validation result:
+In `json` or `toon` mode, the output includes a `notes` array:
 
 ```json
 {
   "passed": true,
   "failures": [],
-  "warnings": [{ "artifactId": "...", "description": "..." }],
+  "notes": [{ "artifactId": "...", "description": "..." }],
   "files": [{ "artifactId": "...", "key": "...", "filename": "...", "status": "validated" }]
 }
 ```
+
+The process exits with code 0 when `passed` is `true`.
 
 ### Requirement: Output on failure
 
@@ -65,22 +67,22 @@ In `text` mode, the command prints each failure to stdout, exits with code 1, an
 ```text
 validation failed <name>/<workspace:capability-path>:
   missing: <path>
-  error: <artifactId> — <description>
-  ...
-  warning: <artifactId> — <description>
-  ...
-note: inspect merged spec output with `specd change spec-preview <name> <workspace:capability-path>`
+    error: <artifactId> — <description>
+    ...
+    note: <artifactId> — <description>
+    ...
+  note: inspect merged spec output with `specd change spec-preview <name> <workspace:capability-path>`
 ```
 
 Missing path lines MUST be derived from `ValidateArtifacts` result metadata. For an existing spec with a delta-capable artifact, this path is the expected `deltas/.../*.delta.yaml` file, even if a direct `specs/...` file exists.
 
-In `json` or `toon` mode, the output is encoded in the respective format and includes the structured validation result:
+In `json` or `toon` mode:
 
 ```json
 {
   "passed": false,
   "failures": [{ "artifactId": "...", "description": "...", "filename": "..." }],
-  "warnings": [],
+  "notes": [],
   "files": [{ "artifactId": "...", "key": "...", "filename": "...", "status": "missing" }]
 }
 ```

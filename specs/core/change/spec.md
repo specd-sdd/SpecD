@@ -145,6 +145,10 @@ Dependency satisfaction is driven by the persisted artifact `state`. Only artifa
 
 **Rollback:** `invalidate()` accepts affected artifact/file detail for the files whose validated content actually drifted. When drift is reported, those files are set to `drifted-pending-review`, their parent artifacts are recomputed, and all other files are downgraded to `pending-review` as part of the return to `designing`. Upstream files are not marked drifted unless their own validated content changed.
 
+- `pending-parent-artifact-review`
+- `pending-parent-artifact-review` — the file's upstream dependency in the artifact DAG is `drifted-pending-review` or `pending-review`, recursively blocking this file until the parent is resolved.
+- `pending-parent-artifact-review` — no file is drifted or pending review, and at least one file is `pending-parent-artifact-review`
+
 ### Requirement: Artifact sync
 
 A Change can reconcile its artifact map against the current schema's artifact types via the `syncArtifacts(artifactTypes)` method. This method:

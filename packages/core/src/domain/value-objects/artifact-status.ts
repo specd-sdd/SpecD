@@ -7,6 +7,7 @@
  * - `skipped` — artifact is optional and was explicitly skipped; satisfies dependency requirements
  * - `pending-review` — artifact was previously validated but must be reviewed again
  * - `drifted-pending-review` — validated content drifted from the recorded hash and must be reviewed
+ * - `pending-parent-artifact-review` — artifact is blocked by an upstream dependency that requires review
  */
 export type ArtifactStatus =
   | 'missing'
@@ -15,3 +16,4 @@ export type ArtifactStatus =
   | 'skipped'
   | 'pending-review'
   | 'drifted-pending-review'
+  | 'pending-parent-artifact-review'
