@@ -88,8 +88,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:0b9615178094559439f97c9c683b74ea590eabeb839fb97afd021f3af4e60402",
-    "verify.md": "sha256:5f48fb8819f2810987cfb9f65ae5b847c5d08945425a59df7cfeefb1b30f20e9"
+    "spec.md": "sha256:f2fb42bf418db441a956f48cec60ed302529761fc9010817ba4fb0d71c3f4fe6",
+    "verify.md": "sha256:12697234dce805f8f3406a6313c2ad069d5075897099e25e0e1f7fc2b097dd78"
   },
   "generatedBy": "core"
 }

@@ -1,9 +1,7 @@
 {
   "title": "CLI Entrypoint",
   "description": "Every subcommand needs consistent config discovery, output routing, and error reporting — without a shared entrypoint contract, each command would reimplement these concerns differently. This spec defines the global behaviour of the `specd` CLI: configuration discovery (with the `--config` override), stdout/stderr conventions, the `--format` flag, and uniform exit codes.",
-  "dependsOn": [
-    "core:core/config"
-  ],
+  "dependsOn": ["core:core/config"],
   "context": [
     "Every subcommand needs consistent config discovery, output routing, and error reporting — without a shared entrypoint contract, each command would reimplement these concerns differently. This spec defines the global behaviour of the `specd` CLI: configuration discovery (with the `--config` override), stdout/stderr conventions, the `--format` flag, and uniform exit codes."
   ],
@@ -35,7 +33,7 @@
     {
       "requirement": "Error message format",
       "rules": [
-        "User and domain errors (exit code 1) are printed to stderr as a single human-readable line prefixed with `error:`. System errors (exit code 3) are printed to stderr with a `fatal:` prefix followed by the error message; a stack trace is included only when the `SPECD_DEBUG=1` environment variable is set."
+        "User and domain errors (exit code 1) are printed to stderr as a single human-readable line prefixed with `error:`. System errors (exit code 3) are printed to stderr with a `fatal:` prefix followed by the error message; a stack trace is included only when debug logging is enabled for the active logger (`Logger.isLevelEnabled('debug')`)."
       ]
     },
     {
@@ -95,48 +93,28 @@
     {
       "requirement": "Configuration discovery",
       "name": "Config found by walking up from CWD",
-      "given": [
-        "CWD is a subdirectory of a project containing specd.yaml at the project root"
-      ],
-      "when": [
-        "any specd command is run without --config"
-      ],
-      "then": [
-        "specd.yaml at the project root is loaded"
-      ]
+      "given": ["CWD is a subdirectory of a project containing specd.yaml at the project root"],
+      "when": ["any specd command is run without --config"],
+      "then": ["specd.yaml at the project root is loaded"]
     },
     {
       "requirement": "Configuration discovery",
       "name": "No config found",
-      "given": [
-        "CWD is not under any directory containing specd.yaml"
-      ],
-      "when": [
-        "any specd command is run without --config"
-      ],
-      "then": [
-        "the command exits with code 1 and prints an error: message to stderr"
-      ]
+      "given": ["CWD is not under any directory containing specd.yaml"],
+      "when": ["any specd command is run without --config"],
+      "then": ["the command exits with code 1 and prints an error: message to stderr"]
     },
     {
       "requirement": "Config flag override",
       "name": "Valid explicit config before subcommand (global position)",
-      "when": [
-        "specd --config /abs/path/specd.yaml change list is run and the file exists"
-      ],
-      "then": [
-        "that file is loaded and the subcommand executes successfully"
-      ]
+      "when": ["specd --config /abs/path/specd.yaml change list is run and the file exists"],
+      "then": ["that file is loaded and the subcommand executes successfully"]
     },
     {
       "requirement": "Config flag override",
       "name": "Valid explicit config after subcommand (local position)",
-      "when": [
-        "specd change list --config /abs/path/specd.yaml is run and the file exists"
-      ],
-      "then": [
-        "that file is loaded and the subcommand executes successfully"
-      ]
+      "when": ["specd change list --config /abs/path/specd.yaml is run and the file exists"],
+      "then": ["that file is loaded and the subcommand executes successfully"]
     },
     {
       "requirement": "Config flag override",
@@ -145,22 +123,14 @@
         "--config /abs/path/specd.yaml is provided before the subcommand",
         "AND the subcommand does not also specify --config"
       ],
-      "when": [
-        "the action handler runs"
-      ],
-      "then": [
-        "opts.config is populated with the root-level value via preAction propagation"
-      ]
+      "when": ["the action handler runs"],
+      "then": ["opts.config is populated with the root-level value via preAction propagation"]
     },
     {
       "requirement": "Config flag override",
       "name": "--config specified twice uses the last value",
-      "given": [
-        "specd --config /root/specd.yaml change list --config /local/specd.yaml is run"
-      ],
-      "when": [
-        "Commander parses the command line"
-      ],
+      "given": ["specd --config /root/specd.yaml change list --config /local/specd.yaml is run"],
+      "when": ["Commander parses the command line"],
       "then": [
         "the last --config value (/local/specd.yaml) is used (Commander option override semantics)",
         "AND the command executes normally — no error is produced"
@@ -169,105 +139,63 @@
     {
       "requirement": "Config flag override",
       "name": "Explicit config file missing",
-      "when": [
-        "specd --config /nonexistent/specd.yaml change list is run"
-      ],
-      "then": [
-        "the command exits with code 1 and prints an error: message to stderr"
-      ]
+      "when": ["specd --config /nonexistent/specd.yaml change list is run"],
+      "then": ["the command exits with code 1 and prints an error: message to stderr"]
     },
     {
       "requirement": "Output conventions",
       "name": "Normal output goes to stdout",
-      "when": [
-        "a command succeeds and produces output"
-      ],
-      "then": [
-        "the output is written to stdout only; stderr is empty"
-      ]
+      "when": ["a command succeeds and produces output"],
+      "then": ["the output is written to stdout only; stderr is empty"]
     },
     {
       "requirement": "Output conventions",
       "name": "Error goes to stderr",
-      "when": [
-        "a command encounters a domain error"
-      ],
-      "then": [
-        "the error message is written to stderr only; stdout is empty"
-      ]
+      "when": ["a command encounters a domain error"],
+      "then": ["the error message is written to stderr only; stdout is empty"]
     },
     {
       "requirement": "Exit codes",
       "name": "Successful command",
-      "when": [
-        "a command completes without error"
-      ],
-      "then": [
-        "the process exits with code 0"
-      ]
+      "when": ["a command completes without error"],
+      "then": ["the process exits with code 0"]
     },
     {
       "requirement": "Exit codes",
       "name": "Change not found",
-      "when": [
-        "a command references a change name that does not exist"
-      ],
-      "then": [
-        "the process exits with code 1"
-      ]
+      "when": ["a command references a change name that does not exist"],
+      "then": ["the process exits with code 1"]
     },
     {
       "requirement": "Exit codes",
       "name": "Hook failure",
-      "when": [
-        "a run: hook exits with a non-zero status during a transition"
-      ],
-      "then": [
-        "the process exits with code 2 and the hook's output is forwarded to stdout/stderr"
-      ]
+      "when": ["a run: hook exits with a non-zero status during a transition"],
+      "then": ["the process exits with code 2 and the hook's output is forwarded to stdout/stderr"]
     },
     {
       "requirement": "Exit codes",
       "name": "Unhandled system error",
-      "when": [
-        "an unexpected I/O error occurs"
-      ],
-      "then": [
-        "the process exits with code 3 and prints a fatal: message to stderr"
-      ]
+      "when": ["an unexpected I/O error occurs"],
+      "then": ["the process exits with code 3 and prints a fatal: message to stderr"]
     },
     {
       "requirement": "Error message format",
       "name": "Domain error prefix",
-      "when": [
-        "a domain error occurs (e.g. change not found)"
-      ],
-      "then": [
-        "stderr contains a line starting with error:"
-      ]
+      "when": ["a domain error occurs (e.g. change not found)"],
+      "then": ["stderr contains a line starting with error:"]
     },
     {
       "requirement": "Error message format",
       "name": "System error prefix",
-      "when": [
-        "a system error occurs"
-      ],
-      "then": [
-        "stderr contains a line starting with fatal:"
-      ]
+      "when": ["a system error occurs"],
+      "then": ["stderr contains a line starting with fatal:"]
     },
     {
       "requirement": "Error message format",
       "name": "Stack trace gated on SPECD_DEBUG",
-      "given": [
-        "SPECD_DEBUG is not set"
-      ],
-      "when": [
-        "a system error occurs"
-      ],
-      "then": [
-        "no stack trace is printed to stderr"
-      ]
+      "given": ["logger debug level is not enabled"],
+      "when": ["a system error occurs"],
+      "then": ["no stack trace is printed to stderr"]
     },
     {
       "requirement": "Excess arguments rejected",
@@ -275,16 +203,12 @@
       "when": [
         "any leaf command is run with an unexpected extra positional argument (e.g. specd change list some-name)"
       ],
-      "then": [
-        "the command exits with code 1 and prints a usage error to stderr"
-      ]
+      "then": ["the command exits with code 1 and prints a usage error to stderr"]
     },
     {
       "requirement": "Banner in help",
       "name": "Banner appears in root help output",
-      "when": [
-        "specd --help is run"
-      ],
+      "when": ["specd --help is run"],
       "then": [
         "stdout contains the SpecD ASCII art banner before the Commander-generated help text"
       ]
@@ -292,22 +216,14 @@
     {
       "requirement": "Banner in help",
       "name": "Banner does not appear in subcommand help",
-      "when": [
-        "specd change --help or any other subcommand --help is run"
-      ],
-      "then": [
-        "stdout does not contain the SpecD ASCII art banner"
-      ]
+      "when": ["specd change --help or any other subcommand --help is run"],
+      "then": ["stdout does not contain the SpecD ASCII art banner"]
     },
     {
       "requirement": "Auto-show dashboard",
       "name": "Bare specd invocation with config present shows dashboard",
-      "given": [
-        "specd.yaml is discoverable from CWD"
-      ],
-      "when": [
-        "specd is run with no subcommand"
-      ],
+      "given": ["specd.yaml is discoverable from CWD"],
+      "when": ["specd is run with no subcommand"],
       "then": [
         "the project dashboard output is displayed (same as specd project dashboard)",
         "AND the process exits with code 0"
@@ -316,107 +232,59 @@
     {
       "requirement": "Auto-show dashboard",
       "name": "specd with only --config and no subcommand shows dashboard",
-      "given": [
-        "a valid specd.yaml exists at /path/to/specd.yaml"
-      ],
-      "when": [
-        "specd --config /path/to/specd.yaml is run with no subcommand"
-      ],
-      "then": [
-        "the project dashboard output is displayed",
-        "AND the process exits with code 0"
-      ]
+      "given": ["a valid specd.yaml exists at /path/to/specd.yaml"],
+      "when": ["specd --config /path/to/specd.yaml is run with no subcommand"],
+      "then": ["the project dashboard output is displayed", "AND the process exits with code 0"]
     },
     {
       "requirement": "Auto-show dashboard",
       "name": "Bare specd invocation without config shows help",
-      "given": [
-        "no specd.yaml is discoverable from CWD"
-      ],
-      "when": [
-        "specd is run with no subcommand"
-      ],
-      "then": [
-        "the standard help text is shown",
-        "AND the process exits with code 0"
-      ]
+      "given": ["no specd.yaml is discoverable from CWD"],
+      "when": ["specd is run with no subcommand"],
+      "then": ["the standard help text is shown", "AND the process exits with code 0"]
     },
     {
       "requirement": "Top-level init alias",
       "name": "specd init appears in root help output",
-      "when": [
-        "specd --help is run"
-      ],
-      "then": [
-        "the help text includes init as a top-level command"
-      ]
+      "when": ["specd --help is run"],
+      "then": ["the help text includes init as a top-level command"]
     },
     {
       "requirement": "Top-level init alias",
       "name": "specd init delegates to project init handler",
-      "given": [
-        "a clean directory with no existing specd.yaml"
-      ],
-      "when": [
-        "specd init --workspace default is run"
-      ],
-      "then": [
-        "the command exits with code 0",
-        "AND specd.yaml is written to the target directory"
-      ]
+      "given": ["a clean directory with no existing specd.yaml"],
+      "when": ["specd init --workspace default is run"],
+      "then": ["the command exits with code 0", "AND specd.yaml is written to the target directory"]
     },
     {
       "requirement": "Top-level init alias",
       "name": "specd init rejects excess arguments",
-      "when": [
-        "specd init extra-arg is run"
-      ],
-      "then": [
-        "the command exits with code 1",
-        "AND stderr contains a usage error"
-      ]
+      "when": ["specd init extra-arg is run"],
+      "then": ["the command exits with code 1", "AND stderr contains a usage error"]
     },
     {
       "requirement": "Top-level init alias",
       "name": "specd init --force overwrites existing config",
-      "given": [
-        "a specd.yaml already exists"
-      ],
-      "when": [
-        "specd init --force --workspace default is run"
-      ],
-      "then": [
-        "the command exits with code 0",
-        "AND specd.yaml is overwritten"
-      ]
+      "given": ["a specd.yaml already exists"],
+      "when": ["specd init --force --workspace default is run"],
+      "then": ["the command exits with code 0", "AND specd.yaml is overwritten"]
     },
     {
       "requirement": "Output format flag",
       "name": "Text format produces human-readable output",
-      "when": [
-        "a command is run with --format text (or without --format)"
-      ],
-      "then": [
-        "stdout contains human-readable text output"
-      ]
+      "when": ["a command is run with --format text (or without --format)"],
+      "then": ["stdout contains human-readable text output"]
     },
     {
       "requirement": "Output format flag",
       "name": "JSON format produces valid JSON to stdout",
-      "when": [
-        "a command is run with --format json"
-      ],
-      "then": [
-        "stdout contains valid JSON",
-        "AND the JSON can be parsed by a standard JSON parser"
-      ]
+      "when": ["a command is run with --format json"],
+      "then": ["stdout contains valid JSON", "AND the JSON can be parsed by a standard JSON parser"]
     },
     {
       "requirement": "Output format flag",
       "name": "TOON format produces TOON encoding to stdout",
-      "when": [
-        "a command is run with --format toon"
-      ],
+      "when": ["a command is run with --format toon"],
       "then": [
         "stdout contains a TOON-encoded representation of the same data model as the JSON output"
       ]
@@ -424,39 +292,22 @@
     {
       "requirement": "Output format flag",
       "name": "Errors go to stderr regardless of format",
-      "given": [
-        "a domain error occurs during a command run with --format json"
-      ],
-      "when": [
-        "the command fails"
-      ],
-      "then": [
-        "stderr contains an error: line in plain text"
-      ]
+      "given": ["a domain error occurs during a command run with --format json"],
+      "when": ["the command fails"],
+      "then": ["stderr contains an error: line in plain text"]
     },
     {
       "requirement": "Output format flag",
       "name": "Errors in text format produce empty stdout",
-      "given": [
-        "a domain error occurs during a command run with --format text"
-      ],
-      "when": [
-        "the command fails"
-      ],
-      "then": [
-        "stderr contains an error: line in plain text",
-        "AND stdout is empty"
-      ]
+      "given": ["a domain error occurs during a command run with --format text"],
+      "when": ["the command fails"],
+      "then": ["stderr contains an error: line in plain text", "AND stdout is empty"]
     },
     {
       "requirement": "Structured error output",
       "name": "JSON format produces structured error on stdout",
-      "given": [
-        "a domain error with code CHANGE_NOT_FOUND occurs"
-      ],
-      "when": [
-        "the command was run with --format json"
-      ],
+      "given": ["a domain error with code CHANGE_NOT_FOUND occurs"],
+      "when": ["the command was run with --format json"],
       "then": [
         "stdout contains valid JSON: {\"result\": \"error\", \"code\": \"CHANGE_NOT_FOUND\", \"message\": \"...\", \"exitCode\": 1}",
         "AND stderr still contains the error: line in plain text"
@@ -465,12 +316,8 @@
     {
       "requirement": "Structured error output",
       "name": "TOON format produces structured error on stdout",
-      "given": [
-        "a domain error occurs"
-      ],
-      "when": [
-        "the command was run with --format toon"
-      ],
+      "given": ["a domain error occurs"],
+      "when": ["the command was run with --format toon"],
       "then": [
         "stdout contains a TOON-encoded error object with result, code, message, and exitCode",
         "AND stderr still contains the error: line in plain text"
@@ -479,12 +326,8 @@
     {
       "requirement": "Structured error output",
       "name": "Schema error produces structured error in JSON format",
-      "given": [
-        "a SchemaNotFoundError occurs"
-      ],
-      "when": [
-        "the command was run with --format json"
-      ],
+      "given": ["a SchemaNotFoundError occurs"],
+      "when": ["the command was run with --format json"],
       "then": [
         "stdout contains {\"result\": \"error\", \"code\": \"SCHEMA_NOT_FOUND\", \"message\": \"...\", \"exitCode\": 3}",
         "AND stderr contains a fatal: line in plain text"
@@ -493,26 +336,15 @@
     {
       "requirement": "Structured error output",
       "name": "Unexpected system error does not produce structured stdout",
-      "given": [
-        "an unexpected error (not a SpecdError subclass) occurs"
-      ],
-      "when": [
-        "the command was run with --format json"
-      ],
-      "then": [
-        "stderr contains a fatal: line in plain text",
-        "AND stdout is empty"
-      ]
+      "given": ["an unexpected error (not a SpecdError subclass) occurs"],
+      "when": ["the command was run with --format json"],
+      "then": ["stderr contains a fatal: line in plain text", "AND stdout is empty"]
     },
     {
       "requirement": "Structured error output",
       "name": "Hook failure produces structured error in JSON format",
-      "given": [
-        "a hook failure occurs"
-      ],
-      "when": [
-        "the command was run with --format json"
-      ],
+      "given": ["a hook failure occurs"],
+      "when": ["the command was run with --format json"],
       "then": [
         "stdout contains {\"result\": \"error\", \"code\": \"HOOK_FAILED\", \"message\": \"...\", \"exitCode\": 2}",
         "AND stderr contains the hook error in plain text"
@@ -521,21 +353,21 @@
     {
       "requirement": "Structured error output",
       "name": "Text format errors do not produce structured stdout",
-      "given": [
-        "a domain error occurs"
-      ],
-      "when": [
-        "the command was run with --format text (or without --format)"
-      ],
-      "then": [
-        "stdout is empty",
-        "AND stderr contains the error: line in plain text"
-      ]
+      "given": ["a domain error occurs"],
+      "when": ["the command was run with --format text (or without --format)"],
+      "then": ["stdout is empty", "AND stderr contains the error: line in plain text"]
+    },
+    {
+      "requirement": "Structured error output",
+      "name": "Stack trace shown when logger debug level is enabled",
+      "given": ["logger debug level is enabled"],
+      "when": ["a system error occurs"],
+      "then": ["a stack trace is printed to stderr"]
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:f6731c175174abebcae1f95e86b51b01ec515df7a3e1bf00eb43816630b49ef6",
-    "verify.md": "sha256:f9ec671266ef8b8872511bba4ffc8217fd17a45736c91fb9cb8b126ea5c2a547"
+    "spec.md": "sha256:4ef8d703f502ffc6d154132630d0b7c29267f9eb9b39d16042eae4299950f1b2",
+    "verify.md": "sha256:d65df229672bb4d87bbbf7820e45df845430ee3d9989657818ff18f89fb359aa"
   },
   "generatedBy": "core"
 }
