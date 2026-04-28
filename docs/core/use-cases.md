@@ -523,6 +523,8 @@ Validates a change's artifact files against the active schema and marks them com
 
 Also enforces approval invalidation: if any artifact's content has changed since an approval was recorded, an `invalidated` event is appended.
 
+Dependency-blocked validation failures are status-aware: `ValidationFailure.description` includes the blocking dependency ID plus its effective status. Review states (`pending-review`, `drifted-pending-review`) are reported as review blockers, and recursive review propagation (`pending-parent-artifact-review`) includes upstream parent blocker context when available.
+
 Validation and file reads happen outside the lock; the final persisted invalidation, `markComplete(...)`, and `setSpecDependsOn(...)` updates are applied through `ChangeRepository.mutate(...)` on a fresh reload.
 
 **Constructor:**

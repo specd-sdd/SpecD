@@ -253,6 +253,7 @@ describe('ValidateArtifacts', () => {
       })
       const specsArtifact = new ChangeArtifact({
         type: 'specs',
+        requires: ['proposal'],
         files: new Map([
           [
             'specs',
@@ -294,6 +295,9 @@ describe('ValidateArtifacts', () => {
       expect(
         result.failures.some((f) => f.artifactId === 'specs' && f.description.includes('blocked')),
       ).toBe(true)
+      expect(
+        result.failures.some((f) => f.artifactId === 'specs' && f.description.includes('status: in-progress')),
+      ).toBe(true)
     })
 
     it('proceeds when dependency is complete', async () => {
@@ -318,6 +322,7 @@ describe('ValidateArtifacts', () => {
       })
       const specsArtifact = new ChangeArtifact({
         type: 'specs',
+        requires: ['proposal'],
         files: new Map([
           [
             'specs',
@@ -1693,6 +1698,111 @@ describe('ValidateArtifacts', () => {
 
       expect(
         result.failures.some((f) => f.artifactId === 'specs' && f.description.includes('blocked')),
+      ).toBe(true)
+      expect(
+        result.failures.some((f) => f.artifactId === 'specs' && f.description.includes('status: missing')),
+      ).toBe(true)
+    })
+
+    it('reports review-state blocker when dependency is pending-review', async () => {
+      const proposalType = makeArtifactType('proposal')
+      const verifyType = makeArtifactType('verify', { requires: ['proposal'] })
+      const schema = makeSchema([proposalType, verifyType])
+
+      const proposalArtifact = new ChangeArtifact({
+        type: 'proposal',
+        files: new Map([
+          [
+            'proposal',
+            new ArtifactFile({ key: 'proposal', filename: 'proposal.md', status: 'pending-review' }),
+          ],
+        ]),
+      })
+      const verifyArtifact = new ChangeArtifact({
+        type: 'verify',
+        requires: ['specs'],
+        files: new Map([
+          ['verify', new ArtifactFile({ key: 'verify', filename: 'verify.md', status: 'in-progress' })],
+        ]),
+      })
+      const change = makeChangeWithArtifacts('c', [proposalArtifact, verifyArtifact])
+      const repo = makeChangeRepository([change])
+
+      const uc = new ValidateArtifacts(
+        repo,
+        new Map(),
+        makeSchemaProvider(schema),
+        makeParsers(),
+        makeActorResolver(),
+        makeContentHasher(),
+      )
+
+      const result = await uc.execute({
+        name: 'c',
+        specPath: 'default:auth',
+        artifactId: 'verify',
+      })
+
+      expect(
+        result.failures.some(
+          (f) =>
+            f.artifactId === 'verify' &&
+            f.description.includes('requiring review') &&
+            f.description.includes('status: pending-review'),
+        ),
+      ).toBe(true)
+    })
+
+    it('reports review-state blocker when dependency is drifted-pending-review', async () => {
+      const proposalType = makeArtifactType('proposal')
+      const verifyType = makeArtifactType('verify', { requires: ['proposal'] })
+      const schema = makeSchema([proposalType, verifyType])
+
+      const proposalArtifact = new ChangeArtifact({
+        type: 'proposal',
+        files: new Map([
+          [
+            'proposal',
+            new ArtifactFile({
+              key: 'proposal',
+              filename: 'proposal.md',
+              status: 'drifted-pending-review',
+            }),
+          ],
+        ]),
+      })
+      const verifyArtifact = new ChangeArtifact({
+        type: 'verify',
+        requires: ['specs'],
+        files: new Map([
+          ['verify', new ArtifactFile({ key: 'verify', filename: 'verify.md', status: 'in-progress' })],
+        ]),
+      })
+      const change = makeChangeWithArtifacts('c', [proposalArtifact, verifyArtifact])
+      const repo = makeChangeRepository([change])
+
+      const uc = new ValidateArtifacts(
+        repo,
+        new Map(),
+        makeSchemaProvider(schema),
+        makeParsers(),
+        makeActorResolver(),
+        makeContentHasher(),
+      )
+
+      const result = await uc.execute({
+        name: 'c',
+        specPath: 'default:auth',
+        artifactId: 'verify',
+      })
+
+      expect(
+        result.failures.some(
+          (f) =>
+            f.artifactId === 'verify' &&
+            f.description.includes('requiring review') &&
+            f.description.includes('status: drifted-pending-review'),
+        ),
       ).toBe(true)
     })
 

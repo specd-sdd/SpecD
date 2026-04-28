@@ -19,6 +19,7 @@ export function registerChangeContext(parent: Command): void {
     .description(
       'Compile and print the full context block for a change, including relevant specs, rules, and constraints for the current lifecycle step.',
     )
+    .option('--mode <mode>', 'display mode: list|summary|full|hybrid')
     .option('--rules', 'include only rules sections in spec content')
     .option('--constraints', 'include only constraints sections in spec content')
     .option('--scenarios', 'include only scenarios sections in spec content')
@@ -58,6 +59,7 @@ When status is 'unchanged', projectContext and specs are omitted from the struct
         name: string,
         step: string,
         opts: {
+          mode?: 'list' | 'summary' | 'full' | 'hybrid'
           rules?: boolean
           constraints?: boolean
           scenarios?: boolean
@@ -75,6 +77,20 @@ When status is 'unchanged', projectContext and specs are omitted from the struct
           }
 
           const { config, kernel } = await resolveCliContext({ configPath: opts.config })
+
+          const sectionFlags: SpecSection[] = []
+          if (opts.rules) sectionFlags.push('rules')
+          if (opts.constraints) sectionFlags.push('constraints')
+          if (opts.scenarios) sectionFlags.push('scenarios')
+
+          const effectiveMode =
+            opts.mode ??
+            (sectionFlags.length > 0 &&
+            config.contextMode !== 'full' &&
+            config.contextMode !== 'hybrid'
+              ? 'hybrid'
+              : config.contextMode)
+
           /**
            * Context filter settings for a single workspace.
            *
@@ -107,14 +123,9 @@ When status is 'unchanged', projectContext and specs are omitted from the struct
             ...(config.contextExcludeSpecs !== undefined
               ? { contextExcludeSpecs: [...config.contextExcludeSpecs] }
               : {}),
-            ...(config.contextMode !== undefined ? { contextMode: config.contextMode } : {}),
+            ...(effectiveMode !== undefined ? { contextMode: effectiveMode } : {}),
             ...(Object.keys(workspacesConfig).length > 0 ? { workspaces: workspacesConfig } : {}),
           }
-
-          const sectionFlags: SpecSection[] = []
-          if (opts.rules) sectionFlags.push('rules')
-          if (opts.constraints) sectionFlags.push('constraints')
-          if (opts.scenarios) sectionFlags.push('scenarios')
 
           const result = await kernel.changes.compile.execute({
             name,

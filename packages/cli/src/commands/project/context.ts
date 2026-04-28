@@ -16,6 +16,7 @@ export function registerProjectContext(parent: Command): void {
     .description(
       'Compile and print the project-level context entries from specd.yaml, for use as background context in agent prompts.',
     )
+    .option('--mode <mode>', 'display mode: list|summary|full|hybrid')
     .option('--rules', 'include only rules sections in spec content')
     .option('--constraints', 'include only constraints sections in spec content')
     .option('--scenarios', 'include only scenarios sections in spec content')
@@ -40,6 +41,7 @@ JSON/TOON output schema:
     )
     .action(
       async (opts: {
+        mode?: 'list' | 'summary' | 'full' | 'hybrid'
         rules?: boolean
         constraints?: boolean
         scenarios?: boolean
@@ -56,6 +58,19 @@ JSON/TOON output schema:
           const { config, kernel } = await resolveCliContext({ configPath: opts.config })
           const fmt = parseFormat(opts.format)
 
+          const sectionFlags: SpecSection[] = []
+          if (opts.rules) sectionFlags.push('rules')
+          if (opts.constraints) sectionFlags.push('constraints')
+          if (opts.scenarios) sectionFlags.push('scenarios')
+
+          const effectiveMode =
+            opts.mode ??
+            (sectionFlags.length > 0 &&
+            config.contextMode !== 'full' &&
+            config.contextMode !== 'hybrid'
+              ? 'full'
+              : config.contextMode)
+
           const compileConfig: CompileContextConfig = {
             ...(config.context !== undefined
               ? {
@@ -70,13 +85,8 @@ JSON/TOON output schema:
             ...(config.contextExcludeSpecs !== undefined
               ? { contextExcludeSpecs: [...config.contextExcludeSpecs] }
               : {}),
-            ...(config.contextMode !== undefined ? { contextMode: config.contextMode } : {}),
+            ...(effectiveMode !== undefined ? { contextMode: effectiveMode } : {}),
           }
-
-          const sectionFlags: SpecSection[] = []
-          if (opts.rules) sectionFlags.push('rules')
-          if (opts.constraints) sectionFlags.push('constraints')
-          if (opts.scenarios) sectionFlags.push('scenarios')
 
           const result = await kernel.project.getProjectContext.execute({
             config: compileConfig,
