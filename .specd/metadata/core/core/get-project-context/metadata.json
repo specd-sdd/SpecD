@@ -21,7 +21,7 @@
     {
       "requirement": "Returns GetProjectContextResult on success",
       "rules": [
-        "`execute` MUST return a `GetProjectContextResult` containing:\n\n- `contextEntries` (string\\[]) — rendered project-level context entries (instruction text or file content).\n- `specs` (`ContextSpecEntry[]`) — specs matched by include/exclude patterns, each with `specId`, `source`, `mode`, and optional `title`, `description`, and `content` fields according to the display mode. The `ContextSpecEntry` type is the same as defined in the `CompileContext` spec.\n- `warnings` (`ContextWarning[]`) — advisory warnings for missing files, stale metadata, unknown workspaces, etc.\n\nSince `GetProjectContext` operates without a change, all specs MUST have `source: 'includePattern'`. The mode field is determined by `config.contextMode`: `list` emits list entries, `summary` emits summary entries, and `full` or `hybrid` emits full entries. Project context has no direct change specs, so `hybrid` is equivalent to `full`."
+        "`execute` MUST return a `GetProjectContextResult` containing:\n\n- `contextEntries` (string\\[]) — rendered project-level context entries (instruction text or file content).\n- `specs` (ContextSpecEntry\\[]) — specs matched by include/exclude patterns, each with `specId`, `source`, `mode`, and optional `title`, `description`, and `content` fields according to the display mode. The `ContextSpecEntry` type is the same as defined in the `CompileContext` spec.\n- `warnings` (ContextWarning\\[]) — advisory warnings for missing files, stale metadata, unknown workspaces, etc.\n\nSince `GetProjectContext` operates without a change, all specs MUST have `source: 'includePattern'`. The mode field is determined by `config.contextMode`: `list` emits list entries, `summary` emits summary entries, and `full` or `hybrid` emits full entries. Project context has no direct change specs, so `hybrid` is equivalent to `full`. **`full` mode rendering MUST use structured output (derived from metadata or extraction) instead of raw markdown.**"
       ]
     },
     {
@@ -57,7 +57,7 @@
     {
       "requirement": "Renders spec content from metadata when fresh",
       "rules": [
-        "For each included spec, if `.specd-metadata.yaml` exists and its content hashes match the current artifacts (verified via `ContentHasher`), the use case MUST render from the parsed metadata according to `config.contextMode`.\n\n- In `list` mode, render no title, description, or content.\n- In `summary` mode, render title and description only.\n- In `full` mode, render description, rules, constraints, and scenarios as applicable, filtered by `input.sections` when provided.\n- In `hybrid` mode, render the same output as `full` because project context has no change-scoped tier.\n\nSection filters MUST NOT affect list-mode or summary-mode entries."
+        "For each included spec, if `.specd-metadata.yaml` exists and its content hashes match the current artifacts (verified via `ContentHasher`), the use case MUST render from the parsed metadata according to `config.contextMode`.\n\n- In `list` mode, render no title, description, or content.\n- In `summary` mode, render title and description only.\n- In `full` mode, render description, rules, constraints, and scenarios as applicable. **If no `sections` filter is active (input is absent or empty), it MUST default to rendering Description + Rules + Constraints.** If a `sections` filter is provided, it overrides this default.\n- In `hybrid` mode, render the same output as `full` because project context has no change-scoped tier.\n\nSection filters MUST NOT affect list-mode or summary-mode entries.\n\n#### Scenario: Default sections in full mode\n\nWhen a spec is rendered in `full` mode (including `hybrid` mode which resolves to `full` here) and no `sections` filter is active (input is absent or empty), it MUST default to rendering **Description + Rules + Constraints**."
       ]
     },
     {
@@ -246,29 +246,21 @@
     {
       "requirement": "Renders spec content from metadata when fresh",
       "name": "Fresh metadata rendered with all sections in full mode",
-      "given": [
-        "a spec has fresh .specd-metadata.yaml with description, rules, constraints, and scenarios",
-        "AND the effective display mode is full"
-      ],
+      "given": ["a spec has fresh .specd-metadata.yaml", "AND the effective display mode is full"],
       "when": ["execute is called without sections filter"],
-      "then": ["the spec entry includes all four sections"]
+      "then": [
+        "the spec entry includes Title, Description, Rules, and Constraints (default sections)"
+      ]
     },
     {
       "requirement": "Renders spec content from metadata when fresh",
       "name": "Sections filter restricts full output",
-      "given": [
-        "a spec has fresh metadata with rules and scenarios",
-        "AND the effective display mode is full"
-      ],
+      "given": ["a spec has fresh metadata", "AND the effective display mode is full"],
       "when": ["execute is called with sections: [\"rules\"]"],
-      "then": ["the spec entry includes rules but not scenarios or description"]
-    },
-    {
-      "requirement": "Renders spec content from metadata when fresh",
-      "name": "Sections filter does not change summary output",
-      "given": ["a spec is rendered in summary mode"],
-      "when": ["execute is called with section filters"],
-      "then": ["the summary output stays unchanged"]
+      "then": [
+        "the spec entry includes Title and Description (header persistence)",
+        "AND the spec entry includes Rules but not scenarios or constraints"
+      ]
     },
     {
       "requirement": "Falls back to extraction when metadata is stale or absent",
@@ -320,8 +312,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:01d19d892f1300dd1738f813f811923d768949fb9de6d011a00e73f8dc469b50",
-    "verify.md": "sha256:29fdc8a3b6c0dbf0963eee55b24f7215a11e929dde34e3e4eaf75e52fb0cb7ae"
+    "spec.md": "sha256:b129cee69dc93d6f33232b159f2398e7aa61e785200e4502bd4046ad30dc307d",
+    "verify.md": "sha256:67c2a1afd37438e1d4728531c682ef478fbb7a0568776c9d84c75afb89169b32"
   },
   "generatedBy": "core"
 }

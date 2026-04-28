@@ -16,24 +16,18 @@
 
 ### Requirement: Behaviour
 
+#### Scenario: Full mode is the absolute default
+
+- **GIVEN** `specd.yaml` sets `contextMode: summary`
+- **WHEN** `specd spec context <spec-id>` is run
+- **THEN** output contains `full` mode sections (Description, Rules, Constraints)
+- **AND** the config mode is ignored
+
 #### Scenario: Fresh metadata used in full mode
 
 - **GIVEN** a spec has fresh metadata
-- **AND** effective context mode is full
 - **WHEN** `specd spec context <spec-id>` is run
 - **THEN** stdout contains full metadata-derived context
-
-#### Scenario: Summary mode emits summary-shaped entries
-
-- **GIVEN** effective context mode is summary
-- **WHEN** `specd spec context <spec-id>` is run
-- **THEN** output contains summary-shaped entries without full section blocks
-
-#### Scenario: List mode emits list-shaped entries
-
-- **GIVEN** effective context mode is list
-- **WHEN** `specd spec context <spec-id>` is run
-- **THEN** output contains list-shaped entries
 
 #### Scenario: Stale metadata falls back to raw artifacts
 
@@ -43,21 +37,15 @@
 
 #### Scenario: Section flags filter only full-mode output
 
-- **GIVEN** full mode output
 - **WHEN** `specd spec context <spec-id> --rules --scenarios` is run
-- **THEN** output includes only those sections
-
-#### Scenario: Section flags do not affect list or summary output
-
-- **GIVEN** list or summary mode output
-- **WHEN** section flags are passed
-- **THEN** entry shape remains list/summary
+- **THEN** output includes Title, Description, Rules, and Scenarios
+- **AND** Constraints are omitted
 
 #### Scenario: --follow-deps includes dependency specs
 
 - **GIVEN** a root spec depends on another spec
 - **WHEN** `specd spec context <spec-id> --follow-deps` is run
-- **THEN** output contains root and dependency entries
+- **THEN** output contains root and dependency entries in `full` mode
 
 ### Requirement: Output
 
@@ -83,6 +71,12 @@
 - **GIVEN** effective mode is list
 - **WHEN** `specd spec context <spec-id> --format json` is run
 - **THEN** JSON entries remain minimal list-shaped objects
+
+#### Scenario: Default sections in full mode
+
+- **WHEN** `specd spec context <spec-id>` is run without section flags
+- **THEN** output includes Title, Description, Rules, and Constraints by default
+- **AND** Scenarios are omitted unless explicitly requested
 
 ### Requirement: Error cases
 

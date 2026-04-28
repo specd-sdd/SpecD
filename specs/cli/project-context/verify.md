@@ -4,6 +4,11 @@
 
 ### Requirement: Command signature
 
+#### Scenario: --mode flag accepted
+
+- **WHEN** `specd project context --mode full` is run
+- **THEN** the command proceeds normally and overrides the config mode
+
 #### Scenario: --depth without --follow-deps
 
 - **WHEN** `specd project context --depth 2` is run without `--follow-deps`
@@ -84,6 +89,22 @@
 - **GIVEN** no `context:` entries and no specs match include patterns
 - **WHEN** `specd project context` is called
 - **THEN** the command prints `no project context configured` and exits with code 0
+
+### Requirement: Output
+
+#### Scenario: Full mode defaults to Description + Rules + Constraints
+
+- **GIVEN** `GetProjectContext` returns specs in `full` mode
+- **WHEN** `specd project context` is run without section flags
+- **THEN** output includes Description, Rules, and Constraints for each spec
+
+#### Scenario: Section flags override full mode defaults
+
+- **GIVEN** `GetProjectContext` returns specs in `full` mode
+- **WHEN** `specd project context --rules` is run
+- **THEN** output includes Title and Description (header persistence)
+- **AND** output includes only the Rules section
+- **AND** Constraints and Scenarios are omitted
 
 ### Requirement: Warnings
 

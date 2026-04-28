@@ -59,6 +59,7 @@ export function registerSpecContext(parent: Command): void {
     .description(
       'Compile and print the context block for a spec, including relevant rules, constraints, and scenarios.',
     )
+    .option('--mode <mode>', 'display mode: list|summary|full|hybrid', 'full')
     .option('--rules', 'include only rules sections')
     .option('--constraints', 'include only constraints sections')
     .option('--scenarios', 'include only scenarios sections')
@@ -88,6 +89,7 @@ JSON/TOON output schema:
       async (
         specPath: string,
         opts: {
+          mode: 'list' | 'summary' | 'full' | 'hybrid'
           rules?: boolean
           constraints?: boolean
           scenarios?: boolean
@@ -117,7 +119,7 @@ JSON/TOON output schema:
             specPath: SpecPath.parse(parsed.capabilityPath),
             ...(opts.followDeps === true ? { followDeps: true } : {}),
             ...(opts.depth !== undefined ? { depth: parseInt(opts.depth, 10) } : {}),
-            ...(config.contextMode !== undefined ? { contextMode: config.contextMode } : {}),
+            contextMode: opts.mode,
             ...(sectionFlags.length > 0 ? { sections: sectionFlags } : {}),
           })
 

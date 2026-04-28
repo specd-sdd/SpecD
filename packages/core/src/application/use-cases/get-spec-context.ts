@@ -174,8 +174,6 @@ export class GetSpecContext {
       return { spec: specLabel, source, mode, stale: metadata === null }
     }
 
-    const showAll = sections === undefined || sections.length === 0
-
     if (metadata !== null) {
       const freshnessResult = await checkMetadataFreshness(
         metadata.contentHashes,
@@ -206,26 +204,31 @@ export class GetSpecContext {
           }
         }
 
+        // Full mode: Title and Description are always included.
+        // If no sections are provided, default to Rules + Constraints.
+        const effectiveSections =
+          sections === undefined || sections.length === 0
+            ? (['rules', 'constraints'] as const)
+            : sections
+
         return {
           spec: specLabel,
           source,
           mode,
           stale: false,
-          ...(showAll && metadata.title !== undefined ? { title: metadata.title } : {}),
-          ...(showAll && metadata.description !== undefined
-            ? { description: metadata.description }
-            : {}),
-          ...((showAll || sections?.includes('rules')) &&
+          ...(metadata.title !== undefined ? { title: metadata.title } : {}),
+          ...(metadata.description !== undefined ? { description: metadata.description } : {}),
+          ...(effectiveSections.includes('rules') &&
           metadata.rules !== undefined &&
           metadata.rules.length > 0
             ? { rules: metadata.rules }
             : {}),
-          ...((showAll || sections?.includes('constraints')) &&
+          ...(effectiveSections.includes('constraints') &&
           metadata.constraints !== undefined &&
           metadata.constraints.length > 0
             ? { constraints: metadata.constraints }
             : {}),
-          ...((showAll || sections?.includes('scenarios')) &&
+          ...(effectiveSections.includes('scenarios') &&
           metadata.scenarios !== undefined &&
           metadata.scenarios.length > 0
             ? { scenarios: metadata.scenarios }

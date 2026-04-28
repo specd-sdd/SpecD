@@ -204,7 +204,6 @@ export class GetProjectContext {
 
     // Project context has no change-scoped tier, so hybrid behaves as full.
     const sectionsFilter = input.sections
-    const showAll = sectionsFilter === undefined
 
     const specs: ContextSpecEntry[] = []
     for (const { workspace, capPath } of includedSpecs.values()) {
@@ -245,21 +244,31 @@ export class GetProjectContext {
 
       if (isFresh && metadata !== null) {
         const metaParts: string[] = []
-        if (showAll && metadata.description !== undefined) {
+
+        // Description is always included in full mode as part of the content string
+        // if it exists in metadata (header persistence).
+        if (metadata.description !== undefined) {
           metaParts.push(`**Description:** ${metadata.description}`)
         }
-        if ((showAll || sectionsFilter?.includes('rules')) && metadata.rules?.length) {
+
+        // If no sections are provided, default to Rules + Constraints.
+        const effectiveSections =
+          sectionsFilter === undefined || sectionsFilter.length === 0
+            ? (['rules', 'constraints'] as const)
+            : sectionsFilter
+
+        if (effectiveSections.includes('rules') && metadata.rules?.length) {
           const rulesText = metadata.rules
             .map((r) => `##### ${r.requirement}\n${r.rules.map((rule) => `- ${rule}`).join('\n')}`)
             .join('\n\n')
           metaParts.push(`#### Rules\n\n${rulesText}`)
         }
-        if ((showAll || sectionsFilter?.includes('constraints')) && metadata.constraints?.length) {
+        if (effectiveSections.includes('constraints') && metadata.constraints?.length) {
           metaParts.push(
             `#### Constraints\n\n${metadata.constraints.map((c) => `- ${c}`).join('\n')}`,
           )
         }
-        if ((showAll || sectionsFilter?.includes('scenarios')) && metadata.scenarios?.length) {
+        if (effectiveSections.includes('scenarios') && metadata.scenarios?.length) {
           const scenariosText = metadata.scenarios
             .map((s) => {
               const lines: string[] = [
@@ -280,13 +289,13 @@ export class GetProjectContext {
           warnings.push({
             type: 'stale-metadata',
             path: specId,
-            message: `Metadata for '${specId}' is stale — falling back to raw artifact content`,
+            message: `Metadata for '${specId}' is stale — falling back to extracted sections`,
           })
         } else {
           warnings.push({
             type: 'stale-metadata',
             path: specId,
-            message: `No metadata for '${specId}' — falling back to raw artifact content`,
+            message: `No metadata for '${specId}' — falling back to extracted sections`,
           })
         }
 
@@ -300,7 +309,6 @@ export class GetProjectContext {
             schema,
             extraction,
             sectionsFilter,
-            showAll,
           )
         }
 
@@ -321,7 +329,6 @@ export class GetProjectContext {
    * @param schema - The resolved schema with artifact definitions
    * @param extraction - The metadata extraction declarations from the schema
    * @param sectionsFilter - Optional filter to include only specific sections
-   * @param showAll - Whether to include all sections regardless of filter
    * @returns Rendered context parts as strings
    */
   private async _extractionFallback(
@@ -330,7 +337,6 @@ export class GetProjectContext {
     schema: import('../../domain/value-objects/schema.js').Schema,
     extraction: import('../../domain/value-objects/metadata-extraction.js').MetadataExtraction,
     sectionsFilter: ReadonlyArray<import('./compile-context.js').SpecSection> | undefined,
-    showAll: boolean,
   ): Promise<string[]> {
     const astsByArtifact = new Map<string, { root: SelectorNode }>()
     const renderers = new Map<string, SubtreeRenderer>()
@@ -378,19 +384,28 @@ export class GetProjectContext {
     )
     const metaParts: string[] = []
 
-    if (showAll && extracted.description !== undefined) {
+    // Description is always included in full mode as part of the content string
+    // if it exists (header persistence).
+    if (extracted.description !== undefined) {
       metaParts.push(`**Description:** ${extracted.description}`)
     }
-    if ((showAll || sectionsFilter?.includes('rules')) && extracted.rules?.length) {
+
+    // If no sections are provided, default to Rules + Constraints.
+    const effectiveSections =
+      sectionsFilter === undefined || sectionsFilter.length === 0
+        ? (['rules', 'constraints'] as const)
+        : sectionsFilter
+
+    if (effectiveSections.includes('rules') && extracted.rules?.length) {
       const rulesText = extracted.rules
         .map((r) => `##### ${r.requirement}\n${r.rules.map((rule) => `- ${rule}`).join('\n')}`)
         .join('\n\n')
       metaParts.push(`#### Rules\n\n${rulesText}`)
     }
-    if ((showAll || sectionsFilter?.includes('constraints')) && extracted.constraints?.length) {
+    if (effectiveSections.includes('constraints') && extracted.constraints?.length) {
       metaParts.push(`#### Constraints\n\n${extracted.constraints.map((c) => `- ${c}`).join('\n')}`)
     }
-    if ((showAll || sectionsFilter?.includes('scenarios')) && extracted.scenarios?.length) {
+    if (effectiveSections.includes('scenarios') && extracted.scenarios?.length) {
       const scenariosText = extracted.scenarios
         .map((s) => {
           const lines: string[] = [`##### Scenario: ${s.name}`, `*Requirement: ${s.requirement}*`]

@@ -53,6 +53,12 @@
   "scenarios": [
     {
       "requirement": "Command signature",
+      "name": "--mode flag accepted",
+      "when": ["specd project context --mode full is run"],
+      "then": ["the command proceeds normally and overrides the config mode"]
+    },
+    {
+      "requirement": "Command signature",
       "name": "--depth without --follow-deps",
       "when": ["specd project context --depth 2 is run without --follow-deps"],
       "then": ["the command exits with code 1 and prints a usage error to stderr"]
@@ -146,6 +152,24 @@
       "then": ["the command prints no project context configured and exits with code 0"]
     },
     {
+      "requirement": "Output",
+      "name": "Full mode defaults to Description + Rules + Constraints",
+      "given": ["GetProjectContext returns specs in full mode"],
+      "when": ["specd project context is run without section flags"],
+      "then": ["output includes Description, Rules, and Constraints for each spec"]
+    },
+    {
+      "requirement": "Output",
+      "name": "Section flags override full mode defaults",
+      "given": ["GetProjectContext returns specs in full mode"],
+      "when": ["specd project context --rules is run"],
+      "then": [
+        "output includes Title and Description (header persistence)",
+        "AND output includes only the Rules section",
+        "AND Constraints and Scenarios are omitted"
+      ]
+    },
+    {
       "requirement": "Warnings",
       "name": "Missing file entry emits warning",
       "given": ["specd.yaml has context: with file: missing.md and the file does not exist"],
@@ -168,7 +192,7 @@
   ],
   "contentHashes": {
     "spec.md": "sha256:18a0424aa351b2008472c04fe45454ced90d33fc78619c85015aa1feb157150a",
-    "verify.md": "sha256:eaa5a35a9f63ac83fbfc57d0169a04b1cb1c2967d96d7a9043e67bc0818f6cdf"
+    "verify.md": "sha256:41d388cee20ca8cc8b01df147a0b5a6e421d6cb53d2af24a679817b2cb00111d"
   },
   "generatedBy": "core"
 }

@@ -38,6 +38,13 @@
 - **WHEN** `execute(input)` is called
 - **THEN** the entry includes identity/mode fields but no title, description, rules, constraints, or scenarios
 
+#### Scenario: Full mode defaults to Description + Rules + Constraints
+
+- **GIVEN** a spec with fresh metadata
+- **AND** effective context mode is `full`
+- **WHEN** `GetSpecContext.execute` is called without section filters
+- **THEN** the entry includes Title, Description, Rules, and Constraints
+
 ### Requirement: Stale or absent metadata produces minimal entry
 
 #### Scenario: No metadata yields stale list entry in list mode
@@ -58,22 +65,18 @@
 
 #### Scenario: Only requested sections included in full mode
 
-- **GIVEN** a spec with fresh metadata containing rules, constraints, and scenarios
-- **AND** effective context mode is full
+- **GIVEN** a spec with fresh metadata
+- **AND** effective context mode is `full`
 - **WHEN** `execute({ ..., sections: ['rules'] })` is called
-- **THEN** the entry includes `rules` but not `constraints`, `scenarios`, `title`, or `description`
+- **THEN** the entry includes Title, Description (persistence), and Rules
+- **AND** Constraints and Scenarios are omitted
 
-#### Scenario: Empty sections array shows all in full mode
+#### Scenario: Empty sections array defaults to Description + Rules + Constraints
 
-- **GIVEN** effective context mode is full
+- **GIVEN** effective context mode is `full`
 - **WHEN** `execute({ ..., sections: [] })` is called
-- **THEN** the entry includes all available full-mode fields
-
-#### Scenario: Section filters do not affect list and summary modes
-
-- **GIVEN** effective context mode is list or summary
-- **WHEN** `execute` is called with section filters
-- **THEN** entry shape remains list/summary without full section rendering
+- **THEN** the entry includes Title, Description, Rules, and Constraints
+- **AND** Scenarios are omitted unless explicitly requested
 
 ### Requirement: Transitive dependency traversal
 

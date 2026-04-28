@@ -6,8 +6,14 @@
 
 #### Scenario: Missing step argument
 
-- **WHEN** `specd change context my-change` is run without the step
-- **THEN** the command exits with code 1 and prints a usage error to stderr
+- **WHEN** `specd change context my-change` is run
+- **THEN** the command exits with code 1
+- **AND** stderr contains a usage error
+
+#### Scenario: --mode flag accepted
+
+- **WHEN** `specd change context my-change designing --mode summary` is run
+- **THEN** the command proceeds normally and overrides the config mode
 
 #### Scenario: --depth without --follow-deps
 
@@ -81,6 +87,12 @@
 - **AND** a change spec matches include patterns or traversal
 - **WHEN** the command is executed
 - **THEN** that spec can still appear in emitted context entries
+
+#### Scenario: Full mode defaults to Description + Rules + Constraints
+
+- **GIVEN** a spec is rendered in `full` mode (due to `--mode full` or being a change spec in `hybrid` mode)
+- **WHEN** `specd change context` is run without section flags
+- **THEN** output includes Description, Rules, and Constraints for that spec
 
 ### Requirement: Step availability warning
 
