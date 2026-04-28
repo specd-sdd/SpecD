@@ -51,6 +51,22 @@ Every other field covered in this guide is optional. Start here and add what you
 
 ---
 
+## Logging
+
+SpecD supports project-level logging settings in `specd.yaml`:
+
+```yaml
+logging:
+  level: info # trace | debug | info | warn | error | silent
+```
+
+- The section is optional.
+- If omitted, SpecD defaults to `info`.
+- Logs are written to `{configPath}/log/specd.log` as structured JSON.
+- CLI runtime verbosity can be increased with `-v` / `-vv` for console output without changing file-level defaults.
+
+---
+
 ## Runtime-owned config root
 
 Beyond `storage`, SpecD also keeps backend-owned runtime files under `configPath`. This root is for project-local operational state rather than workflow artifacts.

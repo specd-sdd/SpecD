@@ -422,6 +422,12 @@ approvals:
 
 Both flags are independent — any combination is valid.
 
+### Requirement: Logging configuration
+
+`specd.yaml` MAY declare a `logging` section at the root. This section is OPTIONAL. If omitted, the system SHALL fallback to built-in defaults.
+
+- **`level`** (optional) — sets the minimum log level for the project. Supported values MUST include `trace`, `debug`, `info`, `warn`, `error`, and `silent`. Defaults to `info`.
+
 ### Requirement: LLM optimization
 
 `specd.yaml` may include a top-level `llmOptimizedContext` boolean field. When `true`, specd may invoke an LLM for optimization tasks that produce richer output than deterministic extraction alone. When `false` or absent (the default), all operations use deterministic processing only.
@@ -480,6 +486,7 @@ Before constructing any use case, the config loader MUST validate the loaded con
 - Pattern syntax in `contextIncludeSpecs` and `contextExcludeSpecs` MUST be valid (no mid-segment wildcards)
 - `plugins` section, if present, MUST conform to the validated structure
 - `artifactRules` is NOT accepted — if present, `ConfigValidationError` is thrown suggesting migration to `schemaOverrides`
+- `logging.level`, if present, MUST be one of the recognized level strings
 
 ## Constraints
 
@@ -497,6 +504,10 @@ Before constructing any use case, the config loader MUST validate the loaded con
 
 ```yaml
 schema: '@specd/schema-std'
+
+# logging section is optional (defaults to level: info)
+logging:
+  level: info
 
 llmOptimizedContext: true # omit or set false for deterministic-only processing
 
@@ -663,6 +674,7 @@ schemaOverrides:
 - [`core:core/storage`](../storage/spec.md) — storage adapter behavior
 - [`core:core/spec-metadata`](../spec-metadata/spec.md) — `.specd-metadata.yaml` format, `dependsOn` traversal in step 5
 - [`core:core/workspace`](../workspace/spec.md) — workspace identity, properties, ownership, and prefix semantics
+- [`default:_global/logging`](../../_global/logging/spec.md) — global logging standards followed by the config schema
 
 ## ADRs
 

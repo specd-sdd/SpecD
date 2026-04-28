@@ -7,7 +7,8 @@
     "default:_global/architecture",
     "core:core/storage",
     "core:core/spec-metadata",
-    "core:core/workspace"
+    "core:core/workspace",
+    "default:_global/logging"
   ],
   "context": [
     "Every tool in the specd ecosystem needs a shared, authoritative source for project-level settings — schema selection, workspace layout, storage paths, and installed plugins — to avoid each adapter hardcoding its own assumptions. `specd.yaml` is that single project-level configuration file: it declares which schema governs the project, how specs are organised across workspaces, where changes and archives are stored, per-artifact constraints, and installed plugins. The CLI, MCP server, and all plugins derive their wiring from it."
@@ -104,6 +105,12 @@
       ]
     },
     {
+      "requirement": "Logging configuration",
+      "rules": [
+        "`specd.yaml` MAY declare a `logging` section at the root. This section is OPTIONAL. If omitted, the system SHALL fallback to built-in defaults.\n\n- **`level`** (optional) — sets the minimum log level for the project. Supported values MUST include `trace`, `debug`, `info`, `warn`, `error`, and `silent`. Defaults to `info`."
+      ]
+    },
+    {
       "requirement": "LLM optimization",
       "rules": [
         "`specd.yaml` may include a top-level `llmOptimizedContext` boolean field. When `true`, specd may invoke an LLM for optimization tasks that produce richer output than deterministic extraction alone. When `false` or absent (the default), all operations use deterministic processing only.\n\n```yaml\nllmOptimizedContext: true # default: false\n```\n\nThe first use case is spec metadata generation: with `llmOptimizedContext: false`, the metadata agent extracts rules and scenarios by parsing the structural conventions of `spec.md` and `verify.md` directly; with `true`, the LLM generates richer `description`, structured `given`/`when`/`then` for free-form scenarios, and more precise `dependsOn` suggestions. Further use cases may be added in future versions.\n\nThis field is a project-level opt-in. Teams that have no LLM available in their automation pipeline (e.g. offline CI, air-gapped environments) leave it `false`. Teams that want LLM-enriched output set it to `true` and ensure their tooling has access to a model."
@@ -124,7 +131,7 @@
     {
       "requirement": "Startup validation",
       "rules": [
-        "Before constructing any use case, the config loader MUST validate the loaded config against the Zod schema. The following startup validation rules apply:\n\n- `schema` field is required — if missing, `ConfigValidationError` is thrown\n- `workspaces.default` is required — if missing, `ConfigValidationError` is thrown\n- Adapter values in storage and workspace configs MUST be recognised strings\n- `contextMode` MUST be one of `list`, `summary`, `full`, or `hybrid` — `lazy` is rejected\n- `contextMode` inside a workspace entry is rejected with the specific message: \"`contextMode` is not valid inside a workspace — it is a project-level setting\"\n- Pattern syntax in `contextIncludeSpecs` and `contextExcludeSpecs` MUST be valid (no mid-segment wildcards)\n- `plugins` section, if present, MUST conform to the validated structure\n- `artifactRules` is NOT accepted — if present, `ConfigValidationError` is thrown suggesting migration to `schemaOverrides`"
+        "Before constructing any use case, the config loader MUST validate the loaded config against the Zod schema. The following startup validation rules apply:\n\n- `schema` field is required — if missing, `ConfigValidationError` is thrown\n- `workspaces.default` is required — if missing, `ConfigValidationError` is thrown\n- Adapter values in storage and workspace configs MUST be recognised strings\n- `contextMode` MUST be one of `list`, `summary`, `full`, or `hybrid` — `lazy` is rejected\n- `contextMode` inside a workspace entry is rejected with the specific message: \"`contextMode` is not valid inside a workspace — it is a project-level setting\"\n- Pattern syntax in `contextIncludeSpecs` and `contextExcludeSpecs` MUST be valid (no mid-segment wildcards)\n- `plugins` section, if present, MUST conform to the validated structure\n- `artifactRules` is NOT accepted — if present, `ConfigValidationError` is thrown suggesting migration to `schemaOverrides`\n- `logging.level`, if present, MUST be one of the recognized level strings"
       ]
     }
   ],
@@ -895,6 +902,13 @@
       ]
     },
     {
+      "requirement": "Startup validation",
+      "name": "Invalid level string",
+      "given": ["specd.yaml with logging: { level: 'verbose' } (not a recognized level)"],
+      "when": ["config is validated at startup"],
+      "then": ["validation MUST fail with a ConfigValidationError"]
+    },
+    {
       "requirement": "Project context instructions",
       "name": "Context entries injected before spec content",
       "given": [
@@ -956,11 +970,25 @@
       "then": [
         "it reads /shared/instructions.md directly, without resolving relative to the specd.yaml directory"
       ]
+    },
+    {
+      "requirement": "Logging configuration",
+      "name": "Section present with all fields",
+      "given": ["a specd.yaml with logging: { level: 'debug' }"],
+      "when": ["the config is loaded"],
+      "then": ["config.logging.level MUST be 'debug'"]
+    },
+    {
+      "requirement": "Logging configuration",
+      "name": "Section absent — defaults applied",
+      "given": ["a specd.yaml without a logging section"],
+      "when": ["the config is loaded"],
+      "then": ["the logging configuration MUST use the default level 'info'"]
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:a9be750ac9e79d4bea9a51c58ad6bca7baa552442c2a956dede8c5bbef11ee90",
-    "verify.md": "sha256:90074b2098fd1c5705e15dfadefedca16e3a41e29de0d457cd12517c46dee871"
+    "spec.md": "sha256:fff698825611f7732c4b15d736b0a7d77ef7b475a12af159a059e3c6eb6373bb",
+    "verify.md": "sha256:a5358f9fa3a3870b74ff4aa0a48810d47eb5197ba70fc4159e56f583715004a8"
   },
   "generatedBy": "core"
 }

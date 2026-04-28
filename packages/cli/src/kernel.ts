@@ -1,4 +1,4 @@
-import { createKernel, type Kernel, type SpecdConfig } from '@specd/core'
+import { createKernel, type Kernel, type LogDestination, type SpecdConfig } from '@specd/core'
 import { fileURLToPath } from 'node:url'
 import * as path from 'node:path'
 
@@ -29,8 +29,24 @@ const _cliSiblingNodeModules = path.resolve(_cliDir, '../../..')
  * @param config - The loaded specd configuration.
  * @returns A fully-configured Kernel instance.
  */
-export async function createCliKernel(config: SpecdConfig): Promise<Kernel> {
-  return createKernel(config, {
+export interface CliKernelOptions {
+  /** Extra logging destinations provided by the CLI layer. */
+  readonly additionalDestinations?: readonly LogDestination[]
+}
+
+/**
+ * Creates a CLI kernel instance with CLI-local module resolution hints.
+ *
+ * @param config - Loaded project configuration.
+ * @param options - Optional CLI-specific kernel extensions.
+ * @returns The fully wired kernel promise.
+ */
+export function createCliKernel(config: SpecdConfig, options?: CliKernelOptions): Promise<Kernel> {
+  const kernelOptions = {
     extraNodeModulesPaths: [_cliPackageNodeModules, _cliSiblingNodeModules],
-  })
+    ...(options?.additionalDestinations !== undefined
+      ? { additionalDestinations: options.additionalDestinations }
+      : {}),
+  }
+  return createKernel(config, kernelOptions)
 }

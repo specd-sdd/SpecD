@@ -5,7 +5,7 @@ The `specd` CLI is the primary interface for managing the spec-driven developmen
 ## Invocation
 
 ```
-specd [--config <path>] <command> [options]
+specd [--config <path>] [-v|--verbose] <command> [options]
 ```
 
 When `specd` is invoked with no subcommand and a `specd.yaml` is discoverable from the current directory, the project dashboard is shown automatically. If no config is found, the help text is printed instead.
@@ -15,6 +15,7 @@ When `specd` is invoked with no subcommand and a `specd.yaml` is discoverable fr
 | Option                      | Description                                                                                 |
 | --------------------------- | ------------------------------------------------------------------------------------------- |
 | `--config <path>`           | Use this config file directly. Skips normal file discovery. Applies to all subcommands.     |
+| `-v, --verbose`             | Increase console logging verbosity. Repeat (`-vv`) for trace-level output.                  |
 | `--format text\|json\|toon` | Output format. `text` is the default for interactive use; `json` is suitable for scripting. |
 
 **Config discovery** — when `--config` is not given, SpecD walks up from the current working directory looking for `specd.local.yaml`, then `specd.yaml`, stopping at the git repo root. See the [configuration reference](../config/config-reference.md#file-discovery) for the full discovery algorithm.

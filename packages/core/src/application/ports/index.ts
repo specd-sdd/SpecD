@@ -31,6 +31,13 @@ export {
 export { type SchemaProvider } from './schema-provider.js'
 export { type ConfigLoader } from './config-loader.js'
 export {
+  type LogDestination,
+  type LogEntry,
+  type LogFormat,
+  type LogLevel,
+  type LoggerPort,
+} from './logger.port.js'
+export {
   type ConfigWriter,
   type InitProjectOptions,
   type InitProjectResult,

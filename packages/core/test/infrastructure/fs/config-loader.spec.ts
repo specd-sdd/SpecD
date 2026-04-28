@@ -67,6 +67,30 @@ ${extra}
 // ---------------------------------------------------------------------------
 
 describe('FsConfigLoader', () => {
+  describe('Requirement: Logging configuration', () => {
+    it('defaults logging level to info when logging section is absent', async () => {
+      const configPath = await writeConfig(minimalYaml())
+      const loader = new FsConfigLoader({ configPath })
+      const config = await loader.load()
+
+      expect(config.logging?.level).toBe('info')
+    })
+
+    it('accepts explicit logging level', async () => {
+      const configPath = await writeConfig(
+        minimalYaml(`
+logging:
+  level: debug
+`),
+      )
+
+      const loader = new FsConfigLoader({ configPath })
+      const config = await loader.load()
+
+      expect(config.logging?.level).toBe('debug')
+    })
+  })
+
   describe('Requirement: configPath', () => {
     it('defaults configPath to .specd/config under the config directory', async () => {
       const configPath = await writeConfig(minimalYaml())

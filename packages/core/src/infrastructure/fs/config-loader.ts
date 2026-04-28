@@ -226,6 +226,12 @@ const PluginsZodSchema = z
   })
   .strict()
 
+const LoggingZodSchema = z
+  .object({
+    level: z.enum(['trace', 'debug', 'info', 'warn', 'error', 'silent']).optional(),
+  })
+  .strict()
+
 const SpecdYamlZodSchema = z
   .object({
     schema: z.string(),
@@ -243,6 +249,7 @@ const SpecdYamlZodSchema = z
         signoff: z.boolean().optional(),
       })
       .optional(),
+    logging: LoggingZodSchema.optional(),
     context: z.array(ContextEntryRawZodSchema).optional(),
     contextIncludeSpecs: z.array(z.string()).optional(),
     contextExcludeSpecs: z.array(z.string()).optional(),
@@ -689,6 +696,9 @@ export class FsConfigLoader implements ConfigLoader {
       approvals: {
         spec: data.approvals?.spec ?? false,
         signoff: data.approvals?.signoff ?? false,
+      },
+      logging: {
+        level: data.logging?.level ?? 'info',
       },
       ...(context !== undefined ? { context } : {}),
       ...(data.contextIncludeSpecs !== undefined

@@ -132,4 +132,12 @@ describe('createKernel', () => {
       /workspaces\.default\.specs\.adapter 'remote' is not registered/,
     )
   })
+
+  it('initialises logging directory from configPath', async () => {
+    const config = await makeConfig()
+    await createKernel(config)
+
+    const logDir = path.join(config.configPath, 'log')
+    await expect(fs.stat(logDir)).resolves.toBeTruthy()
+  })
 })

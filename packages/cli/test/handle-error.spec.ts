@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import {
+  Logger,
   ChangeNotFoundError,
   ChangeAlreadyExistsError,
   AlreadyInitialisedError,
@@ -22,6 +23,7 @@ import {
   HookFailedError,
   SchemaValidationError,
   ConfigValidationError,
+  type LoggerPort,
 } from '@specd/core'
 import { handleError } from '../src/handle-error.js'
 import { mockProcessExit, ExitSentinel } from './commands/helpers.js'
@@ -117,7 +119,7 @@ describe('handleError — exit code 3 (system errors)', () => {
 
   afterEach(() => {
     vi.restoreAllMocks()
-    delete process.env['SPECD_DEBUG']
+    Logger.resetImplementation()
   })
 
   it('SchemaNotFoundError → exit 3 with fatal: prefix', () => {
@@ -145,8 +147,20 @@ describe('handleError — exit code 3 (system errors)', () => {
     expect(out.split('\n').filter((l) => l.trim().startsWith('at ')).length).toBe(0)
   })
 
-  it('stack trace present when SPECD_DEBUG=1', () => {
-    process.env['SPECD_DEBUG'] = '1'
+  it('stack trace present when logger debug level is enabled', () => {
+    const impl: LoggerPort = {
+      log: vi.fn(),
+      info: vi.fn(),
+      debug: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+      fatal: vi.fn(),
+      trace: vi.fn(),
+      isLevelEnabled: vi.fn((level) => level === 'debug'),
+      child: vi.fn(() => impl),
+    }
+    Logger.setImplementation(impl)
+
     callHandleError(new Error('oops'))
     expect(capturedStderr()).toContain('at ')
   })

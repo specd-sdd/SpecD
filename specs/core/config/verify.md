@@ -540,6 +540,12 @@
 - **WHEN** config is validated at startup
 - **THEN** validation fails with `ConfigValidationError` explaining skills are managed via the plugin system
 
+#### Scenario: Invalid level string
+
+- **GIVEN** `specd.yaml` with `logging: { level: 'verbose' }` (not a recognized level)
+- **WHEN** config is validated at startup
+- **THEN** validation MUST fail with a `ConfigValidationError`
+
 ### Requirement: Project context instructions
 
 #### Scenario: Context entries injected before spec content
@@ -583,3 +589,17 @@
 - **GIVEN** `specd.yaml` declares `context: [{ file: /shared/instructions.md }]` and that file exists
 - **WHEN** `CompileContext` resolves the file entry
 - **THEN** it reads `/shared/instructions.md` directly, without resolving relative to the specd.yaml directory
+
+### Requirement: Logging configuration
+
+#### Scenario: Section present with all fields
+
+- **GIVEN** a `specd.yaml` with `logging: { level: 'debug' }`
+- **WHEN** the config is loaded
+- **THEN** `config.logging.level` MUST be `'debug'`
+
+#### Scenario: Section absent — defaults applied
+
+- **GIVEN** a `specd.yaml` without a `logging` section
+- **WHEN** the config is loaded
+- **THEN** the logging configuration MUST use the default level `'info'`

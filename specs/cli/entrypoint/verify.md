@@ -95,7 +95,7 @@
 
 #### Scenario: Stack trace gated on SPECD_DEBUG
 
-- **GIVEN** `SPECD_DEBUG` is not set
+- **GIVEN** logger debug level is not enabled
 - **WHEN** a system error occurs
 - **THEN** no stack trace is printed to stderr
 
@@ -242,3 +242,9 @@
 - **WHEN** the command was run with `--format text` (or without `--format`)
 - **THEN** stdout is empty
 - **AND** stderr contains the `error:` line in plain text
+
+#### Scenario: Stack trace shown when logger debug level is enabled
+
+- **GIVEN** logger debug level is enabled
+- **WHEN** a system error occurs
+- **THEN** a stack trace is printed to stderr
