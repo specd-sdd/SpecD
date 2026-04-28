@@ -25,6 +25,30 @@
 - **THEN** only the `spec.md` section is printed; no error for the missing file
 - **AND** the process exits with code 0
 
+#### Scenario: JSON output structure
+
+- **GIVEN** `default:auth/login` has `spec.md` with content `# Auth Login` and `verify.md` with content `# Verification: Auth Login`
+- **WHEN** `specd spec show default:auth/login --format json` is run
+- **THEN** stdout is a valid JSON array with two entries, each having `filename` and `content`
+- **AND** the first entry has `filename` equal to `"spec.md"` and `content` equal to `"# Auth Login"`
+- **AND** the process exits with code 0
+
+#### Scenario: Single artifact printed with header
+
+- **GIVEN** `default:auth/login` has `spec.md` and `verify.md`
+- **WHEN** `specd spec show default:auth/login --artifact specs` is run
+- **THEN** stdout contains `--- spec.md ---` and the spec content
+- **AND** stdout DOES NOT contain `--- verify.md ---`
+- **AND** the process exits with code 0
+
+#### Scenario: JSON output structure with filtering
+
+- **GIVEN** `default:auth/login` has `spec.md` with content `# Auth Login` and `verify.md` with content `# Verification: Auth Login`
+- **WHEN** `specd spec show default:auth/login --artifact specs --format json` is run
+- **THEN** stdout is a JSON array with exactly one entry
+- **AND** the entry has `filename` equal to `"spec.md"` and `content` equal to `"# Auth Login"`
+- **AND** the process exits with code 0
+
 ### Requirement: Error cases
 
 #### Scenario: Spec does not exist
@@ -39,12 +63,17 @@
 - **THEN** the command exits with code 1
 - **AND** stderr contains an `error:` message
 
-### Requirement: Output format
+### Requirement: Artifact filtering
 
-#### Scenario: JSON output structure
+#### Scenario: Unknown artifact ID
 
-- **GIVEN** `default:auth/login` has `spec.md` with content `# Auth Login` and `verify.md` with content `# Verification: Auth Login`
-- **WHEN** `specd spec show default:auth/login --format json` is run
-- **THEN** stdout is a valid JSON array with two entries, each having `filename` and `content`
-- **AND** the first entry has `filename` equal to `"spec.md"` and `content` equal to `"# Auth Login"`
-- **AND** the process exits with code 0
+- **WHEN** `specd spec show default:auth/login --artifact nonexistent` is run
+- **THEN** the command exits with code 1
+- **AND** stderr contains an `error:` message about unknown artifact ID
+
+#### Scenario: Artifact missing on disk
+
+- **GIVEN** `default:auth/login` has `spec.md` but NO `verify.md`
+- **WHEN** `specd spec show default:auth/login --artifact verify` is run
+- **THEN** the command exits with code 1
+- **AND** stderr contains an `error:` message about missing artifact file
