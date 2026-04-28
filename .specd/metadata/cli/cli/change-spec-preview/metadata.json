@@ -9,25 +9,25 @@
     {
       "requirement": "Command signature",
       "rules": [
-        "```\nspecd change spec-preview <name> <specId> [--diff] [--format text|json|toon]\n```\n\n- `<name>` — required positional; the change name\n- `<specId>` — required positional; the fully-qualified spec ID to preview (e.g. `core:core/compile-context`); MUST be one of the change's `specIds`\n- `--diff` — optional flag; when present, outputs a unified diff instead of the full merged content\n- `--format text|json|toon` — optional; output format, defaults to `text`"
+        "```\nspecd change spec-preview <name> <specId> [--artifact <name>] [--diff] [--format text|json|toon]\n```\n\n- `<name>` — required positional; the change name\n- `<specId>` — required positional; the fully-qualified spec ID to preview (e.g. `core:core/compile-context`); MUST be one of the change's `specIds`\n- `--artifact <name>` — optional; filters the output to only include the artifact with the given ID (e.g. `specs`, `verify`)\n- `--diff` — optional flag; when present, outputs a unified diff instead of the full merged content\n- `--format text|json|toon` — optional; output format, defaults to `text`"
       ]
     },
     {
       "requirement": "Text output — merged mode (no --diff)",
       "rules": [
-        "When `--diff` is not present, the command MUST output the merged spec content. Artifact files MUST be concatenated in order: `spec.md` first (if present), then remaining files alphabetically. Each file MUST be preceded by a `--- <filename> ---` separator line, matching the format used by `specd spec show`."
+        "When `--diff` is not present, the command MUST output the merged spec content. Artifact files MUST be concatenated in order: `spec.md` first (if present), then remaining files alphabetically. Each file MUST be preceded by a `--- <filename> ---` separator line, matching the format used by `specd spec show`.\n\nIf `--artifact <name>` is provided, the command MUST resolve `<name>` to a filename using the active schema. Only the content of the matching artifact SHALL be printed, still preceded by its `--- <filename> ---` header line."
       ]
     },
     {
       "requirement": "Text output — diff mode (--diff)",
       "rules": [
-        "When `--diff` is present, the command MUST generate a unified diff locally from the `base` and `merged` fields returned by `PreviewSpec`, using the `diff` npm package's `createTwoFilesPatch` function with 3 lines of context. The diff MUST be colorized using `chalk`:\n\n- Lines starting with `+` (additions) — green\n- Lines starting with `-` (removals) — red\n- Lines starting with `@@` (hunk headers) — cyan\n- All other lines (context) — dim\n\nEach file's diff MUST be preceded by a `--- <filename> ---` separator line. Files with no changes (no-op deltas) MUST be omitted from the diff output entirely."
+        "When `--diff` is present, the command MUST generate a unified diff locally from the `base` and `merged` fields returned by `PreviewSpec`, using the `diff` npm package's `createTwoFilesPatch` function with 3 lines of context. The diff MUST be colorized using `chalk`:\n\n- Lines starting with `+` (additions) — green\n- Lines starting with `-` (removals) — red\n- Lines starting with `@@` (hunk headers) — cyan\n- All other lines (context) — dim\n\nEach file's diff MUST be preceded by a `--- <filename> ---` separator line. Files with no changes (no-op deltas) MUST be omitted from the diff output entirely.\n\nIf `--artifact <name>` is provided, the command MUST only output the diff for the requested artifact. If the requested artifact has no changes, the command SHALL exit with code 0 and output nothing (or a message indicating no changes if applicable to text format), matching the default diff behavior for individual files."
       ]
     },
     {
       "requirement": "JSON/TOON output",
       "rules": [
-        "JSON and TOON output MUST return the `PreviewSpecResult` object from the use case. When `--diff` is present, the CLI MUST generate non-colorized unified diff strings and include them as a `diff` field on each file entry. When `--diff` is absent, file entries include `base` and `merged` fields as returned by the use case."
+        "JSON and TOON output MUST return the `PreviewSpecResult` object from the use case. When `--diff` is present, the CLI MUST generate non-colorized unified diff strings and include them as a `diff` field on each file entry. When `--diff` is absent, file entries include `base` and `merged` fields as returned by the use case.\n\nIf `--artifact <name>` is provided, the `files` array in the result object SHALL contain exactly one entry for the requested artifact."
       ]
     },
     {
@@ -35,13 +35,20 @@
       "rules": [
         "If the change does not exist, the command MUST print an error message and exit with code 1. If the spec ID is not in the change's `specIds`, the command MUST print an error message and exit with code 1. Parser or delta application warnings from the use case MUST be printed to stderr."
       ]
+    },
+    {
+      "requirement": "Artifact filtering errors",
+      "rules": [
+        "- If `--artifact <name>` is provided and `<name>` does not exist in the active schema, the command SHALL exit with code 1 and print an `error:` message to stderr.\n- If the artifact exists in the schema but its scope is not `spec`, the command SHALL exit with code 1 and print an `error:` message to stderr.\n- If the artifact is valid in the schema but is not present in the change's artifacts for the given `specId`, the command SHALL exit with code 1 and print an `error:` message to stderr."
+      ]
     }
   ],
   "constraints": [
     "The CLI command delegates merge logic to PreviewSpec but owns diff generation via the diff npm package",
     "Colorization applies only to text format output; JSON/TOON output is never colorized",
     "The chalk library (already a dependency of @specd/cli) is used for colorization",
-    "The diff npm package is a dependency of @specd/cli, not @specd/core"
+    "The diff npm package is a dependency of @specd/cli, not @specd/core",
+    "Artifact filtering resolve IDs to filenames using the same logic as specd spec show."
   ],
   "scenarios": [
     {
@@ -66,6 +73,16 @@
       "then": [
         "each file is preceded by a --- <filename> --- separator line",
         "AND spec.md appears before verify.md"
+      ]
+    },
+    {
+      "requirement": "Text output — merged mode",
+      "name": "Filtered artifact in merged mode",
+      "given": ["a change with spec.md and verify.md"],
+      "when": ["specd change spec-preview my-change my-spec --artifact specs is run"],
+      "then": [
+        "stdout contains --- spec.md --- and the merged spec content",
+        "AND stdout DOES NOT contain --- verify.md ---"
       ]
     },
     {
@@ -104,6 +121,16 @@
       "then": ["only the artifact with real changes appears in the output"]
     },
     {
+      "requirement": "Text output — diff mode",
+      "name": "Filtered artifact in diff mode",
+      "given": ["a change with deltas in spec.md and verify.md"],
+      "when": ["specd change spec-preview my-change my-spec --diff --artifact specs is run"],
+      "then": [
+        "stdout contains --- spec.md --- and the colorized diff for spec.md",
+        "AND stdout DOES NOT contain --- verify.md ---"
+      ]
+    },
+    {
       "requirement": "JSON/TOON output",
       "name": "JSON output returns PreviewSpecResult",
       "given": ["a valid change with deltas"],
@@ -116,6 +143,16 @@
       "given": ["a valid change with deltas"],
       "when": ["the command is invoked with --diff --format json"],
       "then": ["each file entry includes a diff field as a plain string without ANSI color codes"]
+    },
+    {
+      "requirement": "JSON/TOON output",
+      "name": "JSON output with artifact filtering",
+      "given": ["a change with spec.md and verify.md"],
+      "when": ["specd change spec-preview my-change my-spec --artifact specs --format json is run"],
+      "then": [
+        "the files array in the JSON output contains exactly one entry",
+        "AND the entry's filename is spec.md"
+      ]
     },
     {
       "requirement": "Error handling",
@@ -140,11 +177,39 @@
         "warnings appear on stderr",
         "AND the command still exits successfully with the partial result on stdout"
       ]
+    },
+    {
+      "requirement": "Artifact filtering errors",
+      "name": "Unknown artifact ID exits with error",
+      "when": ["specd change spec-preview my-change my-spec --artifact nonexistent is run"],
+      "then": [
+        "the command exits with code 1",
+        "AND stderr contains an error: message about unknown artifact ID"
+      ]
+    },
+    {
+      "requirement": "Artifact filtering errors",
+      "name": "Non-spec artifact exits with error",
+      "when": ["specd change spec-preview my-change my-spec --artifact proposal is run"],
+      "then": [
+        "the command exits with code 1",
+        "AND stderr contains an error: message about scope mismatch"
+      ]
+    },
+    {
+      "requirement": "Artifact filtering errors",
+      "name": "Artifact not in change exits with error",
+      "given": ["a change that doesn't have a delta for verify.md for the given spec"],
+      "when": ["specd change spec-preview my-change my-spec --artifact verify is run"],
+      "then": [
+        "the command exits with code 1",
+        "AND stderr contains an error: message about missing artifact in change"
+      ]
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:957a33dda1a16be9b8e46aa195de86504b1ac469390a43b20b78e5ec4030b8d6",
-    "verify.md": "sha256:63051a317532ec3b6de66bd68ec50a12ba355567534aa3221e012f771abfd917"
+    "spec.md": "sha256:ee337355c0c367f6cfca6bceab8e797daa3d4be85fc491b24536d0bbcf1e596c",
+    "verify.md": "sha256:6269eb71b3d306c8b878c64b737093555a68a0bc73aa03a50ff4d7b77cf481d6"
   },
   "generatedBy": "core"
 }

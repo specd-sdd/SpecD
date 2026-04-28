@@ -251,4 +251,148 @@ describe('change spec-preview', () => {
       specId: 'default:auth/login',
     })
   })
+
+  describe('--artifact flag', () => {
+    const mockSchema = {
+      artifact: vi.fn(),
+    }
+
+    it('filters output by artifact ID', async () => {
+      const { kernel, stdout } = setup()
+      kernel.changes.preview.execute.mockResolvedValue({
+        specId: 'default:auth/login',
+        changeName: 'feat',
+        files: [
+          { filename: 'spec.md', base: null, merged: '# Spec' },
+          { filename: 'verify.md', base: null, merged: '# Verify' },
+        ],
+        warnings: [],
+      })
+      kernel.specs.getActiveSchema.execute.mockResolvedValue({ raw: false, schema: mockSchema })
+      mockSchema.artifact.mockReturnValue({
+        id: 'specs',
+        scope: 'spec',
+        output: 'specs/**/spec.md',
+      })
+
+      const program = makeProgram()
+      registerChangeSpecPreview(program.command('change'))
+      await program.parseAsync([
+        'node',
+        'specd',
+        'change',
+        'spec-preview',
+        'feat',
+        'auth/login',
+        '--artifact',
+        'specs',
+      ])
+
+      const out = stdout()
+      expect(out).toContain('--- spec.md ---')
+      expect(out).toContain('# Spec')
+      expect(out).not.toContain('--- verify.md ---')
+      expect(out).not.toContain('# Verify')
+    })
+
+    it('exits 1 for unknown artifact ID', async () => {
+      const { kernel, stderr } = setup()
+      kernel.changes.preview.execute.mockResolvedValue({
+        specId: 'default:auth/login',
+        changeName: 'feat',
+        files: [],
+        warnings: [],
+      })
+      kernel.specs.getActiveSchema.execute.mockResolvedValue({ raw: false, schema: mockSchema })
+      mockSchema.artifact.mockReturnValue(null)
+
+      const program = makeProgram()
+      registerChangeSpecPreview(program.command('change'))
+      await program
+        .parseAsync([
+          'node',
+          'specd',
+          'change',
+          'spec-preview',
+          'feat',
+          'auth/login',
+          '--artifact',
+          'unknown',
+        ])
+        .catch(() => {})
+
+      expect(process.exit).toHaveBeenCalledWith(1)
+      expect(stderr()).toContain("unknown artifact ID 'unknown'")
+    })
+
+    it('exits 1 for artifact with non-spec scope', async () => {
+      const { kernel, stderr } = setup()
+      kernel.changes.preview.execute.mockResolvedValue({
+        specId: 'default:auth/login',
+        changeName: 'feat',
+        files: [],
+        warnings: [],
+      })
+      kernel.specs.getActiveSchema.execute.mockResolvedValue({ raw: false, schema: mockSchema })
+      mockSchema.artifact.mockReturnValue({
+        id: 'proposal',
+        scope: 'change',
+        output: 'proposal.md',
+      })
+
+      const program = makeProgram()
+      registerChangeSpecPreview(program.command('change'))
+      await program
+        .parseAsync([
+          'node',
+          'specd',
+          'change',
+          'spec-preview',
+          'feat',
+          'auth/login',
+          '--artifact',
+          'proposal',
+        ])
+        .catch(() => {})
+
+      expect(process.exit).toHaveBeenCalledWith(1)
+      expect(stderr()).toContain("artifact 'proposal' has scope 'change' (must be 'spec' to show)")
+    })
+
+    it('exits 1 if requested artifact is not found in change preview', async () => {
+      const { kernel, stderr } = setup()
+      kernel.changes.preview.execute.mockResolvedValue({
+        specId: 'default:auth/login',
+        changeName: 'feat',
+        files: [{ filename: 'spec.md', base: null, merged: '# Spec' }],
+        warnings: [],
+      })
+      kernel.specs.getActiveSchema.execute.mockResolvedValue({ raw: false, schema: mockSchema })
+      mockSchema.artifact.mockReturnValue({
+        id: 'verify',
+        scope: 'spec',
+        output: 'specs/**/verify.md',
+      })
+
+      const program = makeProgram()
+      registerChangeSpecPreview(program.command('change'))
+      await program
+        .parseAsync([
+          'node',
+          'specd',
+          'change',
+          'spec-preview',
+          'feat',
+          'auth/login',
+          '--artifact',
+          'verify',
+        ])
+        .catch(() => {})
+
+      expect(process.exit).toHaveBeenCalledWith(1)
+      expect(stderr()).toContain(
+        "artifact 'verify' (verify.md) not found in change for spec 'auth/login'",
+      )
+    })
+  })
 })
