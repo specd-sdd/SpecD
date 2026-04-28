@@ -25,6 +25,13 @@
 - **THEN** each file is preceded by a `--- <filename> ---` separator line
 - **AND** `spec.md` appears before `verify.md`
 
+#### Scenario: Filtered artifact in merged mode
+
+- **GIVEN** a change with `spec.md` and `verify.md`
+- **WHEN** `specd change spec-preview my-change my-spec --artifact specs` is run
+- **THEN** stdout contains `--- spec.md ---` and the merged spec content
+- **AND** stdout DOES NOT contain `--- verify.md ---`
+
 ### Requirement: Text output — diff mode
 
 #### Scenario: Additions colored green
@@ -57,6 +64,13 @@
 - **WHEN** the command is invoked with `--diff`
 - **THEN** only the artifact with real changes appears in the output
 
+#### Scenario: Filtered artifact in diff mode
+
+- **GIVEN** a change with deltas in `spec.md` and `verify.md`
+- **WHEN** `specd change spec-preview my-change my-spec --diff --artifact specs` is run
+- **THEN** stdout contains `--- spec.md ---` and the colorized diff for `spec.md`
+- **AND** stdout DOES NOT contain `--- verify.md ---`
+
 ### Requirement: JSON/TOON output
 
 #### Scenario: JSON output returns PreviewSpecResult
@@ -70,6 +84,13 @@
 - **GIVEN** a valid change with deltas
 - **WHEN** the command is invoked with `--diff --format json`
 - **THEN** each file entry includes a `diff` field as a plain string without ANSI color codes
+
+#### Scenario: JSON output with artifact filtering
+
+- **GIVEN** a change with `spec.md` and `verify.md`
+- **WHEN** `specd change spec-preview my-change my-spec --artifact specs --format json` is run
+- **THEN** the `files` array in the JSON output contains exactly one entry
+- **AND** the entry's `filename` is `spec.md`
 
 ### Requirement: Error handling
 
@@ -91,3 +112,24 @@
 - **WHEN** the command is invoked
 - **THEN** warnings appear on stderr
 - **AND** the command still exits successfully with the partial result on stdout
+
+### Requirement: Artifact filtering errors
+
+#### Scenario: Unknown artifact ID exits with error
+
+- **WHEN** `specd change spec-preview my-change my-spec --artifact nonexistent` is run
+- **THEN** the command exits with code 1
+- **AND** stderr contains an `error:` message about unknown artifact ID
+
+#### Scenario: Non-spec artifact exits with error
+
+- **WHEN** `specd change spec-preview my-change my-spec --artifact proposal` is run
+- **THEN** the command exits with code 1
+- **AND** stderr contains an `error:` message about scope mismatch
+
+#### Scenario: Artifact not in change exits with error
+
+- **GIVEN** a change that doesn't have a delta for `verify.md` for the given spec
+- **WHEN** `specd change spec-preview my-change my-spec --artifact verify` is run
+- **THEN** the command exits with code 1
+- **AND** stderr contains an `error:` message about missing artifact in change
