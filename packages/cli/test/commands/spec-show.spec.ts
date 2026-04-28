@@ -155,4 +155,97 @@ describe('spec show', () => {
       parsed.find((a: { filename: string }) => a.filename === '.specd-metadata.yaml'),
     ).toBeUndefined()
   })
+
+  describe('--artifact flag', () => {
+    const mockSchema = {
+      artifact: vi.fn(),
+    }
+
+    it('filters output by artifact ID', async () => {
+      const { kernel, stdout } = setup()
+      kernel.specs.get.execute.mockResolvedValue(mockSpecResult)
+      kernel.specs.getActiveSchema.execute.mockResolvedValue({ raw: false, schema: mockSchema })
+      mockSchema.artifact.mockReturnValue({
+        id: 'specs',
+        scope: 'spec',
+        output: 'specs/**/spec.md',
+      })
+
+      const program = makeProgram()
+      registerSpecShow(program.command('spec'))
+      await program.parseAsync([
+        'node',
+        'specd',
+        'spec',
+        'show',
+        'auth/login',
+        '--artifact',
+        'specs',
+      ])
+
+      const out = stdout()
+      expect(out).toContain('--- spec.md ---')
+      expect(out).toContain('# Auth Spec')
+      expect(out).not.toContain('--- verify.md ---')
+      expect(out).not.toContain('## Scenarios')
+    })
+
+    it('exits 1 for unknown artifact ID', async () => {
+      const { kernel, stderr } = setup()
+      kernel.specs.get.execute.mockResolvedValue(mockSpecResult)
+      kernel.specs.getActiveSchema.execute.mockResolvedValue({ raw: false, schema: mockSchema })
+      mockSchema.artifact.mockReturnValue(null)
+
+      const program = makeProgram()
+      registerSpecShow(program.command('spec'))
+      await program
+        .parseAsync(['node', 'specd', 'spec', 'show', 'auth/login', '--artifact', 'unknown'])
+        .catch(() => {})
+
+      expect(process.exit).toHaveBeenCalledWith(1)
+      expect(stderr()).toContain("unknown artifact ID 'unknown'")
+    })
+
+    it('exits 1 for artifact with non-spec scope', async () => {
+      const { kernel, stderr } = setup()
+      kernel.specs.get.execute.mockResolvedValue(mockSpecResult)
+      kernel.specs.getActiveSchema.execute.mockResolvedValue({ raw: false, schema: mockSchema })
+      mockSchema.artifact.mockReturnValue({
+        id: 'proposal',
+        scope: 'change',
+        output: 'proposal.md',
+      })
+
+      const program = makeProgram()
+      registerSpecShow(program.command('spec'))
+      await program
+        .parseAsync(['node', 'specd', 'spec', 'show', 'auth/login', '--artifact', 'proposal'])
+        .catch(() => {})
+
+      expect(process.exit).toHaveBeenCalledWith(1)
+      expect(stderr()).toContain("artifact 'proposal' has scope 'change' (must be 'spec' to show)")
+    })
+
+    it('exits 1 if requested artifact is missing on disk', async () => {
+      const { kernel, stderr } = setup()
+      kernel.specs.get.execute.mockResolvedValue({
+        artifacts: new Map([['spec.md', { content: '# Auth Spec' }]]),
+      })
+      kernel.specs.getActiveSchema.execute.mockResolvedValue({ raw: false, schema: mockSchema })
+      mockSchema.artifact.mockReturnValue({
+        id: 'verify',
+        scope: 'spec',
+        output: 'specs/**/verify.md',
+      })
+
+      const program = makeProgram()
+      registerSpecShow(program.command('spec'))
+      await program
+        .parseAsync(['node', 'specd', 'spec', 'show', 'auth/login', '--artifact', 'verify'])
+        .catch(() => {})
+
+      expect(process.exit).toHaveBeenCalledWith(1)
+      expect(stderr()).toContain("artifact 'verify' (verify.md) not found on disk")
+    })
+  })
 })

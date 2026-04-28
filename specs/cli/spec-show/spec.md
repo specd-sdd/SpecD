@@ -9,10 +9,11 @@ Users and scripts need to read the raw content of a spec without navigating the 
 ### Requirement: Command signature
 
 ```
-specd spec show <workspace:capability-path> [--format text|json|toon]
+specd spec show <workspace:capability-path> [--artifact <name>] [--format text|json|toon]
 ```
 
 - `<workspace:capability-path>` — required positional; the fully-qualified spec ID (e.g. `default:auth/login`)
+- `--artifact <name>` — optional; filters the output to only include the artifact with the given ID (e.g. `specs`, `verify`)
 - `--format text|json|toon` — optional; output format, defaults to `text`
 
 ### Requirement: Output format
@@ -24,7 +25,7 @@ In `text` mode (default), the command prints each artifact file for the spec in 
 <content>
 ```
 
-All artifact files declared by the schema with scope `spec` are printed. Files that do not exist on disk are skipped silently.
+If `--artifact` is provided, the header line for the single artifact IS still printed.
 
 In `json` or `toon` mode, the output is an array (encoded in the respective format):
 
@@ -32,12 +33,20 @@ In `json` or `toon` mode, the output is an array (encoded in the respective form
 [{ "filename": "...", "content": "..." }]
 ```
 
-Each entry corresponds to one artifact file present on disk, in schema-declared order. Files that do not exist on disk are omitted.
+If `--artifact` is provided, the array SHALL contain exactly one entry for the requested artifact.
 
 ### Requirement: Error cases
 
 - If the spec does not exist (no artifact files found at the given path), the command exits with code 1 and prints an `error:` message to stderr.
 - If the workspace portion of the path is not a configured workspace, exits with code 1.
+
+### Requirement: Artifact filtering
+
+When the `--artifact <name>` flag is provided, the command MUST resolve the `<name>` to a filename using the active schema's artifact definitions.
+
+- Only the content of the artifact matching the resolved filename SHALL be printed.
+- If `<name>` does not exist in the active schema, the command SHALL exit with code 1 and print an `error:` message to stderr.
+- If the artifact exists in the schema but is missing on disk for the specified spec, the command SHALL exit with code 1 and print an `error:` message to stderr (unlike the default behavior which skips missing files).
 
 ## Constraints
 

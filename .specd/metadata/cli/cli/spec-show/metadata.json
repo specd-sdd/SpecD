@@ -9,19 +9,25 @@
     {
       "requirement": "Command signature",
       "rules": [
-        "```\nspecd spec show <workspace:capability-path> [--format text|json|toon]\n```\n\n- `<workspace:capability-path>` — required positional; the fully-qualified spec ID (e.g. `default:auth/login`)\n- `--format text|json|toon` — optional; output format, defaults to `text`"
+        "```\nspecd spec show <workspace:capability-path> [--artifact <name>] [--format text|json|toon]\n```\n\n- `<workspace:capability-path>` — required positional; the fully-qualified spec ID (e.g. `default:auth/login`)\n- `--artifact <name>` — optional; filters the output to only include the artifact with the given ID (e.g. `specs`, `verify`)\n- `--format text|json|toon` — optional; output format, defaults to `text`"
       ]
     },
     {
       "requirement": "Output format",
       "rules": [
-        "In `text` mode (default), the command prints each artifact file for the spec in schema-declared order. Each file is preceded by a header line:\n\n```\n--- <filename> ---\n<content>\n```\n\nAll artifact files declared by the schema with scope `spec` are printed. Files that do not exist on disk are skipped silently.\n\nIn `json` or `toon` mode, the output is an array (encoded in the respective format):\n\n```json\n[{ \"filename\": \"...\", \"content\": \"...\" }]\n```\n\nEach entry corresponds to one artifact file present on disk, in schema-declared order. Files that do not exist on disk are omitted."
+        "In `text` mode (default), the command prints each artifact file for the spec in schema-declared order. Each file is preceded by a header line:\n\n```\n--- <filename> ---\n<content>\n```\n\nIf `--artifact` is provided, the header line for the single artifact IS still printed.\n\nIn `json` or `toon` mode, the output is an array (encoded in the respective format):\n\n```json\n[{ \"filename\": \"...\", \"content\": \"...\" }]\n```\n\nIf `--artifact` is provided, the array SHALL contain exactly one entry for the requested artifact."
       ]
     },
     {
       "requirement": "Error cases",
       "rules": [
         "- If the spec does not exist (no artifact files found at the given path), the command exits with code 1 and prints an `error:` message to stderr.\n- If the workspace portion of the path is not a configured workspace, exits with code 1."
+      ]
+    },
+    {
+      "requirement": "Artifact filtering",
+      "rules": [
+        "When the `--artifact <name>` flag is provided, the command MUST resolve the `<name>` to a filename using the active schema's artifact definitions.\n\n- Only the content of the artifact matching the resolved filename SHALL be printed.\n- If `<name>` does not exist in the active schema, the command SHALL exit with code 1 and print an `error:` message to stderr.\n- If the artifact exists in the schema but is missing on disk for the specified spec, the command SHALL exit with code 1 and print an `error:` message to stderr (unlike the default behavior which skips missing files)."
       ]
     }
   ],
@@ -58,6 +64,43 @@
       ]
     },
     {
+      "requirement": "Output format",
+      "name": "JSON output structure",
+      "given": [
+        "default:auth/login has spec.md with content # Auth Login and verify.md with content # Verification: Auth Login"
+      ],
+      "when": ["specd spec show default:auth/login --format json is run"],
+      "then": [
+        "stdout is a valid JSON array with two entries, each having filename and content",
+        "AND the first entry has filename equal to \"spec.md\" and content equal to \"# Auth Login\"",
+        "AND the process exits with code 0"
+      ]
+    },
+    {
+      "requirement": "Output format",
+      "name": "Single artifact printed with header",
+      "given": ["default:auth/login has spec.md and verify.md"],
+      "when": ["specd spec show default:auth/login --artifact specs is run"],
+      "then": [
+        "stdout contains --- spec.md --- and the spec content",
+        "AND stdout DOES NOT contain --- verify.md ---",
+        "AND the process exits with code 0"
+      ]
+    },
+    {
+      "requirement": "Output format",
+      "name": "JSON output structure with filtering",
+      "given": [
+        "default:auth/login has spec.md with content # Auth Login and verify.md with content # Verification: Auth Login"
+      ],
+      "when": ["specd spec show default:auth/login --artifact specs --format json is run"],
+      "then": [
+        "stdout is a JSON array with exactly one entry",
+        "AND the entry has filename equal to \"spec.md\" and content equal to \"# Auth Login\"",
+        "AND the process exits with code 0"
+      ]
+    },
+    {
       "requirement": "Error cases",
       "name": "Spec does not exist",
       "when": [
@@ -72,22 +115,28 @@
       "then": ["the command exits with code 1", "AND stderr contains an error: message"]
     },
     {
-      "requirement": "Output format",
-      "name": "JSON output structure",
-      "given": [
-        "default:auth/login has spec.md with content # Auth Login and verify.md with content # Verification: Auth Login"
-      ],
-      "when": ["specd spec show default:auth/login --format json is run"],
+      "requirement": "Artifact filtering",
+      "name": "Unknown artifact ID",
+      "when": ["specd spec show default:auth/login --artifact nonexistent is run"],
       "then": [
-        "stdout is a valid JSON array with two entries, each having filename and content",
-        "AND the first entry has filename equal to \"spec.md\" and content equal to \"# Auth Login\"",
-        "AND the process exits with code 0"
+        "the command exits with code 1",
+        "AND stderr contains an error: message about unknown artifact ID"
+      ]
+    },
+    {
+      "requirement": "Artifact filtering",
+      "name": "Artifact missing on disk",
+      "given": ["default:auth/login has spec.md but NO verify.md"],
+      "when": ["specd spec show default:auth/login --artifact verify is run"],
+      "then": [
+        "the command exits with code 1",
+        "AND stderr contains an error: message about missing artifact file"
       ]
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:141c3c515c6ebb3ee051b0e444068d2bbbf8109bcbf4440b3b5ead9d458959be",
-    "verify.md": "sha256:1fc71844e505eec0709742b16e7bf3cbf6b325be196fb9b238ab8cc7e41b1b35"
+    "spec.md": "sha256:270a66e839127e0bee8f032234eaf56c9c7cf376529e9ae856d92d11fe95bec9",
+    "verify.md": "sha256:56ade5a1c95f7654840ae2bdcf1fb8355686d5c107838ad63d86acf232f8c40e"
   },
   "generatedBy": "core"
 }
