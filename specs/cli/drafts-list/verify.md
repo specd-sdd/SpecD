@@ -19,6 +19,12 @@
 - **WHEN** `specd drafts list` is run
 - **THEN** `b-change` appears before `a-change` in the output
 
+#### Scenario: Singular alias invocation
+
+- **WHEN** `specd draft list` is run
+- **THEN** it behaves as `specd drafts list`
+- **AND** the process exits with the same code as the canonical invocation
+
 ### Requirement: Output format — JSON
 
 #### Scenario: JSON format output

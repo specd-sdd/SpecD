@@ -196,7 +196,7 @@ When status is 'unchanged', projectContext and specs are omitted from the struct
               )
 
               const catalogueParts: string[] = [
-                'Use `specd change spec-preview <change-name> <specId>` to load the merged full content of any change spec you need.',
+                'Use `specd changes spec-preview <change-name> <specId>` to load the merged full content of any change spec you need.',
                 '',
               ]
 

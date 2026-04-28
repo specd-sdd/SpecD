@@ -40,6 +40,12 @@ If the user DID NOT provide a change name as an argument:
 
 1. Check `changes.active` and `changes.drafts` from the `project status` output.
 2. If any exist, list them for the user with their current states.
+
+```bash
+specd changes list --format toon
+specd drafts list --format toon
+```
+
 3. Ask the user:
 
    > Would you like to:
@@ -58,7 +64,7 @@ If a change name is provided (or once selected), run in **text mode** to see the
 diagnostic context (Artifact DAG, blockers, next action):
 
 ```bash
-specd change status <name> --format text
+specd changes status <name> --format text
 ```
 
 **Always prioritize high-visibility blockers.** If the **blockers:** section is not

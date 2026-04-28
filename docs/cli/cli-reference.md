@@ -28,7 +28,7 @@ Manage active development changes. A change is the unit of work in SpecD — it 
 ### change create
 
 ```
-specd change create <name> [options]
+specd changes create <name> [options]
 ```
 
 Create a new change and place it in the active changes directory.
@@ -44,13 +44,13 @@ Create a new change and place it in the active changes directory.
 
 ```bash
 # Create a change for two specs
-specd change create add-auth-flow --spec auth/login --spec auth/logout --description "Add login and logout flows"
+specd changes create add-auth-flow --spec auth/login --spec auth/logout --description "Add login and logout flows"
 ```
 
 ### change list
 
 ```
-specd change list [options]
+specd changes list [options]
 ```
 
 List all active changes as a table with columns: `NAME`, `STATE`, `SPECS`, `SCHEMA`.
@@ -63,7 +63,7 @@ List all active changes as a table with columns: `NAME`, `STATE`, `SPECS`, `SCHE
 ### change status
 
 ```
-specd change status <name> [options]
+specd changes status <name> [options]
 ```
 
 Show the full status of a change: associated specs, artifact file statuses, current lifecycle state, available transitions, and any blockers preventing progression.
@@ -96,8 +96,8 @@ Artifact and file states:
 ### change transition
 
 ```
-specd change transition <name> <step> [options]
-specd change transition <name> --next [options]
+specd changes transition <name> <step> [options]
+specd changes transition <name> --next [options]
 ```
 
 Transition the change to a new lifecycle state. You can either provide an explicit
@@ -129,16 +129,16 @@ execution behave exactly as they do for an explicit target.
 
 ```bash
 # Resolve the next transition automatically
-specd change transition add-auth-flow --next
+specd changes transition add-auth-flow --next
 
 # Transition to implementing, skipping all hooks
-specd change transition add-auth-flow implementing --skip-hooks all
+specd changes transition add-auth-flow implementing --skip-hooks all
 ```
 
 ### change draft
 
 ```
-specd change draft <name> [options]
+specd changes draft <name> [options]
 ```
 
 Shelve the change to the drafts directory. The change is removed from active changes and can be restored later with `drafts restore`. Use this when work needs to be paused without discarding it.
@@ -155,7 +155,7 @@ When a change has previously reached the `implementing` state, drafting is block
 ### change edit
 
 ```
-specd change edit <name> [options]
+specd changes edit <name> [options]
 ```
 
 Edit the spec scope or description of an existing change. At least one of the options below is required.
@@ -171,7 +171,7 @@ Edit the spec scope or description of an existing change. At least one of the op
 ### change validate
 
 ```
-specd change validate <name> [specPath] [options]
+specd changes validate <name> [specPath] [options]
 ```
 
 Validate the artifacts for a change against the active schema, reporting any violations and marking passing artifacts as complete.
@@ -186,7 +186,7 @@ Text output includes per-file status lines:
 
 Single-spec and batch text output always append a preview hint:
 
-`note: verify merged output with: specd change spec-preview <change> <specId>`
+`note: verify merged output with: specd changes spec-preview <change> <specId>`
 
 Structured output (`json` / `toon`) includes a `notes` array for non-blocking hints and a `files` array for each result entry.
 
@@ -202,7 +202,7 @@ Dependency-blocked failures are status-aware. When validation is blocked by an u
 ### change approve spec
 
 ```
-specd change approve spec <name> [options]
+specd changes approve spec <name> [options]
 ```
 
 Record a spec approval for the change. This command is only meaningful when `approvals.spec: true` in `specd.yaml`. It moves the change from `pending-spec-approval` to `spec-approved`, unblocking the `ready → implementing` transition.
@@ -216,7 +216,7 @@ Record a spec approval for the change. This command is only meaningful when `app
 ### change approve signoff
 
 ```
-specd change approve signoff <name> [options]
+specd changes approve signoff <name> [options]
 ```
 
 Record a sign-off for the change. This command is only meaningful when `approvals.signoff: true` in `specd.yaml`. It moves the change from `pending-signoff` to `signed-off`, unblocking the `done → archivable` transition.
@@ -230,7 +230,7 @@ Record a sign-off for the change. This command is only meaningful when `approval
 ### change context
 
 ```
-specd change context <name> <step> [options]
+specd changes context <name> <step> [options]
 ```
 
 Compile the context block for a specific lifecycle step of the change. The compiled context is what an agent receives when working on that step — it includes specs, rules, constraints, scenarios, artifact instructions, and hook instructions as applicable.
@@ -243,7 +243,7 @@ When no section flags are provided, a full spec renders all schema artifacts wit
 
 When non-full entries are present, the command prints guidance to use:
 
-`specd change spec-preview <change-name> <specId>`
+`specd changes spec-preview <change-name> <specId>`
 
 to inspect merged full content for a specific spec in this change.
 
@@ -264,7 +264,7 @@ If `--fingerprint <hash>` matches the current compiled fingerprint, `text` mode 
 ### change artifacts
 
 ```
-specd change artifacts <name> [options]
+specd changes artifacts <name> [options]
 ```
 
 Show the artifact files table for a change with columns: `ID`, `FILENAME`, `STATUS`, `EXISTS`. Useful for a quick check on what has been produced and whether files are present on disk.
@@ -287,7 +287,7 @@ active schema declares `delta: true`.
 ### change skip-artifact
 
 ```
-specd change skip-artifact <name> <artifactId> [options]
+specd changes skip-artifact <name> <artifactId> [options]
 ```
 
 Mark an optional artifact as intentionally skipped. A skipped artifact is treated as resolved in `requires` chains — it does not block downstream artifacts or workflow transitions. Only optional artifacts may be skipped.
@@ -301,7 +301,7 @@ Mark an optional artifact as intentionally skipped. A skipped artifact is treate
 ### change deps
 
 ```
-specd change deps <name> <specId> [options]
+specd changes deps <name> <specId> [options]
 ```
 
 Manage the `dependsOn` relationships for a spec within a change. At least one of `--add`, `--remove`, or `--set` is required.
@@ -317,7 +317,7 @@ Manage the `dependsOn` relationships for a spec within a change. At least one of
 ### change discard
 
 ```
-specd change discard <name> [options]
+specd changes discard <name> [options]
 ```
 
 Permanently discard a change. The change is moved to the discarded directory and cannot be recovered. Use `change draft` if you want to pause work and resume it later.
@@ -334,7 +334,7 @@ When a change has previously reached the `implementing` state, discarding is blo
 ### change check-overlap
 
 ```text
-specd change check-overlap [<name>] [options]
+specd changes check-overlap [<name>] [options]
 ```
 
 Detect specs targeted by multiple active changes. When `<name>` is given, shows only overlaps involving that change. Without a name, shows all overlaps across all active changes.
@@ -348,19 +348,19 @@ Overlap presence does not affect the exit code — the command exits 0 whether o
 
 ```bash
 # Check all active changes for overlap
-specd change check-overlap
+specd changes check-overlap
 
 # Check overlap for a specific change
-specd change check-overlap add-auth-flow
+specd changes check-overlap add-auth-flow
 
 # JSON output for scripting
-specd change check-overlap --format json
+specd changes check-overlap --format json
 ```
 
 ### change archive
 
 ```
-specd change archive <name> [options]
+specd changes archive <name> [options]
 ```
 
 Archive a completed change. Scope-`spec` artifacts are synced into the spec repository, and the change is moved to the archive directory. The change must be in the `archivable` state.
@@ -377,7 +377,7 @@ If other active changes target the same specs, the archive is blocked by default
 ### change run-hooks
 
 ```
-specd change run-hooks <name> <step> [options]
+specd changes run-hooks <name> <step> [options]
 ```
 
 Execute the `run:` hooks defined for a lifecycle step outside of a transition. Useful for re-running hooks after a failure or for manual invocation.
@@ -392,7 +392,7 @@ Execute the `run:` hooks defined for a lifecycle step outside of a transition. U
 ### change hook-instruction
 
 ```
-specd change hook-instruction <name> <step> [options]
+specd changes hook-instruction <name> <step> [options]
 ```
 
 Print the `instruction:` hook text for a lifecycle step. Returns the instruction content that would be injected into agent context at the specified phase, without executing anything.
@@ -407,7 +407,7 @@ Print the `instruction:` hook text for a lifecycle step. Returns the instruction
 ### change artifact-instruction
 
 ```
-specd change artifact-instruction <name> [artifact-id] [options]
+specd changes artifact-instruction <name> [artifact-id] [options]
 ```
 
 Print the artifact instructions, rules, and delta guidance for a change. When `[artifact-id]` is given, returns instructions for that specific artifact only. Returns all artifact instructions when omitted.
@@ -503,7 +503,7 @@ View archived changes. Archived changes are the permanent record of completed wo
 ### archive list
 
 ```
-specd archive list [options]
+specd archives list [options]
 ```
 
 List all archived changes as a table with columns: `NAME`, `WORKSPACE`, `DATE`, `BY`.
@@ -516,7 +516,7 @@ List all archived changes as a table with columns: `NAME`, `WORKSPACE`, `DATE`, 
 ### archive show
 
 ```
-specd archive show <name> [options]
+specd archives show <name> [options]
 ```
 
 Show the details of a specific archived change.
@@ -535,7 +535,7 @@ Browse and manage specs. These commands operate on spec files in the spec reposi
 ### spec list
 
 ```
-specd spec list [options]
+specd specs list [options]
 ```
 
 List all specs known to the project.
@@ -550,7 +550,7 @@ List all specs known to the project.
 ### spec show
 
 ```
-specd spec show <specPath> [options]
+specd specs show <specPath> [options]
 ```
 
 Show the full contents of all artifacts in a spec directory. `<specPath>` is the spec identifier (e.g. `auth/login` or `billing:payments/invoicing`).
@@ -563,7 +563,7 @@ Show the full contents of all artifacts in a spec directory. `<specPath>` is the
 ### spec context
 
 ```
-specd spec context <specPath> [options]
+specd specs context <specPath> [options]
 ```
 
 Compile the context block for a spec. Useful for inspecting what an agent would receive when asked to work with this spec directly.
@@ -583,7 +583,7 @@ Rendering mode is controlled by `contextMode` in `specd.yaml` (`list`, `summary`
 ### spec metadata
 
 ```
-specd spec metadata <specPath> [options]
+specd specs metadata <specPath> [options]
 ```
 
 Show the parsed metadata for a spec: title, content hashes, dependency links, and artifact counts. Reads from `metadata.json` if present and fresh; falls back to extraction from artifact content otherwise.
@@ -596,13 +596,13 @@ Show the parsed metadata for a spec: title, content hashes, dependency links, an
 ### spec resolve-path
 
 ```
-specd spec resolve-path <path> [options]
+specd specs resolve-path <path> [options]
 ```
 
 Resolve a filesystem path to a SpecD spec identifier. Useful when working in a spec directory and needing the canonical identifier to pass to other commands.
 
 ```bash
-specd spec resolve-path specs/auth/login/spec.md
+specd specs resolve-path specs/auth/login/spec.md
 # → auth/login
 ```
 
@@ -614,7 +614,7 @@ specd spec resolve-path specs/auth/login/spec.md
 ### spec validate
 
 ```
-specd spec validate [specPath] [options]
+specd specs validate [specPath] [options]
 ```
 
 Validate the artifact files for a spec against the active schema's validation rules. When `<specPath>` is given, validates that spec only. When `--all` is given, validates every spec in the project.
@@ -629,7 +629,7 @@ Validate the artifact files for a spec against the active schema's validation ru
 ### spec write-metadata
 
 ```
-specd spec write-metadata <specPath> [options]
+specd specs write-metadata <specPath> [options]
 ```
 
 Write a `metadata.json` file for a spec. By default reads from stdin unless `--input` is given.
@@ -644,7 +644,7 @@ Write a `metadata.json` file for a spec. By default reads from stdin unless `--i
 ### spec invalidate-metadata
 
 ```
-specd spec invalidate-metadata <specPath> [options]
+specd specs invalidate-metadata <specPath> [options]
 ```
 
 Mark a spec's `metadata.json` as stale. SpecD will fall back to live extraction on next context compilation until the metadata is regenerated.
@@ -657,7 +657,7 @@ Mark a spec's `metadata.json` as stale. SpecD will fall back to live extraction 
 ### spec generate-metadata
 
 ```
-specd spec generate-metadata [specPath] [options]
+specd specs generate-metadata [specPath] [options]
 ```
 
 Generate metadata for a spec (or all specs) from the schema rules and artifact content. By default, prints the generated metadata without writing it. Pass `--write` to persist it.
@@ -673,8 +673,8 @@ Generate metadata for a spec (or all specs) from the schema rules and artifact c
 
 ```bash
 # Regenerate stale and missing metadata across the whole project
-specd spec generate-metadata --all --status stale --write
-specd spec generate-metadata --all --status missing --write
+specd specs generate-metadata --all --status stale --write
+specd specs generate-metadata --all --status missing --write
 ```
 
 ---
@@ -1182,23 +1182,23 @@ Update all installed skill files to the latest version from the installed SpecD 
 
 ```bash
 # Create the change
-specd change create add-payment-export --spec billing/payments --description "Add CSV export for invoices"
+specd changes create add-payment-export --spec billing/payments --description "Add CSV export for invoices"
 
 # Check what artifacts are needed
-specd change artifacts add-payment-export
+specd changes artifacts add-payment-export
 
 # Once artifacts are produced, check status and available transitions
-specd change status add-payment-export
+specd changes status add-payment-export
 
 # Transition into implementation
-specd change transition add-payment-export implementing
+specd changes transition add-payment-export implementing
 ```
 
 ### Pause and resume work
 
 ```bash
 # Shelve to drafts
-specd change draft add-payment-export --reason "Blocked pending design review"
+specd changes draft add-payment-export --reason "Blocked pending design review"
 
 # Later, restore it
 specd drafts restore add-payment-export
@@ -1208,20 +1208,20 @@ specd drafts restore add-payment-export
 
 ```bash
 # Confirm the change is in archivable state
-specd change status add-payment-export
+specd changes status add-payment-export
 
 # Archive — syncs spec artifacts and moves to archive directory
-specd change archive add-payment-export
+specd changes archive add-payment-export
 ```
 
 ### Inspect and validate a spec
 
 ```bash
 # Validate all artifacts in a spec
-specd spec validate auth/login
+specd specs validate auth/login
 
 # See compiled context for a spec (useful for debugging what an agent receives)
-specd spec context auth/login --rules --constraints --scenarios
+specd specs context auth/login --rules --constraints --scenarios
 ```
 
 ### Set up a new project

@@ -2,6 +2,18 @@
 
 ## Requirements
 
+### Requirement: Command signature
+
+#### Scenario: Canonical plural command
+
+- **WHEN** `specd specs list --format json` is run
+- **THEN** the command executes using the canonical plural group
+
+#### Scenario: Singular alias command
+
+- **WHEN** `specd spec list --format json` is run
+- **THEN** it behaves as an alias of `specd specs list --format json`
+
 ### Requirement: Title resolution
 
 #### Scenario: Title from metadata

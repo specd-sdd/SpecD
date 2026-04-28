@@ -6,13 +6,18 @@
 
 #### Scenario: Missing name argument
 
-- **WHEN** `specd change draft` is run without a name
+- **WHEN** `specd changes draft` is run without a name
 - **THEN** the command exits with code 1 and prints a usage error to stderr
 
 #### Scenario: Force flag is accepted
 
-- **WHEN** `specd change draft my-change --force` is run with a valid change name
+- **WHEN** `specd changes draft my-change --force` is run with a valid change name
 - **THEN** the command accepts the flag as part of its input contract
+
+#### Scenario: Singular alias remains accepted
+
+- **WHEN** `specd change draft my-change` is run
+- **THEN** it is accepted as an alias of `specd changes draft my-change`
 
 ### Requirement: Behaviour
 

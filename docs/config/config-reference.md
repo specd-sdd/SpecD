@@ -326,9 +326,9 @@ Leave this `false` if your pipeline has no LLM access (offline CI, air-gapped en
 
 `contextMode` controls how context commands render collected specs:
 
-- `specd change context`
+- `specd changes context`
 - `specd project context`
-- `specd spec context`
+- `specd specs context`
 
 | Value       | Behaviour                                                                                                                                                                                                                                             |
 | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

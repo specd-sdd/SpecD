@@ -54,7 +54,7 @@ describe('change validate', () => {
 
     expect(stdout()).toContain('validated feat/default:auth/login: all artifacts pass')
     expect(stdout()).toContain('file: deltas/default/auth/login/spec.md.delta.yaml')
-    expect(stdout()).toContain('specd change spec-preview feat default:auth/login')
+    expect(stdout()).toContain('specd changes spec-preview feat default:auth/login')
   })
 
   it('prints failures and exits 1 when validation fails', async () => {
@@ -82,7 +82,7 @@ describe('change validate', () => {
     expect(stdout()).toContain('validation failed')
     expect(stdout()).toContain('missing: deltas/default/auth/login/spec.md.delta.yaml')
     expect(stdout()).toContain('missing required section')
-    expect(stdout()).toContain('specd change spec-preview feat default:auth/login')
+    expect(stdout()).toContain('specd changes spec-preview feat default:auth/login')
   })
 
   it('preserves status-aware dependency-block descriptions in text output', async () => {
@@ -105,8 +105,8 @@ describe('change validate', () => {
       .parseAsync(['node', 'specd', 'change', 'validate', 'feat', 'auth/login'])
       .catch(() => {})
 
-    expect(stdout()).toContain("status: pending-review")
-    expect(stdout()).toContain("requiring review")
+    expect(stdout()).toContain('status: pending-review')
+    expect(stdout()).toContain('requiring review')
     expect(process.exitCode).toBe(1)
   })
 

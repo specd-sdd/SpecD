@@ -1,0 +1,76 @@
+{
+  "title": "Command Resource Naming",
+  "description": "Inconsistent singular/plural command-group naming increases cognitive load and makes CLI usage less predictable. This spec defines one canonical naming policy for countable CLI resource groups and standardizes alias behavior so commands, docs, and skills stay coherent while preserving compatibility.",
+  "dependsOn": ["cli:cli/entrypoint"],
+  "context": [
+    "Inconsistent singular/plural command-group naming increases cognitive load and makes CLI usage less predictable. This spec defines one canonical naming policy for countable CLI resource groups and standardizes alias behavior so commands, docs, and skills stay coherent while preserving compatibility."
+  ],
+  "rules": [
+    {
+      "requirement": "Canonical plural groups",
+      "rules": [
+        "For countable CLI resources, the canonical command-group name SHALL be plural.\n\nCanonical groups in scope include:\n\n- `changes`\n- `specs`\n- `archives`\n- `drafts`"
+      ]
+    },
+    {
+      "requirement": "Singular aliases",
+      "rules": [
+        "Each canonical plural group SHALL accept a singular alias for backward compatibility.\n\nAliases in scope include:\n\n- `change` as alias of `changes`\n- `spec` as alias of `specs`\n- `archive` as alias of `archives`\n- `draft` as alias of `drafts`"
+      ]
+    },
+    {
+      "requirement": "Help and docs canonical display",
+      "rules": [
+        "CLI help and project documentation SHALL present canonical plural command groups as the primary form. Singular aliases MAY be shown as aliases only."
+      ]
+    },
+    {
+      "requirement": "Behavioral equivalence",
+      "rules": [
+        "For any canonical group and its singular alias, command behavior, outputs, and exit codes MUST be equivalent for the same subcommand and arguments."
+      ]
+    }
+  ],
+  "constraints": [
+    "This policy applies to command-group naming only; it does not rename domain entities or internal use-case identifiers.",
+    "Introducing plural canonicals MUST NOT break existing singular invocations."
+  ],
+  "scenarios": [
+    {
+      "requirement": "Canonical plural groups",
+      "name": "Help uses plural canonical groups",
+      "when": ["users inspect CLI command-group help"],
+      "then": [
+        "countable resources are shown as plural canonical groups",
+        "AND the groups include changes, specs, archives, and drafts"
+      ]
+    },
+    {
+      "requirement": "Singular aliases",
+      "name": "Singular aliases are accepted",
+      "when": ["a command is invoked with change, spec, archive, or draft"],
+      "then": ["the command resolves to the corresponding canonical plural group behavior"]
+    },
+    {
+      "requirement": "Help and docs canonical display",
+      "name": "Documentation examples use canonical groups",
+      "when": ["command examples are rendered in project documentation"],
+      "then": [
+        "examples use canonical plural groups as the primary form",
+        "AND singular forms, when present, are shown only as aliases"
+      ]
+    },
+    {
+      "requirement": "Behavioral equivalence",
+      "name": "Canonical and alias invocations produce equivalent outcomes",
+      "given": ["the same subcommand and arguments"],
+      "when": ["the command is run with canonical plural and with singular alias groups"],
+      "then": ["outputs and exit codes are equivalent"]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:d62e4c09a3b15bba5845b4796465981ba2f14b0c2eaefcc9d70dd112bed6e22e",
+    "verify.md": "sha256:bba7a2ff1b8507080fa8883459eaeb7746430ca4f0738f5c655085e42c65d982"
+  },
+  "generatedBy": "core"
+}

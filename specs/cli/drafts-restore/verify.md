@@ -9,6 +9,11 @@
 - **WHEN** `specd drafts restore` is run without a name
 - **THEN** the command exits with code 1 and prints a usage error to stderr
 
+#### Scenario: Singular alias invocation
+
+- **WHEN** `specd draft restore old-experiment` is run
+- **THEN** it is accepted as an alias of `specd drafts restore old-experiment`
+
 ### Requirement: Behaviour
 
 #### Scenario: Change moved back to active

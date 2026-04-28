@@ -12,7 +12,7 @@ Works through tasks one by one and marks them done.
 ### 1. Load change state
 
 ```bash
-specd change status <name> --format text
+specd changes status <name> --format text
 ```
 
 Identify any high-visibility blockers from the **blockers:** section (e.g. `ARTIFACT_DRIFT`,
@@ -36,21 +36,21 @@ Redirect based on the **next action:** `target` recommendation.
 If in `ready` or `spec-approved`, run pre-hooks and transition:
 
 ```bash
-specd change run-hooks <name> implementing --phase pre
-specd change hook-instruction <name> implementing --phase pre --format text
+specd changes run-hooks <name> implementing --phase pre
+specd changes hook-instruction <name> implementing --phase pre --format text
 ```
 
 Follow guidance — it tells you which change artifacts to read.
 
 ```bash
-specd change transition <name> implementing --skip-hooks all
+specd changes transition <name> implementing --skip-hooks all
 ```
 
 If already in `implementing` (resuming), run pre-hooks but skip the transition:
 
 ```bash
-specd change run-hooks <name> implementing --phase pre
-specd change hook-instruction <name> implementing --phase pre --format text
+specd changes run-hooks <name> implementing --phase pre
+specd changes hook-instruction <name> implementing --phase pre --format text
 ```
 
 ### 2. Check workspace ownership
@@ -96,7 +96,7 @@ Find artifacts with `hasTaskCompletionCheck: true` — those have trackable chec
 ### 4. Load context
 
 ```bash
-specd change context <name> implementing --follow-deps --depth 1 --rules --constraints --format text [--fingerprint <stored-value>]
+specd changes context <name> implementing --follow-deps --depth 1 --rules --constraints --format text [--fingerprint <stored-value>]
 ```
 
 Pass `--fingerprint <stored-value>` if you have a `contextFingerprint` from a previous `change context` call in this conversation (see `shared.md` — "Fingerprint mechanism"). If output says `unchanged`, use the context already in memory.
@@ -191,8 +191,8 @@ For each task in order:
 `- [x]`, run the post-implementing hooks.
 
 ```bash
-specd change run-hooks <name> implementing --phase post
-specd change hook-instruction <name> implementing --phase post --format text
+specd changes run-hooks <name> implementing --phase post
+specd changes hook-instruction <name> implementing --phase post --format text
 ```
 
 Follow guidance. If hooks fail (tests, lint), fix and re-run until they pass.
@@ -221,7 +221,7 @@ If during implementation you discover that the artifacts need changes, stop and 
 the issue. If the user agrees:
 
 ```bash
-specd change transition <name> designing --skip-hooks all
+specd changes transition <name> designing --skip-hooks all
 ```
 
 > Artifacts need revision. Run `/specd-design <name>` to update them.

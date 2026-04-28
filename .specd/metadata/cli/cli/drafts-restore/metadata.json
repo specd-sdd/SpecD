@@ -1,7 +1,7 @@
 {
   "title": "Drafts Restore",
   "description": "When paused work is ready to resume, it needs to move back to the active list without losing any lifecycle state or history. `specd drafts restore <name>` recovers a drafted change from `drafts/` back to `changes/`, preserving its state exactly as it was when drafted.",
-  "dependsOn": ["cli:cli/entrypoint", "core:core/change"],
+  "dependsOn": ["cli:cli/entrypoint", "core:core/change", "cli:cli/command-resource-naming"],
   "context": [
     "When paused work is ready to resume, it needs to move back to the active list without losing any lifecycle state or history. `specd drafts restore <name>` recovers a drafted change from `drafts/` back to `changes/`, preserving its state exactly as it was when drafted."
   ],
@@ -9,7 +9,7 @@
     {
       "requirement": "Command signature",
       "rules": [
-        "```\nspecd drafts restore <name> [--format text|json|toon]\n```\n\n- `<name>` — required positional; the name of the drafted change to restore\n- `--format` — controls output encoding; defaults to `text`"
+        "```\nspecd drafts restore <name> [--format text|json|toon]\n```\n\nAlias:\n\n```\nspecd draft restore <name> [--format text|json|toon]\n```\n\n- `<name>` — required positional; the name of the drafted change to restore\n- `--format` — controls output encoding; defaults to `text`"
       ]
     },
     {
@@ -49,6 +49,12 @@
       "name": "Missing name argument",
       "when": ["specd drafts restore is run without a name"],
       "then": ["the command exits with code 1 and prints a usage error to stderr"]
+    },
+    {
+      "requirement": "Command signature",
+      "name": "Singular alias invocation",
+      "when": ["specd draft restore old-experiment is run"],
+      "then": ["it is accepted as an alias of specd drafts restore old-experiment"]
     },
     {
       "requirement": "Behaviour",
@@ -98,8 +104,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:81767f68a3cd9113d74cd1aaa52e6c50387c3b66f080eb6f5b25cf8d4a661d04",
-    "verify.md": "sha256:751f0f7c738c7be8c5ac7f9c27e5b0b89e34075a20db6cf737ffc954d2b3b1cb"
+    "spec.md": "sha256:fb707123eae89d66137ded48792b9adb90a7bfdb9835c754fa7d288e286aa894",
+    "verify.md": "sha256:e55bbf98e4990834e3c768429881e56917e21ccd5bf2bd78e5d94ad2775092c0"
   },
   "generatedBy": "core"
 }

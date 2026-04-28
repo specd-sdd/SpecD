@@ -13,7 +13,7 @@ gate is handled by `/specd-verify`, not by this skill.
 ### 1. Load change state
 
 ```bash
-specd change status <name> --format text
+specd changes status <name> --format text
 ```
 
 Identify any high-visibility blockers from the **blockers:** section (e.g. `ARTIFACT_DRIFT`,
@@ -36,7 +36,7 @@ Redirect based on the **next action:** `target` recommendation.
 ### 2. Load context
 
 ```bash
-specd change context <name> archiving --follow-deps --depth 1 --format text [--fingerprint <stored-value>]
+specd changes context <name> archiving --follow-deps --depth 1 --format text [--fingerprint <stored-value>]
 ```
 
 Pass `--fingerprint <stored-value>` if you have a `contextFingerprint` from a previous `change context` call in this conversation (see `shared.md` — "Fingerprint mechanism"). If output says `unchanged`, use the context already in memory.
@@ -57,8 +57,8 @@ summary specs, evaluate and load any that are relevant (see `shared.md` — "Pro
 ### 4. Pre-archive hooks
 
 ```bash
-specd change run-hooks <name> archiving --phase pre
-specd change hook-instruction <name> archiving --phase pre --format text
+specd changes run-hooks <name> archiving --phase pre
+specd changes hook-instruction <name> archiving --phase pre --format text
 ```
 
 Follow guidance — review deltas to ensure specs match what was built.
@@ -66,7 +66,7 @@ Follow guidance — review deltas to ensure specs match what was built.
 ### 5. Archive
 
 ```bash
-specd change archive <name> --skip-hooks all --format toon
+specd changes archive <name> --skip-hooks all --format toon
 ```
 
 If the command fails with a `SpecOverlapError` (spec overlap detected), other active
@@ -79,14 +79,14 @@ changes target the same specs as this change. When this happens:
 If the user confirms, re-run the command with `--allow-overlap`:
 
 ```bash
-specd change archive <name> --skip-hooks all --allow-overlap --format toon
+specd changes archive <name> --skip-hooks all --allow-overlap --format toon
 ```
 
 ### 6. Post-archive hooks
 
 ```bash
-specd change run-hooks <name> archiving --phase post
-specd change hook-instruction <name> archiving --phase post --format text
+specd changes run-hooks <name> archiving --phase post
+specd changes hook-instruction <name> archiving --phase post --format text
 ```
 
 Follow guidance.
@@ -94,7 +94,7 @@ Follow guidance.
 ### 7. Regenerate metadata
 
 ```bash
-specd spec generate-metadata --all --write --status stale,missing
+specd specs generate-metadata --all --write --status stale,missing
 ```
 
 ### 8. Check LLM optimization
@@ -132,7 +132,7 @@ If during the pre-archive review you discover that the artifacts need revision, 
 If the user agrees:
 
 ```bash
-specd change transition <name> designing --skip-hooks all
+specd changes transition <name> designing --skip-hooks all
 ```
 
 > Specs need revision before archiving. Run `/specd-design <name>` to update them.

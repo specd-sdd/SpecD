@@ -1,15 +1,15 @@
 {
   "title": "Change Draft",
-  "description": "Sometimes work needs to be paused without losing progress or polluting the active change list. `specd change draft <name> [--reason <text>]` shelves an active change to `drafts/` without affecting its lifecycle state, keeping it recoverable at any time via `specd drafts restore`.",
-  "dependsOn": ["cli:cli/entrypoint", "core:core/change"],
+  "description": "Sometimes work needs to be paused without losing progress or polluting the active change list. `specd changes draft <name> [--reason <text>]` is the canonical form and shelves an active change to `drafts/` without affecting its lifecycle state, keeping it recoverable at any time via `specd drafts restore`.\n\n`specd change draft <name> ...` remains supported as an alias.",
+  "dependsOn": ["cli:cli/entrypoint", "core:core/change", "cli:cli/command-resource-naming"],
   "context": [
-    "Sometimes work needs to be paused without losing progress or polluting the active change list. `specd change draft <name> [--reason <text>]` shelves an active change to `drafts/` without affecting its lifecycle state, keeping it recoverable at any time via `specd drafts restore`."
+    "Sometimes work needs to be paused without losing progress or polluting the active change list. `specd changes draft <name> [--reason <text>]` is the canonical form and shelves an active change to `drafts/` without affecting its lifecycle state, keeping it recoverable at any time via `specd drafts restore`.\n\n`specd change draft <name> ...` remains supported as an alias."
   ],
   "rules": [
     {
       "requirement": "Command signature",
       "rules": [
-        "```\nspecd change draft <name> [--reason <text>] [--force] [--format text|json|toon]\n```\n\n- `<name>` — required positional; the name of the change to shelve\n- `--reason <text>` — optional; a human-readable explanation for shelving the change\n- `--force` — optional; bypasses the historical implementation guard when the change has previously reached `implementing`\n- `--format text|json|toon` — optional; output format, defaults to `text`"
+        "```\nspecd changes draft <name> [--reason <text>] [--force] [--format text|json|toon]\n```\n\nAlias:\n\n```\nspecd change draft <name> [--reason <text>] [--force] [--format text|json|toon]\n```\n\n- `<name>` — required positional; the name of the change to shelve\n- `--reason <text>` — optional; a human-readable explanation for shelving the change\n- `--force` — optional; bypasses the historical implementation guard when the change has previously reached `implementing`\n- `--format text|json|toon` — optional; output format, defaults to `text`"
       ]
     },
     {
@@ -41,14 +41,20 @@
     {
       "requirement": "Command signature",
       "name": "Missing name argument",
-      "when": ["specd change draft is run without a name"],
+      "when": ["specd changes draft is run without a name"],
       "then": ["the command exits with code 1 and prints a usage error to stderr"]
     },
     {
       "requirement": "Command signature",
       "name": "Force flag is accepted",
-      "when": ["specd change draft my-change --force is run with a valid change name"],
+      "when": ["specd changes draft my-change --force is run with a valid change name"],
       "then": ["the command accepts the flag as part of its input contract"]
+    },
+    {
+      "requirement": "Command signature",
+      "name": "Singular alias remains accepted",
+      "when": ["specd change draft my-change is run"],
+      "then": ["it is accepted as an alias of specd changes draft my-change"]
     },
     {
       "requirement": "Behaviour",
@@ -114,8 +120,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:e32f285a2dec661e3964af3224447f81795b5cb1af29f3a3df6ce9bf1a1da111",
-    "verify.md": "sha256:28522e6dcea4f4bbe5ebf49fbbe282ea7bd4dc340aaf5ceb76ab8da65e78fd85"
+    "spec.md": "sha256:52985758dbcfcf34562e454487c9d9d910dab36ef7c685bf05fbb9e6f4c2f8ac",
+    "verify.md": "sha256:2d8c12c53cd7309b285cf11eec7ba0072833653421ac8dd82d1a599fe063d64e"
   },
   "generatedBy": "core"
 }

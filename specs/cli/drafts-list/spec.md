@@ -12,6 +12,12 @@ Shelved work is invisible to the active change list, so users need a dedicated v
 specd drafts list [--format text|json|toon]
 ```
 
+Alias:
+
+```
+specd draft list [--format text|json|toon]
+```
+
 No positional arguments. The `--format` flag controls output encoding; defaults to `text`.
 
 ### Requirement: Output format — text
@@ -71,3 +77,4 @@ $ specd drafts list --format json
 
 - [`cli:cli/entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
 - [`core:core/change`](../../core/change/spec.md) — drafting semantics
+- [`cli:cli/command-resource-naming`](../command-resource-naming/spec.md) — canonical plural naming and singular alias policy

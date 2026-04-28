@@ -114,7 +114,7 @@ SpecD uses several states to track artifacts and files:
 To find the correct ID:
 
 ```bash
-specd spec list --format text --summary
+specd specs list --format text --summary
 ```
 
 Use the IDs from the PATH column. For new specs that don't exist yet, **ask the user**
@@ -126,7 +126,7 @@ which workspace they belong to.
 If a spec needs to be part of the change, first add it:
 
 ```bash
-specd change edit <name> --add-spec <workspace:path>
+specd changes edit <name> --add-spec <workspace:path>
 ```
 
 Only after `--add-spec` succeeds should you write the delta or artifact file in the
@@ -136,7 +136,7 @@ validation failures and broken state.
 Whenever you edit or write a delta, check the merged output with
 
 ```bash
-specd change spec-preview <name> <specId>
+specd changes spec-preview <name> <specId>
 ```
 
 If the output is not what you want, edit the delta again (make sure the delta does not remove anything needed).
@@ -217,8 +217,8 @@ are exclusively human actions. When a change reaches `pending-spec-approval` or
 `pending-signoff`, your only job is to tell the user what command to run:
 
 ```bash
-specd change approve spec <name> --reason "..."
-specd change approve signoff <name> --reason "..."
+specd changes approve spec <name> --reason "..."
+specd changes approve signoff <name> --reason "..."
 ```
 
 Do not attempt to approve, do not offer to approve, do not auto-approve. Stop and wait.
@@ -263,13 +263,13 @@ You MUST NOT ignore the summary catalogue. Before proceeding with your task:
 If you are loading a spec inside a change:
 
 ```bash
-specd change spec-preview <change-name> <spec-id> --format text
+specd changes spec-preview <change-name> <spec-id> --format text
 ```
 
 If the spec is not in the change:
 
 ```bash
-specd spec show <spec-id> --format text
+specd specs show <spec-id> --format text
 ```
 
 4. **Follow** the loaded spec content with the same weight as full-mode specs

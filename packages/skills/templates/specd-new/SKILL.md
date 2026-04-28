@@ -45,7 +45,7 @@ project for discovery work.
 Investigate the codebase if relevant:
 
 ```bash
-specd spec list --format text --summary
+specd specs list --format text --summary
 ```
 
 Surface existing specs that might be affected. Let the conversation develop naturally.
@@ -104,7 +104,7 @@ Wait for confirmation.
 ### 4. Create
 
 ```bash
-specd change create <name> --spec <workspace:path> --description "<desc>" --format toon
+specd changes create <name> --spec <workspace:path> --description "<desc>" --format toon
 ```
 
 The response includes `changePath` — the directory where artifacts will be written.
@@ -113,8 +113,8 @@ If `change create` fails with `Change '<name>' already exists`, the change is al
 in progress. Load its status in **text mode** for diagnostics and **toon mode** for extraction:
 
 ```bash
-specd change status <name> --format text
-specd change status <name> --format toon
+specd changes status <name> --format text
+specd changes status <name> --format toon
 ```
 
 Read `state`, `blockers`, `nextAction`, and `review` from the response.
@@ -130,24 +130,24 @@ then stop.
 
 If `review.required` is `false`, suggest based on `nextAction.targetStep`:
 
-| targetStep                       | Suggest                                                                    |
-| -------------------------------- | -------------------------------------------------------------------------- |
-| `drafting` / `designing`         | `/specd-design <name>`                                                     |
-| `ready`                          | Review artifacts, then `/specd-implement <name>` if approved               |
-| `implementing` / `spec-approved` | `/specd-implement <name>`                                                  |
-| `verifying`                      | `/specd-verify <name>`                                                     |
-| `done` / `signed-off`            | `/specd-verify <name>` (handles done→archivable transition)                |
-| `pending-signoff`                | "Signoff pending. Run: `specd change approve signoff <name> --reason ...`" |
-| `archivable`                     | `/specd-archive <name>`                                                    |
-| `pending-spec-approval`          | "Approval pending. Run: `specd change approve spec <name> --reason ...`"   |
+| targetStep                       | Suggest                                                                     |
+| -------------------------------- | --------------------------------------------------------------------------- |
+| `drafting` / `designing`         | `/specd-design <name>`                                                      |
+| `ready`                          | Review artifacts, then `/specd-implement <name>` if approved                |
+| `implementing` / `spec-approved` | `/specd-implement <name>`                                                   |
+| `verifying`                      | `/specd-verify <name>`                                                      |
+| `done` / `signed-off`            | `/specd-verify <name>` (handles done→archivable transition)                 |
+| `pending-signoff`                | "Signoff pending. Run: `specd changes approve signoff <name> --reason ...`" |
+| `archivable`                     | `/specd-archive <name>`                                                     |
+| `pending-spec-approval`          | "Approval pending. Run: `specd changes approve spec <name> --reason ...`"   |
 
 **Stop — do not continue.**
 
 ### 5. Run entry hooks
 
 ```bash
-specd change run-hooks <name> drafting --phase pre
-specd change hook-instruction <name> drafting --phase pre --format text
+specd changes run-hooks <name> drafting --phase pre
+specd changes hook-instruction <name> drafting --phase pre --format text
 ```
 
 Follow guidance if any.
@@ -158,7 +158,7 @@ If during the discovery conversation you identified dependencies between the spe
 change (or between them and existing specs), register them now:
 
 ```bash
-specd change deps <name> <specId> --add <depId> --add <depId>
+specd changes deps <name> <specId> --add <depId> --add <depId>
 ```
 
 This is optional at this stage — dependencies can also be registered later during
@@ -220,8 +220,8 @@ about whether to include something: include it.
 ### 8. Run exit hooks
 
 ```bash
-specd change run-hooks <name> drafting --phase post
-specd change hook-instruction <name> drafting --phase post --format text
+specd changes run-hooks <name> drafting --phase post
+specd changes hook-instruction <name> drafting --phase post --format text
 ```
 
 Follow guidance if any.
@@ -229,8 +229,8 @@ Follow guidance if any.
 ### 9. Show status and stop
 
 ```bash
-specd change status <name> --format text
-specd change status <name> --format toon
+specd changes status <name> --format text
+specd changes status <name> --format toon
 ```
 
 Show the change state and suggest next step:

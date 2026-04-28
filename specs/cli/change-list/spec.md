@@ -2,11 +2,19 @@
 
 ## Purpose
 
-Teams need a quick overview of all in-flight work to coordinate and avoid conflicts. `specd change list` lists all active changes in the project (those in `changes/`), sorted by creation date.
+Teams need a quick overview of all in-flight work to coordinate and avoid conflicts. `specd changes list` is the canonical form and lists all active changes in the project (those in `changes/`), sorted by creation date.
+
+`specd change list` remains supported as an alias.
 
 ## Requirements
 
 ### Requirement: Command signature
+
+```
+specd changes list [--format text|json|toon]
+```
+
+Alias:
 
 ```
 specd change list [--format text|json|toon]
@@ -70,3 +78,4 @@ $ specd change list --format json
 
 - [`cli:cli/entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
 - [`core:core/change`](../../core/change/spec.md) — Change entity, states, storage locations
+- [`cli:cli/command-resource-naming`](../command-resource-naming/spec.md) — canonical plural naming and singular alias policy

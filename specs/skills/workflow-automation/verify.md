@@ -26,3 +26,11 @@
 - **WHEN** the CLI output provides a Repair Guide
 - **THEN** the agent SHALL execute the recommended command (e.g., `/specd-design`)
 - **AND** it MUST NOT attempt to force the transition again without addressing the blocker
+
+### Requirement: Canonical Command References
+
+#### Scenario: Agent uses plural canonical groups in instructions
+
+- **WHEN** an agent writes workflow command examples for countable resources
+- **THEN** examples use canonical plural groups (`changes`, `specs`, `archives`, `drafts`)
+- **AND** singular forms are referenced only as aliases

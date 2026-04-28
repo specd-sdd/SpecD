@@ -18,6 +18,12 @@ AI agents SHALL use machine-optimized formats (`--format json`, `--format toon`)
 
 Agents SHALL follow the "Next Action" recommendations provided in command outputs before attempting to repeat a failed lifecycle operation.
 
+### Requirement: Canonical Command References
+
+Agent-authored workflow instructions and examples MUST use canonical plural command groups for countable resources (for example: `changes`, `specs`, `archives`, `drafts`).
+
+Singular forms MAY be referenced only as aliases.
+
 ## Spec Dependencies
 
-_none — this is a global constraint spec_
+- [`cli:cli/command-resource-naming`](../cli/command-resource-naming/spec.md) — canonical plural naming policy used by agent-facing command examples

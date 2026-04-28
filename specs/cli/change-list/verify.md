@@ -2,6 +2,18 @@
 
 ## Requirements
 
+### Requirement: Command signature
+
+#### Scenario: Canonical plural command
+
+- **WHEN** `specd changes list` is run
+- **THEN** the command executes successfully using the canonical group
+
+#### Scenario: Singular alias command
+
+- **WHEN** `specd change list` is run
+- **THEN** it behaves as an alias of `specd changes list`
+
 ### Requirement: Output format
 
 #### Scenario: Only active changes shown

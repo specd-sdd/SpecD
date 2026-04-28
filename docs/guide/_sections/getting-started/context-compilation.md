@@ -22,7 +22,7 @@ The compilation process:
 
 When output includes non-full specs, the CLI marks them explicitly as list/summary entries and points to:
 
-`specd change spec-preview <change-name> <specId>`
+`specd changes spec-preview <change-name> <specId>`
 
 Use that command to inspect merged full content for a specific spec in the current change.
 
