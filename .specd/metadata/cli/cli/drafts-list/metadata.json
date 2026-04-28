@@ -1,7 +1,7 @@
 {
   "title": "Drafts List",
   "description": "Shelved work is invisible to the active change list, so users need a dedicated view to see what has been parked. `specd drafts list` lists all changes currently in `drafts/`, sorted by `createdAt` ascending.",
-  "dependsOn": ["cli:cli/entrypoint", "core:core/change"],
+  "dependsOn": ["cli:cli/entrypoint", "core:core/change", "cli:cli/command-resource-naming"],
   "context": [
     "Shelved work is invisible to the active change list, so users need a dedicated view to see what has been parked. `specd drafts list` lists all changes currently in `drafts/`, sorted by `createdAt` ascending."
   ],
@@ -9,7 +9,7 @@
     {
       "requirement": "Command signature",
       "rules": [
-        "```\nspecd drafts list [--format text|json|toon]\n```\n\nNo positional arguments. The `--format` flag controls output encoding; defaults to `text`."
+        "```\nspecd drafts list [--format text|json|toon]\n```\n\nAlias:\n\n```\nspecd draft list [--format text|json|toon]\n```\n\nNo positional arguments. The `--format` flag controls output encoding; defaults to `text`."
       ]
     },
     {
@@ -72,6 +72,15 @@
       "then": ["b-change appears before a-change in the output"]
     },
     {
+      "requirement": "Output format — text",
+      "name": "Singular alias invocation",
+      "when": ["specd draft list is run"],
+      "then": [
+        "it behaves as specd drafts list",
+        "AND the process exits with the same code as the canonical invocation"
+      ]
+    },
+    {
       "requirement": "Output format — JSON",
       "name": "JSON format output",
       "given": [
@@ -119,8 +128,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:c33d00813898e72ae66ac27ba753f4bdceaa41a8a263ea24d6e6fdd45932438e",
-    "verify.md": "sha256:849dc8dff0cc3c149ec2d71ed8e7f44fb795f9737c16b797226c346c72446e51"
+    "spec.md": "sha256:86265bff60d82dfc9ce3170afd97539b173c0791bd7d9bb3406ea2fd96b53e3a",
+    "verify.md": "sha256:fe431168ead20d477cb41f34273a5f338102b0dbb9eb53986c791c05c3ba5668"
   },
   "generatedBy": "core"
 }

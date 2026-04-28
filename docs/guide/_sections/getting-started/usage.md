@@ -77,11 +77,11 @@ At every step, the coding assistant has access to the compiled context — the r
 The skills call the specd CLI under the hood. Every operation is ultimately a CLI command:
 
 ```bash
-specd change create add-auth --spec auth/login
-specd change status add-auth
-specd change transition add-auth implementing
-specd change context add-auth designing
-specd change archive add-auth
+specd changes create add-auth --spec auth/login
+specd changes status add-auth
+specd changes transition add-auth implementing
+specd changes context add-auth designing
+specd changes archive add-auth
 ```
 
 You can use the CLI directly when you need to — for scripting, CI pipelines, or when you want fine-grained control. But for day-to-day development, the skills provide the guided experience that makes spec-driven development practical.

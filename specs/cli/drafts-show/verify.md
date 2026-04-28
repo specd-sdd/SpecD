@@ -9,6 +9,11 @@
 - **WHEN** `specd drafts show` is run without a name
 - **THEN** the command exits with code 1 and prints a usage error to stderr
 
+#### Scenario: Singular alias invocation
+
+- **WHEN** `specd draft show my-change` is run
+- **THEN** it is accepted as an alias of `specd drafts show my-change`
+
 ### Requirement: Output format — text
 
 #### Scenario: Normal text output

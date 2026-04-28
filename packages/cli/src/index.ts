@@ -104,7 +104,8 @@ program.hook('preAction', (_thisCommand, actionCommand) => {
 
 // ---- change ----
 const changeCmd = program
-  .command('change')
+  .command('changes')
+  .alias('change')
   .description(
     'Commands for creating, listing, and progressing changes through the specd lifecycle.',
   )
@@ -131,6 +132,7 @@ registerChangeSpecPreview(changeCmd)
 // ---- drafts ----
 const draftsCmd = program
   .command('drafts')
+  .alias('draft')
   .description('Commands for browsing and restoring draft changes that have been shelved.')
 registerDraftsList(draftsCmd)
 registerDraftsShow(draftsCmd)
@@ -145,14 +147,16 @@ registerDiscardedShow(discardedCmd)
 
 // ---- archive ----
 const archiveCmd = program
-  .command('archive')
+  .command('archives')
+  .alias('archive')
   .description('Commands for listing and inspecting archived (completed) changes.')
 registerArchiveList(archiveCmd)
 registerArchiveShow(archiveCmd)
 
 // ---- spec ----
 const specCmd = program
-  .command('spec')
+  .command('specs')
+  .alias('spec')
   .description('Commands for listing, browsing, validating, and managing spec files.')
 registerSpecList(specCmd)
 registerSpecShow(specCmd)

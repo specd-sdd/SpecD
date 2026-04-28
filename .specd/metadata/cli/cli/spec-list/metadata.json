@@ -1,15 +1,15 @@
 {
   "title": "Spec List",
-  "description": "Without a quick inventory of all specs, users and agents cannot orient themselves in a project or spot stale metadata. The `specd spec list` command lists all specs across all configured workspaces, always including a title per spec and optionally a short summary and metadata freshness status.",
-  "dependsOn": ["cli:cli/entrypoint"],
+  "description": "Without a quick inventory of all specs, users and agents cannot orient themselves in a project or spot stale metadata. `specd specs list` is the canonical command and lists all specs across all configured workspaces, always including a title per spec and optionally a short summary and metadata freshness status.\n\n`specd spec list` remains supported as an alias.",
+  "dependsOn": ["cli:cli/entrypoint", "core:core/spec", "cli:cli/command-resource-naming"],
   "context": [
-    "Without a quick inventory of all specs, users and agents cannot orient themselves in a project or spot stale metadata. The `specd spec list` command lists all specs across all configured workspaces, always including a title per spec and optionally a short summary and metadata freshness status."
+    "Without a quick inventory of all specs, users and agents cannot orient themselves in a project or spot stale metadata. `specd specs list` is the canonical command and lists all specs across all configured workspaces, always including a title per spec and optionally a short summary and metadata freshness status.\n\n`specd spec list` remains supported as an alias."
   ],
   "rules": [
     {
       "requirement": "Command signature",
       "rules": [
-        "```\nspecd spec list [--summary] [--metadata-status [filter]] [--format text|json|toon]\n```\n\n- `--summary` — optional flag; when present, a short summary is included for each spec alongside the title\n- `--metadata-status` — optional flag with optional filter value; when present, a metadata-freshness METADATA STATUS column is included for each spec\n  - Without a filter value (`--metadata-status`), all specs are shown with their status\n  - With a comma-separated filter value (`--metadata-status stale`, `--metadata-status stale,missing`), only specs matching at least one of the listed statuses are shown\n  - Valid filter tokens: `fresh`, `stale`, `missing`, `invalid`\n- `--format text|json|toon` — optional; output format, defaults to `text`"
+        "```\nspecd specs list [--summary] [--metadata-status [filter]] [--format text|json|toon]\n```\n\nAlias:\n\n```\nspecd spec list [--summary] [--metadata-status [filter]] [--format text|json|toon]\n```\n\n- `--summary` — optional flag; when present, a short summary is included for each spec alongside the title\n- `--metadata-status` — optional flag with optional filter value; when present, a metadata-freshness METADATA STATUS column is included for each spec\n  - Without a filter value (`--metadata-status`), all specs are shown with their status\n  - With a comma-separated filter value (`--metadata-status stale`, `--metadata-status stale,missing`), only specs matching at least one of the listed statuses are shown\n  - Valid filter tokens: `fresh`, `stale`, `missing`, `invalid`\n- `--format text|json|toon` — optional; output format, defaults to `text`"
       ]
     },
     {
@@ -55,6 +55,18 @@
     "Status resolution errors (I/O failures reading artifacts for hashing) result in stale status, not a hard error"
   ],
   "scenarios": [
+    {
+      "requirement": "Command signature",
+      "name": "Canonical plural command",
+      "when": ["specd specs list --format json is run"],
+      "then": ["the command executes using the canonical plural group"]
+    },
+    {
+      "requirement": "Command signature",
+      "name": "Singular alias command",
+      "when": ["specd spec list --format json is run"],
+      "then": ["it behaves as an alias of specd specs list --format json"]
+    },
     {
       "requirement": "Title resolution",
       "name": "Title from metadata",
@@ -246,8 +258,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:131d76d54d6eb5f682ccf77a97c434f069524a049e9451b2e15fd4d72710ff3c",
-    "verify.md": "sha256:071f71184904847d961fc3afd3e760d619cddc15ff0201634ea24c38dfb84967"
+    "spec.md": "sha256:752548ffdf6c6f138bb3becc1d327453f8460f40f087b0fca83d9b59e8712ac0",
+    "verify.md": "sha256:88c6898d19d0d739fdf1c5d8a6e06a0fb875a7df2f5bff0f3f5be6be2fb4b1e5"
   },
   "generatedBy": "core"
 }

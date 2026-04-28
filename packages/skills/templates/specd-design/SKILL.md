@@ -32,7 +32,7 @@ schema or lifecycle semantics.
 ### 1. Load change state
 
 ```bash
-specd change status <name> --format text
+specd changes status <name> --format text
 ```
 
 Identify any high-visibility blockers from the **blockers:** section (e.g. `ARTIFACT_DRIFT`,
@@ -55,14 +55,14 @@ If the status output shows `review: required: yes`, enter **artifact review mode
 If state is `drafting` or `designing`, transition to `designing`:
 
 ```bash
-specd change run-hooks <name> designing --phase pre
-specd change hook-instruction <name> designing --phase pre --format text
+specd changes run-hooks <name> designing --phase pre
+specd changes hook-instruction <name> designing --phase pre --format text
 ```
 
 Follow guidance.
 
 ```bash
-specd change transition <name> designing --skip-hooks all
+specd changes transition <name> designing --skip-hooks all
 ```
 
 If state is not `drafting` or `designing`, this is the wrong skill. Redirect based on the
@@ -125,7 +125,7 @@ specd schema show --format toon
 ### 4. Load context
 
 ```bash
-specd change context <name> designing --follow-deps --depth 1 --rules --constraints --format text [--fingerprint <stored-value>]
+specd changes context <name> designing --follow-deps --depth 1 --rules --constraints --format text [--fingerprint <stored-value>]
 ```
 
 Pass `--fingerprint <stored-value>` if you have a `contextFingerprint` from a previous `change context` call in this conversation (see `shared.md` — "Fingerprint mechanism"). If lazy mode returns summary specs, evaluate each one and load any that are relevant to the artifact you're about to write (see `shared.md` — "Processing `change context` output").
@@ -208,7 +208,7 @@ as done immediately. Otherwise:
 ### 7. Get next artifact
 
 ```bash
-specd change artifact-instruction <name> --format toon
+specd changes artifact-instruction <name> --format toon
 ```
 
 Returns `artifactId`, `instruction`, `template`, `delta`, `rulesPre`, `rulesPost`.
@@ -225,7 +225,7 @@ Key rules:
 - **Optional artifact**: ask the user if needed. If not, skip:
 
   ```bash
-  specd change skip-artifact <name> <artifactId>
+  specd changes skip-artifact <name> <artifactId>
   ```
 
 - **Delta**: if the spec already exists, write a delta file, NOT a new file.
@@ -235,7 +235,7 @@ Key rules:
 After writing, check if the artifact implies scope changes:
 
 ```bash
-specd spec list --format text --summary
+specd specs list --format text --summary
 ```
 
 ### 9. Validate
@@ -243,7 +243,7 @@ specd spec list --format text --summary
 Run in **text mode** to ensure visibility of notes (optimisation hints):
 
 ```bash
-specd change validate <name> <specId/anySpecId> --artifact <artifactId> --format text
+specd changes validate <name> <specId/anySpecId> --artifact <artifactId> --format text
 ```
 
 If validation fails: fix and re-validate.
@@ -259,8 +259,8 @@ Wait for user response. **Stop completely.**
 ### 10. All artifacts done — run exit hooks immediately
 
 ```bash
-specd change run-hooks <name> designing --phase post
-specd change hook-instruction <name> designing --phase post --format text
+specd changes run-hooks <name> designing --phase post
+specd changes hook-instruction <name> designing --phase post --format text
 ```
 
 Follow guidance.
@@ -300,14 +300,14 @@ whether to update scope or continue. **Stop and wait.**
 Run ready pre-hooks, then transition:
 
 ```bash
-specd change run-hooks <name> ready --phase pre
-specd change hook-instruction <name> ready --phase pre --format text
+specd changes run-hooks <name> ready --phase pre
+specd changes hook-instruction <name> ready --phase pre --format text
 ```
 
 Follow guidance.
 
 ```bash
-specd change transition <name> ready --skip-hooks all
+specd changes transition <name> ready --skip-hooks all
 ```
 
 ### 11. Mandatory review stop
@@ -327,8 +327,8 @@ Show summary of all artifacts and specs.
 Run ready post hooks:
 
 ```bash
-specd change run-hooks <name> ready --phase post
-specd change hook-instruction <name> ready --phase post --format text
+specd changes run-hooks <name> ready --phase post
+specd changes hook-instruction <name> ready --phase post --format text
 ```
 
 ### 12. Handle approval gate
@@ -339,7 +339,7 @@ Run `change status <name> --format text` and check `approvals:` line.
 
 **If spec=on:** Tell user:
 
-> Approval required. Run: `specd change approve spec <name> --reason "..."`
+> Approval required. Run: `specd changes approve spec <name> --reason "..."`
 > Then: `/specd-implement <name>`
 
 **Stop.**

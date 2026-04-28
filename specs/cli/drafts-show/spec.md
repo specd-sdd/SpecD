@@ -12,6 +12,12 @@ Before restoring a drafted change, users need to inspect its metadata to confirm
 specd drafts show <name> [--format text|json|toon]
 ```
 
+Alias:
+
+```
+specd draft show <name> [--format text|json|toon]
+```
+
 - `<name>` — required positional; the name of the drafted change to show
 - `--format` — controls output encoding; defaults to `text`
 
@@ -66,3 +72,4 @@ $ specd drafts show old-experiment --format json
 
 - [`cli:cli/entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
 - [`core:core/change`](../../core/change/spec.md) — Change entity, drafting semantics
+- [`cli:cli/command-resource-naming`](../command-resource-naming/spec.md) — canonical plural naming and singular alias policy

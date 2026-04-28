@@ -2,11 +2,19 @@
 
 ## Purpose
 
-Once a change is fully approved, its spec deltas need to be promoted into the permanent spec tree so they become the source of truth. `specd change archive <name>` finalises a change by merging its deltas into the permanent spec directories and moving the change to the archive.
+Once a change is fully approved, its spec deltas need to be promoted into the permanent spec tree so they become the source of truth. `specd changes archive <name>` is the canonical form and finalises a change by merging its deltas into the permanent spec directories and moving the change to the archive.
+
+`specd change archive <name>` remains supported as an alias.
 
 ## Requirements
 
 ### Requirement: Command signature
+
+```
+specd changes archive <name> [--skip-hooks <phases>] [--allow-overlap] [--format text|json|toon]
+```
+
+Alias:
 
 ```
 specd change archive <name> [--skip-hooks <phases>] [--allow-overlap] [--format text|json|toon]
@@ -74,3 +82,4 @@ specd change archive add-oauth-login --skip-hooks pre
 - [`core:core/change`](../../core/change/spec.md) — archivable state, archive semantics
 - [`core:core/archive-change`](../../core/archive-change/spec.md) — archive hook phase selectors and hook delegation
 - [`core:core/hook-execution-model`](../../core/hook-execution-model/spec.md) — `--skip-hooks` manual-control pattern
+- [`cli:cli/command-resource-naming`](../command-resource-naming/spec.md) — canonical plural naming and singular alias policy

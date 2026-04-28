@@ -12,7 +12,7 @@ transitions to `done`. If any fail, loops back to implementing.
 ### 1. Load change state
 
 ```bash
-specd change status <name> --format text
+specd changes status <name> --format text
 ```
 
 Identify any high-visibility blockers from the **blockers:** section (e.g. `ARTIFACT_DRIFT`,
@@ -39,14 +39,14 @@ Redirect based on the **next action:** `target` recommendation.
 Run pre-hooks and transition:
 
 ```bash
-specd change run-hooks <name> verifying --phase pre
-specd change hook-instruction <name> verifying --phase pre --format text
+specd changes run-hooks <name> verifying --phase pre
+specd changes hook-instruction <name> verifying --phase pre --format text
 ```
 
 Follow guidance.
 
 ```bash
-specd change transition <name> verifying --skip-hooks all
+specd changes transition <name> verifying --skip-hooks all
 ```
 
 If it fails, follow the **Repair Guide** output.
@@ -54,8 +54,8 @@ If it fails, follow the **Repair Guide** output.
 **If in `verifying`** (resuming): run pre-hooks but skip the transition:
 
 ```bash
-specd change run-hooks <name> verifying --phase pre
-specd change hook-instruction <name> verifying --phase pre --format text
+specd changes run-hooks <name> verifying --phase pre
+specd changes hook-instruction <name> verifying --phase pre --format text
 ```
 
 **If in `done`**: skip directly to step 6a (transition to archivable path).
@@ -65,7 +65,7 @@ Continue to step 3.
 ### 3. Load verification context
 
 ```bash
-specd change context <name> verifying --follow-deps --depth 1 --scenarios --format text [--fingerprint <stored-value>]
+specd changes context <name> verifying --follow-deps --depth 1 --scenarios --format text [--fingerprint <stored-value>]
 ```
 
 Pass `--fingerprint <stored-value>` if you have a `contextFingerprint` from a previous `change context` call in this conversation (see `shared.md` — "Fingerprint mechanism"). If output says `unchanged`, use the context already in memory.
@@ -80,7 +80,7 @@ For each spec in the change, use `spec-preview` to get the final merged spec con
 with deltas applied:
 
 ```bash
-specd change spec-preview <name> <specId> --format toon
+specd changes spec-preview <name> <specId> --format toon
 ```
 
 This merged view is what you should verify against.
@@ -104,8 +104,8 @@ For each scenario:
 The moment all scenarios have been evaluated, run the post-verifying hooks:
 
 ```bash
-specd change run-hooks <name> verifying --phase post
-specd change hook-instruction <name> verifying --phase post --format text
+specd changes run-hooks <name> verifying --phase post
+specd changes hook-instruction <name> verifying --phase post --format text
 ```
 
 Follow guidance. If hooks fail, fix and re-run.
@@ -124,7 +124,7 @@ First classify the failure:
 Before choosing a transition, reload status:
 
 ```bash
-specd change status <name> --format text
+specd changes status <name> --format text
 ```
 
 If the fresh status shows `review: required: yes`, do NOT route back to
@@ -133,7 +133,7 @@ If the fresh status shows `review: required: yes`, do NOT route back to
 If this is an implementation-only failure:
 
 ```bash
-specd change transition <name> implementing --skip-hooks all
+specd changes transition <name> implementing --skip-hooks all
 ```
 
 Tell the user to run `/specd-implement <name>` to fix the implementation. **Stop.**
@@ -141,7 +141,7 @@ Tell the user to run `/specd-implement <name>` to fix the implementation. **Stop
 If this is artifact review required:
 
 ```bash
-specd change transition <name> designing --skip-hooks all
+specd changes transition <name> designing --skip-hooks all
 ```
 
 Tell the user to run `/specd-design <name>` to update them. **Stop.**
@@ -153,21 +153,21 @@ Tell the user to run `/specd-design <name>` to update them. **Stop.**
 Run done pre-hooks, then transition:
 
 ```bash
-specd change run-hooks <name> done --phase pre
-specd change hook-instruction <name> done --phase pre --format text
+specd changes run-hooks <name> done --phase pre
+specd changes hook-instruction <name> done --phase pre --format text
 ```
 
 Follow guidance.
 
 ```bash
-specd change transition <name> done --skip-hooks all
+specd changes transition <name> done --skip-hooks all
 ```
 
 Run done post-hooks:
 
 ```bash
-specd change run-hooks <name> done --phase post
-specd change hook-instruction <name> done --phase post --format text
+specd changes run-hooks <name> done --phase post
+specd changes hook-instruction <name> done --phase post --format text
 ```
 
 #### 6b. Handle signoff gate
@@ -177,24 +177,24 @@ Run `change status <name> --format text` and check `approvals:` line.
 **If signoff=off:** no signoff needed — run archivable hooks and transition:
 
 ```bash
-specd change run-hooks <name> archivable --phase pre
-specd change hook-instruction <name> archivable --phase pre --format text
+specd changes run-hooks <name> archivable --phase pre
+specd changes hook-instruction <name> archivable --phase pre --format text
 ```
 
 Follow guidance.
 
 ```bash
-specd change transition <name> archivable --skip-hooks all
+specd changes transition <name> archivable --skip-hooks all
 ```
 
 ```bash
-specd change run-hooks <name> archivable --phase post
-specd change hook-instruction <name> archivable --phase post --format text
+specd changes run-hooks <name> archivable --phase post
+specd changes hook-instruction <name> archivable --phase post --format text
 ```
 
 **If signoff=on:** transition routes to `pending-signoff`. Tell user:
 
-> Signoff required. Run: `specd change approve signoff <name> --reason "..."`
+> Signoff required. Run: `specd changes approve signoff <name> --reason "..."`
 > Then: `/specd-archive <name>`
 
 **Stop.**
@@ -223,7 +223,7 @@ If during verification you discover that the artifacts need revision, stop and e
 If the user agrees:
 
 ```bash
-specd change transition <name> designing --skip-hooks all
+specd changes transition <name> designing --skip-hooks all
 ```
 
 > Artifacts need revision. Run `/specd-design <name>` to update them.

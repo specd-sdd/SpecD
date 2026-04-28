@@ -231,7 +231,7 @@ async function executeSingle(
     const fileLines = result.files.map((file) =>
       file.status === 'missing' ? `missing: ${file.filename}` : `file: ${file.filename}`,
     )
-    const previewNote = `note: verify merged output with: specd change spec-preview ${name} ${fullSpecPath}`
+    const previewNote = `note: verify merged output with: specd changes spec-preview ${name} ${fullSpecPath}`
 
     if (passed) {
       if (result.notes.length > 0) {
@@ -333,7 +333,7 @@ async function executeBatch(
       const fileLines = r.files.map((file) =>
         file.status === 'missing' ? `missing: ${file.filename}` : `file: ${file.filename}`,
       )
-      const previewNote = `note: verify merged output with: specd change spec-preview ${name} ${r.spec}`
+      const previewNote = `note: verify merged output with: specd changes spec-preview ${name} ${r.spec}`
 
       if (r.passed) {
         if (r.notes.length > 0) {

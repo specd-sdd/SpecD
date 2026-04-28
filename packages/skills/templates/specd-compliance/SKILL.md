@@ -17,7 +17,7 @@ The skill supports four modes, determined by the argument passed:
 
 ### Mode details
 
-**Single Spec** — The argument is a spec ID in `workspace:path` format (e.g., `core:core/change`, `default:_global/testing`). Run `specd spec show <specId>` to verify the spec exists. If not found, report an error and stop. No subagent batching — audit inline or with a single subagent.
+**Single Spec** — The argument is a spec ID in `workspace:path` format (e.g., `core:core/change`, `default:_global/testing`). Run `specd specs show <specId>` to verify the spec exists. If not found, report an error and stop. No subagent batching — audit inline or with a single subagent.
 
 **Changed Files (`--changed`)** — Scoped audit based on uncommitted changes (staged + unstaged):
 
@@ -95,7 +95,7 @@ Parse the argument to determine the audit mode:
 3. **Argument starts with `--pr`** → `mode = pr`, extract the PR number/URL from the rest of the argument
 4. **Anything else** → `mode = single`, treat the argument as a spec path relative to `specs/`
 
-For single mode, run `specd spec show <specId>` to verify the spec exists. If not found, report an error and stop.
+For single mode, run `specd specs show <specId>` to verify the spec exists. If not found, report an error and stop.
 
 ### Phase 1 — Discovery and Setup
 
@@ -116,7 +116,7 @@ date +"%Y%m%d-%H%M%S"
 4. **Resolve the spec scope** based on the detected mode:
 
    **If `mode = full`:**
-   - Run `specd spec list --format json` to get all specs
+   - Run `specd specs list --format json` to get all specs
    - Parse the JSON and categorize by workspace:
      - `default:_global/*` → Global specs (apply to all packages)
      - `core:*` → Core package specs
@@ -124,9 +124,9 @@ date +"%Y%m%d-%H%M%S"
      - etc.
 
    **If `mode = single`:**
-   - Run `specd spec show <specId>` to get the spec content
+   - Run `specd specs show <specId>` to get the spec content
    - Extract spec dependencies from the spec's `## Spec Dependencies` section
-   - Run `specd spec show` for each dependency (depth 1)
+   - Run `specd specs show` for each dependency (depth 1)
 
    **If `mode = changed`:**
    - Run: `git diff --name-only HEAD` and `git ls-files --others --exclude-standard`
@@ -178,14 +178,14 @@ Launch one subagent per batch, all in parallel. Each subagent receives:
 
 **For global spec subagents:**
 
-1. For each spec ID (e.g., `default:_global/architecture`), run `specd spec show <specId>` to get the spec content
+1. For each spec ID (e.g., `default:_global/architecture`), run `specd specs show <specId>` to get the spec content
 2. Check the ENTIRE codebase for compliance (these are cross-cutting constraints)
 3. Sample files from each package to verify conventions
 4. Check that configuration (ESLint, TypeScript, etc.) matches relevant specs
 
 **For package spec subagents:**
 
-1. For each spec ID (e.g., `core:core/change`), run `specd spec show <specId>` to get the spec content
+1. For each spec ID (e.g., `core:core/change`), run `specd specs show <specId>` to get the spec content
 2. **Use `specd graph` first to locate relevant code:**
    - `specd graph search "<spec concept>"` to find execution flows related to the spec's domain (e.g., `specd graph search "change creation lifecycle"` for the change spec). This returns symbols and files related to the query — far more precise than keyword grep.
    - `specd graph impact --symbol "<symbol>" --direction both` to get the full picture: all callers, callees, which files use the symbol. This reveals whether a requirement is implemented across multiple call sites.

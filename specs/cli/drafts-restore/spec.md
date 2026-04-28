@@ -12,6 +12,12 @@ When paused work is ready to resume, it needs to move back to the active list wi
 specd drafts restore <name> [--format text|json|toon]
 ```
 
+Alias:
+
+```
+specd draft restore <name> [--format text|json|toon]
+```
+
 - `<name>` — required positional; the name of the drafted change to restore
 - `--format` — controls output encoding; defaults to `text`
 
@@ -63,3 +69,4 @@ $ specd drafts restore old-experiment --format json
 
 - [`cli:cli/entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
 - [`core:core/change`](../../core/change/spec.md) — restore semantics, storage locations
+- [`cli:cli/command-resource-naming`](../command-resource-naming/spec.md) — canonical plural naming and singular alias policy

@@ -1,15 +1,15 @@
 {
   "title": "Change List",
-  "description": "Teams need a quick overview of all in-flight work to coordinate and avoid conflicts. `specd change list` lists all active changes in the project (those in `changes/`), sorted by creation date.",
-  "dependsOn": ["cli:cli/entrypoint", "core:core/change"],
+  "description": "Teams need a quick overview of all in-flight work to coordinate and avoid conflicts. `specd changes list` is the canonical form and lists all active changes in the project (those in `changes/`), sorted by creation date.\n\n`specd change list` remains supported as an alias.",
+  "dependsOn": ["cli:cli/entrypoint", "core:core/change", "cli:cli/command-resource-naming"],
   "context": [
-    "Teams need a quick overview of all in-flight work to coordinate and avoid conflicts. `specd change list` lists all active changes in the project (those in `changes/`), sorted by creation date."
+    "Teams need a quick overview of all in-flight work to coordinate and avoid conflicts. `specd changes list` is the canonical form and lists all active changes in the project (those in `changes/`), sorted by creation date.\n\n`specd change list` remains supported as an alias."
   ],
   "rules": [
     {
       "requirement": "Command signature",
       "rules": [
-        "```\nspecd change list [--format text|json|toon]\n```\n\n- `--format text|json|toon` — optional; output format, defaults to `text`"
+        "```\nspecd changes list [--format text|json|toon]\n```\n\nAlias:\n\n```\nspecd change list [--format text|json|toon]\n```\n\n- `--format text|json|toon` — optional; output format, defaults to `text`"
       ]
     },
     {
@@ -30,6 +30,18 @@
     "No filtering by state or workspace in v1"
   ],
   "scenarios": [
+    {
+      "requirement": "Command signature",
+      "name": "Canonical plural command",
+      "when": ["specd changes list is run"],
+      "then": ["the command executes successfully using the canonical group"]
+    },
+    {
+      "requirement": "Command signature",
+      "name": "Singular alias command",
+      "when": ["specd change list is run"],
+      "then": ["it behaves as an alias of specd changes list"]
+    },
     {
       "requirement": "Output format",
       "name": "Only active changes shown",
@@ -80,8 +92,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:f8384d969888dee9029d106de15149912becfa2d75b96a290f6ecdbac2075b70",
-    "verify.md": "sha256:7a089cf30a3c0b8fbe7b83de9863d70735f49b55598f0bd8721d9ad4def7998b"
+    "spec.md": "sha256:c4c50cc1591c48c390f7289d3852fa2923c282aee2c2c87d1a7ff55974eca60f",
+    "verify.md": "sha256:4aadb61a41565eaf3d3e0f09c25ec7ff6f77c8c06fdabe95410727bdb85f457f"
   },
   "generatedBy": "core"
 }

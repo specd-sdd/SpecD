@@ -53,7 +53,7 @@ The initial state. A newly created change starts here before any work has been d
 
 - **What it means:** The change exists but has not entered the design phase.
 - **What you do:** Nothing yet. Transition to `designing` when you are ready to start.
-- **Transition out:** `specd change transition <name> designing`
+- **Transition out:** `specd changes transition <name> designing`
 - **What can block it:** Nothing — this transition is always allowed.
 
 ---
@@ -63,8 +63,8 @@ The initial state. A newly created change starts here before any work has been d
 The active design and specification phase. This is where the bulk of artifact work happens.
 
 - **What it means:** You are writing the proposal, specs, verify files, design, and tasks.
-- **What you do:** Create and refine the five standard artifacts (proposal, specs, verify, design, tasks). Run `specd change status <name>` to check artifact progress.
-- **Transition out:** `specd change transition <name> ready` once all required artifacts are complete and validated.
+- **What you do:** Create and refine the five standard artifacts (proposal, specs, verify, design, tasks). Run `specd changes status <name>` to check artifact progress.
+- **Transition out:** `specd changes transition <name> ready` once all required artifacts are complete and validated.
 - **What can block it:** The `ready` step requires all artifacts listed in the schema's `requires` field (by default: proposal, specs, verify, design, tasks) to have `complete` status. The CLI reports which artifacts are still missing or in progress.
 
 The `designing → designing` self-transition is valid — it records a checkpoint without changing state. This happens automatically when redesign invalidates an already-`designing` change.
@@ -87,7 +87,7 @@ All design artifacts are complete. The change is ready to hand off to implementa
 The spec approval gate is active and a human reviewer has not yet approved the specs.
 
 - **What it means:** specd has been asked to require human sign-off on the spec artifacts before implementation begins. The change is waiting for that approval.
-- **What you do:** A reviewer runs `specd change approve-spec <name> --reason "..."` after inspecting the spec artifacts.
+- **What you do:** A reviewer runs `specd changes approve-spec <name> --reason "..."` after inspecting the spec artifacts.
 - **Transition out:** `spec-approved` after approval, or back to `designing` (redesign).
 - **What can block it:** Approval must be recorded by a human. The gate cannot be bypassed.
 
@@ -111,7 +111,7 @@ A human has reviewed and approved the spec artifacts.
 Active development is in progress.
 
 - **What it means:** The implementation tasks are being worked through.
-- **What you do:** Work through the task list in `tasks.md`, checking off items as you go (`- [x]`). Run `specd change status <name>` to see task progress.
+- **What you do:** Work through the task list in `tasks.md`, checking off items as you go (`- [x]`). Run `specd changes status <name>` to see task progress.
 - **Transition out:** `verifying` once all tasks are complete, or back to `designing` (redesign). The transition to `verifying` is blocked if any tasks remain incomplete.
 - **What can block it:** The `taskCompletionCheck` defined in the schema. By default, any unchecked `- [ ]` line in `tasks.md` prevents advancing to `verifying`. The CLI reports "N/M tasks complete" when this gate is active.
 
@@ -144,7 +144,7 @@ Implementation and verification are complete.
 The signoff gate is active and a human reviewer has not yet signed off.
 
 - **What it means:** The change requires final human sign-off before it can be archived. This gate is typically used for compliance or stakeholder review.
-- **What you do:** A reviewer runs `specd change signoff <name> --reason "..."` after inspecting the completed work.
+- **What you do:** A reviewer runs `specd changes signoff <name> --reason "..."` after inspecting the completed work.
 - **Transition out:** `signed-off` after sign-off, or back to `designing` (redesign).
 - **What can block it:** Sign-off must be recorded by a human.
 
@@ -168,7 +168,7 @@ A human has reviewed and signed off the completed change.
 The change is ready to be archived.
 
 - **What it means:** All gates have been passed. The change is queued for the archive operation.
-- **What you do:** Run `specd change archive <name>` to perform the archive.
+- **What you do:** Run `specd changes archive <name>` to perform the archive.
 - **Transition out:** `archiving` (via the archive command), or back to `designing` (redesign — last chance before permanent record).
 - **What can block it:** Nothing prevents the transition to `archiving` at this point.
 
@@ -210,7 +210,7 @@ Almost every state can transition back to `designing`. This is the **redesign pa
 To redesign from any active state:
 
 ```bash
-specd change transition <name> designing
+specd changes transition <name> designing
 ```
 
 When a redesign transition occurs:
@@ -250,7 +250,7 @@ approvals:
 **Performing the approval:**
 
 ```bash
-specd change approve-spec add-auth --reason "Specs reviewed and approved — all requirements are clear"
+specd changes approve-spec add-auth --reason "Specs reviewed and approved — all requirements are clear"
 ```
 
 The approver reviews the spec and verify artifacts in the change directory. The approval records a hash of those artifacts at the moment of approval. If any of those artifacts are subsequently modified, an `invalidated` event is appended automatically and the change returns to `designing`, clearing the approval.
@@ -275,7 +275,7 @@ approvals:
 **Performing the signoff:**
 
 ```bash
-specd change signoff add-auth --reason "Implementation reviewed — all scenarios verified"
+specd changes signoff add-auth --reason "Implementation reviewed — all scenarios verified"
 ```
 
 Both gates can be enabled simultaneously:
@@ -297,7 +297,7 @@ The default schema (`@specd/schema-std`) checks for unchecked checkbox lines in 
 - **Incomplete pattern:** `^\s*-\s+\[ \]` — any `- [ ]` line blocks the transition.
 - **Complete pattern:** `^\s*-\s+\[x\]` — `- [x]` lines count toward completion.
 
-When you run `specd change transition <name> verifying` and tasks remain incomplete, the CLI reports the current progress:
+When you run `specd changes transition <name> verifying` and tasks remain incomplete, the CLI reports the current progress:
 
 ```
 3/5 tasks complete — transition to verifying is blocked
@@ -387,7 +387,7 @@ A drafted change retains its current lifecycle state. When restored, it continue
 **Guard:** When a change has previously reached the `implementing` state, drafting is blocked by default — the code and specs may be out of sync, and shelving without archival risks leaving partial implementation behind. If you are certain you want to draft anyway, use `--force`:
 
 ```bash
-specd change draft add-auth --force
+specd changes draft add-auth --force
 ```
 
 ### Discarding
@@ -407,7 +407,7 @@ specd discard add-auth --reason "Superseded" --superseded-by add-oauth-flow
 **Guard:** When a change has previously reached the `implementing` state, discarding is blocked by default — code that has been implemented should ideally be archived, not silently abandoned. If you are certain you want to discard anyway, use `--force`:
 
 ```bash
-specd change discard add-auth --reason "No longer needed" --force
+specd changes discard add-auth --reason "No longer needed" --force
 ```
 
 ---
@@ -417,7 +417,7 @@ specd change discard add-auth --reason "No longer needed" --force
 Archiving is the final operation in the lifecycle. When you run:
 
 ```bash
-specd change archive <name>
+specd changes archive <name>
 ```
 
 specd performs the following steps:
@@ -461,7 +461,7 @@ The skill suggests creating a change and invokes `/specd-new`.
 The agent has a discovery conversation with you — understanding the problem, discussing the approach, identifying affected specs, and reaching agreements about scope. Once the picture is clear, it creates the change:
 
 ```bash
-specd change create add-auth --spec default:auth/login --spec default:auth/logout
+specd changes create add-auth --spec default:auth/login --spec default:auth/logout
 ```
 
 Before handing off, the agent writes a `specd-exploration.md` file to the change directory. This captures everything from the conversation — the problem, the agreed approach, design decisions, rejected alternatives, codebase observations, and open questions. It is the agent's working memory, persisted so that the next phase can pick up where you left off even in a different session. See [Exploration context](#exploration-context-specd-explorationmd) for details.
@@ -570,7 +570,7 @@ Once all scenarios pass, the agent transitions to `done`.
 
 ### 6. Archiving — `/specd-archive`
 
-The agent runs `specd change archive add-auth`. specd:
+The agent runs `specd changes archive add-auth`. specd:
 
 1. Syncs `spec.md` and `verify.md` into `specs/default/auth/login/` and `specs/default/auth/logout/`
 2. Applies any delta files to existing specs

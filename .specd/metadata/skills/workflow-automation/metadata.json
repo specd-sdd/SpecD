@@ -1,6 +1,7 @@
 {
   "title": "Workflow Automation",
   "description": "To ensure consistent and efficient agent interactions across the SpecD lifecycle by defining policies for diagnostic output and data extraction. This spec minimizes \"AI blindness\" by mandating human-optimized text for status checks and machine-optimized formats for data-intensive operations.",
+  "dependsOn": ["cli:cli/command-resource-naming"],
   "context": [
     "To ensure consistent and efficient agent interactions across the SpecD lifecycle by defining policies for diagnostic output and data extraction. This spec minimizes \"AI blindness\" by mandating human-optimized text for status checks and machine-optimized formats for data-intensive operations."
   ],
@@ -21,6 +22,12 @@
       "requirement": "Repair Strategy",
       "rules": [
         "Agents SHALL follow the \"Next Action\" recommendations provided in command outputs before attempting to repeat a failed lifecycle operation."
+      ]
+    },
+    {
+      "requirement": "Canonical Command References",
+      "rules": [
+        "Agent-authored workflow instructions and examples MUST use canonical plural command groups for countable resources (for example: `changes`, `specs`, `archives`, `drafts`).\n\nSingular forms MAY be referenced only as aliases."
       ]
     }
   ],
@@ -52,11 +59,20 @@
         "the agent SHALL execute the recommended command (e.g., /specd-design)",
         "AND it MUST NOT attempt to force the transition again without addressing the blocker"
       ]
+    },
+    {
+      "requirement": "Canonical Command References",
+      "name": "Agent uses plural canonical groups in instructions",
+      "when": ["an agent writes workflow command examples for countable resources"],
+      "then": [
+        "examples use canonical plural groups (changes, specs, archives, drafts)",
+        "AND singular forms are referenced only as aliases"
+      ]
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:67801b77776c7d323676f910c6dad0208632d582e85989c5b8223e6b8a096ae6",
-    "verify.md": "sha256:2602a1f39d36d912c0de8098e73fe70f575fae98a99a7df7e9a77a95b74d6707"
+    "spec.md": "sha256:1d11c1faf26f79fdddfbcb3f65475c27ce3bf495aeb1e6fcee501ed7e18095cf",
+    "verify.md": "sha256:ab452bcd8fa76df2ec0b1fe0647edd66c0380ef69a8a96dfaed64ee467ebd8c4"
   },
   "generatedBy": "core"
 }

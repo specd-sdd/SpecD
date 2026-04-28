@@ -2,11 +2,19 @@
 
 ## Purpose
 
-Sometimes work needs to be paused without losing progress or polluting the active change list. `specd change draft <name> [--reason <text>]` shelves an active change to `drafts/` without affecting its lifecycle state, keeping it recoverable at any time via `specd drafts restore`.
+Sometimes work needs to be paused without losing progress or polluting the active change list. `specd changes draft <name> [--reason <text>]` is the canonical form and shelves an active change to `drafts/` without affecting its lifecycle state, keeping it recoverable at any time via `specd drafts restore`.
+
+`specd change draft <name> ...` remains supported as an alias.
 
 ## Requirements
 
 ### Requirement: Command signature
+
+```
+specd changes draft <name> [--reason <text>] [--force] [--format text|json|toon]
+```
+
+Alias:
 
 ```
 specd change draft <name> [--reason <text>] [--force] [--format text|json|toon]
@@ -55,3 +63,4 @@ specd change draft my-change --reason "intentional rollback of workflow only" --
 
 - [`cli:cli/entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
 - [`core:core/change`](../../core/change/spec.md) — drafting semantics, storage locations
+- [`cli:cli/command-resource-naming`](../command-resource-naming/spec.md) — canonical plural naming and singular alias policy

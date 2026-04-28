@@ -6,14 +6,19 @@
 
 #### Scenario: Missing name argument
 
-- **WHEN** `specd change archive` is run without a name
+- **WHEN** `specd changes archive` is run without a name
 - **THEN** the command exits with code 1 and prints a usage error to stderr
 
 #### Scenario: Skip hooks accepts archive phases
 
-- **WHEN** `specd change archive my-change --skip-hooks pre,post` is run
+- **WHEN** `specd changes archive my-change --skip-hooks pre,post` is run
 - **THEN** the command accepts the invocation
 - **AND** it forwards both archive hook phases to the use case
+
+#### Scenario: Singular alias invocation
+
+- **WHEN** `specd change archive my-change` is run
+- **THEN** it is accepted as an alias of `specd changes archive my-change`
 
 ### Requirement: Prerequisites
 

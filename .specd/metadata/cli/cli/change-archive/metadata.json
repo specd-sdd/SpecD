@@ -1,20 +1,21 @@
 {
   "title": "Change Archive",
-  "description": "Once a change is fully approved, its spec deltas need to be promoted into the permanent spec tree so they become the source of truth. `specd change archive <name>` finalises a change by merging its deltas into the permanent spec directories and moving the change to the archive.",
+  "description": "Once a change is fully approved, its spec deltas need to be promoted into the permanent spec tree so they become the source of truth. `specd changes archive <name>` is the canonical form and finalises a change by merging its deltas into the permanent spec directories and moving the change to the archive.\n\n`specd change archive <name>` remains supported as an alias.",
   "dependsOn": [
     "cli:cli/entrypoint",
     "core:core/change",
     "core:core/archive-change",
-    "core:core/hook-execution-model"
+    "core:core/hook-execution-model",
+    "cli:cli/command-resource-naming"
   ],
   "context": [
-    "Once a change is fully approved, its spec deltas need to be promoted into the permanent spec tree so they become the source of truth. `specd change archive <name>` finalises a change by merging its deltas into the permanent spec directories and moving the change to the archive."
+    "Once a change is fully approved, its spec deltas need to be promoted into the permanent spec tree so they become the source of truth. `specd changes archive <name>` is the canonical form and finalises a change by merging its deltas into the permanent spec directories and moving the change to the archive.\n\n`specd change archive <name>` remains supported as an alias."
   ],
   "rules": [
     {
       "requirement": "Command signature",
       "rules": [
-        "```\nspecd change archive <name> [--skip-hooks <phases>] [--allow-overlap] [--format text|json|toon]\n```\n\n- `<name>` — required positional; the name of the change to archive\n- `--skip-hooks <phases>` — optional; comma-separated list of archive hook phases to skip. Valid values: `pre`, `post`, `all`. When `all` is specified, all hook execution is skipped. When omitted, both phases execute.\n- `--allow-overlap` — optional flag; permits archiving despite spec overlap with other active changes\n- `--format text|json|toon` — optional; output format, defaults to `text`"
+        "```\nspecd changes archive <name> [--skip-hooks <phases>] [--allow-overlap] [--format text|json|toon]\n```\n\nAlias:\n\n```\nspecd change archive <name> [--skip-hooks <phases>] [--allow-overlap] [--format text|json|toon]\n```\n\n- `<name>` — required positional; the name of the change to archive\n- `--skip-hooks <phases>` — optional; comma-separated list of archive hook phases to skip. Valid values: `pre`, `post`, `all`. When `all` is specified, all hook execution is skipped. When omitted, both phases execute.\n- `--allow-overlap` — optional flag; permits archiving despite spec overlap with other active changes\n- `--format text|json|toon` — optional; output format, defaults to `text`"
       ]
     },
     {
@@ -62,17 +63,23 @@
     {
       "requirement": "Command signature",
       "name": "Missing name argument",
-      "when": ["specd change archive is run without a name"],
+      "when": ["specd changes archive is run without a name"],
       "then": ["the command exits with code 1 and prints a usage error to stderr"]
     },
     {
       "requirement": "Command signature",
       "name": "Skip hooks accepts archive phases",
-      "when": ["specd change archive my-change --skip-hooks pre,post is run"],
+      "when": ["specd changes archive my-change --skip-hooks pre,post is run"],
       "then": [
         "the command accepts the invocation",
         "AND it forwards both archive hook phases to the use case"
       ]
+    },
+    {
+      "requirement": "Command signature",
+      "name": "Singular alias invocation",
+      "when": ["specd change archive my-change is run"],
+      "then": ["it is accepted as an alias of specd changes archive my-change"]
     },
     {
       "requirement": "Prerequisites",
@@ -176,8 +183,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:3e801de77c9227ee3b79232c0f667db2dbeb2962251b0d2dc38e709ed77f9119",
-    "verify.md": "sha256:82d84519c2bcb67fbe4db9d2441f8b2b8d7ebd791bcbc5b58759d9c5cc40ec5d"
+    "spec.md": "sha256:9b727d4c2796993468d6b41dcf902a992918d90ca691c42575cba154bd407287",
+    "verify.md": "sha256:90461f6aef9d3309978f73aa9de6079880d2f98b6d0c46b10f8c9d7f1ea8cd82"
   },
   "generatedBy": "core"
 }

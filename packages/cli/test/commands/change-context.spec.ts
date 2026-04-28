@@ -354,7 +354,7 @@ describe('change context', () => {
     ])
 
     expect(stdout()).toContain('## Available context specs')
-    expect(stdout()).toContain('specd change spec-preview')
+    expect(stdout()).toContain('specd changes spec-preview')
     expect(stdout()).toContain('Architecture')
     expect(stdout()).toContain('Hexagonal architecture')
     expect(stdout()).toContain('| default:_global/architecture | summary |')

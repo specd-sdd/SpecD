@@ -2,11 +2,19 @@
 
 ## Purpose
 
-Without a quick inventory of all specs, users and agents cannot orient themselves in a project or spot stale metadata. The `specd spec list` command lists all specs across all configured workspaces, always including a title per spec and optionally a short summary and metadata freshness status.
+Without a quick inventory of all specs, users and agents cannot orient themselves in a project or spot stale metadata. `specd specs list` is the canonical command and lists all specs across all configured workspaces, always including a title per spec and optionally a short summary and metadata freshness status.
+
+`specd spec list` remains supported as an alias.
 
 ## Requirements
 
 ### Requirement: Command signature
+
+```
+specd specs list [--summary] [--metadata-status [filter]] [--format text|json|toon]
+```
+
+Alias:
 
 ```
 specd spec list [--summary] [--metadata-status [filter]] [--format text|json|toon]
@@ -178,3 +186,5 @@ $ specd spec list --metadata-status --format json
 ## Spec Dependencies
 
 - [`cli:cli/entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
+- [`core:core/spec`](../../core/spec/spec.md) — spec metadata access and listing model
+- [`cli:cli/command-resource-naming`](../command-resource-naming/spec.md) — canonical plural naming and singular alias policy
