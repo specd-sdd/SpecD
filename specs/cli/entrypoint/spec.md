@@ -41,7 +41,7 @@ No other exit codes are used. When a hook fails, the hook's own stdout/stderr is
 
 ### Requirement: Error message format
 
-User and domain errors (exit code 1) are printed to stderr as a single human-readable line prefixed with `error:`. System errors (exit code 3) are printed to stderr with a `fatal:` prefix followed by the error message; a stack trace is included only when the `SPECD_DEBUG=1` environment variable is set.
+User and domain errors (exit code 1) are printed to stderr as a single human-readable line prefixed with `error:`. System errors (exit code 3) are printed to stderr with a `fatal:` prefix followed by the error message; a stack trace is included only when debug logging is enabled for the active logger (`Logger.isLevelEnabled('debug')`).
 
 ### Requirement: Output format flag
 

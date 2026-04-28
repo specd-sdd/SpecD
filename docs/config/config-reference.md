@@ -44,6 +44,7 @@ Bootstrap mode is intended for initial indexing and exploratory graph queries. I
 | `contextExcludeSpecs` | array   | no       | —               | Spec patterns always excluded from compiled context.                                                           |
 | `contextMode`         | string  | no       | `'summary'`     | Context rendering mode: `'list'`, `'summary'`, `'full'`, or `'hybrid'`. See [`contextMode`](#contextmode).     |
 | `approvals`           | object  | no       | both `false`    | Approval gate configuration.                                                                                   |
+| `logging`             | object  | no       | `level: info`   | Project-level logging configuration.                                                                           |
 | `llmOptimizedContext` | boolean | no       | `false`         | Opt in to LLM-enriched context operations.                                                                     |
 | `plugins`             | object  | no       | —               | Installed plugins grouped by type.                                                                             |
 | `schemaPlugins`       | array   | no       | `[]`            | Schema plugin references loaded and merged into the active schema.                                             |
@@ -309,6 +310,21 @@ approvals:
 | `signoff` | `done → archivable` is always blocked. The change must pass through `pending-signoff → signed-off` first.      | `done → archivable` is a free transition.    |
 
 Both gates are independent — any combination is valid.
+
+## logging
+
+`logging` configures project-level logging defaults:
+
+```yaml
+logging:
+  level: info
+```
+
+| Field   | Required | Default | Allowed values                                      |
+| ------- | -------- | ------- | --------------------------------------------------- |
+| `level` | no       | `info`  | `trace`, `debug`, `info`, `warn`, `error`, `silent` |
+
+When present, this level is used for default file logging. Logs are written under `{configPath}/log/specd.log`.
 
 ## llmOptimizedContext
 

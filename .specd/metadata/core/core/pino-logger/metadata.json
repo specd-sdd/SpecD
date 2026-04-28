@@ -1,0 +1,111 @@
+{
+  "title": "core:core/pino-logger",
+  "description": "To provide a high-performance implementation of the `LoggerPort` using the Pino logging library. This spec defines how the Pino adapter is constructed, how it maps to our log levels, and how it handles multiple `LogDestination` outputs with intelligent filtering and formatting, including the conversion to `LogEntry` objects for callbacks.",
+  "dependsOn": ["core:core/logger-port", "default:_global/architecture"],
+  "context": [
+    "To provide a high-performance implementation of the `LoggerPort` using the Pino logging library. This spec defines how the Pino adapter is constructed, how it maps to our log levels, and how it handles multiple `LogDestination` outputs with intelligent filtering and formatting, including the conversion to `LogEntry` objects for callbacks."
+  ],
+  "rules": [
+    {
+      "requirement": "Pino Adapter Construction",
+      "rules": [
+        "The `core` package SHALL provide a `PinoLogger` class in its infrastructure layer that implements the `LoggerPort`. This adapter MUST wrap a native Pino instance."
+      ]
+    },
+    {
+      "requirement": "Default Factory Function",
+      "rules": [
+        "The infrastructure layer SHALL expose a factory function (e.g., `createDefaultLogger(options)`) that returns a pre-configured `PinoLogger` instance. This factory SHALL accept an array of `LogDestination` objects and configure the internal Pino multistream accordingly."
+      ]
+    },
+    {
+      "requirement": "Implementation of Destinations",
+      "rules": [
+        "The `PinoLogger` MUST implement the behavior for each `LogDestination` type:\n\n- **`console`**: Writes to `process.stdout` (or `stderr` for errors). MUST support `pretty` formatting.\n- **`file`**: Writes to the specified file path. MUST ensure the file is opened for writing in JSON format.\n- **`callback`**: For each log event, the adapter MUST construct a `LogEntry` object following the core contract and invoke the provided `onLog` callback."
+      ]
+    },
+    {
+      "requirement": "Level Filtering",
+      "rules": [
+        "The `PinoLogger` MUST respect the `level` threshold of each `LogDestination` independently. Messages below the threshold SHALL be discarded with minimal performance overhead."
+      ]
+    },
+    {
+      "requirement": "Child Logger Mapping",
+      "rules": [
+        "The `child()` method of the `PinoLogger` MUST map directly to Pino's native `.child()` functionality. Any child logger created MUST inherit the destinations and filtering rules of its parent."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "Pino Adapter Construction",
+      "name": "Pino instance wrapping",
+      "when": ["a PinoLogger is instantiated"],
+      "then": [
+        "it MUST correctly initialize an internal Pino instance using the provided configuration"
+      ]
+    },
+    {
+      "requirement": "Default Factory Function",
+      "name": "Factory returns LoggerPort",
+      "when": ["calling createDefaultLogger({ destinations: [] })"],
+      "then": ["it MUST return an object that implements the LoggerPort interface"]
+    },
+    {
+      "requirement": "Default Factory Function",
+      "name": "Factory applies level and path",
+      "given": ["a destination with { target: 'file', level: 'debug', path: '/tmp/test.log' }"],
+      "when": ["calling the factory"],
+      "then": [
+        "the returned logger MUST be configured to write debug-level JSON entries to that file"
+      ]
+    },
+    {
+      "requirement": "Implementation of Destinations",
+      "name": "Console output in TTY",
+      "given": ["a console destination with pretty format", "AND the process is running in a TTY"],
+      "when": ["logging a message"],
+      "then": ["the output to stdout MUST be human-readable and colored"]
+    },
+    {
+      "requirement": "Implementation of Destinations",
+      "name": "JSON file persistence",
+      "given": ["a file destination"],
+      "when": ["logging a message"],
+      "then": ["the entry in the specified file MUST be a valid, single-line JSON object"]
+    },
+    {
+      "requirement": "Implementation of Destinations",
+      "name": "Callback invocation",
+      "given": ["a callback destination with an onLog handler"],
+      "when": ["logging a message"],
+      "then": ["the onLog handler MUST be called with a correctly populated LogEntry object"]
+    },
+    {
+      "requirement": "Level Filtering",
+      "name": "Efficient filtering",
+      "given": ["a destination with level error"],
+      "when": ["calling logger.debug(\"silent\")"],
+      "then": [
+        "no output MUST be produced for that destination",
+        "AND the execution overhead MUST be negligible"
+      ]
+    },
+    {
+      "requirement": "Child Logger Mapping",
+      "name": "Context inheritance",
+      "given": [
+        "a logger created with a callback destination",
+        "AND a child logger created with { component: 'test' }"
+      ],
+      "when": ["the child logger logs a message"],
+      "then": ["the LogEntry received by the callback MUST include context.component === 'test'"]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:0c995b832ca22a6afb5d223ca677b3d300ab3f0aee67ad481253b1661eda9935",
+    "verify.md": "sha256:6e05efc420fc1b2ea253327131ad1d37ef23ef07ff8dba472c944207ef93b8ff"
+  },
+  "generatedBy": "core"
+}

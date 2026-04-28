@@ -86,6 +86,7 @@ const program = new Command('specd')
   )
   .version(CLI_VERSION)
   .option('--config <path>', 'path to specd.yaml (overrides config discovery)')
+  .option('-v, --verbose', 'increase logging verbosity (repeat for more detail)')
 
 program.addHelpText(
   'before',

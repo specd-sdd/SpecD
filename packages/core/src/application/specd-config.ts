@@ -11,6 +11,14 @@ export type SpecdContextEntry = { readonly file: string } | { readonly instructi
 
 /** Supported display modes for compiled context specs. */
 export type SpecdContextMode = 'list' | 'summary' | 'full' | 'hybrid'
+/** Supported project-level logging threshold values. */
+export type SpecdLogLevel = 'trace' | 'debug' | 'info' | 'warn' | 'error' | 'silent'
+
+/** Project-level logging configuration resolved from `specd.yaml`. */
+export interface SpecdLoggingConfig {
+  /** Minimum log level for project-level logging. */
+  readonly level: SpecdLogLevel
+}
 
 /** Per-workspace code graph configuration from `specd.yaml`. */
 export interface SpecdWorkspaceGraphConfig {
@@ -142,6 +150,8 @@ export interface SpecdConfig {
   readonly storage: SpecdStorageConfig
   /** Approval gate settings (both default to `false`). */
   readonly approvals: { readonly spec: boolean; readonly signoff: boolean }
+  /** Project-level logging configuration. */
+  readonly logging?: SpecdLoggingConfig
   /** Freeform context entries prepended to the compiled context. */
   readonly context?: readonly SpecdContextEntry[]
   /**
@@ -187,6 +197,9 @@ const specdConfigShape = z.object({
   workspaces: z.array(z.object({ name: z.string() })),
   storage: z.object({ changesPath: z.string() }),
   approvals: z.object({ spec: z.boolean(), signoff: z.boolean() }),
+  logging: z
+    .object({ level: z.enum(['trace', 'debug', 'info', 'warn', 'error', 'silent']) })
+    .optional(),
 })
 
 /**

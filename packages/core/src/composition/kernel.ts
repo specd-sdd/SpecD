@@ -42,6 +42,8 @@ import { type ChangeRepository } from '../application/ports/change-repository.js
 import { type SchemaRegistry } from '../application/ports/schema-registry.js'
 import { type SpecRepository } from '../application/ports/spec-repository.js'
 import { type SpecdConfig } from '../application/specd-config.js'
+import { Logger } from '../application/logger.js'
+import { type LogDestination } from '../application/ports/logger.port.js'
 import { createBuiltinKernelRegistry, createKernelInternals } from './kernel-internals.js'
 import {
   createKernelRegistryView,
@@ -50,6 +52,7 @@ import {
 } from './kernel-registries.js'
 import { LazySchemaProvider } from './lazy-schema-provider.js'
 import { createSpecWorkspaceRoutes } from './spec-workspace-routes.js'
+import { createDefaultLogger } from '../infrastructure/logging/pino-logger.js'
 
 /**
  * All use cases instantiated from a single `SpecdConfig`, grouped by domain area.
@@ -166,6 +169,8 @@ export interface KernelOptions extends KernelRegistryInput {
   readonly extraNodeModulesPaths?: readonly string[]
   /** Selected graph-store backend id for code-graph composition. */
   readonly graphStoreId?: string
+  /** Additional logging destinations registered by delivery adapters (for example CLI). */
+  readonly additionalDestinations?: readonly LogDestination[]
 }
 
 /**
@@ -187,6 +192,20 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
   }
   const i = await createKernelInternals(config, registry, options)
   const workspaceRoutes = createSpecWorkspaceRoutes(config.workspaces)
+
+  const logDir = path.join(config.configPath, 'log')
+  const logFilePath = path.join(logDir, 'specd.log')
+  await fs.mkdir(logDir, { recursive: true })
+  const destinations: LogDestination[] = [
+    {
+      target: 'file',
+      level: config.logging?.level ?? 'info',
+      format: 'json',
+      path: logFilePath,
+    },
+    ...(options?.additionalDestinations ?? []),
+  ]
+  Logger.setImplementation(createDefaultLogger(destinations))
 
   // Shared ResolveSchema + LazySchemaProvider — resolves once with plugins and overrides
   const resolveSchema = new ResolveSchema(
@@ -325,3 +344,5 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
     },
   }
 }
+import fs from 'node:fs/promises'
+import path from 'node:path'

@@ -1,0 +1,135 @@
+{
+  "title": "core:core/logger-port",
+  "description": "To provide a robust logging abstraction for the specd core and its consumers. This spec extends the global logging standard with support for structured metadata, contextual child loggers, a static proxy for ambient access, and a formal contract for log entries and destinations.",
+  "dependsOn": ["default:_global/logging", "default:_global/architecture"],
+  "context": [
+    "To provide a robust logging abstraction for the specd core and its consumers. This spec extends the global logging standard with support for structured metadata, contextual child loggers, a static proxy for ambient access, and a formal contract for log entries and destinations."
+  ],
+  "rules": [
+    {
+      "requirement": "Extended Logger Interface",
+      "rules": [
+        "The `LoggerPort` SHALL implement the `default:_global/logging` standard and extend it with the following methods:\n\n- **`fatal(message: string, context?: object, error?: Error): void`**: For critical system failures.\n- **`trace(message: string, context?: object): void`**: For high-volume technical tracing.\n- **`isLevelEnabled(level: LogLevel): boolean`**: Returns whether the given level is enabled for this logger instance.\n- **`child(context: object): LoggerPort`**: Creates a new logger instance that inherits the current context and prepends the new context to all subsequent entries."
+      ]
+    },
+    {
+      "requirement": "Structured Metadata",
+      "rules": [
+        "All logging methods MUST support an optional `context` object as the second argument. When provided, the properties of this object SHALL be included as structured fields in the final log output."
+      ]
+    },
+    {
+      "requirement": "Log Entry Contract",
+      "rules": [
+        "The system SHALL define a `LogEntry` structure to ensure a consistent data format for consumers (e.g., via callbacks):\n\n- **`timestamp`**: Date object representing when the event occurred.\n- **`level`**: The severity level (`trace`, `debug`, `info`, `warn`, `error`, `fatal`).\n- **`message`**: The primary log message (string).\n- **`context`**: A flattened object containing all metadata associated with the entry, including those from parent child loggers.\n- **`error`**: Optional `Error` object for exceptions, including stack traces where applicable."
+      ]
+    },
+    {
+      "requirement": "Ambient Context Proxy",
+      "rules": [
+        "The `@specd/core` package SHALL expose a static `Logger` object that acts as a global proxy. This object MUST implement the `LoggerPort` interface."
+      ]
+    },
+    {
+      "requirement": "Implementation Swapping",
+      "rules": [
+        "The static `Logger` proxy MUST provide a mechanism (e.g., `setImplementation()`) to swap the underlying implementation at runtime. This mechanism SHALL be used by the composition root (the Kernel) to plug in a concrete logging adapter."
+      ]
+    },
+    {
+      "requirement": "Multi-destination Configuration",
+      "rules": [
+        "The logging system SHALL support configuration for multiple output destinations via a `LogDestination` interface:\n\n- **`target`**: The output sink. Supported values: `console`, `file`, `callback`.\n- **`level`**: The minimum log level for this specific destination.\n- **`format`**: The rendering format. Supported values: `json`, `pretty`.\n- **`path`**: The absolute path for the log file (required if `target` is `file`).\n- **`onLog`**: A callback function receiving a `LogEntry` (required if `target` is `callback`)."
+      ]
+    },
+    {
+      "requirement": "Default Implementation",
+      "rules": [
+        "Until a concrete implementation is provided via the Kernel, the static `Logger` proxy SHALL default to a safe, minimal implementation (e.g., a \"Null Object\" that does nothing or a basic `console` fallback) to ensure that code remains executable during unit testing without extra setup."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "Extended Logger Interface",
+      "name": "Extended methods presence",
+      "when": ["using the LoggerPort"],
+      "then": [
+        "it MUST provide fatal(), trace(), isLevelEnabled(), and child() methods in addition to the global standard basic methods"
+      ]
+    },
+    {
+      "requirement": "Extended Logger Interface",
+      "name": "Level check behavior",
+      "when": ["calling isLevelEnabled('debug') on a logger"],
+      "then": [
+        "it MUST return a boolean that reflects whether that level is enabled by the logger implementation"
+      ]
+    },
+    {
+      "requirement": "Extended Logger Interface",
+      "name": "Child logger creation",
+      "when": ["child({ requestId: '123' }) is called on a logger"],
+      "then": [
+        "it MUST return a new LoggerPort instance",
+        "AND all subsequent logs from this instance MUST include { requestId: '123' } in their context"
+      ]
+    },
+    {
+      "requirement": "Structured Metadata",
+      "name": "Context field inclusion",
+      "when": ["calling info(\"Operation completed\", { duration: 150 })"],
+      "then": [
+        "the resulting log entry MUST contain both the message and the structured { duration: 150 } metadata"
+      ]
+    },
+    {
+      "requirement": "Log Entry Contract",
+      "name": "Data structure validation",
+      "when": ["a LogEntry is emitted (e.g., to a callback)"],
+      "then": [
+        "it MUST be an object containing timestamp (Date), level, message, and context (Object)",
+        "AND it MUST optionally contain an error field if one was provided"
+      ]
+    },
+    {
+      "requirement": "Ambient Context Proxy",
+      "name": "Static access",
+      "when": ["importing Logger from @specd/core"],
+      "then": [
+        "it MUST be possible to call logging methods directly without instantiation (e.g., Logger.info(\"...\"))"
+      ]
+    },
+    {
+      "requirement": "Implementation Swapping",
+      "name": "Runtime swap",
+      "given": ["the static Logger is using its default implementation"],
+      "when": ["setImplementation(customAdapter) is called"],
+      "then": ["all subsequent calls to the static Logger MUST be redirected to customAdapter"]
+    },
+    {
+      "requirement": "Multi-destination Configuration",
+      "name": "Destination validation",
+      "when": ["configuring a LogDestination"],
+      "then": [
+        "the system MUST validate that path is present if target is file",
+        "AND it MUST validate that onLog is a function if target is callback"
+      ]
+    },
+    {
+      "requirement": "Default Implementation",
+      "name": "Silent by default",
+      "given": ["a new environment where the Kernel has not been initialized"],
+      "when": ["Logger.debug(\"test\") is called"],
+      "then": [
+        "it MUST NOT throw an error",
+        "AND it SHOULD NOT produce output by default (Null Object pattern)"
+      ]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:29b69601b782575b19f7e0b5026c274f7cc4f223ab7831a575368dfae9ee5ba3",
+    "verify.md": "sha256:ee212c8dedafdc28ddeae65bfa00cf63188a92f57918991de4c7f3465ad23566"
+  },
+  "generatedBy": "core"
+}

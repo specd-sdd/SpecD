@@ -1,4 +1,5 @@
 import {
+  Logger,
   SpecdError,
   SchemaNotFoundError,
   SchemaValidationError,
@@ -85,12 +86,14 @@ export function handleError(err: unknown, format?: string): never {
   }
 
   // Generic/unexpected errors — stderr only, no structured output
-  const debug = process.env['SPECD_DEBUG'] === '1'
+  const debug = Logger.isLevelEnabled('debug')
   if (err instanceof Error) {
+    Logger.error('CLI command failed with unexpected error', { format }, err)
     process.stderr.write(`fatal: ${err.message}\n${debug && err.stack ? err.stack + '\n' : ''}`)
     process.exit(3)
   }
 
+  Logger.error('CLI command failed with non-error throw', { format, value: String(err) })
   process.stderr.write(`fatal: unexpected error\n${debug ? String(err) + '\n' : ''}`)
   process.exit(3)
 }

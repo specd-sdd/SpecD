@@ -1,0 +1,95 @@
+{
+  "title": "default:_global/logging",
+  "description": "To ensure consistent observability across the entire specd monorepo by defining a unified logging standard. This spec establishes a minimum interface compatible with the standard `console` API and provides clear semantics for different log levels, allowing all packages to follow the same conventions regardless of their specific implementation.",
+  "context": [
+    "To ensure consistent observability across the entire specd monorepo by defining a unified logging standard. This spec establishes a minimum interface compatible with the standard `console` API and provides clear semantics for different log levels, allowing all packages to follow the same conventions regardless of their specific implementation."
+  ],
+  "rules": [
+    {
+      "requirement": "Console Compatibility",
+      "rules": [
+        "The logging interface SHALL be compatible with the standard `console` API methods to ensure a low barrier to adoption and allow for gradual migration. At a minimum, it MUST support `log()`, `info()`, `debug()`, `warn()`, and `error()`."
+      ]
+    },
+    {
+      "requirement": "Method Aliasing",
+      "rules": [
+        "The `log()` method SHALL be treated as an alias for `info()`, ensuring that developers can use familiar terminology while maintaining a structured log level hierarchy."
+      ]
+    },
+    {
+      "requirement": "Level Mapping for Minimal Implementations",
+      "rules": [
+        "Implementations that rely on the standard `console` object MUST support extended levels by mapping them to the closest available console method and prepending a clear prefix to the message:\n\n- **`fatal`** SHALL map to `console.error()` with the prefix `[FATAL]`.\n- **`trace`** SHALL map to `console.debug()` (or `console.log()`) with the prefix `[TRACE]`."
+      ]
+    },
+    {
+      "requirement": "Log Level Semantics",
+      "rules": [
+        "Every log entry MUST be assigned a level that reflects its purpose and severity:\n\n- **`trace`**: Fine-grained technical details (e.g., AST dumps).\n- **`debug`**: Internal diagnostic information (e.g., plugin loading).\n- **`info` / `log`**: Significant application-level events.\n- **`warn`**: Non-critical issues that require attention.\n- **`error`**: Failures in specific operations.\n- **`fatal`**: Critical failures that require immediate process termination."
+      ]
+    },
+    {
+      "requirement": "Policy on Console Usage",
+      "rules": [
+        "Direct usage of the global `console` object for logging in production code SHALL be avoided in favor of the project's logging abstraction."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "Console Compatibility",
+      "name": "Basic methods available",
+      "when": ["inspecting the logging interface"],
+      "then": [
+        "it MUST expose log(), info(), debug(), warn(), and error() methods",
+        "AND their signatures MUST be compatible with the standard console API (accepting a message and optional metadata)"
+      ]
+    },
+    {
+      "requirement": "Method Aliasing",
+      "name": "log() calls info()",
+      "when": ["calling the log() method with a message"],
+      "then": ["the underlying implementation MUST treat it identically to an info() call"]
+    },
+    {
+      "requirement": "Level Mapping for Minimal Implementations",
+      "name": "Fatal mapping with prefix",
+      "given": ["a minimal implementation using standard console"],
+      "when": ["fatal(\"System failure\") is called"],
+      "then": [
+        "console.error MUST be invoked",
+        "AND the output message MUST be prefixed with [FATAL]"
+      ]
+    },
+    {
+      "requirement": "Level Mapping for Minimal Implementations",
+      "name": "Trace mapping with prefix",
+      "given": ["a minimal implementation using standard console"],
+      "when": ["trace(\"Fine details\") is called"],
+      "then": [
+        "console.debug (or console.log) MUST be invoked",
+        "AND the output message MUST be prefixed with [TRACE]"
+      ]
+    },
+    {
+      "requirement": "Log Level Semantics",
+      "name": "Semantic severity ordering",
+      "when": ["comparing log levels"],
+      "then": ["the severity order MUST be: trace < debug < info < warn < error < fatal"]
+    },
+    {
+      "requirement": "Policy on Console Usage",
+      "name": "linting or code review check",
+      "when": ["analyzing production code"],
+      "then": [
+        "any direct call to console.log/warn/error (excluding bootstrapping or infrastructure adapters) SHOULD be flagged as a violation"
+      ]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:0b9615178094559439f97c9c683b74ea590eabeb839fb97afd021f3af4e60402",
+    "verify.md": "sha256:5f48fb8819f2810987cfb9f65ae5b847c5d08945425a59df7cfeefb1b30f20e9"
+  },
+  "generatedBy": "core"
+}

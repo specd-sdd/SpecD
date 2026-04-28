@@ -1,0 +1,108 @@
+{
+  "title": "cli:cli/logging-integration",
+  "description": "To define the relationship between the specd CLI and the core's logging system. This spec ensures that the CLI correctly leverages the Kernel's logging capabilities while providing user-facing controls for console log verbosity and interaction.",
+  "dependsOn": [
+    "core:core/kernel-logging",
+    "core:core/logger-port",
+    "default:_global/architecture"
+  ],
+  "context": [
+    "To define the relationship between the specd CLI and the core's logging system. This spec ensures that the CLI correctly leverages the Kernel's logging capabilities while providing user-facing controls for console log verbosity and interaction."
+  ],
+  "rules": [
+    {
+      "requirement": "Console Destination Definition",
+      "rules": [
+        "The CLI SHALL be responsible for defining its own `LogDestination` for console output.\n\n- **Target**: `console`.\n- **Format**: `pretty` for TTY sessions, `json` otherwise.\n- **Level**: Governed by CLI flags."
+      ]
+    },
+    {
+      "requirement": "Verbosity Overrides",
+      "rules": [
+        "The CLI SHALL support global flags to allow the user to increase console log verbosity. The mapping SHALL be:\n\n- **`-v`** or **`--debug`**: Sets the console `LogDestination.level` to `debug`.\n- **`-vv`** or **`--trace`**: Sets the console `LogDestination.level` to `trace`.\n- **`--quiet`**: Sets the console `LogDestination.level` to `silent`.\n\nIf no flags are provided, the console destination SHALL default to `info`."
+      ]
+    },
+    {
+      "requirement": "Kernel Registration",
+      "rules": [
+        "The CLI SHALL pass its defined console destination to the `Kernel` via the `additionalDestinations` array in `createKernel()`."
+      ]
+    },
+    {
+      "requirement": "Callback Interception (Optional)",
+      "rules": [
+        "The CLI MAY register a `callback` destination if it needs to intercept logs for specialized UI components (e.g., progress bars, dashboard updates). If used, it MUST provide an `onLog` handler that consumes `LogEntry` objects."
+      ]
+    },
+    {
+      "requirement": "Separation of Concerns",
+      "rules": [
+        "The CLI MUST NOT attempt to configure or modify the project-wide file logging, which is managed internally by the Kernel based on `specd.yaml`."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "Console Destination Definition",
+      "name": "Pretty format in TTY",
+      "given": ["the CLI is running in an interactive terminal"],
+      "when": ["initializing the console destination"],
+      "then": ["it MUST be configured with format: 'pretty'"]
+    },
+    {
+      "requirement": "Console Destination Definition",
+      "name": "JSON format when not a TTY",
+      "given": ["the CLI output is piped to another process (not a TTY)"],
+      "when": ["initializing the console destination"],
+      "then": ["it MUST be configured with format: 'json'"]
+    },
+    {
+      "requirement": "Verbosity Overrides",
+      "name": "-v activates debug",
+      "when": ["running specd -v status"],
+      "then": ["the console destination level passed to the Kernel MUST be debug"]
+    },
+    {
+      "requirement": "Verbosity Overrides",
+      "name": "-vv activates trace",
+      "when": ["running specd -vv status"],
+      "then": ["the console destination level passed to the Kernel MUST be trace"]
+    },
+    {
+      "requirement": "Verbosity Overrides",
+      "name": "--quiet suppresses console",
+      "when": ["running specd --quiet status"],
+      "then": ["the console destination level passed to the Kernel MUST be silent"]
+    },
+    {
+      "requirement": "Kernel Registration",
+      "name": "Passing destination to KernelOptions",
+      "when": ["the CLI calls createKernel"],
+      "then": [
+        "it MUST include the prepared console destination in the additionalDestinations array"
+      ]
+    },
+    {
+      "requirement": "Callback Interception (Optional)",
+      "name": "UI component updates",
+      "given": ["a CLI command that uses a progress bar"],
+      "when": ["the command registers a callback destination"],
+      "then": ["it MUST receive LogEntry objects and update the UI accordingly"]
+    },
+    {
+      "requirement": "Separation of Concerns",
+      "name": "Flags do not affect file log",
+      "given": ["specd.yaml has logging: { level: 'info' }"],
+      "when": ["running specd -vv status"],
+      "then": [
+        "the console MUST show trace logs",
+        "AND the file specd.log MUST only contain info logs or higher"
+      ]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:3b030ab52e7d23fc990d443594ae613a50ddb08a34a98d03f9facc9964c29263",
+    "verify.md": "sha256:1d2c33659e09d84e636783b8f74ea4936ecb50699a8f9f39b918a37adb209b13"
+  },
+  "generatedBy": "core"
+}
