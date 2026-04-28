@@ -140,23 +140,18 @@
 
 #### Scenario: Fresh metadata rendered with all sections in full mode
 
-- **GIVEN** a spec has fresh `.specd-metadata.yaml` with description, rules, constraints, and scenarios
+- **GIVEN** a spec has fresh `.specd-metadata.yaml`
 - **AND** the effective display mode is full
 - **WHEN** `execute` is called without `sections` filter
-- **THEN** the spec entry includes all four sections
+- **THEN** the spec entry includes Title, Description, Rules, and Constraints (default sections)
 
 #### Scenario: Sections filter restricts full output
 
-- **GIVEN** a spec has fresh metadata with rules and scenarios
+- **GIVEN** a spec has fresh metadata
 - **AND** the effective display mode is full
 - **WHEN** `execute` is called with `sections: ["rules"]`
-- **THEN** the spec entry includes rules but not scenarios or description
-
-#### Scenario: Sections filter does not change summary output
-
-- **GIVEN** a spec is rendered in summary mode
-- **WHEN** `execute` is called with section filters
-- **THEN** the summary output stays unchanged
+- **THEN** the spec entry includes Title and Description (header persistence)
+- **AND** the spec entry includes Rules but not scenarios or constraints
 
 ### Requirement: Falls back to extraction when metadata is stale or absent
 

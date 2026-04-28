@@ -20,10 +20,10 @@ Tooling sometimes needs the project's compiled spec context without an active ch
 `execute` MUST return a `GetProjectContextResult` containing:
 
 - `contextEntries` (string\[]) — rendered project-level context entries (instruction text or file content).
-- `specs` (`ContextSpecEntry[]`) — specs matched by include/exclude patterns, each with `specId`, `source`, `mode`, and optional `title`, `description`, and `content` fields according to the display mode. The `ContextSpecEntry` type is the same as defined in the `CompileContext` spec.
-- `warnings` (`ContextWarning[]`) — advisory warnings for missing files, stale metadata, unknown workspaces, etc.
+- `specs` (ContextSpecEntry\[]) — specs matched by include/exclude patterns, each with `specId`, `source`, `mode`, and optional `title`, `description`, and `content` fields according to the display mode. The `ContextSpecEntry` type is the same as defined in the `CompileContext` spec.
+- `warnings` (ContextWarning\[]) — advisory warnings for missing files, stale metadata, unknown workspaces, etc.
 
-Since `GetProjectContext` operates without a change, all specs MUST have `source: 'includePattern'`. The mode field is determined by `config.contextMode`: `list` emits list entries, `summary` emits summary entries, and `full` or `hybrid` emits full entries. Project context has no direct change specs, so `hybrid` is equivalent to `full`.
+Since `GetProjectContext` operates without a change, all specs MUST have `source: 'includePattern'`. The mode field is determined by `config.contextMode`: `list` emits list entries, `summary` emits summary entries, and `full` or `hybrid` emits full entries. Project context has no direct change specs, so `hybrid` is equivalent to `full`. **`full` mode rendering MUST use structured output (derived from metadata or extraction) instead of raw markdown.**
 
 ### Requirement: Resolves schema before processing
 
@@ -60,10 +60,14 @@ For each included spec, if `.specd-metadata.yaml` exists and its content hashes 
 
 - In `list` mode, render no title, description, or content.
 - In `summary` mode, render title and description only.
-- In `full` mode, render description, rules, constraints, and scenarios as applicable, filtered by `input.sections` when provided.
+- In `full` mode, render description, rules, constraints, and scenarios as applicable. **If no `sections` filter is active (input is absent or empty), it MUST default to rendering Description + Rules + Constraints.** If a `sections` filter is provided, it overrides this default.
 - In `hybrid` mode, render the same output as `full` because project context has no change-scoped tier.
 
 Section filters MUST NOT affect list-mode or summary-mode entries.
+
+#### Scenario: Default sections in full mode
+
+When a spec is rendered in `full` mode (including `hybrid` mode which resolves to `full` here) and no `sections` filter is active (input is absent or empty), it MUST default to rendering **Description + Rules + Constraints**.
 
 ### Requirement: Falls back to extraction when metadata is stale or absent
 

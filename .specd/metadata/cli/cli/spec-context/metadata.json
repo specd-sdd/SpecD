@@ -54,24 +54,20 @@
     },
     {
       "requirement": "Behaviour",
+      "name": "Full mode is the absolute default",
+      "given": ["specd.yaml sets contextMode: summary"],
+      "when": ["specd spec context <spec-id> is run"],
+      "then": [
+        "output contains full mode sections (Description, Rules, Constraints)",
+        "AND the config mode is ignored"
+      ]
+    },
+    {
+      "requirement": "Behaviour",
       "name": "Fresh metadata used in full mode",
-      "given": ["a spec has fresh metadata", "AND effective context mode is full"],
+      "given": ["a spec has fresh metadata"],
       "when": ["specd spec context <spec-id> is run"],
       "then": ["stdout contains full metadata-derived context"]
-    },
-    {
-      "requirement": "Behaviour",
-      "name": "Summary mode emits summary-shaped entries",
-      "given": ["effective context mode is summary"],
-      "when": ["specd spec context <spec-id> is run"],
-      "then": ["output contains summary-shaped entries without full section blocks"]
-    },
-    {
-      "requirement": "Behaviour",
-      "name": "List mode emits list-shaped entries",
-      "given": ["effective context mode is list"],
-      "when": ["specd spec context <spec-id> is run"],
-      "then": ["output contains list-shaped entries"]
     },
     {
       "requirement": "Behaviour",
@@ -83,23 +79,18 @@
     {
       "requirement": "Behaviour",
       "name": "Section flags filter only full-mode output",
-      "given": ["full mode output"],
       "when": ["specd spec context <spec-id> --rules --scenarios is run"],
-      "then": ["output includes only those sections"]
-    },
-    {
-      "requirement": "Behaviour",
-      "name": "Section flags do not affect list or summary output",
-      "given": ["list or summary mode output"],
-      "when": ["section flags are passed"],
-      "then": ["entry shape remains list/summary"]
+      "then": [
+        "output includes Title, Description, Rules, and Scenarios",
+        "AND Constraints are omitted"
+      ]
     },
     {
       "requirement": "Behaviour",
       "name": "--follow-deps includes dependency specs",
       "given": ["a root spec depends on another spec"],
       "when": ["specd spec context <spec-id> --follow-deps is run"],
-      "then": ["output contains root and dependency entries"]
+      "then": ["output contains root and dependency entries in full mode"]
     },
     {
       "requirement": "Output",
@@ -129,6 +120,15 @@
       "then": ["JSON entries remain minimal list-shaped objects"]
     },
     {
+      "requirement": "Output",
+      "name": "Default sections in full mode",
+      "when": ["specd spec context <spec-id> is run without section flags"],
+      "then": [
+        "output includes Title, Description, Rules, and Constraints by default",
+        "AND Scenarios are omitted unless explicitly requested"
+      ]
+    },
+    {
       "requirement": "Error cases",
       "name": "Unknown workspace",
       "when": ["specd spec context unknown-ws:auth/login is run"],
@@ -143,7 +143,7 @@
   ],
   "contentHashes": {
     "spec.md": "sha256:f308189bd0a4a98684a8117b687ed547633661c2bf2f750cef4dfcc95ccba1e4",
-    "verify.md": "sha256:499e5f29e7139e479e722b96b0f1ca279d1192a1728ab080e842c51f12dad5a9"
+    "verify.md": "sha256:8b4889e5d8d18c406465b07e51a0494198a4955ec2e7736cc372d76f78229918"
   },
   "generatedBy": "core"
 }

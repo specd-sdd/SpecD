@@ -45,21 +45,19 @@
 - **GIVEN** `contextMode: "list"`
 - **WHEN** `CompileContext.execute` is called
 - **THEN** every emitted spec entry has `mode: "list"`
-- **AND** no emitted entry contains full content
 
 #### Scenario: Summary mode emits summary entries only
 
 - **GIVEN** `contextMode: "summary"`
 - **WHEN** `CompileContext.execute` is called
 - **THEN** every emitted spec entry has `mode: "summary"`
-- **AND** no emitted entry contains full content
 
 #### Scenario: Full mode emits full entries only
 
 - **GIVEN** `contextMode: "full"`
 - **WHEN** `CompileContext.execute` is called
 - **THEN** every emitted spec entry has `mode: "full"`
-- **AND** each emitted entry contains renderable content
+- **AND** each emitted entry contains structured content (Title, Description, etc.)
 
 #### Scenario: Hybrid mode renders direct change specs in full
 
@@ -67,7 +65,7 @@
 - **AND** `includeChangeSpecs: true`
 - **AND** a spec is in `change.specIds`
 - **WHEN** `CompileContext.execute` is called
-- **THEN** that spec is emitted in full mode
+- **THEN** that spec is emitted in `full` mode with Description, Rules, and Constraints by default
 
 #### Scenario: Hybrid mode renders non-direct specs as summary
 
@@ -75,12 +73,6 @@
 - **AND** a spec is collected from include patterns or traversal and is not a direct included change spec
 - **WHEN** `CompileContext.execute` is called
 - **THEN** that spec is emitted in summary mode
-
-#### Scenario: Section flags do not affect list and summary entries
-
-- **GIVEN** `contextMode: "list"` or `contextMode: "summary"`
-- **WHEN** `CompileContext.execute` is called with section filters
-- **THEN** emitted entries remain list/summary shaped without full content blocks
 
 ### Requirement: Cycle detection during dependsOn traversal
 

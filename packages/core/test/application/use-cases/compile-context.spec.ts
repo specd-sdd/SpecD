@@ -86,16 +86,18 @@ function makeChange(
 
 function makeSchema(
   opts: {
+    artifactId?: string
     artifacts?: ArtifactType[]
     workflow?: WorkflowStep[]
     metadataExtraction?: import('../../../src/domain/value-objects/metadata-extraction.js').MetadataExtraction
   } = {},
 ): Schema {
+  const artifactId = opts.artifactId ?? 'spec'
   return makeSchemaBase({
     ...opts,
     name: '@specd/schema-std',
     artifacts: opts.artifacts ?? [
-      makeArtifactType('spec', {
+      makeArtifactType(artifactId, {
         scope: 'spec',
         output: 'spec.md',
       }),
@@ -184,6 +186,29 @@ const noOp: CompileContextConfig = {
   contextExcludeSpecs: [],
 }
 
+const defaultExtraction: import('../../../src/domain/value-objects/metadata-extraction.js').MetadataExtraction =
+  {
+    description: {
+      artifact: 'spec',
+      extractor: {
+        selector: { type: 'section', matches: '^Description$' },
+        extract: 'content',
+      },
+    },
+    rules: [
+      {
+        artifact: 'spec',
+        extractor: {
+          selector: { type: 'section', matches: '^Auth$' },
+          fields: {
+            requirement: { from: 'label' },
+            rules: { childSelector: { type: 'list-item' }, capture: '^(.+)$' },
+          },
+        },
+      },
+    ],
+  }
+
 // ---------------------------------------------------------------------------
 // Structured-result query helpers
 // ---------------------------------------------------------------------------
@@ -246,16 +271,15 @@ function makeSut(opts: {
   changeRepo: ChangeRepository
   schemaProvider: SchemaProvider
 } {
-  const {
-    change,
-    schema,
-    specRepos,
-    fileReader,
-    parsers,
-    previewSpec,
-    extractorTransforms,
-    workspaceRoutes,
-  } = opts
+  const { change, specRepos, fileReader, previewSpec, extractorTransforms, workspaceRoutes } = opts
+
+  const schema =
+    opts.schema ??
+    makeSchema({
+      metadataExtraction: defaultExtraction,
+    })
+  const parsers = opts.parsers ?? (new Map() as ArtifactParserRegistry)
+
   const changeRepo = makeStubChangeRepo(change)
   const schemaProvider = makeStubSchemaProvider(schema ?? null)
 
@@ -264,7 +288,7 @@ function makeSut(opts: {
     specRepos ?? new Map(),
     schemaProvider,
     fileReader ?? makeStubFileReader(),
-    parsers ?? (new Map() as ArtifactParserRegistry),
+    parsers,
     makeContentHasher(),
     previewSpec ?? makeStubPreviewSpec(),
     extractorTransforms ?? new Map(),
@@ -388,7 +412,7 @@ describe('CompileContext', () => {
 
   describe('Requirement: Falls back to extraction when metadata is stale or absent', () => {
     it('uses resolveSpecPath during fallback dependsOn traversal', async () => {
-      const specType = makeArtifactType('specs', {
+      const specType = makeArtifactType('spec', {
         scope: 'spec',
         output: 'spec.md',
         format: 'markdown',
@@ -397,7 +421,7 @@ describe('CompileContext', () => {
         artifacts: [specType],
         metadataExtraction: {
           dependsOn: {
-            artifact: 'specs',
+            artifact: 'spec',
             extractor: {
               selector: { type: 'section', matches: '^Spec Dependencies$' },
               extract: 'content',
@@ -465,7 +489,7 @@ describe('CompileContext', () => {
     })
 
     it('fails fallback dependsOn traversal when no dependency candidate is resolvable', async () => {
-      const specType = makeArtifactType('specs', {
+      const specType = makeArtifactType('spec', {
         scope: 'spec',
         output: 'spec.md',
         format: 'markdown',
@@ -474,7 +498,7 @@ describe('CompileContext', () => {
         artifacts: [specType],
         metadataExtraction: {
           dependsOn: {
-            artifact: 'specs',
+            artifact: 'spec',
             extractor: {
               selector: { type: 'section', matches: '^Spec Dependencies$' },
               extract: 'content',
@@ -534,7 +558,7 @@ describe('CompileContext', () => {
     })
 
     it('normalizes ../../_global/architecture/spec.md during fallback dependsOn traversal', async () => {
-      const specType = makeArtifactType('specs', {
+      const specType = makeArtifactType('spec', {
         scope: 'spec',
         output: 'spec.md',
         format: 'markdown',
@@ -543,7 +567,7 @@ describe('CompileContext', () => {
         artifacts: [specType],
         metadataExtraction: {
           dependsOn: {
-            artifact: 'specs',
+            artifact: 'spec',
             extractor: {
               selector: { type: 'section', matches: '^Spec Dependencies$' },
               extract: 'content',
@@ -1672,8 +1696,8 @@ describe('CompileContext', () => {
     const specContent = '# Login\n'
     const loginSpec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
 
-    function metadataWithAllSections(): string {
-      return freshMetadata(specContent, {
+    function metadataWithAllSections(content: string = specContent): string {
+      return freshMetadata(content, {
         description: 'Auth login spec.',
         rules: [{ requirement: 'Auth', rules: ['Must validate tokens'] }],
         constraints: ['Passwords must be hashed'],
@@ -1688,10 +1712,11 @@ describe('CompileContext', () => {
       })
     }
 
-    it('renders raw artifact content when sections is undefined', async () => {
+    it('renders default sections (rules + constraints) when sections is undefined', async () => {
+      const actualContent = '# Login\n\nSpec body from artifact.\n'
       const specRepo = makeSpecRepo([loginSpec], {
-        'auth/login/.specd-metadata.yaml': metadataWithAllSections(),
-        'auth/login/spec.md': '# Login\n\nSpec body from artifact.\n',
+        'auth/login/.specd-metadata.yaml': metadataWithAllSections(actualContent),
+        'auth/login/spec.md': actualContent,
       })
       const change = makeChange('my-change')
       const schema = makeSchema()
@@ -1707,9 +1732,13 @@ describe('CompileContext', () => {
       const specEntry = result.specs.find((s) => s.specId.includes('auth/login'))
       expect(specEntry).toBeDefined()
       expect(specEntry!.description).toContain('Auth login spec.')
-      expect(specEntry!.content).toContain('#### spec.md')
-      expect(specEntry!.content).toContain('Spec body from artifact.')
-      expect(specEntry!.content).not.toContain('Must validate tokens')
+      expect(specEntry!.content).toContain('**Description:** Auth login spec.')
+      expect(specEntry!.content).toContain('#### Rules')
+      expect(specEntry!.content).toContain('Must validate tokens')
+      expect(specEntry!.content).toContain('#### Constraints')
+      expect(specEntry!.content).toContain('Passwords must be hashed')
+      expect(specEntry!.content).not.toContain('#### spec.md')
+      expect(specEntry!.content).not.toContain('Spec body from artifact.')
     })
 
     it('renders only rules when sections is ["rules"]', async () => {
@@ -1731,8 +1760,9 @@ describe('CompileContext', () => {
 
       const specEntry = result.specs.find((s) => s.specId.includes('auth/login'))
       expect(specEntry).toBeDefined()
+      expect(specEntry!.content).toContain('**Description:** Auth login spec.')
       expect(specEntry!.content).toContain('Must validate tokens')
-      expect(specEntry!.content).not.toContain('Auth login spec.')
+      expect(specEntry!.content).not.toContain('#### Constraints')
       expect(specEntry!.content).not.toContain('Passwords must be hashed')
       expect(specEntry!.content).not.toContain('Login works')
     })
@@ -1756,9 +1786,10 @@ describe('CompileContext', () => {
 
       const specEntry = result.specs.find((s) => s.specId.includes('auth/login'))
       expect(specEntry).toBeDefined()
+      expect(specEntry!.content).toContain('**Description:** Auth login spec.')
       expect(specEntry!.content).toContain('Must validate tokens')
+      expect(specEntry!.content).toContain('#### Constraints')
       expect(specEntry!.content).toContain('Passwords must be hashed')
-      expect(specEntry!.content).not.toContain('Auth login spec.')
       expect(specEntry!.content).not.toContain('Login works')
     })
 
@@ -2414,7 +2445,10 @@ describe('CompileContext', () => {
       const loginSpec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
       const loginContent = '# Login\n'
       const mergedContent = '# Login (merged)\n\nNew merged content.'
-      const metadata = freshMetadata(loginContent, { description: 'Login spec.' })
+      const metadata = freshMetadata(loginContent, {
+        description: 'Login spec.',
+        rules: [{ requirement: 'Auth', rules: ['Merged rule'] }],
+      })
 
       const specRepo = makeSpecRepo([loginSpec], {
         'auth/login/.specd-metadata.yaml': metadata,
@@ -2448,8 +2482,9 @@ describe('CompileContext', () => {
 
       const specEntry = result.specs.find((s) => s.specId === 'default:auth/login')
       expect(specEntry).toBeDefined()
-      expect(specEntry!.content).toContain('#### spec.md')
-      expect(specEntry!.content).toContain(mergedContent)
+      expect(specEntry!.description).toContain('Login spec.')
+      expect(specEntry!.content ?? '').toBe('')
+      expect(specEntry!.content).not.toContain('#### spec.md')
       expect(result.warnings.filter((w) => w.type === 'preview')).toHaveLength(0)
     })
 
@@ -2458,6 +2493,7 @@ describe('CompileContext', () => {
       const loginContent = '# Login\n'
       const metadata = freshMetadata(loginContent, {
         description: 'Login fallback spec.',
+        constraints: ['Must fall back to metadata'],
       })
 
       const specRepo = makeSpecRepo([loginSpec], {
@@ -2492,8 +2528,10 @@ describe('CompileContext', () => {
 
       const specEntry = result.specs.find((s) => s.specId === 'default:auth/login')
       expect(specEntry).toBeDefined()
-      expect(specEntry!.content).toContain('#### spec.md')
-      expect(specEntry!.content).toContain(loginContent)
+      expect(specEntry!.content).toContain('**Description:** Login fallback spec.')
+      expect(specEntry!.content).toContain('#### Constraints')
+      expect(specEntry!.content).toContain('Must fall back to metadata')
+      expect(specEntry!.content).not.toContain('#### spec.md')
     })
 
     it('falls back with warning when PreviewSpec throws', async () => {
@@ -2501,6 +2539,7 @@ describe('CompileContext', () => {
       const loginContent = '# Login\n'
       const metadata = freshMetadata(loginContent, {
         description: 'Login throw-fallback spec.',
+        rules: [{ requirement: 'Error', rules: ['Handles preview errors'] }],
       })
 
       const specRepo = makeSpecRepo([loginSpec], {
@@ -2530,8 +2569,10 @@ describe('CompileContext', () => {
 
       const specEntry = result.specs.find((s) => s.specId === 'default:auth/login')
       expect(specEntry).toBeDefined()
-      expect(specEntry!.content).toContain('#### spec.md')
-      expect(specEntry!.content).toContain(loginContent)
+      expect(specEntry!.content).toContain('**Description:** Login throw-fallback spec.')
+      expect(specEntry!.content).toContain('#### Rules')
+      expect(specEntry!.content).toContain('Handles preview errors')
+      expect(specEntry!.content).not.toContain('#### spec.md')
       // Preview warning emitted
       const previewWarnings = result.warnings.filter((w) => w.type === 'preview')
       expect(previewWarnings).toHaveLength(1)
@@ -2639,13 +2680,19 @@ describe('CompileContext', () => {
       expect(callArgs).not.toContain('default:auth/other')
     })
 
-    it('renders all spec-scoped files in stable order when sections is undefined', async () => {
+    it('renders default sections in stable order when sections is undefined', async () => {
       const loginSpec = new Spec('default', SpecPath.parse('auth/login'), [
         'spec.md',
         'verify.md',
         'examples.md',
       ])
+      const metadata = freshMetadata('# Login\n', {
+        description: 'Stable order spec.',
+        rules: [{ requirement: 'Auth', rules: ['Rule 1'] }],
+        constraints: ['Constraint 1'],
+      })
       const specRepo = makeSpecRepo([loginSpec], {
+        'auth/login/.specd-metadata.yaml': metadata,
         'auth/login/spec.md': '# Login\n',
         'auth/login/examples.md': 'Example content.\n',
         'auth/login/verify.md': 'Verify content.\n',
@@ -2668,11 +2715,13 @@ describe('CompileContext', () => {
       })
 
       const content = result.specs.find((s) => s.specId === 'default:auth/login')?.content ?? ''
-      expect(content).toContain('#### spec.md')
-      expect(content).toContain('#### examples.md')
-      expect(content).toContain('#### verify.md')
-      expect(content.indexOf('#### spec.md')).toBeLessThan(content.indexOf('#### examples.md'))
-      expect(content.indexOf('#### examples.md')).toBeLessThan(content.indexOf('#### verify.md'))
+      expect(content).toContain('**Description:** Stable order spec.')
+      expect(content).toContain('#### Rules')
+      expect(content).toContain('Rule 1')
+      expect(content).toContain('#### Constraints')
+      expect(content).toContain('Constraint 1')
+      expect(content).not.toContain('#### spec.md')
+      expect(content.indexOf('#### Rules')).toBeLessThan(content.indexOf('#### Constraints'))
     })
 
     it('renders files alphabetically when spec.md does not exist', async () => {
@@ -2680,7 +2729,16 @@ describe('CompileContext', () => {
         'verify.md',
         'examples.md',
       ])
+      const metadata = freshMetadata('', {
+        description: 'Alpha order spec.',
+        rules: [{ requirement: 'Alpha', rules: ['Alpha rule'] }],
+        contentHashes: {
+          'examples.md': sha256Hex('Example content.\n'),
+          'verify.md': sha256Hex('Verify content.\n'),
+        },
+      })
       const specRepo = makeSpecRepo([loginSpec], {
+        'auth/login/.specd-metadata.yaml': metadata,
         'auth/login/examples.md': 'Example content.\n',
         'auth/login/verify.md': 'Verify content.\n',
       })
@@ -2701,9 +2759,11 @@ describe('CompileContext', () => {
       })
 
       const content = result.specs.find((s) => s.specId === 'default:auth/login')?.content ?? ''
-      expect(content).toContain('#### examples.md')
-      expect(content).toContain('#### verify.md')
-      expect(content.indexOf('#### examples.md')).toBeLessThan(content.indexOf('#### verify.md'))
+      expect(content).toContain('**Description:** Alpha order spec.')
+      expect(content).toContain('#### Rules')
+      expect(content).toContain('Alpha rule')
+      expect(content).not.toContain('#### examples.md')
+      expect(content).not.toContain('#### verify.md')
     })
 
     it('uses merged preview files while keeping unchanged base files in display order', async () => {
@@ -2712,7 +2772,12 @@ describe('CompileContext', () => {
         'verify.md',
         'examples.md',
       ])
+      const metadata = freshMetadata('# Login\n', {
+        description: 'Merged preview spec.',
+        rules: [{ requirement: 'Auth', rules: ['Base rule'] }],
+      })
       const specRepo = makeSpecRepo([loginSpec], {
+        'auth/login/.specd-metadata.yaml': metadata,
         'auth/login/spec.md': '# Login\n',
         'auth/login/examples.md': 'Base examples.\n',
         'auth/login/verify.md': 'Base verify.\n',
@@ -2752,11 +2817,10 @@ describe('CompileContext', () => {
       })
 
       const content = result.specs.find((s) => s.specId === 'default:auth/login')?.content ?? ''
-      expect(content).toContain('# Login merged')
-      expect(content).toContain('Base examples.')
-      expect(content).toContain('Merged verify.')
-      expect(content.indexOf('#### spec.md')).toBeLessThan(content.indexOf('#### examples.md'))
-      expect(content.indexOf('#### examples.md')).toBeLessThan(content.indexOf('#### verify.md'))
+      const specEntry = result.specs.find((s) => s.specId === 'default:auth/login')
+      expect(specEntry?.description).toContain('Merged preview spec.')
+      expect(content).toBe('')
+      expect(content).not.toContain('#### spec.md')
     })
 
     it('derives section-filtered content from merged preview artifacts', async () => {

@@ -66,8 +66,14 @@
     {
       "requirement": "Command signature",
       "name": "Missing step argument",
-      "when": ["specd change context my-change is run without the step"],
-      "then": ["the command exits with code 1 and prints a usage error to stderr"]
+      "when": ["specd change context my-change is run"],
+      "then": ["the command exits with code 1", "AND stderr contains a usage error"]
+    },
+    {
+      "requirement": "Command signature",
+      "name": "--mode flag accepted",
+      "when": ["specd change context my-change designing --mode summary is run"],
+      "then": ["the command proceeds normally and overrides the config mode"]
     },
     {
       "requirement": "Command signature",
@@ -161,6 +167,15 @@
       "then": ["that spec can still appear in emitted context entries"]
     },
     {
+      "requirement": "Output",
+      "name": "Full mode defaults to Description + Rules + Constraints",
+      "given": [
+        "a spec is rendered in full mode (due to --mode full or being a change spec in hybrid mode)"
+      ],
+      "when": ["specd change context is run without section flags"],
+      "then": ["output includes Description, Rules, and Constraints for that spec"]
+    },
+    {
       "requirement": "Step availability warning",
       "name": "Step not yet available",
       "given": ["the step implementing has blocking artifacts"],
@@ -201,7 +216,7 @@
   ],
   "contentHashes": {
     "spec.md": "sha256:c50eb9fc8716ac1b7f5384e87e96f16b7fb5e6d3a4a4ef9d8e97e1d18f92fab0",
-    "verify.md": "sha256:b46487ecbee68348ec4aa52c487a97b0e40184de7c9157a9af9e0e5b1cbd0403"
+    "verify.md": "sha256:5b12a3c02cf4c5ce83daca1babec9f48cb8ae760ef7df2f381447bd8706034de"
   },
   "generatedBy": "core"
 }

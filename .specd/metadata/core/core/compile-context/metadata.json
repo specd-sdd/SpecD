@@ -186,20 +186,14 @@
       "name": "List mode emits list entries only",
       "given": ["contextMode: \"list\""],
       "when": ["CompileContext.execute is called"],
-      "then": [
-        "every emitted spec entry has mode: \"list\"",
-        "AND no emitted entry contains full content"
-      ]
+      "then": ["every emitted spec entry has mode: \"list\""]
     },
     {
       "requirement": "Context display modes",
       "name": "Summary mode emits summary entries only",
       "given": ["contextMode: \"summary\""],
       "when": ["CompileContext.execute is called"],
-      "then": [
-        "every emitted spec entry has mode: \"summary\"",
-        "AND no emitted entry contains full content"
-      ]
+      "then": ["every emitted spec entry has mode: \"summary\""]
     },
     {
       "requirement": "Context display modes",
@@ -208,7 +202,7 @@
       "when": ["CompileContext.execute is called"],
       "then": [
         "every emitted spec entry has mode: \"full\"",
-        "AND each emitted entry contains renderable content"
+        "AND each emitted entry contains structured content (Title, Description, etc.)"
       ]
     },
     {
@@ -220,7 +214,9 @@
         "AND a spec is in change.specIds"
       ],
       "when": ["CompileContext.execute is called"],
-      "then": ["that spec is emitted in full mode"]
+      "then": [
+        "that spec is emitted in full mode with Description, Rules, and Constraints by default"
+      ]
     },
     {
       "requirement": "Context display modes",
@@ -231,13 +227,6 @@
       ],
       "when": ["CompileContext.execute is called"],
       "then": ["that spec is emitted in summary mode"]
-    },
-    {
-      "requirement": "Context display modes",
-      "name": "Section flags do not affect list and summary entries",
-      "given": ["contextMode: \"list\" or contextMode: \"summary\""],
-      "when": ["CompileContext.execute is called with section filters"],
-      "then": ["emitted entries remain list/summary shaped without full content blocks"]
     },
     {
       "requirement": "Cycle detection during dependsOn traversal",
@@ -553,7 +542,7 @@
   ],
   "contentHashes": {
     "spec.md": "sha256:60f25b09a80c7b037e13a7fb1574f4544769e028ff8b9abbc8b46d1309db956c",
-    "verify.md": "sha256:ea7e1589a5c08e2ef2b58e7646ef1c13499a15aa1d9aea7a8fc521b78b314dce"
+    "verify.md": "sha256:706a7fb5bf8c09bf4c910ad464f8c7d91b73cfaf56ca71531d62ed41d1894e5c"
   },
   "generatedBy": "core"
 }

@@ -114,6 +114,13 @@
       ]
     },
     {
+      "requirement": "Build context entry from metadata",
+      "name": "Full mode defaults to Description + Rules + Constraints",
+      "given": ["a spec with fresh metadata", "AND effective context mode is full"],
+      "when": ["GetSpecContext.execute is called without section filters"],
+      "then": ["the entry includes Title, Description, Rules, and Constraints"]
+    },
+    {
       "requirement": "Stale or absent metadata produces minimal entry",
       "name": "No metadata yields stale list entry in list mode",
       "given": ["a spec with no metadata", "AND effective context mode is list"],
@@ -130,26 +137,22 @@
     {
       "requirement": "Section filtering",
       "name": "Only requested sections included in full mode",
-      "given": [
-        "a spec with fresh metadata containing rules, constraints, and scenarios",
-        "AND effective context mode is full"
-      ],
+      "given": ["a spec with fresh metadata", "AND effective context mode is full"],
       "when": ["execute({ ..., sections: ['rules'] }) is called"],
-      "then": ["the entry includes rules but not constraints, scenarios, title, or description"]
+      "then": [
+        "the entry includes Title, Description (persistence), and Rules",
+        "AND Constraints and Scenarios are omitted"
+      ]
     },
     {
       "requirement": "Section filtering",
-      "name": "Empty sections array shows all in full mode",
+      "name": "Empty sections array defaults to Description + Rules + Constraints",
       "given": ["effective context mode is full"],
       "when": ["execute({ ..., sections: [] }) is called"],
-      "then": ["the entry includes all available full-mode fields"]
-    },
-    {
-      "requirement": "Section filtering",
-      "name": "Section filters do not affect list and summary modes",
-      "given": ["effective context mode is list or summary"],
-      "when": ["execute is called with section filters"],
-      "then": ["entry shape remains list/summary without full section rendering"]
+      "then": [
+        "the entry includes Title, Description, Rules, and Constraints",
+        "AND Scenarios are omitted unless explicitly requested"
+      ]
     },
     {
       "requirement": "Transitive dependency traversal",
@@ -221,7 +224,7 @@
   ],
   "contentHashes": {
     "spec.md": "sha256:47d727afbc07b9e770e51d52a0b52579ff8145c785020882b5c52b11f0d909de",
-    "verify.md": "sha256:76fea18354ba1fba119764b069f7e1ae8e15dbe529b50ec0c8fb095da6ca5fa6"
+    "verify.md": "sha256:5a88e2bc7fd9c74f44b94f6d106107a7f75099a8836f9148086e53072b9a958a"
   },
   "generatedBy": "core"
 }

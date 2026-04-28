@@ -576,7 +576,9 @@ export class CompileContext {
 
       // Fall back to metadata or extraction if preview didn't produce content
       if (content === undefined) {
-        if (showAllSections) {
+        if (showAllSections && mode !== 'full') {
+          // Keep raw markdown ONLY for non-full modes that explicitly requested everything
+          // (Internal fallback, standard modes are structured).
           content = this._renderSpecFiles(displayFiles)
         } else if (mergedFiles !== undefined) {
           const extraction = schema.metadataExtraction()
@@ -598,19 +600,19 @@ export class CompileContext {
           }
 
           if (isFresh && metadata !== null) {
-            content = this._renderFromMetadata(metadata, sectionsFilter, showAllSections)
+            content = this._renderFromMetadata(metadata, sectionsFilter)
           } else {
             if (metadata !== null) {
               warnings.push({
                 type: 'stale-metadata',
                 path: specId,
-                message: `Metadata for '${specId}' is stale — falling back to raw artifact content`,
+                message: `Metadata for '${specId}' is stale — falling back to extracted sections`,
               })
             } else {
               warnings.push({
                 type: 'stale-metadata',
                 path: specId,
-                message: `No metadata for '${specId}' — falling back to raw artifact content`,
+                message: `No metadata for '${specId}' — falling back to extracted sections`,
               })
             }
 
@@ -701,29 +703,37 @@ export class CompileContext {
    *
    * @param metadata - The fresh parsed metadata
    * @param sectionsFilter - Optional filter to include only specific sections
-   * @param showAll - Whether to include all sections regardless of filter
    * @returns Rendered content string
    */
   private _renderFromMetadata(
     metadata: SpecMetadata,
     sectionsFilter: ReadonlyArray<SpecSection> | undefined,
-    showAll: boolean,
   ): string {
     const metaParts: string[] = []
-    if (showAll && metadata.description !== undefined) {
+
+    // Description is always included in full mode as part of the content string
+    // if it exists in metadata (header persistence).
+    if (metadata.description !== undefined && metadata.description !== '') {
       metaParts.push(`**Description:** ${metadata.description}`)
     }
-    if ((showAll || sectionsFilter?.includes('rules')) && metadata.rules?.length) {
+
+    // If no sections are provided, default to Rules + Constraints.
+    const effectiveSections =
+      sectionsFilter === undefined || sectionsFilter.length === 0
+        ? (['rules', 'constraints'] as const)
+        : sectionsFilter
+
+    if (effectiveSections.includes('rules') && metadata.rules?.length) {
       const rulesText = metadata.rules
         .map((r) => `##### ${r.requirement}\n${r.rules.map((rule) => `- ${rule}`).join('\n')}`)
         .join('\n\n')
       metaParts.push(`#### Rules\n\n${rulesText}`)
     }
-    if ((showAll || sectionsFilter?.includes('constraints')) && metadata.constraints?.length) {
+    if (effectiveSections.includes('constraints') && metadata.constraints?.length) {
       const constraintsText = metadata.constraints.map((c) => `- ${c}`).join('\n')
       metaParts.push(`#### Constraints\n\n${constraintsText}`)
     }
-    if ((showAll || sectionsFilter?.includes('scenarios')) && metadata.scenarios?.length) {
+    if (effectiveSections.includes('scenarios') && metadata.scenarios?.length) {
       const scenariosText = metadata.scenarios
         .map((s) => {
           const lines: string[] = [`##### Scenario: ${s.name}`, `*Requirement: ${s.requirement}*`]
@@ -867,7 +877,7 @@ export class CompileContext {
    * @param extraction - Schema metadata extraction declarations
    * @param workspace - Workspace owning the spec
    * @param specPath - Capability path for transform context
-   * @param sectionsFilter - Required selected sections
+   * @param sectionsFilter - Optional selected sections
    * @returns Rendered section content
    */
   private async _renderExtractedSectionsFromFiles(
@@ -875,7 +885,7 @@ export class CompileContext {
     extraction: import('../../domain/value-objects/metadata-extraction.js').MetadataExtraction,
     workspace: string,
     specPath: string,
-    sectionsFilter: ReadonlyArray<SpecSection>,
+    sectionsFilter: ReadonlyArray<SpecSection> | undefined,
   ): Promise<string> {
     const astsByArtifact = new Map<string, { root: SelectorNode }>()
     const renderers = new Map<string, SubtreeRenderer>()
@@ -911,7 +921,7 @@ export class CompileContext {
       transformContexts,
     )
 
-    return this._renderFromMetadata(extracted, sectionsFilter, false)
+    return this._renderFromMetadata(extracted, sectionsFilter)
   }
 
   /**
