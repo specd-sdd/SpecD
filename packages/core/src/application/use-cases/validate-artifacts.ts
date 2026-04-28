@@ -14,6 +14,7 @@ import {
   type SignedOffEvent,
 } from '../../domain/entities/change.js'
 import { type PreHashCleanup } from '../../domain/value-objects/validation-rule.js'
+import { type ArtifactStatus } from '../../domain/value-objects/artifact-status.js'
 import { type MetadataExtractorEntry } from '../../domain/value-objects/metadata-extraction.js'
 import { applyPreHashCleanup } from '../../domain/services/pre-hash-cleanup.js'
 import { SpecPath } from '../../domain/value-objects/spec-path.js'
@@ -274,14 +275,22 @@ export class ValidateArtifacts {
     for (const artifactType of schema.artifacts()) {
       if (input.artifactId !== undefined && artifactType.id !== input.artifactId) continue
 
-      const blockedBy = artifactType.requires.find((reqId) => {
-        const depStatus = change.effectiveStatus(reqId)
-        return depStatus !== 'complete' && depStatus !== 'skipped'
-      })
-      if (blockedBy !== undefined) {
+      const blockedDep = artifactType.requires
+        .map((reqId) => ({ reqId, status: change.effectiveStatus(reqId) }))
+        .find(({ status }) => status !== 'complete' && status !== 'skipped')
+      if (blockedDep !== undefined) {
+        const blockedByParent =
+          blockedDep.status === 'pending-parent-artifact-review'
+            ? (change.findBlockingParent(artifactType.id) ?? change.findBlockingParent(blockedDep.reqId))
+            : null
         failures.push({
           artifactId: artifactType.id,
-          description: `Artifact '${artifactType.id}' is blocked by incomplete dependency '${blockedBy}'`,
+          description: this._dependencyBlockedDescription({
+            artifactId: artifactType.id,
+            dependencyId: blockedDep.reqId,
+            dependencyStatus: blockedDep.status,
+            blockedByParent,
+          }),
         })
         continue
       }
@@ -569,5 +578,41 @@ export class ValidateArtifacts {
    */
   private _applyCleanup(content: string, cleanups: readonly PreHashCleanup[]): string {
     return applyPreHashCleanup(content, cleanups)
+  }
+
+  /**
+   * Builds a status-aware dependency-blocked failure description for validation.
+   *
+   * @param args - Dependency blocker context.
+   * @param args.artifactId - Artifact currently being validated.
+   * @param args.dependencyId - Dependency artifact that blocks validation.
+   * @param args.dependencyStatus - Effective status of the blocking dependency.
+   * @param args.blockedByParent - Optional parent artifact context for recursive review blockers.
+   * @returns Human-readable failure description
+   */
+  private _dependencyBlockedDescription(args: {
+    readonly artifactId: string
+    readonly dependencyId: string
+    readonly dependencyStatus: ArtifactStatus
+    readonly blockedByParent: { readonly artifactId: string; readonly status: ArtifactStatus } | null
+  }): string {
+    const base = `Artifact '${args.artifactId}'`
+    const dependency = `'${args.dependencyId}'`
+    switch (args.dependencyStatus) {
+      case 'pending-parent-artifact-review': {
+        if (args.blockedByParent !== null) {
+          return `${base} is blocked by review of dependency ${dependency} [status: pending-parent-artifact-review, parent: '${args.blockedByParent.artifactId}' (${args.blockedByParent.status})]`
+        }
+        return `${base} is blocked by review of dependency ${dependency} [status: pending-parent-artifact-review]`
+      }
+      case 'pending-review':
+      case 'drifted-pending-review':
+        return `${base} is blocked by dependency ${dependency} requiring review [status: ${args.dependencyStatus}]`
+      case 'missing':
+      case 'in-progress':
+        return `${base} is blocked by incomplete dependency ${dependency} [status: ${args.dependencyStatus}]`
+      default:
+        return `${base} is blocked by dependency ${dependency} [status: ${args.dependencyStatus}]`
+    }
   }
 }

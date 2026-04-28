@@ -85,6 +85,31 @@ describe('change validate', () => {
     expect(stdout()).toContain('specd change spec-preview feat default:auth/login')
   })
 
+  it('preserves status-aware dependency-block descriptions in text output', async () => {
+    const { kernel, stdout } = setup()
+    kernel.changes.validate.execute.mockResolvedValue({
+      failures: [
+        {
+          artifactId: 'verify',
+          description:
+            "Artifact 'verify' is blocked by dependency 'specs' requiring review [status: pending-review]",
+        },
+      ],
+      warnings: [],
+      files: [],
+    })
+
+    const program = makeProgram()
+    registerChangeValidate(program.command('change'))
+    await program
+      .parseAsync(['node', 'specd', 'change', 'validate', 'feat', 'auth/login'])
+      .catch(() => {})
+
+    expect(stdout()).toContain("status: pending-review")
+    expect(stdout()).toContain("requiring review")
+    expect(process.exitCode).toBe(1)
+  })
+
   it('writes notes to stdout with pass message', async () => {
     const { kernel, stdout } = setup()
     kernel.changes.validate.execute.mockResolvedValue({
@@ -188,6 +213,28 @@ describe('change validate', () => {
     expect(parsed.failures.length).toBeGreaterThan(0)
     expect(parsed.failures[0].artifactId).toBe('spec')
     expect(Array.isArray(parsed.files)).toBe(true)
+    expect(process.exitCode).toBe(1)
+  })
+
+  it('preserves status-aware dependency-block descriptions in JSON output', async () => {
+    const { kernel, stdout } = setup()
+    const description =
+      "Artifact 'verify' is blocked by review of dependency 'specs' [status: pending-parent-artifact-review, parent: 'proposal' (pending-review)]"
+    kernel.changes.validate.execute.mockResolvedValue({
+      failures: [{ artifactId: 'verify', description }],
+      warnings: [],
+      files: [],
+    })
+
+    const program = makeProgram()
+    registerChangeValidate(program.command('change'))
+    await program
+      .parseAsync(['node', 'specd', 'change', 'validate', 'feat', 'auth/login', '--format', 'json'])
+      .catch(() => {})
+
+    const parsed = JSON.parse(stdout())
+    expect(parsed.passed).toBe(false)
+    expect(parsed.failures[0].description).toBe(description)
     expect(process.exitCode).toBe(1)
   })
 

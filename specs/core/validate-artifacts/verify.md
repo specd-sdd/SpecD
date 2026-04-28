@@ -87,6 +87,30 @@
 - **WHEN** `ValidateArtifacts.execute` is called for `specs`
 - **THEN** `specs` is reported as dependency-blocked and `markComplete` is not called for it
 
+#### Scenario: Dependency-block failure includes effective dependency status
+
+- **GIVEN** artifact `specs` requires `proposal`, and `proposal` effective status is `missing`
+- **WHEN** `ValidateArtifacts.execute` is called for `specs`
+- **THEN** the dependency-blocked failure description includes dependency `proposal`
+- **AND** the description includes status `missing`
+
+#### Scenario: Review-propagation blocker includes recursive parent context
+
+- **GIVEN** artifact `verify` depends on `specs`
+- **AND** `specs` effective status is `pending-parent-artifact-review`
+- **AND** recursive blocker resolution identifies parent artifact `proposal` with status `pending-review`
+- **WHEN** `ValidateArtifacts.execute` is called for `verify`
+- **THEN** the dependency-blocked failure description includes status `pending-parent-artifact-review`
+- **AND** the description includes parent blocker context (`proposal`, `pending-review`)
+
+#### Scenario: Direct review blocker status is reported as review-state
+
+- **GIVEN** artifact `verify` depends on `specs`
+- **AND** `specs` effective status is `pending-review` or `drifted-pending-review`
+- **WHEN** `ValidateArtifacts.execute` is called for `verify`
+- **THEN** the dependency-blocked failure description includes the exact dependency status
+- **AND** the status is presented as a review blocker, not as generic incompleteness
+
 #### Scenario: Skipped artifact is not validated
 
 - **GIVEN** artifact `design` is `optional: true` with `validatedHash === "__skipped__"`

@@ -43,7 +43,7 @@
     {
       "requirement": "Dependency order check",
       "rules": [
-        "Before validating an artifact, `ValidateArtifacts` must check that all artifact IDs in its `requires` list are either `complete` or `skipped` (via `change.effectiveStatus(type)`). If a required dependency is neither `complete` nor `skipped`, validation of the dependent artifact is skipped and reported as a dependency-blocked failure. A `skipped` optional artifact satisfies the dependency. `skipped` artifacts are not validated — there is no file to check."
+        "Before validating an artifact, `ValidateArtifacts` must check that all artifact IDs in its `requires` list are either `complete` or `skipped` (via `change.effectiveStatus(type)`). If a required dependency is neither `complete` nor `skipped`, validation of the dependent artifact is skipped and reported as a dependency-blocked failure. A `skipped` optional artifact satisfies the dependency. `skipped` artifacts are not validated — there is no file to check.\n\nDependency-blocked failures MUST include the dependency artifact ID and its effective status as observed at validation time.\n\nWhen the dependency status is `pending-parent-artifact-review`, the failure description MUST also include the upstream parent blocker context (artifact ID and status) when available from recursive blocker resolution (`findBlockingParent`).\n\nFor blockers outside review-propagation (`missing` and `in-progress`), the failure description MUST still include the dependency status and MUST NOT degrade to generic \"incomplete dependency\" wording.\n\n`pending-review` and `drifted-pending-review` are review blockers. For these statuses, the failure description MUST present them as review-state blockers (not generic incompleteness) and MUST include the status explicitly."
       ]
     },
     {
@@ -128,9 +128,15 @@
     {
       "requirement": "Required artifacts check",
       "name": "Non-optional artifact missing — failure",
-      "given": ["a change with a required (non-optional) artifact that has no files"],
-      "when": ["ValidateArtifacts.execute is called"],
-      "then": ["the result includes a validation failure for the missing artifact"]
+      "given": [
+        "a change with a required (non-optional) artifact that has no files"
+      ],
+      "when": [
+        "ValidateArtifacts.execute is called"
+      ],
+      "then": [
+        "the result includes a validation failure for the missing artifact"
+      ]
     },
     {
       "requirement": "Required artifacts check",
@@ -139,7 +145,9 @@
         "a schema with optional: true artifact design",
         "AND the change has design.validatedHash === \"__skipped__\""
       ],
-      "when": ["ValidateArtifacts.execute is called without artifactId"],
+      "when": [
+        "ValidateArtifacts.execute is called without artifactId"
+      ],
       "then": [
         "design does not appear in result.failures — skipped optional artifacts are resolved"
       ]
@@ -151,8 +159,12 @@
         "a schema with optional: true artifact design",
         "AND the change has no file and no validatedHash for design"
       ],
-      "when": ["ValidateArtifacts.execute is called without artifactId"],
-      "then": ["design does not appear in result.failures — absent optional artifacts are allowed"]
+      "when": [
+        "ValidateArtifacts.execute is called without artifactId"
+      ],
+      "then": [
+        "design does not appear in result.failures — absent optional artifacts are allowed"
+      ]
     },
     {
       "requirement": "Required artifacts check",
@@ -162,7 +174,9 @@
         "AND only proposal has a file; specs is missing",
         "AND artifactId is \"proposal\""
       ],
-      "when": ["ValidateArtifacts.execute is called"],
+      "when": [
+        "ValidateArtifacts.execute is called"
+      ],
       "then": [
         "result.passed is true (assuming proposal passes validation)",
         "AND the missing specs artifact is not reported as a failure"
@@ -176,7 +190,9 @@
         "AND specA has all its artifact files present",
         "AND specB does not have its artifact files yet (not yet created)"
       ],
-      "when": ["ValidateArtifacts.execute is called with specPath: 'specA'"],
+      "when": [
+        "ValidateArtifacts.execute is called with specPath: 'specA'"
+      ],
       "then": [
         "only specA's artifacts are validated",
         "AND missing artifacts from specB do NOT cause validation failure",
@@ -190,7 +206,9 @@
         "the schema has artifacts proposal, specs, and verify",
         "AND artifactId is \"specs\""
       ],
-      "when": ["ValidateArtifacts.execute is called"],
+      "when": [
+        "ValidateArtifacts.execute is called"
+      ],
       "then": [
         "only specs goes through dependency check, delta validation, structural validation, and hash computation",
         "AND proposal and verify are not checked, not reported as missing, and not included in the result"
@@ -203,8 +221,12 @@
         "artifactId is \"specs\" and artifact specs requires proposal",
         "AND proposal is not complete or skipped"
       ],
-      "when": ["ValidateArtifacts.execute is called"],
-      "then": ["specs is reported as dependency-blocked and markComplete is not called"]
+      "when": [
+        "ValidateArtifacts.execute is called"
+      ],
+      "then": [
+        "specs is reported as dependency-blocked and markComplete is not called"
+      ]
     },
     {
       "requirement": "Input — artifactId filter",
@@ -213,15 +235,25 @@
         "artifactId is \"specs\" and artifact specs requires proposal",
         "AND proposal is complete"
       ],
-      "when": ["ValidateArtifacts.execute is called"],
-      "then": ["specs is validated normally and markComplete is called if all validations pass"]
+      "when": [
+        "ValidateArtifacts.execute is called"
+      ],
+      "then": [
+        "specs is validated normally and markComplete is called if all validations pass"
+      ]
     },
     {
       "requirement": "Dependency order check",
       "name": "Dependency complete — validation proceeds",
-      "given": ["artifact specs requires proposal, and proposal is complete"],
-      "when": ["ValidateArtifacts.execute is called for specs"],
-      "then": ["validation of specs proceeds normally"]
+      "given": [
+        "artifact specs requires proposal, and proposal is complete"
+      ],
+      "when": [
+        "ValidateArtifacts.execute is called for specs"
+      ],
+      "then": [
+        "validation of specs proceeds normally"
+      ]
     },
     {
       "requirement": "Dependency order check",
@@ -229,21 +261,80 @@
       "given": [
         "artifact tasks requires design, and design is optional: true with validatedHash === \"__skipped__\""
       ],
-      "when": ["ValidateArtifacts.execute is called for tasks"],
-      "then": ["validation of tasks proceeds — skipped satisfies the dependency"]
+      "when": [
+        "ValidateArtifacts.execute is called for tasks"
+      ],
+      "then": [
+        "validation of tasks proceeds — skipped satisfies the dependency"
+      ]
     },
     {
       "requirement": "Dependency order check",
       "name": "Dependency incomplete — validation blocked",
-      "given": ["artifact specs requires proposal, and proposal is in-progress"],
-      "when": ["ValidateArtifacts.execute is called for specs"],
-      "then": ["specs is reported as dependency-blocked and markComplete is not called for it"]
+      "given": [
+        "artifact specs requires proposal, and proposal is in-progress"
+      ],
+      "when": [
+        "ValidateArtifacts.execute is called for specs"
+      ],
+      "then": [
+        "specs is reported as dependency-blocked and markComplete is not called for it"
+      ]
+    },
+    {
+      "requirement": "Dependency order check",
+      "name": "Dependency-block failure includes effective dependency status",
+      "given": [
+        "artifact specs requires proposal, and proposal effective status is missing"
+      ],
+      "when": [
+        "ValidateArtifacts.execute is called for specs"
+      ],
+      "then": [
+        "the dependency-blocked failure description includes dependency proposal",
+        "AND the description includes status missing"
+      ]
+    },
+    {
+      "requirement": "Dependency order check",
+      "name": "Review-propagation blocker includes recursive parent context",
+      "given": [
+        "artifact verify depends on specs",
+        "AND specs effective status is pending-parent-artifact-review",
+        "AND recursive blocker resolution identifies parent artifact proposal with status pending-review"
+      ],
+      "when": [
+        "ValidateArtifacts.execute is called for verify"
+      ],
+      "then": [
+        "the dependency-blocked failure description includes status pending-parent-artifact-review",
+        "AND the description includes parent blocker context (proposal, pending-review)"
+      ]
+    },
+    {
+      "requirement": "Dependency order check",
+      "name": "Direct review blocker status is reported as review-state",
+      "given": [
+        "artifact verify depends on specs",
+        "AND specs effective status is pending-review or drifted-pending-review"
+      ],
+      "when": [
+        "ValidateArtifacts.execute is called for verify"
+      ],
+      "then": [
+        "the dependency-blocked failure description includes the exact dependency status",
+        "AND the status is presented as a review blocker, not as generic incompleteness"
+      ]
     },
     {
       "requirement": "Dependency order check",
       "name": "Skipped artifact is not validated",
-      "given": ["artifact design is optional: true with validatedHash === \"__skipped__\""],
-      "when": ["ValidateArtifacts.execute is called"],
+      "given": [
+        "artifact design is optional: true with validatedHash === \"__skipped__\""
+      ],
+      "when": [
+        "ValidateArtifacts.execute is called"
+      ],
       "then": [
         "no delta validation, application preview, or structural validation is run for design — there is no file to check"
       ]
@@ -255,7 +346,9 @@
         "a change with an active spec approval",
         "AND two validated files under specs have changed since approval"
       ],
-      "when": ["ValidateArtifacts.execute detects the mismatches"],
+      "when": [
+        "ValidateArtifacts.execute detects the mismatches"
+      ],
       "then": [
         "a single invalidation is performed",
         "AND both file keys are included in the grouped affected artifact detail"
@@ -268,7 +361,9 @@
         "a change with an active approval",
         "AND one validated file has changed since approval"
       ],
-      "when": ["ValidateArtifacts.execute invalidates the change"],
+      "when": [
+        "ValidateArtifacts.execute invalidates the change"
+      ],
       "then": [
         "that file becomes drifted-pending-review",
         "AND unaffected validated files become pending-review"
@@ -277,9 +372,16 @@
     {
       "requirement": "Approval invalidation on content change",
       "name": "Drift invalidation is shared across spec approval and signoff",
-      "given": ["a change with an active signoff", "AND a validated artifact file has changed"],
-      "when": ["ValidateArtifacts.execute detects the mismatch"],
-      "then": ["the same grouped invalidation behavior is applied"]
+      "given": [
+        "a change with an active signoff",
+        "AND a validated artifact file has changed"
+      ],
+      "when": [
+        "ValidateArtifacts.execute detects the mismatch"
+      ],
+      "then": [
+        "the same grouped invalidation behavior is applied"
+      ]
     },
     {
       "requirement": "Per-file validation",
@@ -288,8 +390,13 @@
         "a non-optional spec-scoped artifact has expected filename deltas/core/core/config/spec.md.delta.yaml",
         "AND that file does not exist in the change directory"
       ],
-      "when": ["ValidateArtifacts.execute validates the artifact"],
-      "then": ["result.passed is false", "AND the file is not marked complete"]
+      "when": [
+        "ValidateArtifacts.execute validates the artifact"
+      ],
+      "then": [
+        "result.passed is false",
+        "AND the file is not marked complete"
+      ]
     },
     {
       "requirement": "Per-file validation",
@@ -298,7 +405,9 @@
         "a non-optional spec-scoped artifact has expected filename deltas/core/core/config/spec.md.delta.yaml",
         "AND a direct file exists at specs/core/core/config/spec.md"
       ],
-      "when": ["ValidateArtifacts.execute validates the artifact"],
+      "when": [
+        "ValidateArtifacts.execute validates the artifact"
+      ],
       "then": [
         "validation still reports the expected delta file as missing",
         "AND the direct file is ignored for that artifact"
@@ -312,7 +421,9 @@
         "AND the schema artifact specs declares delta: true",
         "AND the change contains deltas/core/core/config/spec.md.delta.yaml"
       ],
-      "when": ["ValidateArtifacts.execute validates specs for core:core/config"],
+      "when": [
+        "ValidateArtifacts.execute validates specs for core:core/config"
+      ],
       "then": [
         "the delta file is parsed, applied to the base spec, and marked complete if validation passes",
         "AND the result file metadata reports deltas/core/core/config/spec.md.delta.yaml"
@@ -327,7 +438,9 @@
         "AND the change contains specs/core/core/config/spec.md",
         "AND the change does not contain deltas/core/core/config/spec.md.delta.yaml"
       ],
-      "when": ["ValidateArtifacts.execute validates specs for core:core/config"],
+      "when": [
+        "ValidateArtifacts.execute validates specs for core:core/config"
+      ],
       "then": [
         "validation fails with missing filename deltas/core/core/config/spec.md.delta.yaml",
         "AND specs/core/core/config/spec.md is not validated"
@@ -340,8 +453,13 @@
         "core:core/new-capability does not exist",
         "AND the change contains specs/core/core/new-capability/spec.md"
       ],
-      "when": ["ValidateArtifacts.execute validates specs for core:core/new-capability"],
-      "then": ["validation runs against the direct specs file", "AND no delta file is required"]
+      "when": [
+        "ValidateArtifacts.execute validates specs for core:core/new-capability"
+      ],
+      "then": [
+        "validation runs against the direct specs file",
+        "AND no delta file is required"
+      ]
     },
     {
       "requirement": "Delta validation",
@@ -350,7 +468,9 @@
         "an artifact with a deltaValidations rule { type: sequence-item, where: { op: 'added' }, required: true }",
         "AND the delta YAML AST contains no sequence-item node where the correlated op pair has value: added"
       ],
-      "when": ["ValidateArtifacts.execute is called"],
+      "when": [
+        "ValidateArtifacts.execute is called"
+      ],
       "then": [
         "result.passed is false, the artifact is not advanced to application preview, and markComplete is not called"
       ]
@@ -361,7 +481,9 @@
       "given": [
         "a deltaValidations rule with required: false that matches zero nodes in the delta YAML AST"
       ],
-      "when": ["ValidateArtifacts.execute is called"],
+      "when": [
+        "ValidateArtifacts.execute is called"
+      ],
       "then": [
         "the artifact proceeds to application preview and result.warnings includes the unsatisfied rule"
       ]
@@ -369,9 +491,15 @@
     {
       "requirement": "Delta validation",
       "name": "Delta validation passes vacuously when no nodes match",
-      "given": ["a deltaValidations rule whose selector matches zero nodes in the delta YAML AST"],
-      "when": ["ValidateArtifacts.execute is called"],
-      "then": ["the rule passes without error regardless of required"]
+      "given": [
+        "a deltaValidations rule whose selector matches zero nodes in the delta YAML AST"
+      ],
+      "when": [
+        "ValidateArtifacts.execute is called"
+      ],
+      "then": [
+        "the rule passes without error regardless of required"
+      ]
     },
     {
       "requirement": "Delta validation",
@@ -380,7 +508,9 @@
         "an artifact with deltaValidations rules including a required: true rule",
         "AND the delta file contains only [{ op: \"no-op\" }]"
       ],
-      "when": ["ValidateArtifacts.execute is called"],
+      "when": [
+        "ValidateArtifacts.execute is called"
+      ],
       "then": [
         "deltaValidations are not evaluated",
         "AND result.passed is true",
@@ -390,8 +520,12 @@
     {
       "requirement": "Delta application preview and conflict detection",
       "name": "DeltaApplicationError blocks validation",
-      "given": ["a delta file where two entries both target the same node"],
-      "when": ["ValidateArtifacts.execute is called"],
+      "given": [
+        "a delta file where two entries both target the same node"
+      ],
+      "when": [
+        "ValidateArtifacts.execute is called"
+      ],
       "then": [
         "ArtifactParser.apply() throws DeltaApplicationError, result.passed is false, and markComplete is not called"
       ]
@@ -399,8 +533,12 @@
     {
       "requirement": "Delta application preview and conflict detection",
       "name": "Application preview does not write to SpecRepository",
-      "given": ["a valid delta that would modify the base spec"],
-      "when": ["ValidateArtifacts.execute is called"],
+      "given": [
+        "a valid delta that would modify the base spec"
+      ],
+      "when": [
+        "ValidateArtifacts.execute is called"
+      ],
       "then": [
         "the base spec file in SpecRepository is unchanged — the merged result is used only for validations[] checks"
       ]
@@ -413,7 +551,9 @@
         "AND the base spec exists in SpecRepository",
         "AND the expected delta file is missing from the change directory"
       ],
-      "when": ["ValidateArtifacts.execute is called"],
+      "when": [
+        "ValidateArtifacts.execute is called"
+      ],
       "then": [
         "validation fails with the expected delta filename",
         "AND no direct artifact fallback is attempted"
@@ -427,7 +567,9 @@
         "AND the target spec does not exist in SpecRepository",
         "AND the expected direct artifact file exists under specs/<workspace>/<capability-path>/"
       ],
-      "when": ["ValidateArtifacts.execute is called"],
+      "when": [
+        "ValidateArtifacts.execute is called"
+      ],
       "then": [
         "validations[] run against the direct artifact content with no application preview step"
       ]
@@ -440,7 +582,9 @@
         "AND the expected artifact file does not exist in the change directory",
         "AND the artifact belongs to the spec being validated"
       ],
-      "when": ["ValidateArtifacts.execute processes the artifact"],
+      "when": [
+        "ValidateArtifacts.execute processes the artifact"
+      ],
       "then": [
         "validation fails with a failure indicating the missing expected file",
         "AND the artifact is NOT marked complete"
@@ -453,7 +597,9 @@
         "an artifact that IS optional (optional: true in schema)",
         "AND the expected artifact file does not exist in the change directory"
       ],
-      "when": ["ValidateArtifacts.execute processes the artifact"],
+      "when": [
+        "ValidateArtifacts.execute processes the artifact"
+      ],
       "then": [
         "validation continues without failure",
         "AND no failure is recorded for the missing file"
@@ -462,8 +608,12 @@
     {
       "requirement": "Delta application preview and conflict detection",
       "name": "Non-delta artifact validated directly",
-      "given": ["an artifact with delta: false"],
-      "when": ["ValidateArtifacts.execute is called"],
+      "given": [
+        "an artifact with delta: false"
+      ],
+      "when": [
+        "ValidateArtifacts.execute is called"
+      ],
       "then": [
         "validations[] run against the artifact file content directly, with no application preview step"
       ]
@@ -474,7 +624,9 @@
       "given": [
         "an artifact with delta: true and a delta file containing only [{ op: \"no-op\" }]"
       ],
-      "when": ["ValidateArtifacts.execute is called"],
+      "when": [
+        "ValidateArtifacts.execute is called"
+      ],
       "then": [
         "no base spec is loaded from SpecRepository",
         "AND parser.apply() is not called",
@@ -488,22 +640,38 @@
         "an artifact with a validations rule { type: section, matches: '^Purpose$', required: true }",
         "AND the merged artifact content has no top-level Purpose section"
       ],
-      "when": ["ValidateArtifacts.execute is called"],
-      "then": ["result.failures includes the missing section and markComplete is not called"]
+      "when": [
+        "ValidateArtifacts.execute is called"
+      ],
+      "then": [
+        "result.failures includes the missing section and markComplete is not called"
+      ]
     },
     {
       "requirement": "Structural validation",
       "name": "Optional section absent — warning only",
-      "given": ["a validations rule with required: false that matches no node in the artifact AST"],
-      "when": ["ValidateArtifacts.execute is called"],
-      "then": ["result.warnings includes the absent section and validation still passes"]
+      "given": [
+        "a validations rule with required: false that matches no node in the artifact AST"
+      ],
+      "when": [
+        "ValidateArtifacts.execute is called"
+      ],
+      "then": [
+        "result.warnings includes the absent section and validation still passes"
+      ]
     },
     {
       "requirement": "Structural validation",
       "name": "All validation failures collected before returning",
-      "given": ["two required: true validation rules both fail for the same artifact"],
-      "when": ["ValidateArtifacts.execute is called"],
-      "then": ["result.failures contains both failures — validation does not stop at the first"]
+      "given": [
+        "two required: true validation rules both fail for the same artifact"
+      ],
+      "when": [
+        "ValidateArtifacts.execute is called"
+      ],
+      "then": [
+        "result.failures contains both failures — validation does not stop at the first"
+      ]
     },
     {
       "requirement": "Structural validation",
@@ -511,7 +679,9 @@
       "given": [
         "an artifact with validations rules and a delta file containing only [{ op: \"no-op\" }]"
       ],
-      "when": ["ValidateArtifacts.execute is called"],
+      "when": [
+        "ValidateArtifacts.execute is called"
+      ],
       "then": [
         "validations[] rules are not evaluated against the base content",
         "AND markComplete is called with the hash of the raw delta file content"
@@ -524,7 +694,9 @@
         "the schema declares a metadata extractor with transform: resolveSpecPath",
         "AND the artifact being validated has origin context for that transform"
       ],
-      "when": ["ValidateArtifacts.execute performs metadataExtraction validation"],
+      "when": [
+        "ValidateArtifacts.execute performs metadataExtraction validation"
+      ],
       "then": [
         "it calls the extraction engine with the shared extractor-transform registry and the artifact origin context bag"
       ]
@@ -532,16 +704,29 @@
     {
       "requirement": "MetadataExtraction validation",
       "name": "Unknown transform causes validation failure",
-      "given": ["the schema declares a transform name that is not registered"],
-      "when": ["ValidateArtifacts.execute performs metadataExtraction validation"],
-      "then": ["the artifact records a validation failure instead of ignoring the transform"]
+      "given": [
+        "the schema declares a transform name that is not registered"
+      ],
+      "when": [
+        "ValidateArtifacts.execute performs metadataExtraction validation"
+      ],
+      "then": [
+        "the artifact records a validation failure instead of ignoring the transform"
+      ]
     },
     {
       "requirement": "Hash computation and markComplete",
       "name": "All validations pass — markComplete sets complete state",
-      "given": ["all validations pass for a file within artifact specs"],
-      "when": ["ValidateArtifacts.execute marks that file complete"],
-      "then": ["the file state becomes complete", "AND the parent artifact state is recomputed"]
+      "given": [
+        "all validations pass for a file within artifact specs"
+      ],
+      "when": [
+        "ValidateArtifacts.execute marks that file complete"
+      ],
+      "then": [
+        "the file state becomes complete",
+        "AND the parent artifact state is recomputed"
+      ]
     },
     {
       "requirement": "Hash computation and markComplete",
@@ -550,20 +735,33 @@
         "a file currently in pending-review",
         "AND at least one required validation rule fails"
       ],
-      "when": ["ValidateArtifacts.execute runs"],
-      "then": ["markComplete is not called", "AND the file does not become complete"]
+      "when": [
+        "ValidateArtifacts.execute runs"
+      ],
+      "then": [
+        "markComplete is not called",
+        "AND the file does not become complete"
+      ]
     },
     {
       "requirement": "Result shape",
       "name": "passed is false when any required artifact is missing",
-      "when": ["at least one non-optional artifact is missing"],
-      "then": ["result.passed is false"]
+      "when": [
+        "at least one non-optional artifact is missing"
+      ],
+      "then": [
+        "result.passed is false"
+      ]
     },
     {
       "requirement": "Result shape",
       "name": "passed is true when all pass",
-      "when": ["all non-optional artifacts are present and all validations pass"],
-      "then": ["result.passed is true and result.failures is empty"]
+      "when": [
+        "all non-optional artifacts are present and all validations pass"
+      ],
+      "then": [
+        "result.passed is true and result.failures is empty"
+      ]
     },
     {
       "requirement": "Result shape",
@@ -571,7 +769,9 @@
       "given": [
         "validation succeeds for existing spec core:core/config with delta file deltas/core/core/config/spec.md.delta.yaml"
       ],
-      "when": ["ValidateArtifacts.execute returns"],
+      "when": [
+        "ValidateArtifacts.execute returns"
+      ],
       "then": [
         "result.files contains an entry with filename: \"deltas/core/core/config/spec.md.delta.yaml\"",
         "AND that entry status indicates the file was validated"
@@ -580,8 +780,12 @@
     {
       "requirement": "Result shape",
       "name": "files list reports the expected missing filename",
-      "given": ["validation fails because deltas/core/core/config/spec.md.delta.yaml is missing"],
-      "when": ["ValidateArtifacts.execute returns"],
+      "given": [
+        "validation fails because deltas/core/core/config/spec.md.delta.yaml is missing"
+      ],
+      "when": [
+        "ValidateArtifacts.execute returns"
+      ],
       "then": [
         "result.files contains an entry with filename: \"deltas/core/core/config/spec.md.delta.yaml\"",
         "AND that entry status indicates the file is missing"
@@ -590,8 +794,12 @@
     {
       "requirement": "Save after validation",
       "name": "Partial progress is persisted through serialized mutation",
-      "given": ["one artifact passes validation (markComplete is called) and one artifact fails"],
-      "when": ["ValidateArtifacts.execute completes"],
+      "given": [
+        "one artifact passes validation (markComplete is called) and one artifact fails"
+      ],
+      "when": [
+        "ValidateArtifacts.execute completes"
+      ],
       "then": [
         "ChangeRepository.mutate(input.name, fn) is used to persist the updated change",
         "AND the persisted manifest keeps the successful validatedHash updates together with the failure result"
@@ -600,8 +808,12 @@
     {
       "requirement": "Save after validation",
       "name": "Validation side effects run against the fresh persisted change",
-      "given": ["another operation updates the same change before validation persistence begins"],
-      "when": ["ValidateArtifacts.execute enters its persistence step"],
+      "given": [
+        "another operation updates the same change before validation persistence begins"
+      ],
+      "when": [
+        "ValidateArtifacts.execute enters its persistence step"
+      ],
       "then": [
         "the mutation callback receives a freshly reloaded Change",
         "AND validation updates are applied on top of that fresh state instead of overwriting it with an older snapshot"
@@ -614,7 +826,9 @@
         "a validated scope: spec artifact whose metadata extraction declares transform: resolveSpecPath",
         "AND extraction against the validated content returns canonical spec IDs"
       ],
-      "when": ["ValidateArtifacts.execute completes successfully"],
+      "when": [
+        "ValidateArtifacts.execute completes successfully"
+      ],
       "then": [
         "change.setSpecDependsOn(specId, deps) is called with those already-transformed spec IDs",
         "AND no separate SpecRepository.resolveFromPath(...) repair step is run afterward"
@@ -623,8 +837,12 @@
     {
       "requirement": "Automatic dependsOn extraction",
       "name": "Transform failure blocks dependsOn extraction persistence",
-      "given": ["a declared transform throws because required origin context is absent"],
-      "when": ["ValidateArtifacts.execute attempts automatic dependsOn extraction"],
+      "given": [
+        "a declared transform throws because required origin context is absent"
+      ],
+      "when": [
+        "ValidateArtifacts.execute attempts automatic dependsOn extraction"
+      ],
       "then": [
         "validation fails for the artifact",
         "AND dependency updates are not persisted for that artifact"
@@ -637,13 +855,17 @@
         "extraction finds dependency values in the validated artifact content",
         "AND the configured transform receives those values but cannot normalize them"
       ],
-      "when": ["ValidateArtifacts.execute completes dependency extraction"],
-      "then": ["validation fails for the artifact instead of treating dependsOn as absent"]
+      "when": [
+        "ValidateArtifacts.execute completes dependency extraction"
+      ],
+      "then": [
+        "validation fails for the artifact instead of treating dependsOn as absent"
+      ]
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:13b9e7a9d68ad71fbf888c0ef80e0c5cb7bfcb7823739f49df500ae20464c191",
-    "verify.md": "sha256:18b34bc4c9f7d2b1f8c380ad11629c8c445e9d4da3cfaa697fd870c035ced984"
+    "spec.md": "sha256:d3726bea3a2efbfc8aebb0494aa4500089e8a3d72d82174176c504f98d238db8",
+    "verify.md": "sha256:b3f0ff0906784d499da886a78f27cddc2aae188fa08815938c065e1844f6d16d"
   },
   "generatedBy": "core"
 }

@@ -32,7 +32,7 @@
     {
       "requirement": "Output on failure",
       "rules": [
-        "In `text` mode, the command prints each failure to stdout, exits with code 1, and includes any expected file paths that could not be validated:\n\n```text\nvalidation failed <name>/<workspace:capability-path>:\n  missing: <path>\n    error: <artifactId> — <description>\n    ...\n    note: <artifactId> — <description>\n    ...\n  note: inspect merged spec output with `specd change spec-preview <name> <workspace:capability-path>`\n```\n\nMissing path lines MUST be derived from `ValidateArtifacts` result metadata. For an existing spec with a delta-capable artifact, this path is the expected `deltas/.../*.delta.yaml` file, even if a direct `specs/...` file exists.\n\nIn `json` or `toon` mode:\n\n```json\n{\n  \"passed\": false,\n  \"failures\": [{ \"artifactId\": \"...\", \"description\": \"...\", \"filename\": \"...\" }],\n  \"notes\": [],\n  \"files\": [{ \"artifactId\": \"...\", \"key\": \"...\", \"filename\": \"...\", \"status\": \"missing\" }]\n}\n```\n\nThe process exits with code 1 when `passed` is `false`, regardless of format."
+        "In `text` mode, the command prints each failure to stdout, exits with code 1, and includes any expected file paths that could not be validated:\n\n```text\nvalidation failed <name>/<workspace:capability-path>:\n  missing: <path>\n    error: <artifactId> — <description>\n    ...\n    note: <artifactId> — <description>\n    ...\n  note: inspect merged spec output with `specd change spec-preview <name> <workspace:capability-path>`\n```\n\nMissing path lines MUST be derived from `ValidateArtifacts` result metadata. For an existing spec with a delta-capable artifact, this path is the expected `deltas/.../*.delta.yaml` file, even if a direct `specs/...` file exists.\n\nFor dependency-blocked failures, `<description>` MUST be rendered exactly from the core validation failure entry and therefore MUST preserve dependency status context. When core reports review-propagation context (for example, a blocker status of `pending-parent-artifact-review` and an upstream parent blocker), the CLI MUST surface that context verbatim instead of replacing it with generic \"incomplete dependency\" wording.\n\nIn `json` or `toon` mode:\n\n```json\n{\n  \"passed\": false,\n  \"failures\": [{ \"artifactId\": \"...\", \"description\": \"...\", \"filename\": \"...\" }],\n  \"notes\": [],\n  \"files\": [{ \"artifactId\": \"...\", \"key\": \"...\", \"filename\": \"...\", \"status\": \"missing\" }]\n}\n```\n\nThe process exits with code 1 when `passed` is `false`, regardless of format."
       ]
     },
     {
@@ -86,13 +86,19 @@
         "specd change validate my-change --artifact specs is run (no spec ID)",
         "AND specs is a scope: spec artifact in the schema"
       ],
-      "then": ["the command exits with code 1 and prints a usage error to stderr"]
+      "then": [
+        "the command exits with code 1 and prints a usage error to stderr"
+      ]
     },
     {
       "requirement": "Command signature",
       "name": "Artifact flag accepted",
-      "given": ["a valid change my-change with spec default:auth/login"],
-      "when": ["specd change validate my-change default:auth/login --artifact proposal is run"],
+      "given": [
+        "a valid change my-change with spec default:auth/login"
+      ],
+      "when": [
+        "specd change validate my-change default:auth/login --artifact proposal is run"
+      ],
       "then": [
         "the command invokes validation for only the proposal artifact",
         "AND the process exits with code 0 if proposal passes validation"
@@ -104,7 +110,9 @@
       "given": [
         "ValidateArtifacts.execute returns a file entry with filename deltas/core/core/config/spec.md.delta.yaml"
       ],
-      "when": ["specd change validate my-change core:core/config --artifact specs renders output"],
+      "when": [
+        "specd change validate my-change core:core/config --artifact specs renders output"
+      ],
       "then": [
         "the CLI prints or serializes that filename from the result metadata",
         "AND it does not recompute a replacement path in the CLI layer"
@@ -117,7 +125,9 @@
         "a change where all artifacts pass validation",
         "AND validation reports file deltas/core/core/config/spec.md.delta.yaml"
       ],
-      "when": ["specd change validate my-change core:core/config --artifact specs is run"],
+      "when": [
+        "specd change validate my-change core:core/config --artifact specs is run"
+      ],
       "then": [
         "stdout contains validated my-change/core:core/config: all artifacts pass",
         "AND stdout contains file: deltas/core/core/config/spec.md.delta.yaml",
@@ -132,7 +142,9 @@
         "a change where artifacts pass but there are optimization notes",
         "AND validation reports file deltas/core/core/config/spec.md.delta.yaml"
       ],
-      "when": ["specd change validate my-change core:core/config --artifact specs is run"],
+      "when": [
+        "specd change validate my-change core:core/config --artifact specs is run"
+      ],
       "then": [
         "stdout contains a pass message with pass (N note(s))",
         "AND stdout contains note: lines for each note",
@@ -164,7 +176,9 @@
         "a change where a required artifact fails validation and has optimization notes",
         "AND validation reports missing file deltas/core/core/config/spec.md.delta.yaml"
       ],
-      "when": ["specd change validate my-change core:core/config --artifact specs is run"],
+      "when": [
+        "specd change validate my-change core:core/config --artifact specs is run"
+      ],
       "then": [
         "stdout contains validation failed",
         "AND stdout contains missing: deltas/core/core/config/spec.md.delta.yaml",
@@ -176,7 +190,9 @@
     {
       "requirement": "Output on failure",
       "name": "JSON output on failure includes notes and files",
-      "given": ["a change where a required artifact fails validation and has notes"],
+      "given": [
+        "a change where a required artifact fails validation and has notes"
+      ],
       "when": [
         "specd change validate my-change core:core/config --artifact specs --format json is run"
       ],
@@ -188,17 +204,43 @@
       ]
     },
     {
+      "requirement": "Output on failure",
+      "name": "Dependency-block failure preserves core blocker status context",
+      "given": [
+        "validation reports a dependency-blocked failure from core including dependency status context"
+      ],
+      "when": [
+        "specd change validate my-change core:core/config --artifact specs is run"
+      ],
+      "then": [
+        "stdout contains the failure description exactly as emitted by core validation",
+        "AND the CLI does not replace it with generic \"incomplete dependency\" wording"
+      ]
+    },
+    {
       "requirement": "Spec ID not in change",
       "name": "Unknown spec ID",
-      "given": ["a change with specId default:auth/login"],
-      "when": ["specd change validate my-change default:billing/invoices is run"],
-      "then": ["the command exits with code 1", "AND stderr contains an error: message"]
+      "given": [
+        "a change with specId default:auth/login"
+      ],
+      "when": [
+        "specd change validate my-change default:billing/invoices is run"
+      ],
+      "then": [
+        "the command exits with code 1",
+        "AND stderr contains an error: message"
+      ]
     },
     {
       "requirement": "Error cases",
       "name": "Change not found",
-      "when": ["specd change validate nonexistent default:auth/login is run"],
-      "then": ["the command exits with code 1", "AND stderr contains an error: message"]
+      "when": [
+        "specd change validate nonexistent default:auth/login is run"
+      ],
+      "then": [
+        "the command exits with code 1",
+        "AND stderr contains an error: message"
+      ]
     },
     {
       "requirement": "Unknown artifact ID",
@@ -207,7 +249,9 @@
         "a valid change my-change with spec default:auth/login",
         "AND the active schema has no artifact with ID nonexistent"
       ],
-      "when": ["specd change validate my-change default:auth/login --artifact nonexistent is run"],
+      "when": [
+        "specd change validate my-change default:auth/login --artifact nonexistent is run"
+      ],
       "then": [
         "the command exits with code 1",
         "AND stdout contains the validation failure describing the unknown artifact ID"
@@ -235,7 +279,9 @@
       "given": [
         "a change with specIds [\"default:auth/login\", \"default:auth/logout\"] and valid artifacts for both"
       ],
-      "when": ["specd change validate my-change --all is run"],
+      "when": [
+        "specd change validate my-change --all is run"
+      ],
       "then": [
         "both specs are validated",
         "AND text output shows success for each spec",
@@ -245,7 +291,9 @@
     {
       "requirement": "Batch mode (--all)",
       "name": "--all with specPath is rejected",
-      "when": ["specd change validate my-change default:auth/login --all is run"],
+      "when": [
+        "specd change validate my-change default:auth/login --all is run"
+      ],
       "then": [
         "stderr contains error: --all and <specPath> are mutually exclusive and exit code is 1"
       ]
@@ -253,21 +301,35 @@
     {
       "requirement": "Batch mode (--all)",
       "name": "neither specPath nor --all is rejected",
-      "when": ["specd change validate my-change is run without specPath or --all"],
-      "then": ["stderr contains error: either <specPath> or --all is required and exit code is 1"]
+      "when": [
+        "specd change validate my-change is run without specPath or --all"
+      ],
+      "then": [
+        "stderr contains error: either <specPath> or --all is required and exit code is 1"
+      ]
     },
     {
       "requirement": "Batch mode (--all)",
       "name": "--all with --artifact validates one artifact across all specs",
-      "given": ["a change with 2 specIds"],
-      "when": ["specd change validate my-change --all --artifact proposal is run"],
-      "then": ["only the proposal artifact is validated for each spec"]
+      "given": [
+        "a change with 2 specIds"
+      ],
+      "when": [
+        "specd change validate my-change --all --artifact proposal is run"
+      ],
+      "then": [
+        "only the proposal artifact is validated for each spec"
+      ]
     },
     {
       "requirement": "Batch mode (--all)",
       "name": "--all with partial failures exits 1",
-      "given": ["a change with 2 specIds, one passes and one fails validation"],
-      "when": ["specd change validate my-change --all is run"],
+      "given": [
+        "a change with 2 specIds, one passes and one fails validation"
+      ],
+      "when": [
+        "specd change validate my-change --all is run"
+      ],
       "then": [
         "both specs are validated (batch continues)",
         "AND exit code is 1",
@@ -277,14 +339,20 @@
     {
       "requirement": "Batch mode (--all)",
       "name": "--all JSON output",
-      "given": ["a change with 2 specIds, both pass"],
-      "when": ["specd change validate my-change --all --format json is run"],
-      "then": ["output is { passed: true, total: 2, results: [...] } with per-spec entries"]
+      "given": [
+        "a change with 2 specIds, both pass"
+      ],
+      "when": [
+        "specd change validate my-change --all --format json is run"
+      ],
+      "then": [
+        "output is { passed: true, total: 2, results: [...] } with per-spec entries"
+      ]
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:30315c36931c4c003e578ac44160c2a4a85898806faf14fe4e2003f0402524af",
-    "verify.md": "sha256:00ba35fe27a3ab4b926c34494dd0ac36f388a5c15d1d402bb883e9c4d1d18254"
+    "spec.md": "sha256:bffbc5629bdc43e5ee125f1e70acad94282ebd7c402e288251a4fb5198f952a2",
+    "verify.md": "sha256:7e5991563e85a8852c8f0ef16dacac8d14294ca75fd3595e6317a338f0d5f140"
   },
   "generatedBy": "core"
 }

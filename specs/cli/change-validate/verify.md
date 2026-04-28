@@ -88,6 +88,13 @@
 - **AND** `notes` contains the optimization suggestions
 - **AND** the process exits with code 1
 
+#### Scenario: Dependency-block failure preserves core blocker status context
+
+- **GIVEN** validation reports a dependency-blocked failure from core including dependency status context
+- **WHEN** `specd change validate my-change core:core/config --artifact specs` is run
+- **THEN** stdout contains the failure description exactly as emitted by core validation
+- **AND** the CLI does not replace it with generic "incomplete dependency" wording
+
 ### Requirement: Spec ID not in change
 
 #### Scenario: Unknown spec ID

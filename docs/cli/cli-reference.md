@@ -190,6 +190,8 @@ Single-spec and batch text output always append a preview hint:
 
 Structured output (`json` / `toon`) includes a `notes` array for non-blocking hints and a `files` array for each result entry.
 
+Dependency-blocked failures are status-aware. When validation is blocked by an upstream artifact, the failure description includes the blocking dependency status (for example `missing`, `in-progress`, `pending-review`, `drifted-pending-review`, or `pending-parent-artifact-review`). For recursive review propagation, parent blocker context is also included.
+
 | Option                      | Description                                     |
 | --------------------------- | ----------------------------------------------- |
 | `--all`                     | Validate artifacts for all specs in the change. |
