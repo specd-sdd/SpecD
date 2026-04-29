@@ -9,25 +9,25 @@
     {
       "requirement": "ResolvedFile interface",
       "rules": [
-        "`ResolvedFile` MUST be an interface with:\n\n- `filename: string` — resolved file name\n- `content: string` — file content with variables substituted"
+        "`ResolvedFile` MUST be an interface with:\n\n- `filename: string` — resolved file name\n- `content: string` — file content with variables substituted\n- `shared?: boolean` — optional marker indicating that the file is a shared bundle resource rather than a skill-local file\n\nA missing or `false` `shared` value SHALL mean the file is skill-local. A `true` `shared` value SHALL mean installers may route the file to a shared install target."
       ]
     },
     {
       "requirement": "SkillBundle interface",
       "rules": [
-        "`SkillBundle` MUST be an interface with:\n\n- `name: string` — skill name\n- `description: string` — skill description\n- `files: ResolvedFile[]` — array of resolved files\n- `install(targetDir: string): Promise<void>` — writes files to target directory\n- `uninstall(targetDir: string): Promise<void>` — removes installed files from target directory"
+        "`SkillBundle` MUST be an interface with:\n\n- `name: string` — skill name\n- `description: string` — skill description\n- `files: ResolvedFile[]` — array of resolved files\n- `install(target: string | SkillBundleInstallTarget): Promise<void>` — writes files to the normal target and shared files to the optional shared target\n- `uninstall(target: string | SkillBundleInstallTarget): Promise<void>` — removes installed files from the same target routing\n\n`SkillBundleInstallTarget` MUST be an interface with:\n\n- `targetDir: string` — normal skill-local target directory\n- `sharedTargetDir?: string` — optional shared target directory for files marked `shared: true`\n\nPassing a plain string SHALL remain equivalent to passing `{ targetDir: value }`."
       ]
     },
     {
       "requirement": "Install behavior",
       "rules": [
-        "The `install()` method MUST:\n\n- Create the target directory if it does not exist\n- Write each file in `files` to the target directory, preserving the filename\n- Fail gracefully if a file cannot be written"
+        "The `install()` method MUST:\n\n- Resolve the normal target directory from either the string argument or `target.targetDir`\n- Resolve the shared target directory from `target.sharedTargetDir` when provided, otherwise from the normal target directory\n- Create the normal target directory if it does not exist\n- Create the shared target directory if at least one file is marked `shared: true` and that directory does not exist\n- Write each file with `shared: true` to the shared target directory, preserving the filename\n- Write each file without `shared: true` to the normal target directory, preserving the filename\n- Fail gracefully if a file cannot be written"
       ]
     },
     {
       "requirement": "Uninstall behavior",
       "rules": [
-        "The `uninstall()` method MUST:\n\n- Remove each file that was installed\n- Not fail if files do not exist (idempotent)"
+        "The `uninstall()` method MUST:\n\n- Resolve the normal and shared target directories using the same rules as `install()`\n- Remove each file with `shared: true` from the shared target directory\n- Remove each file without `shared: true` from the normal target directory\n- Not fail if files do not exist (idempotent)"
       ]
     }
   ],
@@ -36,27 +36,78 @@
   ],
   "scenarios": [
     {
+      "requirement": "SkillBundle interface",
+      "name": "Bundle install supports single target compatibility",
+      "when": ["bundle.install(targetDir) is called with a string path"],
+      "then": ["files are written using that path as the normal install target"]
+    },
+    {
+      "requirement": "SkillBundle interface",
+      "name": "Bundle install supports split normal and shared targets",
+      "given": ["bundle.files includes both shared and non-shared files"],
+      "when": ["bundle.install({ targetDir, sharedTargetDir }) is called"],
+      "then": [
+        "shared files are written under sharedTargetDir",
+        "AND non-shared files are written under targetDir"
+      ]
+    },
+    {
+      "requirement": "SkillBundle interface",
+      "name": "Bundle uninstall follows the same routing",
+      "given": ["bundle files were installed with shared routing"],
+      "when": ["bundle.uninstall({ targetDir, sharedTargetDir }) is called"],
+      "then": [
+        "shared files are removed from sharedTargetDir",
+        "AND non-shared files are removed from targetDir"
+      ]
+    },
+    {
+      "requirement": "Install behavior",
+      "name": "Shared files use shared target when provided",
+      "given": ["a bundle has at least one file marked shared: true"],
+      "when": ["install({ targetDir, sharedTargetDir }) is executed"],
+      "then": [
+        "shared files are written to sharedTargetDir",
+        "AND non-shared files are written to targetDir"
+      ]
+    },
+    {
+      "requirement": "Install behavior",
+      "name": "Shared files fall back to normal target when shared target is omitted",
+      "given": ["a bundle has files marked as shared"],
+      "when": ["install(targetDir) is executed with the legacy string input"],
+      "then": ["shared files are written under targetDir"]
+    },
+    {
+      "requirement": "Uninstall behavior",
+      "name": "Shared files are removed from shared target when provided",
+      "given": ["files were installed using sharedTargetDir"],
+      "when": ["uninstall({ targetDir, sharedTargetDir }) is executed"],
+      "then": [
+        "shared files are removed from sharedTargetDir",
+        "AND non-shared files are removed from targetDir"
+      ]
+    },
+    {
+      "requirement": "Uninstall behavior",
+      "name": "Missing files do not fail uninstall",
+      "when": ["uninstall(...) is executed and some target files do not exist"],
+      "then": ["uninstall completes without failing"]
+    },
+    {
       "requirement": "ResolvedFile interface",
-      "name": "File has filename and content",
+      "name": "File has filename content and optional shared marker",
       "when": ["a ResolvedFile is created"],
-      "then": ["it has filename and content properties"]
-    },
-    {
-      "requirement": "SkillBundle interface",
-      "name": "Bundle has install method",
-      "when": ["bundle.install(targetDir) is called"],
-      "then": ["files are written to the target directory"]
-    },
-    {
-      "requirement": "SkillBundle interface",
-      "name": "Bundle has uninstall method",
-      "when": ["bundle.uninstall(targetDir) is called"],
-      "then": ["installed files are removed"]
+      "then": [
+        "it has filename and content properties",
+        "AND it may include shared: true to identify a shared bundle resource",
+        "AND a missing shared value is interpreted as a skill-local file"
+      ]
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:c216032eca9ab745a3d616c44709da37d1bc404f9d4cdba10e32ff75fe6e09d1",
-    "verify.md": "sha256:7acb4ac98cbc10a6e5021ac68ade2297f0e45e0603863a4f6b2d2b1564a201c1"
+    "spec.md": "sha256:c7b1a94cc5160e767b4949bfb8835d9a1c6fc7496248c3636d096150beb23c93",
+    "verify.md": "sha256:9a3ad66c1acef4b963ac8cd6ffc7cc150acfdfdb9e37ed8a267c4e24b027693b"
   },
   "generatedBy": "core"
 }

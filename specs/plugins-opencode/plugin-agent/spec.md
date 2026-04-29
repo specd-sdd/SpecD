@@ -40,16 +40,23 @@ The application layer MUST include an `InstallSkills` use case that:
 
 1. reads skills from `@specd/skills`, passing `SpecdConfig` for built-in variable resolution
 2. resolves the per-skill frontmatter map
-3. prepends Open Code-compatible YAML frontmatter to markdown skill files
-4. writes installed skills to the Open Code project skill directory under the `projectRoot` provided in `SpecdConfig`
+3. prepends Open Code-compatible YAML frontmatter only to markdown files not marked as shared
+4. writes files not marked as shared to the installed skill directory under the `projectRoot` provided in `SpecdConfig`
+5. writes files marked as shared to the Open Code shared skills resource directory under the `projectRoot` provided in `SpecdConfig`
 
 ### Requirement: Frontmatter injection
 
-During install, the plugin MUST prepend YAML frontmatter to each markdown skill file and include only configured fields supported by Open Code.
+During install, the plugin MUST prepend YAML frontmatter to each skill-local markdown file and include only configured fields supported by Open Code.
+
+The plugin MUST NOT prepend skill frontmatter to files marked as shared.
 
 ### Requirement: Install location
 
 Project-level skill installation MUST target `.opencode/skills/` under the `projectRoot` provided in `SpecdConfig`.
+
+For each skill, files not marked as shared MUST be installed under `.opencode/skills/<skill-name>/`.
+
+Files marked as shared MUST be installed under `.opencode/skills/_specd-shared/`. This shared directory MUST NOT contain a `SKILL.md` file.
 
 ### Requirement: Project init wizard integration
 
@@ -63,9 +70,11 @@ The `@specd/specd` meta package MUST declare `@specd/plugin-agent-opencode` as a
 
 `uninstall(config: SpecdConfig, options?: AgentInstallOptions)` MUST remove installed skill directories from `.opencode/skills/` relative to `config.projectRoot`.
 
-When `options.skills` is provided, uninstall MUST remove only the selected skill directories.
+When `options.skills` is provided, uninstall MUST remove only the selected specd-managed skill directories. The shared resource directory MUST remain in place because other installed skills may still reference it.
 
-When `options.skills` is omitted, uninstall MUST remove the full `.opencode/skills/` tree.
+When `options.skills` is omitted, uninstall MUST remove all specd-managed skill directories and `_specd-shared/`.
+
+Uninstall MUST NOT remove unrelated directories or files under `.opencode/skills/` that are not part of the specd-managed skill set.
 
 ## Constraints
 
@@ -79,4 +88,5 @@ When `options.skills` is omitted, uninstall MUST remove the full `.opencode/skil
 
 - [`core:core/config`](../../core/core/config/spec.md) — defines SpecdConfig type
 - [`plugin-manager:agent-plugin-type`](../../plugins-manager/agent-plugin-type/spec.md) — defines the `AgentPlugin` install/uninstall contract
+- [`skills:skill-bundle`](../../skills/skill-bundle/spec.md) — shared bundle file routing contract
 - [`skills:skill-templates-source`](../../skills/skill-templates-source/spec.md) — defines template source and plugin-side frontmatter injection responsibility

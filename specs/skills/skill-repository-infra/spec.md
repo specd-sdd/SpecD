@@ -27,6 +27,8 @@ The infrastructure MUST scan `templates/shared/` for `.meta.json` files containi
 
 Each shared file's content is loaded on demand.
 
+When `getBundle()` adds a shared file to a skill bundle because the metadata lists the requested skill, the resulting `ResolvedFile` MUST be marked as shared. Skill-local template files read from `templates/<skill-name>/` MUST NOT be marked as shared.
+
 ### Requirement: createSkillRepository factory
 
 The module MUST export `createSkillRepository(): SkillRepositoryPort` as the main factory function.

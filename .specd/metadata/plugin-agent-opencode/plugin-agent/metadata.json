@@ -4,6 +4,7 @@
   "dependsOn": [
     "core:core/config",
     "plugin-manager:agent-plugin-type",
+    "skills:skill-bundle",
     "skills:skill-templates-source"
   ],
   "context": [
@@ -31,19 +32,19 @@
     {
       "requirement": "Application layer",
       "rules": [
-        "The application layer MUST include an `InstallSkills` use case that:\n\n1. reads skills from `@specd/skills`, passing `SpecdConfig` for built-in variable resolution\n2. resolves the per-skill frontmatter map\n3. prepends Open Code-compatible YAML frontmatter to markdown skill files\n4. writes installed skills to the Open Code project skill directory under the `projectRoot` provided in `SpecdConfig`"
+        "The application layer MUST include an `InstallSkills` use case that:\n\n1. reads skills from `@specd/skills`, passing `SpecdConfig` for built-in variable resolution\n2. resolves the per-skill frontmatter map\n3. prepends Open Code-compatible YAML frontmatter only to markdown files not marked as shared\n4. writes files not marked as shared to the installed skill directory under the `projectRoot` provided in `SpecdConfig`\n5. writes files marked as shared to the Open Code shared skills resource directory under the `projectRoot` provided in `SpecdConfig`"
       ]
     },
     {
       "requirement": "Frontmatter injection",
       "rules": [
-        "During install, the plugin MUST prepend YAML frontmatter to each markdown skill file and include only configured fields supported by Open Code."
+        "During install, the plugin MUST prepend YAML frontmatter to each skill-local markdown file and include only configured fields supported by Open Code.\n\nThe plugin MUST NOT prepend skill frontmatter to files marked as shared."
       ]
     },
     {
       "requirement": "Install location",
       "rules": [
-        "Project-level skill installation MUST target `.opencode/skills/` under the `projectRoot` provided in `SpecdConfig`."
+        "Project-level skill installation MUST target `.opencode/skills/` under the `projectRoot` provided in `SpecdConfig`.\n\nFor each skill, files not marked as shared MUST be installed under `.opencode/skills/<skill-name>/`.\n\nFiles marked as shared MUST be installed under `.opencode/skills/_specd-shared/`. This shared directory MUST NOT contain a `SKILL.md` file."
       ]
     },
     {
@@ -61,7 +62,7 @@
     {
       "requirement": "Uninstall behavior",
       "rules": [
-        "`uninstall(config: SpecdConfig, options?: AgentInstallOptions)` MUST remove installed skill directories from `.opencode/skills/` relative to `config.projectRoot`.\n\nWhen `options.skills` is provided, uninstall MUST remove only the selected skill directories.\n\nWhen `options.skills` is omitted, uninstall MUST remove the full `.opencode/skills/` tree."
+        "`uninstall(config: SpecdConfig, options?: AgentInstallOptions)` MUST remove installed skill directories from `.opencode/skills/` relative to `config.projectRoot`.\n\nWhen `options.skills` is provided, uninstall MUST remove only the selected specd-managed skill directories. The shared resource directory MUST remain in place because other installed skills may still reference it.\n\nWhen `options.skills` is omitted, uninstall MUST remove all specd-managed skill directories and `_specd-shared/`.\n\nUninstall MUST NOT remove unrelated directories or files under `.opencode/skills/` that are not part of the specd-managed skill set."
       ]
     }
   ],
@@ -120,15 +121,6 @@
       ]
     },
     {
-      "requirement": "Application layer",
-      "name": "InstallSkills follows required workflow",
-      "given": ["skills are available from @specd/skills"],
-      "when": ["InstallSkills runs"],
-      "then": [
-        "it reads skill templates, resolves per-skill frontmatter, prepends Open Code YAML frontmatter, and writes installed skill files"
-      ]
-    },
-    {
       "requirement": "Frontmatter injection",
       "name": "Install prepends only Open Code-compatible fields",
       "when": ["skill markdown files are written during install"],
@@ -138,11 +130,27 @@
       ]
     },
     {
+      "requirement": "Frontmatter injection",
+      "name": "Shared files do not receive skill frontmatter",
+      "given": ["a resolved bundle includes files marked as shared"],
+      "when": ["install writes those files"],
+      "then": ["shared files are written without Open Code skill frontmatter"]
+    },
+    {
       "requirement": "Install location",
       "name": "Skills install into Open Code directory",
       "given": ["a SpecdConfig with projectRoot"],
       "when": ["install writes skill files"],
-      "then": ["files are created under .opencode/skills/ within the provided project root"]
+      "then": [
+        "non-shared files are created under .opencode/skills/<skill-name>/",
+        "AND shared files are created under .opencode/skills/_specd-shared/"
+      ]
+    },
+    {
+      "requirement": "Install location",
+      "name": "Shared directory is not discovered as a skill",
+      "when": ["install creates .opencode/skills/_specd-shared/"],
+      "then": ["the directory does not contain a SKILL.md file"]
     },
     {
       "requirement": "Project init wizard integration",
@@ -161,19 +169,38 @@
       "name": "Uninstall removes selected skills when filter is provided",
       "given": ["a SpecdConfig and multiple skills installed under .opencode/skills/"],
       "when": ["uninstall(config, { skills: ['specd-design'] }) is executed"],
-      "then": ["only the selected skill directories are removed"]
+      "then": [
+        "only the selected specd-managed skill directories are removed",
+        "AND .opencode/skills/_specd-shared/ remains when other installed skills may still reference it"
+      ]
     },
     {
       "requirement": "Uninstall behavior",
-      "name": "Uninstall removes all skills when no filter is provided",
-      "given": ["a SpecdConfig and skills installed under .opencode/skills/"],
+      "name": "Uninstall without filter removes only specd-managed skills and shared resources",
+      "given": [
+        "a SpecdConfig with specd-managed skills and unrelated user skills installed under .opencode/skills/"
+      ],
       "when": ["uninstall(config, optionsWithoutSkills) is executed"],
-      "then": ["the full .opencode/skills/ tree is removed"]
+      "then": [
+        "all specd-managed skill directories are removed",
+        "AND .opencode/skills/_specd-shared/ is removed",
+        "AND unrelated user skill directories remain"
+      ]
+    },
+    {
+      "requirement": "Application layer",
+      "name": "InstallSkills follows required workflow",
+      "given": ["skills are available from @specd/skills"],
+      "when": ["InstallSkills runs"],
+      "then": [
+        "it reads skill templates, resolves per-skill frontmatter, prepends Open Code YAML frontmatter only to skill-local markdown files, and writes installed skill files",
+        "AND shared-marked files are written under the Open Code shared skills resource directory"
+      ]
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:fbc38ba20fcf97deeeebe96aa0c73691f0ba010f991d05589934b5742b95bd45",
-    "verify.md": "sha256:b26e9ecf0fbcdbb2c798eb7955259127770e29c1d125e9665d116cb233668e64"
+    "spec.md": "sha256:047ab35fedc2a4cb0085cd8f4e466add6fc2cefe0226934246bcfaf6e1ddb778",
+    "verify.md": "sha256:37386e0caf3819dd66c0884b2a26341e688e50b137ea5e68653fdad214f1a9d6"
   },
   "generatedBy": "core"
 }

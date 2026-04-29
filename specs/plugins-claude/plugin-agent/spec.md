@@ -48,12 +48,13 @@ interface Frontmatter {
 The application layer MUST have `InstallSkills` use case that orchestrates:
 
 1. Get skills via `@specd/skills` repository, passing `SpecdConfig` for built-in variable resolution
-2. Inject stored frontmatter to each skill template
-3. Install to `.claude/skills/` relative to the `projectRoot` found in `SpecdConfig`
+2. Inject stored frontmatter to each skill-local markdown template
+3. Install files not marked as shared to `.claude/skills/<skill-name>/` relative to the `projectRoot` found in `SpecdConfig`
+4. Install files marked as shared to `.claude/skills/_specd-shared/` relative to the `projectRoot` found in `SpecdConfig`
 
 ### Requirement: Frontmatter injection
 
-During install, the plugin MUST prepend YAML frontmatter to each skill file:
+During install, the plugin MUST prepend YAML frontmatter to each skill-local markdown file:
 
 ```yaml
 ---
@@ -64,9 +65,25 @@ argument_hint: { { argument_hint } }
 ---
 ```
 
+The plugin MUST NOT prepend skill frontmatter to files marked as shared.
+
 ### Requirement: Install location
 
 Skills MUST be installed to `.claude/skills/` in the project root.
+
+For each skill, files not marked as shared MUST be installed under `.claude/skills/<skill-name>/`.
+
+Files marked as shared MUST be installed under `.claude/skills/_specd-shared/`. This shared directory MUST NOT contain a `SKILL.md` file.
+
+### Requirement: Uninstall behavior
+
+`uninstall(config: SpecdConfig, options?: AgentInstallOptions)` MUST remove installed skill directories from `.claude/skills/` relative to `config.projectRoot`.
+
+When `options.skills` is provided, uninstall MUST remove only the selected specd-managed skill directories. The shared resource directory MUST remain in place because other installed skills may still reference it.
+
+When `options.skills` is omitted, uninstall MUST remove all specd-managed skill directories and `_specd-shared/`.
+
+Uninstall MUST NOT remove unrelated directories or files under `.claude/skills/` that are not part of the specd-managed skill set.
 
 ## Constraints
 
@@ -78,4 +95,5 @@ Skills MUST be installed to `.claude/skills/` in the project root.
 
 - [`core:core/config`](../../core/core/config/spec.md) — defines SpecdConfig type
 - [`plugin-manager:agent-plugin-type`](../plugin-manager/agent-plugin-type/spec.md) — plugin interface
+- [`skills:skill-bundle`](../skills/skill-bundle/spec.md) — shared bundle file routing contract
 - [`skills:skill-repository`](../skills/skill-repository/spec.md) — skill access

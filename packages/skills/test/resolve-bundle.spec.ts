@@ -8,9 +8,9 @@ function makeMockBundle(name: string): SkillBundle {
   return {
     name,
     description: 'test description',
-    files: [],
-    install: async () => {},
-    uninstall: async () => {},
+    files: [{ filename: 'shared.md', content: 'body', shared: true }],
+    install: async (_target) => {},
+    uninstall: async (_target) => {},
   }
 }
 
@@ -101,5 +101,23 @@ describe('ResolveBundle', () => {
       },
       mockConfig,
     )
+  })
+
+  it('given shared bundle file metadata, when execute is called, then metadata is preserved', async () => {
+    const repository: SkillRepository = {
+      list: vi.fn(),
+      get: vi.fn(),
+      getBundle: vi.fn((name: string) => makeMockBundle(name)),
+      listSharedFiles: vi.fn(),
+    }
+
+    const useCase = new ResolveBundle(repository)
+    const output = await useCase.execute({
+      name: 'test-skill',
+      variables: { custom: 'value' },
+    })
+
+    expect(output.bundle.files[0]?.shared).toBe(true)
+    expect(output.bundle.files[0]?.filename).toBe('shared.md')
   })
 })

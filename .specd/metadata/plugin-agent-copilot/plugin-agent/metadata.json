@@ -4,6 +4,7 @@
   "dependsOn": [
     "core:core/config",
     "plugin-manager:agent-plugin-type",
+    "skills:skill-bundle",
     "skills:skill-templates-source"
   ],
   "context": [
@@ -25,7 +26,7 @@
     {
       "requirement": "Skill installation and frontmatter injection",
       "rules": [
-        "The plugin MUST install skills from `@specd/skills` and inject Copilot-compatible frontmatter into markdown skill files during install.\n\nInstallation flow MUST:\n\n1. load requested skills (or all skills when no filter is provided)\n2. resolve frontmatter for each skill\n3. prepend frontmatter to markdown files in the installed skill directories\n4. return an `InstallResult` with installed and skipped entries"
+        "The plugin MUST install skills from `@specd/skills` and inject Copilot-compatible frontmatter into markdown skill files during install.\n\nInstallation flow MUST:\n\n1. load requested skills (or all skills when no filter is provided)\n2. resolve frontmatter for each skill\n3. write files marked as shared to the Copilot shared skills resource directory\n4. write files not marked as shared to the installed skill directory\n5. prepend frontmatter only to markdown files that are not marked as shared\n6. return an `InstallResult` with installed and skipped entries"
       ]
     },
     {
@@ -37,7 +38,13 @@
     {
       "requirement": "Install location",
       "rules": [
-        "Project-level skill installation MUST target `.github/skills/` under the `projectRoot` provided in `SpecdConfig`."
+        "Project-level skill installation MUST target `.github/skills/` under the `projectRoot` provided in `SpecdConfig`.\n\nFor each skill, files not marked as shared MUST be installed under `.github/skills/<skill-name>/`.\n\nFiles marked as shared MUST be installed under `.github/skills/_specd-shared/`. This shared directory MUST NOT contain a `SKILL.md` file."
+      ]
+    },
+    {
+      "requirement": "Uninstall behavior",
+      "rules": [
+        "`uninstall(config: SpecdConfig, options?: AgentInstallOptions)` MUST remove installed skill directories from `.github/skills/` relative to `config.projectRoot`.\n\nWhen `options.skills` is provided, uninstall MUST remove only the selected specd-managed skill directories. The shared resource directory MUST remain in place because other installed skills may still reference it.\n\nWhen `options.skills` is omitted, uninstall MUST remove all specd-managed skill directories and `_specd-shared/`.\n\nUninstall MUST NOT remove unrelated directories or files under `.github/skills/` that are not part of the specd-managed skill set."
       ]
     }
   ],
@@ -92,6 +99,17 @@
       ]
     },
     {
+      "requirement": "Skill installation and frontmatter injection",
+      "name": "Install routes shared files to the shared directory",
+      "given": ["a resolved bundle contains files marked as shared and non-shared"],
+      "when": ["install(config, options) writes files"],
+      "then": [
+        "shared files are written under .github/skills/_specd-shared/",
+        "AND non-shared files are written under .github/skills/<skill-name>/",
+        "AND frontmatter is not prepended to shared files"
+      ]
+    },
+    {
       "requirement": "Frontmatter field contract",
       "name": "Copilot emitter supports full declared field set",
       "when": ["frontmatter is generated for a skill file"],
@@ -106,11 +124,37 @@
       "name": "Skills are written under GitHub skills directory",
       "when": ["install writes skill files"],
       "then": ["files are created only under .github/skills/ within the target project root"]
+    },
+    {
+      "requirement": "Install location",
+      "name": "Shared directory is not discovered as a skill",
+      "when": ["install creates .github/skills/_specd-shared/"],
+      "then": ["the directory does not contain a SKILL.md file"]
+    },
+    {
+      "requirement": "Uninstall behavior",
+      "name": "Uninstall removes selected skill directories and keeps shared resources",
+      "given": ["multiple skills are installed and share .github/skills/_specd-shared/"],
+      "when": ["uninstall(config, { skills: ['specd'] }) is executed"],
+      "then": ["only .github/skills/specd/ is removed", "AND .github/skills/_specd-shared/ remains"]
+    },
+    {
+      "requirement": "Uninstall behavior",
+      "name": "Uninstall without filter removes only specd-managed skills and shared resources",
+      "given": [
+        "specd-managed skills and unrelated user skills are installed under .github/skills/"
+      ],
+      "when": ["uninstall(config) is executed without skills"],
+      "then": [
+        "all specd-managed skill directories are removed",
+        "AND .github/skills/_specd-shared/ is removed",
+        "AND unrelated user skill directories remain"
+      ]
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:cbdf273058141628b6ee4ea440024a7bc6339e98efbc097283ae6fe3c4f2fc40",
-    "verify.md": "sha256:00eb1b4a5468ee26e37227f9c47845ea4853efee1c3b2767fca3d58f3bcd3530"
+    "spec.md": "sha256:47a103cfe7cf5efaf08f88bbbfb43f0677972bae958b99c544fe537f9e1159c1",
+    "verify.md": "sha256:9ad7a0bcd5bd88543c12c8a07b163abd720fa26b432ca0398808f043464b952c"
   },
   "generatedBy": "core"
 }

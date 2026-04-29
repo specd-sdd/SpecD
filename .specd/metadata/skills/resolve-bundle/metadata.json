@@ -13,7 +13,7 @@
     {
       "requirement": "Behavior",
       "rules": [
-        "The use case MUST:\n\n1. **Built-in Variable Injection**: If `config` is provided, merge built-in variables with the provided `variables` map (user-provided variables override built-ins).\n   Built-in variables SHALL include:\n   - `{{projectRoot}}`: `config.projectRoot`\n   - `{{configPath}}`: `config.configPath`\n   - `{{schemaRef}}`: `config.schemaRef`\n2. Call `SkillRepository.getBundle(input.name, mergedVariables)`\n3. Replace `{{key}}` placeholders in each template file with values from the merged variables map\n4. Return the resolved bundle"
+        "The use case MUST:\n\n1. **Built-in Variable Injection**: If `config` is provided, merge built-in variables with the provided `variables` map (user-provided variables override built-ins).\n   Built-in variables SHALL include:\n   - `{{projectRoot}}`: `config.projectRoot`\n   - `{{configPath}}`: `config.configPath`\n   - `{{schemaRef}}`: `config.schemaRef`\n2. Call `SkillRepository.getBundle(input.name, mergedVariables)`\n3. Replace `{{key}}` placeholders in each resolved file's content with values from the merged variables map\n4. Preserve all non-content `ResolvedFile` metadata, including whether a file is marked as shared\n5. Return the resolved bundle"
       ]
     },
     {
@@ -48,11 +48,18 @@
       "given": ["a SpecdConfig with projectRoot: '/path/to/project'"],
       "when": ["ResolveBundle is executed with that config"],
       "then": ["it automatically replaces {{projectRoot}} with '/path/to/project'"]
+    },
+    {
+      "requirement": "Input",
+      "name": "Shared marker is preserved in resolved output",
+      "given": ["SkillRepository.getBundle returns files including a shared-marked file"],
+      "when": ["ResolveBundle applies variable substitution"],
+      "then": ["the shared marker remains unchanged on that file in the output bundle"]
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:eb060283ce4159a319a75304b257935c4d7a54c935fc59a46b4fbe3fe2911c96",
-    "verify.md": "sha256:37f508bf19bd8b5f4c93b595fc21c0577d7c1e5062d381a6b749b5e3a6e9d5b8"
+    "spec.md": "sha256:86bdf25d5b06f8897cd5395abe81ebc73eaaf8c702d964947cfb2aefe993971d",
+    "verify.md": "sha256:b48f33137290dc3bc532d427a91f539171493f746a64f693de207728514e2f8d"
   },
   "generatedBy": "core"
 }

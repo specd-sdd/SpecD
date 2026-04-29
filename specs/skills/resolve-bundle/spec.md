@@ -26,8 +26,9 @@ The use case MUST:
    - `{{configPath}}`: `config.configPath`
    - `{{schemaRef}}`: `config.schemaRef`
 2. Call `SkillRepository.getBundle(input.name, mergedVariables)`
-3. Replace `{{key}}` placeholders in each template file with values from the merged variables map
-4. Return the resolved bundle
+3. Replace `{{key}}` placeholders in each resolved file's content with values from the merged variables map
+4. Preserve all non-content `ResolvedFile` metadata, including whether a file is marked as shared
+5. Return the resolved bundle
 
 ### Requirement: Input
 

@@ -17,6 +17,8 @@ Abstract interface for skill storage. This port defines the contract that infras
 
 The `getBundle` method SHALL support receiving a `SpecdConfig` to enable the injection of built-in variables during template resolution.
 
+When `getBundle` includes files declared by `listSharedFiles()`, those resolved files MUST preserve their shared origin by setting the bundle file's shared marker. Skill-local template files MUST NOT be marked as shared.
+
 ### Requirement: Port abstraction
 
 The port is an abstract interface. Concrete implementations (e.g., using node:fs) live in the infrastructure layer.

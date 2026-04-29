@@ -29,8 +29,10 @@ Installation flow MUST:
 
 1. load requested skills (or all skills when no filter is provided)
 2. resolve frontmatter for each skill
-3. prepend frontmatter to markdown files in the installed skill directories
-4. return an `InstallResult` with installed and skipped entries
+3. write files marked as shared to the Codex shared skills resource directory
+4. write files not marked as shared to the installed skill directory
+5. prepend frontmatter only to markdown files that are not marked as shared
+6. return an `InstallResult` with installed and skipped entries
 
 ### Requirement: Frontmatter field contract
 
@@ -45,6 +47,20 @@ No other frontmatter keys are considered Codex-supported in this spec.
 
 Skills MUST be installed to `.codex/skills/` under the `projectRoot` provided in `SpecdConfig`.
 
+For each skill, files not marked as shared MUST be installed under `.codex/skills/<skill-name>/`.
+
+Files marked as shared MUST be installed under `.codex/skills/_specd-shared/`. This shared directory MUST NOT contain a `SKILL.md` file.
+
+### Requirement: Uninstall behavior
+
+`uninstall(config: SpecdConfig, options?: AgentInstallOptions)` MUST remove installed skill directories from `.codex/skills/` relative to `config.projectRoot`.
+
+When `options.skills` is provided, uninstall MUST remove only the selected specd-managed skill directories. The shared resource directory MUST remain in place because other installed skills may still reference it.
+
+When `options.skills` is omitted, uninstall MUST remove all specd-managed skill directories and `_specd-shared/`.
+
+Uninstall MUST NOT remove unrelated directories or files under `.codex/skills/` that are not part of the specd-managed skill set.
+
 ## Constraints
 
 - The plugin MUST depend on `@specd/skills` for skill operations.
@@ -56,4 +72,5 @@ Skills MUST be installed to `.codex/skills/` under the `projectRoot` provided in
 
 - [`core:core/config`](../../core/core/config/spec.md) — defines SpecdConfig type
 - [`plugin-manager:agent-plugin-type`](../plugin-manager/agent-plugin-type/spec.md) — plugin interface
+- [`skills:skill-bundle`](../skills/skill-bundle/spec.md) — shared bundle file routing contract
 - [`skills:skill-templates-source`](../skills/skill-templates-source/spec.md) — frontmatter injection responsibility and template source contract

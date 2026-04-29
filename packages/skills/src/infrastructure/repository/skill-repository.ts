@@ -6,7 +6,11 @@ import { createRequire } from 'node:module'
 import type { SpecdConfig } from '@specd/core'
 import type { SharedFile, SkillRepository } from '../../application/ports/skill-repository.js'
 import type { Skill } from '../../domain/skill.js'
-import type { ResolvedFile, SkillBundle } from '../../domain/skill-bundle.js'
+import type {
+  ResolvedFile,
+  SkillBundle,
+  SkillBundleInstallTarget,
+} from '../../domain/skill-bundle.js'
 import { TemplateReader } from './template-reader.js'
 
 /**
@@ -39,14 +43,22 @@ class ResolvedSkillBundle implements SkillBundle {
   /**
    * Installs bundle files into a target directory.
    *
-   * @param targetDir - Target directory path.
+   * @param target - Target directory path or split install targets.
    * @returns A promise that resolves after all writes complete.
    */
-  async install(targetDir: string): Promise<void> {
+  async install(target: string | SkillBundleInstallTarget): Promise<void> {
+    const targetDir = typeof target === 'string' ? target : target.targetDir
+    const sharedTargetDir =
+      typeof target === 'string' ? target : (target.sharedTargetDir ?? target.targetDir)
+
     await mkdir(targetDir, { recursive: true })
+    if (this.files.some((file) => file.shared === true)) {
+      await mkdir(sharedTargetDir, { recursive: true })
+    }
 
     for (const file of this.files) {
-      const outputPath = path.join(targetDir, file.filename)
+      const baseDir = file.shared === true ? sharedTargetDir : targetDir
+      const outputPath = path.join(baseDir, file.filename)
       await writeFile(outputPath, file.content, 'utf8')
     }
   }
@@ -54,12 +66,17 @@ class ResolvedSkillBundle implements SkillBundle {
   /**
    * Uninstalls bundle files from a target directory.
    *
-   * @param targetDir - Target directory path.
+   * @param target - Target directory path or split install targets.
    * @returns A promise that resolves after best-effort cleanup.
    */
-  async uninstall(targetDir: string): Promise<void> {
+  async uninstall(target: string | SkillBundleInstallTarget): Promise<void> {
+    const targetDir = typeof target === 'string' ? target : target.targetDir
+    const sharedTargetDir =
+      typeof target === 'string' ? target : (target.sharedTargetDir ?? target.targetDir)
+
     for (const file of this.files) {
-      const outputPath = path.join(targetDir, file.filename)
+      const baseDir = file.shared === true ? sharedTargetDir : targetDir
+      const outputPath = path.join(baseDir, file.filename)
       try {
         await rm(outputPath, { force: true })
       } catch {
@@ -168,6 +185,7 @@ class FsSkillRepository implements SkillRepository {
       files.push({
         filename: shared.filename,
         content: applyVariables(shared.content, finalVariables),
+        shared: true,
       })
       included.add(shared.filename)
     }
