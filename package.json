@@ -39,6 +39,7 @@
     "@commitlint/cli": "^19.8.1",
     "@commitlint/config-conventional": "^19.8.1",
     "@commitlint/types": "^19.8.1",
+    "@specd/plugin-agent-copilot": "workspace:^",
     "@types/node": "^22.19.17",
     "eslint": "^9.39.4",
     "eslint-plugin-jsdoc": "^50.8.0",
