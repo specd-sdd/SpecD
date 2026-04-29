@@ -69,7 +69,7 @@ specd changes status <name> [options]
 
 Show the full status of a change: associated specs, artifact file statuses, current lifecycle state, available transitions, and any blockers preventing progression.
 
-`change status` provides high-visibility diagnostics including:
+`changes status` provides high-visibility diagnostics including:
 
 - **Artifact DAG**: An ASCII tree rendering of the artifact dependency hierarchy, showing the status and scope of each artifact.
 - **Blockers**: A dedicated section listing explicit conditions preventing progress (e.g. `ARTIFACT_DRIFT`, `MISSING_ARTIFACT`).
@@ -175,7 +175,10 @@ Edit the spec scope or description of an existing change. At least one of the op
 specd changes validate <name> [specPath] [options]
 ```
 
-Validate the artifacts for a change against the active schema, reporting any violations and marking passing artifacts as complete.
+Validate the artifacts for a change against the active schema, reporting structural
+violations and marking passing artifacts as complete. This is a structural and
+lifecycle-state validation step; it does not approve semantic content quality,
+requirement intent, or implementation correctness.
 
 For change-scoped artifacts (e.g. `design`, `tasks`), `<specPath>` can be omitted when using `--artifact` — the command will infer the specPath from the change's first spec.
 
@@ -185,9 +188,20 @@ Text output includes per-file status lines:
 - `missing: <path>` for expected files that were required but absent
 - `note: <artifactId> — <description>` for non-blocking optimization hints (e.g. AST/Delta suggestions)
 
-Single-spec and batch text output always append a preview hint:
+When validating spec-scoped artifacts, text output appends a preview hint:
 
 `note: verify merged output with: specd changes spec-preview <change> <specId>`
+
+When validating a single spec-scoped artifact (`--artifact <id>` where scope is `spec`),
+the preview hint includes the same artifact filter:
+
+`note: verify merged output with: specd changes spec-preview <change> <specId> --artifact <id>`
+
+For change-scoped artifacts (for example `design`, `tasks`), no preview hint is emitted.
+
+Use that preview hint when reviewing spec or verification deltas, especially when
+overlap, drift, or stale-base risk exists. Raw delta files are not a substitute for
+reviewing the merged output that would be archived.
 
 Structured output (`json` / `toon`) includes a `notes` array for non-blocking hints and a `files` array for each result entry.
 
@@ -270,7 +284,7 @@ specd changes artifacts <name> [options]
 
 Show the artifact files table for a change with columns: `ID`, `FILENAME`, `STATUS`, `EXISTS`. Useful for a quick check on what has been produced and whether files are present on disk.
 
-`change artifacts` emits one row per tracked file. Structured output includes:
+`changes artifacts` emits one row per tracked file. Structured output includes:
 
 - `changeDir` — absolute path to the change directory
 - `artifactState` — aggregate parent artifact state
@@ -321,7 +335,7 @@ Manage the `dependsOn` relationships for a spec within a change. At least one of
 specd changes discard <name> [options]
 ```
 
-Permanently discard a change. The change is moved to the discarded directory and cannot be recovered. Use `change draft` if you want to pause work and resume it later.
+Permanently discard a change. The change is moved to the discarded directory and cannot be recovered. Use `changes draft` if you want to pause work and resume it later.
 
 When a change has previously reached the `implementing` state, discarding is blocked by default because the code and specs may be out of sync. Use `--force` to override this guard when you are certain you want to discard anyway.
 
@@ -760,7 +774,7 @@ Display a project-level dashboard showing schema, workspaces, spec counts, and c
 specd project status [options]
 ```
 
-Display consolidated project state including workspaces, spec counts, change counts, graph freshness, and config flags. Designed for programmatic consumption by agents and scripts — replaces multiple calls to `config show`, `spec list`, `change list`, `graph stats`, and `project context`.
+Display consolidated project state including workspaces, spec counts, change counts, graph freshness, and config flags. Designed for programmatic consumption by agents and scripts — replaces multiple calls to `config show`, `specs list`, `changes list`, `graph stats`, and `project context`.
 
 By default, the output includes:
 

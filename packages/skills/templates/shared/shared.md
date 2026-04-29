@@ -23,14 +23,51 @@ defines the behaviour and the change implements the code for it. Use `op: no-op`
 You MUST prioritize formats according to the following rules:
 
 - **Diagnostic Priority**: Always use **`--format text`** (or default) for lifecycle
-  status checks (`change status`), transition attempts (`change transition`), and
-  validation commands (`change validate` / `spec validate`). This ensures high
+  status checks (`changes status`), transition attempts (`changes transition`), and
+  validation commands (`changes validate` / `specs validate`). This ensures high
   visibility of human-readable blockers, the Artifact DAG, and Repair Guides.
 - **Data Extraction**: Use machine-optimized formats **`--format toon`** (preferred)
   strictly when structured data extraction is required for subsequent tool calls
   (e.g., getting `lifecycle.changePath` or `specIds`).
 
 Never use `--format json` unless `toon` is unavailable or explicitly requested.
+
+## Command necessity and freshness
+
+Avoid redundant reads, but only when the replacement is explicit and fresh.
+
+A command MAY be skipped only when all of these are true:
+
+1. A prior command in the same skill execution already returned the exact fields needed
+   for the current decision.
+2. The prior output is still fresh for this decision boundary.
+3. The skill instructions define or clearly imply an equivalence between the skipped
+   command and the prior output.
+
+When any condition is uncertain, run the explicit canonical command. Do not infer
+equivalence from similar-looking output.
+
+Examples of safe equivalence:
+
+- `project status --context --graph --format toon` can satisfy later project-status,
+  workspace-ownership, graph-freshness, active-change, and draft checks in the same
+  skill step when those fields are present in that output.
+- `changes status <name> --format text` can satisfy diagnostic routing, blocker,
+  review, next-action, spec ID, artifact-state, and change-path checks in the same
+  step when the agent is reading the output directly.
+- `changes status <name> --format toon` is preferred when those same values must be
+  extracted as structured fields for later tool calls or internal state.
+
+Freshness rules:
+
+- Do not reuse outputs across separate skill invocations unless the relevant command
+  provides a fingerprint mechanism and the fingerprint was checked.
+- `changes context ... --fingerprint <value>` is the only reusable freshness signal
+  for compiled context.
+- After any write, validation, hook run, transition, or scope edit, re-read the state
+  needed for the next decision.
+- If a skill can be resumed later, it must start from its minimum mandatory reads,
+  even if another skill previously gathered similar data.
 
 ## Command sequencing — no write-then-read parallelism
 
@@ -39,15 +76,15 @@ persisted side-effect.** Parallel execution is only safe for independent reads.
 
 Commands that MUST run sequentially (the second depends on the first completing):
 
-- `change validate` → then `change status` (validate marks artifacts complete)
-- `change edit --add-spec` → then write the delta/artifact file (spec must be registered first)
-- `change transition` → then `change context` for the new state (state must change first)
-- `change run-hooks` → then `change hook-instruction` (hooks must execute first)
+- `changes validate` → then `changes status` (validate marks artifacts complete)
+- `changes edit --add-spec` → then write the delta/artifact file (spec must be registered first)
+- `changes transition` → then `changes context` for the new state (state must change first)
+- `changes run-hooks` → then `changes hook-instruction` (hooks must execute first)
 - Any write operation → then any read that checks its effect
 
-**Safe to parallelize:** multiple `spec show` calls, multiple `Read` calls, `config show`
+**Safe to parallelize:** multiple `specs show` calls, multiple `Read` calls, `config show`
 
-- `spec list` + `change list`, or any set of pure reads with no write dependency.
+- `specs list` + `changes list`, or any set of pure reads with no write dependency.
 
 If a command succeeds but the subsequent read shows unexpected state (e.g. validate
 reports success but status still shows `pending`), **re-read sequentially** before
@@ -55,14 +92,16 @@ concluding there's a bug. The most common cause is accidental parallelism.
 
 ## changePath
 
-Skills that need structural data start by running `change status <name> --format toon`.
+Skills that need structured status data start by running `changes status <name> --format toon`
+or by reusing equivalent fresh status data from the current skill execution.
 The response includes `lifecycle.changePath` — the absolute path to the change
-directory. **Always extract and store this.** All artifacts (proposal.md, design.md,
-tasks.md, deltas/) live there. Never guess the path.
+directory. **Always extract and store this.** Change-scoped artifacts and spec-scoped
+artifact deltas live there. Never guess the path or artifact filenames; use status,
+artifact instructions, and schema metadata.
 
 ## High-visibility blockers
 
-The `change status` response includes a `blockers` array (in `toon` mode) or a
+The `changes status` response includes a `blockers` array (in `toon` mode) or a
 dedicated "blockers:" section (in `text` mode).
 
 When blockers exist, progress is physically gated by the CLI. You MUST:
@@ -73,7 +112,7 @@ When blockers exist, progress is physically gated by the CLI. You MUST:
 
 ## Next Action engine
 
-The `change status` response also includes a `nextAction` object:
+The `changes status` response also includes a `nextAction` object:
 
 - `targetStep`: the lifecycle step to aim for
 - `actionType`: `cognitive` (needs thinking/editing) or `mechanical` (just run a command)
@@ -85,7 +124,7 @@ It accounts for both structural blockers and the logical workflow progression.
 
 ## Repair Guide for failed transitions
 
-When `change transition` fails in `text` mode, it renders a **Repair Guide**,
+When `changes transition` fails in `text` mode, it renders a **Repair Guide**,
 providing the blocker codes and the exact command to resolve them.
 
 If a transition fails, do not guess why. Read the blockers and follow the Repair
@@ -139,25 +178,67 @@ Whenever you edit or write a delta, check the merged output with
 specd changes spec-preview <name> <specId>
 ```
 
+If you only need one spec-scoped artifact (for example just `specs` or just `verify`),
+prefer the filtered form to reduce noise and token usage:
+
+```bash
+specd changes spec-preview <name> <specId> --artifact <artifactId>
+```
+
 If the output is not what you want, edit the delta again (make sure the delta does not remove anything needed).
+
+## Structural validation vs content review
+
+`specd changes validate` is a structural and lifecycle-state gate. It verifies schema
+shape, required files, artifact dependencies, and validation status. It does **not**
+approve semantic content quality, requirement intent, implementation correctness, or
+whether a delta preserves important existing text.
+
+After validation succeeds, review the content that matters for the current phase:
+
+- For spec/verify deltas, review the merged output, not only the raw delta.
+- For design/tasks, compare the artifact content against the latest user intent and
+  upstream artifacts.
+- When overlap, drift, or stale-base risk exists, run:
+
+```bash
+specd changes spec-preview <name> <specId> --format text
+```
+
+Use the preview as the authoritative merged-content checkpoint before accepting the
+delta outcome.
+
+Important scope rule:
+
+- `spec-preview` is for **spec-scoped** artifacts (for example `specs`, `verify`).
+- For **change-scoped** artifacts (for example `proposal`, `design`, `tasks`), do not
+  use `spec-preview` as a review step; validate and review the artifact file content
+  directly.
+
+`changes validate` command shape by scope:
+
+- `scope: spec` artifacts require a spec ID:
+  `specd changes validate <name> <specId> --artifact <artifactId> --format text`
+- `scope: change` artifacts do not require a spec ID:
+  `specd changes validate <name> --artifact <artifactId> --format text`
 
 ## Spec scope vs spec dependencies
 
 These are two distinct operations — do not confuse them:
 
-**`change edit --add-spec <specId>`** — adds a spec to the **change's scope**. This
+**`changes edit --add-spec <specId>`** — adds a spec to the **change's scope**. This
 means the change creates or modifies that spec. It controls which specs get artifacts
 and deltas.
 
-**`change deps <name> <specId> --add <depId>`** — declares that **spec A depends on
+**`changes deps <name> <specId> --add <depId>`** — declares that **spec A depends on
 spec B**. This is a relationship between specs, not between a change and a spec. It
 controls transitive context compilation — when working on spec A, spec B's context is
 automatically included.
 
 **When to use which:**
 
-- "This change should also touch spec X" → `change edit --add-spec X`
-- "Spec A references types/APIs/concepts from spec B" → `change deps ... A --add B`
+- "This change should also touch spec X" → `changes edit --add-spec X`
+- "Spec A references types/APIs/concepts from spec B" → `changes deps ... A --add B`
 
 Both matter: scope determines what gets written, dependencies determine what context
 is available while writing it.
@@ -166,9 +247,9 @@ is available while writing it.
 
 **Always use the CLI.** Never guess filesystem paths.
 
-- Discover: `spec list --format text --summary`
-- Read content: `spec show <specId> --format toon`
-- Read metadata: `spec metadata <specId> --format toon`
+- Discover: `specs list --format text --summary`
+- Read content: `specs show <specId> --format toon`
+- Read metadata: `specs metadata <specId> --format toon`
 
 ## Context loading is mandatory
 
@@ -176,7 +257,7 @@ Every skill that runs CLI instructions, hooks, or artifact instructions MUST loa
 context first. No exceptions — the context contains binding directives that govern
 how all subsequent work is performed.
 
-- **Change exists** → `change context <name> <step> --format text [--fingerprint <value>]`
+- **Change exists** → `changes context <name> <step> --format text [--fingerprint <value>]`
 - **No change yet** → `project context --format text`
 
 Load context before the first hook or instruction call in the skill, **and reload it
@@ -187,32 +268,43 @@ a previous state can lead to wrong decisions.
 ### Fingerprint mechanism
 
 To avoid re-reading unchanged context, the agent stores a `contextFingerprint` from
-the first `change context` call and passes it to subsequent calls — including across
+the first `changes context` call and passes it to subsequent calls — including across
 skill transitions within the same conversation:
 
 1. **No fingerprint stored** (first call in conversation, or new step without prior context):
-   `change context <name> <step> --format text`
+   `changes context <name> <step> --format text`
    - Parse the `contextFingerprint` from the response
    - Store it in the conversation window
 2. **Fingerprint stored** (any subsequent call, including after transitioning to a new skill):
-   `change context <name> <step> --format text --fingerprint <value>`
+   `changes context <name> <step> --format text --fingerprint <value>`
    - If `status: "unchanged"`: use the context already in memory, no re-processing needed
    - If `status: "changed"`: update stored context and fingerprint with the new response
 
+## Terminal stop rule (forced)
+
+When a skill reaches its terminal "stop" step, it MUST end the invocation immediately.
+
+- You MAY suggest the next skill or command.
+- You MUST NOT invoke the next skill automatically.
+- You MUST wait for an explicit user message before starting another skill.
+
+This rule applies even when the next action is obvious and even when the current
+skill output includes a recommended follow-up command.
+
 The fingerprint persists across skill boundaries. When moving from design → implement →
 verify → archive within the same conversation, carry the stored `contextFingerprint`
-forward and pass it to the next skill's `change context` call. Only omit the fingerprint
-if no `change context` call has been made yet in the conversation.
+forward and pass it to the next skill's `changes context` call. Only omit the fingerprint
+if no `changes context` call has been made yet in the conversation.
 
 The fingerprint represents the logical context state. When unchanged, the agent still
 receives `stepAvailable`, `blockingArtifacts`, `availableSteps`, and `warnings` — only
 `projectContext` and `specs` content are omitted.
 
-Follow the processing rules below ("Processing `change context` output").
+Follow the processing rules below ("Processing `changes context` output").
 
 ## Approvals are human-only
 
-**You MUST NEVER run `change approve` yourself.** Spec approval and signoff approval
+**You MUST NEVER run `changes approve` yourself.** Spec approval and signoff approval
 are exclusively human actions. When a change reaches `pending-spec-approval` or
 `pending-signoff`, your only job is to tell the user what command to run:
 
@@ -225,7 +317,7 @@ Do not attempt to approve, do not offer to approve, do not auto-approve. Stop an
 
 ## Processing artifact instructions
 
-When you fetch artifact instructions via `change artifact-instruction`, the response
+When you fetch artifact instructions via `changes artifact-instruction`, the response
 includes `rulesPre`, `instruction`, and `rulesPost`. These three fields are a **single
 mandatory block** — you MUST read and follow all three, in this exact order:
 
@@ -236,9 +328,9 @@ mandatory block** — you MUST read and follow all three, in this exact order:
 They are not optional or advisory. Treat them as binding composition directives that
 together define how the artifact must be authored.
 
-## Processing `change context` output
+## Processing `changes context` output
 
-Every skill that runs `change context` MUST process its output as follows:
+Every skill that runs `changes context` MUST process its output as follows:
 
 ### Project context is binding
 
@@ -266,10 +358,22 @@ If you are loading a spec inside a change:
 specd changes spec-preview <change-name> <spec-id> --format text
 ```
 
+If only one spec-scoped artifact is needed, use:
+
+```bash
+specd changes spec-preview <change-name> <spec-id> --artifact <artifactId> --format text
+```
+
 If the spec is not in the change:
 
 ```bash
 specd specs show <spec-id> --format text
+```
+
+If only one artifact is needed, use:
+
+```bash
+specd specs show <spec-id> --artifact <artifactId> --format text
 ```
 
 4. **Follow** the loaded spec content with the same weight as full-mode specs
@@ -281,22 +385,22 @@ A spec you didn't read can silently violate a constraint you didn't know existed
 
 Every workflow step has pre and post hooks. The pattern is always:
 
-1. **On entry:** `change hook-instruction <name> <step> --phase pre --format text` → follow guidance
-2. **On exit:** `change run-hooks <name> <step> --phase post` → then `change hook-instruction <name> <step> --phase post --format text` → follow guidance
+1. **On entry:** `changes hook-instruction <name> <step> --phase pre --format text` → follow guidance
+2. **On exit:** `changes run-hooks <name> <step> --phase post` → then `changes hook-instruction <name> <step> --phase post --format text` → follow guidance
 
 ### Pre-hooks run BEFORE the transition, always
 
-**The skill controls hook execution, not the transition.** Always call `change transition`
+**The skill controls hook execution, not the transition.** Always call `changes transition`
 with `--skip-hooks all` so that hooks are not executed implicitly. The skill runs them
 explicitly in the correct order.
 
 The complete pattern for every transition is:
 
-1. `change run-hooks <name> <source-state> --phase post` — finish the current state
-2. `change hook-instruction <name> <source-state> --phase post` → follow guidance
-3. `change run-hooks <name> <target-state> --phase pre` — prepare the target state
-4. `change hook-instruction <name> <target-state> --phase pre` → follow guidance
-5. `change transition <name> <target-state> --skip-hooks all` — transition without implicit hooks
+1. `changes run-hooks <name> <source-state> --phase post` — finish the current state
+2. `changes hook-instruction <name> <source-state> --phase post` → follow guidance
+3. `changes run-hooks <name> <target-state> --phase pre` — prepare the target state
+4. `changes hook-instruction <name> <target-state> --phase pre` → follow guidance
+5. `changes transition <name> <target-state> --skip-hooks all` — transition without implicit hooks
 
 This gives the skill full control over ordering, error handling, and guidance compliance.
 Never let the transition run hooks implicitly — it cannot follow `instruction:` guidance.
@@ -393,12 +497,12 @@ use them directly — don't duplicate the search manually.
 
 ## Spec overlap awareness
 
-Commands that modify a change's spec scope (`change create`, `change edit --add-spec`)
+Commands that modify a change's spec scope (`changes create`, `changes edit --add-spec`)
 may emit a `warning: spec overlap detected` message to stderr when the specs in the
-change are also targeted by other active changes. The `change archive` command blocks
+change are also targeted by other active changes. The `changes archive` command blocks
 by default when overlap is detected.
 
-When the CLI output of `change create` or `change edit` contains a spec overlap warning,
+When the CLI output of `changes create` or `changes edit` contains a spec overlap warning,
 you MUST stop and surface it to the user before continuing. Show which specs overlap and
 with which other active changes, then ask whether to proceed or adjust the spec scope.
 Do not silently continue past an overlap warning.

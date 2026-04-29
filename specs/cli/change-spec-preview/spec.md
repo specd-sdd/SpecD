@@ -9,7 +9,7 @@ Humans reviewing a change need to see how a spec will look after its deltas are 
 ### Requirement: Command signature
 
 ```
-specd change spec-preview <name> <specId> [--artifact <name>] [--diff] [--format text|json|toon]
+specd changes spec-preview <name> <specId> [--artifact <name>] [--diff] [--format text|json|toon]
 ```
 
 - `<name>` — required positional; the change name
@@ -17,6 +17,8 @@ specd change spec-preview <name> <specId> [--artifact <name>] [--diff] [--format
 - `--artifact <name>` — optional; filters the output to only include the artifact with the given ID (e.g. `specs`, `verify`)
 - `--diff` — optional flag; when present, outputs a unified diff instead of the full merged content
 - `--format text|json|toon` — optional; output format, defaults to `text`
+
+Canonical agent-facing guidance MUST use plural command groups (for example `changes`). Singular groups remain alias-compatible.
 
 ### Requirement: Text output — merged mode (no --diff)
 
@@ -46,6 +48,16 @@ If `--artifact <name>` is provided, the `files` array in the result object SHALL
 ### Requirement: Error handling
 
 If the change does not exist, the command MUST print an error message and exit with code 1. If the spec ID is not in the change's `specIds`, the command MUST print an error message and exit with code 1. Parser or delta application warnings from the use case MUST be printed to stderr.
+
+### Requirement: Drift and overlap review support
+
+The command SHALL be suitable as the authoritative merged-content checkpoint when artifact drift or overlap risk exists.
+
+Workflow guidance that detects overlap/drift risk MUST use this command to review merged output before accepting delta results.
+
+Reading raw delta files alone MUST NOT be treated as equivalent to merged preview review, because deltas can be stale relative to the current base spec.
+
+When only one spec-scoped artifact is required for that review, guidance SHOULD pass `--artifact <name>` to limit output to the relevant merged artifact.
 
 ### Requirement: Artifact filtering errors
 

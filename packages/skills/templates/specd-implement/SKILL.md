@@ -20,6 +20,8 @@ Identify any high-visibility blockers from the **blockers:** section (e.g. `ARTI
 command recommendation.
 
 Extract the `path:` field from the "lifecycle:" section.
+From the `artifacts (DAG):` section, note which artifact IDs are marked with
+`[hasTasks]`; those are the task-bearing artifacts to read and update later.
 
 If the status output shows `review: required: yes`, this change has artifacts that
 require review before implementation can continue. Tell the user:
@@ -85,13 +87,9 @@ do not implement it, do not work around it, do not assume it's okay. Surface it
 to the user. The design may need revision, or the workspace ownership must change
 in `specd.yaml` before you can proceed.
 
-### 3. Load schema and find task file
+### 3. Locate task-bearing artifacts
 
-```bash
-specd schema show --format toon
-```
-
-Find artifacts with `hasTaskCompletionCheck: true` — those have trackable checkboxes.
+Use the `[hasTasks]` artifact IDs noted from the initial change status output.
 
 ### 4. Load context
 
@@ -99,30 +97,27 @@ Find artifacts with `hasTaskCompletionCheck: true` — those have trackable chec
 specd changes context <name> implementing --follow-deps --depth 1 --rules --constraints --format text [--fingerprint <stored-value>]
 ```
 
-Pass `--fingerprint <stored-value>` if you have a `contextFingerprint` from a previous `change context` call in this conversation (see `shared.md` — "Fingerprint mechanism"). If output says `unchanged`, use the context already in memory.
+Pass `--fingerprint <stored-value>` if you have a `contextFingerprint` from a previous `changes context` call in this conversation (see `shared.md` — "Fingerprint mechanism"). If output says `unchanged`, use the context already in memory.
 
 **MUST follow** — project context entries are binding directives. If lazy mode returns
 summary specs, evaluate each one and load any that are relevant to the code you're
-about to write (see `shared.md` — "Processing `change context` output").
+about to write (see `shared.md` — "Processing `changes context` output").
 
-### 4b. Assess impact with code graph
+### 4b. Check impact coverage
 
-Before reading artifacts, use the code graph to understand the blast radius of the
-files and symbols you'll be modifying:
+Before coding, confirm the change-scoped design artifact already includes impact analysis for the files or
+symbols named by the tasks. Reuse that analysis as the implementation baseline.
 
-```bash
-specd graph hotspots --format toon
-```
-
-If the tasks (from the design artifact) mention specific symbols or files, check their
-dependents:
+Run additional graph impact commands only when implementation discovers a target file
+or symbol that was not covered by the design artifact, when the task scope has changed, or when
+fresh status/context indicates the design may be stale:
 
 ```bash
 specd graph impact --symbol "<name>" --direction dependents --format toon
 specd graph impact --file "<workspace:path>" --direction dependents --format toon
 ```
 
-Surface HIGH or CRITICAL risk findings to the user before starting implementation.
+Surface newly discovered HIGH or CRITICAL risk findings to the user before continuing.
 
 ### 5. Read change artifacts
 
@@ -200,17 +195,18 @@ Follow guidance. If hooks fail (tests, lint), fix and re-run until they pass.
 > Implementation complete. Run `/specd-verify <name>` to verify against scenarios.
 
 **Stop.**
+Do not invoke `/specd-verify` automatically; wait for explicit user confirmation.
 
 ## Session tasks
 
 1. `Load state & hooks`
 2. `Load context & artifacts`
-3. For each task in `tasks.md`: `Implement: <task summary>`
+3. For each task item: `Implement: <task summary>`
 4. `Run exit hooks`
 
 ## Handling failed transitions
 
-When `change transition` fails, it renders a **Repair Guide** in text mode.
+When `changes transition` fails, it renders a **Repair Guide** in text mode.
 Follow the recommended repair command based on the target recommendation.
 
 **Stop — do not continue after redirecting.**
@@ -234,5 +230,5 @@ specd changes transition <name> designing --skip-hooks all
 - The change artifacts are the source of truth for implementation approach
 - If you touch code outside the change's spec scope, surface it to the user
 - Never skip the pre-hook — it tells you what to read
-- Any time a fresh `change status` shows `review: required: yes`, stop
+- Any time a fresh `changes status` shows `review: required: yes`, stop
   implementation and redirect to `/specd-design <name>`

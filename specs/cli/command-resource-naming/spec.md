@@ -30,11 +30,19 @@ Aliases in scope include:
 
 ### Requirement: Help and docs canonical display
 
-CLI help and project documentation SHALL present canonical plural command groups as the primary form. Singular aliases MAY be shown as aliases only.
+CLI help, project documentation, and agent-authored workflow artifacts SHALL present canonical plural command groups as the primary form. Singular aliases MAY be shown as aliases only.
 
 ### Requirement: Behavioral equivalence
 
 For any canonical group and its singular alias, command behavior, outputs, and exit codes MUST be equivalent for the same subcommand and arguments.
+
+### Requirement: Workflow equivalence mapping
+
+When workflow guidance allows skipping a command because another command already produced equivalent information, the mapping MUST be explicit and deterministic.
+
+The equivalence mapping SHALL identify which canonical command output fields satisfy each decision check so command elimination remains auditable and safe.
+
+If equivalence cannot be demonstrated deterministically, workflow guidance MUST require executing the explicit canonical command.
 
 ## Constraints
 

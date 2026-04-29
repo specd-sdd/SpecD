@@ -54,6 +54,8 @@ describe('change validate', () => {
 
     expect(stdout()).toContain('validated feat/default:auth/login: all artifacts pass')
     expect(stdout()).toContain('file: deltas/default/auth/login/spec.md.delta.yaml')
+    expect(stdout()).toContain('validation is structural')
+    expect(stdout()).toContain('review artifact content separately')
     expect(stdout()).toContain('specd changes spec-preview feat default:auth/login')
   })
 
@@ -82,6 +84,8 @@ describe('change validate', () => {
     expect(stdout()).toContain('validation failed')
     expect(stdout()).toContain('missing: deltas/default/auth/login/spec.md.delta.yaml')
     expect(stdout()).toContain('missing required section')
+    expect(stdout()).toContain('validation is structural')
+    expect(stdout()).toContain('review artifact content separately')
     expect(stdout()).toContain('specd changes spec-preview feat default:auth/login')
   })
 
@@ -126,6 +130,37 @@ describe('change validate', () => {
     expect(out).toContain('pass (1 note(s))')
     expect(out).toContain('note: design')
     expect(out).toContain('incomplete section')
+    expect(out).toContain('validation is structural')
+  })
+
+  it('adds --artifact to preview note when validating a spec-scoped artifact', async () => {
+    const { kernel, stdout } = setup()
+    kernel.specs.getActiveSchema.execute.mockResolvedValue({
+      raw: false,
+      schema: {
+        name: () => 'test-schema',
+        version: () => 1,
+        artifacts: () => [{ id: 'specs', scope: 'spec', output: 'spec.md' }],
+      },
+    })
+    kernel.changes.validate.execute.mockResolvedValue({ failures: [], notes: [], files: [] })
+
+    const program = makeProgram()
+    registerChangeValidate(program.command('change'))
+    await program.parseAsync([
+      'node',
+      'specd',
+      'change',
+      'validate',
+      'feat',
+      'auth/login',
+      '--artifact',
+      'specs',
+    ])
+
+    expect(stdout()).toContain(
+      'specd changes spec-preview feat default:auth/login --artifact specs',
+    )
   })
 
   it('outputs JSON with passed flag', async () => {
@@ -270,6 +305,7 @@ describe('change validate', () => {
     const out = stdout()
     expect(out).toContain('validated feat/default:auth/login: all artifacts pass')
     expect(out).toContain('validated feat/default:auth/logout: all artifacts pass')
+    expect(out).toContain('validation is structural')
     expect(out).toContain('validated 2/2 specs')
   })
 
@@ -302,11 +338,19 @@ describe('change validate', () => {
   })
 
   it('--all passes --artifact to each spec', async () => {
-    const { kernel } = setup()
+    const { kernel, stdout } = setup()
     kernel.changes.status.execute.mockResolvedValue({
       change: { specIds: ['default:auth/login', 'default:auth/logout'] },
       artifactStatuses: [],
       lifecycle: {},
+    })
+    kernel.specs.getActiveSchema.execute.mockResolvedValue({
+      raw: false,
+      schema: {
+        name: () => 'test-schema',
+        version: () => 1,
+        artifacts: () => [{ id: 'proposal', scope: 'spec', output: 'proposal.md' }],
+      },
     })
     kernel.changes.validate.execute.mockResolvedValue({ failures: [], warnings: [], files: [] })
 
@@ -328,6 +372,12 @@ describe('change validate', () => {
     )
     expect(kernel.changes.validate.execute).toHaveBeenCalledWith(
       expect.objectContaining({ artifactId: 'proposal', specPath: 'default:auth/logout' }),
+    )
+    expect(stdout()).toContain(
+      'specd changes spec-preview feat default:auth/login --artifact proposal',
+    )
+    expect(stdout()).toContain(
+      'specd changes spec-preview feat default:auth/logout --artifact proposal',
     )
   })
 
@@ -394,7 +444,9 @@ describe('change validate', () => {
       specPath: 'default:auth/login',
       artifactId: 'design',
     })
-    expect(stdout()).toContain('validated feat/default:auth/login: all artifacts pass')
+    expect(stdout()).toContain('validated feat [artifact:design]: all artifacts pass')
+    expect(stdout()).not.toContain('specd changes spec-preview')
+    expect(stdout()).not.toContain('default:auth/login')
   })
 
   it('requires specPath for scope:spec artifacts even with --artifact', async () => {

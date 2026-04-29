@@ -44,4 +44,15 @@ describe('createSkillRepository', () => {
     expect(shared?.skills.includes('specd')).toBe(true)
     expect(shared?.content.length).toBeGreaterThan(0)
   })
+
+  it('given shared workflow guidance, when read, then includes command freshness and review guardrails', async () => {
+    const repository = createSkillRepository()
+    const sharedFiles = await repository.listSharedFiles()
+    const shared = sharedFiles.find((file) => file.filename === 'shared.md')
+
+    expect(shared?.content).toContain('Command necessity and freshness')
+    expect(shared?.content).toContain('Structural validation vs content review')
+    expect(shared?.content).toContain('specd changes validate')
+    expect(shared?.content).toContain('specd changes spec-preview')
+  })
 })

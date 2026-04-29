@@ -64,34 +64,65 @@ Continue to step 3.
 
 ### 3. Load verification context
 
+Use a single-pass context policy: choose one profile before calling `changes context`
+and avoid running both profiles in the same verification cycle unless a hard blocker
+forces a retry.
+
+Choose one profile:
+
+- `light` (lower token cost): use when verification can run primarily from merged
+  scenarios and already-loaded artifacts.
+- `full` (higher coverage): use when you already know rules/constraints/dependency
+  context will be needed.
+
+`light` profile:
+
 ```bash
-specd changes context <name> verifying --follow-deps --depth 1 --scenarios --format text [--fingerprint <stored-value>]
+specd changes context <name> verifying --include-change-specs --scenarios --format text [--fingerprint <stored-value>]
 ```
 
-Pass `--fingerprint <stored-value>` if you have a `contextFingerprint` from a previous `change context` call in this conversation (see `shared.md` — "Fingerprint mechanism"). If output says `unchanged`, use the context already in memory.
+`full` profile:
+
+```bash
+specd changes context <name> verifying --include-change-specs --follow-deps --depth 1 --rules --constraints --scenarios --format text [--fingerprint <stored-value>]
+```
+
+Pass `--fingerprint <stored-value>` if you have a `contextFingerprint` from a previous `changes context` call in this conversation (see `shared.md` — "Fingerprint mechanism"). If output says `unchanged`, use the context already in memory.
 
 **MUST follow** — project context entries are binding directives. If lazy mode returns
 summary specs, evaluate each one and load any that are relevant to the scenarios you're
-about to verify (see `shared.md` — "Processing `change context` output").
+about to verify (see `shared.md` — "Processing `changes context` output").
 
 ### 3b. Get merged specs with deltas applied
 
-For each spec in the change, use `spec-preview` to get the final merged spec content
-with deltas applied:
+Use merged spec-scoped artifact content for verification. If the context read(s)
+already returned the full merged content needed for the spec-scoped requirement and
+scenario artifacts, use that output. If context is still incomplete (summaries/metadata
+only or missing required merged details), if raw deltas are the only artifact content
+you have, or if overlap/drift/stale-base risk exists, use `spec-preview` to get the
+final merged spec-scoped artifacts with deltas applied:
 
 ```bash
 specd changes spec-preview <name> <specId> --format toon
 ```
 
-This merged view is what you should verify against.
+If you only need one merged spec-scoped artifact, prefer:
+
+```bash
+specd changes spec-preview <name> <specId> --artifact <artifactId> --format toon
+```
+
+This merged view is what you should verify against. Raw delta inspection alone is not
+equivalent to merged preview review.
 
 ### 4. Verify each scenario
 
 For each spec in the change, read the merged spec content from step 3b. Then verify
 each scenario against:
 
-1. The **merged spec** (from `spec-preview`)
-2. The **verification scenarios** in the merged `verify.md`
+1. The **merged spec-scoped content** (from `changes context` when it returned the
+   needed full merged content, otherwise from `spec-preview`)
+2. The **verification scenarios** in the merged scenario-bearing artifact
 
 For each scenario:
 
@@ -172,7 +203,7 @@ specd changes hook-instruction <name> done --phase post --format text
 
 #### 6b. Handle signoff gate
 
-Run `change status <name> --format text` and check `approvals:` line.
+Run `changes status <name> --format text` and check `approvals:` line.
 
 **If signoff=off:** no signoff needed — run archivable hooks and transition:
 
@@ -198,10 +229,12 @@ specd changes hook-instruction <name> archivable --phase post --format text
 > Then: `/specd-archive <name>`
 
 **Stop.**
+Do not invoke `/specd-archive` automatically; wait for explicit user confirmation.
 
 > All scenarios pass. Change is ready to archive. Run `/specd-archive <name>`.
 
 **Stop.**
+Do not invoke `/specd-archive` automatically; wait for explicit user confirmation.
 
 ## Session tasks
 
@@ -212,7 +245,7 @@ specd changes hook-instruction <name> archivable --phase post --format text
 
 ## Handling failed transitions
 
-When `change transition` fails, it renders a **Repair Guide** in text mode.
+When `changes transition` fails, it renders a **Repair Guide** in text mode.
 Follow the recommended repair command based on the target recommendation.
 
 **Stop — do not continue after redirecting.**
@@ -234,5 +267,5 @@ specd changes transition <name> designing --skip-hooks all
 
 - Verify against scenarios from the compiled context
 - Run actual tests where applicable
-- Any time a fresh `change status` shows `review: required: yes`, stop
+- Any time a fresh `changes status` shows `review: required: yes`, stop
   verification and redirect to `/specd-design <name>`

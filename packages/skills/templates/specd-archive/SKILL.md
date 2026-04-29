@@ -39,11 +39,11 @@ Redirect based on the **next action:** `target` recommendation.
 specd changes context <name> archiving --follow-deps --depth 1 --format text [--fingerprint <stored-value>]
 ```
 
-Pass `--fingerprint <stored-value>` if you have a `contextFingerprint` from a previous `change context` call in this conversation (see `shared.md` — "Fingerprint mechanism"). If output says `unchanged`, use the context already in memory.
+Pass `--fingerprint <stored-value>` if you have a `contextFingerprint` from a previous `changes context` call in this conversation (see `shared.md` — "Fingerprint mechanism"). If output says `unchanged`, use the context already in memory.
 
 **MUST follow** — project context entries are binding directives. If lazy mode returns
 summary specs, evaluate and load any that are relevant (see `shared.md` — "Processing
-`change context` output").
+`changes context` output").
 
 ### 3. Ask before archiving
 
@@ -62,6 +62,13 @@ specd changes hook-instruction <name> archiving --phase pre --format text
 ```
 
 Follow guidance — review deltas to ensure specs match what was built.
+
+When reviewing spec-scoped deltas, inspect merged output with
+`specd changes spec-preview <name> <specId> --format text` if overlap, drift, or
+stale-base risk exists, or if you have only read raw delta files. Raw deltas are not
+enough to confirm the archived spec will preserve important existing content.
+If only one merged spec-scoped artifact is needed for review, use
+`specd changes spec-preview <name> <specId> --artifact <artifactId> --format text`.
 
 ### 5. Archive
 
@@ -103,6 +110,9 @@ specd specs generate-metadata --all --write --status stale,missing
 specd project status --format toon
 ```
 
+Reuse a fresh `project status` result from this archive execution if it already
+contains `approvals.llmOptimized`; otherwise run the command.
+
 If `approvals.llmOptimized` is `true`, suggest running `/specd-spec-metadata` for each
 spec in the change.
 
@@ -111,6 +121,7 @@ spec in the change.
 > Change `<name>` archived. Deltas merged into specs.
 
 **Stop.**
+Do not invoke any follow-up skill automatically; wait for explicit user confirmation.
 
 ## Session tasks
 
@@ -121,7 +132,7 @@ spec in the change.
 
 ## Handling failed transitions
 
-When `change transition` fails, it renders a **Repair Guide** in text mode.
+When `changes transition` fails, it renders a **Repair Guide** in text mode.
 Follow the recommended repair command based on the target recommendation.
 
 **Stop — do not continue after redirecting.**
@@ -143,5 +154,5 @@ specd changes transition <name> designing --skip-hooks all
 
 - **Always ask before archiving** — it's irreversible
 - Review deltas before confirming — specs should match what was built
-- Any time a fresh `change status` shows `review: required: yes`, stop
+- Any time a fresh `changes status` shows `review: required: yes`, stop
   archiving and redirect to `/specd-design <name>`

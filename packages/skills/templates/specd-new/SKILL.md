@@ -17,7 +17,7 @@ specd project context --format text
 
 **MUST follow** — project context entries are binding directives. If lazy mode returns
 summary specs, evaluate and load any that are relevant to the work ahead
-(see `shared.md` — "Processing `change context` output").
+(see `shared.md` — "Processing `changes context` output").
 
 **Workspace locality rule — mandatory.** External workspaces are still part of the
 project for discovery work.
@@ -80,6 +80,10 @@ When the picture is clear enough, first check workspace ownership:
 specd project status --format toon
 ```
 
+If a fresh command in this same skill execution already returned `workspaces` with
+`ownership` and `codeRoot`, reuse that output instead of running this command again.
+Do not reuse project context alone unless it contains those exact fields.
+
 From the response, build a map of each workspace's `ownership` from the `workspaces` array. For each spec you're
 about to propose, determine which workspace it belongs to.
 
@@ -109,7 +113,7 @@ specd changes create <name> --spec <workspace:path> --description "<desc>" --for
 
 The response includes `changePath` — the directory where artifacts will be written.
 
-If `change create` fails with `Change '<name>' already exists`, the change is already
+If `changes create` fails with `Change '<name>' already exists`, the change is already
 in progress. Load its status in **text mode** for diagnostics and **toon mode** for extraction:
 
 ```bash
@@ -239,6 +243,7 @@ Show the change state and suggest next step:
 > Run `/specd-design <name>` to start writing artifacts.
 
 **Stop here.** Do not start writing artifacts.
+Do not invoke `/specd-design` automatically; wait for explicit user confirmation.
 
 ## Session tasks
 
@@ -256,6 +261,6 @@ Create tasks at the start for session visibility. Update them as you go.
 - Do NOT modify any existing files in the codebase
 - Do NOT create artifacts — that's `/specd-design`
 - Do NOT skip the discovery conversation to rush to creation
-- Spec IDs must be `workspace:capability-path` — look up from `spec list`, never guess
+- Spec IDs must be `workspace:capability-path` — look up from `specs list`, never guess
 - It's fine to create with no specs — they can be added during design
 - For new specs, ask the user which workspace they belong to

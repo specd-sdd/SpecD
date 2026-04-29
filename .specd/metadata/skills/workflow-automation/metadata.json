@@ -15,7 +15,7 @@
     {
       "requirement": "Data Extraction",
       "rules": [
-        "AI agents SHALL use machine-optimized formats (`--format json`, `--format toon`) strictly when structured data extraction is required for subsequent tool calls or internal state management."
+        "AI agents SHALL use machine-optimized formats strictly when structured data extraction is required for subsequent tool calls or internal state management.\n\nAgents MUST prefer `--format toon` for structured extraction. Agents MAY use `--format json` only when `toon` is unavailable or explicitly requested."
       ]
     },
     {
@@ -28,6 +28,18 @@
       "requirement": "Canonical Command References",
       "rules": [
         "Agent-authored workflow instructions and examples MUST use canonical plural command groups for countable resources (for example: `changes`, `specs`, `archives`, `drafts`).\n\nSingular forms MAY be referenced only as aliases."
+      ]
+    },
+    {
+      "requirement": "Command Necessity and Freshness",
+      "rules": [
+        "AI agents MUST avoid redundant command invocations when a prior command in the same skill execution already provides the required fields with equivalent semantics.\n\nA command MAY be skipped only when both conditions hold:\n\n1. The required information is already available from a prior command output in the current execution step.\n2. The information is still fresh for the current decision boundary.\n\nAgents MUST NOT assume continuity across separate skill invocations. When a skill may run later, in a different session, or without reliable in-memory state, the agent SHALL re-read the minimal required state before making lifecycle decisions.\n\nWhen equivalence is not deterministic, agents SHALL run the explicit command instead of reusing inferred state."
+      ]
+    },
+    {
+      "requirement": "Structural Validation and Content Review",
+      "rules": [
+        "Agents SHALL treat `specd changes validate` as structural/state validation only. A successful validation MUST NOT be interpreted as semantic approval of artifact content.\n\nAgents MUST perform content review of requirements, constraints, and intent alignment before progressing lifecycle steps that depend on artifact correctness.\n\nWhen overlap or drift risk exists for spec deltas, agents SHALL verify merged content with `specd changes spec-preview <change-name> <specId>` before accepting the delta outcome.\n\nWhen review only needs one spec-scoped artifact, agents SHOULD prefer `specd changes spec-preview <change-name> <specId> --artifact <artifactId>` to reduce unnecessary output volume."
       ]
     }
   ],
@@ -68,11 +80,63 @@
         "examples use canonical plural groups (changes, specs, archives, drafts)",
         "AND singular forms are referenced only as aliases"
       ]
+    },
+    {
+      "requirement": "Command Necessity and Freshness",
+      "name": "Agent reuses equivalent data within the same execution step",
+      "given": [
+        "a prior command output in the current skill step already contains the required decision fields"
+      ],
+      "when": ["the agent evaluates whether to run an additional read command"],
+      "then": [
+        "it may skip the extra command only if equivalence is deterministic",
+        "AND it records or follows an explicit mapping between required checks and source fields"
+      ]
+    },
+    {
+      "requirement": "Command Necessity and Freshness",
+      "name": "Agent does not assume continuity across skill sessions",
+      "given": ["a skill starts without reliable in-memory outputs from earlier invocations"],
+      "when": ["lifecycle decisions depend on status or context data"],
+      "then": ["the agent re-reads the minimum required state instead of reusing stale assumptions"]
+    },
+    {
+      "requirement": "Command Necessity and Freshness",
+      "name": "Non-deterministic equivalence forces explicit command",
+      "given": ["command-output equivalence cannot be proven for a required check"],
+      "when": ["the agent decides whether to skip a command"],
+      "then": ["the agent executes the explicit canonical command"]
+    },
+    {
+      "requirement": "Structural Validation and Content Review",
+      "name": "Validate passes but semantic review is still required",
+      "given": ["specd changes validate reports success"],
+      "when": ["artifacts contain requirement wording that could diverge from intent"],
+      "then": ["the workflow still requires explicit content review before progression"]
+    },
+    {
+      "requirement": "Structural Validation and Content Review",
+      "name": "Overlap or drift risk requires merged preview",
+      "given": ["overlap or drift risk is detected for a spec delta"],
+      "when": ["the agent assesses whether delta output is safe to accept"],
+      "then": [
+        "the agent runs specd changes spec-preview <change-name> <specId> to inspect merged content",
+        "AND it does not treat raw delta inspection alone as sufficient"
+      ]
+    },
+    {
+      "requirement": "Structural Validation and Content Review",
+      "name": "Single-artifact review uses preview filtering",
+      "given": ["merged review needs only one spec-scoped artifact"],
+      "when": ["the agent runs preview for content review"],
+      "then": [
+        "it prefers specd changes spec-preview <change-name> <specId> --artifact <artifactId> to avoid unrelated output"
+      ]
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:1d11c1faf26f79fdddfbcb3f65475c27ce3bf495aeb1e6fcee501ed7e18095cf",
-    "verify.md": "sha256:ab452bcd8fa76df2ec0b1fe0647edd66c0380ef69a8a96dfaed64ee467ebd8c4"
+    "spec.md": "sha256:0357ae24b33df5edd83359cff62538f3dd50c81839f6cd6b6ac4ebde2195487c",
+    "verify.md": "sha256:9eb2c1561e60913804c594b5e92cbb03e0354de4442848a37f47bc6a1288bfad"
   },
   "generatedBy": "core"
 }

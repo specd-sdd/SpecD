@@ -36,6 +36,9 @@ interface ValidateResult {
   readonly files: ValidationFileEntry[]
 }
 
+/** Artifact scope supported by schema-defined artifact types. */
+type ArtifactScope = 'change' | 'spec'
+
 /**
  * Returns true when the value is a plain object record.
  *
@@ -113,6 +116,21 @@ function toValidateResult(value: unknown): ValidateResult {
 }
 
 /**
+ * Builds the suggested `changes spec-preview` command for merged-content review.
+ *
+ * @param name - Change name
+ * @param specPath - Target spec ID
+ * @param previewArtifactId - Optional artifact filter for spec-scoped previews
+ * @returns Preview command string
+ */
+function buildPreviewCommand(name: string, specPath: string, previewArtifactId?: string): string {
+  if (previewArtifactId === undefined) {
+    return `specd changes spec-preview ${name} ${specPath}`
+  }
+  return `specd changes spec-preview ${name} ${specPath} --artifact ${previewArtifactId}`
+}
+
+/**
  * Registers the `change validate` subcommand on the given parent command.
  *
  * @param parent - The parent Commander command to attach the subcommand to.
@@ -122,7 +140,7 @@ export function registerChangeValidate(parent: Command): void {
     .command('validate <name> [specPath]')
     .allowExcessArguments(false)
     .description(
-      'Validate artifacts in a change against their spec scenarios and the active schema, reporting any violations.',
+      'Validate change artifacts structurally against the active schema, reporting any violations.',
     )
     .option('--all', 'validate all specIds in the change')
     .option('--artifact <artifactId>', 'validate only this artifact')
@@ -160,16 +178,22 @@ JSON/TOON output schema:
             configPath: opts.config,
           })
 
-          // If no specPath but --artifact provided, check if it's scope: change
-          let finalSpecPath: string | undefined = specPath
-          if (specPath === undefined && opts.artifact !== undefined) {
+          let requestedArtifactScope: ArtifactScope | undefined
+          if (opts.artifact !== undefined) {
             const schemaResult = await kernel.specs.getActiveSchema.execute()
             if (schemaResult.raw) {
               cliError('Cannot validate: schema resolved in raw mode', opts.format)
             }
-            const schema = schemaResult.schema
-            const artifactType = schema.artifacts().find((a) => a.id === opts.artifact)
-            if (artifactType !== undefined && artifactType.scope === 'change') {
+            const artifactType = schemaResult.schema.artifacts().find((a) => a.id === opts.artifact)
+            if (artifactType !== undefined) {
+              requestedArtifactScope = artifactType.scope
+            }
+          }
+
+          // If no specPath but --artifact provided, check if it's scope: change
+          let finalSpecPath: string | undefined = specPath
+          if (specPath === undefined && opts.artifact !== undefined && opts.all !== true) {
+            if (requestedArtifactScope === 'change') {
               // scope: change artifact - specPath is optional
               // Use first spec in change as placeholder, or let ValidateArtifacts handle it
               const change = await kernel.changes.list.execute()
@@ -177,16 +201,16 @@ JSON/TOON output schema:
               if (targetChange !== undefined && targetChange.specIds.length > 0) {
                 finalSpecPath = targetChange.specIds[0]
               }
-            } else if (artifactType !== undefined && artifactType.scope === 'spec') {
+            } else if (requestedArtifactScope === 'spec') {
               // scope: spec artifact - specPath is required
               cliError('<specPath> is required for scope: spec artifacts', opts.format)
             }
           }
 
           if (opts.all === true) {
-            await executeBatch(kernel, name, opts)
+            await executeBatch(kernel, name, opts, requestedArtifactScope)
           } else {
-            await executeSingle(kernel, config, name, finalSpecPath!, opts)
+            await executeSingle(kernel, config, name, finalSpecPath!, opts, requestedArtifactScope)
           }
         } catch (err) {
           handleError(err, opts.format)
@@ -205,6 +229,7 @@ JSON/TOON output schema:
  * @param opts - Command options
  * @param opts.format - Output format
  * @param opts.artifact - Optional artifact ID to validate
+ * @param requestedArtifactScope - Optional scope for the requested artifact
  */
 async function executeSingle(
   kernel: import('@specd/core').Kernel,
@@ -212,9 +237,14 @@ async function executeSingle(
   name: string,
   specPath: string,
   opts: { format: string; artifact?: string },
+  requestedArtifactScope?: ArtifactScope,
 ): Promise<void> {
   const parsed = parseSpecId(specPath, config)
   const fullSpecPath = `${parsed.workspace}:${parsed.capabilityPath}`
+  const isChangeScopedArtifact = opts.artifact !== undefined && requestedArtifactScope === 'change'
+  const displayTarget = isChangeScopedArtifact
+    ? `${name} [artifact:${opts.artifact}]`
+    : `${name}/${fullSpecPath}`
 
   const result = toValidateResult(
     await kernel.changes.validate.execute({
@@ -231,26 +261,36 @@ async function executeSingle(
     const fileLines = result.files.map((file) =>
       file.status === 'missing' ? `missing: ${file.filename}` : `file: ${file.filename}`,
     )
-    const previewNote = `note: verify merged output with: specd changes spec-preview ${name} ${fullSpecPath}`
+    const structuralNote =
+      'note: validation is structural; review artifact content separately before relying on it'
+    const previewNote = isChangeScopedArtifact
+      ? null
+      : `note: verify merged output with: ${buildPreviewCommand(
+          name,
+          fullSpecPath,
+          requestedArtifactScope === 'spec' ? opts.artifact : undefined,
+        )}`
 
     if (passed) {
+      const sharedLines = previewNote === null ? [structuralNote] : [structuralNote, previewNote]
       if (result.notes.length > 0) {
         const noteLines = result.notes.map((n) => `note: ${n.artifactId} — ${n.description}`)
         output(
-          `validated ${name}/${fullSpecPath}: pass (${result.notes.length} note(s))\n${[...fileLines, ...noteLines, previewNote].join('\n')}`,
+          `validated ${displayTarget}: pass (${result.notes.length} note(s))\n${[...fileLines, ...noteLines, ...sharedLines].join('\n')}`,
           'text',
         )
       } else {
         output(
-          `validated ${name}/${fullSpecPath}: all artifacts pass\n${[...fileLines, previewNote].join('\n')}`,
+          `validated ${displayTarget}: all artifacts pass\n${[...fileLines, ...sharedLines].join('\n')}`,
           'text',
         )
       }
     } else {
       const errorLines = result.failures.map((f) => `  error: ${f.artifactId} — ${f.description}`)
       const noteLines = result.notes.map((n) => `  note: ${n.artifactId} — ${n.description}`)
-      const allLines = [...fileLines, ...errorLines, ...noteLines, previewNote]
-      output(`validation failed ${name}/${fullSpecPath}:\n${allLines.join('\n')}`, 'text')
+      const trailerLines = previewNote === null ? [structuralNote] : [structuralNote, previewNote]
+      const allLines = [...fileLines, ...errorLines, ...noteLines, ...trailerLines]
+      output(`validation failed ${displayTarget}:\n${allLines.join('\n')}`, 'text')
       process.exitCode = 1
     }
   } else {
@@ -277,11 +317,13 @@ async function executeSingle(
  * @param opts - Command options
  * @param opts.format - Output format
  * @param opts.artifact - Optional artifact ID to validate per spec
+ * @param requestedArtifactScope - Optional scope for the requested artifact
  */
 async function executeBatch(
   kernel: import('@specd/core').Kernel,
   name: string,
   opts: { format: string; artifact?: string },
+  requestedArtifactScope?: ArtifactScope,
 ): Promise<void> {
   const { change } = await kernel.changes.status.execute({ name })
   const specIds = change.specIds
@@ -329,29 +371,40 @@ async function executeBatch(
   const fmt = parseFormat(opts.format)
 
   if (fmt === 'text') {
+    const isChangeScopedArtifact =
+      opts.artifact !== undefined && requestedArtifactScope === 'change'
     for (const r of results) {
       const fileLines = r.files.map((file) =>
         file.status === 'missing' ? `missing: ${file.filename}` : `file: ${file.filename}`,
       )
-      const previewNote = `note: verify merged output with: specd changes spec-preview ${name} ${r.spec}`
+      const structuralNote =
+        'note: validation is structural; review artifact content separately before relying on it'
+      const previewNote = isChangeScopedArtifact
+        ? null
+        : `note: verify merged output with: ${buildPreviewCommand(
+            name,
+            r.spec,
+            requestedArtifactScope === 'spec' ? opts.artifact : undefined,
+          )}`
+      const sharedLines = previewNote === null ? [structuralNote] : [structuralNote, previewNote]
 
       if (r.passed) {
         if (r.notes.length > 0) {
           const noteLines = r.notes.map((n) => `note: ${n.artifactId} — ${n.description}`)
           output(
-            `validated ${name}/${r.spec}: pass (${r.notes.length} note(s))\n${[...fileLines, ...noteLines, previewNote].join('\n')}`,
+            `validated ${name}/${r.spec}: pass (${r.notes.length} note(s))\n${[...fileLines, ...noteLines, ...sharedLines].join('\n')}`,
             'text',
           )
         } else {
           output(
-            `validated ${name}/${r.spec}: all artifacts pass\n${[...fileLines, previewNote].join('\n')}`,
+            `validated ${name}/${r.spec}: all artifacts pass\n${[...fileLines, ...sharedLines].join('\n')}`,
             'text',
           )
         }
       } else {
         const errorLines = r.failures.map((f) => `  error: ${f.artifactId} — ${f.description}`)
         const noteLines = r.notes.map((n) => `  note: ${n.artifactId} — ${n.description}`)
-        const allLines = [...fileLines, ...errorLines, ...noteLines, previewNote]
+        const allLines = [...fileLines, ...errorLines, ...noteLines, ...sharedLines]
         output(`validation failed ${name}/${r.spec}:\n${allLines.join('\n')}`, 'text')
       }
     }

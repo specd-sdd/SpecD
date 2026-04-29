@@ -113,6 +113,26 @@
 - **THEN** warnings appear on stderr
 - **AND** the command still exits successfully with the partial result on stdout
 
+### Requirement: Drift and overlap review support
+
+#### Scenario: Preview used as merged checkpoint under drift risk
+
+- **GIVEN** a change has potential overlap/drift in spec deltas
+- **WHEN** workflow guidance performs pre-acceptance review
+- **THEN** `specd changes spec-preview <name> <specId>` provides merged content for checkpoint review
+
+#### Scenario: Raw deltas are insufficient without merged preview
+
+- **GIVEN** only raw delta files are inspected
+- **WHEN** base spec content may have changed since delta authoring
+- **THEN** this inspection is not treated as equivalent to merged preview verification
+
+#### Scenario: Artifact-filtered preview for targeted review
+
+- **GIVEN** review targets only one spec-scoped artifact
+- **WHEN** `specd changes spec-preview` is used for the merged checkpoint
+- **THEN** the command may include `--artifact <name>` and returns only that merged artifact output
+
 ### Requirement: Artifact filtering errors
 
 #### Scenario: Unknown artifact ID exits with error

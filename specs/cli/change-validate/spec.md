@@ -9,7 +9,7 @@ Before a change can advance, its artifacts must be verified against the schema t
 ### Requirement: Command signature
 
 ```
-specd change validate <name> [workspace:capability-path] [--all] [--artifact <artifactId>] [--format text|json|toon]
+specd changes validate <name> [workspace:capability-path] [--all] [--artifact <artifactId>] [--format text|json|toon]
 ```
 
 - `<name>` — required positional; the name of the change to validate
@@ -18,21 +18,32 @@ specd change validate <name> [workspace:capability-path] [--all] [--artifact <ar
 - `--artifact <artifactId>` — optional; when provided, only the specified artifact is validated instead of all artifacts for the spec. Works with both single-spec and `--all` modes. When the artifact is `scope: change`, `specPath` is not required.
 - `--format text|json|toon` — optional; output format, defaults to `text`
 
+Canonical agent-facing guidance MUST use plural command groups (for example `changes`). Singular groups remain alias-compatible.
+
 ### Requirement: Behaviour
 
 The command invokes the `ValidateArtifacts` use case, passing the change name, spec ID, and optionally the artifact ID from `--artifact`.
 
 The command MUST render file path details from the use case's structured file result metadata instead of recomputing expected paths in the CLI layer.
 
+### Requirement: Structural validation scope
+
+`specd changes validate` SHALL validate artifact structure, schema conformance, dependency readiness, and lifecycle validation status only.
+
+A successful validate result MUST NOT be interpreted as semantic approval of artifact intent, requirement quality, or implementation correctness.
+
+Semantic/content review is a separate workflow obligation and SHALL be performed by human/agent review steps outside validate.
+
 ### Requirement: Output on success
 
-In `text` mode (default), when all artifacts pass, the command prints the validated artifact paths:
+In `text` mode (default), when all artifacts pass, the command prints the validated artifact paths.
+For spec-scoped validation targets, it also prints a merged-preview hint:
 
 ```text
 validated <name>/<workspace:capability-path>: all artifacts pass
   file: <path>
   file: <path>
-note: inspect merged spec output with `specd change spec-preview <name> <workspace:capability-path>`
+note: inspect merged spec output with `specd changes spec-preview <name> <workspace:capability-path>`
 ```
 
 In `text` mode, when there are notes but no failures:
@@ -42,7 +53,13 @@ validated <name>/<workspace:capability-path>: pass (N note(s))
   file: <path>
 note: <artifactId> — <description>
 ...
-note: inspect merged spec output with `specd change spec-preview <name> <workspace:capability-path>`
+note: inspect merged spec output with `specd changes spec-preview <name> <workspace:capability-path>`
+```
+
+When validation targets a spec-scoped artifact via `--artifact <artifactId>`, the preview hint SHOULD include the same artifact filter:
+
+```text
+note: inspect merged spec output with `specd changes spec-preview <name> <workspace:capability-path> --artifact <artifactId>`
 ```
 
 The listed file paths MUST come from `ValidateArtifacts` result metadata and MUST be the exact paths validated for the requested spec/artifact. Any non-blocking suggestion MUST be labeled as a `note`.
@@ -62,7 +79,8 @@ The process exits with code 0 when `passed` is `true`.
 
 ### Requirement: Output on failure
 
-In `text` mode, the command prints each failure to stdout, exits with code 1, and includes any expected file paths that could not be validated:
+In `text` mode, the command prints each failure to stdout, exits with code 1, and includes any expected file paths that could not be validated.
+For spec-scoped validation targets, it also prints a merged-preview hint:
 
 ```text
 validation failed <name>/<workspace:capability-path>:
@@ -71,8 +89,16 @@ validation failed <name>/<workspace:capability-path>:
     ...
     note: <artifactId> — <description>
     ...
-  note: inspect merged spec output with `specd change spec-preview <name> <workspace:capability-path>`
+  note: inspect merged spec output with `specd changes spec-preview <name> <workspace:capability-path>`
 ```
+
+When validation targets a spec-scoped artifact via `--artifact <artifactId>`, the preview hint SHOULD include the same artifact filter:
+
+```text
+note: inspect merged spec output with `specd changes spec-preview <name> <workspace:capability-path> --artifact <artifactId>`
+```
+
+For change-scoped validation targets, no preview hint is emitted.
 
 Missing path lines MUST be derived from `ValidateArtifacts` result metadata. For an existing spec with a delta-capable artifact, this path is the expected `deltas/.../*.delta.yaml` file, even if a direct `specs/...` file exists.
 
