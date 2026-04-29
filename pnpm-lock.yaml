@@ -20,6 +20,9 @@ importers:
       '@commitlint/types':
         specifier: ^19.8.1
         version: 19.8.1
+      '@specd/plugin-agent-copilot':
+        specifier: workspace:^
+        version: link:packages/plugin-agent-copilot
       '@types/node':
         specifier: ^22.19.17
         version: 22.19.17

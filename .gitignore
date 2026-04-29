@@ -17,6 +17,7 @@ apps/public-web/.generated/
 .codex/
 .opencode/
 .gemini/
+.github/
 
 # Environment
 .env
@@ -34,3 +35,5 @@ specd.local.yaml
 .idea/
 .history/
 .gitnexus
+
+gha-creds-*.json

@@ -2,7 +2,7 @@ schema: '@specd/schema-std'
 
 # Agent instructions prepended before spec content
 context:
-  - instruction: >-
+  - instruction: |
       specd is a spec-driven development platform. TypeScript, pnpm monorepo,
       ESM only. Hexagonal architecture: domain (no I/O), application (ports),
       infrastructure (fs adapters). Rich entities enforce invariants; pure
@@ -173,11 +173,11 @@ schemaOverrides:
         rules:
           post:
             - id: designing-docs
-              instruction: >-
+              instruction: |
                 You MUST add instructions to update documentation in docs/ if
                 needed on the design.md.
             - id: check-global-specs-compliance
-              instruction: >-
+              instruction: |
                 Cross-reference this design against the global specs
                 (default:_global/*): architecture (hexagonal layers, dependency
                 direction, no I/O in domain), conventions (naming, exports, ESM,
@@ -190,7 +190,7 @@ schemaOverrides:
         hooks:
           post:
             - id: designing-check-global-specs
-              instruction: >-
+              instruction: |
                 Before finishing design, review all artifacts and deltas in this
                 change against the global specs (default:_global/*). Check
                 compliance with: architecture (hexagonal layers, dependency
@@ -224,7 +224,7 @@ schemaOverrides:
             - id: archiving-run-lint
               run: 'pnpm lint'
             - id: archiving-edit-description
-              instruction: >-
+              instruction: |
                 Read the proposal.md and design.md files in this change
                 directory. Based on their content, write a more elaborate
                 description (2-3 sentences) that summarizes the change purpose
@@ -260,7 +260,7 @@ schemaOverrides:
                   cli:cli/change-validate: minor
                 ```
             - id: archiving-adrs
-              instruction: >-
+              instruction: |
                 Review whether this change introduced any durable decisions that may merit an ADR.
 
                 Be conservative. Prefer no ADR recommendation over ADR spam.
@@ -302,6 +302,7 @@ schemaOverrides:
 
 plugins:
   agents:
-    - name: '@specd/plugin-agent-claude'
     - name: '@specd/plugin-agent-codex'
+    - name: '@specd/plugin-agent-claude'
+    - name: '@specd/plugin-agent-copilot'
     - name: '@specd/plugin-agent-opencode'
