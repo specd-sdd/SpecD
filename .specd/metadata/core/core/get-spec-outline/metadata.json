@@ -1,0 +1,103 @@
+{
+  "title": "Get Spec Outline",
+  "description": "To provide a unified application service for retrieving the navigable structure (outline) of a spec artifact. This use case decouples the CLI and other delivery mechanisms from the details of artifact retrieval, parsing, and outline generation.",
+  "dependsOn": [
+    "core:core/get-spec",
+    "core:core/artifact-parser-port",
+    "core:core/get-active-schema"
+  ],
+  "context": [
+    "To provide a unified application service for retrieving the navigable structure (outline) of a spec artifact. This use case decouples the CLI and other delivery mechanisms from the details of artifact retrieval, parsing, and outline generation."
+  ],
+  "rules": [
+    {
+      "requirement": "Input",
+      "rules": [
+        "The use case SHALL receive:\n\n- `workspace`: name of the workspace containing the spec.\n- `specPath`: path of the spec within the workspace.\n- `artifactId`: optional ID of the artifact to outline (e.g., `specs`, `verify`).\n- `filename`: optional direct filename of the artifact to outline."
+      ]
+    },
+    {
+      "requirement": "Artifact Resolution",
+      "rules": [
+        "The use case SHALL resolve the target artifact file:\n\n- If `artifactId` is provided, it MUST be resolved to a filename using the active schema's artifact definitions.\n- The resolved artifact definition MUST have `scope: 'spec'`. If it does not, the use case MUST throw an error.\n- If `filename` is provided, it MUST be used directly.\n- If both are provided and resolve to the same file, it MUST be treated as a single target.\n- If both resolve to different files, both MUST be processed.\n- If neither is provided, the use case MUST resolve ALL spec-scoped artifacts from the active schema and return outlines for each one that exists on disk."
+      ]
+    },
+    {
+      "requirement": "Outline Generation",
+      "rules": [
+        "For each resolved artifact file, the use case SHALL:\n\n- Read the content from the appropriate `SpecRepository`.\n- Determine the correct `ArtifactParser` based on the file extension or schema format.\n- Parse the content into an AST.\n- Call `ArtifactParser.outline(ast)` to generate the hierarchical structure."
+      ]
+    },
+    {
+      "requirement": "Result",
+      "rules": [
+        "The use case SHALL return a list of outline results, where each result contains:\n\n- `filename`: the resolved artifact filename.\n- `outline`: the hierarchical tree of `OutlineEntry` objects."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "Input",
+      "name": "All optional inputs missing",
+      "when": ["execute() is called with only workspace and specPath"],
+      "then": [
+        "it resolves ALL spec-scoped artifacts from the active schema",
+        "AND returns an outline for each one that exists on disk"
+      ]
+    },
+    {
+      "requirement": "Artifact Resolution",
+      "name": "Resolve by artifactId",
+      "when": ["execute() is called with artifactId: 'verify'"],
+      "then": ["it resolves the filename to verify.md (via schema)", "AND returns its outline"]
+    },
+    {
+      "requirement": "Artifact Resolution",
+      "name": "Error on non-spec artifact scope",
+      "given": ["artifactId design has scope: 'change'"],
+      "when": ["execute() is called with artifactId: 'design'"],
+      "then": ["it throws an error indicating the artifact must have scope: 'spec'"]
+    },
+    {
+      "requirement": "Artifact Resolution",
+      "name": "Resolve by filename",
+      "when": ["execute() is called with filename: 'custom.md'"],
+      "then": ["it uses custom.md directly", "AND returns its outline"]
+    },
+    {
+      "requirement": "Artifact Resolution",
+      "name": "Deduplicate artifactId and filename",
+      "given": ["artifactId specs resolves to spec.md"],
+      "when": ["execute() is called with artifactId: 'specs' AND filename: 'spec.md'"],
+      "then": ["it only processes spec.md once", "AND returns a single result entry for spec.md"]
+    },
+    {
+      "requirement": "Artifact Resolution",
+      "name": "Multiple different targets",
+      "given": ["artifactId verify resolves to verify.md"],
+      "when": ["execute() is called with artifactId: 'verify' AND filename: 'spec.md'"],
+      "then": ["it processes both verify.md and spec.md", "AND returns two result entries"]
+    },
+    {
+      "requirement": "Outline Generation",
+      "name": "Parser selection by extension",
+      "given": ["an artifact with .json extension"],
+      "when": ["generating the outline"],
+      "then": ["it uses the JsonParser", "AND returns the JSON hierarchical outline"]
+    },
+    {
+      "requirement": "Result",
+      "name": "Structured result format",
+      "when": ["the use case completes successfully"],
+      "then": [
+        "it returns an array of objects",
+        "AND each object has filename (string) and outline (OutlineEntry tree)"
+      ]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:9f0dd062a4727bec4481625ab4a4ebfff8126bb1cddf96d0afef7d6420bd503c",
+    "verify.md": "sha256:386e0cac85f8edc09e0fd5cafe3e0262a33c0e8d68305c16ad0b15486b1fe311"
+  },
+  "generatedBy": "core"
+}

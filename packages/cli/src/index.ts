@@ -42,6 +42,7 @@ import { registerArchiveShow } from './commands/archive/show.js'
 // spec
 import { registerSpecList } from './commands/spec/list.js'
 import { registerSpecShow } from './commands/spec/show.js'
+import { registerSpecOutline } from './commands/spec/outline.js'
 import { registerSpecContext } from './commands/spec/context.js'
 import { registerSpecMetadata } from './commands/spec/metadata.js'
 import { registerSpecResolvePath } from './commands/spec/resolve-path.js'
@@ -161,6 +162,7 @@ const specCmd = program
   .description('Commands for listing, browsing, validating, and managing spec files.')
 registerSpecList(specCmd)
 registerSpecShow(specCmd)
+registerSpecOutline(specCmd)
 registerSpecContext(specCmd)
 registerSpecMetadata(specCmd)
 registerSpecResolvePath(specCmd)

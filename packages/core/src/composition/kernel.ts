@@ -37,6 +37,7 @@ import { GetArtifactInstruction } from '../application/use-cases/get-artifact-in
 import { ValidateSchema } from '../application/use-cases/validate-schema.js'
 import { DetectOverlap } from '../application/use-cases/detect-overlap.js'
 import { PreviewSpec } from '../application/use-cases/preview-spec.js'
+import { GetSpecOutline } from '../application/use-cases/get-spec-outline.js'
 import { buildSchema } from '../domain/services/build-schema.js'
 import { type ChangeRepository } from '../application/ports/change-repository.js'
 import { type SchemaRegistry } from '../application/ports/schema-registry.js'
@@ -128,6 +129,8 @@ export interface Kernel {
     list: ListSpecs
     /** Loads a spec and all of its artifact files. */
     get: GetSpec
+    /** Retrieves the navigable structure (outline) of a spec artifact. */
+    getOutline: GetSpecOutline
     /** Writes metadata for a spec. */
     saveMetadata: SaveSpecMetadata
     /** Invalidates a spec's metadata by removing its contentHashes. */
@@ -312,6 +315,7 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
       approveSignoff: new ApproveSignoff(i.changes, i.actor, schemaProvider, i.hasher),
       list: new ListSpecs(i.specs, i.hasher, i.yaml),
       get: new GetSpec(i.specs),
+      getOutline: new GetSpecOutline(i.specs, schemaProvider, i.parsers),
       saveMetadata: new SaveSpecMetadata(i.specs),
       invalidateMetadata: new InvalidateSpecMetadata(i.specs),
       getActiveSchema: new GetActiveSchema(resolveSchema, i.schemas, buildSchema, i.schemaRef),
