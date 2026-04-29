@@ -19,9 +19,9 @@
 
 ### Requirement: Help and docs canonical display
 
-#### Scenario: Documentation examples use canonical groups
+#### Scenario: Documentation and workflow examples use canonical groups
 
-- **WHEN** command examples are rendered in project documentation
+- **WHEN** command examples are rendered in project documentation or agent-authored workflow artifacts
 - **THEN** examples use canonical plural groups as the primary form
 - **AND** singular forms, when present, are shown only as aliases
 
@@ -32,3 +32,18 @@
 - **GIVEN** the same subcommand and arguments
 - **WHEN** the command is run with canonical plural and with singular alias groups
 - **THEN** outputs and exit codes are equivalent
+
+### Requirement: Workflow equivalence mapping
+
+#### Scenario: Command skip requires explicit equivalence map
+
+- **GIVEN** workflow guidance allows skipping a command due to prior command output
+- **WHEN** the skip rule is defined
+- **THEN** it specifies the exact output fields that satisfy each required check
+- **AND** the mapping is deterministic and auditable
+
+#### Scenario: Missing equivalence proof requires explicit command
+
+- **GIVEN** no deterministic mapping exists for a required check
+- **WHEN** workflow guidance decides whether to skip a command
+- **THEN** it requires executing the explicit canonical command

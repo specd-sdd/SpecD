@@ -39,7 +39,8 @@ specd graph index --format toon
 If the user DID NOT provide a change name as an argument:
 
 1. Check `changes.active` and `changes.drafts` from the `project status` output.
-2. If any exist, list them for the user with their current states.
+2. If any exist and `project status` did not include their names/states, list them
+   for the user with their current states.
 
 ```bash
 specd changes list --format toon

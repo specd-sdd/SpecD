@@ -2,19 +2,19 @@
 
 Generates or updates `metadata.json` files in two steps:
 
-1. **Deterministic extraction** — `spec generate-metadata` extracts raw metadata from artifact ASTs via schema-declared `metadataExtraction` rules. Produces `title`, `description`, `dependsOn`, `rules`, `constraints`, `scenarios`, `context`, and `contentHashes`. No LLM.
+1. **Deterministic extraction** — `specs generate-metadata` extracts raw metadata from artifact ASTs via schema-declared `metadataExtraction` rules. Produces `title`, `description`, `dependsOn`, `rules`, `constraints`, `scenarios`, `context`, and `contentHashes`. No LLM.
 2. **LLM optimization** — subagents read the generated metadata and optimize `rules`, `constraints`, `scenarios`, `description` for quality (clean formatting artifacts, deduplicate, convert tables to sentences) without losing content. They also add `keywords`, which cannot be extracted deterministically.
 
 ## Architecture
 
-The deterministic path runs `spec generate-metadata --write` which:
+The deterministic path runs `specs generate-metadata --write` which:
 
 - Parses artifacts into ASTs via the schema's artifact parsers
 - Runs extractors declared in `metadataExtraction` (selectors, captures, groupBy, transforms)
 - Computes SHA-256 content hashes and resolves dependency paths
 - Writes `metadata.json` with `generatedBy: core`
 
-Subagents **only optimize** — they read the generated metadata (not the raw spec files), clean up semantic fields, and return the full JSON as their result string. They **never write files**. The main orchestrator receives the JSON from each subagent and writes it via `spec write-metadata`.
+Subagents **only optimize** — they read the generated metadata (not the raw spec files), clean up semantic fields, and return the full JSON as their result string. They **never write files**. The main orchestrator receives the JSON from each subagent and writes it via `specs write-metadata`.
 
 After optimization, the final written metadata must have `generatedBy: agent` (not `core`), since the LLM optimization step has enhanced it beyond pure deterministic extraction.
 
@@ -34,7 +34,7 @@ When this skill is invoked:
    a. If the input contains a **colon** (e.g. `core:archive-change`), it is already a
    qualified spec ID — use it directly as `<spec-id>`.
    b. **Otherwise** — even if it looks like `core/change` or `specs/core/change` — you MUST
-   run `spec resolve-path` to get the correct spec ID. **Never** convert slashes to
+   run `specs resolve-path` to get the correct spec ID. **Never** convert slashes to
    colons yourself. Run:
 
    ```bash
@@ -112,9 +112,9 @@ When this skill is invoked:
    Existing `dependsOn` entries are curated and **MUST NEVER be silently overwritten**. The
    deterministic extractor may produce a different `dependsOn` list — always reconcile:
 
-   a. **Before** running `spec generate-metadata`, read the current metadata and save its
+   a. **Before** running `specs generate-metadata`, read the current metadata and save its
    `dependsOn` array as `existingDeps`.
-   b. **After** running `spec generate-metadata`, read the new metadata and get `newDeps`.
+   b. **After** running `specs generate-metadata`, read the new metadata and get `newDeps`.
    c. Compare the two:
    - **Removed entries** (`existingDeps` has items not in `newDeps`): These were likely
      manually added. **Ask the user** before removing them:
@@ -125,7 +125,7 @@ When this skill is invoked:
      > `dependsOn` for `<spec-id>`: the extractor found new dependency `<dep>`. Add it?
    - **No changes**: Proceed silently.
      d. After user confirmation, write the reconciled `dependsOn` back to the metadata file
-     before launching the optimizer subagent. Use `spec write-metadata` with a JSON string that has
+     before launching the optimizer subagent. Use `specs write-metadata` with a JSON string that has
      the corrected `dependsOn`.
      e. In **batch mode** (all specs), collect all discrepancies first, then present them to
      the user in a single grouped summary to avoid question fatigue.
@@ -170,7 +170,7 @@ rm /tmp/specd-metadata-<safe-name>.json
 Where `<safe-name>` is the spec ID with colons and slashes replaced by hyphens.
 If `write-metadata` fails, report the error to the user and ask how to proceed — do NOT
 silently retry with `--force`.
-After writing, `spec metadata` output must show non-empty `keywords` and non-empty `contentHashes`.
+After writing, `specs metadata` output must show non-empty `keywords` and non-empty `contentHashes`.
 If it does not, log `ERROR:` for that spec.
 
 ## Subagent prompt
@@ -265,10 +265,10 @@ Copy these fields exactly from the metadata — do NOT modify them:
 - `dependsOn` (keep all resolved paths — NEVER drop, add, or reorder entries)
 - `contentHashes` (keep all computed hashes — never recompute)
 
-**Note on `contentHashes` format:** The CLI `spec metadata --format json` displays `contentHashes`
+**Note on `contentHashes` format:** The CLI `specs metadata --format json` displays `contentHashes`
 as an expanded array with freshness info (`[{ filename, recorded, current, fresh }]`). However,
 the stored format is a simple map (`{ "spec.md": "sha256:..." }`). Your output must use the
-**map format**. To get the original map, use `spec generate-metadata <spec-id> --format json`
+**map format**. To get the original map, use `specs generate-metadata <spec-id> --format json`
 which returns `{ metadata: { contentHashes: { "spec.md": "sha256:..." } } }` — copy the
 `contentHashes` from there.
 
@@ -327,7 +327,7 @@ Use `JSON.stringify`-compatible format: 2-space indentation, double-quoted keys 
 
 ## LLM subagent fallback
 
-If the schema has no `metadataExtraction` declarations (i.e. `spec generate-metadata` fails),
+If the schema has no `metadataExtraction` declarations (i.e. `specs generate-metadata` fails),
 fall back to the full LLM extraction subagent that reads raw spec files. This uses the same
 subagent prompt as above, except:
 

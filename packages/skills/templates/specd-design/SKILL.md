@@ -13,14 +13,14 @@ without stopping (fast-forward mode).
 These rules constrain **how** you execute the workflow; they do not change the
 schema or lifecycle semantics.
 
-- Treat the current artifact from `change artifact-instruction` as the **only**
+- Treat the current artifact from `changes artifact-instruction` as the **only**
   writable scope. Do not prepare or write files for later artifacts.
 - Execute artifact work **sequentially**. Avoid large shell commands that create
   or write multiple artifact files in one shot.
 - Do not manually create change artifact directory structure with `mkdir` unless
   the current artifact cannot be written otherwise. Prefer writing the target file
   directly and let normal file creation happen as part of that write.
-- If the current artifact requires scope changes (for example `change edit --add-spec`
+- If the current artifact requires scope changes (for example `changes edit --add-spec`
   before writing spec deltas), perform those CLI writes first, then re-check state
   sequentially before writing artifact files.
 - In **one-at-a-time** mode, once the current artifact is validated, stop immediately.
@@ -122,13 +122,19 @@ External workspaces remain valid read targets during design:
 specd schema show --format toon
 ```
 
+Skip this command only when a fresh `changes status --format toon` or
+`changes artifact-instruction --format toon` result from the current design step
+already contains the schema artifact metadata needed for the next decision. If the
+artifact definitions, `hasTasks`, validations, or instruction payload are not present,
+run `schema show`.
+
 ### 4. Load context
 
 ```bash
 specd changes context <name> designing --follow-deps --depth 1 --rules --constraints --format text [--fingerprint <stored-value>]
 ```
 
-Pass `--fingerprint <stored-value>` if you have a `contextFingerprint` from a previous `change context` call in this conversation (see `shared.md` — "Fingerprint mechanism"). If lazy mode returns summary specs, evaluate each one and load any that are relevant to the artifact you're about to write (see `shared.md` — "Processing `change context` output").
+Pass `--fingerprint <stored-value>` if you have a `contextFingerprint` from a previous `changes context` call in this conversation (see `shared.md` — "Fingerprint mechanism"). If lazy mode returns summary specs, evaluate each one and load any that are relevant to the artifact you're about to write (see `shared.md` — "Processing `changes context` output").
 
 #### Use code graph to enrich context
 
@@ -246,7 +252,24 @@ Run in **text mode** to ensure visibility of notes (optimisation hints):
 specd changes validate <name> <specId/anySpecId> --artifact <artifactId> --format text
 ```
 
+Use the command shape that matches artifact scope:
+
+- `scope: spec` artifact → keep `<specId>`:
+  `specd changes validate <name> <specId> --artifact <artifactId> --format text`
+- `scope: change` artifact → omit `<specId>`:
+  `specd changes validate <name> --artifact <artifactId> --format text`
+
 If validation fails: fix and re-validate.
+
+When validating a single spec-scoped artifact, review merged output with the same
+artifact filter to avoid reading unrelated files:
+
+```bash
+specd changes spec-preview <name> <specId> --artifact <artifactId> --format text
+```
+
+Do not use `spec-preview` for change-scoped artifacts (`proposal`, `design`, `tasks`);
+review those files directly in the change directory.
 
 **One-at-a-time mode:** show what was written, ask:
 
@@ -273,6 +296,11 @@ Use the code graph to assess the dependent impact of the planned implementation:
 specd graph impact --changes <workspace:path1> <workspace:path2> ... --format toon
 ```
 
+If an equivalent fresh impact result for the exact same planned file set was already
+produced during this design execution, reuse it and cite that result. If the file set
+changed or the prior impact was from a previous skill invocation without a freshness
+check, run this command again.
+
 If risk is HIGH or CRITICAL, surface it to the user and confirm before continuing.
 
 ### 10c. Implementation scope guard — mandatory before `ready`
@@ -285,6 +313,9 @@ Reload workspace config:
 ```bash
 specd project status --format toon
 ```
+
+If a fresh ownership map from this same design execution already includes all
+workspace `ownership` and `codeRoot` fields, reuse it. Otherwise run `project status`.
 
 Build the set of **allowed implementation roots** from the `workspaces` array.
 Exclude `readOnly` roots entirely.
@@ -333,7 +364,7 @@ specd changes hook-instruction <name> ready --phase post --format text
 
 ### 12. Handle approval gate
 
-Run `change status <name> --format text` and check `approvals:` line.
+Run `changes status <name> --format text` and check `approvals:` line.
 
 **If spec=off:** Suggest `/specd-implement <name>`
 
@@ -343,6 +374,7 @@ Run `change status <name> --format text` and check `approvals:` line.
 > Then: `/specd-implement <name>`
 
 **Stop.**
+Do not invoke `/specd-implement` automatically; wait for explicit user confirmation.
 
 ## Session tasks
 
@@ -355,7 +387,7 @@ Run `change status <name> --format text` and check `approvals:` line.
 
 ## Handling failed transitions
 
-When `change transition` fails, it renders a **Repair Guide** in text mode.
+When `changes transition` fails, it renders a **Repair Guide** in text mode.
 Follow the recommended repair command based on the target recommendation.
 
 **Stop — do not continue after redirecting.**
@@ -365,5 +397,5 @@ Follow the recommended repair command based on the target recommendation.
 - Always validate after writing
 - Delta, not rewrite — when outlines exist, always write a delta
 - One spec at a time for `scope: spec` artifacts
-- Never guess spec IDs — look them up from `spec list --format text --summary`
+- Never guess spec IDs — look them up from `specs list --format text --summary`
 - If context is unclear, ask the user — don't guess

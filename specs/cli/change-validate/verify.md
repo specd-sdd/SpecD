@@ -34,6 +34,15 @@
 - **THEN** the CLI prints or serializes that filename from the result metadata
 - **AND** it does not recompute a replacement path in the CLI layer
 
+### Requirement: Structural validation scope
+
+#### Scenario: Successful validate does not imply semantic approval
+
+- **GIVEN** `specd changes validate my-change core:core/config` passes
+- **WHEN** a workflow step evaluates artifact quality
+- **THEN** the pass result is treated as structural/state validation only
+- **AND** semantic/content review remains a separate required activity
+
 ### Requirement: Output on success
 
 #### Scenario: All artifacts pass, no notes

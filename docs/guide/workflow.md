@@ -651,5 +651,5 @@ Time passes between exploration and design. Code changes, specs get renamed, dec
 
 - [Schema format reference](../schemas/schema-format.md) — define custom workflow steps, artifacts, hooks, and task completion checks for your project.
 - [Configuration reference](../config/config-reference.md) — enable approval gates, configure workspaces, and add schema overrides.
-- [CLI reference](../cli/cli-reference.md) — all `specd change`, `specd drafts`, `specd discard`, and `specd archive` commands.
+- [CLI reference](../cli/cli-reference.md) — all `specd changes`, `specd drafts`, `specd discard`, and `specd archives` commands.
 - [Domain model](../core/domain-model.md) — the `Change`, `ChangeState`, `ChangeEvent`, and `ChangeArtifact` types returned by `@specd/core` use cases.

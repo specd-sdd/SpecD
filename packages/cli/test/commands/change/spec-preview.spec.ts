@@ -83,6 +83,31 @@ describe('change spec-preview', () => {
     expect(out).toContain('# Verify content')
   })
 
+  it('renders merged content suitable for drift and overlap review', async () => {
+    const { kernel, stdout } = setup()
+    kernel.changes.preview.execute.mockResolvedValue({
+      specId: 'default:auth/login',
+      changeName: 'feat',
+      files: [
+        {
+          filename: 'spec.md',
+          base: '# Spec\n\nOld requirement',
+          merged: '# Spec\n\nUpdated requirement that preserves existing context',
+        },
+      ],
+      warnings: [],
+    })
+
+    const program = makeProgram()
+    registerChangeSpecPreview(program.command('change'))
+    await program.parseAsync(['node', 'specd', 'change', 'spec-preview', 'feat', 'auth/login'])
+
+    const out = stdout()
+    expect(out).toContain('--- spec.md ---')
+    expect(out).toContain('Updated requirement that preserves existing context')
+    expect(out).not.toContain('Old requirement')
+  })
+
   it('--diff flag outputs unified diff per file', async () => {
     const { kernel, stdout } = setup()
     kernel.changes.preview.execute.mockResolvedValue({
