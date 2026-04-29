@@ -1,6 +1,6 @@
 # specd-implement — write code
 
-Read @shared.md before doing anything.
+Read @../\_specd-shared/shared.md before doing anything.
 
 ## What this does
 

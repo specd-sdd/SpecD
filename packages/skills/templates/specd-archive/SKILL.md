@@ -1,6 +1,6 @@
 # specd-archive — finalize and archive
 
-Read @shared.md before doing anything.
+Read @../\_specd-shared/shared.md before doing anything.
 
 ## What this does
 
@@ -134,8 +134,6 @@ Do not invoke any follow-up skill automatically; wait for explicit user confirma
 
 When `changes transition` fails, it renders a **Repair Guide** in text mode.
 Follow the recommended repair command based on the target recommendation.
-
-**Stop — do not continue after redirecting.**
 
 ## Returning to design
 
