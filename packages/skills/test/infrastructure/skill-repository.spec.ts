@@ -33,6 +33,8 @@ describe('createSkillRepository', () => {
     expect(bundle.files.length).toBeGreaterThan(0)
     expect(bundle.files[0]?.content.length).toBeGreaterThan(0)
     expect(bundle.files.some((file) => file.filename === 'shared.md')).toBe(true)
+    expect(bundle.files.find((file) => file.filename === 'shared.md')?.shared).toBe(true)
+    expect(bundle.files.find((file) => file.filename === 'SKILL.md')?.shared).not.toBe(true)
   })
 
   it('given shared metadata, when listSharedFiles is called, then returns shared file entries', async () => {

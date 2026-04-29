@@ -21,7 +21,13 @@ specd plugins install @specd/plugin-agent-copilot
 
 ## Install target
 
-Skills are written to `.github/skills/<skill-name>/` under the project root.
+Skill-local files are written to `.github/skills/<skill-name>/` under the project root.
+Files marked as shared are written once to `.github/skills/_specd-shared/`.
+
+## Uninstall behavior
+
+- `specd plugins uninstall @specd/plugin-agent-copilot --skills <name>` removes only selected skill directories and keeps `_specd-shared/`.
+- `specd plugins uninstall @specd/plugin-agent-copilot` removes `.github/skills/` completely, including `_specd-shared/`.
 
 ## License
 

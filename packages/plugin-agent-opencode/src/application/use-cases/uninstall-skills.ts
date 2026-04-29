@@ -1,7 +1,7 @@
 import { rm } from 'node:fs/promises'
+import { createSkillRepository } from '@specd/skills'
 import path from 'node:path'
 import type { SpecdConfig } from '@specd/core'
-import { createSkillRepository } from '@specd/skills'
 import type { AgentInstallOptions } from '@specd/plugin-manager'
 
 /**
@@ -24,10 +24,13 @@ export class UninstallSkills {
       }
       return
     }
-    const repository = createSkillRepository()
-    for (const skill of repository.list()) {
-      await rm(path.join(targetDir, skill.name), { recursive: true, force: true })
-      await rm(path.join(targetDir, `${skill.name}.md`), { force: true })
+    const managedSkills = createSkillRepository()
+      .list()
+      .map((skill) => skill.name)
+    for (const skill of managedSkills) {
+      await rm(path.join(targetDir, skill), { recursive: true, force: true })
+      await rm(path.join(targetDir, `${skill}.md`), { force: true })
     }
+    await rm(path.join(targetDir, '_specd-shared'), { recursive: true, force: true })
   }
 }

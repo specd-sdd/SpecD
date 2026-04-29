@@ -26,6 +26,7 @@ export class InstallSkills {
         : availableSkills.map((skill) => skill.name)
 
     const targetDir = path.join(config.projectRoot, '.codex', 'skills')
+    const sharedDir = path.join(targetDir, '_specd-shared')
     await mkdir(targetDir, { recursive: true })
 
     const installed: Array<{ skill: string; path: string }> = []
@@ -53,10 +54,13 @@ export class InstallSkills {
       await rm(legacyFile, { force: true })
 
       for (const file of bundle.files) {
-        const outputPath = path.join(skillDir, file.filename)
-        const content = file.filename.endsWith('.md')
-          ? renderFrontmatter(frontmatter, file.content)
-          : file.content
+        const baseDir = file.shared === true ? sharedDir : skillDir
+        const outputPath = path.join(baseDir, file.filename)
+        await mkdir(path.dirname(outputPath), { recursive: true })
+        const content =
+          file.filename.endsWith('.md') && file.shared !== true
+            ? renderFrontmatter(frontmatter, file.content)
+            : file.content
         await writeFile(outputPath, content, 'utf8')
       }
 

@@ -17,7 +17,13 @@ specd plugins install @specd/plugin-agent-codex
 
 ## Install target
 
-Skills are written to `.codex/skills/<skill-name>/` under the project root.
+Skill-local files are written to `.codex/skills/<skill-name>/` under the project root.
+Files marked as shared are written once to `.codex/skills/_specd-shared/`.
+
+## Uninstall behavior
+
+- `specd plugins uninstall @specd/plugin-agent-codex --skills <name>` removes only selected skill directories and keeps `_specd-shared/`.
+- `specd plugins uninstall @specd/plugin-agent-codex` removes `.codex/skills/` completely, including `_specd-shared/`.
 
 ## License
 

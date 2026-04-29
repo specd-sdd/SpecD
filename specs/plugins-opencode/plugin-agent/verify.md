@@ -39,14 +39,6 @@
 - **AND** optional fields `license`, `compatibility`, and `metadata` are emitted only when configured
 - **AND** unknown fields are not emitted
 
-### Requirement: Application layer
-
-#### Scenario: InstallSkills follows required workflow
-
-- **GIVEN** skills are available from `@specd/skills`
-- **WHEN** `InstallSkills` runs
-- **THEN** it reads skill templates, resolves per-skill frontmatter, prepends Open Code YAML frontmatter, and writes installed skill files
-
 ### Requirement: Frontmatter injection
 
 #### Scenario: Install prepends only Open Code-compatible fields
@@ -55,13 +47,25 @@
 - **THEN** YAML frontmatter is prepended before markdown content
 - **AND** emitted fields are limited to the configured Open Code-supported keys
 
+#### Scenario: Shared files do not receive skill frontmatter
+
+- **GIVEN** a resolved bundle includes files marked as shared
+- **WHEN** install writes those files
+- **THEN** shared files are written without Open Code skill frontmatter
+
 ### Requirement: Install location
 
 #### Scenario: Skills install into Open Code directory
 
 - **GIVEN** a `SpecdConfig` with `projectRoot`
 - **WHEN** install writes skill files
-- **THEN** files are created under `.opencode/skills/` within the provided project root
+- **THEN** non-shared files are created under `.opencode/skills/<skill-name>/`
+- **AND** shared files are created under `.opencode/skills/_specd-shared/`
+
+#### Scenario: Shared directory is not discovered as a skill
+
+- **WHEN** install creates `.opencode/skills/_specd-shared/`
+- **THEN** the directory does not contain a `SKILL.md` file
 
 ### Requirement: Project init wizard integration
 
@@ -83,10 +87,22 @@
 
 - **GIVEN** a `SpecdConfig` and multiple skills installed under `.opencode/skills/`
 - **WHEN** `uninstall(config, { skills: ['specd-design'] })` is executed
-- **THEN** only the selected skill directories are removed
+- **THEN** only the selected specd-managed skill directories are removed
+- **AND** `.opencode/skills/_specd-shared/` remains when other installed skills may still reference it
 
-#### Scenario: Uninstall removes all skills when no filter is provided
+#### Scenario: Uninstall without filter removes only specd-managed skills and shared resources
 
-- **GIVEN** a `SpecdConfig` and skills installed under `.opencode/skills/`
+- **GIVEN** a `SpecdConfig` with specd-managed skills and unrelated user skills installed under `.opencode/skills/`
 - **WHEN** `uninstall(config, optionsWithoutSkills)` is executed
-- **THEN** the full `.opencode/skills/` tree is removed
+- **THEN** all specd-managed skill directories are removed
+- **AND** `.opencode/skills/_specd-shared/` is removed
+- **AND** unrelated user skill directories remain
+
+### Requirement: Application layer
+
+#### Scenario: InstallSkills follows required workflow
+
+- **GIVEN** skills are available from `@specd/skills`
+- **WHEN** `InstallSkills` runs
+- **THEN** it reads skill templates, resolves per-skill frontmatter, prepends Open Code YAML frontmatter only to skill-local markdown files, and writes installed skill files
+- **AND** shared-marked files are written under the Open Code shared skills resource directory

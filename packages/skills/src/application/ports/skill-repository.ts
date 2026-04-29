@@ -48,6 +48,9 @@ export interface SkillRepository {
    * @param variables - Placeholder substitution values.
    * @param config - Optional project configuration for built-in variables.
    * @returns Resolved install bundle.
+   *
+   * Shared files included from `templates/shared` MUST preserve their shared
+   * origin metadata in the resolved bundle output.
    */
   getBundle(
     name: string,

@@ -575,6 +575,36 @@ Show the full contents of all artifacts in a spec directory. `<specPath>` is the
 | `--format text\|json\|toon` | Output format.    |
 | `--config <path>`           | Config file path. |
 
+### spec outline
+
+```
+specd specs outline <specPath> [options]
+```
+
+Display the navigable structure (outline) of a spec artifact. Returns a hierarchical tree of sections, headings, or keys without reading the full file content. Useful for quick discovery of what a spec contains.
+
+`<specPath>` is the spec identifier (e.g. `auth/login` or `core:core/config`).
+
+| Option                      | Description                                                                       |
+| --------------------------- | --------------------------------------------------------------------------------- |
+| `--artifact <id>`           | Resolve the artifact filename from the active schema (e.g. `specs`, `verify`).    |
+| `--file <name>`             | Specify a direct filename within the spec directory.                              |
+| `--format text\|json\|toon` | Output format. Text and json both render JSON; toon uses token-oriented notation. |
+| `--config <path>`           | Config file path.                                                                 |
+
+Examples:
+
+```bash
+# Outline the default spec.md
+specd specs outline core:core/config
+
+# Outline verify.md via artifact ID
+specd specs outline core:core/config --artifact verify
+
+# Outline a specific file in toon format
+specd specs outline core:core/config --file verify.md --format toon
+```
+
 ### spec context
 
 ```

@@ -11,6 +11,27 @@ export interface ResolvedFile {
    * Final file content after variable substitution.
    */
   readonly content: string
+
+  /**
+   * Marks files that should be routed to a shared install directory.
+   */
+  readonly shared?: boolean
+}
+
+/**
+ * Install target options for `SkillBundle` operations.
+ */
+export interface SkillBundleInstallTarget {
+  /**
+   * Directory for skill-local files.
+   */
+  readonly targetDir: string
+
+  /**
+   * Optional directory for files marked `shared: true`.
+   * Falls back to `targetDir` when omitted.
+   */
+  readonly sharedTargetDir?: string
 }
 
 /**
@@ -35,16 +56,16 @@ export interface SkillBundle {
   /**
    * Installs the bundle into the target directory.
    *
-   * @param targetDir - Target directory path.
+   * @param target - Target directory path or split install targets.
    * @returns A promise that resolves when installation is complete.
    */
-  install(targetDir: string): Promise<void>
+  install(target: string | SkillBundleInstallTarget): Promise<void>
 
   /**
    * Uninstalls bundle files from the target directory.
    *
-   * @param targetDir - Target directory path.
+   * @param target - Target directory path or split install targets.
    * @returns A promise that resolves when uninstall is complete.
    */
-  uninstall(targetDir: string): Promise<void>
+  uninstall(target: string | SkillBundleInstallTarget): Promise<void>
 }

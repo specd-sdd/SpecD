@@ -21,7 +21,7 @@
     {
       "requirement": "Shared file scanning",
       "rules": [
-        "The infrastructure MUST scan `templates/shared/` for `.meta.json` files containing:\n\n```json\n{\n  \"filename\": \"...\",\n  \"skills\": [\"skill1\", \"skill2\"]\n}\n```\n\nEach shared file's content is loaded on demand."
+        "The infrastructure MUST scan `templates/shared/` for `.meta.json` files containing:\n\n```json\n{\n  \"filename\": \"...\",\n  \"skills\": [\"skill1\", \"skill2\"]\n}\n```\n\nEach shared file's content is loaded on demand.\n\nWhen `getBundle()` adds a shared file to a skill bundle because the metadata lists the requested skill, the resulting `ResolvedFile` MUST be marked as shared. Skill-local template files read from `templates/<skill-name>/` MUST NOT be marked as shared."
       ]
     },
     {
@@ -43,6 +43,16 @@
       "then": ["template files are read from packages/skills/templates/"]
     },
     {
+      "requirement": "File reading",
+      "name": "Shared template entries are marked in resolved bundle files",
+      "given": ["templates/shared/*.meta.json associates shared.md to a skill"],
+      "when": ["getBundle resolves that skill"],
+      "then": [
+        "the resulting ResolvedFile for shared.md is marked as shared",
+        "AND files loaded from templates/<skill-name>/ are not marked as shared"
+      ]
+    },
+    {
       "requirement": "createSkillRepository factory",
       "name": "Factory exists",
       "when": ["createSkillRepository() is called"],
@@ -50,8 +60,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:e3fbf9f00aea33756079b49b4b410a0d81faddb9db5a68dad962ca804b7ddb81",
-    "verify.md": "sha256:73b4f5c9ae5b40f0cc9c27991faf96e21c56a0494d5203253e2dee94791b610e"
+    "spec.md": "sha256:f43745475b95e1c29b1ff6ded56e7af35d35f0b5e3a00b00f03d12af75b0f597",
+    "verify.md": "sha256:d7708e1e3e8d286c48de142eee628cce6439824562ad5accf35f756c4829d5b9"
   },
   "generatedBy": "core"
 }

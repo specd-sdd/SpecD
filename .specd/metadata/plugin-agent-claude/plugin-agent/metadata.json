@@ -1,7 +1,12 @@
 {
   "title": "plugin-agent-claude:plugin-agent",
   "description": "Claude agent plugin implementation. Exports `create(): AgentPlugin` that provides skill installation with Claude Code frontmatter injection.",
-  "dependsOn": ["core:core/config", "plugin-manager:agent-plugin-type", "skills:skill-repository"],
+  "dependsOn": [
+    "core:core/config",
+    "plugin-manager:agent-plugin-type",
+    "skills:skill-bundle",
+    "skills:skill-repository"
+  ],
   "context": [
     "Claude agent plugin implementation. Exports `create(): AgentPlugin` that provides skill installation with Claude Code frontmatter injection."
   ],
@@ -27,18 +32,26 @@
     {
       "requirement": "Application layer",
       "rules": [
-        "The application layer MUST have `InstallSkills` use case that orchestrates:\n\n1. Get skills via `@specd/skills` repository, passing `SpecdConfig` for built-in variable resolution\n2. Inject stored frontmatter to each skill template\n3. Install to `.claude/skills/` relative to the `projectRoot` found in `SpecdConfig`"
+        "The application layer MUST have `InstallSkills` use case that orchestrates:\n\n1. Get skills via `@specd/skills` repository, passing `SpecdConfig` for built-in variable resolution\n2. Inject stored frontmatter to each skill-local markdown template\n3. Install files not marked as shared to `.claude/skills/<skill-name>/` relative to the `projectRoot` found in `SpecdConfig`\n4. Install files marked as shared to `.claude/skills/_specd-shared/` relative to the `projectRoot` found in `SpecdConfig`"
       ]
     },
     {
       "requirement": "Frontmatter injection",
       "rules": [
-        "During install, the plugin MUST prepend YAML frontmatter to each skill file:\n\n```yaml\n---\nname: { { name } }\ndescription: { { description } }\nallowed_tools: { { allowed_tools } }\nargument_hint: { { argument_hint } }\n---\n```"
+        "During install, the plugin MUST prepend YAML frontmatter to each skill-local markdown file:\n\n```yaml\n---\nname: { { name } }\ndescription: { { description } }\nallowed_tools: { { allowed_tools } }\nargument_hint: { { argument_hint } }\n---\n```\n\nThe plugin MUST NOT prepend skill frontmatter to files marked as shared."
       ]
     },
     {
       "requirement": "Install location",
-      "rules": ["Skills MUST be installed to `.claude/skills/` in the project root."]
+      "rules": [
+        "Skills MUST be installed to `.claude/skills/` in the project root.\n\nFor each skill, files not marked as shared MUST be installed under `.claude/skills/<skill-name>/`.\n\nFiles marked as shared MUST be installed under `.claude/skills/_specd-shared/`. This shared directory MUST NOT contain a `SKILL.md` file."
+      ]
+    },
+    {
+      "requirement": "Uninstall behavior",
+      "rules": [
+        "`uninstall(config: SpecdConfig, options?: AgentInstallOptions)` MUST remove installed skill directories from `.claude/skills/` relative to `config.projectRoot`.\n\nWhen `options.skills` is provided, uninstall MUST remove only the selected specd-managed skill directories. The shared resource directory MUST remain in place because other installed skills may still reference it.\n\nWhen `options.skills` is omitted, uninstall MUST remove all specd-managed skill directories and `_specd-shared/`.\n\nUninstall MUST NOT remove unrelated directories or files under `.claude/skills/` that are not part of the specd-managed skill set."
+      ]
     }
   ],
   "constraints": [
@@ -74,19 +87,55 @@
       "requirement": "Frontmatter injection",
       "name": "Install adds frontmatter",
       "when": ["install() is called"],
-      "then": ["YAML frontmatter is prepended to each skill file"]
+      "then": ["YAML frontmatter is prepended to each skill-local markdown file"]
+    },
+    {
+      "requirement": "Frontmatter injection",
+      "name": "Install does not prepend skill frontmatter to shared files",
+      "given": ["a resolved bundle includes files marked as shared"],
+      "when": ["install() writes those files"],
+      "then": ["shared files are written without Claude skill frontmatter"]
     },
     {
       "requirement": "Install location",
       "name": "Installs to .claude/skills/",
       "given": ["a SpecdConfig with projectRoot"],
       "when": ["install is called with that configuration"],
-      "then": ["files are written to {projectRoot}/.claude/skills/"]
+      "then": [
+        "non-shared files are written to {projectRoot}/.claude/skills/<skill-name>/",
+        "AND shared files are written to {projectRoot}/.claude/skills/_specd-shared/"
+      ]
+    },
+    {
+      "requirement": "Install location",
+      "name": "Shared directory is not discovered as a skill",
+      "when": ["install creates .claude/skills/_specd-shared/"],
+      "then": ["the directory does not contain a SKILL.md file"]
+    },
+    {
+      "requirement": "Uninstall behavior",
+      "name": "Uninstall removes selected skill directories and keeps shared resources",
+      "given": ["multiple skills are installed and share .claude/skills/_specd-shared/"],
+      "when": ["uninstall(config, { skills: ['specd'] }) is executed"],
+      "then": ["only .claude/skills/specd/ is removed", "AND .claude/skills/_specd-shared/ remains"]
+    },
+    {
+      "requirement": "Uninstall behavior",
+      "name": "Uninstall without filter removes only specd-managed skills and shared resources",
+      "given": [
+        "specd-managed skills and unrelated user skills are installed under .claude/skills/"
+      ],
+      "when": ["uninstall(config) is executed without skills"],
+      "then": [
+        "all specd-managed skill directories are removed",
+        "AND .claude/skills/_specd-shared/ is removed",
+        "AND unrelated user skill directories remain"
+      ]
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:06935de36ffac1214c33b88a2909ad41cc8e6fddf6dbf5086b97564f858ab527",
-    "verify.md": "sha256:b663f8b23562a54de99a80ba601279c877fc3f9f93b1c0ebae190e69abf85131"
+    "spec.md": "sha256:de9dce2d6a065234c642455b27506f8803fa4b601dcf1769329633ee24d1d1e6",
+    "verify.md": "sha256:d2ee9a396ebf75a1293ae059e3f47a491a7064b6a07e12bf219b90bc9d874bdc"
   },
   "generatedBy": "core"
 }

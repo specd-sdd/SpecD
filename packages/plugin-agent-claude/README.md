@@ -29,7 +29,13 @@ specd plugins install @specd/plugin-agent-claude
 
 ## Install target
 
-Skills are written to `.claude/skills/<skill-name>/` under the project root.
+Skill-local files are written to `.claude/skills/<skill-name>/` under the project root.
+Files marked as shared are written once to `.claude/skills/_specd-shared/`.
+
+## Uninstall behavior
+
+- `specd plugins uninstall @specd/plugin-agent-claude --skills <name>` removes only selected skill directories and keeps `_specd-shared/`.
+- `specd plugins uninstall @specd/plugin-agent-claude` removes `.claude/skills/` completely, including `_specd-shared/`.
 
 ## License
 

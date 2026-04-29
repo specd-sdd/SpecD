@@ -20,7 +20,13 @@ specd plugins install @specd/plugin-agent-opencode
 
 ## Install target
 
-Skills are written to `.opencode/skills/<skill-name>/` under the project root.
+Skill-local files are written to `.opencode/skills/<skill-name>/` under the project root.
+Files marked as shared are written once to `.opencode/skills/_specd-shared/`.
+
+## Uninstall behavior
+
+- `specd plugins uninstall @specd/plugin-agent-opencode --skills <name>` removes only selected skill directories and keeps `_specd-shared/`.
+- `specd plugins uninstall @specd/plugin-agent-opencode` removes `.opencode/skills/` completely, including `_specd-shared/`.
 
 ## License
 
