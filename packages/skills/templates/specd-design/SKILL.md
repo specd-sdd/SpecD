@@ -1,6 +1,6 @@
 # specd-design — write artifacts
 
-Read @shared.md before doing anything.
+Read @../\_specd-shared/shared.md before doing anything.
 
 ## What this does
 
@@ -68,7 +68,7 @@ specd changes transition <name> designing --skip-hooks all
 If state is not `drafting` or `designing`, this is the wrong skill. Redirect based on the
 **next action:** `target` recommendation.
 
-**Stop — do not continue.**
+**Stop — do not continue if state is not `drafting` or `designing`**
 
 Check the **artifacts (DAG):** section — if some are already marked `[✓]`, you're resuming
 mid-design.
