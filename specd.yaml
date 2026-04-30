@@ -117,6 +117,14 @@ workspaces:
     codeRoot: packages/plugin-agent-opencode
     ownership: owned
 
+  plugin-agent-standard:
+    specs:
+      adapter: fs
+      fs:
+        path: specs/plugins-agent-standard
+    codeRoot: packages/plugin-agent-standard
+    ownership: owned
+
   specd-metapackage:
     specs:
       adapter: fs
@@ -306,3 +314,4 @@ plugins:
     - name: '@specd/plugin-agent-claude'
     - name: '@specd/plugin-agent-copilot'
     - name: '@specd/plugin-agent-opencode'
+    - name: '@specd/plugin-agent-standard'

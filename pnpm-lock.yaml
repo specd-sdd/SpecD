@@ -153,6 +153,9 @@ importers:
       '@specd/plugin-agent-opencode':
         specifier: workspace:*
         version: link:../plugin-agent-opencode
+      '@specd/plugin-agent-standard':
+        specifier: workspace:*
+        version: link:../plugin-agent-standard
       '@specd/plugin-manager':
         specifier: workspace:*
         version: link:../plugin-manager
@@ -297,6 +300,18 @@ importers:
         specifier: workspace:*
         version: link:../skills
 
+  packages/plugin-agent-standard:
+    dependencies:
+      '@specd/core':
+        specifier: workspace:^
+        version: link:../core
+      '@specd/plugin-manager':
+        specifier: workspace:*
+        version: link:../plugin-manager
+      '@specd/skills':
+        specifier: workspace:*
+        version: link:../skills
+
   packages/plugin-manager:
     dependencies:
       '@specd/core':
@@ -344,6 +359,9 @@ importers:
       '@specd/plugin-agent-opencode':
         specifier: workspace:*
         version: link:../plugin-agent-opencode
+      '@specd/plugin-agent-standard':
+        specifier: workspace:*
+        version: link:../plugin-agent-standard
       '@specd/plugin-manager':
         specifier: workspace:*
         version: link:../plugin-manager

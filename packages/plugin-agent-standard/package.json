@@ -1,0 +1,30 @@
+{
+  "name": "@specd/plugin-agent-standard",
+  "version": "0.0.1",
+  "license": "MIT",
+  "private": false,
+  "repository": "https://github.com/specd-sdd/SpecD",
+  "homepage": "https://getspecd.dev",
+  "files": [
+    "dist/",
+    "specd-plugin.json"
+  ],
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "node --import tsx ../../dev/scripts/sync-plugin-manifests.ts packages/plugin-agent-standard && tsup src/index.ts --format esm --dts --clean",
+    "dev": "tsup src/index.ts --format esm --dts --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@specd/core": "workspace:^",
+    "@specd/plugin-manager": "workspace:*",
+    "@specd/skills": "workspace:*"
+  }
+}

@@ -1,0 +1,226 @@
+{
+  "title": "plugin-agent-standard:plugin-agent",
+  "description": "The Agent Skills open standard (agentskills.io) is adopted by a growing number of agent clients (Gemini CLI, Cursor, Amp, Roo Code, etc.). specd needs a vendor-neutral plugin that installs skills using this standard's frontmatter format, complementing the existing vendor-specific plugins. This spec defines the Agent Skills standard plugin contract for skill install/uninstall, target install directory, frontmatter handling including `allowed-tools`, and integration requirements.",
+  "dependsOn": ["plugin-agent-opencode:plugin-agent", "default:_global/commits"],
+  "context": [
+    "The Agent Skills open standard (agentskills.io) is adopted by a growing number of agent clients (Gemini CLI, Cursor, Amp, Roo Code, etc.). specd needs a vendor-neutral plugin that installs skills using this standard's frontmatter format, complementing the existing vendor-specific plugins. This spec defines the Agent Skills standard plugin contract for skill install/uninstall, target install directory, frontmatter handling including `allowed-tools`, and integration requirements."
+  ],
+  "rules": [
+    {
+      "requirement": "Factory export",
+      "rules": [
+        "The package MUST export `create(options: PluginLoaderOptions): AgentPlugin` as a named export.\n\nThe factory function MUST read `specd-plugin.json` at the infrastructure boundary to obtain `name` and `version`. It MUST search for the manifest in its own directory first, then the parent directory as fallback. The `type` field MUST remain hardcoded as `'agent'`."
+      ]
+    },
+    {
+      "requirement": "Domain layer",
+      "rules": [
+        "The domain layer MUST define:\n\n- a plugin runtime type implementing the `AgentPlugin` contract, receiving `name` and `version` via constructor (not hardcoded)\n- an Agent Skills standard frontmatter type reflecting the fields defined by the agentskills.io specification\n- a per-skill frontmatter map keyed by skill name\n\nThe plugin class constructor MUST accept `name` and `version` as parameters. The `type` getter MUST return `'agent'` (hardcoded)."
+      ]
+    },
+    {
+      "requirement": "Frontmatter type contract",
+      "rules": [
+        "The Agent Skills standard frontmatter model MUST support this exact field set per the agentskills.io specification:\n\n- `name` (required)\n- `description` (required)\n- `license` (optional)\n- `compatibility` (optional)\n- `metadata` (optional `Record<string, string>`)\n- `allowed-tools` (optional, space-separated string of pre-approved tools)\n\nUnknown fields MUST NOT be emitted into generated `SKILL.md` files."
+      ]
+    },
+    {
+      "requirement": "Application layer",
+      "rules": [
+        "The application layer MUST include an `InstallSkills` use case that:\n\n1. reads skills from `@specd/skills`, passing `SpecdConfig` for built-in variable resolution\n2. resolves the per-skill frontmatter map\n3. prepends Agent Skills standard YAML frontmatter only to markdown files not marked as shared\n4. writes files not marked as shared to the installed skill directory under the `projectRoot` provided in `SpecdConfig`\n5. writes files marked as shared to the Agent Skills standard shared skills resource directory under the `projectRoot` provided in `SpecdConfig`"
+      ]
+    },
+    {
+      "requirement": "Frontmatter injection",
+      "rules": [
+        "During install, the plugin MUST prepend YAML frontmatter to each skill-local markdown file and include only configured fields supported by the Agent Skills standard.\n\nThe plugin MUST NOT prepend skill frontmatter to files marked as shared."
+      ]
+    },
+    {
+      "requirement": "Install location",
+      "rules": [
+        "Project-level skill installation MUST target `.agents/skills/` under the `projectRoot` provided in `SpecdConfig`.\n\nFor each skill, files not marked as shared MUST be installed under `.agents/skills/<skill-name>/`.\n\nFiles marked as shared MUST be installed under `.agents/skills/_specd-shared/`. This shared directory MUST NOT contain a `SKILL.md` file."
+      ]
+    },
+    {
+      "requirement": "allowed-tools configuration",
+      "rules": [
+        "The per-skill frontmatter map MUST declare `allowed-tools` for each skill with appropriate tool strings matching the agentskills.io format (space-separated). Tool strings MUST include the tools needed by each specd skill:\n\n- Read, Write, Edit, Grep, Glob for file operations\n- `Bash(node *)`, `Bash(specd *)`, `Bash(pnpm *)` for command execution\n- Agent for sub-agent spawning where applicable"
+      ]
+    },
+    {
+      "requirement": "Project init wizard integration",
+      "rules": [
+        "The interactive `specd project init` plugin selection MUST include `@specd/plugin-agent-standard` in the known agent plugin options."
+      ]
+    },
+    {
+      "requirement": "Meta package inclusion",
+      "rules": [
+        "The `@specd/specd` meta package MUST declare `@specd/plugin-agent-standard` as a workspace dependency."
+      ]
+    },
+    {
+      "requirement": "Uninstall behavior",
+      "rules": [
+        "`uninstall(config: SpecdConfig, options?: AgentInstallOptions)` MUST remove installed skill directories from `.agents/skills/` relative to `config.projectRoot`.\n\nWhen `options.skills` is provided, uninstall MUST remove only the selected specd-managed skill directories. The shared resource directory MUST remain in place because other installed skills may still reference it.\n\nWhen `options.skills` is omitted, uninstall MUST remove all specd-managed skill directories and `_specd-shared/`.\n\nUninstall MUST NOT remove unrelated directories or files under `.agents/skills/` that are not part of the specd-managed skill set."
+      ]
+    }
+  ],
+  "constraints": [
+    "The plugin MUST depend on @specd/skills for skill repository access.",
+    "The plugin MUST implement the AgentPlugin contract defined by @specd/plugin-manager.",
+    "The plugin MUST remain an adapter package with no domain logic outside plugin orchestration concerns.",
+    "name and version MUST be read from specd-plugin.json by the factory and passed to the plugin constructor — never hardcoded in the class.",
+    "type MUST remain hardcoded as 'agent' for type safety.",
+    "The frontmatter key for pre-approved tools MUST be allowed-tools (with hyphen) per the agentskills.io specification, not allowed_tools (underscore)."
+  ],
+  "scenarios": [
+    {
+      "requirement": "Factory export",
+      "name": "Exposes named create factory",
+      "when": ["plugin package exports are loaded"],
+      "then": [
+        "a named create() export is available",
+        "AND calling create() returns an AgentPlugin"
+      ]
+    },
+    {
+      "requirement": "Factory export",
+      "name": "Factory reads manifest for name and version",
+      "given": [
+        "specd-plugin.json contains name: \"@specd/plugin-agent-standard\" and version: \"1.0.0\""
+      ],
+      "when": ["create() is called"],
+      "then": [
+        "the returned plugin has name === \"@specd/plugin-agent-standard\" and version === \"1.0.0\""
+      ]
+    },
+    {
+      "requirement": "Factory export",
+      "name": "Type is hardcoded",
+      "when": ["create() is called"],
+      "then": ["the returned plugin has type === 'agent'"]
+    },
+    {
+      "requirement": "Domain layer",
+      "name": "Domain contract defines runtime and frontmatter types",
+      "when": ["domain types are inspected"],
+      "then": [
+        "a plugin runtime type implementing AgentPlugin is defined, receiving name and version via constructor",
+        "AND an Agent Skills standard frontmatter type is defined with supported keys",
+        "AND a per-skill frontmatter map keyed by skill name is defined"
+      ]
+    },
+    {
+      "requirement": "Frontmatter type contract",
+      "name": "Frontmatter model enforces supported field set",
+      "when": ["frontmatter is generated for an installed SKILL.md"],
+      "then": [
+        "required fields name and description are present",
+        "AND optional fields license, compatibility, metadata, and allowed-tools are emitted only when configured",
+        "AND unknown fields are not emitted"
+      ]
+    },
+    {
+      "requirement": "Frontmatter type contract",
+      "name": "allowed-tools uses hyphen not underscore",
+      "when": ["frontmatter is generated with pre-approved tools configured"],
+      "then": [
+        "the emitted key is allowed-tools (with hyphen)",
+        "AND the value is a space-separated string per the agentskills.io specification"
+      ]
+    },
+    {
+      "requirement": "Frontmatter injection",
+      "name": "Install prepends only Agent Skills standard fields",
+      "when": ["skill markdown files are written during install"],
+      "then": [
+        "YAML frontmatter is prepended before markdown content",
+        "AND emitted fields are limited to the Agent Skills standard-supported keys"
+      ]
+    },
+    {
+      "requirement": "Frontmatter injection",
+      "name": "Shared files do not receive skill frontmatter",
+      "given": ["a resolved bundle includes files marked as shared"],
+      "when": ["install writes those files"],
+      "then": ["shared files are written without Agent Skills standard frontmatter"]
+    },
+    {
+      "requirement": "Install location",
+      "name": "Skills install into agents directory",
+      "given": ["a SpecdConfig with projectRoot"],
+      "when": ["install writes skill files"],
+      "then": [
+        "non-shared files are created under .agents/skills/<skill-name>/",
+        "AND shared files are created under .agents/skills/_specd-shared/"
+      ]
+    },
+    {
+      "requirement": "Install location",
+      "name": "Shared directory is not discovered as a skill",
+      "when": ["install creates .agents/skills/_specd-shared/"],
+      "then": ["the directory does not contain a SKILL.md file"]
+    },
+    {
+      "requirement": "allowed-tools configuration",
+      "name": "Each skill has appropriate tool declarations",
+      "when": ["the per-skill frontmatter map is inspected"],
+      "then": [
+        "every skill entry that requires file or command operations has a non-empty allowed-tools string",
+        "AND tool strings include at minimum Read and Bash(node *) where applicable"
+      ]
+    },
+    {
+      "requirement": "Project init wizard integration",
+      "name": "Wizard exposes Agent Skills standard plugin option",
+      "when": ["interactive specd project init renders plugin choices"],
+      "then": ["@specd/plugin-agent-standard appears in the known agent plugin options"]
+    },
+    {
+      "requirement": "Meta package inclusion",
+      "name": "Meta package depends on Agent Skills standard plugin",
+      "when": ["packages/specd/package.json dependencies are inspected"],
+      "then": ["@specd/plugin-agent-standard is declared as a workspace:* dependency"]
+    },
+    {
+      "requirement": "Uninstall behavior",
+      "name": "Uninstall removes selected skills when filter is provided",
+      "given": ["a SpecdConfig and multiple skills installed under .agents/skills/"],
+      "when": ["uninstall(config, { skills: ['specd-design'] }) is executed"],
+      "then": [
+        "only the selected specd-managed skill directories are removed",
+        "AND .agents/skills/_specd-shared/ remains when other installed skills may still reference it"
+      ]
+    },
+    {
+      "requirement": "Uninstall behavior",
+      "name": "Uninstall without filter removes only specd-managed skills and shared resources",
+      "given": [
+        "a SpecdConfig with specd-managed skills and unrelated user skills installed under .agents/skills/"
+      ],
+      "when": ["uninstall(config, optionsWithoutSkills) is executed"],
+      "then": [
+        "all specd-managed skill directories are removed",
+        "AND .agents/skills/_specd-shared/ is removed",
+        "AND unrelated user skill directories remain"
+      ]
+    },
+    {
+      "requirement": "Application layer",
+      "name": "InstallSkills follows required workflow",
+      "given": ["skills are available from @specd/skills"],
+      "when": ["InstallSkills runs"],
+      "then": [
+        "it reads skill templates, resolves per-skill frontmatter, prepends Agent Skills standard YAML frontmatter only to skill-local markdown files, and writes installed skill files",
+        "AND shared-marked files are written under the Agent Skills standard shared skills resource directory"
+      ]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:52e91bd0be2299292e344883e7e85d43641c464bb0565bc3693140a6c0204f86",
+    "verify.md": "sha256:9194a2411b745349db2c9cc7dc4c1a280b2b077dd0dcb7790cdc0ca2b43945a5"
+  },
+  "generatedBy": "core"
+}
