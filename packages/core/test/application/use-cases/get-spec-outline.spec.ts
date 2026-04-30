@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { GetSpecOutline } from '../../../src/application/use-cases/get-spec-outline.js'
 import { Spec } from '../../../src/domain/entities/spec.js'
 import { SpecPath } from '../../../src/domain/value-objects/spec-path.js'
@@ -246,7 +246,14 @@ describe('GetSpecOutline', () => {
       ]
       const mdParser = makeParser()
       const parsers = new Map([
-        ['markdown', { ...mdParser, outline: () => outline }],
+        [
+          'markdown',
+          {
+            ...mdParser,
+            outline: () => outline,
+            selectorHints: () => ({ section: { matches: '<value>', level: '<level>' } }),
+          },
+        ],
       ]) as unknown as Map<string, ReturnType<typeof makeParser>>
       const { uc, specPath } = setup({ parsers })
 
@@ -256,6 +263,52 @@ describe('GetSpecOutline', () => {
         { filename: 'spec.md', outline },
         { filename: 'verify.md', outline },
       ])
+    })
+
+    it('returns root-level selectorHints placeholders when hints mode is enabled', async () => {
+      const outline = [
+        {
+          type: 'section',
+          label: 'Requirement: Login',
+          depth: 0,
+        },
+      ]
+      const mdParser = makeParser()
+      const parsers = new Map([
+        [
+          'markdown',
+          {
+            ...mdParser,
+            outline: () => outline,
+            selectorHints: () => ({ section: { matches: '<value>', level: '<level>' } }),
+          },
+        ],
+      ]) as unknown as Map<string, ReturnType<typeof makeParser>>
+      const { uc, specPath } = setup({ parsers })
+
+      const result = await uc.execute({
+        workspace: 'default',
+        specPath,
+        artifactId: 'specs',
+        hints: true,
+      })
+      expect(result[0]?.selectorHints?.section).toEqual({
+        matches: '<value>',
+        level: '<level>',
+      })
+    })
+
+    it('passes full mode to parser', async () => {
+      const parser = makeParser()
+      const outlineSpy = vi.spyOn(parser, 'outline')
+      const parsers = new Map([['markdown', parser]]) as unknown as Map<
+        string,
+        ReturnType<typeof makeParser>
+      >
+      const { uc, specPath } = setup({ parsers })
+
+      await uc.execute({ workspace: 'default', specPath, artifactId: 'specs', full: true })
+      expect(outlineSpy).toHaveBeenCalledWith(expect.any(Object), { full: true })
     })
   })
 })

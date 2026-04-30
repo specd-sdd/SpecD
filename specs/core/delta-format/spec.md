@@ -41,7 +41,18 @@ interface ArtifactParser {
 
 `nodeTypes()` returns a static description of all addressable node types for this file format. `CompileContext` calls `nodeTypes()` to inject a concise vocabulary into the LLM's context when generating a delta, so the LLM knows what node types and selector properties are valid for the target artifact.
 
-`outline(ast)` returns a simplified, navigable summary of the artifact's addressable nodes — headings, keys, scenario titles, etc. — without full content. `CompileContext` injects this outline when asking the LLM to generate a delta, so the LLM can reference nodes that actually exist in the current artifact without needing to read the full file.
+`outline(ast)` returns a simplified, navigable summary of the artifact's addressable nodes — headings, keys, scenario titles, etc. — without full content.
+
+Default mode uses compact parser subsets:
+
+- markdown: `section`
+- json: `property`, `array-item`
+- yaml: `pair`
+- plaintext: `paragraph`
+
+Full selector-addressable coverage is available through full-detail retrieval mode.
+
+When clients request hint metadata, hints are returned as a root-level type-keyed object with placeholders (for example `matches: "<value>"`, `contains: "<contains>"`, `level: "<level>"`) and are not duplicated in each outline node.
 
 `deltaInstructions()` returns a format-specific, static text block that `CompileContext` injects verbatim into the LLM instruction when `delta: true` is active for the artifact. Each adapter implements this method to explain its selector vocabulary, the semantics of `content` vs `value` for that format, and a concrete example mapping an AST node to a delta entry. This separates format-level technical guidance (owned by the adapter) from domain-level guidance (owned by the schema's `deltaInstruction` field).
 

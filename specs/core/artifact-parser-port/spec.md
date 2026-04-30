@@ -95,6 +95,27 @@ The shared `applyDelta` engine MUST use these flags instead of hardcoded type ve
 
 The `outline` method MUST return a simplified navigable summary of the artifact's addressable nodes, suitable for injection into LLM context during delta generation.
 
+The parser's default outline output MUST preserve the historical compact subset for its format:
+
+- markdown: `section`
+- json: `property`, `array-item`
+- yaml: `pair`
+- plaintext: `paragraph`
+
+Full selector-addressable coverage is exposed through full-detail retrieval mode at the use-case/command level.
+
+### Requirement: Selector hint contract
+
+The parser port MUST expose selector-hint metadata for root-level outline responses.
+
+Selector hint payloads MUST:
+
+- be keyed by node type.
+- use placeholder values only (for example `"<value>"`, `"<contains>"`, `"<level>"`).
+- avoid concrete per-node duplication already represented in outline labels.
+
+The use case MAY omit this metadata unless hint mode is explicitly requested by the caller.
+
 ### Requirement: DeltaInstructions contract
 
 The `deltaInstructions` method MUST return a format-specific static text block that is injected verbatim when `delta: true` is active for an artifact.
@@ -139,6 +160,7 @@ Each `DeltaEntry` MUST contain:
 
 - `NodeTypeDescriptor` MUST contain `type: string`, `identifiedBy: readonly string[]`, `description: string`, `isCollection: boolean`, `isSequence: boolean`, `isSequenceItem: boolean`, `isContainer: boolean`, and `isLeaf: boolean`.
 - `OutlineEntry` MUST contain `type: string`, `label: string`, `depth: number`, and optional `children: readonly OutlineEntry[]`.
+- Parser-level outline entries remain structural. Selector hint metadata is response-level and keyed by type; it is not required per `OutlineEntry` node.
 
 ## Constraints
 

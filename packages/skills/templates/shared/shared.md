@@ -328,6 +328,19 @@ mandatory block** — you MUST read and follow all three, in this exact order:
 They are not optional or advisory. Treat them as binding composition directives that
 together define how the artifact must be authored.
 
+When the response includes `delta.availableOutlines`, treat it as a list of spec IDs
+for which full outline data can be retrieved. Fetch full outline content on demand
+using the canonical command:
+
+```bash
+specd specs outline <specPath> --artifact <artifactId>
+```
+
+Do not expect `changes artifact-instruction` to embed full outline trees.
+
+Use `--full` when you need all selector-addressable node families, and `--hints`
+when you need root-level selector hint placeholders by type.
+
 ## Processing `changes context` output
 
 Every skill that runs `changes context` MUST process its output as follows:

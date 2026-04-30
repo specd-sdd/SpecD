@@ -16,6 +16,14 @@ AI agents SHALL use machine-optimized formats strictly when structured data extr
 
 Agents MUST prefer `--format toon` for structured extraction. Agents MAY use `--format json` only when `toon` is unavailable or explicitly requested.
 
+### Requirement: On-demand outline retrieval
+
+When artifact-instruction responses provide only outline availability references (for example `availableOutlines`), AI agents MUST retrieve full outline content on demand using the canonical command:
+
+`specd specs outline <specPath> --artifact <artifactId>`
+
+Agents MUST NOT rely on embedded full outline trees in `changes artifact-instruction` output.
+
 ### Requirement: Repair Strategy
 
 Agents SHALL follow the "Next Action" recommendations provided in command outputs before attempting to repeat a failed lifecycle operation.
@@ -25,6 +33,8 @@ Agents SHALL follow the "Next Action" recommendations provided in command output
 Agent-authored workflow instructions and examples MUST use canonical plural command groups for countable resources (for example: `changes`, `specs`, `archives`, `drafts`).
 
 Singular forms MAY be referenced only as aliases.
+
+For outline retrieval examples, the canonical form is `specd specs outline <specPath> --artifact <artifactId>`.
 
 ### Requirement: Command Necessity and Freshness
 

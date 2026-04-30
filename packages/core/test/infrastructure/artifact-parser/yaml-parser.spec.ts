@@ -663,13 +663,25 @@ describe('YamlParser', () => {
   })
 
   describe('outline', () => {
-    it('returns entries for top-level pairs', () => {
+    it('returns compact default entries for top-level pairs', () => {
       const ast = parser.parse('schema: spec-driven\nmodel: gpt-4')
       const outline = parser.outline(ast)
       expect(outline.length).toBeGreaterThanOrEqual(2)
       const labels = outline.map((e) => e.label)
       expect(labels).toContain('schema')
       expect(labels).toContain('model')
+      expect(outline.some((e) => e.type === 'mapping')).toBe(false)
+    })
+
+    it('includes mapping/sequence families in full mode', () => {
+      const ast = parser.parse('schema: spec-driven\nsteps:\n  - one\n')
+      const outline = parser.outline(ast, { full: true })
+      type TestOutlineEntry = { type: string; children?: readonly TestOutlineEntry[] }
+      const flatten = (entries: readonly TestOutlineEntry[]): string[] =>
+        entries.flatMap((e) => [e.type, ...(e.children ? flatten(e.children) : [])])
+      const types = flatten(outline as readonly TestOutlineEntry[])
+      expect(types).toContain('sequence')
+      expect(types).toContain('sequence-item')
     })
   })
 

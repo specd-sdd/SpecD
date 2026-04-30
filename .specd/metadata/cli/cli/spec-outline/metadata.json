@@ -9,13 +9,31 @@
     {
       "requirement": "Command Interface",
       "rules": [
-        "The CLI SHALL provide a subcommand `specs outline <specPath>` with the following options:\n\n- `--artifact <id>`: Resolve the artifact filename from the active schema.\n- `--file <name>`: Specify a direct filename within the spec directory.\n- `--format <fmt>`: Output format (`text`, `json`, `toon`). Default is `text`.\n- `--config <path>`: Path to `specd.yaml`."
+        "The CLI SHALL provide a subcommand `specd specs outline <specPath>` with the following options:\n\n- `--artifact <id>`: Resolve the artifact filename from the active schema.\n- `--file <name>`: Specify a direct filename within the spec directory.\n- `--format <fmt>`: Output format (`text`, `json`, `toon`). Default is `text`.\n- `--full`: Include all selector-addressable node families for the artifact format.\n- `--hints`: Include root-level selector hint metadata for the node types present in the response.\n- `--config <path>`: Path to `specd.yaml`.\n\nFor workflow instructions and agent guidance, canonical plural command naming MUST be used (`specs`, not `spec`). The canonical on-demand form is `specd specs outline <specPath> --artifact <artifactId>`."
       ]
     },
     {
       "requirement": "Output Rendering",
       "rules": [
         "The command SHALL render the outline based on the requested format:\n\n- **Text**: Display the outline as formatted JSON (consistent with `json` format).\n- **JSON/TOON**: Output an array of objects containing `filename` and the `outline` tree.\n\nWhen no `--artifact` or `--file` flags are provided, the command MUST display outlines for ALL spec-scoped artifacts that exist on disk."
+      ]
+    },
+    {
+      "requirement": "Outline detail modes",
+      "rules": [
+        "The command SHALL expose two outline detail modes:\n\n- **Default mode** (without `--full`): returns the historical compact subset per parser:\n  - markdown: `section`\n  - json: `property`, `array-item`\n  - yaml: `pair`\n  - plaintext: `paragraph`\n- **Full mode** (`--full`): returns all selector-addressable node families for the parser.\n\nThe default mode is optimized for low-noise delta authoring and MUST remain stable unless the spec is updated."
+      ]
+    },
+    {
+      "requirement": "Root-level selector hint metadata",
+      "rules": [
+        "When `--hints` is used, the command SHALL return a root-level `selectorHints` object keyed by node type.\n\nThe hint values are placeholder-oriented guidance, not per-node concrete values. At minimum each type includes:\n\n- `matches: \"<value>\"`\n\nOptional placeholders MAY be included when applicable to the node type:\n\n- `contains: \"<contains>\"`\n- `level: \"<level>\"`\n\nThe `outline` entries themselves MUST remain structural and MUST NOT duplicate hint payload per entry."
+      ]
+    },
+    {
+      "requirement": "On-demand outline retrieval for workflows",
+      "rules": [
+        "The command SHALL be suitable as the on-demand retrieval path when another command returns only outline availability references.\n\nGiven a spec ID from `availableOutlines`, callers MUST be able to fetch outline detail using:\n\n`specd specs outline <specPath> --artifact <artifactId>`"
       ]
     },
     {
@@ -38,7 +56,7 @@
       "when": ["running specd specs outline core:core/config"],
       "then": [
         "it resolves ALL spec-scoped artifacts (e.g. spec.md, verify.md)",
-        "AND outputs the outline for each one that exists"
+        "AND outputs the default compact outline subset for each one that exists"
       ]
     },
     {
@@ -49,9 +67,24 @@
     },
     {
       "requirement": "Command Interface",
-      "name": "Use filename filter",
-      "when": ["running specd specs outline core:core/config --file verify.md"],
-      "then": ["it outputs the outline of verify.md"]
+      "name": "Full mode",
+      "when": ["running specd specs outline core:core/config --artifact specs --full"],
+      "then": ["the output includes all selector-addressable node families for that parser"]
+    },
+    {
+      "requirement": "Command Interface",
+      "name": "Hints mode",
+      "when": ["running specd specs outline core:core/config --artifact specs --hints"],
+      "then": [
+        "the response includes root-level selectorHints keyed by returned node type",
+        "AND hint values are placeholders"
+      ]
+    },
+    {
+      "requirement": "Command Interface",
+      "name": "Canonical plural command form",
+      "when": ["workflow instructions reference this command"],
+      "then": ["they use specd specs outline <specPath> --artifact <artifactId> as canonical form"]
     },
     {
       "requirement": "Output Rendering",
@@ -64,6 +97,16 @@
       "name": "JSON/TOON format structure",
       "when": ["running with --format json"],
       "then": ["the output is an array of objects", "AND each object contains filename and outline"]
+    },
+    {
+      "requirement": "On-demand outline retrieval for workflows",
+      "name": "Available outline reference resolved on demand",
+      "given": ["another workflow output provides availableOutlines: [\"core:core/config\"]"],
+      "when": ["specd specs outline core:core/config --artifact specs is executed"],
+      "then": [
+        "outline content is returned for that spec/artifact",
+        "AND no embedded outline payload is required in the source command"
+      ]
     },
     {
       "requirement": "Deduplication",
@@ -91,8 +134,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:5c0a01c0bc9b6006758a408c9779679abeb2b9d0387333f7b807891cdef63232",
-    "verify.md": "sha256:9652dba9d1b927a766057a0bd2fd7a1838e220b042b154d8df32e5caf511d8ad"
+    "spec.md": "sha256:02860c1a57fe2f46ccbbd5c2e711713860029891493f637243c9d122e08e6b4d",
+    "verify.md": "sha256:3c20d48ebd2d77f6b11618ea7e2f8b98ab0ad5506000df73da3e9ed02c6234dd"
   },
   "generatedBy": "core"
 }

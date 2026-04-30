@@ -46,7 +46,7 @@ describe('spec outline', () => {
 
     const program = makeProgram()
     registerSpecOutline(program.command('specs'))
-    await program.parseAsync(['node', 'specd', 'specs', 'outline', 'auth/login'])
+    await program.parseAsync(['node', 'specd', 'specs', 'outline', 'default:auth/login'])
 
     const out = stdout()
     const parsed = JSON.parse(out)
@@ -69,7 +69,7 @@ describe('spec outline', () => {
       'specd',
       'specs',
       'outline',
-      'auth/login',
+      'default:auth/login',
       '--format',
       'json',
     ])
@@ -102,7 +102,7 @@ describe('spec outline', () => {
       'specd',
       'specs',
       'outline',
-      'auth/login',
+      'default:auth/login',
       '--artifact',
       'verify',
     ])
@@ -125,13 +125,43 @@ describe('spec outline', () => {
       'specd',
       'specs',
       'outline',
-      'auth/login',
+      'default:auth/login',
       '--file',
       'verify.md',
     ])
 
     expect(kernel.specs.getOutline.execute).toHaveBeenCalledWith(
       expect.objectContaining({ filename: 'verify.md' }),
+    )
+  })
+
+  it('passes full flag to use case', async () => {
+    const { kernel } = setup()
+    kernel.specs.getOutline.execute.mockResolvedValue([
+      { filename: 'spec.md', outline: mockOutline },
+    ])
+
+    const program = makeProgram()
+    registerSpecOutline(program.command('specs'))
+    await program.parseAsync(['node', 'specd', 'specs', 'outline', 'default:auth/login', '--full'])
+
+    expect(kernel.specs.getOutline.execute).toHaveBeenCalledWith(
+      expect.objectContaining({ full: true }),
+    )
+  })
+
+  it('passes hints flag to use case', async () => {
+    const { kernel } = setup()
+    kernel.specs.getOutline.execute.mockResolvedValue([
+      { filename: 'spec.md', outline: mockOutline },
+    ])
+
+    const program = makeProgram()
+    registerSpecOutline(program.command('specs'))
+    await program.parseAsync(['node', 'specd', 'specs', 'outline', 'default:auth/login', '--hints'])
+
+    expect(kernel.specs.getOutline.execute).toHaveBeenCalledWith(
+      expect.objectContaining({ hints: true }),
     )
   })
 
@@ -145,7 +175,15 @@ describe('spec outline', () => {
     const program = makeProgram()
     registerSpecOutline(program.command('specs'))
     await program
-      .parseAsync(['node', 'specd', 'specs', 'outline', 'auth/login', '--artifact', 'unknown'])
+      .parseAsync([
+        'node',
+        'specd',
+        'specs',
+        'outline',
+        'default:auth/login',
+        '--artifact',
+        'unknown',
+      ])
       .catch(() => {})
 
     expect(process.exit).toHaveBeenCalledWith(1)
@@ -168,7 +206,15 @@ describe('spec outline', () => {
     const program = makeProgram()
     registerSpecOutline(program.command('specs'))
     await program
-      .parseAsync(['node', 'specd', 'specs', 'outline', 'auth/login', '--artifact', 'design'])
+      .parseAsync([
+        'node',
+        'specd',
+        'specs',
+        'outline',
+        'default:auth/login',
+        '--artifact',
+        'design',
+      ])
       .catch(() => {})
 
     expect(process.exit).toHaveBeenCalledWith(1)
@@ -182,7 +228,9 @@ describe('spec outline', () => {
 
     const program = makeProgram()
     registerSpecOutline(program.command('specs'))
-    await program.parseAsync(['node', 'specd', 'specs', 'outline', 'auth/missing']).catch(() => {})
+    await program
+      .parseAsync(['node', 'specd', 'specs', 'outline', 'default:auth/missing'])
+      .catch(() => {})
 
     expect(process.exit).toHaveBeenCalledWith(1)
     expect(stderr()).toContain('error:')
@@ -211,7 +259,7 @@ describe('spec outline', () => {
       'specd',
       'specs',
       'outline',
-      'auth/login',
+      'default:auth/login',
       '--artifact',
       'specs',
       '--file',

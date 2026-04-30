@@ -2,7 +2,7 @@ import * as path from 'node:path'
 import { type ChangeRepository } from '../ports/change-repository.js'
 import { type SpecRepository } from '../ports/spec-repository.js'
 import { type SchemaProvider } from '../ports/schema-provider.js'
-import { type ArtifactParserRegistry, type OutlineEntry } from '../ports/artifact-parser.js'
+import { type ArtifactParserRegistry } from '../ports/artifact-parser.js'
 import { type TemplateExpander } from '../template-expander.js'
 import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
 import { SchemaMismatchError } from '../errors/schema-mismatch-error.js'
@@ -36,17 +36,14 @@ export interface GetArtifactInstructionResult {
   readonly delta: {
     readonly formatInstructions: string
     readonly domainInstructions: string | null
-    readonly outlines: readonly {
-      readonly specId: string
-      readonly outline: readonly OutlineEntry[]
-    }[]
+    readonly availableOutlines: readonly string[]
   } | null
   readonly rulesPost: readonly string[]
 }
 
 /**
  * Returns artifact-specific instructions: the schema instruction, composition
- * rules (`rules.pre`/`rules.post`), and delta guidance with existing artifact outlines.
+ * rules (`rules.pre`/`rules.post`), and delta guidance.
  *
  * Read-only — never modifies state or executes commands.
  */
@@ -146,8 +143,8 @@ export class GetArtifactInstruction {
           ? this._templates.expand(artifactType.deltaInstruction, contextVars)
           : null
 
-      // Build outlines from existing spec artifacts
-      const outlines: { specId: string; outline: readonly OutlineEntry[] }[] = []
+      // Build available outline references from existing spec artifacts.
+      const availableOutlines: string[] = []
       for (const specId of change.specIds) {
         const { workspace: specWorkspace, capPath } = parseSpecId(specId)
         const specRepo = this._specs.get(specWorkspace)
@@ -156,13 +153,10 @@ export class GetArtifactInstruction {
         const spec = new Spec(specWorkspace, SpecPath.parse(capPath), [])
         const artifact = await specRepo.artifact(spec, outputBasename)
         if (artifact === null) continue
-
-        const ast = parser.parse(artifact.content)
-        const outline = parser.outline(ast)
-        outlines.push({ specId, outline })
+        availableOutlines.push(specId)
       }
 
-      delta = { formatInstructions, domainInstructions, outlines }
+      delta = { formatInstructions, domainInstructions, availableOutlines }
     }
 
     // rules.post

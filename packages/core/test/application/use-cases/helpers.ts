@@ -614,6 +614,7 @@ export function makeParser(
     renderSubtree: opts.renderSubtree ?? (() => 'rendered'),
     nodeTypes: () => [],
     outline: () => [],
+    selectorHints: () => ({}),
     deltaInstructions: () => '',
     parseDelta: opts.parseDelta ?? (() => []),
   }

@@ -53,6 +53,19 @@
 - **THEN** it uses the `JsonParser`
 - **AND** returns the JSON hierarchical outline
 
+#### Scenario: Default mode returns compact subset
+
+- **WHEN** `GetSpecOutline` runs in default mode
+- **THEN** markdown output includes `section` entries
+- **AND** json output includes `property` and `array-item` entries
+- **AND** yaml output includes `pair` entries
+- **AND** plaintext output includes `paragraph` entries
+
+#### Scenario: Full mode returns full selector-addressable families
+
+- **WHEN** `GetSpecOutline` runs in full mode
+- **THEN** all selector-addressable node families for the parser are included
+
 ### Requirement: Result
 
 #### Scenario: Structured result format
@@ -60,3 +73,10 @@
 - **WHEN** the use case completes successfully
 - **THEN** it returns an array of objects
 - **AND** each object has `filename` (string) and `outline` (OutlineEntry tree)
+
+#### Scenario: Optional root-level selector hint metadata
+
+- **WHEN** hint mode is enabled
+- **THEN** each result includes root-level `selectorHints` keyed by node type
+- **AND** hint values use placeholders such as `"<value>"`, `"<contains>"`, `"<level>"`
+- **AND** per-node outline entries do not duplicate hints

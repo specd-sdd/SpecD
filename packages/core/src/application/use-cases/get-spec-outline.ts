@@ -15,12 +15,17 @@ export interface GetSpecOutlineInput {
   readonly specPath: SpecPath
   readonly artifactId?: string
   readonly filename?: string
+  readonly full?: boolean
+  readonly hints?: boolean
 }
 
 /** Result entry for the {@link GetSpecOutline} use case. */
 export interface SpecOutlineResult {
   readonly filename: string
   readonly outline: readonly OutlineEntry[]
+  readonly selectorHints?: Readonly<
+    Record<string, { matches: string; contains?: string; level?: string }>
+  >
 }
 
 /**
@@ -88,9 +93,13 @@ export class GetSpecOutline {
       }
 
       const ast = parser.parse(artifact.content)
-      const outline = parser.outline(ast)
-
-      results.push({ filename, outline })
+      const outline = parser.outline(ast, { full: input.full === true })
+      const selectorHints = input.hints === true ? parser.selectorHints(outline) : undefined
+      results.push({
+        filename,
+        outline,
+        ...(selectorHints !== undefined ? { selectorHints } : {}),
+      })
     }
 
     return results

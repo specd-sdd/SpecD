@@ -18,6 +18,22 @@
 - **WHEN** it executes the status check
 - **THEN** it SHALL use `--format json` or `--format toon` to ensure robust parsing of the spec ID array
 
+### Requirement: On-demand outline retrieval
+
+#### Scenario: Agent fetches full outline using canonical command
+
+- **GIVEN** artifact-instruction output includes `availableOutlines: ["core:core/config"]`
+- **WHEN** the agent needs full structure for delta authoring
+- **THEN** it runs `specd specs outline core:core/config --artifact specs`
+- **AND** uses that output as the outline source
+
+#### Scenario: Agent avoids inline outline dependency
+
+- **GIVEN** `changes artifact-instruction` output does not include full outline trees
+- **WHEN** generating deltas
+- **THEN** the agent does not fail due to missing embedded outlines
+- **AND** retrieves required detail via `specd specs outline`
+
 ### Requirement: Repair Strategy
 
 #### Scenario: Agent follows repair guide after transition failure
@@ -34,6 +50,11 @@
 - **WHEN** an agent writes workflow command examples for countable resources
 - **THEN** examples use canonical plural groups (`changes`, `specs`, `archives`, `drafts`)
 - **AND** singular forms are referenced only as aliases
+
+#### Scenario: Canonical outline command example
+
+- **WHEN** the agent documents outline retrieval
+- **THEN** it uses `specd specs outline <specPath> --artifact <artifactId>`
 
 ### Requirement: Command Necessity and Freshness
 

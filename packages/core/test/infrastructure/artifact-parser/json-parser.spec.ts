@@ -563,13 +563,25 @@ describe('JsonParser', () => {
   })
 
   describe('outline', () => {
-    it('returns property entries at correct depths', () => {
+    it('returns compact default entries at correct depths', () => {
       const ast = parser.parse('{"name": "core", "version": "0.1.0"}')
       const outline = parser.outline(ast)
       expect(outline.length).toBeGreaterThanOrEqual(2)
       const names = outline.map((e) => e.label)
       expect(names).toContain('name')
       expect(names).toContain('version')
+      expect(outline.some((e) => e.type === 'object')).toBe(false)
+    })
+
+    it('includes object/array entries in full mode', () => {
+      const ast = parser.parse('{"name": "core", "tags": ["a"]}')
+      const outline = parser.outline(ast, { full: true })
+      type TestOutlineEntry = { type: string; children?: readonly TestOutlineEntry[] }
+      const flatten = (entries: readonly TestOutlineEntry[]): string[] =>
+        entries.flatMap((e) => [e.type, ...(e.children ? flatten(e.children) : [])])
+      const types = flatten(outline as readonly TestOutlineEntry[])
+      expect(types).toContain('object')
+      expect(types).toContain('array')
     })
   })
 

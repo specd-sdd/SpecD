@@ -45,13 +45,13 @@
     {
       "requirement": "Instruction resolution",
       "rules": [
-        "`GetArtifactInstruction` MUST resolve each instruction component independently:\n\n- **`rulesPre`** — if the artifact declares `rules.pre`, collect all entries' `text` in declaration order. These are composition rules added by extending schemas or plugins to augment the base instruction.\n- **`instruction`** — the artifact's `instruction` field from the schema. `null` if not declared.\n- **`template`** — if the artifact declares a `template` path, read the file content from the schema directory via `SchemaRegistry` and return the resolved string. `null` if the artifact has no template. Template variable expansion (via `TemplateExpander`) MUST be applied to the template content using the same contextual variables as `instruction`.\n- **`delta`** — if the artifact has `delta: true`, resolve three sub-components:\n  - **`formatInstructions`** — call `parsers.get(artifact.format).deltaInstructions()` for the technical delta format guidance.\n  - **`domainInstructions`** — the artifact's `deltaInstruction` field. `null` if not declared.\n  - **`outlines`** — for each spec ID in `change.specIds`, read the corresponding artifact file from `SpecRepository`, parse it via `ArtifactParser.parse()`, and call `ArtifactParser.outline()` to obtain an `OutlineEntry[]` tree. An outline is a navigable summary of the artifact's addressable nodes (sections in markdown, keys in YAML/JSON) without their content — it tells the agent what structure exists so it can target delta operations correctly. Missing files are silently skipped. Each entry includes the `specId` and its `outline`.\n- **`rulesPost`** — if the artifact declares `rules.post`, collect all entries' `text` in declaration order.\n\nWhen `delta` is `false`, the `delta` field in the result is `null`."
+        "`GetArtifactInstruction` MUST resolve each instruction component independently:\n\n- **`rulesPre`** — if the artifact declares `rules.pre`, collect all entries' `text` in declaration order. These are composition rules added by extending schemas or plugins to augment the base instruction.\n- **`instruction`** — the artifact's `instruction` field from the schema. `null` if not declared.\n- **`template`** — if the artifact declares a `template` path, read the file content from the schema directory via `SchemaRegistry` and return the resolved string. `null` if the artifact has no template. Template variable expansion (via `TemplateExpander`) MUST be applied to the template content using the same contextual variables as `instruction`.\n- **`delta`** — if the artifact has `delta: true`, resolve three sub-components:\n  - **`formatInstructions`** — call `parsers.get(artifact.format).deltaInstructions()` for the technical delta format guidance.\n  - **`domainInstructions`** — the artifact's `deltaInstruction` field. `null` if not declared.\n  - **`availableOutlines`** — for each spec ID in `change.specIds`, if the corresponding artifact file exists in `SpecRepository`, include that `specId` in `availableOutlines`. `availableOutlines` is strictly `string[]` of spec IDs. The use case MUST NOT embed full outline trees in this payload. Full outline content is retrieved on demand via `GetSpecOutline` (CLI: `specd specs outline <specPath> --artifact <artifactId>`).\n- **`rulesPost`** — if the artifact declares `rules.post`, collect all entries' `text` in declaration order.\n\nWhen `delta` is `false`, the `delta` field in the result is `null`."
       ]
     },
     {
       "requirement": "Result shape",
       "rules": [
-        "`GetArtifactInstruction.execute` MUST return a structured result containing:\n\n- `artifactId` (string) — the artifact ID\n- `rulesPre` (string\\[]) — `rules.pre` texts in declaration order; empty array if none\n- `instruction` (string | null) — the artifact's instruction text; `null` if not declared\n- `template` (string | null) — the resolved template file content with variables expanded; `null` when the artifact has no template declared\n- `delta` (object | null) — delta-specific instruction components; `null` when `delta: false`:\n  - `formatInstructions` (string) — format-specific delta writing guidance\n  - `domainInstructions` (string | null) — the artifact's `deltaInstruction` text; `null` if not declared\n  - `outlines` (array) — one entry per spec in `change.specIds` that has an existing artifact file:\n    - `specId` (string) — the spec ID\n    - `outline` (OutlineEntry\\[]) — the navigable node structure\n- `rulesPost` (string\\[]) — `rules.post` texts in declaration order; empty array if none\n\nThe caller decides which parts to use. A subagent creating artifacts from scratch uses `rulesPre` + `instruction` + `template` + `rulesPost`. A subagent creating deltas uses `rulesPre` + `delta` + `rulesPost` (the template is not needed for deltas since `outlines` provides the existing structure)."
+        "`GetArtifactInstruction.execute` MUST return a structured result containing:\n\n- `artifactId` (string) — the artifact ID\n- `rulesPre` (string\\[]) — `rules.pre` texts in declaration order; empty array if none\n- `instruction` (string | null) — the artifact's instruction text; `null` if not declared\n- `template` (string | null) — the resolved template file content with variables expanded; `null` when the artifact has no template declared\n- `delta` (object | null) — delta-specific instruction components; `null` when `delta: false`:\n  - `formatInstructions` (string) — format-specific delta writing guidance\n  - `domainInstructions` (string | null) — the artifact's `deltaInstruction` text; `null` if not declared\n  - `availableOutlines` (string\\[]) — spec IDs from `change.specIds` whose artifact file exists and can be outlined\n- `rulesPost` (string\\[]) — `rules.post` texts in declaration order; empty array if none\n\nThe caller decides which parts to use. A subagent creating artifacts from scratch uses `rulesPre` + `instruction` + `template` + `rulesPost`. A subagent creating deltas uses `rulesPre` + `delta` + `rulesPost`, and fetches outline details on demand with `specd specs outline <specPath> --artifact <artifactId>`."
       ]
     }
   ],
@@ -59,7 +59,8 @@
     "This use case is read-only — it does not modify the change or execute any commands",
     "rules.pre and rules.post are schema composition mechanisms — they augment the instruction without replacing it",
     "The use case does not evaluate step availability or artifact status",
-    "Delta outlines are loaded from SpecRepository for each spec in change.specIds — missing files are silently skipped",
+    "Delta outline availability is derived from SpecRepository for each spec in change.specIds; missing files are silently skipped",
+    "Full outline trees are intentionally excluded from this result; consumers must call GetSpecOutline/specd specs outline on demand",
     "ArtifactParserRegistry must contain an adapter for the artifact's format; if no adapter is registered, the use case throws ParserNotRegisteredError"
   ],
   "scenarios": [
@@ -104,72 +105,29 @@
     },
     {
       "requirement": "Instruction resolution",
-      "name": "Artifact with only instruction (no rules, no delta)",
-      "given": ["an artifact with instruction: \"Create the proposal\" and no rules or delta"],
-      "when": ["GetArtifactInstruction.execute is called"],
-      "then": [
-        "instruction is \"Create the proposal\"",
-        "AND rulesPre is []",
-        "AND rulesPost is []",
-        "AND delta is null"
-      ]
-    },
-    {
-      "requirement": "Instruction resolution",
-      "name": "Artifact with no instruction content",
-      "given": ["an artifact with no instruction, no rules, and delta: false"],
-      "when": ["GetArtifactInstruction.execute is called"],
-      "then": [
-        "instruction is null",
-        "AND rulesPre is []",
-        "AND rulesPost is []",
-        "AND delta is null"
-      ]
-    },
-    {
-      "requirement": "Instruction resolution",
-      "name": "Delta outlines from existing specs",
+      "name": "Delta availableOutlines from existing specs",
       "given": [
         "an artifact with delta: true and change.specIds includes default:auth/login",
         "AND SpecRepository has an existing spec.md for auth/login"
       ],
       "when": ["GetArtifactInstruction.execute is called"],
       "then": [
-        "delta.outlines includes an entry with specId: \"default:auth/login\" and a non-empty outline"
+        "delta.availableOutlines includes \"default:auth/login\"",
+        "AND no inline outline tree is returned in this payload"
       ]
     },
     {
       "requirement": "Instruction resolution",
-      "name": "Missing existing artifact silently skipped in outlines",
+      "name": "Missing existing artifact silently skipped in availableOutlines",
       "given": [
         "an artifact with delta: true and change.specIds includes default:new/spec",
         "AND SpecRepository has no existing file for new/spec"
       ],
       "when": ["GetArtifactInstruction.execute is called"],
       "then": [
-        "delta.outlines does not include an entry for default:new/spec",
+        "delta.availableOutlines does not include \"default:new/spec\"",
         "AND no error or warning is produced"
       ]
-    },
-    {
-      "requirement": "Instruction resolution",
-      "name": "rules.pre from extending schema",
-      "given": [
-        "a base schema with instruction: \"Write specs\"",
-        "AND a child schema that extends it adding rules.pre: [{ id: \"lang\", text: \"Use formal language\" }]"
-      ],
-      "when": ["GetArtifactInstruction.execute is called"],
-      "then": ["rulesPre is [\"Use formal language\"]", "AND instruction is \"Write specs\""]
-    },
-    {
-      "requirement": "Instruction resolution",
-      "name": "Template content resolved and returned",
-      "given": [
-        "an artifact with template: \"templates/design.md\" pointing to a file containing # Design: {{change.name}}",
-        "AND a change named add-auth"
-      ],
-      "when": ["GetArtifactInstruction.execute is called for this artifact"],
-      "then": ["template is \"# Design: add-auth\" (variables expanded)"]
     },
     {
       "requirement": "Result shape",
@@ -182,15 +140,18 @@
     },
     {
       "requirement": "Result shape",
-      "name": "Result includes template field",
-      "given": ["an artifact with template: \"templates/tasks.md\""],
+      "name": "Delta result exposes availableOutlines",
+      "given": ["a delta-enabled artifact and existing spec artifacts in change scope"],
       "when": ["GetArtifactInstruction.execute is called"],
-      "then": ["the result includes a template field with the resolved file content"]
+      "then": [
+        "delta.availableOutlines is present as string[]",
+        "AND consumers can retrieve full outline content on demand using specd specs outline <specPath> --artifact <artifactId>"
+      ]
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:a143f0d9855d3a400851331ec62c9d58a6320be6a333529fe3aff20585e7e4d5",
-    "verify.md": "sha256:6dbc0fd3afebb25538f418d0ed2cb469129a5d4f1404f5de4fe88f8a94595bcc"
+    "spec.md": "sha256:4b0c9724fe1171736e652d565136f6186554c3b682b46a641c75baab5c236cb5",
+    "verify.md": "sha256:5c817a4318e7536f872a6dd362fe53aecdc11f09e620e2feab104f4d1ffd2a91"
   },
   "generatedBy": "core"
 }

@@ -249,14 +249,44 @@ export class JsonParser implements ArtifactParser {
    * Returns a simplified navigable outline of the JSON artifact's addressable nodes.
    *
    * @param ast - The AST to generate an outline for
+   * @param options - Outline generation options
+   * @param options.full - When true, include full node-family coverage
    * @returns A flat list of outline entries with nesting depth
    */
-  outline(ast: ArtifactAST): readonly OutlineEntry[] {
+  outline(ast: ArtifactAST, options?: { readonly full?: boolean }): readonly OutlineEntry[] {
     const entries: OutlineEntry[] = []
     const rootNode = ast.root.children?.[0]
     if (!rootNode) return entries
-    this.collectOutlineEntries(rootNode, 0, entries)
+    this.collectOutlineEntries(rootNode, 0, entries, options?.full === true)
     return entries
+  }
+
+  /**
+   * Returns selector hint placeholders keyed by node type for JSON outlines.
+   *
+   * @param outline - Outline entries returned by {@link outline}
+   * @returns Hint placeholder map
+   */
+  selectorHints(
+    outline: readonly OutlineEntry[],
+  ): Readonly<Record<string, { matches: string; contains?: string; level?: string }>> {
+    const types = new Set<string>()
+    const walk = (entries: readonly OutlineEntry[]): void => {
+      for (const entry of entries) {
+        types.add(entry.type)
+        if (entry.children !== undefined) walk(entry.children)
+      }
+    }
+    walk(outline)
+
+    const out: Record<string, { matches: string; contains?: string; level?: string }> = {}
+    for (const type of types) {
+      out[type] = {
+        matches: '<value>',
+        ...(type === 'property' || type === 'array-item' ? { contains: '<contains>' } : {}),
+      }
+    }
+    return out
   }
 
   /**
@@ -265,13 +295,20 @@ export class JsonParser implements ArtifactParser {
    * @param node - The current AST node being processed
    * @param depth - The nesting depth (0 = root children)
    * @param entries - Accumulator for outline entries
+   * @param full - Whether to include full node-family coverage
    */
-  private collectOutlineEntries(node: ArtifactNode, depth: number, entries: OutlineEntry[]): void {
+  private collectOutlineEntries(
+    node: ArtifactNode,
+    depth: number,
+    entries: OutlineEntry[],
+    full: boolean,
+  ): void {
     if (node.type === 'object') {
+      if (full) entries.push({ type: 'object', label: node.label ?? 'object', depth })
       for (const prop of node.children ?? []) {
         const children: OutlineEntry[] = []
         if (prop.children && prop.children.length > 0) {
-          this.collectOutlineEntries(prop.children[0]!, depth + 1, children)
+          this.collectOutlineEntries(prop.children[0]!, depth + 1, children, full)
         }
         entries.push({
           type: 'property',
@@ -281,11 +318,12 @@ export class JsonParser implements ArtifactParser {
         })
       }
     } else if (node.type === 'array') {
+      if (full) entries.push({ type: 'array', label: node.label ?? 'array', depth })
       for (let i = 0; i < (node.children ?? []).length; i++) {
         const item = node.children![i]!
         const children: OutlineEntry[] = []
         if (item.children && item.children.length > 0) {
-          this.collectOutlineEntries(item.children[0]!, depth + 1, children)
+          this.collectOutlineEntries(item.children[0]!, depth + 1, children, full)
         }
         entries.push({
           type: 'array-item',

@@ -226,4 +226,38 @@ describe('GetArtifactInstruction', () => {
       expect(result.rulesPost).toEqual(['After my-change'])
     })
   })
+
+  describe('delta payload', () => {
+    it('returns availableOutlines spec IDs only for existing artifacts', async () => {
+      const artifactType = makeArtifactType('spec', {
+        delta: true,
+        format: 'markdown',
+        output: 'spec.md',
+      })
+      const schema = makeSchema({ name: 'test-schema', artifacts: [artifactType] })
+      const change = makeChange('my-change', {
+        schemaName: 'test-schema',
+        specIds: ['default:auth/login', 'default:auth/missing'],
+      })
+      const { changeRepo, schemaProvider } = makeSut({ change, schema })
+      const specRepo = makeSpecRepository({
+        artifacts: {
+          'auth/login/spec.md': '# Login',
+        },
+      })
+
+      const sut = new GetArtifactInstruction(
+        changeRepo,
+        new Map([['default', specRepo]]),
+        schemaProvider,
+        makeParsers(),
+        makeTemplateExpander(),
+      )
+
+      const result = await sut.execute({ name: 'my-change', artifactId: 'spec' })
+      expect(result.delta).not.toBeNull()
+      expect(result.delta?.availableOutlines).toEqual(['default:auth/login'])
+      expect(result.delta).not.toHaveProperty('outlines')
+    })
+  })
 })

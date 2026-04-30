@@ -35,12 +35,27 @@ For each resolved artifact file, the use case SHALL:
 - Parse the content into an AST.
 - Call `ArtifactParser.outline(ast)` to generate the hierarchical structure.
 
+The use case SHALL support two detail modes for returned outline families:
+
+- **default**: compact subset defined by the parser's default outline contract (historical behavior)
+- **full**: all selector-addressable families for the parser
+
 ### Requirement: Result
 
 The use case SHALL return a list of outline results, where each result contains:
 
 - `filename`: the resolved artifact filename.
 - `outline`: the hierarchical tree of `OutlineEntry` objects.
+
+When hint mode is enabled by the caller, each result also contains:
+
+- `selectorHints`: a root-level object keyed by node type with placeholder guidance.
+
+`selectorHints` MUST be sourced from parser-provided hint metadata, so new parsers can define their own type-level guidance without use-case changes.
+
+`selectorHints` entries MUST use placeholder values (for example `"<value>"`, `"<contains>"`, `"<level>"`) and MUST NOT duplicate per-node concrete values already visible in `outline` labels.
+
+`outline` entries MUST remain structural and sufficient for selector derivation without embedding repeated hint payload in each node.
 
 ## Spec Dependencies
 

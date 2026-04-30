@@ -45,14 +45,22 @@
 
 ### Requirement: JSON output format
 
-#### Scenario: JSON output with instruction
+#### Scenario: JSON output includes availableOutlines only
 
-- **GIVEN** an artifact with `instruction: "Write the spec"`
-- **WHEN** `specd change artifact-instruction add-auth specs --format json`
-- **THEN** stdout contains JSON with `"result": "ok"`, `"artifactId": "specs"`, and `"instruction": "Write the spec"`
+- **GIVEN** a delta-enabled artifact and change specs with existing outlineable files
+- **WHEN** `specd changes artifact-instruction add-auth specs --format json` is executed
+- **THEN** `delta.availableOutlines` is present as a string array of spec IDs
+- **AND** `delta.outlines` is not present in the response
 
-#### Scenario: JSON output includes template
+#### Scenario: Outline details retrieved on demand via specs outline
 
-- **GIVEN** an artifact with a declared template containing scaffolding content
-- **WHEN** `specd change artifact-instruction add-auth specs --format json`
-- **THEN** stdout contains JSON with a `"template"` field containing the resolved template content
+- **GIVEN** `availableOutlines` contains `core:core/config`
+- **WHEN** `specd specs outline core:core/config --artifact specs` is executed
+- **THEN** the command returns the full outline structure for the requested artifact
+
+### Requirement: Command signature
+
+#### Scenario: Canonical command references in examples
+
+- **WHEN** users inspect command examples for outline retrieval
+- **THEN** examples use canonical plural command form `specd specs outline <specPath> --artifact <artifactId>`

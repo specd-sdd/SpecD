@@ -21,16 +21,20 @@ export function registerSpecOutline(parent: Command): void {
       'resolve artifact filename from the active schema (e.g. specs, verify)',
     )
     .option('--file <name>', 'specify a direct filename within the spec directory')
+    .option('--full', 'include all selector-addressable node families')
+    .option('--hints', 'include root-level selector hint placeholders by node type')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
     .addHelpText(
       'after',
       `
 JSON/TOON output schema:
-  Array<{ filename: string, outline: OutlineEntry[] }>
+  Array<{ filename: string, outline: OutlineEntry[], selectorHints?: Record<string, object> }>
 
 Examples:
   specd specs outline core:core/config
+  specd specs outline core:core/config --full
+  specd specs outline core:core/config --hints
   specd specs outline core:core/config --artifact verify
   specd specs outline core:core/config --file verify.md --format toon
 `,
@@ -38,7 +42,14 @@ Examples:
     .action(
       async (
         specPath: string,
-        opts: { artifact?: string; file?: string; format: string; config?: string },
+        opts: {
+          artifact?: string
+          file?: string
+          full?: boolean
+          hints?: boolean
+          format: string
+          config?: string
+        },
       ) => {
         try {
           const { config, kernel } = await resolveCliContext({ configPath: opts.config })
@@ -69,6 +80,8 @@ Examples:
             specPath: SpecPath.parse(parsed.capabilityPath),
             ...(opts.artifact !== undefined ? { artifactId: opts.artifact } : {}),
             ...(opts.file !== undefined ? { filename: opts.file } : {}),
+            ...(opts.full === true ? { full: true } : {}),
+            ...(opts.hints === true ? { hints: true } : {}),
           })
 
           const fmt = parseFormat(opts.format)

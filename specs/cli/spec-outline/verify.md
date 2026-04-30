@@ -8,7 +8,7 @@
 
 - **WHEN** running `specd specs outline core:core/config`
 - **THEN** it resolves ALL spec-scoped artifacts (e.g. `spec.md`, `verify.md`)
-- **AND** outputs the outline for each one that exists
+- **AND** outputs the default compact outline subset for each one that exists
 
 #### Scenario: Use artifactId filter
 
@@ -16,10 +16,21 @@
 - **THEN** it resolves `verify` to `verify.md`
 - **AND** outputs the outline of `verify.md`
 
-#### Scenario: Use filename filter
+#### Scenario: Full mode
 
-- **WHEN** running `specd specs outline core:core/config --file verify.md`
-- **THEN** it outputs the outline of `verify.md`
+- **WHEN** running `specd specs outline core:core/config --artifact specs --full`
+- **THEN** the output includes all selector-addressable node families for that parser
+
+#### Scenario: Hints mode
+
+- **WHEN** running `specd specs outline core:core/config --artifact specs --hints`
+- **THEN** the response includes root-level `selectorHints` keyed by returned node type
+- **AND** hint values are placeholders
+
+#### Scenario: Canonical plural command form
+
+- **WHEN** workflow instructions reference this command
+- **THEN** they use `specd specs outline <specPath> --artifact <artifactId>` as canonical form
 
 ### Requirement: Output Rendering
 
@@ -33,6 +44,15 @@
 - **WHEN** running with `--format json`
 - **THEN** the output is an array of objects
 - **AND** each object contains `filename` and `outline`
+
+### Requirement: On-demand outline retrieval for workflows
+
+#### Scenario: Available outline reference resolved on demand
+
+- **GIVEN** another workflow output provides `availableOutlines: ["core:core/config"]`
+- **WHEN** `specd specs outline core:core/config --artifact specs` is executed
+- **THEN** outline content is returned for that spec/artifact
+- **AND** no embedded outline payload is required in the source command
 
 ### Requirement: Deduplication
 

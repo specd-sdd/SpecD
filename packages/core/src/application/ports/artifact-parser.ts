@@ -298,6 +298,19 @@ export interface OutlineEntry {
   readonly children?: readonly OutlineEntry[]
 }
 
+/** Controls outline detail emitted by parsers. */
+export interface OutlineOptions {
+  /** Include all selector-addressable node families. */
+  readonly full?: boolean
+}
+
+/** Placeholder selector hints for one node type. */
+export interface SelectorHintPlaceholders {
+  readonly matches: string
+  readonly contains?: string
+  readonly level?: string
+}
+
 /**
  * Domain port that abstracts all file-type-specific parsing, delta application,
  * and serialization. Each supported file format has a corresponding infrastructure
@@ -338,7 +351,15 @@ export interface ArtifactParser {
    * Returns a simplified navigable summary of the artifact's addressable nodes.
    * `CompileContext` injects this outline when asking the LLM to generate a delta.
    */
-  outline(ast: ArtifactAST): readonly OutlineEntry[]
+  outline(ast: ArtifactAST, options?: OutlineOptions): readonly OutlineEntry[]
+
+  /**
+   * Returns root-level selector hint placeholders keyed by node type for the
+   * outline entries returned by `outline(...)`.
+   */
+  selectorHints(
+    outline: readonly OutlineEntry[],
+  ): Readonly<Record<string, SelectorHintPlaceholders>>
 
   /**
    * Returns a format-specific static text block that `CompileContext` injects

@@ -589,8 +589,20 @@ Display the navigable structure (outline) of a spec artifact. Returns a hierarch
 | --------------------------- | --------------------------------------------------------------------------------- |
 | `--artifact <id>`           | Resolve the artifact filename from the active schema (e.g. `specs`, `verify`).    |
 | `--file <name>`             | Specify a direct filename within the spec directory.                              |
+| `--full`                    | Include all selector-addressable node families for the artifact format.           |
+| `--hints`                   | Include root-level `selectorHints` placeholders keyed by returned node type.      |
 | `--format text\|json\|toon` | Output format. Text and json both render JSON; toon uses token-oriented notation. |
 | `--config <path>`           | Config file path.                                                                 |
+
+Default output is intentionally compact and parser-defined:
+
+- markdown: `section`
+- json: `property`, `array-item`
+- yaml: `pair`
+- plaintext: `paragraph`
+
+Use `--full` when you need exhaustive selector-addressable coverage.
+Use `--hints` when you need placeholder selector guidance (`"<value>"`, `"<contains>"`, `"<level>"`).
 
 Examples:
 
