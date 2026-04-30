@@ -195,3 +195,20 @@
 - **WHEN** the source of `applyDelta` is inspected
 - **THEN** there are no hardcoded arrays of type names like `['array', 'sequence', 'list']` or `['array-item', 'sequence-item', 'list-item']`
 - **AND** all collection-aware logic uses descriptor flag lookups (`isSequence`, `isSequenceItem`, `isCollection`)
+
+### Requirement: Outline contract
+
+#### Scenario: Default outline remains compact
+
+- **WHEN** `outline(ast)` is called on each built-in adapter in default mode
+- **THEN** markdown returns `section` entries
+- **AND** json returns `property` and `array-item` entries
+- **AND** yaml returns `pair` entries
+- **AND** plaintext returns `paragraph` entries
+
+#### Scenario: Existing outline fields remain required
+
+- **GIVEN** an `OutlineEntry` object
+- **WHEN** it is validated against the interface
+- **THEN** `type`, `label`, and `depth` remain required
+- **AND** `children` remains optional

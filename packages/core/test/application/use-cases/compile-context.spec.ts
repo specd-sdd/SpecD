@@ -164,6 +164,7 @@ const stubParser: ArtifactParser = {
   renderSubtree: () => '',
   nodeTypes: () => [],
   outline: () => [],
+  selectorHints: () => ({}),
   deltaInstructions: () => 'delta format instructions',
   parseDelta: () => [],
 }

@@ -25,13 +25,13 @@
     {
       "requirement": "Outline Generation",
       "rules": [
-        "For each resolved artifact file, the use case SHALL:\n\n- Read the content from the appropriate `SpecRepository`.\n- Determine the correct `ArtifactParser` based on the file extension or schema format.\n- Parse the content into an AST.\n- Call `ArtifactParser.outline(ast)` to generate the hierarchical structure."
+        "For each resolved artifact file, the use case SHALL:\n\n- Read the content from the appropriate `SpecRepository`.\n- Determine the correct `ArtifactParser` based on the file extension or schema format.\n- Parse the content into an AST.\n- Call `ArtifactParser.outline(ast)` to generate the hierarchical structure.\n\nThe use case SHALL support two detail modes for returned outline families:\n\n- **default**: compact subset defined by the parser's default outline contract (historical behavior)\n- **full**: all selector-addressable families for the parser"
       ]
     },
     {
       "requirement": "Result",
       "rules": [
-        "The use case SHALL return a list of outline results, where each result contains:\n\n- `filename`: the resolved artifact filename.\n- `outline`: the hierarchical tree of `OutlineEntry` objects."
+        "The use case SHALL return a list of outline results, where each result contains:\n\n- `filename`: the resolved artifact filename.\n- `outline`: the hierarchical tree of `OutlineEntry` objects.\n\nWhen hint mode is enabled by the caller, each result also contains:\n\n- `selectorHints`: a root-level object keyed by node type with placeholder guidance.\n\n`selectorHints` MUST be sourced from parser-provided hint metadata, so new parsers can define their own type-level guidance without use-case changes.\n\n`selectorHints` entries MUST use placeholder values (for example `\"<value>\"`, `\"<contains>\"`, `\"<level>\"`) and MUST NOT duplicate per-node concrete values already visible in `outline` labels.\n\n`outline` entries MUST remain structural and sufficient for selector derivation without embedding repeated hint payload in each node."
       ]
     }
   ],
@@ -86,6 +86,23 @@
       "then": ["it uses the JsonParser", "AND returns the JSON hierarchical outline"]
     },
     {
+      "requirement": "Outline Generation",
+      "name": "Default mode returns compact subset",
+      "when": ["GetSpecOutline runs in default mode"],
+      "then": [
+        "markdown output includes section entries",
+        "AND json output includes property and array-item entries",
+        "AND yaml output includes pair entries",
+        "AND plaintext output includes paragraph entries"
+      ]
+    },
+    {
+      "requirement": "Outline Generation",
+      "name": "Full mode returns full selector-addressable families",
+      "when": ["GetSpecOutline runs in full mode"],
+      "then": ["all selector-addressable node families for the parser are included"]
+    },
+    {
       "requirement": "Result",
       "name": "Structured result format",
       "when": ["the use case completes successfully"],
@@ -93,11 +110,21 @@
         "it returns an array of objects",
         "AND each object has filename (string) and outline (OutlineEntry tree)"
       ]
+    },
+    {
+      "requirement": "Result",
+      "name": "Optional root-level selector hint metadata",
+      "when": ["hint mode is enabled"],
+      "then": [
+        "each result includes root-level selectorHints keyed by node type",
+        "AND hint values use placeholders such as \"<value>\", \"<contains>\", \"<level>\"",
+        "AND per-node outline entries do not duplicate hints"
+      ]
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:9f0dd062a4727bec4481625ab4a4ebfff8126bb1cddf96d0afef7d6420bd503c",
-    "verify.md": "sha256:386e0cac85f8edc09e0fd5cafe3e0262a33c0e8d68305c16ad0b15486b1fe311"
+    "spec.md": "sha256:da648464b502619b3ae4c4d7553280cf9f887d55bf92b6c0a4b125873dc158fb",
+    "verify.md": "sha256:e5dd84c9697cb2e69f7dee6eefbe789c83fa30242dfaf30f124b19a7a8ab66b7"
   },
   "generatedBy": "core"
 }

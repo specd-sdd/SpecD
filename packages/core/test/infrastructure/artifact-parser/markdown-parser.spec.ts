@@ -525,6 +525,20 @@ describe('MarkdownParser', () => {
       expect(allLabels).toContain('Requirement: Logout')
       expect(allLabels).toContain('Requirement: Remember me')
     })
+
+    it('keeps default outline limited to section entries', () => {
+      const ast = parser.parse('## Requirements\n\n### Requirement: Login\n')
+      const outline = parser.outline(ast)
+      const req = flattenOutlineEntries(outline).find((e) => e.label === 'Requirement: Login')
+      expect(req?.type).toBe('section')
+      expect(flattenOutlineEntries(outline).some((e) => e.type === 'paragraph')).toBe(false)
+    })
+
+    it('returns broader families in full mode', () => {
+      const ast = parser.parse('## Requirements\n\nParagraph text.\n')
+      const outline = parser.outline(ast, { full: true })
+      expect(flattenOutlineEntries(outline).some((e) => e.type === 'paragraph')).toBe(true)
+    })
   })
 
   describe('selector model scenarios', () => {
@@ -1050,4 +1064,15 @@ function flattenOutlineLabels(
     }
   }
   return labels
+}
+
+function flattenOutlineEntries<T extends { children?: readonly T[] }>(entries: readonly T[]): T[] {
+  const all: T[] = []
+  for (const entry of entries) {
+    all.push(entry)
+    if (entry.children) {
+      all.push(...flattenOutlineEntries(entry.children))
+    }
+  }
+  return all
 }

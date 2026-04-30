@@ -39,7 +39,7 @@
     {
       "requirement": "JSON output format",
       "rules": [
-        "When `--format` is `json` or `toon`, output to stdout:\n\n```json\n{\n  \"result\": \"ok\",\n  \"artifactId\": \"<artifact-id>\",\n  \"rulesPre\": [\"<rule text>\"],\n  \"instruction\": \"<instruction text>\" | null,\n  \"template\": \"<resolved template content>\" | null,\n  \"delta\": {\n    \"formatInstructions\": \"<format guidance>\",\n    \"domainInstructions\": \"<delta instruction>\" | null,\n    \"outlines\": [{ \"specId\": \"<spec-id>\", \"outline\": [...] }]\n  } | null,\n  \"rulesPost\": [\"<rule text>\"]\n}\n```"
+        "When `--format` is `json` or `toon`, output to stdout:\n\n```json\n{\n  \"result\": \"ok\",\n  \"artifactId\": \"<artifact-id>\",\n  \"rulesPre\": [\"<rule text>\"],\n  \"instruction\": \"<instruction text>\" | null,\n  \"template\": \"<resolved template content>\" | null,\n  \"delta\": {\n    \"formatInstructions\": \"<format guidance>\",\n    \"domainInstructions\": \"<delta instruction>\" | null,\n    \"availableOutlines\": [\"<spec-id>\"]\n  } | null,\n  \"rulesPost\": [\"<rule text>\"]\n}\n```\n\n`availableOutlines` MUST contain only spec IDs (`string[]`) that have an existing artifact file eligible for outlining. The command MUST NOT embed full outline trees in this response. Full outline content is obtained on demand with `specd specs outline <specPath> --artifact <artifactId>`."
       ]
     }
   ],
@@ -91,26 +91,33 @@
     },
     {
       "requirement": "JSON output format",
-      "name": "JSON output with instruction",
-      "given": ["an artifact with instruction: \"Write the spec\""],
-      "when": ["specd change artifact-instruction add-auth specs --format json"],
+      "name": "JSON output includes availableOutlines only",
+      "given": ["a delta-enabled artifact and change specs with existing outlineable files"],
+      "when": ["specd changes artifact-instruction add-auth specs --format json is executed"],
       "then": [
-        "stdout contains JSON with \"result\": \"ok\", \"artifactId\": \"specs\", and \"instruction\": \"Write the spec\""
+        "delta.availableOutlines is present as a string array of spec IDs",
+        "AND delta.outlines is not present in the response"
       ]
     },
     {
       "requirement": "JSON output format",
-      "name": "JSON output includes template",
-      "given": ["an artifact with a declared template containing scaffolding content"],
-      "when": ["specd change artifact-instruction add-auth specs --format json"],
+      "name": "Outline details retrieved on demand via specs outline",
+      "given": ["availableOutlines contains core:core/config"],
+      "when": ["specd specs outline core:core/config --artifact specs is executed"],
+      "then": ["the command returns the full outline structure for the requested artifact"]
+    },
+    {
+      "requirement": "Command signature",
+      "name": "Canonical command references in examples",
+      "when": ["users inspect command examples for outline retrieval"],
       "then": [
-        "stdout contains JSON with a \"template\" field containing the resolved template content"
+        "examples use canonical plural command form specd specs outline <specPath> --artifact <artifactId>"
       ]
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:7552452f8522e8eab9efaa0c5225594598e8d7bc44346cc1c913886f142a752a",
-    "verify.md": "sha256:ce4bb9b9083d8f527f95983075084f35dda34393a52b8c617974d6674b98276a"
+    "spec.md": "sha256:ce335f0a5d736ca01fa537711d90ad853082f03c4afb0ca74330617c82c3d8b1",
+    "verify.md": "sha256:a01d1311133d47385e2e5040c9878437d71e6f76ab640c10c2bb3a1c3fd430a7"
   },
   "generatedBy": "core"
 }

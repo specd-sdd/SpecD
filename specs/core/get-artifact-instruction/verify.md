@@ -39,53 +39,21 @@
 - **AND** `delta.domainInstructions` is `"Add requirements"`
 - **AND** `rulesPost` is `["Post rule"]`
 
-#### Scenario: Artifact with only instruction (no rules, no delta)
-
-- **GIVEN** an artifact with `instruction: "Create the proposal"` and no rules or delta
-- **WHEN** `GetArtifactInstruction.execute` is called
-- **THEN** `instruction` is `"Create the proposal"`
-- **AND** `rulesPre` is `[]`
-- **AND** `rulesPost` is `[]`
-- **AND** `delta` is `null`
-
-#### Scenario: Artifact with no instruction content
-
-- **GIVEN** an artifact with no `instruction`, no `rules`, and `delta: false`
-- **WHEN** `GetArtifactInstruction.execute` is called
-- **THEN** `instruction` is `null`
-- **AND** `rulesPre` is `[]`
-- **AND** `rulesPost` is `[]`
-- **AND** `delta` is `null`
-
-#### Scenario: Delta outlines from existing specs
+#### Scenario: Delta availableOutlines from existing specs
 
 - **GIVEN** an artifact with `delta: true` and `change.specIds` includes `default:auth/login`
 - **AND** `SpecRepository` has an existing `spec.md` for `auth/login`
 - **WHEN** `GetArtifactInstruction.execute` is called
-- **THEN** `delta.outlines` includes an entry with `specId: "default:auth/login"` and a non-empty `outline`
+- **THEN** `delta.availableOutlines` includes `"default:auth/login"`
+- **AND** no inline outline tree is returned in this payload
 
-#### Scenario: Missing existing artifact silently skipped in outlines
+#### Scenario: Missing existing artifact silently skipped in availableOutlines
 
 - **GIVEN** an artifact with `delta: true` and `change.specIds` includes `default:new/spec`
 - **AND** `SpecRepository` has no existing file for `new/spec`
 - **WHEN** `GetArtifactInstruction.execute` is called
-- **THEN** `delta.outlines` does not include an entry for `default:new/spec`
+- **THEN** `delta.availableOutlines` does not include `"default:new/spec"`
 - **AND** no error or warning is produced
-
-#### Scenario: rules.pre from extending schema
-
-- **GIVEN** a base schema with `instruction: "Write specs"`
-- **AND** a child schema that extends it adding `rules.pre: [{ id: "lang", text: "Use formal language" }]`
-- **WHEN** `GetArtifactInstruction.execute` is called
-- **THEN** `rulesPre` is `["Use formal language"]`
-- **AND** `instruction` is `"Write specs"`
-
-#### Scenario: Template content resolved and returned
-
-- **GIVEN** an artifact with `template: "templates/design.md"` pointing to a file containing `# Design: {{change.name}}`
-- **AND** a change named `add-auth`
-- **WHEN** `GetArtifactInstruction.execute` is called for this artifact
-- **THEN** `template` is `"# Design: add-auth"` (variables expanded)
 
 ### Requirement: Result shape
 
@@ -96,8 +64,9 @@
 - **THEN** `instruction` is `null`
 - **AND** `rulesPost` is `["Check grammar"]`
 
-#### Scenario: Result includes template field
+#### Scenario: Delta result exposes availableOutlines
 
-- **GIVEN** an artifact with `template: "templates/tasks.md"`
+- **GIVEN** a delta-enabled artifact and existing spec artifacts in change scope
 - **WHEN** `GetArtifactInstruction.execute` is called
-- **THEN** the result includes a `template` field with the resolved file content
+- **THEN** `delta.availableOutlines` is present as `string[]`
+- **AND** consumers can retrieve full outline content on demand using `specd specs outline <specPath> --artifact <artifactId>`

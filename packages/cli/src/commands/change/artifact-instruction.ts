@@ -29,7 +29,7 @@ JSON/TOON output schema:
     delta: {
       formatInstructions: string
       domainInstructions: string | null
-      outlines: Array<{ specId: string, outline: object }>
+      availableOutlines: string[]
     } | null
     rulesPost: string[]
   }
@@ -84,10 +84,10 @@ JSON/TOON output schema:
               if (result.delta.domainInstructions !== null) {
                 deltaParts.push(result.delta.domainInstructions)
               }
-              if (result.delta.outlines.length > 0) {
-                for (const entry of result.delta.outlines) {
-                  deltaParts.push(`${entry.specId}:\n${JSON.stringify(entry.outline, null, 2)}`)
-                }
+              if (result.delta.availableOutlines.length > 0) {
+                deltaParts.push(
+                  `availableOutlines: ${JSON.stringify(result.delta.availableOutlines)}`,
+                )
               }
               sections.push(`[delta]\n${deltaParts.join('\n\n')}`)
             }

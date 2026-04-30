@@ -221,6 +221,21 @@ Returns `artifactId`, `instruction`, `template`, `delta`, `rulesPre`, `rulesPost
 
 If the next artifact is `null`, go to step 10.
 
+Immediately after reading `changes artifact-instruction`:
+
+- If `delta.availableOutlines` is present and non-empty, fetch full outlines on demand
+  for the specs relevant to what you are about to edit:
+
+```bash
+specd specs outline <specPath> --artifact <artifactId>
+```
+
+- `availableOutlines` contains spec IDs (for example `core:core/config`), so pass those
+  values as `<specPath>`.
+- Add `--full` when you need exhaustive selector-addressable families.
+- Add `--hints` when you need root-level selector hint placeholders by type.
+- Run this before writing any delta so selector targeting uses real structure, not guesses.
+
 ### 8. Write the artifact
 
 **`rulesPre`, `instruction`, and `rulesPost` are a single mandatory block.** You MUST
@@ -395,7 +410,7 @@ Follow the recommended repair command based on the target recommendation.
 ## Guardrails
 
 - Always validate after writing
-- Delta, not rewrite — when outlines exist, always write a delta
+- Delta, not rewrite — when full structure is needed, fetch outlines on demand with `specd specs outline <specPath> --artifact <artifactId>` and write a delta
 - One spec at a time for `scope: spec` artifacts
 - Never guess spec IDs — look them up from `specs list --format text --summary`
 - If context is unclear, ask the user — don't guess

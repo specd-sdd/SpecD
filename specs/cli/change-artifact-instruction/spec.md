@@ -51,11 +51,13 @@ When `--format` is `json` or `toon`, output to stdout:
   "delta": {
     "formatInstructions": "<format guidance>",
     "domainInstructions": "<delta instruction>" | null,
-    "outlines": [{ "specId": "<spec-id>", "outline": [...] }]
+    "availableOutlines": ["<spec-id>"]
   } | null,
   "rulesPost": ["<rule text>"]
 }
 ```
+
+`availableOutlines` MUST contain only spec IDs (`string[]`) that have an existing artifact file eligible for outlining. The command MUST NOT embed full outline trees in this response. Full outline content is obtained on demand with `specd specs outline <specPath> --artifact <artifactId>`.
 
 ## Constraints
 
@@ -66,13 +68,16 @@ When `--format` is `json` or `toon`, output to stdout:
 
 ```bash
 # Get instruction for the specs artifact
-specd change artifact-instruction add-auth specs
+specd changes artifact-instruction add-auth specs
 
 # Get instruction for the verify artifact in JSON
-specd change artifact-instruction add-auth verify --format json
+specd changes artifact-instruction add-auth verify --format json
 
 # Get instruction for tasks (may include delta instructions if delta: true)
-specd change artifact-instruction add-auth tasks
+specd changes artifact-instruction add-auth tasks
+
+# Get full outline for a specific spec/artifact on demand
+specd specs outline core:core/config --artifact specs
 ```
 
 ## Spec Dependencies

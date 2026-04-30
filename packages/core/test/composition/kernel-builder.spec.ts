@@ -77,6 +77,7 @@ const TOML_PARSER: ArtifactParser = {
   renderSubtree: () => '',
   nodeTypes: () => [],
   outline: () => [],
+  selectorHints: () => ({}),
   deltaInstructions: () => '',
   parseDelta: () => [],
 }

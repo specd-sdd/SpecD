@@ -448,12 +448,42 @@ export class YamlParser implements ArtifactParser {
    * Returns a simplified navigable outline of the YAML artifact's key hierarchy.
    *
    * @param ast - The AST to generate an outline for
+   * @param options - Outline generation options
+   * @param options.full - When true, include full node-family coverage
    * @returns A nested list of pair outline entries
    */
-  outline(ast: ArtifactAST): readonly OutlineEntry[] {
+  outline(ast: ArtifactAST, options?: { readonly full?: boolean }): readonly OutlineEntry[] {
     const entries: OutlineEntry[] = []
-    this.collectOutlineEntries(ast.root, 0, entries)
+    this.collectOutlineEntries(ast.root, 0, entries, options?.full === true)
     return entries
+  }
+
+  /**
+   * Returns selector hint placeholders keyed by node type for YAML outlines.
+   *
+   * @param outline - Outline entries returned by {@link outline}
+   * @returns Hint placeholder map
+   */
+  selectorHints(
+    outline: readonly OutlineEntry[],
+  ): Readonly<Record<string, { matches: string; contains?: string; level?: string }>> {
+    const types = new Set<string>()
+    const walk = (entries: readonly OutlineEntry[]): void => {
+      for (const entry of entries) {
+        types.add(entry.type)
+        if (entry.children !== undefined) walk(entry.children)
+      }
+    }
+    walk(outline)
+
+    const out: Record<string, { matches: string; contains?: string; level?: string }> = {}
+    for (const type of types) {
+      out[type] = {
+        matches: '<value>',
+        ...(type === 'pair' || type === 'sequence-item' ? { contains: '<contains>' } : {}),
+      }
+    }
+    return out
   }
 
   /**
@@ -462,16 +492,22 @@ export class YamlParser implements ArtifactParser {
    * @param node - The current AST node being processed
    * @param depth - The nesting depth (0 = root children)
    * @param entries - Accumulator for outline entries
+   * @param full - Whether to include full node-family coverage
    */
-  private collectOutlineEntries(node: ArtifactNode, depth: number, entries: OutlineEntry[]): void {
+  private collectOutlineEntries(
+    node: ArtifactNode,
+    depth: number,
+    entries: OutlineEntry[],
+    full: boolean,
+  ): void {
     if (node.type === 'document') {
       for (const child of node.children ?? []) {
-        this.collectOutlineEntries(child, depth, entries)
+        this.collectOutlineEntries(child, depth, entries, full)
       }
     } else if (node.type === 'pair') {
       const children: OutlineEntry[] = []
       if (node.children && node.children.length > 0) {
-        this.collectOutlineEntries(node.children[0]!, depth + 1, children)
+        this.collectOutlineEntries(node.children[0]!, depth + 1, children, full)
       }
       entries.push({
         type: 'pair',
@@ -480,8 +516,28 @@ export class YamlParser implements ArtifactParser {
         ...(children.length > 0 ? { children } : {}),
       })
     } else if (node.type === 'mapping') {
+      if (full) entries.push({ type: 'mapping', label: node.label ?? 'mapping', depth })
       for (const pair of node.children ?? []) {
-        this.collectOutlineEntries(pair, depth, entries)
+        this.collectOutlineEntries(pair, depth, entries, full)
+      }
+    } else if (node.type === 'sequence') {
+      if (full) entries.push({ type: 'sequence', label: node.label ?? 'sequence', depth })
+      for (let i = 0; i < (node.children ?? []).length; i++) {
+        const item = node.children![i]!
+        const children: OutlineEntry[] = []
+        if (item.children && item.children.length > 0) {
+          this.collectOutlineEntries(item.children[0]!, depth + 1, children, full)
+        }
+        if (full) {
+          entries.push({
+            type: 'sequence-item',
+            label: `[${i}]`,
+            depth: depth + 1,
+            ...(children.length > 0 ? { children } : {}),
+          })
+        } else if (children.length > 0) {
+          entries.push(...children)
+        }
       }
     }
   }

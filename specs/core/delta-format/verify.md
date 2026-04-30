@@ -24,10 +24,21 @@
 - **WHEN** `deltaInstructions()` is called on the JSON adapter
 - **THEN** it returns a string describing `type: property`, `key`, `value`, `index`, `where`, and includes a concrete example using `op: modified` with a `value` field
 
-#### Scenario: outline reflects current artifact nodes
+#### Scenario: default outline mode is compact
 
-- **WHEN** `outline(ast)` is called on a parsed markdown spec with three `### Requirement:` headings
-- **THEN** it returns three `OutlineEntry` objects with `type: section` and their respective heading texts as `label`
+- **WHEN** `outline(ast)` is used in default mode for markdown, json, yaml, and plaintext
+- **THEN** it returns only the compact historical subset for each parser
+
+#### Scenario: full mode includes all selector-addressable families
+
+- **WHEN** full outline mode is requested
+- **THEN** all selector-addressable node families for the format are represented
+
+#### Scenario: hints are returned as root-level placeholders
+
+- **WHEN** hints mode is requested
+- **THEN** selector hints are returned as a root-level type-keyed object with placeholder values
+- **AND** hints are not duplicated in each outline entry
 
 #### Scenario: apply rejects on unresolved selector
 

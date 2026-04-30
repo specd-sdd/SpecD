@@ -660,12 +660,50 @@ export class MarkdownParser implements ArtifactParser {
    * Returns a simplified navigable outline of the Markdown artifact's section hierarchy.
    *
    * @param ast - The AST to generate an outline for
+   * @param options - Outline generation options
+   * @param options.full - When true, include full node-family coverage
    * @returns A nested list of section outline entries
    */
-  outline(ast: ArtifactAST): readonly OutlineEntry[] {
+  outline(ast: ArtifactAST, options?: { readonly full?: boolean }): readonly OutlineEntry[] {
+    if (options?.full === true) {
+      const fullEntries: OutlineEntry[] = []
+      this.collectFullOutlineEntries(ast.root, fullEntries, 0)
+      return fullEntries
+    }
     const entries: OutlineEntry[] = []
     this.collectOutlineEntries(ast.root, entries)
     return entries
+  }
+
+  /**
+   * Returns selector hint placeholders keyed by node type for markdown outlines.
+   *
+   * @param outline - Outline entries returned by {@link outline}
+   * @returns Hint placeholder map
+   */
+  selectorHints(
+    outline: readonly OutlineEntry[],
+  ): Readonly<Record<string, { matches: string; contains?: string; level?: string }>> {
+    const types = new Set<string>()
+    const walk = (entries: readonly OutlineEntry[]): void => {
+      for (const entry of entries) {
+        types.add(entry.type)
+        if (entry.children !== undefined) walk(entry.children)
+      }
+    }
+    walk(outline)
+
+    const out: Record<string, { matches: string; contains?: string; level?: string }> = {}
+    for (const type of types) {
+      out[type] = {
+        matches: '<value>',
+        ...(type === 'section' ? { level: '<level>' } : {}),
+        ...(type === 'paragraph' || type === 'list-item' || type === 'code-block'
+          ? { contains: '<contains>' }
+          : {}),
+      }
+    }
+    return out
   }
 
   /**
@@ -681,21 +719,74 @@ export class MarkdownParser implements ArtifactParser {
       }
       return
     }
-    if (node.type === 'section') {
-      const depth = (node.level ?? 1) - 1
-      const children: OutlineEntry[] = []
+    if (node.type !== 'section') {
       for (const child of node.children ?? []) {
-        if (child.type === 'section') {
-          this.collectOutlineEntries(child, children)
-        }
+        this.collectOutlineEntries(child, entries)
       }
+      return
+    }
+    const children: OutlineEntry[] = []
+    for (const child of node.children ?? []) {
+      if (child.type === 'section') this.collectOutlineEntries(child, children)
+    }
+    entries.push({
+      type: 'section',
+      label: node.label ?? '',
+      depth: (node.level ?? 1) - 1,
+      ...(children.length > 0 ? { children } : {}),
+    })
+  }
+
+  /**
+   * Recursively collects a broad set of selector-addressable markdown node families.
+   *
+   * @param node - Current node
+   * @param entries - Outline accumulator
+   * @param depth - Outline depth
+   */
+  private collectFullOutlineEntries(
+    node: ArtifactNode,
+    entries: OutlineEntry[],
+    depth: number,
+  ): void {
+    if (node.type === 'document') {
+      for (const child of node.children ?? []) this.collectFullOutlineEntries(child, entries, depth)
+      return
+    }
+
+    const label = this.fullOutlineLabel(node)
+    if (label !== null) {
+      const children: OutlineEntry[] = []
+      for (const child of node.children ?? [])
+        this.collectFullOutlineEntries(child, children, depth + 1)
       entries.push({
-        type: 'section',
-        label: node.label ?? '',
+        type: node.type,
+        label,
         depth,
         ...(children.length > 0 ? { children } : {}),
       })
+      return
     }
+
+    for (const child of node.children ?? [])
+      this.collectFullOutlineEntries(child, entries, depth + 1)
+  }
+
+  /**
+   * Gets a stable full-outline label for a markdown node family.
+   *
+   * @param node - Node to label
+   * @returns Label or null when node should not be emitted
+   */
+  private fullOutlineLabel(node: ArtifactNode): string | null {
+    if (typeof node.label === 'string' && node.label.length > 0) return node.label
+    if (typeof node.value === 'string' && node.value.trim().length > 0) {
+      return node.value.trim().slice(0, 80)
+    }
+    if (node.type === 'list') return node.ordered ? 'ordered-list' : 'unordered-list'
+    if (node.type === 'thematic-break') return '---'
+    if (node.type === 'code-block') return 'code-block'
+    return null
   }
 
   /**

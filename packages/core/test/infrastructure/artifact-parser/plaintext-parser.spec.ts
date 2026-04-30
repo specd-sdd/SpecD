@@ -138,7 +138,7 @@ describe('PlaintextParser', () => {
   })
 
   describe('outline', () => {
-    it('returns one entry per paragraph with first 50 chars as label', () => {
+    it('returns paragraph entries in default mode', () => {
       const ast = parser.parse(
         'Short paragraph.\n\nA much longer paragraph that exceeds fifty characters total in length.',
       )
@@ -146,8 +146,15 @@ describe('PlaintextParser', () => {
       expect(outline).toHaveLength(2)
       expect(outline[0]!.type).toBe('paragraph')
       expect(outline[0]!.label).toBe('Short paragraph.')
+      expect(outline[0]!.children).toBeUndefined()
       expect(outline[1]!.label).toHaveLength(50)
       expect(outline[1]!.depth).toBe(0)
+    })
+
+    it('includes line children in full mode', () => {
+      const ast = parser.parse('Short paragraph.')
+      const outline = parser.outline(ast, { full: true })
+      expect(outline[0]!.children?.[0]?.type).toBe('line')
     })
 
     it('returns empty array for empty document', () => {

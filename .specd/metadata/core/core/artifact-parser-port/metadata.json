@@ -68,7 +68,13 @@
     {
       "requirement": "Outline contract",
       "rules": [
-        "The `outline` method MUST return a simplified navigable summary of the artifact's addressable nodes, suitable for injection into LLM context during delta generation."
+        "The `outline` method MUST return a simplified navigable summary of the artifact's addressable nodes, suitable for injection into LLM context during delta generation.\n\nThe parser's default outline output MUST preserve the historical compact subset for its format:\n\n- markdown: `section`\n- json: `property`, `array-item`\n- yaml: `pair`\n- plaintext: `paragraph`\n\nFull selector-addressable coverage is exposed through full-detail retrieval mode at the use-case/command level."
+      ]
+    },
+    {
+      "requirement": "Selector hint contract",
+      "rules": [
+        "The parser port MUST expose selector-hint metadata for root-level outline responses.\n\nSelector hint payloads MUST:\n\n- be keyed by node type.\n- use placeholder values only (for example `\"<value>\"`, `\"<contains>\"`, `\"<level>\"`).\n- avoid concrete per-node duplication already represented in outline labels.\n\nThe use case MAY omit this metadata unless hint mode is explicitly requested by the caller."
       ]
     },
     {
@@ -102,7 +108,7 @@
     {
       "requirement": "Supporting type shapes",
       "rules": [
-        "- `NodeTypeDescriptor` MUST contain `type: string`, `identifiedBy: readonly string[]`, `description: string`, `isCollection: boolean`, `isSequence: boolean`, `isSequenceItem: boolean`, `isContainer: boolean`, and `isLeaf: boolean`.\n- `OutlineEntry` MUST contain `type: string`, `label: string`, `depth: number`, and optional `children: readonly OutlineEntry[]`."
+        "- `NodeTypeDescriptor` MUST contain `type: string`, `identifiedBy: readonly string[]`, `description: string`, `isCollection: boolean`, `isSequence: boolean`, `isSequenceItem: boolean`, `isContainer: boolean`, and `isLeaf: boolean`.\n- `OutlineEntry` MUST contain `type: string`, `label: string`, `depth: number`, and optional `children: readonly OutlineEntry[]`.\n- Parser-level outline entries remain structural. Selector hint metadata is response-level and keyed by type; it is not required per `OutlineEntry` node."
       ]
     }
   ],
@@ -340,11 +346,29 @@
         "there are no hardcoded arrays of type names like ['array', 'sequence', 'list'] or ['array-item', 'sequence-item', 'list-item']",
         "AND all collection-aware logic uses descriptor flag lookups (isSequence, isSequenceItem, isCollection)"
       ]
+    },
+    {
+      "requirement": "Outline contract",
+      "name": "Default outline remains compact",
+      "when": ["outline(ast) is called on each built-in adapter in default mode"],
+      "then": [
+        "markdown returns section entries",
+        "AND json returns property and array-item entries",
+        "AND yaml returns pair entries",
+        "AND plaintext returns paragraph entries"
+      ]
+    },
+    {
+      "requirement": "Outline contract",
+      "name": "Existing outline fields remain required",
+      "given": ["an OutlineEntry object"],
+      "when": ["it is validated against the interface"],
+      "then": ["type, label, and depth remain required", "AND children remains optional"]
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:951b3d4e2ea58d0561e5534c256eb782773d296f515378d82af8e090572db293",
-    "verify.md": "sha256:fabccd4b4ff94192cdc8cb4ca68009bc5d5b4957b5e7483ac7fd694f50a0db99"
+    "spec.md": "sha256:16df2e0ff19838aee5a11ab48d288c0da54b0372462b863b2a8e0fc8ee66a695",
+    "verify.md": "sha256:aceb28b5419ab51d206aa1bbd947bc8385c20793ca92ef689b929a76fdb0caa9"
   },
   "generatedBy": "core"
 }

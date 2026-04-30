@@ -53,7 +53,7 @@ After resolving the schema, `GetArtifactInstruction` MUST compare `schema.name()
 - **`delta`** — if the artifact has `delta: true`, resolve three sub-components:
   - **`formatInstructions`** — call `parsers.get(artifact.format).deltaInstructions()` for the technical delta format guidance.
   - **`domainInstructions`** — the artifact's `deltaInstruction` field. `null` if not declared.
-  - **`outlines`** — for each spec ID in `change.specIds`, read the corresponding artifact file from `SpecRepository`, parse it via `ArtifactParser.parse()`, and call `ArtifactParser.outline()` to obtain an `OutlineEntry[]` tree. An outline is a navigable summary of the artifact's addressable nodes (sections in markdown, keys in YAML/JSON) without their content — it tells the agent what structure exists so it can target delta operations correctly. Missing files are silently skipped. Each entry includes the `specId` and its `outline`.
+  - **`availableOutlines`** — for each spec ID in `change.specIds`, if the corresponding artifact file exists in `SpecRepository`, include that `specId` in `availableOutlines`. `availableOutlines` is strictly `string[]` of spec IDs. The use case MUST NOT embed full outline trees in this payload. Full outline content is retrieved on demand via `GetSpecOutline` (CLI: `specd specs outline <specPath> --artifact <artifactId>`).
 - **`rulesPost`** — if the artifact declares `rules.post`, collect all entries' `text` in declaration order.
 
 When `delta` is `false`, the `delta` field in the result is `null`.
@@ -69,19 +69,18 @@ When `delta` is `false`, the `delta` field in the result is `null`.
 - `delta` (object | null) — delta-specific instruction components; `null` when `delta: false`:
   - `formatInstructions` (string) — format-specific delta writing guidance
   - `domainInstructions` (string | null) — the artifact's `deltaInstruction` text; `null` if not declared
-  - `outlines` (array) — one entry per spec in `change.specIds` that has an existing artifact file:
-    - `specId` (string) — the spec ID
-    - `outline` (OutlineEntry\[]) — the navigable node structure
+  - `availableOutlines` (string\[]) — spec IDs from `change.specIds` whose artifact file exists and can be outlined
 - `rulesPost` (string\[]) — `rules.post` texts in declaration order; empty array if none
 
-The caller decides which parts to use. A subagent creating artifacts from scratch uses `rulesPre` + `instruction` + `template` + `rulesPost`. A subagent creating deltas uses `rulesPre` + `delta` + `rulesPost` (the template is not needed for deltas since `outlines` provides the existing structure).
+The caller decides which parts to use. A subagent creating artifacts from scratch uses `rulesPre` + `instruction` + `template` + `rulesPost`. A subagent creating deltas uses `rulesPre` + `delta` + `rulesPost`, and fetches outline details on demand with `specd specs outline <specPath> --artifact <artifactId>`.
 
 ## Constraints
 
 - This use case is read-only — it does not modify the change or execute any commands
 - `rules.pre` and `rules.post` are schema composition mechanisms — they augment the instruction without replacing it
 - The use case does not evaluate step availability or artifact status
-- Delta outlines are loaded from `SpecRepository` for each spec in `change.specIds` — missing files are silently skipped
+- Delta outline availability is derived from `SpecRepository` for each spec in `change.specIds`; missing files are silently skipped
+- Full outline trees are intentionally excluded from this result; consumers must call `GetSpecOutline`/`specd specs outline` on demand
 - `ArtifactParserRegistry` must contain an adapter for the artifact's format; if no adapter is registered, the use case throws `ParserNotRegisteredError`
 
 ## Spec Dependencies

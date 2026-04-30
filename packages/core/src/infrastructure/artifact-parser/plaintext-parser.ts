@@ -136,15 +136,45 @@ export class PlaintextParser implements ArtifactParser {
    * Returns a simplified navigable outline of the plain text artifact's paragraphs.
    *
    * @param ast - The AST to generate an outline for
+   * @param options - Outline generation options
+   * @param options.full - When true, include line-level entries under each paragraph
    * @returns A flat list of paragraph outline entries with depth 0
    */
-  outline(ast: ArtifactAST): readonly OutlineEntry[] {
+  outline(ast: ArtifactAST, options?: { readonly full?: boolean }): readonly OutlineEntry[] {
     const children = ast.root.children ?? []
-    return children.map((c) => ({
-      type: 'paragraph',
-      label: this._serializeParagraph(c).slice(0, 50),
-      depth: 0,
-    }))
+    return children.map((c) => {
+      const paragraphText = this._serializeParagraph(c)
+      const lineChildren: OutlineEntry[] =
+        options?.full === true
+          ? (c.children ?? []).map((line, idx) => ({
+              type: 'line',
+              label: typeof line.value === 'string' ? line.value.slice(0, 50) : `line-${idx + 1}`,
+              depth: 1,
+            }))
+          : []
+      return {
+        type: 'paragraph',
+        label: paragraphText.slice(0, 50),
+        depth: 0,
+        ...(lineChildren.length > 0 ? { children: lineChildren } : {}),
+      }
+    })
+  }
+
+  /**
+   * Returns selector hint placeholders keyed by node type for plaintext outlines.
+   *
+   * @param outline - Outline entries returned by {@link outline}
+   * @returns Hint placeholder map
+   */
+  selectorHints(
+    outline: readonly OutlineEntry[],
+  ): Readonly<Record<string, { matches: string; contains?: string; level?: string }>> {
+    const hasLine = outline.some((entry) => entry.children?.some((c) => c.type === 'line') === true)
+    return {
+      paragraph: { matches: '<value>', contains: '<contains>' },
+      ...(hasLine ? { line: { matches: '<value>', contains: '<contains>' } } : {}),
+    }
   }
 
   /**

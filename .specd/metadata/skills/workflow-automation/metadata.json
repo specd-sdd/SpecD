@@ -19,6 +19,12 @@
       ]
     },
     {
+      "requirement": "On-demand outline retrieval",
+      "rules": [
+        "When artifact-instruction responses provide only outline availability references (for example `availableOutlines`), AI agents MUST retrieve full outline content on demand using the canonical command:\n\n`specd specs outline <specPath> --artifact <artifactId>`\n\nAgents MUST NOT rely on embedded full outline trees in `changes artifact-instruction` output."
+      ]
+    },
+    {
       "requirement": "Repair Strategy",
       "rules": [
         "Agents SHALL follow the \"Next Action\" recommendations provided in command outputs before attempting to repeat a failed lifecycle operation."
@@ -27,7 +33,7 @@
     {
       "requirement": "Canonical Command References",
       "rules": [
-        "Agent-authored workflow instructions and examples MUST use canonical plural command groups for countable resources (for example: `changes`, `specs`, `archives`, `drafts`).\n\nSingular forms MAY be referenced only as aliases."
+        "Agent-authored workflow instructions and examples MUST use canonical plural command groups for countable resources (for example: `changes`, `specs`, `archives`, `drafts`).\n\nSingular forms MAY be referenced only as aliases.\n\nFor outline retrieval examples, the canonical form is `specd specs outline <specPath> --artifact <artifactId>`."
       ]
     },
     {
@@ -63,6 +69,26 @@
       ]
     },
     {
+      "requirement": "On-demand outline retrieval",
+      "name": "Agent fetches full outline using canonical command",
+      "given": ["artifact-instruction output includes availableOutlines: [\"core:core/config\"]"],
+      "when": ["the agent needs full structure for delta authoring"],
+      "then": [
+        "it runs specd specs outline core:core/config --artifact specs",
+        "AND uses that output as the outline source"
+      ]
+    },
+    {
+      "requirement": "On-demand outline retrieval",
+      "name": "Agent avoids inline outline dependency",
+      "given": ["changes artifact-instruction output does not include full outline trees"],
+      "when": ["generating deltas"],
+      "then": [
+        "the agent does not fail due to missing embedded outlines",
+        "AND retrieves required detail via specd specs outline"
+      ]
+    },
+    {
       "requirement": "Repair Strategy",
       "name": "Agent follows repair guide after transition failure",
       "given": ["a transition from designing to ready fails with MISSING_ARTIFACT"],
@@ -80,6 +106,12 @@
         "examples use canonical plural groups (changes, specs, archives, drafts)",
         "AND singular forms are referenced only as aliases"
       ]
+    },
+    {
+      "requirement": "Canonical Command References",
+      "name": "Canonical outline command example",
+      "when": ["the agent documents outline retrieval"],
+      "then": ["it uses specd specs outline <specPath> --artifact <artifactId>"]
     },
     {
       "requirement": "Command Necessity and Freshness",
@@ -135,8 +167,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:0357ae24b33df5edd83359cff62538f3dd50c81839f6cd6b6ac4ebde2195487c",
-    "verify.md": "sha256:9eb2c1561e60913804c594b5e92cbb03e0354de4442848a37f47bc6a1288bfad"
+    "spec.md": "sha256:604225b09198cf5917d90471af9fd2eb20bd4b8d119fc9f17ba25645effd9c25",
+    "verify.md": "sha256:d5c45462016f6fcf53c60664628a7e02d6fa16829e8a23e706851745d13f5c8d"
   },
   "generatedBy": "core"
 }
