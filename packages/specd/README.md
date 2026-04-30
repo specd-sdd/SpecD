@@ -28,9 +28,17 @@ SpecD addresses this by combining:
 ## Minimal workflow
 
 ```sh
+npm install -g @specd/specd
+```
+
+Initialize a project (wizard guides you through plugin selection):
+
+```sh
 # CLI
 specd project init
 ```
+
+Run skill on your coding agent:
 
 ```text
 # Coding agent
@@ -57,7 +65,7 @@ Key differences from earlier SDD tools:
 
 ## Current status (April 2026)
 
-SpecD is in active development and usable from source in this monorepo.
+SpecD is in active development and installable from npm.
 
 - **@specd/specd** — convenience metapackage that installs the full SpecD stack
 - **@specd/core** — business logic layer: change lifecycle, spec management, schema validation, delta application, context compilation, hooks, storage adapters
@@ -70,7 +78,17 @@ SpecD is in active development and usable from source in this monorepo.
 - **@specd/mcp** — in progress (stub)
 - **@specd/public-web** — in progress (Docusaurus site with landing page and docs)
 
-Publishing/install flows are not finalized yet; use workspace commands for now.
+Install from npm:
+
+```sh
+npm install -g @specd/specd
+```
+
+Or run without global install:
+
+```sh
+npx @specd/cli --help
+```
 
 ## Core concepts
 
@@ -154,7 +172,13 @@ Teams with microservice architectures can manage cross-cutting specs (authentica
 
 ### Use as a CLI
 
-Install globally:
+Install globally (npm):
+
+```sh
+npm install -g @specd/specd
+```
+
+Install globally (pnpm):
 
 ```sh
 pnpm add -g @specd/specd
