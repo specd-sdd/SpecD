@@ -44,7 +44,7 @@
     {
       "requirement": "Automated enforcement",
       "rules": [
-        "Commit conventions must be automatically enforced by commitlint via a husky `commit-msg` hook. Commits that violate the format are rejected at commit time before they reach the repository.\n\ncommitlint configuration must:\n\n- Extend `@commitlint/config-conventional` as the base\n- Restrict `scope-enum` to the known specd package names: `core`, `cli`, `mcp`, `skills`, `schema-std`, `plugin-manager`, `plugin-agent-claude`, `plugin-agent-copilot`, `plugin-agent-codex`, `plugin-agent-opencode`, `code-graph`, `root`, `all`\n- Enforce `subject-case: lower-case`\n- Enforce `header-max-length: 72`\n- Enforce `body-max-line-length: 100`\n- Reject commits that include AI co-author trailers (`Co-Authored-By: ... @anthropic.com`)"
+        "Commit conventions must be automatically enforced by commitlint via a husky `commit-msg` hook. Commits that violate the format are rejected at commit time before they reach the repository.\n\ncommitlint configuration must:\n\n- Extend `@commitlint/config-conventional` as the base\n- Restrict `scope-enum` to the known specd package names: `core`, `cli`, `mcp`, `skills`, `schema-std`, `plugin-manager`, `plugin-agent-claude`, `plugin-agent-copilot`, `plugin-agent-codex`, `plugin-agent-opencode`, `plugin-agent-standard`, `code-graph`, `root`, `all`\n- Enforce `subject-case: lower-case`\n- Enforce `header-max-length: 72`\n- Enforce `body-max-line-length: 100`\n- Reject commits that include AI co-author trailers (`Co-Authored-By: ... @anthropic.com`)"
       ]
     },
     {
@@ -152,7 +152,7 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:5ca2c054a423d09190ecc97d7184b0f88ae822ffd9ca2231079246e21beefc67",
+    "spec.md": "sha256:bf1fb24917f07404284859bf6501d003bd550e1637c9866ab8f8dbdd4461b060",
     "verify.md": "sha256:8353f0bd3f445bc84ff816668adc1cacd22bb3d5733060829d73ff848c0980f6"
   },
   "generatedBy": "core"

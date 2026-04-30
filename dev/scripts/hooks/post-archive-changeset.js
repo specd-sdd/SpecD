@@ -18,6 +18,7 @@ const WORKSPACE_PACKAGE_MAP = {
   'plugin-agent-claude': '@specd/plugin-agent-claude',
   'plugin-agent-copilot': '@specd/plugin-agent-copilot',
   'plugin-agent-codex': '@specd/plugin-agent-codex',
+  'plugin-agent-standard': '@specd/plugin-agent-standard',
 }
 
 async function findIndexFile(archiveDir) {

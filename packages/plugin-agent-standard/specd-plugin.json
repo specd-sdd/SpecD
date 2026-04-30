@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "name": "@specd/plugin-agent-standard",
+  "version": "0.0.1",
+  "description": "Agent Skills standard plugin for specd skills installation",
+  "pluginType": "agent",
+  "minCoreVersion": "*"
+}

@@ -18,6 +18,7 @@ export default {
         'plugin-agent-copilot',
         'plugin-agent-codex',
         'plugin-agent-opencode',
+        'plugin-agent-standard',
         'public-web',
         'root',
         'all',

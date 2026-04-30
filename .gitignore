@@ -13,6 +13,7 @@ apps/public-web/.generated/
 !.specd/metadata/
 
 # AI Agents
+.agents/
 .claude/
 .codex/
 .opencode/
@@ -34,6 +35,5 @@ specd.local.yaml
 .vscode/
 .idea/
 .history/
-.gitnexus
 
 gha-creds-*.json

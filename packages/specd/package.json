@@ -18,6 +18,7 @@
     "@specd/plugin-agent-codex": "workspace:*",
     "@specd/plugin-agent-copilot": "workspace:*",
     "@specd/plugin-agent-opencode": "workspace:*",
+    "@specd/plugin-agent-standard": "workspace:*",
     "@specd/plugin-manager": "workspace:*",
     "@specd/schema-std": "workspace:*",
     "@specd/skills": "workspace:*"
