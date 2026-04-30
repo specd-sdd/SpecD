@@ -1,5 +1,20 @@
 # @specd/mcp
 
+## 0.0.4
+
+### Patch Changes
+
+- Updated dependencies [c7c485e]
+- Updated dependencies [0103454]
+- Updated dependencies [c5c8f64]
+- Updated dependencies [f4aa390]
+- Updated dependencies [60ea657]
+- Updated dependencies [ef13876]
+- Updated dependencies [5f6a823]
+- Updated dependencies [1c1c54a]
+- Updated dependencies [c558cb2]
+  - @specd/core@0.2.0
+
 ## 0.0.3
 
 ### Patch Changes

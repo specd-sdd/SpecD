@@ -1,5 +1,91 @@
 # @specd/core
 
+## 0.2.0
+
+### Minor Changes
+
+- 0103454: 20260424 - add-markdown-paragraph-delta-tests: Add nature flags (isCollection, isSequence, isSequenceItem, isContainer, isLeaf) to NodeTypeDescriptor for declarative node-type classification. Replace all hardcoded type vectors in applyDelta with descriptor lookups, implement semantic validation (validateContent/Value/Rename) with error/warning matrix, and wrap apply return in DeltaApplicationResult. Warnings now propagate through change validate to the CLI.
+
+  Specs affected:
+  - `core:core/delta-format`
+  - `core:core/artifact-parser-port`
+  - `core:core/artifact-ast`
+
+- 60ea657: 20260427 - schema-artifact-hastasks: Introduced an explicit hasTasks boolean field to artifact definitions in the schema as a master switch for task tracking. Implemented semantic validation at schema load and defensive runtime checks in TransitionChange to ensure requiresTaskCompletion consistency, while providing default markdown checkbox patterns when enabled.
+
+  Specs affected:
+  - `core:core/schema-format`
+  - `cli:cli/change-status`
+  - `core:core/transition-change`
+
+- 1c1c54a: 20260428 - context-modes-ux: Adds an explicit --mode flag to context commands and aligns full/hybrid rendering behavior across project context, change context, and spec context. The implementation now defaults full-mode output to structured Description + Rules + Constraints, with section filters overriding defaults while preserving header context. Core and CLI context use cases/tests were updated to enforce consistent mode semantics and predictable context output for agents.
+
+  Specs affected:
+  - `cli:cli/project-context`
+  - `cli:cli/change-context`
+  - `cli:cli/spec-context`
+  - `core:core/compile-context`
+  - `core:core/get-spec-context`
+  - `core:core/get-project-context`
+  - `core:core/config`
+
+- c558cb2: 20260430 - compact-and-complete-outlines: Implemented a compact-first outline workflow by keeping changes artifact-instruction focused on availableOutlines references and moving full structure retrieval to on-demand specs outline. Added --full and --hints modes, with parser-owned default subsets and parser-provided root-level selectorHints, reducing verbosity while preserving complete selector coverage when needed. Updated core/CLI contracts, parser adapters, tests, and workflow guidance to keep the behavior consistent across current and future parsers.
+
+  Specs affected:
+  - `cli:cli/change-artifact-instruction`
+  - `core:core/get-artifact-instruction`
+  - `core:core/delta-format`
+  - `cli:cli/spec-outline`
+  - `core:core/get-spec-outline`
+  - `core:core/artifact-parser-port`
+  - `skills:workflow-automation`
+
+### Patch Changes
+
+- c7c485e: 20260422 - fix-config-compliance: Align config behavior with current spec contracts by removing legacy artifactRules/skills handling, enforcing plugins validation at load time, and tightening workspace contextMode errors. The change also adds unknown-template warning callbacks and updates config show/docs so runtime output, verification scenarios, and documentation all reflect the same model. This closes the compliance gaps without changing the broader plugin-manager workflow.
+
+  Specs affected:
+  - `core:core/config`
+  - `cli:cli/config-show`
+  - `core:core/template-variables`
+  - `core:core/config-writer-port`
+
+- c5c8f64: 20260424 - enforce-artifact-path-validation: Ensures change manifests and validation strictly target correct artifact paths (deltas vs specs) from creation time, and enhances CLI output to report explicit file paths with merged-spec preview guidance.
+
+  Specs affected:
+  - `core:core/change-layout`
+  - `core:core/change-manifest`
+  - `core:core/validate-artifacts`
+  - `cli:cli/change-validate`
+
+- f4aa390: 20260427 - improve-specd-diagnostics-and-ux: Rename warnings to notes, provide clear blockers in status/transition, and optimize skill diagnostic output.
+
+  Specs affected:
+  - `core:core/get-status`
+  - `core:core/transition-change`
+  - `cli:cli/change-status`
+  - `cli:cli/change-transition`
+  - `cli:cli/change-validate`
+  - `skills:workflow-automation`
+  - `core:core/change`
+
+- ef13876: 20260428 - 20260428-unified-logging-system: Introduce a structured logging system using Pino and a global proxy to minimize injection boilerplate.
+
+  Specs affected:
+  - `core:core/logger-port`
+  - `cli:cli/logging-integration`
+  - `core:core/pino-logger`
+  - `core:core/kernel-logging`
+  - `core:core/config`
+  - `default:_global/logging`
+  - `cli:entrypoint`
+
+- 5f6a823: 20260428 - change-validate-blocker-diagnostics: Align change validate dependency-blocked diagnostics with change transition by reporting effective blocker status and recursive parent review blockers.
+
+  Specs affected:
+  - `cli:cli/change-validate`
+  - `core:core/validate-artifacts`
+
 ## 0.1.0
 
 ### Minor Changes

@@ -1,5 +1,111 @@
 # @specd/skills
 
+## 0.2.0
+
+### Minor Changes
+
+- 1bdd9b0: 20260429 - shared-skill-bundle-targets: Adds first-class shared file support for skill bundles so plugin installers can route shared templates to a dedicated shared directory while preserving compatibility when no shared target is configured. Agent plugin installers now install and uninstall only specd-managed skills, keeping unrelated user skills untouched during full uninstall operations. The change also standardizes shared template references and verifies end-to-end behavior across codex, claude, copilot, and opencode plugin workflows.
+
+  Specs affected:
+  - `skills:skill-bundle`
+  - `skills:skill-repository-port`
+  - `skills:skill-repository-infra`
+  - `skills:resolve-bundle`
+  - `plugin-manager:agent-plugin-type`
+  - `plugin-agent-codex:plugin-agent`
+  - `plugin-agent-claude:plugin-agent`
+  - `plugin-agent-copilot:plugin-agent`
+  - `plugin-agent-opencode:plugin-agent`
+
+### Patch Changes
+
+- ec47a74: 20260423 - project-status-command: Add specd project status command consolidating workspace info, spec/change counts, graph freshness, and context references into one output. Enhance change status with schema-derived artifactDag and approval gates. Update skill templates to use the new command.
+
+  Specs affected:
+  - `cli:cli/project-status`
+  - `cli:cli/change-status`
+
+- 90da65f: 20260424 - multi-language-call-resolution: Implements issues 52 and 54 by extending code-graph dependency resolution across the current built-in language adapters with deterministic binding/call facts, shared scoped resolution, and first-class USES_TYPE / CONSTRUCTS relations. The change also removes noisy self-relations and updates graph impact CLI/docs/skills to prefer the clearer dependents / dependencies direction aliases while preserving upstream / downstream compatibility.
+
+  Specs affected:
+  - `code-graph:code-graph/language-adapter`
+  - `code-graph:code-graph/indexer`
+  - `code-graph:code-graph/symbol-model`
+  - `cli:cli/graph-impact`
+  - `skills:skill-templates-source`
+  - `default:_global/docs`
+
+- aad2115: 20260424 - refactor-agent-plugin-config: Replace projectRoot: string with SpecdConfig in AgentPlugin and PluginContext, rename InstallOptions/InstallResult to agent-specific names, and inject built-in variables automatically when resolving skill bundles.
+
+  Specs affected:
+  - `plugin-manager:specd-plugin-type`
+  - `plugin-manager:agent-plugin-type`
+  - `plugin-manager:install-plugin-use-case`
+  - `skills:resolve-bundle`
+  - `skills:skill-repository-port`
+  - `plugin-agent-claude:plugin-agent`
+  - `plugin-agent-copilot:plugin-agent`
+  - `plugin-agent-codex:plugin-agent`
+  - `plugin-agent-opencode:plugin-agent`
+  - `plugin-manager:uninstall-plugin-use-case`
+  - `plugin-manager:update-plugin-use-case`
+  - `plugin-manager:plugin-loader`
+
+- f4aa390: 20260427 - improve-specd-diagnostics-and-ux: Rename warnings to notes, provide clear blockers in status/transition, and optimize skill diagnostic output.
+
+  Specs affected:
+  - `core:core/get-status`
+  - `core:core/transition-change`
+  - `cli:cli/change-status`
+  - `cli:cli/change-transition`
+  - `cli:cli/change-validate`
+  - `skills:workflow-automation`
+  - `core:core/change`
+
+- d32a861: 20260428 - pluralize-cli-resource-commands: Standardize CLI countable resource command groups to canonical plural forms (changes, specs, archives, drafts) while maintaining singular aliases for backward compatibility. This change includes a new governing policy spec (cli:cli/command-resource-naming), updates to affected CLI specs, and comprehensive updates to documentation and skill examples to ensure a consistent command vocabulary across the ecosystem.
+
+  Specs affected:
+  - `cli:cli/change-draft`
+  - `cli:cli/drafts-list`
+  - `cli:cli/drafts-show`
+  - `cli:cli/drafts-restore`
+  - `cli:cli/command-resource-naming`
+  - `cli:cli/change-list`
+  - `cli:cli/spec-list`
+  - `cli:cli/change-archive`
+  - `skills:workflow-automation`
+
+- 873d021: 20260429 - clarify-skill-review-and-command-usage: Align workflow-skill guidance and CLI-facing contracts with the current canonical commands and artifact-focused flags so agents can avoid redundant reads while preserving deterministic safety checks. Clarify that changes validate is structural/state validation only and must not be used as semantic content approval, with explicit review expectations in skills and docs. Reinforce overlap/drift protection by requiring merged-content review patterns (including artifact-filtered preview when targeted) before archiving or accepting spec deltas.
+
+  Specs affected:
+  - `skills:workflow-automation`
+  - `cli:change-validate`
+  - `cli:change-spec-preview`
+  - `cli:command-resource-naming`
+
+- c558cb2: 20260430 - compact-and-complete-outlines: Implemented a compact-first outline workflow by keeping changes artifact-instruction focused on availableOutlines references and moving full structure retrieval to on-demand specs outline. Added --full and --hints modes, with parser-owned default subsets and parser-provided root-level selectorHints, reducing verbosity while preserving complete selector coverage when needed. Updated core/CLI contracts, parser adapters, tests, and workflow guidance to keep the behavior consistent across current and future parsers.
+
+  Specs affected:
+  - `cli:cli/change-artifact-instruction`
+  - `core:core/get-artifact-instruction`
+  - `core:core/delta-format`
+  - `cli:cli/spec-outline`
+  - `core:core/get-spec-outline`
+  - `core:core/artifact-parser-port`
+  - `skills:workflow-automation`
+
+- 469ba03: Fixed typos on specd-compliance skill
+- Updated dependencies [c7c485e]
+- Updated dependencies [0103454]
+- Updated dependencies [c5c8f64]
+- Updated dependencies [f4aa390]
+- Updated dependencies [60ea657]
+- Updated dependencies [ef13876]
+- Updated dependencies [5f6a823]
+- Updated dependencies [1c1c54a]
+- Updated dependencies [c558cb2]
+  - @specd/core@0.2.0
+
 ## 0.1.0
 
 ### Minor Changes

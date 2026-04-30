@@ -1,6 +1,43 @@
+<p align="center">
+  <img src="assets/readme-hero.png" alt="SpecD — Stop making agents guess" width="1000" height="500" style="width: 100%; height: auto">
+</p>
+
 # SpecD
 
-A spec-driven development platform for AI-native teams. SpecD compiles the specs your agent needs at every lifecycle step — so context is delivered, not discovered, and compliance is structural, not hoped for.
+Stop making agents guess.
+
+Spec-driven development for AI coding agents. SpecD compiles the right specs into agent context, verifies plans against requirements before implementation, and helps prevent drift before code ships.
+
+Context is delivered, not discovered. Compliance is structural, not optional. For more information, visit [getspecd.dev](https://getspecd.dev).
+
+## Why SpecD?
+
+AI coding agents often fail for repeatable reasons:
+
+- They miss relevant requirements.
+- They lose context across long tasks.
+- They drift from specifications during implementation.
+
+SpecD addresses this by combining:
+
+- **Compiled context for agents.** The right specs and lifecycle instructions are assembled before the agent starts work.
+- **Structured verification and approval guardrails.** Mandatory verification reduces drift during the lifecycle, while optional human approval checkpoints can gate progression at key transitions.
+- **Spec and code graph impact analysis.** SpecD connects specs, source files, symbols, and dependencies so agents can reason about change impact.
+- **Deterministic where correctness matters.** Merging, validation, status resolution, and delta application are computed by SpecD instead of delegated to the LLM.
+
+## Minimal workflow
+
+```sh
+# CLI
+specd project init
+```
+
+```text
+# Coding agent
+/specd
+```
+
+Invokes the SpecD skill, inspects project state, and routes to the next workflow step (for example creating or continuing a change).
 
 ## What is SpecD?
 
@@ -10,40 +47,41 @@ SpecD is a ground-up redesign of that workflow, built for professional teams. It
 
 Key differences from earlier SDD tools:
 
+- **Context compiled, not discovered.** At every lifecycle step, SpecD computes which specs are relevant to the current change and delivers their content as a structured, ready-to-consume block. The agent does not decide what to read; SpecD resolves it.
 - **Code graph built in.** SpecD indexes your codebase and specs into a queryable graph, enabling impact analysis (upstream/downstream reach), hotspot detection, and change-aware queries. Multi-language: TypeScript, Go, Python, PHP (more languages coming).
-- **Deterministic where possible.** Spec merging, validation, status resolution, and delta application are computed algorithmically — not delegated to the LLM.
-- **Schema-driven format.** The spec file format, section headers, artifact names, and dependency order are defined in a `schema.yaml` you control. SpecD does not hardcode any particular convention.
-- **Governance built in.** Optional approval gates let teams require explicit human sign-off before implementation begins or before a change is archived.
+- **Deterministic where correctness matters.** Spec merging, validation, status resolution, and delta application are computed algorithmically — not delegated to the LLM.
+- **Customizable schema model.** A default schema is included, while projects can define their own artifact workflow, section structure, and dependency order in `schema.yaml`. SpecD does not hardcode any particular convention.
 - **Composable packages.** Use only what you need: the core library as an SDK, the CLI for terminal workflows, the MCP server for agent-native workflows, or the full stack.
-- **Context compiled, not discovered.** At every lifecycle step, SpecD computes which specs are relevant to the current change and delivers their content as a structured, ready-to-consume block. The agent does not decide what to read — SpecD resolves it.
-- **Compliance gates.** Two structural checkpoints enforce spec adherence: one before implementation (plan vs specs) and one before archiving (code vs specs). The agent cannot advance past either gate until it demonstrably complies.
+- **Structured verification and approval guardrails.** Mandatory verification is built into the lifecycle, while optional human approval checkpoints can govern progression at critical transitions.
 - **Multi-workspace and coordinator repos.** A project can declare multiple spec workspaces, each pointing to a different directory or repository. A single coordinator repo can govern specs across an entire microservice architecture without coupling service repos to each other.
 
 ## Current status (April 2026)
 
 SpecD is in active development and usable from source in this monorepo.
 
+- **@specd/specd** — convenience metapackage that installs the full SpecD stack
 - **@specd/core** — business logic layer: change lifecycle, spec management, schema validation, delta application, context compilation, hooks, storage adapters
 - **@specd/cli** — complete command surface: `change`, `spec`, `project`, `schema`, `skills`, `graph`, `plugins`, `drafts`, `discarded`, `archive`, `config`
-- **@specd/code-graph** — Multi-language indexing (TypeScript, Go, Python, PHP), impact analysis, hotspot detection, staleness detection
+- **@specd/code-graph** — multi-language indexing (TypeScript, Go, Python, PHP), impact analysis, hotspot detection, staleness detection
 - **@specd/skills** — skill registry API with bundle resolution and multiple agent runtime support
-- **@specd/plugin-\*** — all agent plugins (claude, copilot, codex, opencode) implemented per spec
+- **@specd/plugin-\*** — agent plugins (claude, copilot, codex, opencode, standard) implemented per spec
 - **@specd/plugin-manager** — plugin loader, install/update/uninstall use cases
-- **@specd/mcp** and **@specd/public-web** — in progress
 - **@specd/schema-std** — ships a real `schema.yaml` and template files
+- **@specd/mcp** — in progress (stub)
+- **@specd/public-web** — in progress (Docusaurus site with landing page and docs)
 
 Publishing/install flows are not finalized yet; use workspace commands for now.
 
 ## Core concepts
 
-| Concept       | Description                                                                                                                                                                                 |
-| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Change**    | A named, in-progress unit of spec work. A change tracks which specs are being modified, which artifacts have been produced, and where it sits in its lifecycle.                             |
-| **Spec**      | A specification file (or set of files) that defines what a system should do. Specs live in a dedicated directory and are governed by the active schema.                                     |
-| **Artifact**  | A typed file produced during a change — for example, a proposal, a spec, a design, or a task list. Artifact types and their dependency order are declared in the schema.                    |
-| **Schema**    | A `schema.yaml` file that defines the artifact workflow for a project: what artifacts exist, how they relate, what validations apply, and what instructions guide the AI.                   |
-| **Workspace** | A declared location of specs, with its own storage path, code root, and ownership relationship. A project can span multiple workspaces (e.g. a coordinator managing several service repos). |
-| **Delta**     | A structured YAML document that expresses changes to a spec as AST operations, rather than inline text diffs. Deltas are applied deterministically by SpecD.                                |
+| Concept       | Description                                                                                                                                                                                  |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Change**    | A named, in-progress unit of spec work. A change tracks which specs are being modified, which artifacts have been produced, and where it sits in its lifecycle.                              |
+| **Spec**      | A specification file (or set of files) that defines what a system should do. Specs live in a dedicated directory and are governed by the active schema.                                      |
+| **Artifact**  | A typed file produced during a change — for example, a proposal, a spec, a design, or a task list. Artifact types and their dependency order are declared in the schema.                     |
+| **Schema**    | A `schema.yaml` file that defines the artifact workflow for a project: what artifacts exist, how they relate, what validations apply, and what instructions guide the AI.                    |
+| **Workspace** | A declared location of specs, with its own storage path, code root, and ownership relationship. A project can span multiple workspaces (e.g. a coordinator managing several service repos).  |
+| **Delta**     | A structured artifact expressing semantic operations over spec documents using selectors and generated content, rather than line-based diffs. Deltas are applied deterministically by SpecD. |
 
 The change lifecycle progresses through well-defined states:
 
@@ -51,7 +89,7 @@ The change lifecycle progresses through well-defined states:
 drafting → designing → ready → implementing ⇄ verifying → done → archivable
 ```
 
-Optional approval gates can require human sign-off between `ready → implementing` and `done → archivable`.
+Optional approval checkpoints can require human sign-off between `ready → implementing` and `done → archivable`.
 
 ## Context compilation
 
@@ -67,21 +105,23 @@ The resolution works in five steps:
 
 The output is a single, ordered instruction block combining project context, schema instructions for the active artifact, spec content, and lifecycle hooks — ready to inject into the agent's context window. The agent doesn't search, doesn't guess, and doesn't miss a spec that wasn't mentioned by name.
 
-## Compliance gates
+## Structured verification and approval guardrails
 
 The most common failure mode in spec-driven development is not writing bad specs — it is that agents plan and implement without fully respecting them. An agent reads the specs, generates a design and task list, then produces code that diverges from the requirements. The gap surfaces during verification or review, after the work is done.
 
-SpecD addresses this with two structural checkpoints in the change lifecycle:
+SpecD addresses this with mandatory verification built into the lifecycle, plus optional human approval guardrails around critical transitions:
 
 ```
-designing → ready → [gate: plan vs specs] → implementing → verifying → [gate: code vs specs] → done → archivable
+designing → ready → [optional approval] → implementing ⇄ verifying → done → [optional approval] → archivable
 ```
 
-**Before implementation:** a compliance agent reads the planned artifacts — design document and task list — and verifies they do not contradict any requirement or constraint in the relevant specs. If they do, the change transitions back to designing with a violation report. The agent revisits the approach before any code is written.
+**Verification (mandatory):** after implementation, the agent enters the `verifying` step, where a dedicated verification skill checks the implementation against the relevant specs and may send the change back for revision when drift or contradictions are detected.
 
-**Before archiving:** the same agent runs again during the verifying step, this time against the actual implementation. It checks that the code behaviour matches what the specs require. Only changes that pass both gates can be archived.
+**Approval checkpoints (optional):** projects may require a design approval gate before implementation (`ready → implementing`) to review scope, affected specs, and design decisions, and/or an implementation approval gate before archiving (`done → archivable`) to review correctness, catch omissions discovered late, reconsider flawed or incomplete approaches, or reopen the change when the implementation or spec changes need adjustment before specs and deltas are merged. These checkpoints are deterministic workflow gates controlled by project policy.
 
-This turns spec compliance from a social convention into a structural constraint. The agent is not asked to follow specs — it cannot advance until it demonstrably has.
+This separates verification from governance: verification is always part of the lifecycle, while approvals are an optional control layer.
+
+This turns spec conformance review into a first-class lifecycle concern, while allowing teams to add human governance where needed.
 
 ## Multi-workspace projects
 
@@ -93,20 +133,22 @@ Teams with microservice architectures can manage cross-cutting specs (authentica
 
 ## Packages
 
-| Package                  | Description                                                                                                   | Status      |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------- | ----------- |
-| `@specd/core`            | Business logic: change lifecycle, spec management, schema validation, delta application, context compilation. | Functional  |
-| `@specd/cli`             | CLI adapter around `@specd/core` with command registration and formatting/output modes.                       | Functional  |
-| `@specd/code-graph`      | Code graph indexing, impact analysis, hotspots, staleness detection (TypeScript, Go, Python, PHP).            | Functional  |
-| `@specd/mcp`             | MCP server adapter package.                                                                                   | In Progress |
-| `@specd/skills`          | Skill registry API with bundle resolution, multiple agent runtimes.                                           | Functional  |
-| `@specd/schema-std`      | Standard SpecD schema package with `schema.yaml` and template files.                                          | Functional  |
-| `@specd/plugin-manager`  | Plugin loader, install/update/uninstall use cases.                                                            | Functional  |
-| `@specd/plugin-claude`   | Claude Code plugin with skill installation and frontmatter injection.                                         | Functional  |
-| `@specd/plugin-copilot`  | GitHub Copilot plugin.                                                                                        | Functional  |
-| `@specd/plugin-codex`    | OpenAI Codex plugin.                                                                                          | Functional  |
-| `@specd/plugin-opencode` | Open Code plugin.                                                                                             | Functional  |
-| `@specd/public-web`      | Public documentation site (Docusaurus).                                                                       | In Progress |
+| Package                        | Description                                                                                                   | Status      |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------- | ----------- |
+| `@specd/specd`                 | Convenience metapackage that installs the full SpecD stack.                                                   | Functional  |
+| `@specd/core`                  | Business logic: change lifecycle, spec management, schema validation, delta application, context compilation. | Functional  |
+| `@specd/cli`                   | CLI adapter around `@specd/core` with command registration and formatting/output modes.                       | Functional  |
+| `@specd/code-graph`            | Code graph indexing, impact analysis, hotspots, staleness detection (TypeScript, Go, Python, PHP).            | Functional  |
+| `@specd/mcp`                   | MCP server adapter package.                                                                                   | In Progress |
+| `@specd/skills`                | Skill registry API with bundle resolution, multiple agent runtimes.                                           | Functional  |
+| `@specd/schema-std`            | Standard SpecD schema package with `schema.yaml` and template files.                                          | Functional  |
+| `@specd/plugin-manager`        | Plugin loader, install/update/uninstall use cases.                                                            | Functional  |
+| `@specd/plugin-claude`         | Claude Code plugin with skill installation and frontmatter injection.                                         | Functional  |
+| `@specd/plugin-copilot`        | GitHub Copilot plugin.                                                                                        | Functional  |
+| `@specd/plugin-codex`          | OpenAI Codex plugin.                                                                                          | Functional  |
+| `@specd/plugin-opencode`       | Open Code plugin.                                                                                             | Functional  |
+| `@specd/plugin-agent-standard` | Agent Skills Standard plugin.                                                                                 | Functional  |
+| `@specd/public-web`            | Public documentation site (Docusaurus).                                                                       | In Progress |
 
 ## Getting started (CLI)
 

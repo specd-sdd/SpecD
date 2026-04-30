@@ -1,5 +1,32 @@
 # @specd/code-graph
 
+## 0.1.0
+
+### Minor Changes
+
+- 90da65f: 20260424 - multi-language-call-resolution: Implements issues 52 and 54 by extending code-graph dependency resolution across the current built-in language adapters with deterministic binding/call facts, shared scoped resolution, and first-class USES_TYPE / CONSTRUCTS relations. The change also removes noisy self-relations and updates graph impact CLI/docs/skills to prefer the clearer dependents / dependencies direction aliases while preserving upstream / downstream compatibility.
+
+  Specs affected:
+  - `code-graph:code-graph/language-adapter`
+  - `code-graph:code-graph/indexer`
+  - `code-graph:code-graph/symbol-model`
+  - `cli:cli/graph-impact`
+  - `skills:skill-templates-source`
+  - `default:_global/docs`
+
+### Patch Changes
+
+- Updated dependencies [c7c485e]
+- Updated dependencies [0103454]
+- Updated dependencies [c5c8f64]
+- Updated dependencies [f4aa390]
+- Updated dependencies [60ea657]
+- Updated dependencies [ef13876]
+- Updated dependencies [5f6a823]
+- Updated dependencies [1c1c54a]
+- Updated dependencies [c558cb2]
+  - @specd/core@0.2.0
+
 ## 0.0.3
 
 ### Patch Changes

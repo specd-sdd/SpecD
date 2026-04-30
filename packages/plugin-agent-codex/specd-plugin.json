@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "name": "@specd/plugin-agent-codex",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Codex agent plugin for specd skills installation",
   "pluginType": "agent",
   "minCoreVersion": "*"
