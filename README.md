@@ -59,14 +59,16 @@ Key differences from earlier SDD tools:
 
 SpecD is in active development and usable from source in this monorepo.
 
+- **@specd/specd** — convenience metapackage that installs the full SpecD stack
 - **@specd/core** — business logic layer: change lifecycle, spec management, schema validation, delta application, context compilation, hooks, storage adapters
 - **@specd/cli** — complete command surface: `change`, `spec`, `project`, `schema`, `skills`, `graph`, `plugins`, `drafts`, `discarded`, `archive`, `config`
-- **@specd/code-graph** — Multi-language indexing (TypeScript, Go, Python, PHP), impact analysis, hotspot detection, staleness detection
+- **@specd/code-graph** — multi-language indexing (TypeScript, Go, Python, PHP), impact analysis, hotspot detection, staleness detection
 - **@specd/skills** — skill registry API with bundle resolution and multiple agent runtime support
-- **@specd/plugin-\*** — all agent plugins (claude, copilot, codex, opencode) implemented per spec
+- **@specd/plugin-\*** — agent plugins (claude, copilot, codex, opencode, standard) implemented per spec
 - **@specd/plugin-manager** — plugin loader, install/update/uninstall use cases
-- **@specd/mcp** and **@specd/public-web** — in progress
 - **@specd/schema-std** — ships a real `schema.yaml` and template files
+- **@specd/mcp** — in progress (stub)
+- **@specd/public-web** — in progress (Docusaurus site with landing page and docs)
 
 Publishing/install flows are not finalized yet; use workspace commands for now.
 
@@ -131,20 +133,22 @@ Teams with microservice architectures can manage cross-cutting specs (authentica
 
 ## Packages
 
-| Package                  | Description                                                                                                   | Status      |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------- | ----------- |
-| `@specd/core`            | Business logic: change lifecycle, spec management, schema validation, delta application, context compilation. | Functional  |
-| `@specd/cli`             | CLI adapter around `@specd/core` with command registration and formatting/output modes.                       | Functional  |
-| `@specd/code-graph`      | Code graph indexing, impact analysis, hotspots, staleness detection (TypeScript, Go, Python, PHP).            | Functional  |
-| `@specd/mcp`             | MCP server adapter package.                                                                                   | In Progress |
-| `@specd/skills`          | Skill registry API with bundle resolution, multiple agent runtimes.                                           | Functional  |
-| `@specd/schema-std`      | Standard SpecD schema package with `schema.yaml` and template files.                                          | Functional  |
-| `@specd/plugin-manager`  | Plugin loader, install/update/uninstall use cases.                                                            | Functional  |
-| `@specd/plugin-claude`   | Claude Code plugin with skill installation and frontmatter injection.                                         | Functional  |
-| `@specd/plugin-copilot`  | GitHub Copilot plugin.                                                                                        | Functional  |
-| `@specd/plugin-codex`    | OpenAI Codex plugin.                                                                                          | Functional  |
-| `@specd/plugin-opencode` | Open Code plugin.                                                                                             | Functional  |
-| `@specd/public-web`      | Public documentation site (Docusaurus).                                                                       | In Progress |
+| Package                        | Description                                                                                                   | Status      |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------- | ----------- |
+| `@specd/specd`                 | Convenience metapackage that installs the full SpecD stack.                                                   | Functional  |
+| `@specd/core`                  | Business logic: change lifecycle, spec management, schema validation, delta application, context compilation. | Functional  |
+| `@specd/cli`                   | CLI adapter around `@specd/core` with command registration and formatting/output modes.                       | Functional  |
+| `@specd/code-graph`            | Code graph indexing, impact analysis, hotspots, staleness detection (TypeScript, Go, Python, PHP).            | Functional  |
+| `@specd/mcp`                   | MCP server adapter package.                                                                                   | In Progress |
+| `@specd/skills`                | Skill registry API with bundle resolution, multiple agent runtimes.                                           | Functional  |
+| `@specd/schema-std`            | Standard SpecD schema package with `schema.yaml` and template files.                                          | Functional  |
+| `@specd/plugin-manager`        | Plugin loader, install/update/uninstall use cases.                                                            | Functional  |
+| `@specd/plugin-claude`         | Claude Code plugin with skill installation and frontmatter injection.                                         | Functional  |
+| `@specd/plugin-copilot`        | GitHub Copilot plugin.                                                                                        | Functional  |
+| `@specd/plugin-codex`          | OpenAI Codex plugin.                                                                                          | Functional  |
+| `@specd/plugin-opencode`       | Open Code plugin.                                                                                             | Functional  |
+| `@specd/plugin-agent-standard` | Agent Skills Standard plugin.                                                                                 | Functional  |
+| `@specd/public-web`            | Public documentation site (Docusaurus).                                                                       | In Progress |
 
 ## Getting started (CLI)
 
