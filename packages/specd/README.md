@@ -60,6 +60,7 @@ Key differences from earlier SDD tools:
 - **Deterministic where correctness matters.** Spec merging, validation, status resolution, and delta application are computed algorithmically — not delegated to the LLM.
 - **Customizable schema model.** A default schema is included, while projects can define their own artifact workflow, section structure, and dependency order in `schema.yaml`. SpecD does not hardcode any particular convention.
 - **Composable packages.** Use only what you need: the core library as an SDK, the CLI for terminal workflows, the MCP server for agent-native workflows, or the full stack.
+- **Lifecycle hooks.** Shell commands and AI instructions are attached to state transitions (`pre`/`post`), enabling lint gates, test runs, notifications, and step-specific agent guidance without leaving the workflow.
 - **Structured verification and approval guardrails.** Mandatory verification is built into the lifecycle, while optional human approval checkpoints can govern progression at critical transitions.
 - **Multi-workspace and coordinator repos.** A project can declare multiple spec workspaces, each pointing to a different directory or repository. A single coordinator repo can govern specs across an entire microservice architecture without coupling service repos to each other.
 
@@ -140,6 +141,34 @@ designing → ready → [optional approval] → implementing ⇄ verifying → d
 This separates verification from governance: verification is always part of the lifecycle, while approvals are an optional control layer.
 
 This turns spec conformance review into a first-class lifecycle concern, while allowing teams to add human governance where needed.
+
+## Hooks
+
+Hooks attach automated actions or AI guidance to lifecycle transitions. They are defined in the schema's `workflow` section and extended in `specd.yaml` via `schemaOverrides`.
+
+- **Pre hooks** run before entering a step — failure blocks the transition.
+- **Post hooks** run after entering a step — failure does not roll back the state.
+
+Two hook types are supported:
+
+| Type           | Description                                                                                                      |
+| -------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `run:`         | Shell command executed in the project root. Non-zero exit blocks a pre hook.                                     |
+| `instruction:` | Orders or guidance injected into the agent context — e.g. run a verification, update a file, follow a checklist. |
+
+```yaml
+workflow:
+  - step: implementing
+    hooks:
+      pre:
+        - id: run-lint
+          run: pnpm lint
+      post:
+        - id: notify
+          run: echo "Implementation started for {{change.name}}"
+```
+
+Hook `run:` commands support template variables (`{{change.name}}`, `{{change.workspace}}`, `{{change.path}}`, `{{project.root}}`). Schema-level hooks fire first, then project-level overrides, in declaration order.
 
 ## Multi-workspace projects
 
