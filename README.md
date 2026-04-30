@@ -85,12 +85,6 @@ Install from npm:
 npm install -g @specd/specd
 ```
 
-Or run without global install:
-
-```sh
-npx @specd/cli --help
-```
-
 ## Core concepts
 
 | Concept       | Description                                                                                                                                                                                  |
