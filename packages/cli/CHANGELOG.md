@@ -1,5 +1,169 @@
 # @specd/cli
 
+## 0.2.0
+
+### Minor Changes
+
+- 90da65f: 20260424 - multi-language-call-resolution: Implements issues 52 and 54 by extending code-graph dependency resolution across the current built-in language adapters with deterministic binding/call facts, shared scoped resolution, and first-class USES_TYPE / CONSTRUCTS relations. The change also removes noisy self-relations and updates graph impact CLI/docs/skills to prefer the clearer dependents / dependencies direction aliases while preserving upstream / downstream compatibility.
+
+  Specs affected:
+  - `code-graph:code-graph/language-adapter`
+  - `code-graph:code-graph/indexer`
+  - `code-graph:code-graph/symbol-model`
+  - `cli:cli/graph-impact`
+  - `skills:skill-templates-source`
+  - `default:_global/docs`
+
+- 60ea657: 20260427 - schema-artifact-hastasks: Introduced an explicit hasTasks boolean field to artifact definitions in the schema as a master switch for task tracking. Implemented semantic validation at schema load and defensive runtime checks in TransitionChange to ensure requiresTaskCompletion consistency, while providing default markdown checkbox patterns when enabled.
+
+  Specs affected:
+  - `core:core/schema-format`
+  - `cli:cli/change-status`
+  - `core:core/transition-change`
+
+- c88761e: 20260428 - change-spec-preview-artifact-flag: This change adds an optional --artifact <name> flag to specd change spec-preview so reviewers can focus output on a single spec-scoped artifact such as spec.md or verify.md. The CLI now resolves artifact IDs via the active schema, filters merged/diff/json preview output accordingly, and reports consistent errors for unknown, wrong-scope, or missing artifacts.
+
+  Specs affected:
+  - `cli:cli/change-spec-preview`
+
+- 1c1c54a: 20260428 - context-modes-ux: Adds an explicit --mode flag to context commands and aligns full/hybrid rendering behavior across project context, change context, and spec context. The implementation now defaults full-mode output to structured Description + Rules + Constraints, with section filters overriding defaults while preserving header context. Core and CLI context use cases/tests were updated to enforce consistent mode semantics and predictable context output for agents.
+
+  Specs affected:
+  - `cli:cli/project-context`
+  - `cli:cli/change-context`
+  - `cli:cli/spec-context`
+  - `core:core/compile-context`
+  - `core:core/get-spec-context`
+  - `core:core/get-project-context`
+  - `core:core/config`
+
+- c558cb2: 20260430 - compact-and-complete-outlines: Implemented a compact-first outline workflow by keeping changes artifact-instruction focused on availableOutlines references and moving full structure retrieval to on-demand specs outline. Added --full and --hints modes, with parser-owned default subsets and parser-provided root-level selectorHints, reducing verbosity while preserving complete selector coverage when needed. Updated core/CLI contracts, parser adapters, tests, and workflow guidance to keep the behavior consistent across current and future parsers.
+
+  Specs affected:
+  - `cli:cli/change-artifact-instruction`
+  - `core:core/get-artifact-instruction`
+  - `core:core/delta-format`
+  - `cli:cli/spec-outline`
+  - `core:core/get-spec-outline`
+  - `core:core/artifact-parser-port`
+  - `skills:workflow-automation`
+
+### Patch Changes
+
+- c7c485e: 20260422 - fix-config-compliance: Align config behavior with current spec contracts by removing legacy artifactRules/skills handling, enforcing plugins validation at load time, and tightening workspace contextMode errors. The change also adds unknown-template warning callbacks and updates config show/docs so runtime output, verification scenarios, and documentation all reflect the same model. This closes the compliance gaps without changing the broader plugin-manager workflow.
+
+  Specs affected:
+  - `core:core/config`
+  - `cli:cli/config-show`
+  - `core:core/template-variables`
+  - `core:core/config-writer-port`
+
+- 27fc818: 20260423 - cli-init-alias: Add specd init as a top-level CLI alias that delegates to specd project init, giving new users a shorter, conventional command to bootstrap a project. Both invocation forms share the same handler, flags, interactive wizard, and output — no duplication needed since registerProjectInit() already parameterises the parent command.
+
+  Specs affected:
+  - `cli:cli/project-init`
+  - `cli:cli/entrypoint`
+
+- ec47a74: 20260423 - project-status-command: Add specd project status command consolidating workspace info, spec/change counts, graph freshness, and context references into one output. Enhance change status with schema-derived artifactDag and approval gates. Update skill templates to use the new command.
+
+  Specs affected:
+  - `cli:cli/project-status`
+  - `cli:cli/change-status`
+
+- c5c8f64: 20260424 - enforce-artifact-path-validation: Ensures change manifests and validation strictly target correct artifact paths (deltas vs specs) from creation time, and enhances CLI output to report explicit file paths with merged-spec preview guidance.
+
+  Specs affected:
+  - `core:core/change-layout`
+  - `core:core/change-manifest`
+  - `core:core/validate-artifacts`
+  - `cli:cli/change-validate`
+
+- 2064880: 20260424 - suppress-unresolved-template-variable-warnings: Remove console.warn output when {{variable}} tokens cannot be resolved during template expansion in hooks
+
+  Specs affected:
+  - `cli:cli/change-hook-instruction`
+
+- f4aa390: 20260427 - improve-specd-diagnostics-and-ux: Rename warnings to notes, provide clear blockers in status/transition, and optimize skill diagnostic output.
+
+  Specs affected:
+  - `core:core/get-status`
+  - `core:core/transition-change`
+  - `cli:cli/change-status`
+  - `cli:cli/change-transition`
+  - `cli:cli/change-validate`
+  - `skills:workflow-automation`
+  - `core:core/change`
+
+- ca5082e: 20260427 - project-status-workspace-details: Enhanced the project status command to include isExternal status and codeRoot path for every workspace. This change provides better visibility into workspace locality and implementation roots in both text and structured (JSON/TOON) formats.
+
+  Specs affected:
+  - `cli:cli/project-status`
+
+- ef13876: 20260428 - 20260428-unified-logging-system: Introduce a structured logging system using Pino and a global proxy to minimize injection boilerplate.
+
+  Specs affected:
+  - `core:core/logger-port`
+  - `cli:cli/logging-integration`
+  - `core:core/pino-logger`
+  - `core:core/kernel-logging`
+  - `core:core/config`
+  - `default:_global/logging`
+  - `cli:entrypoint`
+
+- 5f6a823: 20260428 - change-validate-blocker-diagnostics: Align change validate dependency-blocked diagnostics with change transition by reporting effective blocker status and recursive parent review blockers.
+
+  Specs affected:
+  - `cli:cli/change-validate`
+  - `core:core/validate-artifacts`
+
+- d32a861: 20260428 - pluralize-cli-resource-commands: Standardize CLI countable resource command groups to canonical plural forms (changes, specs, archives, drafts) while maintaining singular aliases for backward compatibility. This change includes a new governing policy spec (cli:cli/command-resource-naming), updates to affected CLI specs, and comprehensive updates to documentation and skill examples to ensure a consistent command vocabulary across the ecosystem.
+
+  Specs affected:
+  - `cli:cli/change-draft`
+  - `cli:cli/drafts-list`
+  - `cli:cli/drafts-show`
+  - `cli:cli/drafts-restore`
+  - `cli:cli/command-resource-naming`
+  - `cli:cli/change-list`
+  - `cli:cli/spec-list`
+  - `cli:cli/change-archive`
+  - `skills:workflow-automation`
+
+- 2852b44: 20260428 - spec-show-artifact-flag: Added the --artifact <name> flag to the specd spec show command, allowing users to extract specific artifact content (e.g., spec.md, verify.md) by its schema-defined ID.
+
+  Specs affected:
+  - `cli:cli/spec-show`
+
+- 873d021: 20260429 - clarify-skill-review-and-command-usage: Align workflow-skill guidance and CLI-facing contracts with the current canonical commands and artifact-focused flags so agents can avoid redundant reads while preserving deterministic safety checks. Clarify that changes validate is structural/state validation only and must not be used as semantic content approval, with explicit review expectations in skills and docs. Reinforce overlap/drift protection by requiring merged-content review patterns (including artifact-filtered preview when targeted) before archiving or accepting spec deltas.
+
+  Specs affected:
+  - `skills:workflow-automation`
+  - `cli:change-validate`
+  - `cli:change-spec-preview`
+  - `cli:command-resource-naming`
+
+- Updated dependencies [c7c485e]
+- Updated dependencies [0103454]
+- Updated dependencies [c5c8f64]
+- Updated dependencies [90da65f]
+- Updated dependencies [aad2115]
+- Updated dependencies [f4aa390]
+- Updated dependencies [60ea657]
+- Updated dependencies [ef13876]
+- Updated dependencies [5f6a823]
+- Updated dependencies [1c1c54a]
+- Updated dependencies [1bdd9b0]
+- Updated dependencies [c558cb2]
+- Updated dependencies [76c61c6]
+  - @specd/core@0.2.0
+  - @specd/code-graph@0.1.0
+  - @specd/plugin-manager@0.2.0
+  - @specd/plugin-agent-claude@0.2.0
+  - @specd/plugin-agent-copilot@0.2.0
+  - @specd/plugin-agent-codex@0.2.0
+  - @specd/plugin-agent-standard@0.1.0
+  - @specd/plugin-agent-opencode@0.0.3
+
 ## 0.1.1
 
 ### Patch Changes

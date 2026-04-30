@@ -1,6 +1,14 @@
-# @specd/plugin-agent-opencode
+# @specd/plugin-agent-standard
 
-## 0.0.3
+## 0.1.0
+
+### Minor Changes
+
+- 76c61c6: 20260430 - plugin-agent-standard: Add @specd/plugin-agent-standard, a vendor-neutral agent plugin that installs specd skills into .agents/skills/ using the Agent Skills open standard (agentskills.io) frontmatter format including allowed-tools support. Also integrates the new package into CLI init wizard, meta-package, and commitlint scopes.
+
+  Specs affected:
+  - `plugin-agent-standard:plugin-agent`
+  - `default:_global/commits`
 
 ### Patch Changes
 
@@ -23,16 +31,3 @@
   - @specd/core@0.2.0
   - @specd/skills@0.2.0
   - @specd/plugin-manager@0.2.0
-
-## 0.0.2
-
-### Patch Changes
-
-- Updated dependencies [58c75d9]
-- Updated dependencies [7ac27d1]
-- Updated dependencies [0109e6d]
-- Updated dependencies [5215349]
-- Updated dependencies [9225d20]
-- Updated dependencies [aa2e957]
-  - @specd/skills@0.1.0
-  - @specd/plugin-manager@0.1.0
