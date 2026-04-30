@@ -65,10 +65,15 @@ Follow guidance.
 specd changes transition <name> designing --skip-hooks all
 ```
 
-If state is not `drafting` or `designing`, this is the wrong skill. Redirect based on the
-**next action:** `target` recommendation.
+If state is neither `drafting` nor `designing`, ask the user:
 
-**Stop — do not continue if state is not `drafting` or `designing`**
+> Current state is **`<state>`**. Design requires **`designing`**.
+> Transition to `designing` and continue?
+
+- **Yes**: run the pre-hooks and transition to `designing` (same commands as above), then continue to the next step.
+- **No**: redirect based on the **next action:** `target` recommendation.
+
+**Stop — wait for the user's answer before continuing.**
 
 Check the **artifacts (DAG):** section — if some are already marked `[✓]`, you're resuming
 mid-design.
