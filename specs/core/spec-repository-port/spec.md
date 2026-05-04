@@ -56,14 +56,36 @@ Relative resolution MUST be pure computation (no I/O). Absolute resolution MAY r
 
 If the ownership is `owned` or `shared`, `saveMetadata` proceeds normally: it MUST write the metadata content for the given spec. The `content` parameter is a JSON string. If `originalHash` is set on the content and does not match the current file hash on disk, the save MUST be rejected by throwing `ArtifactConflictError`. When `options.force` is `true`, the conflict check MUST be skipped. If the metadata directory does not exist, it MUST be created. This method replaces the previous pattern of `save(spec, new SpecArtifact('.specd-metadata.yaml', content))` for metadata writes.
 
+### Requirement: search returns specs matching a text query
+
+`search(query, options?)` MUST accept a text query string and return an array of `SpecSearchResult` objects for specs within this workspace whose content matches the query. The search MUST cover spec artifact content (at minimum `spec.md` and `verify.md`).
+
+`SpecSearchResult` MUST contain:
+
+- `spec` — the `Spec` metadata object (same type as returned by `get()`)
+- `score` — a relevance score (number, higher is more relevant)
+- `matches` — an array of `SpecSearchMatch` objects, each containing:
+  - `filename` — the artifact filename where the match was found (e.g. `"spec.md"`)
+  - `line` — the 1-based line number of the best match within that file
+  - `snippet` — a short text excerpt around the match (max 120 characters)
+
+The `options` parameter MAY include:
+
+- `limit` — maximum number of results to return (default: implementation-defined)
+
+Results MUST be sorted by `score` descending. The implementation MAY use case-insensitive matching. When no specs match, an empty array MUST be returned (not an error).
+
+This method is the port-level search primitive — it performs a content scan within a single workspace. Cross-workspace orchestration is handled by a use case.
+
 ### Requirement: Abstract class with abstract methods
 
-`SpecRepository` MUST be defined as an `abstract class`, not an `interface`. All storage operations (`get`, `list`, `artifact`, `save`, `delete`, `resolveFromPath`, `metadata`, `saveMetadata`) MUST be declared as `abstract` methods. This follows the architecture spec requirement that ports with shared construction are abstract classes.
+`SpecRepository` MUST be defined as an `abstract class`, not an `interface`. All storage operations (`get`, `list`, `artifact`, `save`, `delete`, `resolveFromPath`, `metadata`, `saveMetadata`, `search`) MUST be declared as `abstract` methods. This follows the architecture spec requirement that ports with shared construction are abstract classes.
 
 ## Constraints
 
 - Each instance is bound to a single workspace; workspace is immutable after construction
 - `get` and `list` return lightweight `Spec` metadata — artifact content is never loaded by these methods
+- `search` loads artifact content as needed to perform matching — it is more expensive than `list`
 - `save` creates the spec directory if it does not already exist
 - `ArtifactConflictError` is the sole error type for concurrent modification detection on `save` and `saveMetadata`
 - `resolveFromPath` with a relative path and no `from` parameter is invalid and the implementation MUST handle this as an error or return `null`
@@ -71,7 +93,7 @@ If the ownership is `owned` or `shared`, `saveMetadata` proceeds normally: it MU
 - `metadata` and `saveMetadata` operate on a storage location determined by the adapter — callers MUST NOT assume metadata lives alongside spec content
 - `metadata` returns parsed content; `artifact` returns raw content — they are not interchangeable
 - `save` and `saveMetadata` MUST throw `ReadOnlyWorkspaceError` before any I/O when ownership is `readOnly`
-- Read operations (`get`, `list`, `artifact`, `metadata`, `resolveFromPath`) are not affected by ownership — readOnly workspaces can always be read
+- Read operations (`get`, `list`, `artifact`, `metadata`, `resolveFromPath`, `search`) are not affected by ownership — readOnly workspaces can always be read
 
 ## Spec Dependencies
 
@@ -82,3 +104,4 @@ If the ownership is `owned` or `shared`, `saveMetadata` proceeds normally: it MU
 - [`core:core/workspace`](../workspace/spec.md) — workspace identity and scoping semantics
 - [`core:core/spec-id-format`](../spec-id-format/spec.md) — canonical spec ID format used in `resolveFromPath` results
 - [`core:core/spec-metadata`](../spec-metadata/spec.md) — metadata file format and structure returned by `metadata()`
+- [`core:core/search-specs`](../search-specs/spec.md) — use case that orchestrates `search()` across workspaces

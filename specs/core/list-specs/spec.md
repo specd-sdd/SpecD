@@ -2,13 +2,15 @@
 
 ## Purpose
 
-Agents and CLI users need a single query to discover what specs exist across all workspaces without loading full spec content. The `ListSpecs` use case enumerates all specs across all configured workspaces, returning a title for each entry and optionally a short summary and metadata freshness status. It is the primary query for discovery UIs and CLI listing commands.
+Agents and CLI users need a single query to discover what specs exist across all workspaces without loading full spec content. The `ListSpecs` use case enumerates all specs across all configured workspaces, returning a title for each entry and optionally a short summary and metadata freshness status. It supports optional workspace filtering so callers can restrict results to one or more named workspaces. It is the primary query for discovery UIs and CLI listing commands.
 
 ## Requirements
 
 ### Requirement: Enumerate specs across all workspaces
 
 `ListSpecs.execute()` SHALL iterate every configured workspace in declaration order and call `SpecRepository.list()` on each. The returned `SpecListEntry[]` MUST preserve workspace declaration order, with specs within each workspace ordered by repository order.
+
+When `options.workspaces` is provided as a non-empty array of workspace names, only entries belonging to those workspaces SHALL be included. Workspace names that do not match any configured workspace SHALL be silently ignored (no error, no warning). When `options.workspaces` is omitted or empty, all configured workspaces are included.
 
 ### Requirement: Always resolve a title for each entry
 
@@ -52,11 +54,14 @@ Each entry MUST include the following required fields:
 
 Optional fields (`summary`, `metadataStatus`) MUST only be present when explicitly requested and successfully resolved.
 
+When workspace filtering is active, the result array contains entries only from the filtered workspaces. Callers that need all configured workspace names (including those with no matching specs) MUST consult the config directly.
+
 ## Constraints
 
 - The use case receives a `ReadonlyMap<string, SpecRepository>` — it MUST NOT modify the map or the repositories.
 - The use case defaults `includeSummary` and `includeMetadataStatus` to `false` when the options object or individual flags are not provided.
 - Title and description values from metadata MUST be trimmed before use; empty-after-trim values MUST be treated as absent.
+- Workspace filtering is performed at the use-case level; individual `SpecRepository.list()` calls are not affected by the filter.
 
 ## Spec Dependencies
 

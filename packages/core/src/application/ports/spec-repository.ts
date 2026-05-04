@@ -6,6 +6,20 @@ import { Repository, type RepositoryConfig } from './repository.js'
 
 export { type RepositoryConfig as SpecRepositoryConfig }
 
+/** A single match location within a spec artifact. */
+export interface SpecSearchMatch {
+  readonly filename: string
+  readonly line: number
+  readonly snippet: string
+}
+
+/** A search hit from a repository: spec + relevance score + match locations. */
+export interface SpecSearchResult {
+  readonly spec: Spec
+  readonly score: number
+  readonly matches: readonly SpecSearchMatch[]
+}
+
 /**
  * Port for reading and writing specs within a single workspace.
  *
@@ -16,6 +30,9 @@ export { type RepositoryConfig as SpecRepositoryConfig }
  * `list` and `get` return lightweight {@link Spec} metadata — no artifact content
  * is loaded. Content is fetched explicitly via `artifact()`. Write operations
  * receive a `Spec` so implementations never deal with raw paths.
+ *
+ * `search` performs content-based search across all spec artifacts in this workspace,
+ * returning results ranked by relevance score.
  */
 export abstract class SpecRepository extends Repository {
   /**
@@ -110,6 +127,19 @@ export abstract class SpecRepository extends Repository {
     content: string,
     options?: { force?: boolean; originalHash?: string },
   ): Promise<void>
+
+  /**
+   * Searches spec artifact content for the given query string.
+   *
+   * Performs case-insensitive substring matching across all spec artifacts.
+   * Results are returned sorted by descending relevance score.
+   *
+   * @param query - The search query string
+   * @param options - Search options
+   * @param options.limit - Maximum number of results to return
+   * @returns Matching specs with scores and match locations, sorted by relevance
+   */
+  abstract search(query: string, options?: { limit?: number }): Promise<SpecSearchResult[]>
 
   /**
    * Resolves a storage path to a spec identity within this workspace.

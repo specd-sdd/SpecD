@@ -772,4 +772,97 @@ describe('FsSpecRepository', () => {
       await fs.rm(tmpDir, { recursive: true, force: true })
     })
   })
+
+  describe('search()', () => {
+    let ctx: RepoContext
+
+    beforeEach(async () => {
+      ctx = await setupRepo()
+    })
+
+    afterEach(async () => {
+      await cleanupRepo(ctx)
+    })
+
+    it('returns specs matching query', async () => {
+      await writeSpecFile(
+        ctx,
+        'auth/login',
+        'spec.md',
+        '# Login\n\nThe user authentication flow uses OAuth2.',
+      )
+      await writeSpecFile(
+        ctx,
+        'billing/pay',
+        'spec.md',
+        '# Payment\n\nHandles credit card payments.',
+      )
+
+      const results = await ctx.repo.search('OAuth2')
+
+      expect(results).toHaveLength(1)
+      expect(results[0]!.spec.name.toString()).toBe('auth/login')
+      expect(results[0]!.score).toBeGreaterThan(0)
+      expect(results[0]!.matches.length).toBeGreaterThan(0)
+      expect(results[0]!.matches[0]!.filename).toBe('spec.md')
+    })
+
+    it('performs case-insensitive matching', async () => {
+      await writeSpecFile(ctx, 'core/config', 'spec.md', 'Configuration Loading')
+
+      const results = await ctx.repo.search('configuration loading')
+
+      expect(results).toHaveLength(1)
+      expect(results[0]!.spec.name.toString()).toBe('core/config')
+    })
+
+    it('returns empty when no matches', async () => {
+      await writeSpecFile(ctx, 'auth/login', 'spec.md', '# Login\n\nNo relevant content.')
+
+      const results = await ctx.repo.search('xyznonexistent')
+
+      expect(results).toEqual([])
+    })
+
+    it('sorts results by score descending', async () => {
+      await writeSpecFile(ctx, 'a/one', 'spec.md', 'keyword keyword keyword keyword keyword')
+      await writeSpecFile(ctx, 'b/two', 'spec.md', 'keyword')
+
+      const results = await ctx.repo.search('keyword')
+
+      expect(results).toHaveLength(2)
+      expect(results[0]!.score).toBeGreaterThan(results[1]!.score)
+    })
+
+    it('respects limit option', async () => {
+      await writeSpecFile(ctx, 'a/one', 'spec.md', 'keyword here')
+      await writeSpecFile(ctx, 'b/two', 'spec.md', 'keyword there')
+      await writeSpecFile(ctx, 'c/three', 'spec.md', 'keyword everywhere')
+
+      const results = await ctx.repo.search('keyword', { limit: 2 })
+
+      expect(results).toHaveLength(2)
+    })
+
+    it('searches across all artifact files', async () => {
+      await writeSpecFile(ctx, 'auth/login', 'spec.md', '# Login\n\nLogin spec.')
+      await writeSpecFile(ctx, 'auth/login', 'verify.md', 'WHEN searching for OAuth2 THEN find it')
+
+      const results = await ctx.repo.search('OAuth2')
+
+      expect(results).toHaveLength(1)
+      expect(results[0]!.matches.some((m) => m.filename === 'verify.md')).toBe(true)
+    })
+
+    it('includes snippet and line in matches', async () => {
+      await writeSpecFile(ctx, 'auth/login', 'spec.md', 'line1\nline2\nOAuth2 is here\nline4')
+
+      const results = await ctx.repo.search('OAuth2')
+
+      expect(results).toHaveLength(1)
+      const match = results[0]!.matches[0]!
+      expect(match.line).toBe(3)
+      expect(match.snippet).toContain('OAuth2')
+    })
+  })
 })

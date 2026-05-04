@@ -154,6 +154,7 @@ export function makeMockKernel(overrides: Record<string, unknown> = {}): Kernel 
     approveSpec: { execute: vi.fn() },
     approveSignoff: { execute: vi.fn() },
     list: { execute: vi.fn().mockResolvedValue([]) },
+    search: { execute: vi.fn().mockResolvedValue([]) },
     get: { execute: vi.fn() },
     getOutline: { execute: vi.fn() },
     saveMetadata: { execute: vi.fn() },

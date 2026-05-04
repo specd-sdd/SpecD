@@ -11,6 +11,12 @@ export {
   type UpdateSpecDepsResult,
 } from './update-spec-deps.js'
 export { type ListSpecs, type SpecListEntry, type SpecMetadataStatus } from './list-specs.js'
+export {
+  type SearchSpecs,
+  type SpecSearchEntry,
+  type SearchSpecsOptions,
+  type SpecSearchMatch,
+} from './search-specs.js'
 export { type GetSpec, type GetSpecInput, type GetSpecResult } from './get-spec.js'
 export {
   type SaveSpecMetadata,

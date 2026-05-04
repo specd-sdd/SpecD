@@ -4,6 +4,8 @@ export {
   SpecRepository,
   type SpecRepositoryConfig,
   type ResolveFromPathResult,
+  type SpecSearchMatch,
+  type SpecSearchResult,
 } from './spec-repository.js'
 export { ChangeRepository, type ChangeRepositoryConfig } from './change-repository.js'
 export { ArchiveRepository, type ArchiveRepositoryConfig } from './archive-repository.js'

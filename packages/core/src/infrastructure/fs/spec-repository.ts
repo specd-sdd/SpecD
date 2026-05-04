@@ -10,6 +10,8 @@ import {
   SpecRepository,
   type SpecRepositoryConfig,
   type ResolveFromPathResult,
+  type SpecSearchResult,
+  type SpecSearchMatch,
 } from '../../application/ports/spec-repository.js'
 import { isEnoent } from './is-enoent.js'
 import { writeFileAtomic } from './write-atomic.js'
@@ -341,6 +343,67 @@ export class FsSpecRepository extends SpecRepository {
     const specPath = SpecPath.fromSegments(prefixed)
     const specId = this.workspace() + ':' + specPath.toString()
     return { specPath, specId }
+  }
+
+  /**
+   * Searches spec artifact content for the given query string.
+   *
+   * Iterates all specs, loads each artifact file, and performs
+   * case-insensitive substring matching. Results are scored by match count
+   * weighted by position (earlier matches score higher) and returned sorted
+   * by descending score.
+   *
+   * @param query - The search query string
+   * @param options - Search options
+   * @param options.limit - Maximum number of results to return
+   * @returns Matching specs with scores and match locations
+   */
+  override async search(query: string, options?: { limit?: number }): Promise<SpecSearchResult[]> {
+    const limit = options?.limit
+    const lowerQuery = query.toLowerCase()
+    const specs = await this.list()
+    const results: SpecSearchResult[] = []
+
+    for (const spec of specs) {
+      let score = 0
+      const matches: SpecSearchMatch[] = []
+
+      for (const filename of spec.filenames) {
+        const artifact = await this.artifact(spec, filename)
+        if (artifact === null) continue
+
+        const content = artifact.content
+        const lowerContent = content.toLowerCase()
+        let searchOffset = 0
+
+        while (searchOffset < lowerContent.length) {
+          const idx = lowerContent.indexOf(lowerQuery, searchOffset)
+          if (idx === -1) break
+
+          const line = content.substring(0, idx).split('\n').length
+          const snippetStart = Math.max(0, idx - 60)
+          const snippetEnd = Math.min(content.length, idx + query.length + 60)
+          const snippet = content.substring(snippetStart, snippetEnd)
+
+          matches.push({ filename, line, snippet })
+          const positionWeight = 1 / (1 + idx / content.length)
+          score += 1 + positionWeight
+          searchOffset = idx + 1
+        }
+      }
+
+      if (matches.length > 0) {
+        results.push({ spec, score, matches })
+      }
+    }
+
+    results.sort((a, b) => b.score - a.score)
+
+    if (limit !== undefined && limit > 0) {
+      return results.slice(0, limit)
+    }
+
+    return results
   }
 
   /**

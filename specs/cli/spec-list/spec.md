@@ -11,21 +11,34 @@ Without a quick inventory of all specs, users and agents cannot orient themselve
 ### Requirement: Command signature
 
 ```
-specd specs list [--summary] [--metadata-status [filter]] [--format text|json|toon]
+specd specs list [--workspace <name>] [--summary] [--metadata-status [filter]] [--format text|json|toon]
 ```
 
 Alias:
 
 ```
-specd spec list [--summary] [--metadata-status [filter]] [--format text|json|toon]
+specd spec list [--workspace <name>] [--summary] [--metadata-status [filter]] [--format text|json|toon]
 ```
 
+- `--workspace <name>` — optional, repeatable; include only specs belonging to the named workspace(s). When omitted, all workspaces are included
 - `--summary` — optional flag; when present, a short summary is included for each spec alongside the title
 - `--metadata-status` — optional flag with optional filter value; when present, a metadata-freshness METADATA STATUS column is included for each spec
   - Without a filter value (`--metadata-status`), all specs are shown with their status
   - With a comma-separated filter value (`--metadata-status stale`, `--metadata-status stale,missing`), only specs matching at least one of the listed statuses are shown
   - Valid filter tokens: `fresh`, `stale`, `missing`, `invalid`
 - `--format text|json|toon` — optional; output format, defaults to `text`
+
+### Requirement: Workspace filtering
+
+When `--workspace` is provided one or more times, the CLI MUST pass the collected workspace names to `ListSpecs.execute({ workspaces: [...] })` so that filtering is performed by the core use case, not by the CLI.
+
+Workspace names that do not match any configured workspace MUST produce no output for that name (no error, no warning).
+
+When `--workspace` is not provided, the CLI calls `ListSpecs.execute()` without `workspaces`, which includes all configured workspaces (existing behavior).
+
+In text mode, only workspace groups matching the filter are rendered. Empty filtered workspaces (no specs in the filtered set) are still shown with their heading and `(none)`.
+
+In JSON/toon mode, the `workspaces` array contains entries for all configured workspace names; filtered-out workspaces appear with an empty `specs` array, matching the existing empty-workspace behavior.
 
 ### Requirement: Title resolution
 
@@ -75,6 +88,8 @@ In `text` mode (default), specs are grouped by workspace. Each group is rendered
 - When `--summary` is passed, `SUMMARY` follows as an additional aligned column using wrap overflow (capped at 60 characters).
 - Workspace groups are separated by a blank line.
 
+When `--workspace` filters are applied, only workspace groups matching the filter are rendered. Column widths are computed across all remaining entries (not across all workspaces).
+
 ```
   workspace: default
   PATH                      TITLE
@@ -118,6 +133,8 @@ In `json` or `toon` mode, each spec entry is an object. The `path` field uses th
 }
 ```
 
+When `--workspace` filters are applied in JSON/toon mode, the `workspaces` array contains entries for all configured workspace names; filtered-out workspaces appear with an empty `specs` array, matching the existing empty-workspace behavior.
+
 When `--summary` is not passed, `summary` is omitted from text rows and from JSON/toon objects. When `--summary` is passed but no summary is available for a spec, the text row shows the title only and the JSON/toon object omits `summary` (does not include `null`).
 
 When `--metadata-status` is not passed, `metadataStatus` is omitted from JSON/toon objects. When `--metadata-status` is passed, `metadataStatus` is always present as a string (`"fresh"`, `"stale"`, `"missing"`, or `"invalid"`).
@@ -134,8 +151,8 @@ If the spec filesystem cannot be read (I/O error), exits with code 3.
 
 ## Constraints
 
-- No filtering by workspace or prefix in v1
-- All configured workspaces are listed, even empty ones
+- Workspace filtering is supported via `--workspace` (repeatable); prefix filtering is not supported in v1
+- All configured workspaces are listed, even empty ones (filtered workspaces with no matching specs show `(none)`)
 - Title resolution, summary extraction, and status resolution are all implemented in `@specd/core`, not in the CLI
 - Summary is never a hard error — if extraction fails for any reason, the spec is still listed without it
 - Status resolution errors (I/O failures reading artifacts for hashing) result in `stale` status, not a hard error
@@ -144,6 +161,24 @@ If the spec filesystem cannot be read (I/O error), exits with code 3.
 
 ```
 $ specd spec list
+  workspace: default
+  PATH                      TITLE
+  default:auth/login        Login
+  default:auth/register     Register
+  default:billing/invoices  Invoices
+
+  workspace: billing
+  PATH                      TITLE
+  billing:payments/create   Create Payment
+
+$ specd spec list --workspace default
+  workspace: default
+  PATH                      TITLE
+  default:auth/login        Login
+  default:auth/register     Register
+  default:billing/invoices  Invoices
+
+$ specd spec list --workspace default --workspace billing
   workspace: default
   PATH                      TITLE
   default:auth/login        Login
@@ -181,6 +216,9 @@ $ specd spec list --metadata-status stale,missing
 
 $ specd spec list --metadata-status --format json
 {"workspaces":[{"name":"default","specs":[{"path":"default:auth/login","title":"Login","metadataStatus":"fresh"},{"path":"default:auth/register","title":"Register","metadataStatus":"stale"}]}]}
+
+$ specd spec list --workspace default --format json
+{"workspaces":[{"name":"default","specs":[{"path":"default:auth/login","title":"Login"},{"path":"default:auth/register","title":"Register"}]},{"name":"billing","specs":[]}]}
 ```
 
 ## Spec Dependencies
@@ -188,3 +226,4 @@ $ specd spec list --metadata-status --format json
 - [`cli:cli/entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
 - [`core:core/spec`](../../core/spec/spec.md) — spec metadata access and listing model
 - [`cli:cli/command-resource-naming`](../command-resource-naming/spec.md) — canonical plural naming and singular alias policy
+- [`cli:cli/spec-search`](../spec-search/spec.md) — dedicated spec search command; `specs list` does not perform text searches

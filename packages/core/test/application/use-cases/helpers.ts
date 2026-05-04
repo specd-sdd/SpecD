@@ -16,6 +16,7 @@ import { ChangeRepository } from '../../../src/application/ports/change-reposito
 import {
   SpecRepository,
   type ResolveFromPathResult,
+  type SpecSearchResult,
 } from '../../../src/application/ports/spec-repository.js'
 import { type SpecMetadata } from '../../../src/domain/services/parse-metadata.js'
 import { ArchiveRepository } from '../../../src/application/ports/archive-repository.js'
@@ -456,6 +457,10 @@ class StubSpecRepository extends SpecRepository {
       return await this._resolveFromPathFn(inputPath, from)
     }
     return null
+  }
+
+  override async search(): Promise<SpecSearchResult[]> {
+    return []
   }
 }
 

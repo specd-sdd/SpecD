@@ -77,17 +77,25 @@ export class ListSpecs {
    *   each spec in addition to the title. Default: `false`.
    * @param options.includeMetadataStatus - When `true`, resolves metadata freshness
    *   status for each spec. Default: `false`.
-   * @returns All specs across all workspaces with resolved titles
+   * @param options.workspaces - When provided, only include specs from these workspaces.
+   *   Omitted or empty means all workspaces.
+   * @returns All specs across all (or filtered) workspaces with resolved titles
    */
   async execute(options?: {
     includeSummary?: boolean
     includeMetadataStatus?: boolean
+    workspaces?: readonly string[]
   }): Promise<SpecListEntry[]> {
     const includeSummary = options?.includeSummary ?? false
     const includeMetadataStatus = options?.includeMetadataStatus ?? false
+    const workspaceFilter =
+      options?.workspaces !== undefined && options.workspaces.length > 0
+        ? new Set(options.workspaces)
+        : null
     const results: SpecListEntry[] = []
 
-    for (const [, repo] of this._specRepos) {
+    for (const [wsName, repo] of this._specRepos) {
+      if (workspaceFilter !== null && !workspaceFilter.has(wsName)) continue
       const specs = await repo.list()
       for (const spec of specs) {
         results.push(await this._resolveEntry(repo, spec, includeSummary, includeMetadataStatus))

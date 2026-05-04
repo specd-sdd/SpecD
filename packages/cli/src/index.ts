@@ -41,6 +41,7 @@ import { registerArchiveShow } from './commands/archive/show.js'
 
 // spec
 import { registerSpecList } from './commands/spec/list.js'
+import { registerSpecSearch } from './commands/spec/search.js'
 import { registerSpecShow } from './commands/spec/show.js'
 import { registerSpecOutline } from './commands/spec/outline.js'
 import { registerSpecContext } from './commands/spec/context.js'
@@ -161,6 +162,7 @@ const specCmd = program
   .alias('spec')
   .description('Commands for listing, browsing, validating, and managing spec files.')
 registerSpecList(specCmd)
+registerSpecSearch(specCmd)
 registerSpecShow(specCmd)
 registerSpecOutline(specCmd)
 registerSpecContext(specCmd)

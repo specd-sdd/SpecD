@@ -1,0 +1,58 @@
+{
+  "title": "Search Specs",
+  "description": "Consumers need a core-level use case to search spec content by keyword without depending on the code graph. SearchSpecs provides content-based search across all configured workspaces by delegating to each workspace's SpecRepository.search() method. It is the fallback search path when the code graph is unavailable, and the primary search path for consumers that do not have graph access.",
+  "dependsOn": ["core:core/spec-repository-port", "core:core/list-specs", "core:core/workspace"],
+  "rules": [
+    {
+      "requirement": "Search across all configured workspaces",
+      "rules": [
+        "SearchSpecs.execute(query, options?) SHALL iterate every configured workspace in declaration order and call SpecRepository.search(query, options) on each repository. Results from all workspaces MUST be merged into a single flat array sorted by score descending across all workspaces."
+      ]
+    },
+    {
+      "requirement": "Optional workspace filter",
+      "rules": [
+        "When options.workspaces is provided as a non-empty array of workspace names, only those workspaces SHALL be searched. Workspace names that do not match any configured workspace SHALL be silently ignored. When options.workspaces is omitted or empty, all configured workspaces are searched."
+      ]
+    },
+    {
+      "requirement": "Optional summary resolution",
+      "rules": [
+        "When options.includeSummary is true, each result MUST include a summary field resolved using the same algorithm as ListSpecs: metadata description first, then spec.md extraction fallback. When options.includeSummary is false or omitted, summary MUST NOT appear on any result."
+      ]
+    },
+    {
+      "requirement": "Result shape",
+      "rules": [
+        "Each entry in the result array MUST include: workspace (the workspace name), path (the spec's capability path), title (the resolved title, same resolution as ListSpecs), score (the relevance score from the repository search), and matches (the array of SpecSearchMatch objects from the repository). Optional fields: summary (present only when includeSummary is true and a summary is available)."
+      ]
+    },
+    {
+      "requirement": "Silent error handling",
+      "rules": [
+        "Errors encountered while searching an individual workspace MUST be silently caught. Results from that workspace MUST be omitted from the output, but results from other workspaces MUST still be returned. The use case SHALL NOT propagate I/O errors from individual repository searches to the caller."
+      ]
+    },
+    {
+      "requirement": "Empty results",
+      "rules": [
+        "When no specs match across all searched workspaces, the use case MUST return an empty array (not an error)."
+      ]
+    }
+  ],
+  "keywords": [
+    "search",
+    "specs",
+    "content-based",
+    "workspace",
+    "fallback",
+    "delegation",
+    "sorted-results",
+    "filter"
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:927dba4d2fe99ded77ddcefd10e2442d7c057a83f167d8b43d9ced0d9b249eb8",
+    "verify.md": "sha256:eb2ce47616f93dd5a7beec0956dafec9e7241c59390cc4acebaf13baee48b1d2"
+  },
+  "generatedBy": "agent"
+}

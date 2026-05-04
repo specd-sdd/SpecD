@@ -8,6 +8,16 @@ import { handleError } from '../../handle-error.js'
 import { colWidth, renderTable } from '../../helpers/table.js'
 
 /**
+ * Collects repeatable option values into an array.
+ * @param value - The new option value.
+ * @param previous - The accumulated array of previous values.
+ * @returns A new array with the value appended.
+ */
+function collect(value: string, previous: string[]): string[] {
+  return [...previous, value]
+}
+
+/**
  * Column widths shared across all workspace groups in a single `spec list` run.
  * Computed once over all entries so every group renders identically wide columns.
  */
@@ -124,11 +134,15 @@ export function registerSpecList(parent: Command): void {
       '--metadata-status [filter]',
       'show metadata freshness status; optionally filter by fresh,stale,missing,invalid',
     )
+    .option('--workspace <name>', 'filter by workspace (repeatable)', collect, [])
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
     .addHelpText(
       'after',
       `
+Options:
+  --workspace <name>   Filter results to one or more workspaces (repeatable)
+
 JSON/TOON output schema:
   {
     workspaces: Array<{
@@ -147,6 +161,7 @@ JSON/TOON output schema:
       async (opts: {
         summary?: boolean
         metadataStatus?: boolean | string
+        workspace: string[]
         format: string
         config?: string
       }) => {
@@ -155,7 +170,11 @@ JSON/TOON output schema:
           const includeSummary = opts.summary === true
           const includeMetadataStatus = opts.metadataStatus !== undefined
           const metadataStatusFilter = parseMetadataStatusFilter(opts.metadataStatus)
-          let entries = await kernel.specs.list.execute({ includeSummary, includeMetadataStatus })
+          let entries = await kernel.specs.list.execute({
+            includeSummary,
+            includeMetadataStatus,
+            ...(opts.workspace.length > 0 ? { workspaces: opts.workspace } : {}),
+          })
           const fmt = parseFormat(opts.format)
 
           // Apply status filter when a filter value is provided
@@ -166,19 +185,24 @@ JSON/TOON output schema:
           }
 
           const workspaceNames = config.workspaces.map((w) => w.name)
+          const workspaceFilter = opts.workspace.length > 0 ? new Set(opts.workspace) : null
+          const visibleWorkspaces =
+            workspaceFilter !== null
+              ? workspaceNames.filter((n) => workspaceFilter.has(n))
+              : workspaceNames
 
           if (fmt === 'text') {
-            if (workspaceNames.length === 0) {
+            if (visibleWorkspaces.length === 0) {
               output('no workspaces configured', 'text')
               return
             }
 
             const byWorkspace = new Map<string, SpecListEntry[]>()
-            for (const name of workspaceNames) byWorkspace.set(name, [])
+            for (const name of visibleWorkspaces) byWorkspace.set(name, [])
             for (const entry of entries) byWorkspace.get(entry.workspace)?.push(entry)
 
             const widths = computeGlobalWidths(entries, includeMetadataStatus, includeSummary)
-            const groups = workspaceNames.map((name) =>
+            const groups = visibleWorkspaces.map((name) =>
               renderWorkspaceGroup(
                 name,
                 byWorkspace.get(name) ?? [],
@@ -190,7 +214,7 @@ JSON/TOON output schema:
             output(groups.join('\n\n'), 'text')
           } else {
             const byWorkspace = new Map<string, SpecListEntry[]>()
-            for (const name of workspaceNames) byWorkspace.set(name, [])
+            for (const name of visibleWorkspaces) byWorkspace.set(name, [])
             for (const entry of entries) byWorkspace.get(entry.workspace)?.push(entry)
 
             output(

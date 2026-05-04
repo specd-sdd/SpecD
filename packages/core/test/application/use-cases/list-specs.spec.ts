@@ -108,4 +108,77 @@ describe('ListSpecs', () => {
 
     expect(result[0]!.title).toBe('Login Flow')
   })
+
+  describe('workspace filtering', () => {
+    it('filters to a single workspace', async () => {
+      const spec1 = new Spec('alpha', SpecPath.parse('auth/login'), ['spec.md'])
+      const spec2 = new Spec('beta', SpecPath.parse('billing/pay'), ['spec.md'])
+
+      const repo1 = makeSpecRepository({ specs: [spec1], workspace: 'alpha' })
+      const repo2 = makeSpecRepository({ specs: [spec2], workspace: 'beta' })
+
+      const specRepos = new Map([
+        ['alpha', repo1],
+        ['beta', repo2],
+      ])
+
+      const uc = new ListSpecs(specRepos, makeContentHasher(), makeYamlSerializer())
+      const result = await uc.execute({ workspaces: ['alpha'] })
+
+      expect(result).toHaveLength(1)
+      expect(result[0]!.workspace).toBe('alpha')
+      expect(result[0]!.path).toBe('auth/login')
+    })
+
+    it('filters to multiple workspaces', async () => {
+      const spec1 = new Spec('alpha', SpecPath.parse('auth/login'), ['spec.md'])
+      const spec2 = new Spec('beta', SpecPath.parse('billing/pay'), ['spec.md'])
+      const spec3 = new Spec('gamma', SpecPath.parse('search/index'), ['spec.md'])
+
+      const repo1 = makeSpecRepository({ specs: [spec1], workspace: 'alpha' })
+      const repo2 = makeSpecRepository({ specs: [spec2], workspace: 'beta' })
+      const repo3 = makeSpecRepository({ specs: [spec3], workspace: 'gamma' })
+
+      const specRepos = new Map([
+        ['alpha', repo1],
+        ['beta', repo2],
+        ['gamma', repo3],
+      ])
+
+      const uc = new ListSpecs(specRepos, makeContentHasher(), makeYamlSerializer())
+      const result = await uc.execute({ workspaces: ['alpha', 'gamma'] })
+
+      expect(result).toHaveLength(2)
+      expect(result.map((r) => r.workspace).sort()).toEqual(['alpha', 'gamma'])
+    })
+
+    it('returns empty when workspace does not exist', async () => {
+      const spec = new Spec('alpha', SpecPath.parse('auth/login'), ['spec.md'])
+      const repo = makeSpecRepository({ specs: [spec], workspace: 'alpha' })
+
+      const specRepos = new Map([['alpha', repo]])
+      const uc = new ListSpecs(specRepos, makeContentHasher(), makeYamlSerializer())
+      const result = await uc.execute({ workspaces: ['nonexistent'] })
+
+      expect(result).toEqual([])
+    })
+
+    it('returns all workspaces when filter is empty array', async () => {
+      const spec1 = new Spec('alpha', SpecPath.parse('auth/login'), ['spec.md'])
+      const spec2 = new Spec('beta', SpecPath.parse('billing/pay'), ['spec.md'])
+
+      const repo1 = makeSpecRepository({ specs: [spec1], workspace: 'alpha' })
+      const repo2 = makeSpecRepository({ specs: [spec2], workspace: 'beta' })
+
+      const specRepos = new Map([
+        ['alpha', repo1],
+        ['beta', repo2],
+      ])
+
+      const uc = new ListSpecs(specRepos, makeContentHasher(), makeYamlSerializer())
+      const result = await uc.execute({ workspaces: [] })
+
+      expect(result).toHaveLength(2)
+    })
+  })
 })

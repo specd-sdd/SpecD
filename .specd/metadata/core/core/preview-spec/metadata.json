@@ -50,7 +50,7 @@
     {
       "requirement": "Result shape",
       "rules": [
-        "`PreviewSpec.execute` MUST return a `PreviewSpecResult`:\n\n```typescript\ninterface PreviewSpecFileEntry {\n  /** The artifact filename (e.g. `spec.md`, `verify.md`). */\n  readonly filename: string\n  /** The original base content (before delta application). `null` for new specs. */\n  readonly base: string | null\n  /** The merged content (after delta application). */\n  readonly merged: string\n  /** \n   * The preview status of this file. \n   * - 'merged': delta applied successfully with changes, or new spec file\n   * - 'no-op': delta applied but resulted in no changes to base content\n   * - 'missing': delta file or base artifact not found, or delta application failed\n   */\n  readonly status: 'merged' | 'no-op' | 'missing'\n}\n\ninterface PreviewSpecResult {\n  /** The spec ID that was previewed. */\n  readonly specId: string\n  /** The change name. */\n  readonly changeName: string\n  /** Per-file preview entries, ordered per the artifact file ordering requirement. */\n  readonly files: readonly PreviewSpecFileEntry[]\n  /** Warnings encountered during preview (e.g. parser errors, missing base). */\n  readonly warnings: readonly string[]\n}\n```"
+        "`PreviewSpec.execute` MUST return a `PreviewSpecResult`:\n\n```typescript\ninterface PreviewSpecFileEntry {\n  /** The artifact filename (e.g. `spec.md`, `verify.md`). */\n  readonly filename: string\n  /** The original base content (before delta application). `null` for new specs. */\n  readonly base: string | null\n  /** The merged content (after delta application). */\n  readonly merged: string\n  /**\n   * The preview status of this file.\n   * - 'merged': delta applied successfully with changes, or new spec file\n   * - 'no-op': delta applied but resulted in no changes to base content\n   * - 'missing': delta file or base artifact not found, or delta application failed\n   */\n  readonly status: 'merged' | 'no-op' | 'missing'\n}\n\ninterface PreviewSpecResult {\n  /** The spec ID that was previewed. */\n  readonly specId: string\n  /** The change name. */\n  readonly changeName: string\n  /** Per-file preview entries, ordered per the artifact file ordering requirement. */\n  readonly files: readonly PreviewSpecFileEntry[]\n  /** Warnings encountered during preview (e.g. parser errors, missing base). */\n  readonly warnings: readonly string[]\n}\n```"
       ]
     },
     {
@@ -206,7 +206,7 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:9bdd8612d0237118442dd56d106b78f2d08a4136be23901d2433ba0eefb61ecb",
+    "spec.md": "sha256:d61a5fbdb85a6e5215e060a7e4216e3961464c35b8ba622afc2bbb9e3fd223f9",
     "verify.md": "sha256:1467d4e03ae6b1bc5c4e6eb0fe33ea40e930ac0b7a9181f77fb054f6ed55b90c"
   },
   "generatedBy": "core"

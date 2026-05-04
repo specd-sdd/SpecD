@@ -4,6 +4,7 @@ import { SpecArtifact } from '../../../../src/domain/value-objects/spec-artifact
 import { SpecPath } from '../../../../src/domain/value-objects/spec-path.js'
 import {
   type ResolveFromPathResult,
+  type SpecSearchResult,
   SpecRepository,
 } from '../../../../src/application/ports/spec-repository.js'
 import {
@@ -64,6 +65,10 @@ class FakeSpecRepository extends SpecRepository {
     _from?: SpecPath,
   ): Promise<ResolveFromPathResult | null> {
     return this._resolveResult
+  }
+
+  override async search(): Promise<SpecSearchResult[]> {
+    return []
   }
 }
 

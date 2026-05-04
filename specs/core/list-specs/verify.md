@@ -16,6 +16,24 @@
 - **WHEN** `execute()` is called
 - **THEN** the result array contains no entries for that workspace and no error is thrown
 
+#### Scenario: Workspace filter limits results
+
+- **GIVEN** specs exist in workspaces `alpha` and `beta`
+- **WHEN** `execute({ workspaces: ["alpha"] })` is called
+- **THEN** only entries from workspace `alpha` are returned
+
+#### Scenario: Unknown workspace name in filter silently ignored
+
+- **GIVEN** no workspace named `nonexistent` is configured
+- **WHEN** `execute({ workspaces: ["nonexistent"] })` is called
+- **THEN** the result array is empty and no error is thrown
+
+#### Scenario: Empty workspaces array includes all
+
+- **GIVEN** specs exist in workspaces `alpha` and `beta`
+- **WHEN** `execute({ workspaces: [] })` is called
+- **THEN** entries from both workspaces are returned
+
 ### Requirement: Always resolve a title for each entry
 
 #### Scenario: Title from metadata

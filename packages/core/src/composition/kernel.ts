@@ -18,6 +18,7 @@ import { EditChange } from '../application/use-cases/edit-change.js'
 import { UpdateSpecDeps } from '../application/use-cases/update-spec-deps.js'
 import { SkipArtifact } from '../application/use-cases/skip-artifact.js'
 import { ListSpecs } from '../application/use-cases/list-specs.js'
+import { SearchSpecs } from '../application/use-cases/search-specs.js'
 import { GetSpec } from '../application/use-cases/get-spec.js'
 import { SaveSpecMetadata } from '../application/use-cases/save-spec-metadata.js'
 import { InvalidateSpecMetadata } from '../application/use-cases/invalidate-spec-metadata.js'
@@ -127,6 +128,8 @@ export interface Kernel {
     approveSignoff: ApproveSignoff
     /** Lists all specs across all configured workspaces. */
     list: ListSpecs
+    /** Searches spec content across all configured workspaces. */
+    search: SearchSpecs
     /** Loads a spec and all of its artifact files. */
     get: GetSpec
     /** Retrieves the navigable structure (outline) of a spec artifact. */
@@ -314,6 +317,7 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
       approveSpec: new ApproveSpec(i.changes, i.actor, schemaProvider, i.hasher),
       approveSignoff: new ApproveSignoff(i.changes, i.actor, schemaProvider, i.hasher),
       list: new ListSpecs(i.specs, i.hasher, i.yaml),
+      search: new SearchSpecs(i.specs, i.hasher, i.yaml),
       get: new GetSpec(i.specs),
       getOutline: new GetSpecOutline(i.specs, schemaProvider, i.parsers),
       saveMetadata: new SaveSpecMetadata(i.specs),

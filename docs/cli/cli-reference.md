@@ -559,8 +559,34 @@ List all specs known to the project.
 | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
 | `--summary`                  | Show a one-line summary per spec instead of the full table.                                                                                |
 | `--metadata-status [filter]` | Filter by metadata freshness. Valid values: `fresh`, `stale`, `missing`, `invalid`. Omitting the value shows all with their status column. |
+| `--workspace <name>`         | Filter by workspace name. Repeatable: `--workspace alpha --workspace beta`.                                                                |
 | `--format text\|json\|toon`  | Output format.                                                                                                                             |
 | `--config <path>`            | Config file path.                                                                                                                          |
+
+### spec search
+
+```
+specd specs search <query> [options]
+```
+
+Search spec content across workspaces. Uses the code graph index when available for fast full-text search; falls back to filesystem search with a warning on stderr.
+
+| Option | Description |
+| | ---------------------------- | -------------------------------------------------------------------- | -- |
+| `--workspace <name>` | Filter by workspace name. Repeatable. |
+| `--graph` | Require code graph index; error if unavailable. |
+| `--summary` | Include a short description for each result. |
+| `--limit <n>` | Maximum results (default: 20). |
+| `--format text\|json\|toon` | Output format. |
+| `--config <path>` | Config file path. |
+
+Examples:
+
+```bash
+specd specs search "authentication"
+specd specs search "login" --workspace alpha
+specd specs search "payment" --graph --format json
+```
 
 ### spec show
 

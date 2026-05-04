@@ -1,6 +1,38 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { makeMockConfig, makeMockKernel, makeProgram, captureStdout } from './helpers.js'
 
+function makeMultiWorkspaceConfig() {
+  return makeMockConfig({
+    workspaces: [
+      {
+        name: 'alpha',
+        specsPath: '/project/specs-alpha',
+        specsAdapter: { adapter: 'fs', config: { path: '/project/specs-alpha' } },
+        schemasPath: null,
+        schemasAdapter: null,
+        codeRoot: '/project',
+        ownership: 'owned' as const,
+        isExternal: false,
+      },
+      {
+        name: 'beta',
+        specsPath: '/project/specs-beta',
+        specsAdapter: { adapter: 'fs', config: { path: '/project/specs-beta' } },
+        schemasPath: null,
+        schemasAdapter: null,
+        codeRoot: '/project',
+        ownership: 'owned' as const,
+        isExternal: false,
+      },
+    ],
+  })
+}
+
+const multiEntries = [
+  { workspace: 'alpha', path: 'auth/login', title: 'Login' },
+  { workspace: 'beta', path: 'billing/pay', title: 'Pay' },
+]
+
 vi.mock('../../src/load-config.js', () => ({
   loadConfig: vi.fn(),
   resolveConfigPath: vi.fn().mockResolvedValue(null),
@@ -166,5 +198,110 @@ describe('spec list --metadata-status', () => {
 
     const out = stdout()
     expect(out).not.toContain('METADATA STATUS')
+  })
+})
+
+describe('spec list --workspace', () => {
+  it('passes workspace filter to use case', async () => {
+    const config = makeMultiWorkspaceConfig()
+    const kernel = makeMockKernel()
+    vi.mocked(loadConfig).mockResolvedValue(config)
+    vi.mocked(createCliKernel).mockResolvedValue(kernel)
+    kernel.specs.list.execute.mockResolvedValue([])
+
+    const program = makeProgram()
+    registerSpecList(program.command('spec'))
+    await program.parseAsync(['node', 'specd', 'spec', 'list', '--workspace', 'alpha'])
+
+    expect(kernel.specs.list.execute).toHaveBeenCalledWith({
+      includeSummary: false,
+      includeMetadataStatus: false,
+      workspaces: ['alpha'],
+    })
+  })
+
+  it('passes multiple workspace filters to use case', async () => {
+    const config = makeMultiWorkspaceConfig()
+    const kernel = makeMockKernel()
+    vi.mocked(loadConfig).mockResolvedValue(config)
+    vi.mocked(createCliKernel).mockResolvedValue(kernel)
+    kernel.specs.list.execute.mockResolvedValue([])
+
+    const program = makeProgram()
+    registerSpecList(program.command('spec'))
+    await program.parseAsync([
+      'node',
+      'specd',
+      'spec',
+      'list',
+      '--workspace',
+      'alpha',
+      '--workspace',
+      'beta',
+    ])
+
+    expect(kernel.specs.list.execute).toHaveBeenCalledWith({
+      includeSummary: false,
+      includeMetadataStatus: false,
+      workspaces: ['alpha', 'beta'],
+    })
+  })
+
+  it('shows only filtered workspace in text output', async () => {
+    const config = makeMultiWorkspaceConfig()
+    const kernel = makeMockKernel()
+    vi.mocked(loadConfig).mockResolvedValue(config)
+    vi.mocked(createCliKernel).mockResolvedValue(kernel)
+    kernel.specs.list.execute.mockResolvedValue([multiEntries[0]!])
+
+    const stdout = captureStdout()
+    const program = makeProgram()
+    registerSpecList(program.command('spec'))
+    await program.parseAsync(['node', 'specd', 'spec', 'list', '--workspace', 'alpha'])
+
+    const out = stdout()
+    expect(out).toContain('alpha')
+    expect(out).toContain('Login')
+    expect(out).not.toContain('beta')
+  })
+
+  it('includes only filtered workspaces in JSON output', async () => {
+    const config = makeMultiWorkspaceConfig()
+    const kernel = makeMockKernel()
+    vi.mocked(loadConfig).mockResolvedValue(config)
+    vi.mocked(createCliKernel).mockResolvedValue(kernel)
+    kernel.specs.list.execute.mockResolvedValue([multiEntries[0]!])
+
+    const stdout = captureStdout()
+    const program = makeProgram()
+    registerSpecList(program.command('spec'))
+    await program.parseAsync([
+      'node',
+      'specd',
+      'spec',
+      'list',
+      '--workspace',
+      'alpha',
+      '--format',
+      'json',
+    ])
+
+    const json = JSON.parse(stdout())
+    expect(json.workspaces).toHaveLength(1)
+    expect(json.workspaces[0].name).toBe('alpha')
+  })
+
+  it('omits workspaces property when no --workspace is provided', async () => {
+    const { kernel } = setup()
+    kernel.specs.list.execute.mockResolvedValue([])
+
+    const program = makeProgram()
+    registerSpecList(program.command('spec'))
+    await program.parseAsync(['node', 'specd', 'spec', 'list'])
+
+    expect(kernel.specs.list.execute).toHaveBeenCalledWith({
+      includeSummary: false,
+      includeMetadataStatus: false,
+    })
   })
 })

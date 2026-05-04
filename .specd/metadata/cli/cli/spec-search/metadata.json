@@ -1,0 +1,204 @@
+{
+  "generatedBy": "agent",
+  "title": "Spec Search",
+  "description": "CLI command to search spec content by keyword with relevance-ranked results. Uses graph-first search with core fallback, supports workspace filtering and multiple output formats.",
+  "keywords": [
+    "search",
+    "code-graph",
+    "workspace-filtering",
+    "output-format",
+    "fallback",
+    "relevance-ranking"
+  ],
+  "dependsOn": ["cli:cli/entrypoint", "default:_global/spec-layout", "core:core/search-specs"],
+  "contentHashes": {
+    "spec.md": "sha256:dbf5bf924820f32fa8844d01d8b2d21e640bc779704a0cf32df56d0dc37120a2",
+    "verify.md": "sha256:c1e08c6097c3f9bf1e8857542b7cedde7bad87225be9b4f1a4291c725df1b120"
+  },
+  "rules": [
+    {
+      "requirement": "Command signature",
+      "rules": [
+        "specd specs search requires a query argument",
+        "specd specs search <query> [--workspace <name>] [--graph] [--summary] [--format text|json|toon]",
+        "--workspace is repeatable and filters to named workspace(s)",
+        "--graph forces graph-only mode and errors if graph is unavailable",
+        "--summary includes a short summary per result",
+        "--format defaults to text"
+      ]
+    },
+    {
+      "requirement": "Search execution",
+      "rules": [
+        "Graph-first: use code graph when available and fresh",
+        "Core fallback: when graph unavailable, use SearchSpecs.execute() from @specd/core",
+        "Print warning to stderr on fallback indicating less precise results",
+        "Graph-only error: when --graph set and graph unavailable, exit code 1 with error message"
+      ]
+    },
+    {
+      "requirement": "Workspace filtering",
+      "rules": [
+        "Pass workspace names to search backend for server-side filtering",
+        "Non-matching workspace names are silently ignored"
+      ]
+    },
+    {
+      "requirement": "Summary resolution",
+      "rules": [
+        "Use same algorithm as specd specs list --summary",
+        "Priority: metadata description, then paragraph after H1 in spec.md, then first paragraph of Overview/Summary/Purpose"
+      ]
+    },
+    {
+      "requirement": "Output format — text",
+      "rules": [
+        "Table with PATH and TITLE columns, SUMMARY when --summary passed",
+        "Sorted by score descending",
+        "Print 'no matching specs' when no results"
+      ]
+    },
+    {
+      "requirement": "Output format — JSON/toon",
+      "rules": [
+        "Flat array of result objects with path, title, score, summary (when --summary)",
+        "Empty array [] when no results"
+      ]
+    },
+    {
+      "requirement": "Error cases",
+      "rules": [
+        "Graph provider failure with --graph exits code 1",
+        "Empty query exits code 1 with error message",
+        "I/O errors during core fallback exit code 3"
+      ]
+    }
+  ],
+  "constraints": [
+    "CLI orchestrates search strategy; core does not depend on code graph",
+    "Delegates to SearchSpecs use case for fallback; no direct filesystem access in CLI"
+  ],
+  "scenarios": [
+    {
+      "requirement": "Command signature",
+      "name": "Query is required",
+      "when": ["specd specs search is run without a query argument"],
+      "then": ["the command exits with a non-zero code"]
+    },
+    {
+      "requirement": "Command signature",
+      "name": "Empty query rejected",
+      "when": ["specd specs search \"\" is run"],
+      "then": ["the command exits with code 1 and prints an error message"]
+    },
+    {
+      "requirement": "Search execution",
+      "name": "Graph available returns graph results",
+      "given": ["the code graph is indexed and fresh"],
+      "when": ["specd specs search \"config\" is run"],
+      "then": ["results are returned from the graph search", "AND no warning is printed to stderr"]
+    },
+    {
+      "requirement": "Search execution",
+      "name": "Graph unavailable falls back to core",
+      "given": ["the code graph is stale or unavailable"],
+      "when": ["specd specs search \"config\" is run"],
+      "then": [
+        "results are returned from SearchSpecs.execute()",
+        "AND a warning is printed to stderr indicating the fallback"
+      ]
+    },
+    {
+      "requirement": "Search execution",
+      "name": "Graph-only flag with stale graph errors",
+      "given": ["the code graph is stale or unavailable"],
+      "when": ["specd specs search \"config\" --graph is run"],
+      "then": ["the command exits with code 1", "AND an error message is printed to stderr"]
+    },
+    {
+      "requirement": "Workspace filtering",
+      "name": "Single workspace filter",
+      "given": ["the project has specs in workspaces default and cli"],
+      "when": ["specd specs search \"spec\" --workspace default is run"],
+      "then": ["only specs from workspace default appear in results"]
+    },
+    {
+      "requirement": "Workspace filtering",
+      "name": "Multiple workspace filters",
+      "given": ["the project has specs in workspaces default, cli, and core"],
+      "when": ["specd specs search \"spec\" --workspace default --workspace cli is run"],
+      "then": ["results include specs from default and cli only"]
+    },
+    {
+      "requirement": "Workspace filtering",
+      "name": "Non-existent workspace name ignored",
+      "given": ["the project has no workspace named nonexistent"],
+      "when": ["specd specs search \"spec\" --workspace nonexistent is run"],
+      "then": ["no error is raised and results may be empty"]
+    },
+    {
+      "requirement": "Summary resolution",
+      "name": "Summary from metadata",
+      "given": ["a matching spec has .specd-metadata.yaml with description: \"Handles auth\""],
+      "when": ["specd specs search \"auth\" --summary is run"],
+      "then": ["the result includes summary: \"Handles auth\""]
+    },
+    {
+      "requirement": "Summary resolution",
+      "name": "Summary omitted without flag",
+      "given": ["a matching spec has a description in metadata"],
+      "when": ["specd specs search \"auth\" is run without --summary"],
+      "then": ["the result does not include a summary field"]
+    },
+    {
+      "requirement": "Output format — text",
+      "name": "Results in table format",
+      "given": ["two specs match the query with paths default:auth/login and cli:cli/entry"],
+      "when": ["specd specs search \"auth\" --format text is run"],
+      "then": [
+        "stdout shows a table with PATH and TITLE columns",
+        "AND results are sorted by score descending"
+      ]
+    },
+    {
+      "requirement": "Output format — text",
+      "name": "No results prints message",
+      "when": ["specd specs search \"zzzznonexistent\" is run and nothing matches"],
+      "then": ["stdout contains no matching specs"]
+    },
+    {
+      "requirement": "Output format — text",
+      "name": "Summary column added with flag",
+      "given": ["a matching spec has a summary available"],
+      "when": ["specd specs search \"spec\" --summary --format text is run"],
+      "then": ["the table includes a SUMMARY column"]
+    },
+    {
+      "requirement": "Output format — JSON/toon",
+      "name": "JSON output with score",
+      "given": ["one spec matches the query"],
+      "when": ["specd specs search \"spec\" --format json is run"],
+      "then": ["stdout is a valid JSON array with one object containing path, title, and score"]
+    },
+    {
+      "requirement": "Output format — JSON/toon",
+      "name": "Empty results JSON",
+      "when": ["specd specs search \"zzzznonexistent\" --format json is run and nothing matches"],
+      "then": ["stdout is []"]
+    },
+    {
+      "requirement": "Error cases",
+      "name": "Graph provider failure with --graph",
+      "given": ["the graph provider fails to initialize"],
+      "when": ["specd specs search \"test\" --graph is run"],
+      "then": ["the command exits with code 1"]
+    },
+    {
+      "requirement": "Error cases",
+      "name": "I/O error during core fallback",
+      "given": ["the graph is unavailable and SpecRepository.search() throws an I/O error"],
+      "when": ["specd specs search \"test\" is run"],
+      "then": ["the command exits with code 3"]
+    }
+  ]
+}

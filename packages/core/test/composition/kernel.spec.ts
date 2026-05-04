@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { HookResult } from '../../src/domain/value-objects/hook-result.js'
 import { RegistryConflictError } from '../../src/application/errors/registry-conflict-error.js'
 import { createKernel } from '../../src/composition/kernel.js'
+import { SearchSpecs } from '../../src/application/use-cases/search-specs.js'
 import { type ArtifactParser } from '../../src/application/ports/artifact-parser.js'
 import { type SpecdConfig } from '../../src/application/specd-config.js'
 
@@ -140,5 +141,12 @@ describe('createKernel', () => {
 
     const logDir = path.join(config.configPath, 'log')
     await expect(fs.stat(logDir)).resolves.toBeTruthy()
+  })
+
+  it('wires kernel.specs.search as SearchSpecs', async () => {
+    const config = await makeConfig()
+    const kernel = await createKernel(config)
+
+    expect(kernel.specs.search).toBeInstanceOf(SearchSpecs)
   })
 })

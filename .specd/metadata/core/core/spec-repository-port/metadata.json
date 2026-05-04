@@ -8,7 +8,8 @@
     "core:core/storage",
     "core:core/workspace",
     "core:core/spec-id-format",
-    "core:core/spec-metadata"
+    "core:core/spec-metadata",
+    "core:core/search-specs"
   ],
   "context": [
     "Use cases need to read and write specs without knowing how or where they are stored on disk, so a port boundary is essential for testability and storage-strategy independence. `SpecRepository` is the application-layer port for reading and writing specs within a single workspace, extending the shared `Repository` base class with immutable `workspace()`, `ownership()`, and `isExternal()` accessors set at construction time. Use cases that need multiple workspaces receive a separate `SpecRepository` instance per workspace."
@@ -73,15 +74,22 @@
       ]
     },
     {
+      "requirement": "search returns specs matching a text query",
+      "rules": [
+        "`search(query, options?)` MUST accept a text query string and return an array of `SpecSearchResult` objects for specs within this workspace whose content matches the query. The search MUST cover spec artifact content (at minimum `spec.md` and `verify.md`).\n\n`SpecSearchResult` MUST contain:\n\n- `spec` — the `Spec` metadata object (same type as returned by `get()`)\n- `score` — a relevance score (number, higher is more relevant)\n- `matches` — an array of `SpecSearchMatch` objects, each containing:\n  - `filename` — the artifact filename where the match was found (e.g. `\"spec.md\"`)\n  - `line` — the 1-based line number of the best match within that file\n  - `snippet` — a short text excerpt around the match (max 120 characters)\n\nThe `options` parameter MAY include:\n\n- `limit` — maximum number of results to return (default: implementation-defined)\n\nResults MUST be sorted by `score` descending. The implementation MAY use case-insensitive matching. When no specs match, an empty array MUST be returned (not an error).\n\nThis method is the port-level search primitive — it performs a content scan within a single workspace. Cross-workspace orchestration is handled by a use case."
+      ]
+    },
+    {
       "requirement": "Abstract class with abstract methods",
       "rules": [
-        "`SpecRepository` MUST be defined as an `abstract class`, not an `interface`. All storage operations (`get`, `list`, `artifact`, `save`, `delete`, `resolveFromPath`, `metadata`, `saveMetadata`) MUST be declared as `abstract` methods. This follows the architecture spec requirement that ports with shared construction are abstract classes."
+        "`SpecRepository` MUST be defined as an `abstract class`, not an `interface`. All storage operations (`get`, `list`, `artifact`, `save`, `delete`, `resolveFromPath`, `metadata`, `saveMetadata`, `search`) MUST be declared as `abstract` methods. This follows the architecture spec requirement that ports with shared construction are abstract classes."
       ]
     }
   ],
   "constraints": [
     "Each instance is bound to a single workspace; workspace is immutable after construction",
     "get and list return lightweight Spec metadata — artifact content is never loaded by these methods",
+    "search loads artifact content as needed to perform matching — it is more expensive than list",
     "save creates the spec directory if it does not already exist",
     "ArtifactConflictError is the sole error type for concurrent modification detection on save and saveMetadata",
     "resolveFromPath with a relative path and no from parameter is invalid and the implementation MUST handle this as an error or return null",
@@ -89,7 +97,7 @@
     "metadata and saveMetadata operate on a storage location determined by the adapter — callers MUST NOT assume metadata lives alongside spec content",
     "metadata returns parsed content; artifact returns raw content — they are not interchangeable",
     "save and saveMetadata MUST throw ReadOnlyWorkspaceError before any I/O when ownership is readOnly",
-    "Read operations (get, list, artifact, metadata, resolveFromPath) are not affected by ownership — readOnly workspaces can always be read"
+    "Read operations (get, list, artifact, metadata, resolveFromPath, search) are not affected by ownership — readOnly workspaces can always be read"
   ],
   "scenarios": [
     {
@@ -242,11 +250,50 @@
       "given": ["a spec with no metadata on disk"],
       "when": ["metadata(spec) is called"],
       "then": ["null is returned"]
+    },
+    {
+      "requirement": "search returns specs matching a text query",
+      "name": "Matching specs returned with score",
+      "given": ["a workspace with a spec whose spec.md contains the word \"authentication\""],
+      "when": ["search(\"authentication\") is called"],
+      "then": [
+        "the result array contains a SpecSearchResult with that spec",
+        "AND the score is a positive number",
+        "AND matches contains at least one entry with filename: \"spec.md\""
+      ]
+    },
+    {
+      "requirement": "search returns specs matching a text query",
+      "name": "No matching specs returns empty array",
+      "given": ["a workspace with no specs containing \"zzzznonexistent\""],
+      "when": ["search(\"zzzznonexistent\") is called"],
+      "then": ["the result array is empty"]
+    },
+    {
+      "requirement": "search returns specs matching a text query",
+      "name": "Results sorted by score descending",
+      "given": ["a workspace with two specs matching the query with different relevance"],
+      "when": ["search(\"test\") is called"],
+      "then": ["results are ordered with the higher-scoring spec first"]
+    },
+    {
+      "requirement": "search returns specs matching a text query",
+      "name": "Limit option respected",
+      "given": ["a workspace with 5 specs matching the query"],
+      "when": ["search(\"test\", { limit: 2 }) is called"],
+      "then": ["at most 2 results are returned"]
+    },
+    {
+      "requirement": "search returns specs matching a text query",
+      "name": "Search scoped to single workspace",
+      "given": ["a SpecRepository bound to workspace billing"],
+      "when": ["search(\"invoice\") is called"],
+      "then": ["only specs within the billing workspace are returned"]
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:54f07bf426928d6c07c2c20b3fa51954f7a962147330e1d6d1ca12cfb1e3d574",
-    "verify.md": "sha256:225ad6ed239296d00e49b29ff4ddcc3a12406d45de535e60c2b6516ce54db374"
+    "spec.md": "sha256:cdfed91576d960863387d10608ea8ca4305b98893bc3bf169988fb850e1ab1a0",
+    "verify.md": "sha256:3f28ccca1623d23191c4c41820e957112b9accfcb8af117178d4e18ef281992d"
   },
   "generatedBy": "core"
 }

@@ -142,6 +142,7 @@ The following table is the exhaustive mapping between kernel paths and use case 
 | `specs.approveSpec`        | `ApproveSpec`                         | [approve-spec](../approve-spec/spec.md)                         | Records a spec approval and transitions state               |
 | `specs.approveSignoff`     | `ApproveSignoff`                      | [approve-signoff](../approve-signoff/spec.md)                   | Records a sign-off and transitions state                    |
 | `specs.list`               | `ListSpecs`                           | [list-specs](../list-specs/spec.md)                             | Lists all specs across all workspaces                       |
+| `specs.search`             | `SearchSpecs`                         | [search-specs](../search-specs/spec.md)                         | Searches spec content across all workspaces                 |
 | `specs.get`                | `GetSpec`                             | [get-spec](../get-spec/spec.md)                                 | Loads a spec and all artifact files                         |
 | `specs.saveMetadata`       | `SaveSpecMetadata`                    | [save-spec-metadata](../save-spec-metadata/spec.md)             | Writes a `.specd-metadata.yaml` file                        |
 | `specs.invalidateMetadata` | `InvalidateSpecMetadata`              | [invalidate-spec-metadata](../invalidate-spec-metadata/spec.md) | Invalidates a spec's metadata                               |

@@ -138,3 +138,37 @@
 - **GIVEN** a spec with no metadata on disk
 - **WHEN** `metadata(spec)` is called
 - **THEN** `null` is returned
+
+### Requirement: search returns specs matching a text query
+
+#### Scenario: Matching specs returned with score
+
+- **GIVEN** a workspace with a spec whose `spec.md` contains the word "authentication"
+- **WHEN** `search("authentication")` is called
+- **THEN** the result array contains a `SpecSearchResult` with that spec
+- **AND** the `score` is a positive number
+- **AND** `matches` contains at least one entry with `filename: "spec.md"`
+
+#### Scenario: No matching specs returns empty array
+
+- **GIVEN** a workspace with no specs containing "zzzznonexistent"
+- **WHEN** `search("zzzznonexistent")` is called
+- **THEN** the result array is empty
+
+#### Scenario: Results sorted by score descending
+
+- **GIVEN** a workspace with two specs matching the query with different relevance
+- **WHEN** `search("test")` is called
+- **THEN** results are ordered with the higher-scoring spec first
+
+#### Scenario: Limit option respected
+
+- **GIVEN** a workspace with 5 specs matching the query
+- **WHEN** `search("test", { limit: 2 })` is called
+- **THEN** at most 2 results are returned
+
+#### Scenario: Search scoped to single workspace
+
+- **GIVEN** a `SpecRepository` bound to workspace `billing`
+- **WHEN** `search("invoice")` is called
+- **THEN** only specs within the `billing` workspace are returned
