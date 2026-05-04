@@ -22,9 +22,15 @@ Canonical agent-facing guidance MUST use plural command groups (for example `cha
 
 ### Requirement: Text output — merged mode (no --diff)
 
-When `--diff` is not present, the command MUST output the merged spec content. Artifact files MUST be concatenated in order: `spec.md` first (if present), then remaining files alphabetically. Each file MUST be preceded by a `--- <filename> ---` separator line, matching the format used by `specd spec show`.
+When `--diff` is not present, the command MUST output the merged spec content. Artifact files MUST be concatenated in order: `spec.md` first (if present), then remaining files alphabetically. Each file MUST be preceded by a separator line formatted as `--- <filename> --- <label>`, where `<label>` depends on the file's status:
 
-If `--artifact <name>` is provided, the command MUST resolve `<name>` to a filename using the active schema. Only the content of the matching artifact SHALL be printed, still preceded by its `--- <filename> ---` header line.
+- status `merged`: No label (empty)
+- status `no-op`: `(no-op delta, showing original)`
+- status `missing`:
+  - If base is not `null` (delta): `(missing artifact, showing original)`
+  - If base is `null` (new spec): `(missing artifact)`
+
+If `--artifact <name>` is provided, the command MUST resolve `<name>` to a filename using the active schema. Only the content of the matching artifact SHALL be printed, still preceded by its `--- <filename> --- <label>` header line.
 
 ### Requirement: Text output — diff mode (--diff)
 
@@ -47,7 +53,7 @@ If `--artifact <name>` is provided, the `files` array in the result object SHALL
 
 ### Requirement: Error handling
 
-If the change does not exist, the command MUST print an error message and exit with code 1. If the spec ID is not in the change's `specIds`, the command MUST print an error message and exit with code 1. Parser or delta application warnings from the use case MUST be printed to stderr.
+If the change does not exist, the command MUST print an error message and exit with code 1. If the spec ID is not in the change's `specIds`, the command MUST print an error message and exit with code 1; the error message SHALL explicitly suggest using `specd specs show <specId>` to view the canonical spec. Parser or delta application warnings from the use case MUST be printed to stderr.
 
 ### Requirement: Drift and overlap review support
 

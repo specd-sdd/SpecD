@@ -13,8 +13,6 @@ import { SpecPath } from '../../../src/domain/value-objects/spec-path.js'
 import { SpecArtifact } from '../../../src/domain/value-objects/spec-artifact.js'
 import {
   type ArtifactParserRegistry,
-  type ArtifactParser,
-  type ArtifactAST,
   type DeltaEntry,
 } from '../../../src/application/ports/artifact-parser.js'
 import {
@@ -81,7 +79,7 @@ function makeSut(opts: {
   parsers?: ArtifactParserRegistry
 }) {
   const schemaName = opts.schemaName ?? SCHEMA_NAME
-  const artifactType = makeArtifactType('specs', { scope: 'spec' })
+  const artifactType = makeArtifactType('specs', { scope: 'spec', delta: true })
   const schema = makeSchema({ artifacts: [artifactType], name: schemaName })
   const schemaProvider = makeSchemaProvider(schema)
 
@@ -133,7 +131,7 @@ describe('PreviewSpec', () => {
   })
 
   describe('new spec files discovered', () => {
-    it('returns an entry with base: null for a non-delta artifact filename', async () => {
+    it('returns an entry with status: merged and base: null for a non-delta artifact', async () => {
       const artifactFilename = `changes/${CHANGE_NAME}/core/core/config/spec.md`
       const changeArtifact = makeSpecArtifact('specs', SPEC_ID, artifactFilename)
       const change = makeChangeWithArtifacts([SPEC_ID], [changeArtifact])
@@ -145,34 +143,21 @@ describe('PreviewSpec', () => {
       const result = await useCase.execute(input)
 
       expect(result.files).toHaveLength(1)
+      expect(result.files[0]?.status).toBe('merged')
       expect(result.files[0]?.base).toBeNull()
       expect(result.files[0]?.merged).toBe(content)
       expect(result.files[0]?.filename).toBe('spec.md')
     })
   })
 
-  describe('base is null for new specs', () => {
-    it('sets base to null for a new (non-delta) file entry', async () => {
-      const artifactFilename = `changes/${CHANGE_NAME}/core/core/config/verify.md`
-      const changeArtifact = makeSpecArtifact('specs', SPEC_ID, artifactFilename)
-      const change = makeChangeWithArtifacts([SPEC_ID], [changeArtifact])
-
-      const { useCase } = makeSut({ change, artifactContent: '# Verify\n' })
-
-      const result = await useCase.execute({ name: CHANGE_NAME, specId: SPEC_ID })
-
-      expect(result.files[0]?.base).toBeNull()
-    })
-  })
-
   describe('delta files discovered from change artifacts', () => {
-    it('loads delta from ChangeRepository for a .delta.yaml filename', async () => {
+    it('loads delta and base, returns status: merged', async () => {
       const deltaFilename = `deltas/${CHANGE_NAME}/core/core/config/spec.md.delta.yaml`
       const changeArtifact = makeSpecArtifact('specs', SPEC_ID, deltaFilename)
       const change = makeChangeWithArtifacts([SPEC_ID], [changeArtifact])
 
       const baseContent = '# Config\n\nBase content.'
-      const deltaContent = '- op: replace\n  path: /root\n  value: new content'
+      const deltaContent = '- op: modified\n'
       const mergedContent = '# Config\n\nMerged content.'
 
       const deltaEntry: DeltaEntry = { op: 'modified' }
@@ -202,7 +187,6 @@ describe('PreviewSpec', () => {
       const specRepos = new Map([['core', specRepo]])
 
       const changes = makeChangeRepository([change])
-      // Stub artifact() to return delta content
       ;(changes as unknown as Record<string, unknown>).artifact = vi.fn(
         async (_c: Change, filename: string) => {
           if (filename === deltaFilename) return new SpecArtifact(filename, deltaContent)
@@ -210,7 +194,7 @@ describe('PreviewSpec', () => {
         },
       )
 
-      const artifactType = makeArtifactType('specs', { scope: 'spec' })
+      const artifactType = makeArtifactType('specs', { scope: 'spec', delta: true })
       const schema = makeSchema({ artifacts: [artifactType], name: SCHEMA_NAME })
       const schemaProvider = makeSchemaProvider(schema)
 
@@ -218,112 +202,20 @@ describe('PreviewSpec', () => {
       const result = await useCase.execute({ name: CHANGE_NAME, specId: SPEC_ID })
 
       expect(result.files).toHaveLength(1)
+      expect(result.files[0]?.status).toBe('merged')
       expect(result.files[0]?.filename).toBe('spec.md')
-    })
-  })
-
-  describe('delta merged into base spec', () => {
-    it('applies delta entries to base content and returns merged result', async () => {
-      const deltaFilename = `deltas/${CHANGE_NAME}/core/core/config/spec.md.delta.yaml`
-      const changeArtifact = makeSpecArtifact('specs', SPEC_ID, deltaFilename)
-      const change = makeChangeWithArtifacts([SPEC_ID], [changeArtifact])
-
-      const baseContent = '# Config\n\nOriginal content.'
-      const mergedContent = '# Config\n\nUpdated content.'
-      const deltaEntry: DeltaEntry = { op: 'modified' }
-
-      const yamlParser = makeParser({ parseDelta: () => [deltaEntry] })
-      const mdParser = makeParser({
-        apply: () => ({
-          ast: { root: { type: 'doc', value: mergedContent } },
-          warnings: [] as readonly string[],
-        }),
-        serialize: () => mergedContent,
-      })
-      const parsers: ArtifactParserRegistry = new Map([
-        ['yaml', yamlParser],
-        ['markdown', mdParser],
-      ])
-
-      const spec = makeSpec('core', 'core/config')
-      const specRepo = makeSpecRepository({
-        specs: [spec],
-        artifacts: { 'core/config/spec.md': baseContent },
-      })
-      const specRepos = new Map([['core', specRepo]])
-
-      const changes = makeChangeRepository([change])
-      ;(changes as unknown as Record<string, unknown>).artifact = vi.fn(
-        async (_c: Change, filename: string) =>
-          filename === deltaFilename ? new SpecArtifact(filename, 'delta-yaml-content') : null,
-      )
-
-      const artifactType = makeArtifactType('specs', { scope: 'spec' })
-      const schema = makeSchema({ artifacts: [artifactType], name: SCHEMA_NAME })
-      const schemaProvider = makeSchemaProvider(schema)
-
-      const useCase = new PreviewSpec(changes, specRepos, schemaProvider, parsers)
-      const result = await useCase.execute({ name: CHANGE_NAME, specId: SPEC_ID })
-
       expect(result.files[0]?.base).toBe(baseContent)
       expect(result.files[0]?.merged).toBe(mergedContent)
     })
   })
 
-  describe('base content included for delta files', () => {
-    it('sets both base and merged fields for a delta entry', async () => {
+  describe('no-op delta records status', () => {
+    it('returns status no-op and original content when delta contains only no-op entries', async () => {
       const deltaFilename = `deltas/${CHANGE_NAME}/core/core/config/spec.md.delta.yaml`
       const changeArtifact = makeSpecArtifact('specs', SPEC_ID, deltaFilename)
       const change = makeChangeWithArtifacts([SPEC_ID], [changeArtifact])
 
       const baseContent = '# Base\n'
-      const mergedContent = '# Merged\n'
-      const deltaEntry: DeltaEntry = { op: 'modified' }
-
-      const yamlParser = makeParser({ parseDelta: () => [deltaEntry] })
-      const mdParser = makeParser({
-        apply: () => ({
-          ast: { root: { type: 'doc', value: mergedContent } },
-          warnings: [] as readonly string[],
-        }),
-        serialize: () => mergedContent,
-      })
-      const parsers: ArtifactParserRegistry = new Map([
-        ['yaml', yamlParser],
-        ['markdown', mdParser],
-      ])
-
-      const spec = makeSpec('core', 'core/config')
-      const specRepo = makeSpecRepository({
-        specs: [spec],
-        artifacts: { 'core/config/spec.md': baseContent },
-      })
-      const specRepos = new Map([['core', specRepo]])
-
-      const changes = makeChangeRepository([change])
-      ;(changes as unknown as Record<string, unknown>).artifact = vi.fn(
-        async (_c: Change, filename: string) =>
-          filename === deltaFilename ? new SpecArtifact(filename, 'delta') : null,
-      )
-
-      const artifactType = makeArtifactType('specs', { scope: 'spec' })
-      const schema = makeSchema({ artifacts: [artifactType], name: SCHEMA_NAME })
-      const schemaProvider = makeSchemaProvider(schema)
-
-      const useCase = new PreviewSpec(changes, specRepos, schemaProvider, parsers)
-      const result = await useCase.execute({ name: CHANGE_NAME, specId: SPEC_ID })
-
-      expect(result.files[0]?.base).toBe(baseContent)
-      expect(result.files[0]?.merged).toBe(mergedContent)
-    })
-  })
-
-  describe('no-op delta skipped', () => {
-    it('excludes files whose delta contains only no-op entries', async () => {
-      const deltaFilename = `deltas/${CHANGE_NAME}/core/core/config/spec.md.delta.yaml`
-      const changeArtifact = makeSpecArtifact('specs', SPEC_ID, deltaFilename)
-      const change = makeChangeWithArtifacts([SPEC_ID], [changeArtifact])
-
       const noOpEntry: DeltaEntry = { op: 'no-op' }
       const yamlParser = makeParser({ parseDelta: () => [noOpEntry] })
       const parsers: ArtifactParserRegistry = new Map([
@@ -331,78 +223,6 @@ describe('PreviewSpec', () => {
         ['markdown', makeParser()],
       ])
 
-      const changes = makeChangeRepository([change])
-      ;(changes as unknown as Record<string, unknown>).artifact = vi.fn(
-        async () => new SpecArtifact(deltaFilename, 'delta'),
-      )
-
-      const artifactType = makeArtifactType('specs', { scope: 'spec' })
-      const schema = makeSchema({ artifacts: [artifactType], name: SCHEMA_NAME })
-      const schemaProvider = makeSchemaProvider(schema)
-
-      const useCase = new PreviewSpec(changes, new Map(), schemaProvider, parsers)
-      const result = await useCase.execute({ name: CHANGE_NAME, specId: SPEC_ID })
-
-      expect(result.files).toHaveLength(0)
-    })
-  })
-
-  describe('spec.md appears first', () => {
-    it('orders spec.md before other files, then alphabetically', async () => {
-      // Two new spec files: verify.md and spec.md — ensure spec.md comes first
-      const specFile = makeSpecArtifact(
-        'specs',
-        SPEC_ID,
-        `changes/${CHANGE_NAME}/core/core/config/spec.md`,
-      )
-      const verifyFile = makeSpecArtifact(
-        'specs-verify',
-        SPEC_ID,
-        `changes/${CHANGE_NAME}/core/core/config/verify.md`,
-      )
-
-      const change = makeChangeWithArtifacts([SPEC_ID], [specFile, verifyFile])
-
-      // Two artifact types in the schema: specs and specs-verify
-      const specsType = makeArtifactType('specs', { scope: 'spec' })
-      const verifyType = makeArtifactType('specs-verify', { scope: 'spec' })
-      const schema = makeSchema({ artifacts: [verifyType, specsType], name: SCHEMA_NAME })
-      const schemaProvider = makeSchemaProvider(schema)
-
-      const changes = makeChangeRepository([change])
-      ;(changes as unknown as Record<string, unknown>).artifact = vi.fn(
-        async (_c: Change, filename: string) =>
-          new SpecArtifact(filename, `content of ${filename}`),
-      )
-
-      const useCase = new PreviewSpec(changes, new Map(), schemaProvider, makeParsers())
-      const result = await useCase.execute({ name: CHANGE_NAME, specId: SPEC_ID })
-
-      expect(result.files.length).toBeGreaterThanOrEqual(2)
-      expect(result.files[0]?.filename).toBe('spec.md')
-    })
-  })
-
-  describe('delta application failure produces warning', () => {
-    it('adds a warning when parser.apply throws and skips the file', async () => {
-      const deltaFilename = `deltas/${CHANGE_NAME}/core/core/config/spec.md.delta.yaml`
-      const changeArtifact = makeSpecArtifact('specs', SPEC_ID, deltaFilename)
-      const change = makeChangeWithArtifacts([SPEC_ID], [changeArtifact])
-
-      const baseContent = '# Base\n'
-      const deltaEntry: DeltaEntry = { op: 'modified' }
-
-      const yamlParser = makeParser({ parseDelta: () => [deltaEntry] })
-      const mdParser = makeParser({
-        apply: () => {
-          throw new Error('apply failed')
-        },
-      })
-      const parsers: ArtifactParserRegistry = new Map([
-        ['yaml', yamlParser],
-        ['markdown', mdParser],
-      ])
-
       const spec = makeSpec('core', 'core/config')
       const specRepo = makeSpecRepository({
         specs: [spec],
@@ -412,38 +232,75 @@ describe('PreviewSpec', () => {
 
       const changes = makeChangeRepository([change])
       ;(changes as unknown as Record<string, unknown>).artifact = vi.fn(
-        async (_c: Change, filename: string) =>
-          filename === deltaFilename ? new SpecArtifact(filename, 'delta') : null,
+        async () => new SpecArtifact(deltaFilename, 'delta'),
       )
 
-      const artifactType = makeArtifactType('specs', { scope: 'spec' })
+      const artifactType = makeArtifactType('specs', { scope: 'spec', delta: true })
       const schema = makeSchema({ artifacts: [artifactType], name: SCHEMA_NAME })
       const schemaProvider = makeSchemaProvider(schema)
 
       const useCase = new PreviewSpec(changes, specRepos, schemaProvider, parsers)
       const result = await useCase.execute({ name: CHANGE_NAME, specId: SPEC_ID })
 
-      expect(result.files).toHaveLength(0)
-      expect(result.warnings.length).toBeGreaterThan(0)
-      expect(result.warnings.some((w) => w.includes('apply failed'))).toBe(true)
+      expect(result.files).toHaveLength(1)
+      expect(result.files[0]?.status).toBe('no-op')
+      expect(result.files[0]?.merged).toBe(baseContent)
     })
   })
 
-  describe('other files still returned on partial failure', () => {
-    it('returns valid files when one of two files fails', async () => {
-      // Delta file (will fail) + new spec file (will succeed)
+  describe('missing delta file records status', () => {
+    it('returns status missing when artifact is expected by schema but not in change', async () => {
+      const change = makeChangeWithArtifacts([SPEC_ID], []) // No artifacts
+
+      const artifactType = makeArtifactType('specs', { scope: 'spec', delta: true })
+      const schema = makeSchema({ artifacts: [artifactType], name: SCHEMA_NAME })
+      const schemaProvider = makeSchemaProvider(schema)
+
+      const useCase = new PreviewSpec(
+        makeChangeRepository([change]),
+        new Map(),
+        schemaProvider,
+        makeParsers(),
+      )
+      const result = await useCase.execute({ name: CHANGE_NAME, specId: SPEC_ID })
+
+      expect(result.files).toHaveLength(1)
+      expect(result.files[0]?.filename).toBe('spec.md')
+      expect(result.files[0]?.status).toBe('missing')
+    })
+  })
+
+  describe('all schema artifacts returned', () => {
+    it('returns entries for all scope:spec artifacts in the schema', async () => {
+      const change = makeChangeWithArtifacts([SPEC_ID], [])
+
+      const specsType = makeArtifactType('specs', { scope: 'spec', delta: true })
+      const verifyType = makeArtifactType('verify', { scope: 'spec', delta: true })
+      const schema = makeSchema({ artifacts: [specsType, verifyType], name: SCHEMA_NAME })
+      const schemaProvider = makeSchemaProvider(schema)
+
+      const useCase = new PreviewSpec(
+        makeChangeRepository([change]),
+        new Map(),
+        schemaProvider,
+        makeParsers(),
+      )
+      const result = await useCase.execute({ name: CHANGE_NAME, specId: SPEC_ID })
+
+      expect(result.files).toHaveLength(2)
+      expect(result.files.map((f) => f.filename)).toContain('spec.md')
+      expect(result.files.map((f) => f.filename)).toContain('verify.md')
+    })
+  })
+
+  describe('delta application failure produces warning and missing status', () => {
+    it('adds warning and returns status missing when parser throws', async () => {
       const deltaFilename = `deltas/${CHANGE_NAME}/core/core/config/spec.md.delta.yaml`
-      const newFilename = `changes/${CHANGE_NAME}/core/core/config/verify.md`
-
-      const deltaArtifact = makeSpecArtifact('specs', SPEC_ID, deltaFilename)
-      const verifyArtifact = makeSpecArtifact('verify', SPEC_ID, newFilename)
-
-      const change = makeChangeWithArtifacts([SPEC_ID], [deltaArtifact, verifyArtifact])
+      const changeArtifact = makeSpecArtifact('specs', SPEC_ID, deltaFilename)
+      const change = makeChangeWithArtifacts([SPEC_ID], [changeArtifact])
 
       const baseContent = '# Base\n'
-      const deltaEntry: DeltaEntry = { op: 'modified' }
-
-      const yamlParser = makeParser({ parseDelta: () => [deltaEntry] })
+      const yamlParser = makeParser({ parseDelta: () => [{ op: 'modified' }] })
       const mdParser = makeParser({
         apply: () => {
           throw new Error('apply failed')
@@ -463,24 +320,156 @@ describe('PreviewSpec', () => {
 
       const changes = makeChangeRepository([change])
       ;(changes as unknown as Record<string, unknown>).artifact = vi.fn(
-        async (_c: Change, filename: string) =>
-          new SpecArtifact(filename, `content of ${filename}`),
+        async () => new SpecArtifact(deltaFilename, 'delta'),
       )
 
-      const specsType = makeArtifactType('specs', { scope: 'spec' })
-      const verifyType = makeArtifactType('verify', { scope: 'spec' })
+      const artifactType = makeArtifactType('specs', { scope: 'spec', delta: true })
+      const schema = makeSchema({ artifacts: [artifactType], name: SCHEMA_NAME })
+      const schemaProvider = makeSchemaProvider(schema)
+
+      const useCase = new PreviewSpec(changes, specRepos, schemaProvider, parsers)
+      const result = await useCase.execute({ name: CHANGE_NAME, specId: SPEC_ID })
+
+      expect(result.files).toHaveLength(1)
+      expect(result.files[0]?.status).toBe('missing')
+      expect(result.warnings.some((w) => w.includes('apply failed'))).toBe(true)
+    })
+
+    it('returns other files normally when one file fails partial application', async () => {
+      const delta1Filename = `deltas/${CHANGE_NAME}/core/core/config/spec.md.delta.yaml`
+      const delta2Filename = `deltas/${CHANGE_NAME}/core/core/config/verify.md.delta.yaml`
+
+      const file1 = new ArtifactFile({
+        key: SPEC_ID,
+        filename: delta1Filename,
+        status: 'in-progress',
+      })
+      const file2 = new ArtifactFile({
+        key: SPEC_ID,
+        filename: delta2Filename,
+        status: 'in-progress',
+      })
+
+      const changeArtifact1 = new ChangeArtifact({
+        type: 'specs',
+        files: new Map([[SPEC_ID, file1]]),
+      })
+      const changeArtifact2 = new ChangeArtifact({
+        type: 'verify',
+        files: new Map([[SPEC_ID, file2]]),
+      })
+
+      const change = makeChangeWithArtifacts([SPEC_ID], [changeArtifact1, changeArtifact2])
+
+      const baseContent1 = '# Base Spec\n'
+      const baseContent2 = '# Base Verify\n'
+
+      const yamlParser = makeParser({ parseDelta: () => [{ op: 'modified' }] })
+
+      let calls = 0
+      const mdParser = makeParser({
+        parse: (c) => ({ root: { type: 'doc', value: c } }),
+        apply: (_ast, _delta) => {
+          calls++
+          if (calls === 1) {
+            // First call (spec.md) succeeds
+            return { ast: { root: { type: 'doc', value: '# Merged Spec' } }, warnings: [] }
+          }
+          // Second call (verify.md) fails
+          throw new Error('apply failed')
+        },
+        serialize: () => '# Merged Spec',
+      })
+      const parsers: ArtifactParserRegistry = new Map([
+        ['yaml', yamlParser],
+        ['markdown', mdParser],
+      ])
+
+      const spec = makeSpec('core', 'core/config')
+      const specRepo = makeSpecRepository({
+        specs: [spec],
+        artifacts: {
+          'core/config/spec.md': baseContent1,
+          'core/config/verify.md': baseContent2,
+        },
+      })
+      const specRepos = new Map([['core', specRepo]])
+
+      const changes = makeChangeRepository([change])
+      ;(changes as unknown as Record<string, unknown>).artifact = vi.fn(async (_c, filename) => {
+        if (filename === delta1Filename) return new SpecArtifact(delta1Filename, 'delta1')
+        if (filename === delta2Filename) return new SpecArtifact(delta2Filename, 'delta2')
+        return null
+      })
+
+      const specsType = makeArtifactType('specs', { scope: 'spec', delta: true })
+      const verifyType = makeArtifactType('verify', { scope: 'spec', delta: true })
       const schema = makeSchema({ artifacts: [specsType, verifyType], name: SCHEMA_NAME })
       const schemaProvider = makeSchemaProvider(schema)
 
       const useCase = new PreviewSpec(changes, specRepos, schemaProvider, parsers)
       const result = await useCase.execute({ name: CHANGE_NAME, specId: SPEC_ID })
 
-      // The verify.md (new file) should still appear
-      const verifyEntry = result.files.find((f) => f.filename === 'verify.md')
-      expect(verifyEntry).toBeDefined()
-      expect(verifyEntry?.base).toBeNull()
-      // Warning about the failed delta
-      expect(result.warnings.length).toBeGreaterThan(0)
+      expect(result.files).toHaveLength(2)
+
+      const specFile = result.files.find((f) => f.filename === 'spec.md')
+      expect(specFile?.status).toBe('merged')
+      expect(specFile?.merged).toBe('# Merged Spec')
+
+      const verifyFile = result.files.find((f) => f.filename === 'verify.md')
+      expect(verifyFile?.status).toBe('missing')
+      expect(verifyFile?.merged).toBe('# Base Verify\n')
+
+      expect(result.warnings.some((w) => w.includes('apply failed'))).toBe(true)
+    })
+  })
+
+  describe('artifact file ordering', () => {
+    it('orders spec.md before other files and sorts the rest alphabetically', async () => {
+      const change = makeChangeWithArtifacts([SPEC_ID], [])
+      const specsType = makeArtifactType('specs', { scope: 'spec', delta: true })
+      const verifyType = makeArtifactType('verify', { scope: 'spec', delta: true })
+      const otherType = makeArtifactType('a-other', { scope: 'spec', delta: true })
+      const schema = makeSchema({
+        artifacts: [verifyType, otherType, specsType],
+        name: SCHEMA_NAME,
+      })
+      const schemaProvider = makeSchemaProvider(schema)
+
+      const useCase = new PreviewSpec(
+        makeChangeRepository([change]),
+        new Map(),
+        schemaProvider,
+        makeParsers(),
+      )
+      const result = await useCase.execute({ name: CHANGE_NAME, specId: SPEC_ID })
+
+      expect(result.files).toHaveLength(3)
+      expect(result.files[0]?.filename).toBe('spec.md')
+      expect(result.files[1]?.filename).toBe('a-other.md')
+      expect(result.files[2]?.filename).toBe('verify.md')
+    })
+  })
+
+  describe('delta: false artifacts included', () => {
+    it('includes artifacts that do not support deltas', async () => {
+      const change = makeChangeWithArtifacts([SPEC_ID], [])
+      const specsType = makeArtifactType('specs', { scope: 'spec', delta: true })
+      const otherType = makeArtifactType('other', { scope: 'spec', delta: false })
+      const schema = makeSchema({ artifacts: [specsType, otherType], name: SCHEMA_NAME })
+      const schemaProvider = makeSchemaProvider(schema)
+
+      const useCase = new PreviewSpec(
+        makeChangeRepository([change]),
+        new Map(),
+        schemaProvider,
+        makeParsers(),
+      )
+      const result = await useCase.execute({ name: CHANGE_NAME, specId: SPEC_ID })
+
+      expect(result.files).toHaveLength(2)
+      expect(result.files[0]?.filename).toBe('spec.md')
+      expect(result.files.find((f) => f.filename === 'other.md')).toBeDefined()
     })
   })
 })

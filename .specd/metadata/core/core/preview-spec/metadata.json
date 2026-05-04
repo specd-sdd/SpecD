@@ -38,7 +38,7 @@
     {
       "requirement": "Delta application",
       "rules": [
-        "For each discovered file:\n\n1. If `filename` ends with `.delta.yaml`, it is a delta file:\n   a. Load the delta content from `ChangeRepository.artifact(change, filename)`\n   b. Parse the delta using `ArtifactParserRegistry.get('yaml').parseDelta(deltaContent)`\n   c. If all parsed entries are `no-op`, skip this file — no changes to apply\n   d. Derive the output basename by stripping the `.delta.yaml` suffix and the `deltas/<workspace>/<capability-path>/` prefix\n   e. Load the base artifact from `SpecRepository.artifact(spec, outputBasename)`\n   f. Determine the format: `artifactType.format ?? inferFormat(outputBasename) ?? 'plaintext'`\n   g. Parse the base content: `parser.parse(baseContent)`\n   h. Apply the delta: `parser.apply(baseAst, deltaEntries)`\n   i. Serialize the result: `parser.serialize(mergedAst)`\n2. If `filename` does not end with `.delta.yaml`, it is a new spec artifact:\n   a. Load the content directly from `ChangeRepository.artifact(change, filename)`\n   b. The base content is `null` (this is a new file)"
+        "`PreviewSpec` MUST process all artifact types defined in the active schema with `scope: spec`. For each artifact:\n\n1. If `filename` ends with `.delta.yaml`, it is a delta file:\n   a. Load the delta content from `ChangeRepository.artifact(change, filename)`.\n   b. If content is missing, record status as `missing`.\n   c. Load the base artifact from `SpecRepository.artifact(spec, outputBasename)`.\n   d. If base artifact is missing, record status as `missing`.\n   e. Parse the delta and apply it to the base.\n   f. If all parsed entries are `no-op`, record status as `no-op`.\n   g. If application fails, record status as `missing` and add a warning.\n   h. Otherwise, record status as `merged`.\n   i. The `merged` field contains the result of application (or original content for `no-op`/`missing`).\n2. If `filename` does not end with `.delta.yaml`, it is a new spec artifact:\n   a. Load the content from `ChangeRepository.artifact(change, filename)`.\n   b. If content is missing, record status as `missing`.\n   c. Otherwise, record status as `merged`.\n   d. The base content is `null`.\n\n`PreviewSpec` MUST return an entry for every `scope: spec` artifact type, even if the status is `missing` or `no-op`."
       ]
     },
     {
@@ -50,13 +50,13 @@
     {
       "requirement": "Result shape",
       "rules": [
-        "`PreviewSpec.execute` MUST return a `PreviewSpecResult`:\n\n```typescript\ninterface PreviewSpecFileEntry {\n  /** The artifact filename (e.g. `spec.md`, `verify.md`). */\n  readonly filename: string\n  /** The original base content (before delta application). `null` for new specs. */\n  readonly base: string | null\n  /** The merged content (after delta application). */\n  readonly merged: string\n}\n\ninterface PreviewSpecResult {\n  /** The spec ID that was previewed. */\n  readonly specId: string\n  /** The change name. */\n  readonly changeName: string\n  /** Per-file preview entries, ordered per the artifact file ordering requirement. */\n  readonly files: readonly PreviewSpecFileEntry[]\n  /** Warnings encountered during preview (e.g. parser errors, missing base). */\n  readonly warnings: readonly string[]\n}\n```"
+        "`PreviewSpec.execute` MUST return a `PreviewSpecResult`:\n\n```typescript\ninterface PreviewSpecFileEntry {\n  /** The artifact filename (e.g. `spec.md`, `verify.md`). */\n  readonly filename: string\n  /** The original base content (before delta application). `null` for new specs. */\n  readonly base: string | null\n  /** The merged content (after delta application). */\n  readonly merged: string\n  /** \n   * The preview status of this file. \n   * - 'merged': delta applied successfully with changes, or new spec file\n   * - 'no-op': delta applied but resulted in no changes to base content\n   * - 'missing': delta file or base artifact not found, or delta application failed\n   */\n  readonly status: 'merged' | 'no-op' | 'missing'\n}\n\ninterface PreviewSpecResult {\n  /** The spec ID that was previewed. */\n  readonly specId: string\n  /** The change name. */\n  readonly changeName: string\n  /** Per-file preview entries, ordered per the artifact file ordering requirement. */\n  readonly files: readonly PreviewSpecFileEntry[]\n  /** Warnings encountered during preview (e.g. parser errors, missing base). */\n  readonly warnings: readonly string[]\n}\n```"
       ]
     },
     {
       "requirement": "Error handling",
       "rules": [
-        "If delta application fails for an artifact file (e.g. selector resolution failure, parser error), `PreviewSpec` MUST NOT throw. Instead, it MUST:\n\n1. Add a warning describing the failure and the affected filename\n2. Skip that file in the result (do not include a partial or broken entry)\n\nThe preview MUST always succeed — partial results are acceptable, total failure is not."
+        "If delta application fails for an artifact file (e.g. selector resolution failure, parser error), `PreviewSpec` MUST NOT throw. Instead, it MUST:\n\n1. Add a warning describing the failure and the affected filename\n2. Include the file in the result with status `missing`\n\nThe preview MUST always succeed — partial results are acceptable, total failure is not."
       ]
     },
     {
@@ -68,7 +68,6 @@
   ],
   "constraints": [
     "PreviewSpec is read-only — it MUST NOT mutate any canonical spec content, change state, or artifact status",
-    "Only scope: spec artifact types with delta: true are candidates for preview",
     "Diff generation is NOT part of PreviewSpec — it is the CLI adapter's responsibility. PreviewSpec returns base and merged only.",
     "PreviewSpec does not validate deltas — validation is ValidateArtifacts' concern",
     "PreviewSpec does not check whether deltas are validated (complete status) — it applies whatever delta files exist; callers like CompileContext may choose to skip unvalidated deltas"
@@ -102,28 +101,41 @@
     {
       "requirement": "Delta application",
       "name": "Delta merged into base spec content",
-      "given": [
-        "a base spec with content \"# Spec\\n\\n## Requirements\\n\\n### Requirement: A\\n\\nOriginal text.\"",
-        "AND a delta that modifies \"Requirement: A\" with new content"
-      ],
+      "given": ["a valid delta file and a matching base spec"],
       "when": ["PreviewSpec.execute is called"],
       "then": [
-        "the result contains a PreviewSpecFileEntry with merged reflecting the delta applied to the base"
+        "the entry in files has status merged",
+        "AND merged content contains the result of application"
       ]
     },
     {
       "requirement": "Delta application",
-      "name": "No-op delta skipped",
+      "name": "No-op delta records status",
       "given": ["a delta file containing only a no-op entry"],
       "when": ["PreviewSpec.execute is called"],
-      "then": ["the result files array does not contain an entry for that artifact"]
+      "then": [
+        "the result contains an entry for that artifact with status no-op",
+        "AND merged contains the original base content"
+      ]
     },
     {
       "requirement": "Delta application",
-      "name": "Missing delta file skipped",
+      "name": "Missing delta file records status",
       "given": ["a change with a scope: spec artifact whose delta file does not exist on disk"],
       "when": ["PreviewSpec.execute is called"],
-      "then": ["that artifact is skipped — no entry in the result and no error"]
+      "then": ["the result contains an entry for that artifact with status missing"]
+    },
+    {
+      "requirement": "Delta application",
+      "name": "All schema artifacts returned",
+      "given": [
+        "a schema with spec.md and verify.md artifact types",
+        "AND a change that only has a delta for spec.md"
+      ],
+      "when": ["PreviewSpec.execute is called"],
+      "then": [
+        "the files array contains entries for both spec.md (status merged) and verify.md (status missing)"
+      ]
     },
     {
       "requirement": "Artifact file ordering",
@@ -141,28 +153,34 @@
     },
     {
       "requirement": "Result shape",
-      "name": "Base content included for delta files",
+      "name": "Base content and status included for delta files",
       "given": ["a delta applied to an existing spec"],
       "when": ["PreviewSpec.execute returns"],
       "then": [
-        "the PreviewSpecFileEntry has base set to the original content and merged set to the result after delta application"
+        "the PreviewSpecFileEntry has status merged",
+        "AND base is set to the original content",
+        "AND merged is set to the result after delta application"
       ]
     },
     {
       "requirement": "Result shape",
-      "name": "Base is null for new specs",
+      "name": "Base is null and status is merged for new specs",
       "given": ["a new spec file (not a delta)"],
       "when": ["PreviewSpec.execute returns"],
-      "then": ["the PreviewSpecFileEntry has base: null and merged set to the new file content"]
+      "then": [
+        "the PreviewSpecFileEntry has status merged",
+        "AND base: null",
+        "AND merged is set to the new file content"
+      ]
     },
     {
       "requirement": "Error handling",
-      "name": "Delta application failure produces warning",
+      "name": "Delta application failure produces warning and missing status",
       "given": ["a delta with a selector that does not match any node in the base spec"],
       "when": ["PreviewSpec.execute is called"],
       "then": [
         "the result includes a warning describing the failure",
-        "AND the failing file is not included in files",
+        "AND the failing file is included in files with status missing",
         "AND the use case does not throw"
       ]
     },
@@ -172,9 +190,9 @@
       "given": ["a change with two delta files — one valid, one with a bad selector"],
       "when": ["PreviewSpec.execute is called"],
       "then": [
-        "the valid file appears in files with merged content",
-        "AND the failing file is absent from files",
-        "AND a warning is present for the failing file"
+        "both files appear in files",
+        "AND the valid one has status merged",
+        "AND the failing one has status missing"
       ]
     },
     {
@@ -188,8 +206,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:23dc217475113c9be9f549cb14f1986c2651d6b4bca74ab888780c753cb1824b",
-    "verify.md": "sha256:0fda7610d48333859a12c62d967fa6653f7fc6a4a3b512afe167cd8f4e7e53d2"
+    "spec.md": "sha256:9bdd8612d0237118442dd56d106b78f2d08a4136be23901d2433ba0eefb61ecb",
+    "verify.md": "sha256:1467d4e03ae6b1bc5c4e6eb0fe33ea40e930ac0b7a9181f77fb054f6ed55b90c"
   },
   "generatedBy": "core"
 }

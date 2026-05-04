@@ -42,22 +42,25 @@ This avoids manually deriving filenames from the schema — the change entity al
 
 ### Requirement: Delta application
 
-For each discovered file:
+`PreviewSpec` MUST process all artifact types defined in the active schema with `scope: spec`. For each artifact:
 
 1. If `filename` ends with `.delta.yaml`, it is a delta file:
-   a. Load the delta content from `ChangeRepository.artifact(change, filename)`
-   b. Parse the delta using `ArtifactParserRegistry.get('yaml').parseDelta(deltaContent)`
-   c. If all parsed entries are `no-op`, skip this file — no changes to apply
-   d. Derive the output basename by stripping the `.delta.yaml` suffix and the `deltas/<workspace>/<capability-path>/` prefix
-   e. Load the base artifact from `SpecRepository.artifact(spec, outputBasename)`
-   f. Determine the format: `artifactType.format ?? inferFormat(outputBasename) ?? 'plaintext'`
-   g. Parse the base content: `parser.parse(baseContent)`
-   h. Apply the delta: `parser.apply(baseAst, deltaEntries)`
-   i. Serialize the result: `parser.serialize(mergedAst)`
-
+   a. Load the delta content from `ChangeRepository.artifact(change, filename)`.
+   b. If content is missing, record status as `missing`.
+   c. Load the base artifact from `SpecRepository.artifact(spec, outputBasename)`.
+   d. If base artifact is missing, record status as `missing`.
+   e. Parse the delta and apply it to the base.
+   f. If all parsed entries are `no-op`, record status as `no-op`.
+   g. If application fails, record status as `missing` and add a warning.
+   h. Otherwise, record status as `merged`.
+   i. The `merged` field contains the result of application (or original content for `no-op`/`missing`).
 2. If `filename` does not end with `.delta.yaml`, it is a new spec artifact:
-   a. Load the content directly from `ChangeRepository.artifact(change, filename)`
-   b. The base content is `null` (this is a new file)
+   a. Load the content from `ChangeRepository.artifact(change, filename)`.
+   b. If content is missing, record status as `missing`.
+   c. Otherwise, record status as `merged`.
+   d. The base content is `null`.
+
+`PreviewSpec` MUST return an entry for every `scope: spec` artifact type, even if the status is `missing` or `no-op`.
 
 ### Requirement: Artifact file ordering
 
@@ -75,6 +78,13 @@ interface PreviewSpecFileEntry {
   readonly base: string | null
   /** The merged content (after delta application). */
   readonly merged: string
+  /**
+   * The preview status of this file.
+   * - 'merged': delta applied successfully with changes, or new spec file
+   * - 'no-op': delta applied but resulted in no changes to base content
+   * - 'missing': delta file or base artifact not found, or delta application failed
+   */
+  readonly status: 'merged' | 'no-op' | 'missing'
 }
 
 interface PreviewSpecResult {
@@ -94,7 +104,7 @@ interface PreviewSpecResult {
 If delta application fails for an artifact file (e.g. selector resolution failure, parser error), `PreviewSpec` MUST NOT throw. Instead, it MUST:
 
 1. Add a warning describing the failure and the affected filename
-2. Skip that file in the result (do not include a partial or broken entry)
+2. Include the file in the result with status `missing`
 
 The preview MUST always succeed — partial results are acceptable, total failure is not.
 
@@ -105,7 +115,6 @@ After obtaining the schema from `SchemaProvider`, `PreviewSpec` MUST compare `sc
 ## Constraints
 
 - `PreviewSpec` is read-only — it MUST NOT mutate any canonical spec content, change state, or artifact status
-- Only `scope: spec` artifact types with `delta: true` are candidates for preview
 - Diff generation is NOT part of `PreviewSpec` — it is the CLI adapter's responsibility. `PreviewSpec` returns `base` and `merged` only.
 - `PreviewSpec` does not validate deltas — validation is `ValidateArtifacts`' concern
 - `PreviewSpec` does not check whether deltas are validated (complete status) — it applies whatever delta files exist; callers like `CompileContext` may choose to skip unvalidated deltas

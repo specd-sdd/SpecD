@@ -10,33 +10,27 @@ import { resolveCliContext } from '../../helpers/cli-context.js'
 interface PreviewFile {
   readonly filename: string
   readonly merged: string
-  readonly base: string
+  readonly base: string | null
+  readonly status: 'merged' | 'no-op' | 'missing'
 }
 
-function isPreviewFile(value: unknown): value is Omit<PreviewFile, 'base'> & {
-  base?: string | null
-} {
+function isPreviewFile(value: unknown): value is PreviewFile {
   if (typeof value !== 'object' || value === null) return false
   const candidate = value as Record<string, unknown>
   return (
     typeof candidate['filename'] === 'string' &&
     typeof candidate['merged'] === 'string' &&
-    (candidate['base'] === undefined ||
-      candidate['base'] === null ||
-      typeof candidate['base'] === 'string')
+    (candidate['base'] === null || typeof candidate['base'] === 'string') &&
+    (candidate['status'] === 'merged' ||
+      candidate['status'] === 'no-op' ||
+      candidate['status'] === 'missing')
   )
 }
 
 function asPreviewFiles(files: readonly unknown[]): PreviewFile[] {
   return files.flatMap((value) => {
     if (!isPreviewFile(value)) return []
-    return [
-      {
-        filename: value.filename,
-        merged: value.merged,
-        base: typeof value.base === 'string' ? value.base : '',
-      },
-    ]
+    return [value]
   })
 }
 
@@ -116,8 +110,28 @@ export function registerChangeSpecPreview(parent: Command): void {
               return
             }
 
+            const getLabel = (file: PreviewFile): string => {
+              if (file.status === 'merged') return ''
+              if (file.status === 'no-op') return ' (no-op delta, showing original)'
+              if (file.status === 'missing') {
+                return file.base !== null
+                  ? ' (missing artifact, showing original)'
+                  : ' (missing artifact)'
+              }
+              return ''
+            }
+
+            const sortedFiles = asPreviewFiles(result.files).sort((a, b) => {
+              if (a.filename === 'spec.md') return -1
+              if (b.filename === 'spec.md') return 1
+              return a.filename.localeCompare(b.filename)
+            })
+
             if (opts.diff === true) {
-              for (const file of asPreviewFiles(result.files)) {
+              for (const file of sortedFiles) {
+                if (file.status === 'no-op' || file.status === 'missing') {
+                  continue
+                }
                 const diffStr = createTwoFilesPatch(
                   `a/${file.filename} (base)`,
                   `b/${file.filename} (merged)`,
@@ -142,8 +156,8 @@ export function registerChangeSpecPreview(parent: Command): void {
                 }
               }
             } else {
-              for (const file of asPreviewFiles(result.files)) {
-                output(`--- ${file.filename} ---`, 'text')
+              for (const file of sortedFiles) {
+                output(`--- ${file.filename} ---${getLabel(file)}`, 'text')
                 output(file.merged, 'text')
               }
             }

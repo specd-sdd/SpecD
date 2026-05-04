@@ -16,6 +16,8 @@ export class SpecNotInChangeError extends SpecdError {
    * @param changeName - The change name
    */
   constructor(specId: string, changeName: string) {
-    super(`Spec '${specId}' is not in the current specIds of change '${changeName}'`)
+    super(
+      `Spec '${specId}' is not in the current specIds of change '${changeName}'. Suggestion: use specd specs show ${specId} to view the canonical spec`,
+    )
   }
 }

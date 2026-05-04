@@ -165,6 +165,11 @@ export class ArtifactType {
     return this._output
   }
 
+  /** The basename of the output file (e.g. `spec.md`). */
+  get filename(): string {
+    return this._output.split('/').pop() ?? this._output
+  }
+
   /** Human-readable summary for tooling, or `undefined` if not set. */
   get description(): string | undefined {
     return this._description

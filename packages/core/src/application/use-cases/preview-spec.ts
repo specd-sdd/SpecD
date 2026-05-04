@@ -25,6 +25,13 @@ export interface PreviewSpecFileEntry {
   readonly base: string | null
   /** The merged content (after delta application). */
   readonly merged: string
+  /**
+   * The preview status of this file.
+   * - 'merged': delta applied successfully with changes, or new spec file
+   * - 'no-op': delta applied but resulted in no changes to base content
+   * - 'missing': delta file or base artifact not found, or delta application failed
+   */
+  readonly status: 'merged' | 'no-op' | 'missing'
 }
 
 /** Result returned by a successful {@link PreviewSpec} execution. */
@@ -105,45 +112,84 @@ export class PreviewSpec {
       if (artifactType.scope !== 'spec') continue
 
       const artifact = change.artifacts.get(artifactType.id)
-      if (artifact === undefined) continue
-
-      const file = artifact.getFile(input.specId)
-      if (file === undefined || file.status === 'missing') continue
+      const file = artifact?.getFile(input.specId)
+      const outputBasename = artifactType.filename
 
       try {
+        if (file === undefined || file.status === 'missing') {
+          // Artifact missing in change — record as missing
+          const baseArtifact =
+            spec !== null && specRepo !== undefined
+              ? await specRepo.artifact(spec, outputBasename)
+              : null
+
+          files.push({
+            filename: outputBasename,
+            base: baseArtifact?.content ?? null,
+            merged: baseArtifact?.content ?? '',
+            status: 'missing',
+          })
+          continue
+        }
+
         const content = await this._changes.artifact(change, file.filename)
-        if (content === null) continue
+        if (content === null) {
+          const baseArtifact =
+            spec !== null && specRepo !== undefined
+              ? await specRepo.artifact(spec, outputBasename)
+              : null
+
+          files.push({
+            filename: outputBasename,
+            base: baseArtifact?.content ?? null,
+            merged: baseArtifact?.content ?? '',
+            status: 'missing',
+          })
+          continue
+        }
 
         if (file.filename.endsWith('.delta.yaml')) {
           // Delta file — parse, apply to base, serialize
           const yamlParser = this._parsers.get('yaml')
           if (yamlParser === undefined) {
             warnings.push(`No YAML parser registered — skipping ${file.filename}`)
+            files.push({
+              filename: outputBasename,
+              base: null,
+              merged: '',
+              status: 'missing',
+            })
             continue
           }
 
           const deltaEntries = yamlParser.parseDelta(content.content)
-          if (deltaEntries.length === 0) continue
-          if (deltaEntries.every((e) => e.op === 'no-op')) continue
-
-          // Derive output basename: strip deltas/<ws>/<capPath>/ prefix and .delta.yaml suffix
-          const deltaYamlSuffix = '.delta.yaml'
-          const basenameWithSuffix = file.filename.slice(file.filename.lastIndexOf('/') + 1)
-          const outputBasename = basenameWithSuffix.slice(
-            0,
-            basenameWithSuffix.length - deltaYamlSuffix.length,
-          )
 
           // Load base artifact
-          if (spec === null || specRepo === undefined) {
-            warnings.push(`Base spec not found for '${input.specId}' — skipping ${outputBasename}`)
-            continue
-          }
-          const baseArtifact = await specRepo.artifact(spec, outputBasename)
+          const baseArtifact =
+            spec !== null && specRepo !== undefined
+              ? await specRepo.artifact(spec, outputBasename)
+              : null
+
           if (baseArtifact === null) {
             warnings.push(
-              `Base artifact '${outputBasename}' not found for '${input.specId}' — skipping`,
+              `Base artifact '${outputBasename}' not found for '${input.specId}' — recording as missing`,
             )
+            files.push({
+              filename: outputBasename,
+              base: null,
+              merged: '',
+              status: 'missing',
+            })
+            continue
+          }
+
+          if (deltaEntries.length === 0 || deltaEntries.every((e) => e.op === 'no-op')) {
+            files.push({
+              filename: outputBasename,
+              base: baseArtifact.content,
+              merged: baseArtifact.content,
+              status: 'no-op',
+            })
             continue
           }
 
@@ -151,6 +197,12 @@ export class PreviewSpec {
           const parser = this._parsers.get(format)
           if (parser === undefined) {
             warnings.push(`No parser for format '${format}' — skipping ${outputBasename}`)
+            files.push({
+              filename: outputBasename,
+              base: baseArtifact.content,
+              merged: baseArtifact.content,
+              status: 'missing',
+            })
             continue
           }
 
@@ -163,19 +215,32 @@ export class PreviewSpec {
             filename: outputBasename,
             base: baseArtifact.content,
             merged,
+            status: 'merged',
           })
         } else {
           // New spec file — content is the merged result, base is null
-          const outputBasename = file.filename.slice(file.filename.lastIndexOf('/') + 1)
           files.push({
             filename: outputBasename,
             base: null,
             merged: content.content,
+            status: 'merged',
           })
         }
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err)
-        warnings.push(`Failed to preview ${file.filename}: ${message}`)
+        warnings.push(`Failed to preview ${outputBasename}: ${message}`)
+
+        const baseArtifact =
+          spec !== null && specRepo !== undefined
+            ? await specRepo.artifact(spec, outputBasename)
+            : null
+
+        files.push({
+          filename: outputBasename,
+          base: baseArtifact?.content ?? null,
+          merged: baseArtifact?.content ?? '',
+          status: 'missing',
+        })
       }
     }
 

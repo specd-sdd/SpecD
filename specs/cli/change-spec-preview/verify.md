@@ -18,19 +18,21 @@
 
 ### Requirement: Text output — merged mode
 
-#### Scenario: Files separated by header lines
+#### Scenario: Files separated by header lines with status labels
 
-- **GIVEN** a change producing preview for `spec.md` and `verify.md`
+- **GIVEN** a change with `merged`, `no-op`, and `missing` artifacts
 - **WHEN** the command is invoked without `--diff`
-- **THEN** each file is preceded by a `--- <filename> ---` separator line
-- **AND** `spec.md` appears before `verify.md`
+- **THEN** each file header includes the appropriate label
+- **AND** `spec.md` with status `merged` header is `--- spec.md ---`
+- **AND** `verify.md` with status `no-op` header is `--- verify.md --- (no-op delta, showing original)`
+- **AND** `other.md` with status `missing` (delta) header is `--- other.md --- (missing artifact, showing original)`
+- **AND** `new.md` with status `missing` (new spec) header is `--- new.md --- (missing artifact)`
 
-#### Scenario: Filtered artifact in merged mode
+#### Scenario: Filtered artifact shows status label
 
-- **GIVEN** a change with `spec.md` and `verify.md`
+- **GIVEN** a change where `specs` artifact is `no-op`
 - **WHEN** `specd change spec-preview my-change my-spec --artifact specs` is run
-- **THEN** stdout contains `--- spec.md ---` and the merged spec content
-- **AND** stdout DOES NOT contain `--- verify.md ---`
+- **THEN** stdout contains `--- spec.md --- (no-op delta, showing original)`
 
 ### Requirement: Text output — diff mode
 
@@ -100,11 +102,13 @@
 - **WHEN** `specd change spec-preview ghost core:core/config` is invoked
 - **THEN** the command prints an error message and exits with code 1
 
-#### Scenario: Spec not in change exits with error
+#### Scenario: Spec not in change exits with error and suggestion
 
 - **GIVEN** a change `my-change` that does not include `core:core/other`
 - **WHEN** `specd change spec-preview my-change core:core/other` is invoked
-- **THEN** the command prints an error message and exits with code 1
+- **THEN** the command prints an error message
+- **AND** the message includes `use specd specs show core:core/other`
+- **AND** the command exits with code 1
 
 #### Scenario: Warnings printed to stderr
 

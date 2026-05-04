@@ -28,22 +28,30 @@
 
 #### Scenario: Delta merged into base spec content
 
-- **GIVEN** a base spec with content "# Spec\n\n## Requirements\n\n### Requirement: A\n\nOriginal text."
-- **AND** a delta that modifies "Requirement: A" with new content
+- **GIVEN** a valid delta file and a matching base spec
 - **WHEN** `PreviewSpec.execute` is called
-- **THEN** the result contains a `PreviewSpecFileEntry` with `merged` reflecting the delta applied to the base
+- **THEN** the entry in `files` has status `merged`
+- **AND** `merged` content contains the result of application
 
-#### Scenario: No-op delta skipped
+#### Scenario: No-op delta records status
 
 - **GIVEN** a delta file containing only a `no-op` entry
 - **WHEN** `PreviewSpec.execute` is called
-- **THEN** the result `files` array does not contain an entry for that artifact
+- **THEN** the result contains an entry for that artifact with status `no-op`
+- **AND** `merged` contains the original base content
 
-#### Scenario: Missing delta file skipped
+#### Scenario: Missing delta file records status
 
 - **GIVEN** a change with a `scope: spec` artifact whose delta file does not exist on disk
 - **WHEN** `PreviewSpec.execute` is called
-- **THEN** that artifact is skipped — no entry in the result and no error
+- **THEN** the result contains an entry for that artifact with status `missing`
+
+#### Scenario: All schema artifacts returned
+
+- **GIVEN** a schema with `spec.md` and `verify.md` artifact types
+- **AND** a change that only has a delta for `spec.md`
+- **WHEN** `PreviewSpec.execute` is called
+- **THEN** the `files` array contains entries for both `spec.md` (status `merged`) and `verify.md` (status `missing`)
 
 ### Requirement: Artifact file ordering
 
@@ -61,35 +69,39 @@
 
 ### Requirement: Result shape
 
-#### Scenario: Base content included for delta files
+#### Scenario: Base content and status included for delta files
 
 - **GIVEN** a delta applied to an existing spec
 - **WHEN** `PreviewSpec.execute` returns
-- **THEN** the `PreviewSpecFileEntry` has `base` set to the original content and `merged` set to the result after delta application
+- **THEN** the `PreviewSpecFileEntry` has status `merged`
+- **AND** `base` is set to the original content
+- **AND** `merged` is set to the result after delta application
 
-#### Scenario: Base is null for new specs
+#### Scenario: Base is null and status is merged for new specs
 
 - **GIVEN** a new spec file (not a delta)
 - **WHEN** `PreviewSpec.execute` returns
-- **THEN** the `PreviewSpecFileEntry` has `base: null` and `merged` set to the new file content
+- **THEN** the `PreviewSpecFileEntry` has status `merged`
+- **AND** `base: null`
+- **AND** `merged` is set to the new file content
 
 ### Requirement: Error handling
 
-#### Scenario: Delta application failure produces warning
+#### Scenario: Delta application failure produces warning and missing status
 
 - **GIVEN** a delta with a selector that does not match any node in the base spec
 - **WHEN** `PreviewSpec.execute` is called
 - **THEN** the result includes a warning describing the failure
-- **AND** the failing file is not included in `files`
+- **AND** the failing file is included in `files` with status `missing`
 - **AND** the use case does not throw
 
 #### Scenario: Other files still returned on partial failure
 
 - **GIVEN** a change with two delta files — one valid, one with a bad selector
 - **WHEN** `PreviewSpec.execute` is called
-- **THEN** the valid file appears in `files` with merged content
-- **AND** the failing file is absent from `files`
-- **AND** a warning is present for the failing file
+- **THEN** both files appear in `files`
+- **AND** the valid one has status `merged`
+- **AND** the failing one has status `missing`
 
 ### Requirement: Schema name guard
 
