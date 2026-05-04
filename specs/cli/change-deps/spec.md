@@ -64,6 +64,6 @@ All errors exit with code 1 and write to stderr:
 
 ## Spec Dependencies
 
-- [`core:core/change`](../../core/change/spec.md) — `specDependsOn` field on the Change entity
-- [`core:core/change-manifest`](../../core/change-manifest/spec.md) — `specDependsOn` field in the manifest
-- [`core:core/compile-context`](../../core/compile-context/spec.md) — dependsOn resolution order (manifest-first)
+- [`core:change`](../../core/change/spec.md) — `specDependsOn` field on the Change entity
+- [`core:change-manifest`](../../core/change-manifest/spec.md) — `specDependsOn` field in the manifest
+- [`core:compile-context`](../../core/compile-context/spec.md) — dependsOn resolution order (manifest-first)

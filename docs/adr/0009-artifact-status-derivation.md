@@ -47,4 +47,4 @@ Chosen option: "Derived status via `validatedHash`", because it makes out-of-ban
 
 ### Spec
 
-- [`specs/core/storage/spec.md`](../../specs/core/storage/spec.md)
+- [`core:storage`](../../specs/core/storage/spec.md)

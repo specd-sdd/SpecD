@@ -80,9 +80,9 @@ When no `instruction:` hooks exist for the step+phase, the result is `{ phase, i
 
 ## Spec Dependencies
 
-- [`core:core/hook-execution-model`](../hook-execution-model/spec.md) — hook types, instruction hooks as passive text, ordering
-- [`core:core/schema-format`](../schema-format/spec.md) — `workflow[].hooks` structure, `instruction:` entries
-- [`core:core/config`](../config/spec.md) — project-level hooks via `schemaOverrides`
-- [`core:core/change`](../change/spec.md) — Change entity, `schemaName`
-- [`core:core/template-variables`](../template-variables/spec.md) — `TemplateExpander`, `TemplateVariables`, expansion semantics
-- [`core:core/archive-repository-port`](../archive-repository-port/spec.md) — `ArchiveRepository` port, `get()`, `archivePath()`, `ArchivedChange`
+- [`core:hook-execution-model`](../hook-execution-model/spec.md) — hook types, instruction hooks as passive text, ordering
+- [`core:schema-format`](../schema-format/spec.md) — `workflow[].hooks` structure, `instruction:` entries
+- [`core:config`](../config/spec.md) — project-level hooks via `schemaOverrides`
+- [`core:change`](../change/spec.md) — Change entity, `schemaName`
+- [`core:template-variables`](../template-variables/spec.md) — `TemplateExpander`, `TemplateVariables`, expansion semantics
+- [`core:archive-repository-port`](../archive-repository-port/spec.md) — `ArchiveRepository` port, `get()`, `archivePath()`, `ArchivedChange`

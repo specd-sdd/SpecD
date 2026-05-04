@@ -62,6 +62,6 @@ The builder SHALL support initialization from a resolved project configuration p
 
 ## Spec Dependencies
 
-- [`core:core/kernel`](../kernel/spec.md) — kernel shape, additive registries, merged registry exposure
-- [`core:core/composition`](../composition/spec.md) — composition-layer exports and construction responsibilities
+- [`core:kernel`](../kernel/spec.md) — kernel shape, additive registries, merged registry exposure
+- [`core:composition`](../composition/spec.md) — composition-layer exports and construction responsibilities
 - [`default:_global/architecture`](../../_global/architecture/spec.md) — composition-layer boundaries

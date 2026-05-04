@@ -111,9 +111,9 @@ The visible dependency label is the canonical spec ID. When a link is present, t
 
 ## Spec Dependencies
 
-- [`core:core/schema-format`](../../../core/schema-format/spec.md) — schema-level metadata extraction declarations and dependency extraction shape
-- [`core:core/content-extraction`](../../../core/content-extraction/spec.md) — extractor capture semantics and transform runtime for dependency extraction
-- [`core:core/spec-id-format`](../../../core/spec-id-format/spec.md) — canonical `workspace:capabilityPath` format used in dependency labels
+- [`core:schema-format`](../../../core/schema-format/spec.md) — schema-level metadata extraction declarations and dependency extraction shape
+- [`core:content-extraction`](../../../core/content-extraction/spec.md) — extractor capture semantics and transform runtime for dependency extraction
+- [`core:spec-id-format`](../../../core/spec-id-format/spec.md) — canonical `workspace:capabilityPath` format used in dependency labels
 
 ## ADRs
 

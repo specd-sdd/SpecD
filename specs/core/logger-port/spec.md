@@ -1,4 +1,4 @@
-# core:core/logger-port
+# core:logger-port
 
 ## Purpose
 

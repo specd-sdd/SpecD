@@ -1,7 +1,7 @@
 {
   "title": "skills:skill-repository-port",
   "description": "Abstract interface for skill storage. This port defines the contract that infrastructure implementations must fulfill.",
-  "dependsOn": ["core:core/config", "skills:skill", "skills:skill-bundle"],
+  "dependsOn": ["core:config", "skills:skill", "skills:skill-bundle"],
   "context": [
     "Abstract interface for skill storage. This port defines the contract that infrastructure implementations must fulfill."
   ],
@@ -39,7 +39,7 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:ffd23bc2553f718888294d69a005e1f74b84a2884d9f21b67e6bbb9180e645cd",
+    "spec.md": "sha256:f15f4aa3d875deebcb8255847c09c903b1359b075be2681d35d1217d77a68629",
     "verify.md": "sha256:a467fded07534d06e91612fa68f8323950337cb87a8dd05c8baefaf4c6aaea90"
   },
   "generatedBy": "core"

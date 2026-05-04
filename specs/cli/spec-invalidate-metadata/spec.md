@@ -36,4 +36,4 @@ If the spec does not exist, or has no metadata, the command writes `error: spec 
 
 - [`default:_global/architecture`](../../_global/architecture/spec.md) — adapter packages contain no business logic
 - [`default:_global/conventions`](../../_global/conventions/spec.md) — error types, named exports
-- [`core:core/invalidate-spec-metadata`](../../core/invalidate-spec-metadata/spec.md) — the use case this command delegates to
+- [`core:invalidate-spec-metadata`](../../core/invalidate-spec-metadata/spec.md) — the use case this command delegates to

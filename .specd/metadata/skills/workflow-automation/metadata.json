@@ -1,7 +1,7 @@
 {
   "title": "Workflow Automation",
   "description": "To ensure consistent and efficient agent interactions across the SpecD lifecycle by defining policies for diagnostic output and data extraction. This spec minimizes \"AI blindness\" by mandating human-optimized text for status checks and machine-optimized formats for data-intensive operations.",
-  "dependsOn": ["cli:cli/command-resource-naming"],
+  "dependsOn": ["cli:command-resource-naming"],
   "context": [
     "To ensure consistent and efficient agent interactions across the SpecD lifecycle by defining policies for diagnostic output and data extraction. This spec minimizes \"AI blindness\" by mandating human-optimized text for status checks and machine-optimized formats for data-intensive operations."
   ],
@@ -71,10 +71,10 @@
     {
       "requirement": "On-demand outline retrieval",
       "name": "Agent fetches full outline using canonical command",
-      "given": ["artifact-instruction output includes availableOutlines: [\"core:core/config\"]"],
+      "given": ["artifact-instruction output includes availableOutlines: [\"core:config\"]"],
       "when": ["the agent needs full structure for delta authoring"],
       "then": [
-        "it runs specd specs outline core:core/config --artifact specs",
+        "it runs specd specs outline core:config --artifact specs",
         "AND uses that output as the outline source"
       ]
     },
@@ -167,8 +167,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:604225b09198cf5917d90471af9fd2eb20bd4b8d119fc9f17ba25645effd9c25",
-    "verify.md": "sha256:d5c45462016f6fcf53c60664628a7e02d6fa16829e8a23e706851745d13f5c8d"
+    "spec.md": "sha256:18a0fd8a7ecb590067b8cfae7dc933273b656b05ad85b4d725352240c27cf554",
+    "verify.md": "sha256:f58b58b58a4c7d4be64eb00d7a8b5e1a6baba503cb6c4a62d599553dc531e6fe"
   },
   "generatedBy": "core"
 }

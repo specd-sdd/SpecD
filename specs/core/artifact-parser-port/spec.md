@@ -172,6 +172,6 @@ Each `DeltaEntry` MUST contain:
 ## Spec Dependencies
 
 - [`default:_global/architecture`](../../_global/architecture/spec.md) — hexagonal architecture and port placement rules
-- [`core:core/artifact-ast`](../artifact-ast/spec.md) — AST structure and node type definitions
-- [`core:core/delta-format`](../delta-format/spec.md) — delta entry format and application semantics
-- [`core:core/selector-model`](../selector-model/spec.md) — selector resolution model
+- [`core:artifact-ast`](../artifact-ast/spec.md) — AST structure and node type definitions
+- [`core:delta-format`](../delta-format/spec.md) — delta entry format and application semantics
+- [`core:selector-model`](../selector-model/spec.md) — selector resolution model

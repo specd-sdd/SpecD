@@ -57,7 +57,7 @@ When storage selection requires workspace-specific VCS or null-VCS handling, tha
 
 ### Requirement: Change manifest format
 
-The format of `manifest.json` — its fields, event shapes, and schema version behavior — is defined in [`specs/core/change-manifest/spec.md`](../change-manifest/spec.md). `FsChangeRepository` reads and writes the manifest according to that format and must write it atomically (temp file + rename) to prevent partial reads.
+The format of `manifest.json` — its fields, event shapes, and schema version behavior — is defined in [`core:change-manifest`](../change-manifest/spec.md). `FsChangeRepository` reads and writes the manifest according to that format and must write it atomically (temp file + rename) to prevent partial reads.
 
 ### Requirement: Change locks directory placement
 
@@ -79,8 +79,8 @@ at construction time. The repository derives the locks directory internally as
 ## Spec Dependencies
 
 - [`default:_global/architecture`](../../_global/architecture/spec.md) — infrastructure layer constraints
-- [`core:core/change`](../change/spec.md) — Change domain model; defines event types, lifecycle states, and derivation rules serialized in the manifest
-- [`core:core/change-manifest`](../change-manifest/spec.md) — manifest format, event shapes, and schema version behavior
+- [`core:change`](../change/spec.md) — Change domain model; defines event types, lifecycle states, and derivation rules serialized in the manifest
+- [`core:change-manifest`](../change-manifest/spec.md) — manifest format, event shapes, and schema version behavior
 
 ## ADRs
 

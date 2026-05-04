@@ -54,7 +54,7 @@
 #### Scenario: Text output shows overlap entries when reason is spec-overlap-conflict
 
 - **GIVEN** `GetStatus` returns `review.required: true` with `reason: 'spec-overlap-conflict'`
-- **AND** `review.overlapDetail` has two entries: `[{ archivedChangeName: 'beta', overlappingSpecIds: ['core:core/config'] }, { archivedChangeName: 'alpha', overlappingSpecIds: ['core:core/kernel'] }]`
+- **AND** `review.overlapDetail` has two entries: `[{ archivedChangeName: 'beta', overlappingSpecIds: ['core:config'] }, { archivedChangeName: 'alpha', overlappingSpecIds: ['core:kernel'] }]`
 - **WHEN** `specd change status <name>` is run
 - **THEN** the review section shows `reason: spec-overlap-conflict`
 - **AND** an `overlap:` subsection lists both entries as bullets

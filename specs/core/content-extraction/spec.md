@@ -181,5 +181,5 @@ fields:
 
 ## Spec Dependencies
 
-- [`core:core/selector-model`](../selector-model/spec.md) — the selector model used by extractors to identify AST nodes
-- [`core:core/artifact-ast`](../artifact-ast/spec.md) — the normalized AST format that extractors operate on
+- [`core:selector-model`](../selector-model/spec.md) — the selector model used by extractors to identify AST nodes
+- [`core:artifact-ast`](../artifact-ast/spec.md) — the normalized AST format that extractors operate on

@@ -39,9 +39,9 @@
 
 #### Scenario: dependsOn extracted from metadata
 
-- **GIVEN** a spec directory with `.specd-metadata.yaml` containing `dependsOn: [core:core/config, core:core/storage]`
+- **GIVEN** a spec directory with `.specd-metadata.yaml` containing `dependsOn: [core:config, core:storage]`
 - **WHEN** a `SpecNode` is created
-- **THEN** `dependsOn` is `['core:core/config', 'core:core/storage']`
+- **THEN** `dependsOn` is `['core:config', 'core:storage']`
 
 #### Scenario: SpecNode includes workspace field
 
@@ -106,9 +106,9 @@
 
 #### Scenario: DEPENDS_ON relation connects specs
 
-- **GIVEN** spec A has `dependsOn: ['core:core/config']`
+- **GIVEN** spec A has `dependsOn: ['core:config']`
 - **WHEN** relations are built from the `SpecNode`
-- **THEN** a `DEPENDS_ON` relation exists from spec A's `specId` to `core:core/config`
+- **THEN** a `DEPENDS_ON` relation exists from spec A's `specId` to `core:config`
 
 #### Scenario: Hierarchy relation types are part of the closed set
 

@@ -55,5 +55,5 @@ $ specd skills show my-skill --format json
 
 ## Spec Dependencies
 
-- [`cli:cli/entrypoint`](../entrypoint/spec.md) — exit codes, output conventions
-- [`cli:cli/skills-list`](../skills-list/spec.md) — available skills source
+- [`cli:entrypoint`](../entrypoint/spec.md) — exit codes, output conventions
+- [`cli:skills-list`](../skills-list/spec.md) — available skills source

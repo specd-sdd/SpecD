@@ -1,4 +1,4 @@
-# Verification: core:core/logger-port
+# Verification: core:logger-port
 
 ## Requirements
 

@@ -103,7 +103,7 @@ For non-no-op deltas, the delta file is parsed by the YAML adapter to produce a 
 For each rule in `deltaValidations[]`, apply the rule evaluation algorithm (identical for both `validations` and `deltaValidations`; only the document root differs):
 
 1. Select candidate nodes from the document root using one of:
-   - **Selector fields** (`type`, `matches`, `contains`, `parent`, `index`, `where`): apply the selector model defined in [`specs/core/selector-model/spec.md`](../selector-model/spec.md) against the AST.
+   - **Selector fields** (`type`, `matches`, `contains`, `parent`, `index`, `where`): apply the selector model defined in [`core:selector-model`](../selector-model/spec.md) against the AST.
    - **`path`** (JSONPath string): evaluate the JSONPath expression against the document root.
 2. If zero nodes are selected: if `required: true`, record a failure; if `required: false`, record a warning. Skip `children` and `contentMatches` evaluation.
 3. If one or more nodes are selected: for each matched node:
@@ -203,12 +203,12 @@ If metadataExtraction validation fails, `ValidateArtifacts` MUST record the fail
 
 ## Spec Dependencies
 
-- [`core:core/change`](../change/spec.md) — change entity, approval invalidation, and artifact state
-- [`core:core/change-layout`](../change-layout/spec.md) — expected file paths for new spec artifacts and delta artifacts
-- [`core:core/change-manifest`](../change-manifest/spec.md) — persisted artifact filenames used by validation
-- [`core:core/schema-format`](../schema-format/spec.md) — artifact definition, validations, delta behavior, and pre-hash cleanup
-- [`core:core/delta-format`](../delta-format/spec.md) — parser contract and delta application errors
-- [`core:core/selector-model`](../selector-model/spec.md) — selector rules for validations and delta validations
-- [`core:core/storage`](../storage/spec.md) — validation as the only path to `complete`
+- [`core:change`](../change/spec.md) — change entity, approval invalidation, and artifact state
+- [`core:change-layout`](../change-layout/spec.md) — expected file paths for new spec artifacts and delta artifacts
+- [`core:change-manifest`](../change-manifest/spec.md) — persisted artifact filenames used by validation
+- [`core:schema-format`](../schema-format/spec.md) — artifact definition, validations, delta behavior, and pre-hash cleanup
+- [`core:delta-format`](../delta-format/spec.md) — parser contract and delta application errors
+- [`core:selector-model`](../selector-model/spec.md) — selector rules for validations and delta validations
+- [`core:storage`](../storage/spec.md) — validation as the only path to `complete`
 - [`default:_global/architecture`](../../_global/architecture/spec.md) — port-per-workspace and manual DI constraints
-- [`core:core/spec-id-format`](../spec-id-format/spec.md) — canonical spec ID format for spec-scoped artifacts
+- [`core:spec-id-format`](../spec-id-format/spec.md) — canonical spec ID format for spec-scoped artifacts

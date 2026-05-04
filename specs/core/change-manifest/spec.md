@@ -147,7 +147,7 @@ On read, the manifest loader MUST also accept legacy historical invalidation eve
 
 ### Requirement: Artifact filenames use expected paths
 
-Every `ManifestArtifactFile.filename` MUST be the expected change-directory path for that artifact, as defined by `core:core/change-layout`.
+Every `ManifestArtifactFile.filename` MUST be the expected change-directory path for that artifact, as defined by `core:change-layout`.
 
 When a change is created or its spec scope changes, persisted spec-scoped artifact filenames MUST be resolved using the target spec's existence and the schema artifact's delta capability before the manifest is written. Existing specs with delta-capable artifacts MUST be persisted as `deltas/<workspace>/<capability-path>/<artifact-filename>.delta.yaml`; new specs MUST be persisted as `specs/<workspace>/<capability-path>/<artifact-filename>`.
 
@@ -177,9 +177,9 @@ The manifest must be written atomically — by writing to a temporary file and t
 
 ## Spec Dependencies
 
-- [`core:core/change`](../change/spec.md) — change event model and lifecycle derivation
-- [`core:core/change-layout`](../change-layout/spec.md) — expected artifact paths for new spec files and delta files
-- [`core:core/storage`](../storage/spec.md) — repository writes and atomic manifest handling
-- [`core:core/spec-metadata`](../spec-metadata/spec.md) — metadata files referenced by the manifest model
-- [`core:core/spec-id-format`](../spec-id-format/spec.md) — canonical `workspace:capabilityPath` identifiers
-- [`core:core/workspace`](../workspace/spec.md) — workspace semantics referenced by persisted spec IDs
+- [`core:change`](../change/spec.md) — change event model and lifecycle derivation
+- [`core:change-layout`](../change-layout/spec.md) — expected artifact paths for new spec files and delta files
+- [`core:storage`](../storage/spec.md) — repository writes and atomic manifest handling
+- [`core:spec-metadata`](../spec-metadata/spec.md) — metadata files referenced by the manifest model
+- [`core:spec-id-format`](../spec-id-format/spec.md) — canonical `workspace:capabilityPath` identifiers
+- [`core:workspace`](../workspace/spec.md) — workspace semantics referenced by persisted spec IDs

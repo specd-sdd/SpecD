@@ -50,6 +50,6 @@ When no specs match across all searched workspaces, the use case MUST return an 
 
 ## Spec Dependencies
 
-- [`core:core/spec-repository-port`](../spec-repository-port/spec.md) — `SpecRepository.search()` method and `SpecSearchResult` type
-- [`core:core/list-specs`](../list-specs/spec.md) — title and summary resolution algorithm
-- [`core:core/workspace`](../workspace/spec.md) — workspace ordering semantics
+- [`core:spec-repository-port`](../spec-repository-port/spec.md) — `SpecRepository.search()` method and `SpecSearchResult` type
+- [`core:list-specs`](../list-specs/spec.md) — title and summary resolution algorithm
+- [`core:workspace`](../workspace/spec.md) — workspace ordering semantics

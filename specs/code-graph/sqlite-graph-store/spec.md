@@ -84,7 +84,7 @@ That schema MUST define:
   as normalized search text
 
 The physical schema is an implementation concern of the SQLite adapter. Storage-agnostic
-consumers MUST depend on `code-graph:code-graph/graph-store` instead of this spec.
+consumers MUST depend on `code-graph:graph-store` instead of this spec.
 
 ### Requirement: Persisted node storage
 
@@ -196,7 +196,7 @@ abstract `GraphStore` contract.
 - `sqlite` is the stable backend id used to select this adapter from a multi-backend
   graph-store registry
 - SQLite-specific file layout, FTS behavior, schema shape, and schema-version handling
-  are defined here, not in `code-graph:code-graph/graph-store`
+  are defined here, not in `code-graph:graph-store`
 - All SQLite scratch files and persisted database artifacts are rooted under
   `configPath`
 - Storage-agnostic use cases and CLI commands MUST NOT depend on this spec unless they
@@ -204,11 +204,11 @@ abstract `GraphStore` contract.
 
 ## Spec Dependencies
 
-- [`code-graph:code-graph/graph-store`](../graph-store/spec.md) — abstract
+- [`code-graph:graph-store`](../graph-store/spec.md) — abstract
   graph-store contract implemented by this adapter
-- [`core:core/config`](../../../core/config/spec.md) — `configPath` and
+- [`core:config`](../../../core/config/spec.md) — `configPath` and
   derived graph/temp directories
-- [`code-graph:code-graph/symbol-model`](../symbol-model/spec.md) — persisted node
+- [`code-graph:symbol-model`](../symbol-model/spec.md) — persisted node
   and relation concepts
-- [`code-graph:code-graph/workspace-integration`](../workspace-integration/spec.md)
+- [`code-graph:workspace-integration`](../workspace-integration/spec.md)
   — workspace-prefixed file and spec identity rules

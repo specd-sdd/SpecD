@@ -40,7 +40,7 @@ In `json` or `toon` mode, the command MUST output the `OverlapReport` structure:
   "hasOverlap": true,
   "entries": [
     {
-      "specId": "core:core/config",
+      "specId": "core:config",
       "changes": [
         { "name": "change-a", "state": "designing" },
         { "name": "change-b", "state": "implementing" }
@@ -77,5 +77,5 @@ Overlap presence MUST NOT cause a non-zero exit code.
 
 ## Spec Dependencies
 
-- `cli:cli/entrypoint` — config discovery, exit codes, output conventions
-- `core:core/spec-overlap` — `DetectOverlap` use case and `OverlapReport` type
+- `cli:entrypoint` — config discovery, exit codes, output conventions
+- `core:spec-overlap` — `DetectOverlap` use case and `OverlapReport` type

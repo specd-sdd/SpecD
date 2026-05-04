@@ -58,4 +58,4 @@ When introducing a new file format, check: will a human edit this file? If yes, 
 
 ### Spec
 
-- [`specs/core/spec-metadata/spec.md`](../../specs/core/spec-metadata/spec.md)
+- [`core:spec-metadata`](../../specs/core/spec-metadata/spec.md)

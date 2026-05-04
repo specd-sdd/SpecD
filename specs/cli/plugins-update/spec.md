@@ -1,4 +1,4 @@
-# cli:cli/plugins-update
+# cli:plugins-update
 
 ## Purpose
 
@@ -42,4 +42,4 @@ The format MUST be machine-parseable when invoked with `--format json`.
 ## Spec Dependencies
 
 - [`plugin-manager:update-plugin-use-case`](../plugin-manager/update-plugin-use-case/spec.md) — orchestrates plugin update
-- [`core:core/config-writer-port`](../core/config-writer-port/spec.md) — reads declared plugins
+- [`core:config-writer-port`](../core/config-writer-port/spec.md) — reads declared plugins

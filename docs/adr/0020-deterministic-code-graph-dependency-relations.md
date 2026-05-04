@@ -121,6 +121,6 @@ distinct dependency semantics.
 
 ### Spec
 
-- [`specs/code-graph/symbol-model/spec.md`](../../specs/code-graph/symbol-model/spec.md)
-- [`specs/code-graph/language-adapter/spec.md`](../../specs/code-graph/language-adapter/spec.md)
-- [`specs/code-graph/indexer/spec.md`](../../specs/code-graph/indexer/spec.md)
+- [`code-graph:symbol-model`](../../specs/code-graph/symbol-model/spec.md)
+- [`code-graph:language-adapter`](../../specs/code-graph/language-adapter/spec.md)
+- [`code-graph:indexer`](../../specs/code-graph/indexer/spec.md)

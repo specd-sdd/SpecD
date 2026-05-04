@@ -1,4 +1,4 @@
-# core:core/pino-logger
+# core:pino-logger
 
 ## Purpose
 
@@ -32,5 +32,5 @@ The `child()` method of the `PinoLogger` MUST map directly to Pino's native `.ch
 
 ## Spec Dependencies
 
-- [`core:core/logger-port`](../logger-port/spec.md) — Implements this interface and its data structures (`LogEntry`, `LogDestination`).
+- [`core:logger-port`](../logger-port/spec.md) — Implements this interface and its data structures (`LogEntry`, `LogDestination`).
 - [`default:_global/architecture`](../../../default/_global/architecture/spec.md) — Placed in the infrastructure layer of `@specd/core`.

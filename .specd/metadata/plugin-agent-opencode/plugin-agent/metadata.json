@@ -2,7 +2,7 @@
   "title": "plugin-agent-opencode:plugin-agent",
   "description": "Open Code support is required to keep agent-plugin behavior consistent across the ecosystem and avoid a Claude-only installation path. This spec defines the Open Code plugin contract for skill install/uninstall, target install directory, and frontmatter handling so the plugin can be implemented predictably and validated against the same standards used by other agent plugins.",
   "dependsOn": [
-    "core:core/config",
+    "core:config",
     "plugin-manager:agent-plugin-type",
     "skills:skill-bundle",
     "skills:skill-templates-source"
@@ -199,7 +199,7 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:047ab35fedc2a4cb0085cd8f4e466add6fc2cefe0226934246bcfaf6e1ddb778",
+    "spec.md": "sha256:cbbb0f57264f5538a8220a5af69e804dcda6662b8f27d081c45c221438a88c92",
     "verify.md": "sha256:37386e0caf3819dd66c0884b2a26341e688e50b137ea5e68653fdad214f1a9d6"
   },
   "generatedBy": "core"

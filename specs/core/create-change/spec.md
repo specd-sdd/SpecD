@@ -61,5 +61,5 @@ The return type is `{ change: Change; changePath: string }`.
 
 ## Spec Dependencies
 
-- [`core:core/change`](../change/spec.md)
+- [`core:change`](../change/spec.md)
 - [`default:_global/architecture`](../../_global/architecture/spec.md)

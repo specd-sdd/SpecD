@@ -51,4 +51,4 @@ If equivalence cannot be demonstrated deterministically, workflow guidance MUST 
 
 ## Spec Dependencies
 
-- [`cli:cli/entrypoint`](../entrypoint/spec.md) — CLI parsing and command registration conventions
+- [`cli:entrypoint`](../entrypoint/spec.md) — CLI parsing and command registration conventions

@@ -6,7 +6,7 @@
 
 #### Scenario: Metadata file present
 
-- **GIVEN** a spec at `core:core/config` with a `metadata.json` at `.specd/metadata/core/config/metadata.json`
+- **GIVEN** a spec at `core:config` with a `metadata.json` at `.specd/metadata/core/config/metadata.json`
 - **WHEN** `metadata(spec)` is called
 - **THEN** the result contains the parsed JSON fields
 
@@ -26,7 +26,7 @@
 #### Scenario: Workspace with prefix stores metadata correctly
 
 - **GIVEN** a workspace `core` with prefix `core` configured
-- **AND** a spec at `core:core/config`
+- **AND** a spec at `core:config`
 - **WHEN** metadata is saved for that spec
 - **THEN** the file is stored at `.specd/metadata/core/core/config/metadata.json`
 
@@ -54,7 +54,7 @@
 
 #### Scenario: Valid metadata file with all fields
 
-- **GIVEN** a `metadata.json` containing `{"title":"Config","description":"Project configuration","dependsOn":["core:core/storage"],"contentHashes":{"spec.md":"sha256:abc..."},"generatedBy":"core"}`
+- **GIVEN** a `metadata.json` containing `{"title":"Config","description":"Project configuration","dependsOn":["core:storage"],"contentHashes":{"spec.md":"sha256:abc..."},"generatedBy":"core"}`
 - **WHEN** it is parsed by the lenient schema
 - **THEN** all fields are present in the result
 

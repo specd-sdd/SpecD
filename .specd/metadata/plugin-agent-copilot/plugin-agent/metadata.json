@@ -2,7 +2,7 @@
   "title": "plugin-agent-copilot:plugin-agent",
   "description": "This spec defines the Copilot plugin contract for concrete install/uninstall behavior, project install location, and exact frontmatter support so agent skills are usable directly in Copilot workflows.",
   "dependsOn": [
-    "core:core/config",
+    "core:config",
     "plugin-manager:agent-plugin-type",
     "skills:skill-bundle",
     "skills:skill-templates-source"
@@ -153,7 +153,7 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:47a103cfe7cf5efaf08f88bbbfb43f0677972bae958b99c544fe537f9e1159c1",
+    "spec.md": "sha256:338829ecdd6325eaf81473746c79a35f3f28c931d3affe0c980d0c35c34186c4",
     "verify.md": "sha256:9ad7a0bcd5bd88543c12c8a07b163abd720fa26b432ca0398808f043464b952c"
   },
   "generatedBy": "core"

@@ -164,28 +164,28 @@
 
 #### Scenario: Existing spec validates only the expected delta
 
-- **GIVEN** `core:core/config` already exists
+- **GIVEN** `core:config` already exists
 - **AND** the schema artifact `specs` declares `delta: true`
 - **AND** the change contains `deltas/core/core/config/spec.md.delta.yaml`
-- **WHEN** `ValidateArtifacts.execute` validates `specs` for `core:core/config`
+- **WHEN** `ValidateArtifacts.execute` validates `specs` for `core:config`
 - **THEN** the delta file is parsed, applied to the base spec, and marked complete if validation passes
 - **AND** the result file metadata reports `deltas/core/core/config/spec.md.delta.yaml`
 
 #### Scenario: Existing spec with only a direct file fails
 
-- **GIVEN** `core:core/config` already exists
+- **GIVEN** `core:config` already exists
 - **AND** the schema artifact `specs` declares `delta: true`
 - **AND** the change contains `specs/core/core/config/spec.md`
 - **AND** the change does not contain `deltas/core/core/config/spec.md.delta.yaml`
-- **WHEN** `ValidateArtifacts.execute` validates `specs` for `core:core/config`
+- **WHEN** `ValidateArtifacts.execute` validates `specs` for `core:config`
 - **THEN** validation fails with missing filename `deltas/core/core/config/spec.md.delta.yaml`
 - **AND** `specs/core/core/config/spec.md` is not validated
 
 #### Scenario: New spec validates the direct specs file
 
-- **GIVEN** `core:core/new-capability` does not exist
+- **GIVEN** `core:new-capability` does not exist
 - **AND** the change contains `specs/core/core/new-capability/spec.md`
-- **WHEN** `ValidateArtifacts.execute` validates `specs` for `core:core/new-capability`
+- **WHEN** `ValidateArtifacts.execute` validates `specs` for `core:new-capability`
 - **THEN** validation runs against the direct specs file
 - **AND** no delta file is required
 
@@ -355,7 +355,7 @@
 
 #### Scenario: files list reports the expected validated filename
 
-- **GIVEN** validation succeeds for existing spec `core:core/config` with delta file `deltas/core/core/config/spec.md.delta.yaml`
+- **GIVEN** validation succeeds for existing spec `core:config` with delta file `deltas/core/core/config/spec.md.delta.yaml`
 - **WHEN** `ValidateArtifacts.execute` returns
 - **THEN** `result.files` contains an entry with `filename: "deltas/core/core/config/spec.md.delta.yaml"`
 - **AND** that entry status indicates the file was validated

@@ -101,14 +101,14 @@
 
 #### Scenario: Upsert replaces spec DEPENDS_ON relations
 
-- **GIVEN** a spec `core:core/change` with 2 `DEPENDS_ON` relations in the store
+- **GIVEN** a spec `core:change` with 2 `DEPENDS_ON` relations in the store
 - **WHEN** `upsertSpec()` is called with 3 new `DEPENDS_ON` relations
 - **THEN** the store contains exactly 3 `DEPENDS_ON` relations for that spec
 
 #### Scenario: Remove spec cleans up all relations
 
-- **GIVEN** a spec `core:core/config` that is both a source and target of `DEPENDS_ON` relations
-- **WHEN** `removeSpec('core:core/config')` is called
+- **GIVEN** a spec `core:config` that is both a source and target of `DEPENDS_ON` relations
+- **WHEN** `removeSpec('core:config')` is called
 - **THEN** the `SpecNode` and all `DEPENDS_ON` relations where it appears as source or target are removed
 
 ### Requirement: Full-text search

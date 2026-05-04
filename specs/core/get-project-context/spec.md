@@ -104,8 +104,8 @@ All dependencies are injected at construction time. The schema is resolved lazil
 
 ## Spec Dependencies
 
-- [`core:core/config`](../config/spec.md) — context entry format, include/exclude pattern semantics, `CompileContextConfig` structure, `contextMode`
-- [`core:core/compile-context`](../compile-context/spec.md) — shared pattern matching, rendering logic, `ContextSpecEntry` type definition
-- [`core:core/spec-metadata`](../spec-metadata/spec.md) — `.specd-metadata.yaml` format and content hash freshness model
-- [`core:core/schema-format`](../schema-format/spec.md) — `metadataExtraction` declarations and schema artifacts
+- [`core:config`](../config/spec.md) — context entry format, include/exclude pattern semantics, `CompileContextConfig` structure, `contextMode`
+- [`core:compile-context`](../compile-context/spec.md) — shared pattern matching, rendering logic, `ContextSpecEntry` type definition
+- [`core:spec-metadata`](../spec-metadata/spec.md) — `.specd-metadata.yaml` format and content hash freshness model
+- [`core:schema-format`](../schema-format/spec.md) — `metadataExtraction` declarations and schema artifacts
 - `default:_global/architecture` — port/adapter design constraints

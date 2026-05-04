@@ -25,7 +25,7 @@ function detectSpecOverlap(changes: readonly Change[]): OverlapReport
 
 Each `OverlapEntry` MUST contain:
 
-- `specId` — the qualified spec ID (e.g. `core:core/config`) targeted by multiple changes
+- `specId` — the qualified spec ID (e.g. `core:config`) targeted by multiple changes
 - `changes` — a readonly array of objects, each containing:
   - `name` — the change name
   - `state` — the change's current lifecycle state
@@ -68,6 +68,6 @@ When the named change is not found among active changes, `DetectOverlap` MUST th
 
 ## Spec Dependencies
 
-- `core:core/change` — Change entity, `specIds` getter, lifecycle states
-- `core:core/list-changes` — `ChangeRepository.list()` contract
-- `core:core/kernel` — kernel entry for the new use case
+- `core:change` — Change entity, `specIds` getter, lifecycle states
+- `core:list-changes` — `ChangeRepository.list()` contract
+- `core:kernel` — kernel entry for the new use case

@@ -1,4 +1,4 @@
-# Verification: cli:cli/plugins-list
+# Verification: cli:plugins-list
 
 ## Requirements
 

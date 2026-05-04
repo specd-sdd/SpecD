@@ -1,4 +1,4 @@
-# Verification: core:core/pino-logger
+# Verification: core:pino-logger
 
 ## Requirements
 

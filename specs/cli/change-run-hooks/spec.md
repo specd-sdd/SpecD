@@ -119,6 +119,6 @@ specd change run-hooks add-auth archiving --phase pre
 
 ## Spec Dependencies
 
-- [`cli:cli/entrypoint`](../entrypoint/spec.md) — config discovery, exit codes (0, 1, 2), output conventions, `--format` flag
-- [`core:core/run-step-hooks`](../../core/run-step-hooks/spec.md) — `RunStepHooks` use case, result shape
-- [`core:core/hook-execution-model`](../../core/hook-execution-model/spec.md) — hook types, failure semantics, agent-driven execution mode
+- [`cli:entrypoint`](../entrypoint/spec.md) — config discovery, exit codes (0, 1, 2), output conventions, `--format` flag
+- [`core:run-step-hooks`](../../core/run-step-hooks/spec.md) — `RunStepHooks` use case, result shape
+- [`core:hook-execution-model`](../../core/hook-execution-model/spec.md) — hook types, failure semantics, agent-driven execution mode

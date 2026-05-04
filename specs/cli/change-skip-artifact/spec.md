@@ -63,5 +63,5 @@ specd change skip-artifact add-oauth-login proposal --reason "scope too small to
 
 ## Spec Dependencies
 
-- [`cli:cli/entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
-- [`core:core/change`](../../core/change/spec.md) — artifact skipped semantics, optional artifacts, sentinel value
+- [`cli:entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
+- [`core:change`](../../core/change/spec.md) — artifact skipped semantics, optional artifacts, sentinel value

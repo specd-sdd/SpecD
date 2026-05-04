@@ -78,6 +78,6 @@ specd change create add-shared-api --spec shared-ws:api/contracts
 
 ## Spec Dependencies
 
-- [`cli:cli/entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
-- [`core:core/change`](../../core/change/spec.md) — Change entity, identity requirements
-- [`core:core/spec-id-format`](../../core/spec-id-format/spec.md) — canonical `workspace:capabilityPath` format, bare path shorthand
+- [`cli:entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
+- [`core:change`](../../core/change/spec.md) — Change entity, identity requirements
+- [`core:spec-id-format`](../../core/spec-id-format/spec.md) — canonical `workspace:capabilityPath` format, bare path shorthand

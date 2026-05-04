@@ -42,7 +42,7 @@ The `ArchiveRepository` instance is scoped to the default workspace and is injec
 
 ## Spec Dependencies
 
-- [`specs/core/archive-change/spec.md`](../archive-change/spec.md) -- `ArchiveChange` use case that produces archived changes; `ArchivedChange` entity
-- [`specs/core/storage/spec.md`](../storage/spec.md) -- `ArchiveRepository` port, `index.jsonl` ordering guarantees
-- [`specs/core/kernel/spec.md`](../kernel/spec.md) -- kernel wiring under `changes.listArchived`
-- [`specs/_global/architecture/spec.md`](../../_global/architecture/spec.md) -- port-based architecture, manual DI
+- [`core:archive-change`](../archive-change/spec.md) -- `ArchiveChange` use case that produces archived changes; `ArchivedChange` entity
+- [`core:storage`](../storage/spec.md) -- `ArchiveRepository` port, `index.jsonl` ordering guarantees
+- [`core:kernel`](../kernel/spec.md) -- kernel wiring under `changes.listArchived`
+- [`default:_global/architecture`](../../_global/architecture/spec.md) -- port-based architecture, manual DI

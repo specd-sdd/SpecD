@@ -102,6 +102,6 @@ specd init --format json
 
 ## Spec Dependencies
 
-- [`cli:cli/entrypoint`](../entrypoint/spec.md) — exit codes, output conventions
-- [`cli:cli/skills-install`](../skills-install/spec.md) — skill installation logic called after init
-- [`core:core/config`](../../core/config/spec.md) — InitProject use case, ConfigWriter port
+- [`cli:entrypoint`](../entrypoint/spec.md) — exit codes, output conventions
+- [`cli:skills-install`](../skills-install/spec.md) — skill installation logic called after init
+- [`core:config`](../../core/config/spec.md) — InitProject use case, ConfigWriter port

@@ -104,5 +104,5 @@ schemaOverrides: (present)
 
 ## Spec Dependencies
 
-- [`cli:cli/entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
-- [`core:core/config`](../../core/config/spec.md) — SpecdConfig shape
+- [`cli:entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
+- [`core:config`](../../core/config/spec.md) — SpecdConfig shape

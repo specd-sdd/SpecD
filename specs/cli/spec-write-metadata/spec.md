@@ -69,7 +69,7 @@ When `--force` is set, the overwrite check is skipped entirely.
 
 - [`default:_global/architecture`](../../_global/architecture/spec.md) — adapter packages contain no business logic
 - [`default:_global/conventions`](../../_global/conventions/spec.md) — error types, named exports
-- [`core:core/spec-metadata`](../../core/spec-metadata/spec.md) — metadata format, validation, and dependsOn overwrite protection
+- [`core:spec-metadata`](../../core/spec-metadata/spec.md) — metadata format, validation, and dependsOn overwrite protection
 
 ## ADRs
 

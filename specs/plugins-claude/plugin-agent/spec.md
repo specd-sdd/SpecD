@@ -93,7 +93,7 @@ Uninstall MUST NOT remove unrelated directories or files under `.claude/skills/`
 
 ## Spec Dependencies
 
-- [`core:core/config`](../../core/core/config/spec.md) — defines SpecdConfig type
+- [`core:config`](../../core/core/config/spec.md) — defines SpecdConfig type
 - [`plugin-manager:agent-plugin-type`](../plugin-manager/agent-plugin-type/spec.md) — plugin interface
 - [`skills:skill-bundle`](../skills/skill-bundle/spec.md) — shared bundle file routing contract
 - [`skills:skill-repository`](../skills/skill-repository/spec.md) — skill access

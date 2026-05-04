@@ -86,4 +86,4 @@ The chosen approach.
 
 ### Spec
 
-- [`specs/cli/cli/command-resource-naming/spec.md`](../../specs/cli/cli/command-resource-naming/spec.md)
+- [`cli:command-resource-naming`](../../specs/cli/cli/command-resource-naming/spec.md)

@@ -61,4 +61,4 @@ Dependencies are wired manually at the application entry point. The CLI entry po
 
 ### Spec
 
-- [`specs/_global/architecture/spec.md`](../../specs/_global/architecture/spec.md)
+- [`default:_global/architecture`](../../specs/_global/architecture/spec.md)

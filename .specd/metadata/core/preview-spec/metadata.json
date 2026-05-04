@@ -1,0 +1,213 @@
+{
+  "title": "PreviewSpec",
+  "description": "During an active change, agents and humans need to see what a spec will look like after its deltas are applied — but the canonical spec remains untouched until archive. `PreviewSpec` fills this gap by applying a change's delta artifacts to the base spec content and returning the merged result per artifact file, without mutating anything. It is the single source of delta-merge logic for read-only preview, consumed both by `CompileContext` (for materialized views) and by the CLI preview command (for human review).",
+  "dependsOn": [
+    "core:delta-format",
+    "core:artifact-parser-port",
+    "core:change-layout",
+    "core:file-reader-port"
+  ],
+  "context": [
+    "During an active change, agents and humans need to see what a spec will look like after its deltas are applied — but the canonical spec remains untouched until archive. `PreviewSpec` fills this gap by applying a change's delta artifacts to the base spec content and returning the merged result per artifact file, without mutating anything. It is the single source of delta-merge logic for read-only preview, consumed both by `CompileContext` (for materialized views) and by the CLI preview command (for human review)."
+  ],
+  "rules": [
+    {
+      "requirement": "Ports and constructor",
+      "rules": [
+        "`PreviewSpec` receives at construction time: `ChangeRepository`, a map of `SpecRepository` instances (one per configured workspace), `SchemaProvider`, and `ArtifactParserRegistry`.\n\n```typescript\nclass PreviewSpec {\n  constructor(\n    changes: ChangeRepository,\n    specs: ReadonlyMap<string, SpecRepository>,\n    schemaProvider: SchemaProvider,\n    parsers: ArtifactParserRegistry,\n  )\n}\n```\n\nAll are injected at kernel composition time, not passed per invocation."
+      ]
+    },
+    {
+      "requirement": "Input",
+      "rules": [
+        "`PreviewSpec.execute` receives:\n\n- `name` — the change name\n- `specId` — the fully-qualified spec ID to preview (e.g. `core:compile-context`); MUST be one of the change's `specIds`"
+      ]
+    },
+    {
+      "requirement": "Spec ID validation",
+      "rules": [
+        "`PreviewSpec` MUST verify that `specId` is present in `change.specIds`. If it is not, it MUST throw a `SpecNotInChangeError` (or equivalent) — previewing a spec that the change does not target is not valid."
+      ]
+    },
+    {
+      "requirement": "File discovery via change artifacts",
+      "rules": [
+        "`PreviewSpec` MUST discover which files to preview by inspecting `change.artifacts`. For each artifact type with `scope: spec`, retrieve the `ArtifactFile` keyed by the target `specId`. The `ArtifactFile.filename` property contains the resolved relative path within the change directory (e.g. `deltas/core/core/compile-context/spec.md.delta.yaml` or `specs/core/core/preview-spec/spec.md`).\n\nThis avoids manually deriving filenames from the schema — the change entity already has the resolved paths."
+      ]
+    },
+    {
+      "requirement": "Delta application",
+      "rules": [
+        "`PreviewSpec` MUST process all artifact types defined in the active schema with `scope: spec`. For each artifact:\n\n1. If `filename` ends with `.delta.yaml`, it is a delta file:\n   a. Load the delta content from `ChangeRepository.artifact(change, filename)`.\n   b. If content is missing, record status as `missing`.\n   c. Load the base artifact from `SpecRepository.artifact(spec, outputBasename)`.\n   d. If base artifact is missing, record status as `missing`.\n   e. Parse the delta and apply it to the base.\n   f. If all parsed entries are `no-op`, record status as `no-op`.\n   g. If application fails, record status as `missing` and add a warning.\n   h. Otherwise, record status as `merged`.\n   i. The `merged` field contains the result of application (or original content for `no-op`/`missing`).\n2. If `filename` does not end with `.delta.yaml`, it is a new spec artifact:\n   a. Load the content from `ChangeRepository.artifact(change, filename)`.\n   b. If content is missing, record status as `missing`.\n   c. Otherwise, record status as `merged`.\n   d. The base content is `null`.\n\n`PreviewSpec` MUST return an entry for every `scope: spec` artifact type, even if the status is `missing` or `no-op`."
+      ]
+    },
+    {
+      "requirement": "Artifact file ordering",
+      "rules": [
+        "The result MUST order artifact files as: the file named `spec.md` first (if present), then all remaining files in alphabetical order. This ordering applies to both merged content and diff output."
+      ]
+    },
+    {
+      "requirement": "Result shape",
+      "rules": [
+        "`PreviewSpec.execute` MUST return a `PreviewSpecResult`:\n\n```typescript\ninterface PreviewSpecFileEntry {\n  /** The artifact filename (e.g. `spec.md`, `verify.md`). */\n  readonly filename: string\n  /** The original base content (before delta application). `null` for new specs. */\n  readonly base: string | null\n  /** The merged content (after delta application). */\n  readonly merged: string\n  /**\n   * The preview status of this file.\n   * - 'merged': delta applied successfully with changes, or new spec file\n   * - 'no-op': delta applied but resulted in no changes to base content\n   * - 'missing': delta file or base artifact not found, or delta application failed\n   */\n  readonly status: 'merged' | 'no-op' | 'missing'\n}\n\ninterface PreviewSpecResult {\n  /** The spec ID that was previewed. */\n  readonly specId: string\n  /** The change name. */\n  readonly changeName: string\n  /** Per-file preview entries, ordered per the artifact file ordering requirement. */\n  readonly files: readonly PreviewSpecFileEntry[]\n  /** Warnings encountered during preview (e.g. parser errors, missing base). */\n  readonly warnings: readonly string[]\n}\n```"
+      ]
+    },
+    {
+      "requirement": "Error handling",
+      "rules": [
+        "If delta application fails for an artifact file (e.g. selector resolution failure, parser error), `PreviewSpec` MUST NOT throw. Instead, it MUST:\n\n1. Add a warning describing the failure and the affected filename\n2. Include the file in the result with status `missing`\n\nThe preview MUST always succeed — partial results are acceptable, total failure is not."
+      ]
+    },
+    {
+      "requirement": "Schema name guard",
+      "rules": [
+        "After obtaining the schema from `SchemaProvider`, `PreviewSpec` MUST compare `schema.name()` with `change.schemaName`. If they differ, it MUST throw `SchemaMismatchError`."
+      ]
+    }
+  ],
+  "constraints": [
+    "PreviewSpec is read-only — it MUST NOT mutate any canonical spec content, change state, or artifact status",
+    "Diff generation is NOT part of PreviewSpec — it is the CLI adapter's responsibility. PreviewSpec returns base and merged only.",
+    "PreviewSpec does not validate deltas — validation is ValidateArtifacts' concern",
+    "PreviewSpec does not check whether deltas are validated (complete status) — it applies whatever delta files exist; callers like CompileContext may choose to skip unvalidated deltas"
+  ],
+  "scenarios": [
+    {
+      "requirement": "Spec ID validation",
+      "name": "specId not in change throws error",
+      "given": ["a change with specIds: [\"core:config\"]"],
+      "when": ["PreviewSpec.execute is called with specId: \"core:other\""],
+      "then": ["the use case throws a SpecNotInChangeError (or equivalent)"]
+    },
+    {
+      "requirement": "File discovery via change artifacts",
+      "name": "Delta files discovered from change artifacts",
+      "given": [
+        "a change with a scope: spec artifact whose ArtifactFile.filename is deltas/core/core/config/spec.md.delta.yaml"
+      ],
+      "when": ["PreviewSpec.execute is called for that specId"],
+      "then": ["the delta file is loaded from ChangeRepository using that filename"]
+    },
+    {
+      "requirement": "File discovery via change artifacts",
+      "name": "New spec files discovered from change artifacts",
+      "given": [
+        "a change with a scope: spec artifact whose ArtifactFile.filename is specs/core/core/preview-spec/spec.md"
+      ],
+      "when": ["PreviewSpec.execute is called for that specId"],
+      "then": ["the file is loaded directly from ChangeRepository as new content with base: null"]
+    },
+    {
+      "requirement": "Delta application",
+      "name": "Delta merged into base spec content",
+      "given": ["a valid delta file and a matching base spec"],
+      "when": ["PreviewSpec.execute is called"],
+      "then": [
+        "the entry in files has status merged",
+        "AND merged content contains the result of application"
+      ]
+    },
+    {
+      "requirement": "Delta application",
+      "name": "No-op delta records status",
+      "given": ["a delta file containing only a no-op entry"],
+      "when": ["PreviewSpec.execute is called"],
+      "then": [
+        "the result contains an entry for that artifact with status no-op",
+        "AND merged contains the original base content"
+      ]
+    },
+    {
+      "requirement": "Delta application",
+      "name": "Missing delta file records status",
+      "given": ["a change with a scope: spec artifact whose delta file does not exist on disk"],
+      "when": ["PreviewSpec.execute is called"],
+      "then": ["the result contains an entry for that artifact with status missing"]
+    },
+    {
+      "requirement": "Delta application",
+      "name": "All schema artifacts returned",
+      "given": [
+        "a schema with spec.md and verify.md artifact types",
+        "AND a change that only has a delta for spec.md"
+      ],
+      "when": ["PreviewSpec.execute is called"],
+      "then": [
+        "the files array contains entries for both spec.md (status merged) and verify.md (status missing)"
+      ]
+    },
+    {
+      "requirement": "Artifact file ordering",
+      "name": "spec.md appears first",
+      "given": ["a change producing verify.md and spec.md preview entries"],
+      "when": ["PreviewSpec.execute returns"],
+      "then": ["files[0].filename is spec.md and files[1].filename is verify.md"]
+    },
+    {
+      "requirement": "Artifact file ordering",
+      "name": "Remaining files sorted alphabetically",
+      "given": ["a change producing spec.md, verify.md, and config.yaml preview entries"],
+      "when": ["PreviewSpec.execute returns"],
+      "then": ["the order is spec.md, config.yaml, verify.md"]
+    },
+    {
+      "requirement": "Result shape",
+      "name": "Base content and status included for delta files",
+      "given": ["a delta applied to an existing spec"],
+      "when": ["PreviewSpec.execute returns"],
+      "then": [
+        "the PreviewSpecFileEntry has status merged",
+        "AND base is set to the original content",
+        "AND merged is set to the result after delta application"
+      ]
+    },
+    {
+      "requirement": "Result shape",
+      "name": "Base is null and status is merged for new specs",
+      "given": ["a new spec file (not a delta)"],
+      "when": ["PreviewSpec.execute returns"],
+      "then": [
+        "the PreviewSpecFileEntry has status merged",
+        "AND base: null",
+        "AND merged is set to the new file content"
+      ]
+    },
+    {
+      "requirement": "Error handling",
+      "name": "Delta application failure produces warning and missing status",
+      "given": ["a delta with a selector that does not match any node in the base spec"],
+      "when": ["PreviewSpec.execute is called"],
+      "then": [
+        "the result includes a warning describing the failure",
+        "AND the failing file is included in files with status missing",
+        "AND the use case does not throw"
+      ]
+    },
+    {
+      "requirement": "Error handling",
+      "name": "Other files still returned on partial failure",
+      "given": ["a change with two delta files — one valid, one with a bad selector"],
+      "when": ["PreviewSpec.execute is called"],
+      "then": [
+        "both files appear in files",
+        "AND the valid one has status merged",
+        "AND the failing one has status missing"
+      ]
+    },
+    {
+      "requirement": "Schema name guard",
+      "name": "Schema mismatch throws",
+      "given": [
+        "a change with schemaName: \"schema-std\" and a schema whose name() is \"other-schema\""
+      ],
+      "when": ["PreviewSpec.execute is called"],
+      "then": ["the use case throws SchemaMismatchError"]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:bed39941579ab222e23ff577980764e1b133fa64ac9576ff8afbd83cf4c37034",
+    "verify.md": "sha256:133e706cab8e105988e0ca73e7181dbc06372e0c66bed9624eaeb64e8eac75d3"
+  },
+  "generatedBy": "core"
+}

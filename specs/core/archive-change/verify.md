@@ -54,46 +54,46 @@
 
 #### Scenario: Archive blocked when other changes target same specs
 
-- **GIVEN** a change `alpha` in `archivable` state targeting `core:core/config`
-- **AND** another active change `beta` also targets `core:core/config`
+- **GIVEN** a change `alpha` in `archivable` state targeting `core:config`
+- **AND** another active change `beta` also targets `core:config`
 - **WHEN** `ArchiveChange.execute({ name: 'alpha' })` is called without `allowOverlap`
 - **THEN** `SpecOverlapError` is thrown
-- **AND** the error message includes `core:core/config` and `beta`
+- **AND** the error message includes `core:config` and `beta`
 - **AND** no files are modified and no hooks are executed
 
 #### Scenario: Archive with allowOverlap invalidates overlapping changes
 
-- **GIVEN** a change `alpha` in `archivable` state targeting `core:core/config` and `core:core/kernel`
-- **AND** another active change `beta` targeting `core:core/config` in `implementing` state
-- **AND** another active change `gamma` targeting `core:core/kernel` in `ready` state
+- **GIVEN** a change `alpha` in `archivable` state targeting `core:config` and `core:kernel`
+- **AND** another active change `beta` targeting `core:config` in `implementing` state
+- **AND** another active change `gamma` targeting `core:kernel` in `ready` state
 - **WHEN** `ArchiveChange.execute({ name: 'alpha', allowOverlap: true })` is called
 - **THEN** the archive proceeds normally
 - **AND** `beta` is invalidated to `designing` with cause `'spec-overlap-conflict'`
 - **AND** `gamma` is invalidated to `designing` with cause `'spec-overlap-conflict'`
-- **AND** `beta`'s invalidation message includes `'alpha'` and `'core:core/config'`
-- **AND** `gamma`'s invalidation message includes `'alpha'` and `'core:core/kernel'`
-- **AND** `result.invalidatedChanges` has two entries: `{ name: 'beta', specIds: ['core:core/config'] }` and `{ name: 'gamma', specIds: ['core:core/kernel'] }`
+- **AND** `beta`'s invalidation message includes `'alpha'` and `'core:config'`
+- **AND** `gamma`'s invalidation message includes `'alpha'` and `'core:kernel'`
+- **AND** `result.invalidatedChanges` has two entries: `{ name: 'beta', specIds: ['core:config'] }` and `{ name: 'gamma', specIds: ['core:kernel'] }`
 
 #### Scenario: Archive with allowOverlap invalidation happens via ChangeRepository.mutate
 
-- **GIVEN** a change `alpha` in `archivable` state targeting `core:core/config`
-- **AND** another active change `beta` also targets `core:core/config`
+- **GIVEN** a change `alpha` in `archivable` state targeting `core:config`
+- **AND** another active change `beta` also targets `core:config`
 - **WHEN** `ArchiveChange.execute({ name: 'alpha', allowOverlap: true })` invalidates `beta`
 - **THEN** the invalidation is performed inside `ChangeRepository.mutate('beta', fn)`
 - **AND** the callback calls `change.invalidate('spec-overlap-conflict', message, affectedArtifacts)`
 
 #### Scenario: No overlap with allowOverlap produces empty invalidatedChanges
 
-- **GIVEN** a change `alpha` in `archivable` state targeting `core:core/config`
-- **AND** no other active change targets `core:core/config`
+- **GIVEN** a change `alpha` in `archivable` state targeting `core:config`
+- **AND** no other active change targets `core:config`
 - **WHEN** `ArchiveChange.execute({ name: 'alpha', allowOverlap: true })` is called
 - **THEN** the archive proceeds normally
 - **AND** `result.invalidatedChanges` is an empty array
 
 #### Scenario: Overlap check excludes the change being archived
 
-- **GIVEN** a change `alpha` in `archivable` state targeting `core:core/config`
-- **AND** no other active change targets `core:core/config`
+- **GIVEN** a change `alpha` in `archivable` state targeting `core:config`
+- **AND** no other active change targets `core:config`
 - **WHEN** `ArchiveChange.execute({ name: 'alpha' })` is called
 - **THEN** `alpha` itself does not cause an overlap detection
 - **AND** the archive proceeds normally
@@ -198,14 +198,14 @@
 
 #### Scenario: ArchivedChange workspace derived from specIds at runtime
 
-- **GIVEN** a change with `specIds: ['core:core/archive-change', 'cli:cli/context']`
+- **GIVEN** a change with `specIds: ['core:archive-change', 'cli:context']`
 - **WHEN** `ArchiveChange` constructs the `ArchivedChange`
 - **THEN** the `ArchivedChange` record does NOT contain a `workspace` property
 - **AND** calling `archivedChange.workspaces` returns `['core', 'cli']` (derived from specIds)
 
 #### Scenario: ArchivedChange.workspaces returns unique workspaces from specIds
 
-- **GIVEN** a change with `specIds: ['core:core/a', 'core:core/b', 'cli:cli/x']`
+- **GIVEN** a change with `specIds: ['core:a', 'core:b', 'cli:x']`
 - **WHEN** the change is archived and `archivedChange.workspaces` is accessed
 - **THEN** the result is `['core', 'cli']` (unique workspaces only)
 

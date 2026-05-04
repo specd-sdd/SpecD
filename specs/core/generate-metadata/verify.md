@@ -71,7 +71,7 @@
 - **AND** extraction yields the relative link `../storage/spec.md`
 - **AND** the schema declares `transform: resolveSpecPath`
 - **WHEN** `GenerateSpecMetadata` executes extraction
-- **THEN** the transformed `dependsOn` value is `core:core/storage`
+- **THEN** the transformed `dependsOn` value is `core:storage`
 - **AND** no separate post-extraction repair step runs afterward
 
 #### Scenario: Cross-workspace relative spec path resolves through repository-backed normalization
@@ -92,10 +92,10 @@
 
 #### Scenario: Canonical spec ID may pass through resolveSpecPath when enabled by args
 
-- **GIVEN** extraction yields the canonical spec ID `core:core/storage`
+- **GIVEN** extraction yields the canonical spec ID `core:storage`
 - **AND** the schema declares `transform: { name: "resolveSpecPath", args: ["true"] }`
 - **WHEN** `GenerateSpecMetadata` executes extraction
-- **THEN** the final `dependsOn` value remains `core:core/storage`
+- **THEN** the final `dependsOn` value remains `core:storage`
 
 ### Requirement: Content hashes
 

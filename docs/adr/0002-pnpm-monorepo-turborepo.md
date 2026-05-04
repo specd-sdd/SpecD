@@ -68,4 +68,4 @@ pnpm handles dependency hoisting, workspace linking (`workspace:*`), and lockfil
 
 ### Spec
 
-- [`specs/_global/conventions/spec.md`](../../specs/_global/conventions/spec.md)
+- [`default:_global/conventions`](../../specs/_global/conventions/spec.md)

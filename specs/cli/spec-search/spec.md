@@ -100,6 +100,6 @@ When no results match, the output is `[]`.
 
 ## Spec Dependencies
 
-- [`cli:cli/entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
+- [`cli:entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
 - [`default:_global/spec-layout`](../../../_global/spec-layout/spec.md) — spec directory structure and file naming conventions
-- [`core:core/search-specs`](../../core/search-specs/spec.md) — core use case for repository-based spec search (fallback path)
+- [`core:search-specs`](../../core/search-specs/spec.md) — core use case for repository-based spec search (fallback path)

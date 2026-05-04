@@ -117,5 +117,5 @@ $ specd schema show @specd/schema-std --raw
 
 ## Spec Dependencies
 
-- [`cli:cli/entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
-- [`core:core/schema-format`](../../core/schema-format/spec.md) — schema structure, artifact and workflow declarations
+- [`cli:entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
+- [`core:schema-format`](../../core/schema-format/spec.md) — schema structure, artifact and workflow declarations

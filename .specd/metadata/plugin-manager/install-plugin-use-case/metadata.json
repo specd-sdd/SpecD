@@ -1,11 +1,7 @@
 {
   "title": "plugin-manager:install-plugin-use-case",
   "description": "Use case that orchestrates plugin installation. Loads the plugin, calls its install method, and returns a generic result.",
-  "dependsOn": [
-    "core:core/config",
-    "plugin-manager:agent-plugin-type",
-    "plugin-manager:plugin-loader"
-  ],
+  "dependsOn": ["core:config", "plugin-manager:agent-plugin-type", "plugin-manager:plugin-loader"],
   "context": [
     "Use case that orchestrates plugin installation. Loads the plugin, calls its install method, and returns a generic result."
   ],
@@ -62,7 +58,7 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:81c76b27d10eef2d344d64f673b2e2d90a435f6156e9eb8e93a03af0a0a3cbb3",
+    "spec.md": "sha256:9a3fe57820058ab38f19ad1a637a36822fead9af16291d44d37ff4bda54ba778",
     "verify.md": "sha256:bbeb01caf1e3cf8bd87fe1f29eaf8ec417ac0db2173243b1bb321a0307e14220"
   },
   "generatedBy": "core"

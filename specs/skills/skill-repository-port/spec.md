@@ -29,6 +29,6 @@ The port is an abstract interface. Concrete implementations (e.g., using node:fs
 
 ## Spec Dependencies
 
-- [`core:core/config`](../../core/core/config/spec.md) — defines SpecdConfig type
+- [`core:config`](../../core/core/config/spec.md) — defines SpecdConfig type
 - [`skills:skill`](../skill/spec.md) — domain types
 - [`skills:skill-bundle`](../skill-bundle/spec.md) — bundle type

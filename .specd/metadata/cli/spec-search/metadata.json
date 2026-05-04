@@ -1,0 +1,188 @@
+{
+  "title": "Spec Search",
+  "description": "Users need a dedicated command to search spec content by keyword. `specd specs search` provides relevance-ranked results by first attempting the code graph for fast, precise search, and falling back to `@specd/core`'s `SearchSpecs` use case (repository-based content search) when the graph is unavailable. Results are presented with titles, summaries, and workspace attribution in the same columnar style as `specs list`.",
+  "dependsOn": ["cli:entrypoint", "default:_global/spec-layout", "core:search-specs"],
+  "context": [
+    "Users need a dedicated command to search spec content by keyword. `specd specs search` provides relevance-ranked results by first attempting the code graph for fast, precise search, and falling back to `@specd/core`'s `SearchSpecs` use case (repository-based content search) when the graph is unavailable. Results are presented with titles, summaries, and workspace attribution in the same columnar style as `specs list`."
+  ],
+  "rules": [
+    {
+      "requirement": "Command signature",
+      "rules": [
+        "```\nspecd specs search <query> [--workspace <name>] [--graph] [--summary] [--format text|json|toon]\n```\n\n- `<query>` — required positional argument; the search text\n- `--workspace <name>` — optional, repeatable; restrict results to the named workspace(s). When provided, the workspace names MUST be passed to the search backend (graph or core) for server-side filtering\n- `--graph` — optional flag; force graph-only mode. When set, the command MUST error if the graph is unavailable or stale\n- `--summary` — optional flag; when present, a short summary is included for each result (same resolution as `specd specs list --summary`)\n- `--format text|json|toon` — optional; output format, defaults to `text`"
+      ]
+    },
+    {
+      "requirement": "Search execution",
+      "rules": [
+        "The command MUST use the following search strategy:\n\n1. **Graph-first**: Attempt to use the code graph's spec search facility. If the graph is available and not stale, use it for fast, precise search results.\n2. **Core fallback**: When the graph is stale or unavailable and `--graph` is NOT set, fall back to `SearchSpecs.execute(query, options)` from `@specd/core`, which searches spec content via `SpecRepository.search()`. The command MUST print a warning to stderr indicating the fallback and that results may be less precise.\n3. **Graph-only error**: When `--graph` is set and the graph is stale or unavailable, the command MUST exit with code 1 and print an error message to stderr.\n\nIn both paths, the search MUST cover spec content (title, description, spec.md body)."
+      ]
+    },
+    {
+      "requirement": "Workspace filtering",
+      "rules": [
+        "When `--workspace` is provided one or more times, the workspace names MUST be passed to the active search backend:\n\n- In graph mode: pass workspaces to the graph search options for server-side filtering\n- In core mode: pass `options.workspaces` to `SearchSpecs.execute()`\n\nWorkspace names that do not match any configured workspace MUST be silently ignored (no error, no warning).\n\nWhen `--workspace` is not provided, all workspaces are included."
+      ]
+    },
+    {
+      "requirement": "Summary resolution",
+      "rules": [
+        "When `--summary` is passed, each result MUST include a summary resolved using the exact same algorithm and priority order as `specd specs list --summary`:\n\n1. `description` field from the spec's `.specd-metadata.yaml`\n2. First non-empty paragraph after the H1 heading in `spec.md`\n3. First paragraph of the first matching section (`## Overview`, `## Summary`, `## Purpose`)\n\nSummary extraction is performed by `@specd/core` — the CLI does not contain Markdown parsing logic."
+      ]
+    },
+    {
+      "requirement": "Output format — text",
+      "rules": [
+        "In text mode, results are rendered as a single table with columns depending on flags:\n\n- Always: `PATH`, `TITLE`\n- With `--summary`: add `SUMMARY` column (wrap overflow, capped at 60 characters)\n\nResults are sorted by search score descending (highest relevance first). PATH displays the fully-qualified spec identifier `workspace:capability-path`.\n\nColumn widths are computed globally across all results (same algorithm as `specd specs list`).\n\nWhen no results match, the command MUST print `no matching specs` to stdout."
+      ]
+    },
+    {
+      "requirement": "Output format — JSON/toon",
+      "rules": [
+        "In `json` or `toon` mode, the output is a flat array of result objects:\n\n```json\n[\n  {\n    \"path\": \"workspace:capability-path\",\n    \"title\": \"...\",\n    \"score\": 0.42,\n    \"summary\": \"...\"\n  }\n]\n```\n\n- `path` uses the fully-qualified `workspace:capability-path` format\n- `score` is the search relevance score from the active backend\n- `summary` is present only when `--summary` is passed and a summary is available\n\nWhen no results match, the output is `[]`."
+      ]
+    },
+    {
+      "requirement": "Error cases",
+      "rules": [
+        "- If the graph provider fails to initialize and `--graph` is set, exit with code 1\n- If `<query>` is empty or whitespace-only, exit with code 1 with an error message\n- I/O errors during core fallback exit with code 3"
+      ]
+    }
+  ],
+  "constraints": [
+    "The CLI orchestrates the search strategy (graph vs core); core does not depend on the code graph",
+    "The command reuses the code-graph's existing spec search API when graph is available; no new graph indexing logic is introduced",
+    "The command delegates to SearchSpecs use case from @specd/core for the fallback path; no direct filesystem access in the CLI",
+    "Summary extraction delegates to @specd/core — the CLI does not parse Markdown",
+    "Results are always ranked by relevance score; there is no alphabetical sort mode",
+    "The --graph flag is the only way to require graph availability; the default behavior degrades gracefully to core"
+  ],
+  "scenarios": [
+    {
+      "requirement": "Command signature",
+      "name": "Query is required",
+      "when": ["specd specs search is run without a query argument"],
+      "then": ["the command exits with a non-zero code"]
+    },
+    {
+      "requirement": "Command signature",
+      "name": "Empty query rejected",
+      "when": ["specd specs search \"\" is run"],
+      "then": ["the command exits with code 1 and prints an error message"]
+    },
+    {
+      "requirement": "Search execution",
+      "name": "Graph available returns graph results",
+      "given": ["the code graph is indexed and fresh"],
+      "when": ["specd specs search \"config\" is run"],
+      "then": ["results are returned from the graph search", "AND no warning is printed to stderr"]
+    },
+    {
+      "requirement": "Search execution",
+      "name": "Graph unavailable falls back to core",
+      "given": ["the code graph is stale or unavailable"],
+      "when": ["specd specs search \"config\" is run"],
+      "then": [
+        "results are returned from SearchSpecs.execute()",
+        "AND a warning is printed to stderr indicating the fallback"
+      ]
+    },
+    {
+      "requirement": "Search execution",
+      "name": "Graph-only flag with stale graph errors",
+      "given": ["the code graph is stale or unavailable"],
+      "when": ["specd specs search \"config\" --graph is run"],
+      "then": ["the command exits with code 1", "AND an error message is printed to stderr"]
+    },
+    {
+      "requirement": "Workspace filtering",
+      "name": "Single workspace filter",
+      "given": ["the project has specs in workspaces default and cli"],
+      "when": ["specd specs search \"spec\" --workspace default is run"],
+      "then": ["only specs from workspace default appear in results"]
+    },
+    {
+      "requirement": "Workspace filtering",
+      "name": "Multiple workspace filters",
+      "given": ["the project has specs in workspaces default, cli, and core"],
+      "when": ["specd specs search \"spec\" --workspace default --workspace cli is run"],
+      "then": ["results include specs from default and cli only"]
+    },
+    {
+      "requirement": "Workspace filtering",
+      "name": "Non-existent workspace name ignored",
+      "given": ["the project has no workspace named nonexistent"],
+      "when": ["specd specs search \"spec\" --workspace nonexistent is run"],
+      "then": ["no error is raised and results may be empty"]
+    },
+    {
+      "requirement": "Summary resolution",
+      "name": "Summary from metadata",
+      "given": ["a matching spec has .specd-metadata.yaml with description: \"Handles auth\""],
+      "when": ["specd specs search \"auth\" --summary is run"],
+      "then": ["the result includes summary: \"Handles auth\""]
+    },
+    {
+      "requirement": "Summary resolution",
+      "name": "Summary omitted without flag",
+      "given": ["a matching spec has a description in metadata"],
+      "when": ["specd specs search \"auth\" is run without --summary"],
+      "then": ["the result does not include a summary field"]
+    },
+    {
+      "requirement": "Output format — text",
+      "name": "Results in table format",
+      "given": ["two specs match the query with paths default:auth/login and cli:entry"],
+      "when": ["specd specs search \"auth\" --format text is run"],
+      "then": [
+        "stdout shows a table with PATH and TITLE columns",
+        "AND results are sorted by score descending"
+      ]
+    },
+    {
+      "requirement": "Output format — text",
+      "name": "No results prints message",
+      "when": ["specd specs search \"zzzznonexistent\" is run and nothing matches"],
+      "then": ["stdout contains no matching specs"]
+    },
+    {
+      "requirement": "Output format — text",
+      "name": "Summary column added with flag",
+      "given": ["a matching spec has a summary available"],
+      "when": ["specd specs search \"spec\" --summary --format text is run"],
+      "then": ["the table includes a SUMMARY column"]
+    },
+    {
+      "requirement": "Output format — JSON/toon",
+      "name": "JSON output with score",
+      "given": ["one spec matches the query"],
+      "when": ["specd specs search \"spec\" --format json is run"],
+      "then": ["stdout is a valid JSON array with one object containing path, title, and score"]
+    },
+    {
+      "requirement": "Output format — JSON/toon",
+      "name": "Empty results JSON",
+      "when": ["specd specs search \"zzzznonexistent\" --format json is run and nothing matches"],
+      "then": ["stdout is []"]
+    },
+    {
+      "requirement": "Error cases",
+      "name": "Graph provider failure with --graph",
+      "given": ["the graph provider fails to initialize"],
+      "when": ["specd specs search \"test\" --graph is run"],
+      "then": ["the command exits with code 1"]
+    },
+    {
+      "requirement": "Error cases",
+      "name": "I/O error during core fallback",
+      "given": ["the graph is unavailable and SpecRepository.search() throws an I/O error"],
+      "when": ["specd specs search \"test\" is run"],
+      "then": ["the command exits with code 3"]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:c8b7c69b475fa48b4387ca5450ae1d744e29aa5b9116a11baaa37ff5239bce7c",
+    "verify.md": "sha256:9d21264b7aa5e46d10f6fd5692cfe0fbcfa4bb28469186b6c318c42def4cf434"
+  },
+  "generatedBy": "core"
+}

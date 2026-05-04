@@ -62,4 +62,4 @@ All `package.json` files in `packages/` contain `"type": "module"`. The root Typ
 
 ### Spec
 
-- [`specs/_global/conventions/spec.md`](../../specs/_global/conventions/spec.md)
+- [`default:_global/conventions`](../../specs/_global/conventions/spec.md)

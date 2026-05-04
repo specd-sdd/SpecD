@@ -60,6 +60,6 @@ The `SchemaYamlData` type is the explicit contract between layers 1 and 2. It is
 
 ### Spec
 
-- [`specs/core/build-schema/spec.md`](../../specs/core/build-schema/spec.md)
-- [`specs/core/parse-schema-yaml/spec.md`](../../specs/core/parse-schema-yaml/spec.md)
-- [`specs/_global/architecture/spec.md`](../../specs/_global/architecture/spec.md)
+- [`core:build-schema`](../../specs/core/build-schema/spec.md)
+- [`core:parse-schema-yaml`](../../specs/core/parse-schema-yaml/spec.md)
+- [`default:_global/architecture`](../../specs/_global/architecture/spec.md)

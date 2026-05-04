@@ -1,0 +1,374 @@
+{
+  "title": "ArtifactParser Port",
+  "description": "Artifacts come in multiple file formats (markdown, YAML, JSON, plaintext), each with its own parsing, delta, and serialization semantics, so domain services need a uniform interface to operate on any format without importing concrete parsing libraries. `ArtifactParser` and `ArtifactParserRegistry` define this application-layer port — each supported format has a corresponding infrastructure adapter, and the registry collects all adapters keyed by format name.",
+  "dependsOn": [
+    "default:_global/architecture",
+    "core:artifact-ast",
+    "core:delta-format",
+    "core:selector-model"
+  ],
+  "context": [
+    "Artifacts come in multiple file formats (markdown, YAML, JSON, plaintext), each with its own parsing, delta, and serialization semantics, so domain services need a uniform interface to operate on any format without importing concrete parsing libraries. `ArtifactParser` and `ArtifactParserRegistry` define this application-layer port — each supported format has a corresponding infrastructure adapter, and the registry collects all adapters keyed by format name."
+  ],
+  "rules": [
+    {
+      "requirement": "ArtifactParser interface shape",
+      "rules": [
+        "The port MUST be declared as a TypeScript `interface` named `ArtifactParser`. It SHALL define the following members:\n\n- `fileExtensions: readonly string[]` — the file extensions this adapter handles\n- `parse(content: string): ArtifactAST` — parse content into a normalised AST\n- `apply(ast: ArtifactAST, delta: readonly DeltaEntry[]): DeltaApplicationResult` — apply delta entries to an AST, returning the modified AST plus any semantic validation warnings\n- `serialize(ast: ArtifactAST): string` — serialise an AST back to native format\n- `renderSubtree(node: ArtifactNode): string` — serialise a single node and its descendants\n- `nodeTypes(): readonly NodeTypeDescriptor[]` — describe addressable node types for the format\n- `outline(ast: ArtifactAST): readonly OutlineEntry[]` — produce a navigable summary of addressable nodes\n- `deltaInstructions(): string` — return format-specific static text for delta generation context\n- `parseDelta(content: string): readonly DeltaEntry[]` — parse a YAML delta file into typed entries"
+      ]
+    },
+    {
+      "requirement": "ArtifactParserRegistry type",
+      "rules": [
+        "The `ArtifactParserRegistry` type MUST be declared as `ReadonlyMap<string, ArtifactParser>`, keyed by format name. Standard format names are `'markdown'`, `'json'`, `'yaml'`, and `'plaintext'`."
+      ]
+    },
+    {
+      "requirement": "ArtifactParserRegistry is additively extensible",
+      "rules": [
+        "`ArtifactParserRegistry` SHALL support additive extension through kernel composition. Built-in parsers remain available, and external parser registrations extend the registry by format name.\n\nReferencing a parser format that is not present in the merged registry MUST fail with a clear error."
+      ]
+    },
+    {
+      "requirement": "Parse contract",
+      "rules": [
+        "The `parse` method MUST accept a `content: string` parameter and return an `ArtifactAST` containing a single `root` node. The AST MUST be a normalised, format-independent tree structure."
+      ]
+    },
+    {
+      "requirement": "Apply contract — atomic selector resolution",
+      "rules": [
+        "The `apply` method MUST resolve all selectors before applying any operation. If any selector fails to resolve (no match or ambiguous match), the entire application MUST be rejected with a `DeltaApplicationError`. Partial application SHALL NOT occur.\n\nThe method returns a `DeltaApplicationResult` containing the modified AST and any semantic validation warnings. Callers MUST check `result.warnings` for ambiguity warnings on hybrid node types."
+      ]
+    },
+    {
+      "requirement": "Serialize round-trip",
+      "rules": [
+        "Calling `serialize(parse(content))` MUST produce output that, when parsed again, yields an equivalent AST. Implementations SHOULD preserve formatting where practical, but semantic equivalence is the binding constraint.\n\nFor the markdown adapter, serialize/apply behavior MUST preserve inline formatting intent represented in the AST (for example inline code, emphasis, and strong markers) for nodes not targeted by delta operations.\n\nThe markdown adapter MUST support serializer style options derived from source content (at minimum unordered list marker, emphasis marker, and strong marker) so merged output can preserve original style where unambiguous.\n\nIf source style is ambiguous (mixed markers for the same construct), the markdown adapter MUST serialize deterministically using project markdown conventions so output is stable across runs."
+      ]
+    },
+    {
+      "requirement": "RenderSubtree contract",
+      "rules": [
+        "The `renderSubtree` method MUST accept a single `ArtifactNode` and return the native format string for that node and all its descendants. This is used by `ValidateArtifacts` for `contentMatches` evaluation and by the metadata extraction engine."
+      ]
+    },
+    {
+      "requirement": "NodeTypes contract",
+      "rules": [
+        "The `nodeTypes` method MUST return a static array of `NodeTypeDescriptor` entries describing every addressable node type for the format. Each descriptor MUST include `type`, `identifiedBy`, and `description`."
+      ]
+    },
+    {
+      "requirement": "Node nature descriptors",
+      "rules": [
+        "Each `NodeTypeDescriptor` returned by `nodeTypes()` MUST include boolean flags that declaratively describe the nature of the node type. These flags drive the `applyDelta` engine's collection-aware logic and semantic validation — they MUST accurately reflect the AST structure that the parser produces.\n\n#### Structural flags\n\n- `isContainer: boolean` — the node has or can have a `children` array. True for any node that can hold child nodes, regardless of whether those children are homogeneous or heterogeneous. Examples: `document` (holds sections, paragraphs, lists...), `section` (holds paragraphs, lists, nested sections...), `list` (holds `list-item` nodes), `object` (holds `property` nodes).\n- `isLeaf: boolean` — the node has or can have a scalar `value` field (`string | number | boolean | null`). True for nodes that represent atomic data, not structural containers. Examples: `paragraph` (text content), `code-block` (source code), `line` (single line of text). A node that wraps a complex value (e.g. JSON `property` wrapping an object) can be BOTH `isContainer: true` AND `isLeaf: true` — these are hybrid types.\n- A node that is neither container nor leaf (e.g. markdown `thematic-break`) is a void node — it has neither `children` nor `value`. All three flags being `false` is valid but means the node cannot be meaningfully modified by delta operations.\n\n#### Collection flags\n\n- `isCollection: boolean` — the node's children are homogeneous: ALL children are of the same type (or the same small set of closely related types). For example: `list` always has `list-item` children, `object` always has `property` children, `array` always has `array-item` children. Contrast with `section` which has heterogeneous children (paragraphs, lists, code blocks, nested sections) — `section` is `isContainer: true` but `isCollection: false`. Controls same-type unwrapping in `added` entries: when the parent scope is a collection and parsed content starts with the same type, the engine unwraps to the inner children instead of nesting.\n- `isSequence: boolean` — the node is an ordered sequential collection where position matters and items can be appended, reordered, or merged by key. This is a subset of `isCollection`: `list`, `array`, and `sequence` are sequences, but `object` and `mapping` are NOT (their children are key-value pairs identified by name, not by position). Controls whether `strategy` (append/merge-by) is valid and whether the node is treated as \"array-like\" by the delta engine.\n- `isSequenceItem: boolean` — the node is a positional item within a sequential collection. True for `list-item`, `array-item`, and `sequence-item`. These nodes may themselves be hybrids (e.g. an `array-item` can wrap a scalar value or an entire object). Used for \"all children are sequence items\" detection and for finding inner array nodes wrapped inside property/pair containers.\n\n#### Example flag assignments\n\n| Node                  | isCollection | isSequence | isSequenceItem | isContainer | isLeaf | Why                                                           |\n| --------------------- | :----------: | :--------: | :------------: | :---------: | :----: | ------------------------------------------------------------- |\n| `document` (md)       |      F       |     F      |       F        |      T      |   F    | Has heterogeneous children (sections, paragraphs...)          |\n| `section` (md)        |      F       |     F      |       F        |      T      |   F    | Has heterogeneous children (paragraphs, lists...)             |\n| `list` (md)           |      T       |     T      |       F        |      T      |   F    | Homogeneous ordered children (list-items), supports strategy  |\n| `list-item` (md)      |      F       |     F      |       T        |      T      |   F    | Item within a list, may have nested lists as children         |\n| `paragraph` (md)      |      F       |     F      |       F        |      F      |   T    | Scalar text value, no children                                |\n| `object` (json)       |      T       |     F      |       F        |      T      |   F    | Homogeneous children (properties), but keyed not ordered      |\n| `property` (json)     |      F       |     F      |       F        |      T      |   T    | Hybrid: wraps scalar value OR object/array as child           |\n| `array` (json)        |      T       |     T      |       F        |      T      |   F    | Homogeneous ordered children (array-items), supports strategy |\n| `array-item` (json)   |      F       |     F      |       T        |      T      |   T    | Hybrid item: scalar value OR object/array as child            |\n| `thematic-break` (md) |      F       |     F      |       F        |      F      |   F    | Void: no children, no value                                   |\n\nThe shared `applyDelta` engine MUST use these flags instead of hardcoded type vectors for all collection-aware logic."
+      ]
+    },
+    {
+      "requirement": "Outline contract",
+      "rules": [
+        "The `outline` method MUST return a simplified navigable summary of the artifact's addressable nodes, suitable for injection into LLM context during delta generation.\n\nThe parser's default outline output MUST preserve the historical compact subset for its format:\n\n- markdown: `section`\n- json: `property`, `array-item`\n- yaml: `pair`\n- plaintext: `paragraph`\n\nFull selector-addressable coverage is exposed through full-detail retrieval mode at the use-case/command level."
+      ]
+    },
+    {
+      "requirement": "Selector hint contract",
+      "rules": [
+        "The parser port MUST expose selector-hint metadata for root-level outline responses.\n\nSelector hint payloads MUST:\n\n- be keyed by node type.\n- use placeholder values only (for example `\"<value>\"`, `\"<contains>\"`, `\"<level>\"`).\n- avoid concrete per-node duplication already represented in outline labels.\n\nThe use case MAY omit this metadata unless hint mode is explicitly requested by the caller."
+      ]
+    },
+    {
+      "requirement": "DeltaInstructions contract",
+      "rules": [
+        "The `deltaInstructions` method MUST return a format-specific static text block that is injected verbatim when `delta: true` is active for an artifact."
+      ]
+    },
+    {
+      "requirement": "ParseDelta contract",
+      "rules": [
+        "The `parseDelta` method MUST accept a YAML delta file's raw content and return a typed array of `DeltaEntry` objects. Only the YAML adapter is expected to return a non-empty result; other adapters MAY return an empty array.\n\nIf the parsed array contains a `no-op` entry alongside any other entry, `parseDelta` MUST throw a `SchemaValidationError` explaining that `no-op` cannot be mixed with other operations."
+      ]
+    },
+    {
+      "requirement": "ArtifactAST shape",
+      "rules": ["The `ArtifactAST` interface MUST contain a single `root: ArtifactNode` property."]
+    },
+    {
+      "requirement": "ArtifactNode shape",
+      "rules": [
+        "The `ArtifactNode` interface MUST contain:\n\n- `type: string` — the node type identifier\n- `label?: string` — optional label\n- `value?: string | number | boolean | null` — optional scalar value\n- `children?: readonly ArtifactNode[]` — optional child nodes\n- `level?: number` — present on markdown section nodes\n- `ordered?: boolean` — present on markdown list nodes\n- Arbitrary extra fields via an index signature for adapter-specific metadata"
+      ]
+    },
+    {
+      "requirement": "DeltaEntry shape",
+      "rules": [
+        "Each `DeltaEntry` MUST contain:\n\n- `op: 'added' | 'modified' | 'removed' | 'no-op'` — the operation type\n- `selector?: Selector` — optional node selector; not valid for `no-op`\n- `position?: DeltaPosition` — optional positioning directive; not valid for `no-op`\n- `rename?: string` — optional new name for rename operations; not valid for `no-op`\n- `content?: string` — optional content payload; not valid for `no-op`\n- `value?: unknown` — optional value payload; not valid for `no-op`\n- `strategy?: 'replace' | 'append' | 'merge-by'` — optional merge strategy; not valid for `no-op`\n- `mergeKey?: string` — optional key for `merge-by` strategy; not valid for `no-op`\n- `description?: string` — optional free-text description of what this entry does or why; valid on all operation types; ignored during application"
+      ]
+    },
+    {
+      "requirement": "Supporting type shapes",
+      "rules": [
+        "- `NodeTypeDescriptor` MUST contain `type: string`, `identifiedBy: readonly string[]`, `description: string`, `isCollection: boolean`, `isSequence: boolean`, `isSequenceItem: boolean`, `isContainer: boolean`, and `isLeaf: boolean`.\n- `OutlineEntry` MUST contain `type: string`, `label: string`, `depth: number`, and optional `children: readonly OutlineEntry[]`.\n- Parser-level outline entries remain structural. Selector hint metadata is response-level and keyed by type; it is not required per `OutlineEntry` node."
+      ]
+    }
+  ],
+  "constraints": [
+    "The port lives in application/ports/ per the hexagonal architecture rule",
+    "No direct dependency on any parsing library (remark, yaml, etc.) at the port level",
+    "Domain services never reference concrete parsers — only this port interface",
+    "Selector and DeltaPosition are domain value objects imported from domain/value-objects/"
+  ],
+  "scenarios": [
+    {
+      "requirement": "ArtifactParser interface shape",
+      "name": "Implementation satisfies the contract",
+      "given": ["a concrete class implementing ArtifactParser"],
+      "when": ["the class implements all required methods and the fileExtensions property"],
+      "then": ["it compiles and can be instantiated"]
+    },
+    {
+      "requirement": "ArtifactParserRegistry type",
+      "name": "Registry keyed by format name",
+      "given": ["an ArtifactParserRegistry instance"],
+      "when": ["queried with \"markdown\", \"json\", \"yaml\", or \"plaintext\""],
+      "then": ["each key returns the corresponding ArtifactParser adapter"]
+    },
+    {
+      "requirement": "ArtifactParserRegistry is additively extensible",
+      "name": "External parser registration preserves built-ins",
+      "given": [
+        "built-in parsers for markdown, yaml, json, and plaintext",
+        "AND an external parser is registered for toml"
+      ],
+      "when": ["the parser registry is exposed from the kernel"],
+      "then": [
+        "toml is available alongside the built-ins",
+        "AND existing built-in format lookups continue to work unchanged"
+      ]
+    },
+    {
+      "requirement": "ArtifactParserRegistry is additively extensible",
+      "name": "Unknown parser format fails clearly",
+      "given": ["no built-in or external parser is registered for graphql"],
+      "when": ["a caller requests the parser for graphql"],
+      "then": ["the operation fails with a clear unknown-format error"]
+    },
+    {
+      "requirement": "Parse contract",
+      "name": "Valid content produces an AST with a root node",
+      "when": ["parse is called with valid content for the format"],
+      "then": ["it returns an ArtifactAST whose root property is a non-null ArtifactNode"]
+    },
+    {
+      "requirement": "Apply contract — atomic selector resolution",
+      "name": "All selectors resolve successfully",
+      "given": ["a valid AST and delta entries whose selectors all match exactly one node"],
+      "when": ["apply is called"],
+      "then": [
+        "it returns a DeltaApplicationResult whose ast has all operations applied",
+        "AND warnings is empty when no semantic issues are detected"
+      ]
+    },
+    {
+      "requirement": "Apply contract — atomic selector resolution",
+      "name": "One selector fails to resolve",
+      "given": ["a valid AST and delta entries where one selector matches no node"],
+      "when": ["apply is called"],
+      "then": ["it throws a DeltaApplicationError and no changes are applied"]
+    },
+    {
+      "requirement": "Apply contract — atomic selector resolution",
+      "name": "Ambiguous selector match",
+      "given": ["a valid AST and a delta entry whose selector matches multiple nodes"],
+      "when": ["apply is called"],
+      "then": ["it throws a DeltaApplicationError"]
+    },
+    {
+      "requirement": "Serialize round-trip",
+      "name": "Parse then serialize produces equivalent content",
+      "given": ["a valid content string"],
+      "when": ["parse is called followed by serialize"],
+      "then": ["parsing the serialized output produces an AST equivalent to the original"]
+    },
+    {
+      "requirement": "Serialize round-trip",
+      "name": "Markdown serialize preserves untouched inline formatting",
+      "given": [
+        "a markdown AST containing inline code, emphasis, and strong in one paragraph",
+        "AND delta application modifies a different node in the same document"
+      ],
+      "when": ["the markdown adapter serializes the resulting AST"],
+      "then": [
+        "the untouched paragraph preserves inline formatting intent (inline code/emphasis/strong)"
+      ]
+    },
+    {
+      "requirement": "Serialize round-trip",
+      "name": "Markdown serializer uses source style when unambiguous",
+      "given": ["a markdown source that consistently uses - bullets and _ emphasis"],
+      "when": ["the markdown adapter parses, applies delta, and serializes"],
+      "then": ["output keeps - as bullet marker and _ as emphasis marker where representable"]
+    },
+    {
+      "requirement": "Serialize round-trip",
+      "name": "Markdown serializer resolves mixed style deterministically",
+      "given": ["a markdown source that mixes both supported markers for bullets or emphasis"],
+      "when": ["the markdown adapter serializes the AST"],
+      "then": ["output uses deterministic project markdown conventions for the ambiguous construct"]
+    },
+    {
+      "requirement": "RenderSubtree contract",
+      "name": "Single node renders to native format",
+      "given": ["an ArtifactNode from a parsed AST"],
+      "when": ["renderSubtree is called with that node"],
+      "then": [
+        "it returns a string in the artifact's native format representing that node and all its descendants"
+      ]
+    },
+    {
+      "requirement": "ParseDelta contract",
+      "name": "YAML adapter parses delta content",
+      "given": ["the YAML adapter and valid delta YAML content"],
+      "when": ["parseDelta is called"],
+      "then": ["it returns a non-empty array of DeltaEntry objects"]
+    },
+    {
+      "requirement": "ParseDelta contract",
+      "name": "Non-YAML adapter returns empty array",
+      "given": ["a markdown or plaintext adapter"],
+      "when": ["parseDelta is called with any content"],
+      "then": ["it MAY return an empty array"]
+    },
+    {
+      "requirement": "ParseDelta contract",
+      "name": "no-op mixed with other entries — rejection",
+      "given": [
+        "the YAML adapter and delta content containing [{ op: \"no-op\" }, { op: \"added\", content: \"...\" }]"
+      ],
+      "when": ["parseDelta is called"],
+      "then": [
+        "it throws SchemaValidationError explaining that no-op cannot be mixed with other operations"
+      ]
+    },
+    {
+      "requirement": "ParseDelta contract",
+      "name": "no-op as sole entry — accepted",
+      "given": [
+        "the YAML adapter and delta content containing [{ op: \"no-op\", description: \"No changes needed\" }]"
+      ],
+      "when": ["parseDelta is called"],
+      "then": [
+        "it returns an array with one DeltaEntry where op is \"no-op\" and description is \"No changes needed\""
+      ]
+    },
+    {
+      "requirement": "DeltaEntry shape",
+      "name": "DeltaEntry with no-op op",
+      "given": ["a delta entry with op: \"no-op\""],
+      "when": ["parseDelta is called"],
+      "then": ["the returned DeltaEntry has op equal to \"no-op\""]
+    },
+    {
+      "requirement": "DeltaEntry shape",
+      "name": "DeltaEntry with description field",
+      "given": ["a delta entry with op: \"modified\" and description: \"Update constructor\""],
+      "when": ["parseDelta is called"],
+      "then": ["the returned DeltaEntry has description equal to \"Update constructor\""]
+    },
+    {
+      "requirement": "ArtifactNode shape",
+      "name": "Markdown section node has level",
+      "given": ["a markdown AST containing a heading"],
+      "when": ["the corresponding ArtifactNode is inspected"],
+      "then": ["it has a level property indicating the heading depth"]
+    },
+    {
+      "requirement": "ArtifactNode shape",
+      "name": "Markdown list node has ordered flag",
+      "given": ["a markdown AST containing an ordered list"],
+      "when": ["the corresponding ArtifactNode is inspected"],
+      "then": ["it has ordered set to true"]
+    },
+    {
+      "requirement": "Node nature descriptors",
+      "name": "Markdown nodeTypes include nature flags",
+      "when": ["nodeTypes() is called on the markdown adapter"],
+      "then": [
+        "each NodeTypeDescriptor includes isCollection, isSequence, isSequenceItem, isContainer, and isLeaf flags",
+        "AND document has isCollection: false, isSequence: false, isSequenceItem: false, isContainer: true, isLeaf: false",
+        "AND section has isCollection: false, isSequence: false, isSequenceItem: false, isContainer: true, isLeaf: false",
+        "AND paragraph has isCollection: false, isSequence: false, isSequenceItem: false, isContainer: false, isLeaf: true",
+        "AND list has isCollection: true, isSequence: true, isSequenceItem: false, isContainer: true, isLeaf: false",
+        "AND list-item has isCollection: false, isSequence: false, isSequenceItem: true, isContainer: true, isLeaf: false",
+        "AND code-block has isCollection: false, isSequence: false, isSequenceItem: false, isContainer: false, isLeaf: true",
+        "AND thematic-break has isCollection: false, isSequence: false, isSequenceItem: false, isContainer: false, isLeaf: false"
+      ]
+    },
+    {
+      "requirement": "Node nature descriptors",
+      "name": "JSON nodeTypes include nature flags",
+      "when": ["nodeTypes() is called on the JSON adapter"],
+      "then": [
+        "document has isCollection: false, isSequence: false, isContainer: true, isLeaf: false",
+        "AND object has isCollection: true, isSequence: false, isContainer: true, isLeaf: false",
+        "AND property has isCollection: false, isSequence: false, isContainer: true, isLeaf: true (identifiedBy includes \"matches\", so has label)",
+        "AND array has isCollection: true, isSequence: true, isContainer: true, isLeaf: false",
+        "AND array-item has isCollection: false, isSequence: false, isSequenceItem: true, isContainer: true, isLeaf: true"
+      ]
+    },
+    {
+      "requirement": "Node nature descriptors",
+      "name": "YAML nodeTypes include nature flags",
+      "when": ["nodeTypes() is called on the YAML adapter"],
+      "then": [
+        "document has isCollection: false, isSequence: false, isContainer: true, isLeaf: false",
+        "AND mapping has isCollection: true, isSequence: false, isContainer: true, isLeaf: false",
+        "AND pair has isCollection: false, isSequence: false, isContainer: true, isLeaf: true (identifiedBy includes \"matches\", so has label)",
+        "AND sequence has isCollection: true, isSequence: true, isContainer: true, isLeaf: false",
+        "AND sequence-item has isCollection: false, isSequence: false, isSequenceItem: true, isContainer: true, isLeaf: true"
+      ]
+    },
+    {
+      "requirement": "Node nature descriptors",
+      "name": "Plaintext nodeTypes include nature flags",
+      "when": ["nodeTypes() is called on the plaintext adapter"],
+      "then": [
+        "document has isCollection: false, isSequence: false, isContainer: true, isLeaf: false",
+        "AND paragraph has isCollection: true, isSequence: false, isContainer: false, isLeaf: false",
+        "AND line has isCollection: false, isSequence: false, isContainer: false, isLeaf: true"
+      ]
+    },
+    {
+      "requirement": "Node nature descriptors",
+      "name": "No hardcoded type vectors in applyDelta",
+      "when": ["the source of applyDelta is inspected"],
+      "then": [
+        "there are no hardcoded arrays of type names like ['array', 'sequence', 'list'] or ['array-item', 'sequence-item', 'list-item']",
+        "AND all collection-aware logic uses descriptor flag lookups (isSequence, isSequenceItem, isCollection)"
+      ]
+    },
+    {
+      "requirement": "Outline contract",
+      "name": "Default outline remains compact",
+      "when": ["outline(ast) is called on each built-in adapter in default mode"],
+      "then": [
+        "markdown returns section entries",
+        "AND json returns property and array-item entries",
+        "AND yaml returns pair entries",
+        "AND plaintext returns paragraph entries"
+      ]
+    },
+    {
+      "requirement": "Outline contract",
+      "name": "Existing outline fields remain required",
+      "given": ["an OutlineEntry object"],
+      "when": ["it is validated against the interface"],
+      "then": ["type, label, and depth remain required", "AND children remains optional"]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:2a86a157f7979f71b123609050e00b44de8c330071e6b7451508a54522300147",
+    "verify.md": "sha256:aceb28b5419ab51d206aa1bbd947bc8385c20793ca92ef689b929a76fdb0caa9"
+  },
+  "generatedBy": "core"
+}

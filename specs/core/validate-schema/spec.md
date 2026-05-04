@@ -86,7 +86,7 @@ When the extends reference cannot be resolved (e.g. the parent is an npm package
 
 ## Spec Dependencies
 
-- [`core:core/resolve-schema`](../resolve-schema/spec.md) — delegated to for project resolved mode
-- [`core:core/build-schema`](../build-schema/spec.md) — semantic validation service
-- [`core:core/schema-registry-port`](../schema-registry-port/spec.md) — resolution port for all I/O
-- [`core:core/parse-schema-yaml`](../parse-schema-yaml/spec.md) — structural validation (internal to registry)
+- [`core:resolve-schema`](../resolve-schema/spec.md) — delegated to for project resolved mode
+- [`core:build-schema`](../build-schema/spec.md) — semantic validation service
+- [`core:schema-registry-port`](../schema-registry-port/spec.md) — resolution port for all I/O
+- [`core:parse-schema-yaml`](../parse-schema-yaml/spec.md) — structural validation (internal to registry)

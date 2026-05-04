@@ -40,4 +40,4 @@ ESLint `no-restricted-imports` rules in `@specd/core` enforce that `domain/` doe
 
 ### Spec
 
-- [`specs/_global/architecture/spec.md`](../../specs/_global/architecture/spec.md)
+- [`default:_global/architecture`](../../specs/_global/architecture/spec.md)

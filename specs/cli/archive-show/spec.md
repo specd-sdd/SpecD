@@ -65,5 +65,5 @@ $ specd archive show add-oauth-login --format json
 
 ## Spec Dependencies
 
-- [`cli:cli/entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
-- [`core:core/change`](../../core/change/spec.md) — archive semantics, archivable state
+- [`cli:entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
+- [`core:change`](../../core/change/spec.md) — archive semantics, archivable state

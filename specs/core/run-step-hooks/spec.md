@@ -133,11 +133,11 @@ When no hooks match (empty `run:` hook list for the step+phase, or the step has 
 
 ## Spec Dependencies
 
-- [`core:core/hook-execution-model`](../hook-execution-model/spec.md) — hook types, execution modes, failure semantics, ordering
-- [`core:core/hook-runner-port`](../hook-runner-port/spec.md) — `HookRunner` interface, `HookResult`, `HookVariables`
-- [`core:core/external-hook-runner-port`](../external-hook-runner-port/spec.md) — external hook runner contract and accepted-type dispatch
-- [`core:core/schema-format`](../schema-format/spec.md) — `workflow[].hooks` structure, `run:`, `instruction:`, and explicit external entries
-- [`core:core/config`](../config/spec.md) — project-level workflow hooks from `specd.yaml`
-- [`core:core/change`](../change/spec.md) — Change entity, `schemaName`, `workspaces`
-- [`core:core/template-variables`](../template-variables/spec.md) — `TemplateVariables` map, variable namespaces
-- [`core:core/archive-repository-port`](../archive-repository-port/spec.md) — `ArchiveRepository` port, `get()`, `archivePath()`, `ArchivedChange`
+- [`core:hook-execution-model`](../hook-execution-model/spec.md) — hook types, execution modes, failure semantics, ordering
+- [`core:hook-runner-port`](../hook-runner-port/spec.md) — `HookRunner` interface, `HookResult`, `HookVariables`
+- [`core:external-hook-runner-port`](../external-hook-runner-port/spec.md) — external hook runner contract and accepted-type dispatch
+- [`core:schema-format`](../schema-format/spec.md) — `workflow[].hooks` structure, `run:`, `instruction:`, and explicit external entries
+- [`core:config`](../config/spec.md) — project-level workflow hooks from `specd.yaml`
+- [`core:change`](../change/spec.md) — Change entity, `schemaName`, `workspaces`
+- [`core:template-variables`](../template-variables/spec.md) — `TemplateVariables` map, variable namespaces
+- [`core:archive-repository-port`](../archive-repository-port/spec.md) — `ArchiveRepository` port, `get()`, `archivePath()`, `ArchivedChange`

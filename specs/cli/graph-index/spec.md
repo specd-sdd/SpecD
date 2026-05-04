@@ -135,7 +135,7 @@ $ specd graph index --format json
 
 ## Spec Dependencies
 
-- [`cli:cli/entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
-- [`core:core/config`](../../core/config/spec.md) — configured operation, explicit config path handling, and bootstrap-mode relationship
-- [`code-graph:code-graph/composition`](../../code-graph/composition/spec.md) — CodeGraphProvider, IndexResult
-- [`code-graph:code-graph/graph-store`](../../code-graph/graph-store/spec.md) — abstract recreation semantics used by `--force`
+- [`cli:entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
+- [`core:config`](../../core/config/spec.md) — configured operation, explicit config path handling, and bootstrap-mode relationship
+- [`code-graph:composition`](../../code-graph/composition/spec.md) — CodeGraphProvider, IndexResult
+- [`code-graph:graph-store`](../../code-graph/graph-store/spec.md) — abstract recreation semantics used by `--force`

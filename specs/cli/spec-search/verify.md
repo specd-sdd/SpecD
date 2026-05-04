@@ -75,7 +75,7 @@
 
 #### Scenario: Results in table format
 
-- **GIVEN** two specs match the query with paths `default:auth/login` and `cli:cli/entry`
+- **GIVEN** two specs match the query with paths `default:auth/login` and `cli:entry`
 - **WHEN** `specd specs search "auth" --format text` is run
 - **THEN** stdout shows a table with PATH and TITLE columns
 - **AND** results are sorted by score descending

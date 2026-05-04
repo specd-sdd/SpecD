@@ -1,0 +1,488 @@
+{
+  "title": "TransitionChange",
+  "description": "Changes must advance through a strict lifecycle, and the rules for doing so — approval gates, task completion checks, validation clearing, requires enforcement, and hook execution — are too complex for callers to enforce ad-hoc. The `TransitionChange` use case centralises lifecycle state transitions, implementing approval-gate routing, task completion checks for the `implementing` to `verifying` transition, artifact validation clearing for the `verifying` to `implementing` transition, workflow `requires` enforcement, and `run:` hook execution with progress callbacks.",
+  "dependsOn": [
+    "core:change",
+    "core:run-step-hooks",
+    "core:hook-execution-model",
+    "core:workflow-model",
+    "default:_global/architecture"
+  ],
+  "context": [
+    "Changes must advance through a strict lifecycle, and the rules for doing so — approval gates, task completion checks, validation clearing, requires enforcement, and hook execution — are too complex for callers to enforce ad-hoc. The `TransitionChange` use case centralises lifecycle state transitions, implementing approval-gate routing, task completion checks for the `implementing` to `verifying` transition, artifact validation clearing for the `verifying` to `implementing` transition, workflow `requires` enforcement, and `run:` hook execution with progress callbacks."
+  ],
+  "rules": [
+    {
+      "requirement": "Input contract",
+      "rules": [
+        "`TransitionChange.execute` SHALL accept a `TransitionChangeInput` with the following fields:\n\n- `name` (string, required) — the change to transition\n- `to` (ChangeState, required) — the requested target state\n- `approvalsSpec` (boolean, required) — whether the spec approval gate is enabled\n- `approvalsSignoff` (boolean, required) — whether the signoff gate is enabled\n- `skipHookPhases` (ReadonlySet\\<HookPhaseSelector>, optional, default empty set) — which hook phases to skip. Valid values: `'source.pre'`, `'source.post'`, `'target.pre'`, `'target.post'`, `'all'`. When `'all'` is in the set, all hook phases are skipped. When the set is empty (default), all applicable hooks execute.\n\nThe `implementingTaskChecks` and `implementingRequires` fields are removed. Task completion checks are now derived automatically from the schema during requires enforcement (see Requirement: Task completion check during requires enforcement). Artifact validation clearing on `verifying → implementing` reads the `implementing` step's `requires` from the schema directly."
+      ]
+    },
+    {
+      "requirement": "Change must exist",
+      "rules": [
+        "The use case MUST load the change from the `ChangeRepository` by name. If no change exists with the given name, it MUST throw `ChangeNotFoundError`."
+      ]
+    },
+    {
+      "requirement": "Approval-gate routing for spec approval",
+      "rules": [
+        "When the change is in `ready` state, the requested target is `implementing`, and `approvalsSpec` is `true`, the use case MUST route the transition to `pending-spec-approval` instead of `implementing`."
+      ]
+    },
+    {
+      "requirement": "Approval-gate routing for signoff",
+      "rules": [
+        "When the change is in `done` state, the requested target is `archivable`, and `approvalsSignoff` is `true`, the use case MUST route the transition to `pending-signoff` instead of `archivable`."
+      ]
+    },
+    {
+      "requirement": "Human-approval pending states produce explicit transition failures",
+      "rules": [
+        "When the current change state represents a human approval boundary, `TransitionChange` MUST fail with an `InvalidStateTransitionError` that carries a structured reason explaining why normal lifecycle progression cannot continue through `change transition`.\n\nSpecifically:\n\n- When the change is in `pending-spec-approval` and the requested target is anything other than `designing`, the use case MUST throw `InvalidStateTransitionError` with reason `{ type: 'approval-required', gate: 'spec' }`\n- When the change is in `pending-signoff` and the requested target is anything other than `designing`, the use case MUST throw `InvalidStateTransitionError` with reason `{ type: 'approval-required', gate: 'signoff' }`\n\nThis explicit failure happens before delegating to `change.transition(...)`. The goal is to preserve the existing lifecycle rules while giving callers enough information to explain why the transition cannot proceed automatically."
+      ]
+    },
+    {
+      "requirement": "Direct transition when gates are inactive",
+      "rules": [
+        "When neither approval-gate routing condition is met, the use case MUST transition to the exact target state requested in the input."
+      ]
+    },
+    {
+      "requirement": "Workflow requires enforcement",
+      "rules": [
+        "After resolving the effective target, the use case MUST obtain the active schema via `SchemaProvider` and look up the workflow step for the effective target via `schema.workflowStep(effectiveTarget)`. If the step declares a non-empty `requires` array, the use case MUST check `change.effectiveStatus(artifactId)` for each required artifact ID. If any required artifact has an effective status other than `complete` or `skipped`, the use case MUST throw `InvalidStateTransitionError` with a structured reason explaining the block.\n\nThe error reason MUST include:\n\n- `type`: `'incomplete-artifact'`\n- `artifactId`: The ID of the blocking artifact.\n- `status`: The artifact's current effective status (e.g. `'drifted-pending-review'`, `'pending-parent-artifact-review'`).\n- `blockedBy`: (Optional) If the status is `'pending-parent-artifact-review'`, this MUST include the ID and status of the first upstream parent in the DAG that is causing the recursive block.\n\nIf no workflow step exists for the effective target (the schema does not declare one), or the schema cannot be resolved, the requires check is skipped.\n\nThe use case MUST emit a `requires-check` progress event per artifact checked, reporting whether the requirement was satisfied."
+      ]
+    },
+    {
+      "requirement": "Task completion check during requires enforcement",
+      "rules": [
+        "After workflow requires enforcement passes, if the target workflow step declares a non-empty `requiresTaskCompletion` array, the use case MUST check each listed artifact for incomplete task items:\n\n1. Look up the `ArtifactType` from the schema.\n2. **Defensive Check**: If the `ArtifactType` has `hasTasks: false`, the use case MUST throw `InvalidStateTransitionError` with reason `missing-task-capability`. This represents an invariant violation where a completion-gated step references an artifact that does not support tasks.\n3. If `hasTasks: true`, proceed with content check.\n4. Get the `ChangeArtifact` via `change.getArtifact(artifactId)`. If it does not exist, skip it.\n5. Iterate the artifact's `files` map. For each `ArtifactFile`, load the file content via `ChangeRepository.artifact(change, file.filename)`.\n6. If the file does not exist (returns `null`), skip it.\n7. Use standard markdown checkbox patterns if `taskCompletionCheck` patterns are omitted in the schema:\n   - `incompletePattern`: `^\\s*-\\s+\\[ \\]`\n   - `completePattern`: `^\\s*-\\s+\\[x\\]`\n8. Compile the patterns using `safeRegex` with the `'gm'` flags.\n9. If the incomplete regex matches any line in the file content, throw `InvalidStateTransitionError` with reason `incomplete-tasks`, including the artifact ID and counts.\n\nOnly artifacts listed in `requiresTaskCompletion` are content-checked. When `requiresTaskCompletion` is absent or empty, no task completion gating applies."
+      ]
+    },
+    {
+      "requirement": "Artifact validation clearing on verifying to implementing",
+      "rules": [
+        "When the current state is `verifying` and the effective target is `implementing`, the use case MUST treat that path as an implementation-only retry.\n\nThe transition is valid only when the current artifacts still correctly describe the intended behavior and the required fix fits within the already-defined tasks. In that case:\n\n- the use case transitions back to `implementing`\n- it MUST NOT clear unchanged validated artifacts\n- it MUST NOT downgrade artifact or file states merely because verification failed\n\nIf verification concludes that the artifacts must change, or that new tasks are required before implementation can resume, callers must route to `designing` instead of `implementing`."
+      ]
+    },
+    {
+      "requirement": "Transition to designing from any state",
+      "rules": [
+        "Every state except `drafting` SHALL include `designing` as a valid transition target. This allows the user to return to the design phase at any point in the lifecycle when issues are discovered.\n\nWhen the effective target is `designing` and the change is **not already in** `designing` or `drafting`, the use case MUST:\n\n1. Invalidate the active spec approval if one exists.\n2. Invalidate the active signoff if one exists — the first invalidation already clears both.\n3. Downgrade every artifact file to `pending-review`, except files already marked `drifted-pending-review`, which keep that more specific state.\n4. Recompute every artifact's aggregate persisted `state`.\n5. Proceed with the transition via `change.transition('designing', actor)`.\n\nWhen the change is **already in** `designing` (a `designing → designing` transition) or in `drafting` (the natural first entry), the use case MUST NOT invalidate approvals, downgrade artifacts, or call `invalidate()`. It MUST proceed directly with the transition via `change.transition('designing', actor)`.\n\nDrift detection (artifact content changes) is handled independently at the repository layer and is not affected by this rule."
+      ]
+    },
+    {
+      "requirement": "Pre-hook execution",
+      "rules": [
+        "After source.post hooks succeed (or are skipped), when `'all'` and `'target.pre'` are both absent from `skipHookPhases`, and the target workflow step has `run:` pre-hooks, the use case MUST execute them via `RunStepHooks.execute({ name, step: effectiveTarget, phase: 'pre' })`. It MUST emit `hook-start` and `hook-done` progress events (with `phase: 'pre'`) for each hook. If any pre-hook fails, the use case MUST throw `HookFailedError` — no state transition occurs.\n\nWhen `'all'` or `'target.pre'` is in `skipHookPhases`, pre-hook execution is skipped entirely."
+      ]
+    },
+    {
+      "requirement": "Transition delegation",
+      "rules": [
+        "After routing, pre-transition checks, and successful pre-hooks, the use case MUST delegate the actual state transition to `change.transition(effectiveTarget, actor)`. The `Change` entity enforces transition validity via its own state machine."
+      ]
+    },
+    {
+      "requirement": "Transition event",
+      "rules": [
+        "After a successful state transition, the use case MUST emit a `transitioned` progress event with `from` and `to` states."
+      ]
+    },
+    {
+      "requirement": "Post-hook execution",
+      "rules": [
+        "**Before** the state transition (and before pre-hooks), when `'all'` and `'source.post'` are both absent from `skipHookPhases`, the use case MUST look up the workflow step for the **source state** (`fromState`) via `schema.workflowStep(fromState)`. If the step has `run:` post-hooks, the use case MUST execute them via `RunStepHooks.execute({ name, step: fromState, phase: 'post' })`. It MUST emit `hook-start` and `hook-done` progress events (with `phase: 'post'`) for each hook. If any post-hook fails, the use case MUST throw `HookFailedError` — no state transition occurs.\n\nThe source state is the state the change was in **before** the transition — post hooks represent \"after finishing this step\". This means hooks configured as `implementing.post` run when transitioning **out of** implementing (e.g. `implementing → verifying`), not when transitioning **into** implementing.\n\nThe execution order is: source.post hooks → target.pre hooks → state transition. Both phases are fail-fast — a failure in either aborts the transition.\n\nIf no workflow step exists for the source state, or the schema cannot be resolved, post-hook execution is skipped."
+      ]
+    },
+    {
+      "requirement": "Persistence",
+      "rules": [
+        "After routing, persisted-state checks, and successful pre-transition hooks, the use case MUST apply the final change-state mutation through `ChangeRepository.mutate(name, fn)` rather than persisting a previously loaded snapshot.\n\nInside the mutation callback, the repository supplies the fresh persisted `Change` for `name`. The use case MUST apply any persisted-state-dependent transition mutations on that instance — including approval invalidation for redesign, artifact validation clearing for `verifying -> implementing`, and the lifecycle transition itself — before returning the updated change.\n\nWhen the callback resolves, the repository persists the updated change manifest. This ensures the final lifecycle mutation is serialized with other concurrent mutations of the same change."
+      ]
+    },
+    {
+      "requirement": "Result type",
+      "rules": [
+        "`TransitionChange.execute` MUST return a `TransitionChangeResult` containing:\n\n- `change` — the updated `Change` instance after the transition\n\nThe previous `postHookFailures` field is removed because both hook phases are now fail-fast — a hook failure throws `HookFailedError` and prevents the transition. There are no post-transition hook failures to collect."
+      ]
+    },
+    {
+      "requirement": "Progress callback",
+      "rules": [
+        "`TransitionChange.execute` SHALL accept an optional second parameter `onProgress?: OnTransitionProgress`. Progress events are:\n\n- `{ type: 'requires-check', artifactId: string, satisfied: boolean }` — emitted per artifact during requires enforcement\n- `{ type: 'task-completion-failed', artifactId: string, incomplete: number, complete: number, total: number }` — emitted when task completion check fails, before throwing\n- `{ type: 'hook-start', phase: 'pre' | 'post', hookId: string, command: string }` — emitted before each hook\n- `{ type: 'hook-done', phase: 'pre' | 'post', hookId: string, success: boolean, exitCode: number }` — emitted after each hook\n- `{ type: 'transitioned', from: ChangeState, to: ChangeState }` — emitted after state change"
+      ]
+    },
+    {
+      "requirement": "Dependencies",
+      "rules": [
+        "`TransitionChange` depends on the following ports injected via constructor:\n\n- `ChangeRepository` — for loading, artifact content access, and persistence\n- `ActorResolver` — for resolving the current actor identity\n- `SchemaProvider` — for obtaining the fully-resolved active schema to look up workflow steps and requires\n- `RunStepHooks` — for executing `run:` hooks at step boundaries"
+      ]
+    }
+  ],
+  "constraints": [
+    "The use case MUST NOT bypass the Change entity's transition validation — it only resolves the effective target and delegates",
+    "Task completion checks are controlled by requiresTaskCompletion on the workflow step — only listed artifacts are content-checked",
+    "Task completion checks use safeRegex to compile patterns; patterns that fail compilation or contain nested quantifiers are treated as non-matching (no error thrown)",
+    "InvalidStateTransitionError carries a structured reason field: 'incomplete-artifact', 'incomplete-tasks', 'missing-task-capability', 'invalid-transition', or 'approval-required'",
+    "Approval-gate routing is purely input-driven — the use case does not read configuration directly",
+    "Pre-hook failure aborts the transition — no state change occurs",
+    "Post-hook failure aborts the transition — no state change occurs (both phases are fail-fast)",
+    "When schema resolution fails or no workflow step exists for the target, requires and hooks are skipped gracefully",
+    "Artifact validation clearing on verifying → implementing reads the implementing step's requires from the schema — the caller does not supply them",
+    "A designing → designing transition MUST NOT trigger approval invalidation or artifact downgrade — it is a state-preserving transition that only re-enters the same step"
+  ],
+  "scenarios": [
+    {
+      "requirement": "Change must exist",
+      "name": "Non-existent change is rejected",
+      "when": [
+        "TransitionChange.execute is called with a name that does not exist in the repository"
+      ],
+      "then": ["a ChangeNotFoundError is thrown"]
+    },
+    {
+      "requirement": "Approval-gate routing for spec approval",
+      "name": "Ready to implementing is rerouted when spec approval is active",
+      "given": ["a change in ready state"],
+      "when": ["execute is called with to: 'implementing' and approvalsSpec: true"],
+      "then": ["the change transitions to pending-spec-approval"]
+    },
+    {
+      "requirement": "Approval-gate routing for spec approval",
+      "name": "Ready to implementing is direct when spec approval is inactive",
+      "given": ["a change in ready state"],
+      "when": ["execute is called with to: 'implementing' and approvalsSpec: false"],
+      "then": ["the change transitions to implementing"]
+    },
+    {
+      "requirement": "Approval-gate routing for signoff",
+      "name": "Done to archivable is rerouted when signoff is active",
+      "given": ["a change in done state"],
+      "when": ["execute is called with to: 'archivable' and approvalsSignoff: true"],
+      "then": ["the change transitions to pending-signoff"]
+    },
+    {
+      "requirement": "Approval-gate routing for signoff",
+      "name": "Done to archivable is direct when signoff is inactive",
+      "given": ["a change in done state"],
+      "when": ["execute is called with to: 'archivable' and approvalsSignoff: false"],
+      "then": ["the change transitions to archivable"]
+    },
+    {
+      "requirement": "Human-approval pending states produce explicit transition failures",
+      "name": "Pending spec approval blocks normal forward transition",
+      "given": ["a change in pending-spec-approval state"],
+      "when": ["execute is called with to: 'spec-approved'"],
+      "then": [
+        "it throws InvalidStateTransitionError",
+        "AND the error reason equals { type: 'approval-required', gate: 'spec' }"
+      ]
+    },
+    {
+      "requirement": "Human-approval pending states produce explicit transition failures",
+      "name": "Pending signoff blocks normal forward transition",
+      "given": ["a change in pending-signoff state"],
+      "when": ["execute is called with to: 'signed-off'"],
+      "then": [
+        "it throws InvalidStateTransitionError",
+        "AND the error reason equals { type: 'approval-required', gate: 'signoff' }"
+      ]
+    },
+    {
+      "requirement": "Human-approval pending states produce explicit transition failures",
+      "name": "Pending approval still allows redesign",
+      "given": ["a change in pending-spec-approval state"],
+      "when": ["execute is called with to: 'designing'"],
+      "then": ["the change transitions to designing"]
+    },
+    {
+      "requirement": "Task completion check during requires enforcement",
+      "name": "Transition blocked by requiresTaskCompletion artifact with incomplete items",
+      "given": [
+        "a change in implementing state",
+        "AND the verifying step declares requiresTaskCompletion: [tasks]",
+        "AND the tasks artifact file contains - [ ] unfinished task"
+      ],
+      "when": ["execute is called with to: 'verifying'"],
+      "then": ["it throws InvalidStateTransitionError with reason incomplete-tasks"]
+    },
+    {
+      "requirement": "Task completion check during requires enforcement",
+      "name": "Transition blocked by missing task capability (defensive check)",
+      "given": [
+        "a workflow step declares requiresTaskCompletion: [proposal]",
+        "AND artifact proposal has hasTasks: false"
+      ],
+      "when": ["execute is called"],
+      "then": ["it throws InvalidStateTransitionError with reason missing-task-capability"]
+    },
+    {
+      "requirement": "Task completion check during requires enforcement",
+      "name": "Transition allowed when all tasks complete",
+      "given": [
+        "a change in implementing state",
+        "AND the verifying step declares requiresTaskCompletion: [tasks]",
+        "AND the tasks file contains only - [x] done task"
+      ],
+      "when": ["execute is called with to: 'verifying'"],
+      "then": ["the change transitions to verifying"]
+    },
+    {
+      "requirement": "Task completion check during requires enforcement",
+      "name": "No gating when requiresTaskCompletion absent",
+      "given": [
+        "a change in implementing state",
+        "AND the verifying step has requires: [tasks] but no requiresTaskCompletion",
+        "AND the tasks file contains incomplete items"
+      ],
+      "when": ["execute is called with to: 'verifying'"],
+      "then": ["the change transitions to verifying — no content check"]
+    },
+    {
+      "requirement": "Task completion check during requires enforcement",
+      "name": "Missing artifact file is skipped",
+      "given": ["a step with requiresTaskCompletion: [tasks]", "AND the tasks file does not exist"],
+      "when": ["execute is called"],
+      "then": ["the check is skipped and the transition proceeds"]
+    },
+    {
+      "requirement": "Task completion check during requires enforcement",
+      "name": "Error carries incomplete and complete counts",
+      "given": [
+        "a step with requiresTaskCompletion: [tasks]",
+        "AND the tasks file has 5 complete items and 3 incomplete items"
+      ],
+      "when": ["execute is called"],
+      "then": [
+        "the error reason includes artifactId: 'tasks', incomplete: 3, complete: 5, total: 8"
+      ]
+    },
+    {
+      "requirement": "Task completion check during requires enforcement",
+      "name": "task-completion-failed progress event emitted before throwing",
+      "given": ["a step with requiresTaskCompletion: [tasks] and incomplete items"],
+      "when": ["execute is called with an onProgress callback"],
+      "then": ["a task-completion-failed event is emitted with counts before the error is thrown"]
+    },
+    {
+      "requirement": "Workflow requires enforcement",
+      "name": "Unsatisfied requirement throws with structured reason",
+      "given": [
+        "a workflow step with requires: [specs, tasks]",
+        "AND specs has effective status in-progress"
+      ],
+      "when": ["execute is called"],
+      "then": [
+        "InvalidStateTransitionError is thrown with reason incomplete-artifact and blocking artifact specs"
+      ]
+    },
+    {
+      "requirement": "Workflow requires enforcement",
+      "name": "Transition blocked by recursive parent review",
+      "given": [
+        "a workflow step requires artifact design",
+        "AND design is complete but depends on specs which is pending-review",
+        "AND design effective status is 'pending-parent-artifact-review'"
+      ],
+      "when": ["execute is called"],
+      "then": [
+        "it throws InvalidStateTransitionError",
+        "AND the error reason includes status: 'pending-parent-artifact-review'",
+        "AND it includes blockedBy: { artifactId: 'specs', status: 'pending-review' }"
+      ]
+    },
+    {
+      "requirement": "Artifact validation clearing on verifying to implementing",
+      "name": "Implementation-only retry preserves validated artifacts",
+      "given": [
+        "a change in verifying state with validated artifacts",
+        "AND verification fails for implementation-only reasons"
+      ],
+      "when": ["execute is called with to: 'implementing'"],
+      "then": ["unchanged validated artifacts are not cleared"]
+    },
+    {
+      "requirement": "Artifact validation clearing on verifying to implementing",
+      "name": "Artifact review required does not route through implementing",
+      "given": [
+        "a change in verifying state",
+        "AND the required fix needs new tasks or revised artifacts"
+      ],
+      "when": ["lifecycle routing is resolved"],
+      "then": ["the caller must transition to designing, not implementing"]
+    },
+    {
+      "requirement": "Transition to designing from any state",
+      "name": "Transition from archivable to designing",
+      "given": ["a change in archivable state"],
+      "when": ["execute is called with to: 'designing'"],
+      "then": ["the change transitions to designing"]
+    },
+    {
+      "requirement": "Transition to designing from any state",
+      "name": "Transition to designing downgrades files to pending-review",
+      "given": [
+        "a change with validated artifacts",
+        "AND one file is already drifted-pending-review"
+      ],
+      "when": ["execute is called with to: 'designing'"],
+      "then": [
+        "every other tracked file becomes pending-review",
+        "AND the drifted file remains drifted-pending-review"
+      ]
+    },
+    {
+      "requirement": "Transition to designing from any state",
+      "name": "Transition to designing invalidates active approvals",
+      "given": ["a change in implementing state with an active spec approval"],
+      "when": ["execute is called with to: 'designing'"],
+      "then": ["the approval is invalidated before the transition"]
+    },
+    {
+      "requirement": "Transition to designing from any state",
+      "name": "Transition from designing to designing does not invalidate",
+      "given": ["a change already in designing state"],
+      "when": ["execute is called with to: 'designing'"],
+      "then": [
+        "change.invalidate() is not called",
+        "AND change.transition('designing', actor) is called directly",
+        "AND no artifact files are downgraded",
+        "AND no approvals are cleared"
+      ]
+    },
+    {
+      "requirement": "Transition to designing from any state",
+      "name": "Transition from drafting to designing does not invalidate",
+      "given": ["a change in drafting state"],
+      "when": ["execute is called with to: 'designing'"],
+      "then": [
+        "change.invalidate() is not called",
+        "AND change.transition('designing', actor) is called directly"
+      ]
+    },
+    {
+      "requirement": "Transition to designing from any state",
+      "name": "Transition from implementing to designing invalidates",
+      "given": ["a change in implementing state with validated artifacts"],
+      "when": ["execute is called with to: 'designing'"],
+      "then": [
+        "change.invalidate() is called with cause 'artifact-review-required'",
+        "AND all artifact files are downgraded to pending-review",
+        "AND any active spec approval is cleared"
+      ]
+    },
+    {
+      "requirement": "Post-hook execution",
+      "name": "Post hooks run for the source state, not the target",
+      "given": [
+        "a change in implementing state",
+        "AND the schema declares implementing.hooks.post: [{ id: run-tests, run: pnpm test }]"
+      ],
+      "when": ["execute is called with to: 'verifying'"],
+      "then": ["RunStepHooks.execute is called with { step: 'implementing', phase: 'post' }"]
+    },
+    {
+      "requirement": "Post-hook execution",
+      "name": "Post hooks do not run for the target state on entry",
+      "given": [
+        "a change in ready state",
+        "AND the schema declares implementing.hooks.post: [{ id: run-tests, run: pnpm test }]",
+        "AND the schema declares no hooks for ready"
+      ],
+      "when": ["execute is called with to: 'implementing'"],
+      "then": ["no post hooks are executed"]
+    },
+    {
+      "requirement": "Post-hook execution",
+      "name": "Post hooks skipped when source state has no workflow step",
+      "given": [
+        "a change in drafting state",
+        "AND the schema declares no workflow step for drafting"
+      ],
+      "when": ["execute is called with to: 'designing'"],
+      "then": ["no post hooks are executed"]
+    },
+    {
+      "requirement": "Post-hook execution",
+      "name": "Source post hooks run before target pre hooks",
+      "given": [
+        "a change in implementing state",
+        "AND the schema declares implementing.hooks.post and verifying.hooks.pre"
+      ],
+      "when": ["execute is called with to: 'verifying'"],
+      "then": [
+        "implementing.post hooks execute first",
+        "AND verifying.pre hooks execute second",
+        "AND the state transition occurs third"
+      ]
+    },
+    {
+      "requirement": "Post-hook execution",
+      "name": "Post hook failure aborts transition",
+      "given": [
+        "a change in implementing state",
+        "AND the schema declares implementing.hooks.post: [{ id: run-tests, run: pnpm test }]",
+        "AND pnpm test exits with code 1"
+      ],
+      "when": ["execute is called with to: 'verifying'"],
+      "then": ["HookFailedError is thrown", "AND no state transition occurs"]
+    },
+    {
+      "requirement": "Post-hook execution",
+      "name": "skipHookPhases source.post skips only post hooks",
+      "given": [
+        "a change in implementing state",
+        "AND the schema declares implementing.hooks.post and verifying.hooks.pre"
+      ],
+      "when": [
+        "execute is called with to: 'verifying' and skipHookPhases: new Set(['source.post'])"
+      ],
+      "then": ["implementing.post hooks are skipped", "AND verifying.pre hooks still execute"]
+    },
+    {
+      "requirement": "Post-hook execution",
+      "name": "skipHookPhases target.pre skips only pre hooks",
+      "given": [
+        "a change in implementing state",
+        "AND the schema declares implementing.hooks.post and verifying.hooks.pre"
+      ],
+      "when": [
+        "execute is called with to: 'verifying' and skipHookPhases: new Set(['target.pre'])"
+      ],
+      "then": ["verifying.pre hooks are skipped", "AND implementing.post hooks still execute"]
+    },
+    {
+      "requirement": "Post-hook execution",
+      "name": "skipHookPhases all skips everything",
+      "given": [
+        "a change in implementing state",
+        "AND the schema declares implementing.hooks.post and verifying.hooks.pre"
+      ],
+      "when": ["execute is called with to: 'verifying' and skipHookPhases: new Set(['all'])"],
+      "then": ["no hooks are executed", "AND the state transition occurs"]
+    },
+    {
+      "requirement": "Transition delegation",
+      "name": "Invalid transition is rejected by entity",
+      "given": ["a change in drafting state"],
+      "when": ["execute is called with to: 'implementing'"],
+      "then": ["change.transition throws InvalidStateTransitionError"]
+    },
+    {
+      "requirement": "Persistence",
+      "name": "Change is saved after successful transition through serialized mutation",
+      "when": ["TransitionChange.execute completes successfully"],
+      "then": [
+        "ChangeRepository.mutate(input.name, fn) was called for the final persisted mutation",
+        "AND the callback applied any redesign invalidation, validation clearing, and lifecycle transition on the fresh persisted Change"
+      ]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:b8f6bf67e80f8eab4f62a6cd37c392c7e504025a605c8cdd0787045483f5f529",
+    "verify.md": "sha256:33693a0a13f0f07cd6bc19eed7fb479f6d8d5296007ec922174fb9a3fc3aa3c6"
+  },
+  "generatedBy": "core"
+}

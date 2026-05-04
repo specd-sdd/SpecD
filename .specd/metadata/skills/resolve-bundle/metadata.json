@@ -1,7 +1,7 @@
 {
   "title": "skills:resolve-bundle",
   "description": "Use case for resolving a skill bundle with variable substitution.",
-  "dependsOn": ["core:core/config", "skills:skill-bundle", "skills:skill-repository-port"],
+  "dependsOn": ["core:config", "skills:skill-bundle", "skills:skill-repository-port"],
   "context": ["Use case for resolving a skill bundle with variable substitution."],
   "rules": [
     {
@@ -58,7 +58,7 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:86bdf25d5b06f8897cd5395abe81ebc73eaaf8c702d964947cfb2aefe993971d",
+    "spec.md": "sha256:a6895242c995850f8efefe77fbd8169b616f639ab503b57c50e06b998c9a570c",
     "verify.md": "sha256:b48f33137290dc3bc532d427a91f539171493f746a64f693de207728514e2f8d"
   },
   "generatedBy": "core"

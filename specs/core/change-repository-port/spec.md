@@ -149,8 +149,8 @@ ports with shared construction are abstract classes.
 
 ## Spec Dependencies
 
-- [`core:core/repository-port`](../repository-port/spec.md) — shared repository base contract
+- [`core:repository-port`](../repository-port/spec.md) — shared repository base contract
 - [`default:_global/architecture`](../../_global/architecture/spec.md) — application ports and ownership boundaries
-- [`core:core/change`](../change/spec.md) — change entity state, invalidation, and artifact semantics
-- [`core:core/storage`](../storage/spec.md) — filesystem persistence and change directory layout
-- [`core:core/change-manifest`](../change-manifest/spec.md) — manifest fields persisted by the repository
+- [`core:change`](../change/spec.md) — change entity state, invalidation, and artifact semantics
+- [`core:storage`](../storage/spec.md) — filesystem persistence and change directory layout
+- [`core:change-manifest`](../change-manifest/spec.md) — manifest fields persisted by the repository

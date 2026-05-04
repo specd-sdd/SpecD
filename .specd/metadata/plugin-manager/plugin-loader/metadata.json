@@ -1,11 +1,7 @@
 {
   "title": "plugin-manager:plugin-loader",
   "description": "Infrastructure component for dynamically loading plugins. Handles package resolution, manifest validation, and plugin instantiation.",
-  "dependsOn": [
-    "core:core/config",
-    "plugin-manager:specd-plugin-type",
-    "plugin-manager:plugin-errors"
-  ],
+  "dependsOn": ["core:config", "plugin-manager:specd-plugin-type", "plugin-manager:plugin-errors"],
   "context": [
     "Infrastructure component for dynamically loading plugins. Handles package resolution, manifest validation, and plugin instantiation."
   ],
@@ -81,7 +77,7 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:2cf9821ea5f6c9579fa699fb32bcaa3fe4cc3c62cbc8a59ab8cc32cd7c68cd4a",
+    "spec.md": "sha256:2328912874ad2f87da058dba84d2a11849886b61449b40848c91690cb109224b",
     "verify.md": "sha256:0a5ae4933041d3300cb8794382ff7a1275cc56ed92823c4b615b9193d25cd632"
   },
   "generatedBy": "core"

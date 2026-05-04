@@ -1,4 +1,4 @@
-# cli:cli/plugins-list
+# cli:plugins-list
 
 ## Purpose
 
@@ -40,4 +40,4 @@ The format MUST be machine-parseable when invoked with `--format json`.
 ## Spec Dependencies
 
 - [`plugin-manager:load-plugin-use-case`](../plugin-manager/load-plugin-use-case/spec.md) — loads and validates plugins
-- [`core:core/config-writer-port`](../core/config-writer-port/spec.md) — reads declared plugins
+- [`core:config-writer-port`](../core/config-writer-port/spec.md) — reads declared plugins

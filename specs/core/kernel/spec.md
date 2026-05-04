@@ -59,7 +59,7 @@ When `ChangeRepository.get()` loads a change, the `FsChangeRepository` implement
 1. The change is beyond `designing` state (has progressed past the initial design phase), OR
 2. The change has an active approval (spec approval or signoff) not superseded by a subsequent `invalidated` event.
 
-The invalidation payload must preserve every drifted file key for every affected artifact before the rollback is recorded. This ensures that both state-inconsistent artifact changes and approval drift are detected eagerly on any change load, not only during explicit validation. See [`specs/core/change-repository-port/spec.md`](../change-repository-port/spec.md) for the full port-level contract.
+The invalidation payload must preserve every drifted file key for every affected artifact before the rollback is recorded. This ensures that both state-inconsistent artifact changes and approval drift are detected eagerly on any change load, not only during explicit validation. See [`core:change-repository-port`](../change-repository-port/spec.md) for the full port-level contract.
 
 Historical manifests may still contain `invalidated` events whose persisted cause is `"artifact-change"`. The fs read path must accept that legacy value as backward-compatible history and normalize it to the current artifact-drift semantics when the raw manifest is deserialized.
 
@@ -109,57 +109,57 @@ The following table is the exhaustive mapping between kernel paths and use case 
 
 #### kernel.changes
 
-| Kernel path                      | Use case class           | Spec                                                            | Description                                             |
-| -------------------------------- | ------------------------ | --------------------------------------------------------------- | ------------------------------------------------------- |
-| `changes.repo`                   | `ChangeRepository`       | —                                                               | Underlying repository for adapter-level queries         |
-| `changes.create`                 | `CreateChange`           | [create-change](../create-change/spec.md)                       | Creates a new change                                    |
-| `changes.status`                 | `GetStatus`              | [get-status](../get-status/spec.md)                             | Reports lifecycle state and artifact statuses           |
-| `changes.transition`             | `TransitionChange`       | [transition-change](../transition-change/spec.md)               | Performs a lifecycle state transition                   |
-| `changes.draft`                  | `DraftChange`            | [draft-change](../draft-change/spec.md)                         | Shelves a change to drafts                              |
-| `changes.restore`                | `RestoreChange`          | [restore-change](../restore-change/spec.md)                     | Recovers a drafted change                               |
-| `changes.discard`                | `DiscardChange`          | [discard-change](../discard-change/spec.md)                     | Permanently abandons a change                           |
-| `changes.archive`                | `ArchiveChange`          | [archive-change](../archive-change/spec.md)                     | Finalises a change: merges deltas, moves to archive     |
-| `changes.validate`               | `ValidateArtifacts`      | [validate-artifacts](../validate-artifacts/spec.md)             | Validates artifact files against the active schema      |
-| `changes.compile`                | `CompileContext`         | [compile-context](../compile-context/spec.md)                   | Assembles the context block for a lifecycle step        |
-| `changes.list`                   | `ListChanges`            | [list-changes](../list-changes/spec.md)                         | Lists all active changes                                |
-| `changes.listDrafts`             | `ListDrafts`             | [list-drafts](../list-drafts/spec.md)                           | Lists all drafted changes                               |
-| `changes.listDiscarded`          | `ListDiscarded`          | [list-discarded](../list-discarded/spec.md)                     | Lists all discarded changes                             |
-| `changes.edit`                   | `EditChange`             | [edit-change](../edit-change/spec.md)                           | Edits the spec scope of a change                        |
-| `changes.skipArtifact`           | `SkipArtifact`           | [skip-artifact](../skip-artifact/spec.md)                       | Explicitly skips an optional artifact                   |
-| `changes.updateSpecDeps`         | `UpdateSpecDeps`         | [update-spec-deps](../update-spec-deps/spec.md)                 | Updates declared dependencies for a spec                |
-| `changes.listArchived`           | `ListArchived`           | [list-archived](../list-archived/spec.md)                       | Lists all archived changes                              |
-| `changes.getArchived`            | `GetArchivedChange`      | [get-archived-change](../get-archived-change/spec.md)           | Retrieves a single archived change by name              |
-| `changes.runStepHooks`           | `RunStepHooks`           | [run-step-hooks](../run-step-hooks/spec.md)                     | Executes run: hooks for a step and phase                |
-| `changes.getHookInstructions`    | `GetHookInstructions`    | [get-hook-instructions](../get-hook-instructions/spec.md)       | Returns instruction: hook text for a step and phase     |
-| `changes.getArtifactInstruction` | `GetArtifactInstruction` | [get-artifact-instruction](../get-artifact-instruction/spec.md) | Returns artifact instruction block with rules and delta |
-| `changes.detectOverlap`          | `DetectOverlap`          | [spec-overlap](../spec-overlap/spec.md)                         | Detects specs targeted by multiple active changes       |
+| Kernel path                      | Use case class           | Spec                                                                 | Description                                             |
+| -------------------------------- | ------------------------ | -------------------------------------------------------------------- | ------------------------------------------------------- |
+| `changes.repo`                   | `ChangeRepository`       | —                                                                    | Underlying repository for adapter-level queries         |
+| `changes.create`                 | `CreateChange`           | [core:create-change](../create-change/spec.md)                       | Creates a new change                                    |
+| `changes.status`                 | `GetStatus`              | [core:get-status](../get-status/spec.md)                             | Reports lifecycle state and artifact statuses           |
+| `changes.transition`             | `TransitionChange`       | [core:transition-change](../transition-change/spec.md)               | Performs a lifecycle state transition                   |
+| `changes.draft`                  | `DraftChange`            | [core:draft-change](../draft-change/spec.md)                         | Shelves a change to drafts                              |
+| `changes.restore`                | `RestoreChange`          | [core:restore-change](../restore-change/spec.md)                     | Recovers a drafted change                               |
+| `changes.discard`                | `DiscardChange`          | [core:discard-change](../discard-change/spec.md)                     | Permanently abandons a change                           |
+| `changes.archive`                | `ArchiveChange`          | [core:archive-change](../archive-change/spec.md)                     | Finalises a change: merges deltas, moves to archive     |
+| `changes.validate`               | `ValidateArtifacts`      | [core:validate-artifacts](../validate-artifacts/spec.md)             | Validates artifact files against the active schema      |
+| `changes.compile`                | `CompileContext`         | [core:compile-context](../compile-context/spec.md)                   | Assembles the context block for a lifecycle step        |
+| `changes.list`                   | `ListChanges`            | [core:list-changes](../list-changes/spec.md)                         | Lists all active changes                                |
+| `changes.listDrafts`             | `ListDrafts`             | [core:list-drafts](../list-drafts/spec.md)                           | Lists all drafted changes                               |
+| `changes.listDiscarded`          | `ListDiscarded`          | [core:list-discarded](../list-discarded/spec.md)                     | Lists all discarded changes                             |
+| `changes.edit`                   | `EditChange`             | [core:edit-change](../edit-change/spec.md)                           | Edits the spec scope of a change                        |
+| `changes.skipArtifact`           | `SkipArtifact`           | [core:skip-artifact](../skip-artifact/spec.md)                       | Explicitly skips an optional artifact                   |
+| `changes.updateSpecDeps`         | `UpdateSpecDeps`         | [core:update-spec-deps](../update-spec-deps/spec.md)                 | Updates declared dependencies for a spec                |
+| `changes.listArchived`           | `ListArchived`           | [core:list-archived](../list-archived/spec.md)                       | Lists all archived changes                              |
+| `changes.getArchived`            | `GetArchivedChange`      | [core:get-archived-change](../get-archived-change/spec.md)           | Retrieves a single archived change by name              |
+| `changes.runStepHooks`           | `RunStepHooks`           | [core:run-step-hooks](../run-step-hooks/spec.md)                     | Executes run: hooks for a step and phase                |
+| `changes.getHookInstructions`    | `GetHookInstructions`    | [core:get-hook-instructions](../get-hook-instructions/spec.md)       | Returns instruction: hook text for a step and phase     |
+| `changes.getArtifactInstruction` | `GetArtifactInstruction` | [core:get-artifact-instruction](../get-artifact-instruction/spec.md) | Returns artifact instruction block with rules and delta |
+| `changes.detectOverlap`          | `DetectOverlap`          | [core:spec-overlap](../spec-overlap/spec.md)                         | Detects specs targeted by multiple active changes       |
 
 #### kernel.specs
 
-| Kernel path                | Use case class                        | Spec                                                            | Description                                                 |
-| -------------------------- | ------------------------------------- | --------------------------------------------------------------- | ----------------------------------------------------------- |
-| `specs.repos`              | `ReadonlyMap<string, SpecRepository>` | —                                                               | Spec repositories keyed by workspace name                   |
-| `specs.approveSpec`        | `ApproveSpec`                         | [approve-spec](../approve-spec/spec.md)                         | Records a spec approval and transitions state               |
-| `specs.approveSignoff`     | `ApproveSignoff`                      | [approve-signoff](../approve-signoff/spec.md)                   | Records a sign-off and transitions state                    |
-| `specs.list`               | `ListSpecs`                           | [list-specs](../list-specs/spec.md)                             | Lists all specs across all workspaces                       |
-| `specs.search`             | `SearchSpecs`                         | [search-specs](../search-specs/spec.md)                         | Searches spec content across all workspaces                 |
-| `specs.get`                | `GetSpec`                             | [get-spec](../get-spec/spec.md)                                 | Loads a spec and all artifact files                         |
-| `specs.saveMetadata`       | `SaveSpecMetadata`                    | [save-spec-metadata](../save-spec-metadata/spec.md)             | Writes a `.specd-metadata.yaml` file                        |
-| `specs.invalidateMetadata` | `InvalidateSpecMetadata`              | [invalidate-spec-metadata](../invalidate-spec-metadata/spec.md) | Invalidates a spec's metadata                               |
-| `specs.getActiveSchema`    | `GetActiveSchema`                     | [get-active-schema](../get-active-schema/spec.md)               | Resolves and returns the active schema                      |
-| `specs.validate`           | `ValidateSpecs`                       | [validate-specs](../validate-specs/spec.md)                     | Validates spec artifacts against schema rules               |
-| `specs.generateMetadata`   | `GenerateSpecMetadata`                | [generate-metadata](../generate-metadata/spec.md)               | Generates deterministic metadata from extraction rules      |
-| `specs.getContext`         | `GetSpecContext`                      | [get-spec-context](../get-spec-context/spec.md)                 | Builds structured context entries with dependency traversal |
-| `specs.resolveSchema`      | `ResolveSchema`                       | [resolve-schema](../resolve-schema/spec.md)                     | Resolves base schema with extends, plugins, and overrides   |
+| Kernel path                | Use case class                        | Spec                                                                 | Description                                                 |
+| -------------------------- | ------------------------------------- | -------------------------------------------------------------------- | ----------------------------------------------------------- |
+| `specs.repos`              | `ReadonlyMap<string, SpecRepository>` | —                                                                    | Spec repositories keyed by workspace name                   |
+| `specs.approveSpec`        | `ApproveSpec`                         | [core:approve-spec](../approve-spec/spec.md)                         | Records a spec approval and transitions state               |
+| `specs.approveSignoff`     | `ApproveSignoff`                      | [core:approve-signoff](../approve-signoff/spec.md)                   | Records a sign-off and transitions state                    |
+| `specs.list`               | `ListSpecs`                           | [core:list-specs](../list-specs/spec.md)                             | Lists all specs across all workspaces                       |
+| `specs.search`             | `SearchSpecs`                         | [core:search-specs](../search-specs/spec.md)                         | Searches spec content across all workspaces                 |
+| `specs.get`                | `GetSpec`                             | [core:get-spec](../get-spec/spec.md)                                 | Loads a spec and all artifact files                         |
+| `specs.saveMetadata`       | `SaveSpecMetadata`                    | [core:save-spec-metadata](../save-spec-metadata/spec.md)             | Writes a `.specd-metadata.yaml` file                        |
+| `specs.invalidateMetadata` | `InvalidateSpecMetadata`              | [core:invalidate-spec-metadata](../invalidate-spec-metadata/spec.md) | Invalidates a spec's metadata                               |
+| `specs.getActiveSchema`    | `GetActiveSchema`                     | [core:get-active-schema](../get-active-schema/spec.md)               | Resolves and returns the active schema                      |
+| `specs.validate`           | `ValidateSpecs`                       | [core:validate-specs](../validate-specs/spec.md)                     | Validates spec artifacts against schema rules               |
+| `specs.generateMetadata`   | `GenerateSpecMetadata`                | [core:generate-metadata](../generate-metadata/spec.md)               | Generates deterministic metadata from extraction rules      |
+| `specs.getContext`         | `GetSpecContext`                      | [core:get-spec-context](../get-spec-context/spec.md)                 | Builds structured context entries with dependency traversal |
+| `specs.resolveSchema`      | `ResolveSchema`                       | [core:resolve-schema](../resolve-schema/spec.md)                     | Resolves base schema with extends, plugins, and overrides   |
 
 #### kernel.project
 
-| Kernel path                  | Use case class       | Spec                                                    | Description                                     |
-| ---------------------------- | -------------------- | ------------------------------------------------------- | ----------------------------------------------- |
-| `project.init`               | `InitProject`        | [init-project](../init-project/spec.md)                 | Initialises a new specd project                 |
-| `project.recordSkillInstall` | `RecordSkillInstall` | [record-skill-install](../record-skill-install/spec.md) | Records that skills were installed for an agent |
-| `project.getSkillsManifest`  | `GetSkillsManifest`  | [get-skills-manifest](../get-skills-manifest/spec.md)   | Reads the installed skills manifest             |
-| `project.getProjectContext`  | `GetProjectContext`  | [get-project-context](../get-project-context/spec.md)   | Compiles the project-level context block        |
+| Kernel path                  | Use case class       | Spec                                                         | Description                                     |
+| ---------------------------- | -------------------- | ------------------------------------------------------------ | ----------------------------------------------- |
+| `project.init`               | `InitProject`        | [core:init-project](../init-project/spec.md)                 | Initialises a new specd project                 |
+| `project.recordSkillInstall` | `RecordSkillInstall` | [core:record-skill-install](../record-skill-install/spec.md) | Records that skills were installed for an agent |
+| `project.getSkillsManifest`  | `GetSkillsManifest`  | [core:get-skills-manifest](../get-skills-manifest/spec.md)   | Reads the installed skills manifest             |
+| `project.getProjectContext`  | `GetProjectContext`  | [core:get-project-context](../get-project-context/spec.md)   | Compiles the project-level context block        |
 
 Adding, removing, or renaming an entry in this table is a contract change and must be reflected in both the `Kernel` interface and `createKernel`.
 
@@ -174,7 +174,7 @@ const kernel = createKernel(config)
 // Create a change
 const change = await kernel.changes.create.execute({
   name: 'add-oauth-login',
-  specs: ['core:core/change'],
+  specs: ['core:change'],
 })
 
 // Check its status
@@ -191,7 +191,7 @@ const specs = await kernel.specs.list.execute()
 
 // Get structured context for a spec with transitive dependencies
 const ctx = await kernel.specs.getContext.execute({
-  specId: 'core:core/change',
+  specId: 'core:change',
   depth: 2,
 })
 
@@ -218,40 +218,40 @@ await kernel.project.init.execute({
 ## Spec Dependencies
 
 - [`default:_global/architecture`](../../_global/architecture/spec.md)
-- [`core:core/composition`](../composition/spec.md)
-- [`core:core/create-change`](../create-change/spec.md)
-- [`core:core/get-status`](../get-status/spec.md)
-- [`core:core/transition-change`](../transition-change/spec.md)
-- [`core:core/draft-change`](../draft-change/spec.md)
-- [`core:core/restore-change`](../restore-change/spec.md)
-- [`core:core/discard-change`](../discard-change/spec.md)
-- [`core:core/archive-change`](../archive-change/spec.md)
-- [`core:core/validate-artifacts`](../validate-artifacts/spec.md)
-- [`core:core/compile-context`](../compile-context/spec.md)
-- [`core:core/list-changes`](../list-changes/spec.md)
-- [`core:core/list-drafts`](../list-drafts/spec.md)
-- [`core:core/list-discarded`](../list-discarded/spec.md)
-- [`core:core/edit-change`](../edit-change/spec.md)
-- [`core:core/skip-artifact`](../skip-artifact/spec.md)
-- [`core:core/update-spec-deps`](../update-spec-deps/spec.md)
-- [`core:core/list-archived`](../list-archived/spec.md)
-- [`core:core/get-archived-change`](../get-archived-change/spec.md)
-- [`core:core/run-step-hooks`](../run-step-hooks/spec.md)
-- [`core:core/get-hook-instructions`](../get-hook-instructions/spec.md)
-- [`core:core/get-artifact-instruction`](../get-artifact-instruction/spec.md)
-- [`core:core/approve-spec`](../approve-spec/spec.md)
-- [`core:core/approve-signoff`](../approve-signoff/spec.md)
-- [`core:core/list-specs`](../list-specs/spec.md)
-- [`core:core/get-spec`](../get-spec/spec.md)
-- [`core:core/save-spec-metadata`](../save-spec-metadata/spec.md)
-- [`core:core/invalidate-spec-metadata`](../invalidate-spec-metadata/spec.md)
-- [`core:core/get-active-schema`](../get-active-schema/spec.md)
-- [`core:core/validate-specs`](../validate-specs/spec.md)
-- [`core:core/generate-metadata`](../generate-metadata/spec.md)
-- [`core:core/get-spec-context`](../get-spec-context/spec.md)
-- [`core:core/init-project`](../init-project/spec.md)
-- [`core:core/record-skill-install`](../record-skill-install/spec.md)
-- [`core:core/get-skills-manifest`](../get-skills-manifest/spec.md)
-- [`core:core/get-project-context`](../get-project-context/spec.md)
-- [`core:core/resolve-schema`](../resolve-schema/spec.md)
-- [`core:core/spec-overlap`](../spec-overlap/spec.md)
+- [`core:composition`](../composition/spec.md)
+- [`core:create-change`](../create-change/spec.md)
+- [`core:get-status`](../get-status/spec.md)
+- [`core:transition-change`](../transition-change/spec.md)
+- [`core:draft-change`](../draft-change/spec.md)
+- [`core:restore-change`](../restore-change/spec.md)
+- [`core:discard-change`](../discard-change/spec.md)
+- [`core:archive-change`](../archive-change/spec.md)
+- [`core:validate-artifacts`](../validate-artifacts/spec.md)
+- [`core:compile-context`](../compile-context/spec.md)
+- [`core:list-changes`](../list-changes/spec.md)
+- [`core:list-drafts`](../list-drafts/spec.md)
+- [`core:list-discarded`](../list-discarded/spec.md)
+- [`core:edit-change`](../edit-change/spec.md)
+- [`core:skip-artifact`](../skip-artifact/spec.md)
+- [`core:update-spec-deps`](../update-spec-deps/spec.md)
+- [`core:list-archived`](../list-archived/spec.md)
+- [`core:get-archived-change`](../get-archived-change/spec.md)
+- [`core:run-step-hooks`](../run-step-hooks/spec.md)
+- [`core:get-hook-instructions`](../get-hook-instructions/spec.md)
+- [`core:get-artifact-instruction`](../get-artifact-instruction/spec.md)
+- [`core:approve-spec`](../approve-spec/spec.md)
+- [`core:approve-signoff`](../approve-signoff/spec.md)
+- [`core:list-specs`](../list-specs/spec.md)
+- [`core:get-spec`](../get-spec/spec.md)
+- [`core:save-spec-metadata`](../save-spec-metadata/spec.md)
+- [`core:invalidate-spec-metadata`](../invalidate-spec-metadata/spec.md)
+- [`core:get-active-schema`](../get-active-schema/spec.md)
+- [`core:validate-specs`](../validate-specs/spec.md)
+- [`core:generate-metadata`](../generate-metadata/spec.md)
+- [`core:get-spec-context`](../get-spec-context/spec.md)
+- [`core:init-project`](../init-project/spec.md)
+- [`core:record-skill-install`](../record-skill-install/spec.md)
+- [`core:get-skills-manifest`](../get-skills-manifest/spec.md)
+- [`core:get-project-context`](../get-project-context/spec.md)
+- [`core:resolve-schema`](../resolve-schema/spec.md)
+- [`core:spec-overlap`](../spec-overlap/spec.md)

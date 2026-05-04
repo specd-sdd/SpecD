@@ -58,6 +58,6 @@ interface PluginLoaderOptions {
 
 ## Spec Dependencies
 
-- [`core:core/config`](../../core/core/config/spec.md) — defines SpecdConfig type
+- [`core:config`](../../core/core/config/spec.md) — defines SpecdConfig type
 - [`plugin-manager:specd-plugin-type`](../specd-plugin-type/spec.md) — plugin type
 - [`plugin-manager:plugin-errors`](../plugin-errors/spec.md) — error classes

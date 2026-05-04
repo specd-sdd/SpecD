@@ -2,7 +2,7 @@
   "title": "plugin-agent-codex:plugin-agent",
   "description": "This spec defines the Codex agent plugin contract for install/uninstall behavior, install target directory, and exact frontmatter support so implementation and verification are deterministic.",
   "dependsOn": [
-    "core:core/config",
+    "core:config",
     "plugin-manager:agent-plugin-type",
     "skills:skill-bundle",
     "skills:skill-templates-source"
@@ -149,7 +149,7 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:8065fb8a0e025d845094edbd18cd1019afa36a08b2cf270a845810fdd4abfc02",
+    "spec.md": "sha256:d3ef1edf42f956a60a9b7cdf4a3ecef554f505c9308766f97ae0ba94e60f064c",
     "verify.md": "sha256:5da1c716da45d2e6a64d472c9003c8e561c18adf927ed23df36575abf19ee5e3"
   },
   "generatedBy": "core"

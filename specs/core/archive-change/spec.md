@@ -187,17 +187,17 @@ After merging deltas and archiving the change, the archive process generates met
 
 ## Spec Dependencies
 
-- [`core:core/change`](../change/spec.md) — Change entity, `assertArchivable()`, `ArchivedChange`
-- [`core:core/schema-format`](../schema-format/spec.md) — `artifacts[].delta`, `artifacts[].format`, workflow hooks
-- [`core:core/delta-format`](../delta-format/spec.md) — `ArtifactParser` port, `apply()`, `DeltaApplicationError`, `ArtifactParserRegistry`
-- [`core:core/validate-artifacts`](../validate-artifacts/spec.md) — artifact validation gate before archive
-- [`core:core/storage`](../storage/spec.md) — archive directory naming, `index.jsonl`, `FsArchiveRepository.archive()`
-- [`core:core/run-step-hooks`](../run-step-hooks/spec.md) — shared hook execution engine
-- [`core:core/hook-execution-model`](../hook-execution-model/spec.md) — hook types, execution semantics
-- [`core:core/template-variables`](../template-variables/spec.md) — `TemplateVariables` map, variable namespaces
-- [`core:core/spec-metadata`](../spec-metadata/spec.md) — deterministic metadata generation at archive time; `SaveSpecMetadata` for writing
-- [`core:core/content-extraction`](../content-extraction/spec.md) — `extractMetadata()` engine used to extract metadata fields from spec artifacts
+- [`core:change`](../change/spec.md) — Change entity, `assertArchivable()`, `ArchivedChange`
+- [`core:schema-format`](../schema-format/spec.md) — `artifacts[].delta`, `artifacts[].format`, workflow hooks
+- [`core:delta-format`](../delta-format/spec.md) — `ArtifactParser` port, `apply()`, `DeltaApplicationError`, `ArtifactParserRegistry`
+- [`core:validate-artifacts`](../validate-artifacts/spec.md) — artifact validation gate before archive
+- [`core:storage`](../storage/spec.md) — archive directory naming, `index.jsonl`, `FsArchiveRepository.archive()`
+- [`core:run-step-hooks`](../run-step-hooks/spec.md) — shared hook execution engine
+- [`core:hook-execution-model`](../hook-execution-model/spec.md) — hook types, execution semantics
+- [`core:template-variables`](../template-variables/spec.md) — `TemplateVariables` map, variable namespaces
+- [`core:spec-metadata`](../spec-metadata/spec.md) — deterministic metadata generation at archive time; `SaveSpecMetadata` for writing
+- [`core:content-extraction`](../content-extraction/spec.md) — `extractMetadata()` engine used to extract metadata fields from spec artifacts
 - [`default:_global/architecture`](../../_global/architecture/spec.md) — port-per-workspace pattern; manual DI at entry points
-- [`core:core/workspace`](../workspace/spec.md) — primary workspace for archive path template resolution
-- [`core:core/spec-id-format`](../spec-id-format/spec.md) — canonical `workspace:capabilityPath` format for `specIds`
-- [`core:core/spec-overlap`](../spec-overlap/spec.md) — `detectSpecOverlap` domain service for overlap detection
+- [`core:workspace`](../workspace/spec.md) — primary workspace for archive path template resolution
+- [`core:spec-id-format`](../spec-id-format/spec.md) — canonical `workspace:capabilityPath` format for `specIds`
+- [`core:spec-overlap`](../spec-overlap/spec.md) — `detectSpecOverlap` domain service for overlap detection

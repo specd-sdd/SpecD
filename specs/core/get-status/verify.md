@@ -105,14 +105,14 @@
 
 - **GIVEN** a change in `designing` state with files in `pending-review`
 - **AND** history contains two `invalidated` events with `cause: 'spec-overlap-conflict'`
-- **AND** event A was caused by archiving change `alpha` overlapping `core:core/config`
-- **AND** event B was caused by archiving change `beta` overlapping `core:core/kernel`
+- **AND** event A was caused by archiving change `alpha` overlapping `core:config`
+- **AND** event B was caused by archiving change `beta` overlapping `core:kernel`
 - **AND** no `transitioned` event with `to` not equal to `'designing'` appears after either
 - **WHEN** `execute()` is called
 - **THEN** `review.overlapDetail` has two entries
 - **AND** the entries are ordered newest-first
-- **AND** one entry references `beta` with `core:core/kernel`
-- **AND** the other references `alpha` with `core:core/config`
+- **AND** one entry references `beta` with `core:kernel`
+- **AND** the other references `alpha` with `core:config`
 
 #### Scenario: Overlap scan stops at forward transition boundary
 

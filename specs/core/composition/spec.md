@@ -98,7 +98,7 @@ The fields `artifactRules` and `workflow` (project-level hook additions) are no 
 ## Spec Dependencies
 
 - [`default:_global/architecture`](../../_global/architecture/spec.md)
-- [`core:core/resolve-schema`](../resolve-schema/spec.md) — `ResolveSchema` use case wiring
+- [`core:resolve-schema`](../resolve-schema/spec.md) — `ResolveSchema` use case wiring
 
 ## ADRs
 

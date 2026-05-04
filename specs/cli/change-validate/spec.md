@@ -161,7 +161,7 @@ specd change validate update-billing default:billing/invoices --artifact specs
 
 ## Spec Dependencies
 
-- [`cli:cli/entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
-- [`core:core/change`](../../core/change/spec.md) — artifact status, validation, approval invalidation
-- [`core:core/validate-artifacts`](../../core/validate-artifacts/spec.md) — validation result shape and expected artifact file paths
-- [`core:core/spec-id-format`](../../core/spec-id-format/spec.md) — canonical `workspace:capabilityPath` format
+- [`cli:entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
+- [`core:change`](../../core/change/spec.md) — artifact status, validation, approval invalidation
+- [`core:validate-artifacts`](../../core/validate-artifacts/spec.md) — validation result shape and expected artifact file paths
+- [`core:spec-id-format`](../../core/spec-id-format/spec.md) — canonical `workspace:capabilityPath` format

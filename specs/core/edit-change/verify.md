@@ -119,21 +119,21 @@
 
 #### Scenario: Removing a spec cleans up its scaffolded directories
 
-- **GIVEN** a change with `specIds: ['core:core/edit-change']` and scaffolded directories at `specs/core/core/edit-change/` and `deltas/core/core/edit-change/`
-- **WHEN** `execute` is called with `removeSpecIds: ['core:core/edit-change']`
+- **GIVEN** a change with `specIds: ['core:edit-change']` and scaffolded directories at `specs/core/core/edit-change/` and `deltas/core/core/edit-change/`
+- **WHEN** `execute` is called with `removeSpecIds: ['core:edit-change']`
 - **THEN** `ChangeRepository.unscaffold` is called with the removed spec IDs
 - **AND** the directories `specs/core/core/edit-change/` and `deltas/core/core/edit-change/` are removed from the change directory
 
 #### Scenario: Removing multiple specs cleans up all their directories
 
-- **GIVEN** a change with `specIds: ['core:core/edit-change', 'core:core/change-repository-port']`
+- **GIVEN** a change with `specIds: ['core:edit-change', 'core:change-repository-port']`
 - **AND** scaffolded directories for both specs exist
-- **WHEN** `execute` is called with `removeSpecIds: ['core:core/edit-change', 'core:core/change-repository-port']`
+- **WHEN** `execute` is called with `removeSpecIds: ['core:edit-change', 'core:change-repository-port']`
 - **THEN** `ChangeRepository.unscaffold` is called with both removed spec IDs
 - **AND** all corresponding directories are removed
 
 #### Scenario: Adding a spec does not trigger unscaffold
 
-- **GIVEN** a change with `specIds: ['core:core/edit-change']`
-- **WHEN** `execute` is called with `addSpecIds: ['core:core/change-repository-port']`
+- **GIVEN** a change with `specIds: ['core:edit-change']`
+- **WHEN** `execute` is called with `addSpecIds: ['core:change-repository-port']`
 - **THEN** `ChangeRepository.unscaffold` is NOT called

@@ -33,5 +33,5 @@ When `specd.yaml` has no `skills` section, `readSkillsManifest` MUST return `{}`
 
 ## Spec Dependencies
 
-- [`core:core/config`](../config/spec.md) — defines `ConfigWriter` port contract and skills manifest structure
+- [`core:config`](../config/spec.md) — defines `ConfigWriter` port contract and skills manifest structure
 - [`default:_global/architecture`](../../_global/architecture/spec.md) — port/adapter design constraints

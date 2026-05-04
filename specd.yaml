@@ -43,7 +43,6 @@ workspaces:
         - apps/
 
   core:
-    prefix: core
     specs:
       adapter: fs
       fs:
@@ -52,7 +51,6 @@ workspaces:
     ownership: owned
 
   cli:
-    prefix: cli
     specs:
       adapter: fs
       fs:
@@ -61,7 +59,6 @@ workspaces:
     ownership: owned
 
   code-graph:
-    prefix: code-graph
     specs:
       adapter: fs
       fs:
@@ -134,7 +131,6 @@ workspaces:
     ownership: owned
 
   public-web:
-    prefix: public-web
     specs:
       adapter: fs
       fs:

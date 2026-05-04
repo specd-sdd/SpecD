@@ -78,8 +78,8 @@ The result is returned with `hasExtraction: true`.
 
 ## Spec Dependencies
 
-- [`core:core/spec-metadata`](../spec-metadata/spec.md) — metadata format, fields, validation
-- [`core:core/content-extraction`](../content-extraction/spec.md) — the `extractMetadata()` domain service
-- [`core:core/schema-format`](../schema-format/spec.md) — `metadataExtraction` declarations and artifact type definitions
-- [`core:core/spec-id-format`](../spec-id-format/spec.md) — `parseSpecId()` resolution
-- [`core:core/spec-repository-port`](../spec-repository-port/spec.md) — repository-backed path resolution used by dependency-normalizing transforms
+- [`core:spec-metadata`](../spec-metadata/spec.md) — metadata format, fields, validation
+- [`core:content-extraction`](../content-extraction/spec.md) — the `extractMetadata()` domain service
+- [`core:schema-format`](../schema-format/spec.md) — `metadataExtraction` declarations and artifact type definitions
+- [`core:spec-id-format`](../spec-id-format/spec.md) — `parseSpecId()` resolution
+- [`core:spec-repository-port`](../spec-repository-port/spec.md) — repository-backed path resolution used by dependency-normalizing transforms

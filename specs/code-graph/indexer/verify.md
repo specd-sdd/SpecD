@@ -297,10 +297,10 @@
 
 #### Scenario: Spec with .specd-metadata.yaml indexed
 
-- **GIVEN** a spec in workspace `core` with `.specd-metadata.yaml` containing `dependsOn: [core:core/config, core:core/storage]`
+- **GIVEN** a spec in workspace `core` with `.specd-metadata.yaml` containing `dependsOn: [core:config, core:storage]`
 - **WHEN** spec indexing runs
-- **THEN** a `SpecNode` with `specId: 'core:core/change'` and `workspace: 'core'` is upserted
-- **AND** two `DEPENDS_ON` relations are created to `core:core/config` and `core:core/storage`
+- **THEN** a `SpecNode` with `specId: 'core:change'` and `workspace: 'core'` is upserted
+- **AND** two `DEPENDS_ON` relations are created to `core:config` and `core:storage`
 
 #### Scenario: Spec without metadata uses defaults
 
@@ -311,9 +311,9 @@
 
 #### Scenario: Spec title defaults to specId when metadata is absent
 
-- **GIVEN** a spec with `specId: 'code-graph:code-graph/change'` and no `.specd-metadata.yaml`
+- **GIVEN** a spec with `specId: 'code-graph:change'` and no `.specd-metadata.yaml`
 - **WHEN** spec indexing runs
-- **THEN** the `SpecNode` has `title: 'code-graph:code-graph/change'`
+- **THEN** the `SpecNode` has `title: 'code-graph:change'`
 
 #### Scenario: Incremental spec indexing skips unchanged specs
 
@@ -326,7 +326,7 @@
 
 - **GIVEN** workspaces `core` and `cli` both have a spec named `spec-metadata`
 - **WHEN** spec indexing runs
-- **THEN** specIds are `core:core/spec-metadata` and `cli:cli/spec-metadata` respectively
+- **THEN** specIds are `core:spec-metadata` and `cli:spec-metadata` respectively
 - **AND** no primary key collision occurs
 
 ### Requirement: Error isolation

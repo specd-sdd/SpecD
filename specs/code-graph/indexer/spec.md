@@ -220,8 +220,8 @@ await store.close()
 
 ## Spec Dependencies
 
-- [`code-graph:code-graph/graph-store`](../graph-store/spec.md) — abstract graph-store contract used by the indexer
-- [`code-graph:code-graph/language-adapter`](../language-adapter/spec.md) — adapter extraction and resolution capabilities
-- [`code-graph:code-graph/symbol-model`](../symbol-model/spec.md) — files, symbols, specs, relations, and result types
-- [`code-graph:code-graph/workspace-integration`](../workspace-integration/spec.md) — workspace-prefixed path and spec identity rules
-- [`core:core/config`](../../core/config/spec.md) — graph discovery config and config-derived graph/temp directories
+- [`code-graph:graph-store`](../graph-store/spec.md) — abstract graph-store contract used by the indexer
+- [`code-graph:language-adapter`](../language-adapter/spec.md) — adapter extraction and resolution capabilities
+- [`code-graph:symbol-model`](../symbol-model/spec.md) — files, symbols, specs, relations, and result types
+- [`code-graph:workspace-integration`](../workspace-integration/spec.md) — workspace-prefixed path and spec identity rules
+- [`core:config`](../../core/config/spec.md) — graph discovery config and config-derived graph/temp directories

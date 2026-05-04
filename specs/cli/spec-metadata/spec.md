@@ -102,6 +102,6 @@ scenarios:   5
 
 ## Spec Dependencies
 
-- [`cli:cli/entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
-- [`core:core/spec-metadata`](../../core/spec-metadata/spec.md) — `.specd-metadata.yaml` format and fields
-- [`core:core/spec-id-format`](../../core/spec-id-format/spec.md) — canonical `workspace:capabilityPath` format
+- [`cli:entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
+- [`core:spec-metadata`](../../core/spec-metadata/spec.md) — `.specd-metadata.yaml` format and fields
+- [`core:spec-id-format`](../../core/spec-id-format/spec.md) — canonical `workspace:capabilityPath` format

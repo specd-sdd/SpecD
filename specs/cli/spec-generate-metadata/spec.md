@@ -75,7 +75,7 @@ When `--write --force` is used, the overwrite check is skipped entirely.
 
 ## Spec Dependencies
 
-- [`core:core/generate-metadata`](../../core/generate-metadata/spec.md) — the core use case
-- [`core:core/spec-metadata`](../../core/spec-metadata/spec.md) — metadata format and validation
-- [`core:core/list-specs`](../../core/list-specs/spec.md) — batch mode uses `ListSpecs` with `includeMetadataStatus` for filtering
+- [`core:generate-metadata`](../../core/generate-metadata/spec.md) — the core use case
+- [`core:spec-metadata`](../../core/spec-metadata/spec.md) — metadata format and validation
+- [`core:list-specs`](../../core/list-specs/spec.md) — batch mode uses `ListSpecs` with `includeMetadataStatus` for filtering
 - [`default:_global/architecture`](../../_global/architecture/spec.md) — adapter packages contain no business logic

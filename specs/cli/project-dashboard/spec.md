@@ -91,5 +91,5 @@ specd project dashboard --config /path/to/specd.yaml
 
 ## Spec Dependencies
 
-- [`cli:cli/entrypoint`](../entrypoint/spec.md) — exit codes, output conventions
-- [`core:core/config`](../../core/config/spec.md) — config loading
+- [`cli:entrypoint`](../entrypoint/spec.md) — exit codes, output conventions
+- [`core:config`](../../core/config/spec.md) — config loading

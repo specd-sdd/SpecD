@@ -20,7 +20,7 @@ A selector is a YAML object with the following fields:
 
 ### Requirement: Node types by file format
 
-All adapters normalize to the AST format defined in [`specs/core/artifact-ast/spec.md`](../artifact-ast/spec.md). The node types addressable by selectors are the same types produced by each adapter:
+All adapters normalize to the AST format defined in [`core:artifact-ast`](../artifact-ast/spec.md). The node types addressable by selectors are the same types produced by each adapter:
 
 - Markdown: `document`, `section`, `paragraph`, `list`, `list-item`, `code-block`, `thematic-break`
 - JSON: `document`, `object`, `property`, `array`, `array-item`
@@ -102,4 +102,4 @@ selector:
 
 ## Spec Dependencies
 
-- [`core:core/artifact-ast`](../artifact-ast/spec.md) — normalized AST format; defines node types, `label`/`value` semantics
+- [`core:artifact-ast`](../artifact-ast/spec.md) — normalized AST format; defines node types, `label`/`value` semantics

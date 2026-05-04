@@ -124,7 +124,7 @@ Every validation failure during `load()` — missing config file, invalid YAML, 
 
 ## Spec Dependencies
 
-- [`core:core/config`](../config/spec.md) — `SpecdConfig` structure, field semantics, YAML format, and validation rules
-- [`core:core/composition`](../composition/spec.md) — composition layer design and factory conventions
-- [`core:core/schema-merge`](../schema-merge/spec.md) — schema merge operations and `schemaOverrides` structure
+- [`core:config`](../config/spec.md) — `SpecdConfig` structure, field semantics, YAML format, and validation rules
+- [`core:composition`](../composition/spec.md) — composition layer design and factory conventions
+- [`core:schema-merge`](../schema-merge/spec.md) — schema merge operations and `schemaOverrides` structure
 - [`default:_global/architecture`](../../_global/architecture/spec.md) — port and adapter design

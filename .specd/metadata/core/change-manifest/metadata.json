@@ -1,0 +1,189 @@
+{
+  "title": "Change Manifest",
+  "description": "The Change entity's state must survive process restarts and be recoverable from disk alone, so there needs to be a single, well-defined file that captures everything. The change manifest (`manifest.json`) is that file — it persists identity, specs, artifacts, and the complete event history from which lifecycle state is derived. It lives inside the change's directory and is written and read exclusively by `FsChangeRepository`.",
+  "dependsOn": [
+    "core:change",
+    "core:change-layout",
+    "core:storage",
+    "core:spec-metadata",
+    "core:spec-id-format",
+    "core:workspace"
+  ],
+  "context": [
+    "The Change entity's state must survive process restarts and be recoverable from disk alone, so there needs to be a single, well-defined file that captures everything. The change manifest (`manifest.json`) is that file — it persists identity, specs, artifacts, and the complete event history from which lifecycle state is derived. It lives inside the change's directory and is written and read exclusively by `FsChangeRepository`."
+  ],
+  "rules": [
+    {
+      "requirement": "Manifest structure",
+      "rules": [
+        "Each change is persisted as a `manifest.json` file inside its change directory. Its top-level structure is:\n\n```jsonc\n// manifest.json\n{\n  \"name\": \"add-auth-flow\",\n  \"createdAt\": \"2024-03-15T10:00:00.000Z\",\n  \"schema\": {\n    \"name\": \"@specd/schema-std\",\n    \"version\": 2,\n  },\n  \"specIds\": [\"default:auth/login\", \"default:auth/register\"],\n  \"artifacts\": [\n    {\n      \"type\": \"proposal\",\n      \"optional\": false,\n      \"requires\": [],\n      \"state\": \"complete\",\n      \"files\": [\n        {\n          \"key\": \"proposal\",\n          \"filename\": \"proposal.md\",\n          \"state\": \"complete\",\n          \"validatedHash\": \"sha256:abc123...\",\n        },\n      ],\n    },\n    {\n      \"type\": \"specs\",\n      \"optional\": false,\n      \"requires\": [\"proposal\"],\n      \"state\": \"drifted-pending-review\",\n      \"files\": [\n        {\n          \"key\": \"default:auth/login\",\n          \"filename\": \"specs/default/auth/login/spec.md\",\n          \"state\": \"complete\",\n          \"validatedHash\": \"sha256:def456...\",\n        },\n        {\n          \"key\": \"default:auth/register\",\n          \"filename\": \"specs/default/auth/register/spec.md\",\n          \"state\": \"drifted-pending-review\",\n          \"validatedHash\": \"sha256:ghi789...\",\n        },\n      ],\n    },\n    {\n      \"type\": \"design\",\n      \"optional\": true,\n      \"requires\": [\"proposal\"],\n      \"state\": \"skipped\",\n      \"files\": [\n        {\n          \"key\": \"design\",\n          \"filename\": \"design.md\",\n          \"state\": \"skipped\",\n          \"validatedHash\": \"__skipped__\",\n        },\n      ],\n    },\n  ],\n  \"history\": [\n    {\n      \"type\": \"created\",\n      \"at\": \"2024-03-15T10:00:00.000Z\",\n      \"by\": { \"name\": \"Alice\", \"email\": \"alice@example.com\" },\n      \"specIds\": [\"default:auth/login\", \"default:auth/register\"],\n      \"schemaName\": \"@specd/schema-std\",\n      \"schemaVersion\": 2,\n    },\n    {\n      \"type\": \"transitioned\",\n      \"at\": \"2024-03-15T10:01:00.000Z\",\n      \"by\": { \"name\": \"Alice\", \"email\": \"alice@example.com\" },\n      \"from\": \"drafting\",\n      \"to\": \"designing\",\n    },\n  ],\n}\n```\n\nField definitions:\n\n- **`name`** — the change slug; immutable after creation\n- **`createdAt`** — ISO 8601 timestamp; immutable after creation; source of truth for the directory prefix\n- **`schema`** — `name` (string) and `version` (integer) of the schema active at creation; written once, never updated\n- **`workspaces`** — optional; accepted on load for backward compatibility with older manifests but no longer written on save. Active workspaces are derived at runtime from `specIds` via `parseSpecId()`\n- **`specIds`** — current snapshot of spec IDs; mutable\n- **`specDependsOn`** (optional) — a record keyed by spec ID, each value being an array of spec ID strings representing that spec's declared dependencies. Captured at authoring time to ensure dependencies are tracked even before metadata is generated. Omitted from the manifest when empty.\n- **`artifacts`** — array of artifact descriptors. Each artifact has `type`, `optional`, `requires`, `state`, and a `files` array of `ManifestArtifactFile` entries. Each file entry has `key`, `filename`, `state`, and `validatedHash`.\n- **`state`** on both artifacts and files uses the `ArtifactStatus` domain values (`missing`, `in-progress`, `complete`, `skipped`, `pending-review`, `drifted-pending-review`). File state is the source of truth; artifact state is the persisted aggregate.\n- **`validatedHash`** remains persisted for drift detection and approval signatures. It is `null` when not validated, a SHA-256 string when validated, or `\"__skipped__\"` when explicitly skipped.\n- **`history`** — append-only array of typed events. The event types, their semantics, and the derivation rules (current state, active approval, draft status) are defined in [`specs/core/change/spec.md` — Requirement: History and event sourcing](../change/spec.md). This section defines only the JSON serialization of those events. The current lifecycle state is derived from the most recent `transitioned` event's `to` field.\n\nThe JSON serialization of each event type is:\n\n```jsonc\n// state transition\n{ \"type\": \"transitioned\", \"at\": \"...\", \"by\": { \"name\": \"...\", \"email\": \"...\" }, \"from\": \"drafting\", \"to\": \"designing\" }\n\n// spec gate approved\n{ \"type\": \"spec-approved\", \"at\": \"...\", \"by\": { \"name\": \"...\", \"email\": \"...\" }, \"reason\": \"LGTM\", \"artifactHashes\": { \"proposal:proposal\": \"sha256:...\", \"specs:default:auth/login\": \"sha256:...\" } }\n\n// signoff gate passed\n{ \"type\": \"signed-off\", \"at\": \"...\", \"by\": { \"name\": \"...\", \"email\": \"...\" }, \"reason\": \"Ship it\", \"artifactHashes\": { \"proposal:proposal\": \"sha256:...\", \"specs:default:auth/login\": \"sha256:...\" } }\n\n// approval invalidated\n{\n  \"type\": \"invalidated\",\n  \"at\": \"...\",\n  \"by\": { \"name\": \"...\", \"email\": \"...\" },\n  \"cause\": \"artifact-drift\",\n  \"message\": \"Invalidated because validated artifacts drifted\",\n  \"affectedArtifacts\": [\n    { \"type\": \"specs\", \"files\": [\"default:auth/login\", \"default:auth/register\"] }\n  ]\n}\n\n// shelved to drafts/\n{ \"type\": \"drafted\", \"at\": \"...\", \"by\": { \"name\": \"...\", \"email\": \"...\" }, \"reason\": \"parking for now\" }\n\n// restored from drafts/\n{ \"type\": \"restored\", \"at\": \"...\", \"by\": { \"name\": \"...\", \"email\": \"...\" } }\n\n// optional artifact explicitly marked as not produced\n{ \"type\": \"artifact-skipped\", \"at\": \"...\", \"by\": { \"name\": \"...\", \"email\": \"...\" }, \"artifactId\": \"design\", \"reason\": \"not needed for this change\" }\n\n// artifact sync reconciled the artifact map against the schema\n{ \"type\": \"artifacts-synced\", \"at\": \"...\", \"by\": { \"name\": \"specd\", \"email\": \"system@getspecd.dev\" }, \"typesAdded\": [\"tasks\"], \"typesRemoved\": [], \"filesAdded\": [{ \"type\": \"specs\", \"key\": \"default:auth/register\" }], \"filesRemoved\": [] }\n\n// permanently abandoned\n{ \"type\": \"discarded\", \"at\": \"...\", \"by\": { \"name\": \"...\", \"email\": \"...\" }, \"reason\": \"superseded\", \"supersededBy\": [\"new-auth-flow\"] }\n```\n\nOn read, the manifest loader MUST also accept legacy historical invalidation events that persisted `\"cause\": \"artifact-change\"`. That legacy value is a backward-compatible alias for `\"artifact-drift\"` and MUST be normalized to the current domain cause during deserialization instead of being treated as corruption."
+      ]
+    },
+    {
+      "requirement": "Artifact filenames use expected paths",
+      "rules": [
+        "Every `ManifestArtifactFile.filename` MUST be the expected change-directory path for that artifact, as defined by `core:change-layout`.\n\nWhen a change is created or its spec scope changes, persisted spec-scoped artifact filenames MUST be resolved using the target spec's existence and the schema artifact's delta capability before the manifest is written. Existing specs with delta-capable artifacts MUST be persisted as `deltas/<workspace>/<capability-path>/<artifact-filename>.delta.yaml`; new specs MUST be persisted as `specs/<workspace>/<capability-path>/<artifact-filename>`.\n\nThe manifest MUST NOT initially persist a `specs/...` filename for an existing delta-capable spec and rely on a later read, validation, or delta creation pass to repair it. The manifest is a user- and agent-visible contract from creation time.\n\nWhen loading older manifests that contain a stale `specs/...` filename for an existing delta-capable spec, the repository MAY normalize the filename to the expected `deltas/...` path while preserving the file state and validation hash semantics."
+      ]
+    },
+    {
+      "requirement": "Schema version",
+      "rules": [
+        "`schema.name` is the value of the `schema` field from `specd.yaml` at creation time. `schema.version` is the `version` integer from the schema's `schema.yaml`. Both are written once at change creation and never updated.\n\nWhen a change is loaded and the active schema's name or version differs from what is recorded in the manifest, specd must emit a warning. The change remains usable — the warning is advisory, not a hard error. Archiving a change with a schema version mismatch must still be possible; the warning surfaces the mismatch so the user can decide whether to proceed."
+      ]
+    },
+    {
+      "requirement": "Atomic writes",
+      "rules": [
+        "The manifest must be written atomically — by writing to a temporary file and then renaming it into place — to prevent partial reads if the process is interrupted mid-write."
+      ]
+    }
+  ],
+  "constraints": [
+    "Artifact and file state are stored explicitly in the manifest; callers must not reconstruct steady-state status solely from validatedHash",
+    "validatedHash has three valid values: null (not yet validated), a SHA-256 string (validated), or \"__skipped__\" (optional artifact explicitly not produced)",
+    "If an older manifest is encountered without a state field on an artifact or file, loading defaults that missing state to missing",
+    "If an older manifest is encountered with an invalidated event whose cause is \"artifact-change\", loading must accept it and normalize it to the current artifact-drift semantics",
+    "The manifest has no top-level state field; the current lifecycle state is always derived from the history array at load time",
+    "The history array is append-only — existing events must never be modified or removed by any operation",
+    "The schema field is written once at creation and must never be updated by subsequent operations"
+  ],
+  "scenarios": [
+    {
+      "requirement": "Manifest structure",
+      "name": "Manifest stores artifact and file state explicitly",
+      "when": ["a change manifest is written"],
+      "then": [
+        "each persisted artifact entry includes state",
+        "AND each persisted file entry includes state"
+      ]
+    },
+    {
+      "requirement": "Manifest structure",
+      "name": "Missing state defaults to missing on load",
+      "given": ["a manifest entry without a state field"],
+      "when": ["the manifest is loaded"],
+      "then": ["the missing state is treated as missing"]
+    },
+    {
+      "requirement": "Manifest structure",
+      "name": "Invalidated event stores message and affectedArtifacts",
+      "when": ["a change is invalidated because validated files drifted"],
+      "then": [
+        "the invalidated event includes cause",
+        "AND it includes a human-readable message",
+        "AND it includes affectedArtifacts with artifact types and file keys"
+      ]
+    },
+    {
+      "requirement": "Manifest structure",
+      "name": "Legacy artifact-change invalidation cause remains readable",
+      "given": [
+        "a historical manifest whose invalidated event persisted cause: \"artifact-change\""
+      ],
+      "when": ["the manifest is loaded"],
+      "then": [
+        "loading succeeds without reporting corruption",
+        "AND the event is normalized to the current artifact-drift semantics"
+      ]
+    },
+    {
+      "requirement": "Manifest structure",
+      "name": "validatedHash and state coexist",
+      "when": ["ValidateArtifacts marks a file complete with hash sha256:abc"],
+      "then": [
+        "the manifest stores validatedHash: \"sha256:abc\"",
+        "AND the file state is complete"
+      ]
+    },
+    {
+      "requirement": "Manifest structure",
+      "name": "Drifted and pending-review states round-trip",
+      "given": [
+        "a manifest with one file in drifted-pending-review and one file in pending-review"
+      ],
+      "when": ["the manifest is loaded and saved again"],
+      "then": ["both states are preserved"]
+    },
+    {
+      "requirement": "Artifact filenames use expected paths",
+      "name": "Existing delta-capable spec is persisted as a delta filename",
+      "given": [
+        "core:config already exists",
+        "AND the active schema artifact specs declares delta: true and output spec.md"
+      ],
+      "when": ["a change is created for core:config"],
+      "then": [
+        "the manifest file entry for specs:core:config stores filename: \"deltas/core/core/config/spec.md.delta.yaml\"",
+        "AND it does not first store specs/core/core/config/spec.md"
+      ]
+    },
+    {
+      "requirement": "Artifact filenames use expected paths",
+      "name": "New spec is persisted as a direct specs filename",
+      "given": ["core:new-capability does not exist"],
+      "when": ["a change is created for core:new-capability"],
+      "then": [
+        "the manifest file entry for specs:core:new-capability stores filename: \"specs/core/core/new-capability/spec.md\""
+      ]
+    },
+    {
+      "requirement": "Artifact filenames use expected paths",
+      "name": "Legacy stale filename can be normalized on load",
+      "given": [
+        "an older manifest stores specs/core/core/config/spec.md for an existing delta-capable spec"
+      ],
+      "when": ["the change repository loads or syncs that change"],
+      "then": [
+        "the artifact filename may be normalized to deltas/core/core/config/spec.md.delta.yaml",
+        "AND the file state and validatedHash semantics are preserved"
+      ]
+    },
+    {
+      "requirement": "Schema version",
+      "name": "Schema unchanged",
+      "when": [
+        "a change is loaded and its manifest schema matches the active schema name and version"
+      ],
+      "then": ["no warning is emitted"]
+    },
+    {
+      "requirement": "Schema version",
+      "name": "Schema version bumped",
+      "when": [
+        "a change is loaded and the active schema has a higher version than recorded in the manifest"
+      ],
+      "then": [
+        "specd emits a warning indicating the schema has changed since the change was created and the user should review whether the change artifacts are still compatible"
+      ]
+    },
+    {
+      "requirement": "Schema version",
+      "name": "Schema name changed",
+      "when": [
+        "a change is loaded and the active schema name differs from the one recorded in the manifest"
+      ],
+      "then": ["specd emits a warning indicating the change was created under a different schema"]
+    },
+    {
+      "requirement": "Schema version",
+      "name": "Archiving with schema mismatch",
+      "when": ["specd archive is run on a change with a schema version mismatch"],
+      "then": [
+        "the warning is shown and the user is asked to confirm before proceeding; archiving is not blocked"
+      ]
+    },
+    {
+      "requirement": "Atomic writes",
+      "name": "History events appended atomically",
+      "when": ["a state transition occurs"],
+      "then": [
+        "the new transitioned event is appended to history and the entire manifest is written atomically (temp file + rename); no partial writes are visible"
+      ]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:1be677de1ef6f32e463bdd0a4393250ca93a180a761d922c7d31294883246afe",
+    "verify.md": "sha256:c6aebc0b898cdf05582b4305442e31a478b8650543bba399a5e44f898229abd5"
+  },
+  "generatedBy": "core"
+}

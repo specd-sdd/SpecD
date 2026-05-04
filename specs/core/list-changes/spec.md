@@ -24,5 +24,5 @@ When the repository contains no active changes (all are drafted, discarded, or n
 
 ## Spec Dependencies
 
-- [`core:core/change`](../change/spec.md)
-- [`core:core/kernel`](../kernel/spec.md)
+- [`core:change`](../change/spec.md)
+- [`core:kernel`](../kernel/spec.md)

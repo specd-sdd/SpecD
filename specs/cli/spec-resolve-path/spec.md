@@ -33,7 +33,7 @@ In `text` mode (default), the command prints the spec identifier to stdout:
 workspace:capability-path
 ```
 
-For example: `core:core/change`.
+For example: `core:change`.
 
 In `json` or `toon` mode, the output is an object:
 
@@ -41,7 +41,7 @@ In `json` or `toon` mode, the output is an object:
 {
   "workspace": "core",
   "specPath": "core/change",
-  "specId": "core:core/change"
+  "specId": "core:change"
 }
 ```
 
@@ -58,6 +58,6 @@ In `json` or `toon` mode, the output is an object:
 
 ## Spec Dependencies
 
-- [`cli:cli/entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
-- [`core:core/config`](../../core/config/spec.md) — workspace and prefix configuration
-- [`core:core/spec-id-format`](../../core/spec-id-format/spec.md) — canonical `workspace:capabilityPath` format
+- [`cli:entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
+- [`core:config`](../../core/config/spec.md) — workspace and prefix configuration
+- [`core:spec-id-format`](../../core/spec-id-format/spec.md) — canonical `workspace:capabilityPath` format

@@ -36,5 +36,5 @@ When no VCS is detected (all probes fail), `createVcsAdapter` MUST return a `Nul
 
 ## Spec Dependencies
 
-- [`core:core/composition`](../composition/spec.md)
+- [`core:composition`](../composition/spec.md)
 - [`default:_global/architecture`](../../_global/architecture/spec.md)

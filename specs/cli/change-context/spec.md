@@ -95,9 +95,9 @@ specd change context add-oauth-login implementing --follow-deps --depth 1
 
 ## Spec Dependencies
 
-- [`cli:cli/entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
-- [`cli:cli/change-spec-preview`](../change-spec-preview/spec.md) — command users are directed to for merged full spec content
-- [`core:core/compile-context`](../../core/compile-context/spec.md) — `CompileContext` use case, `CompileContextResult` structured shape, `ContextSpecEntry` type
-- [`core:core/config`](../../core/config/spec.md) — `contextMode` field
-- [`core:core/get-artifact-instruction`](../../core/get-artifact-instruction/spec.md) — artifact instructions (separate concern)
-- [`core:core/get-hook-instructions`](../../core/get-hook-instructions/spec.md) — step hook instructions (separate concern)
+- [`cli:entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
+- [`cli:change-spec-preview`](../change-spec-preview/spec.md) — command users are directed to for merged full spec content
+- [`core:compile-context`](../../core/compile-context/spec.md) — `CompileContext` use case, `CompileContextResult` structured shape, `ContextSpecEntry` type
+- [`core:config`](../../core/config/spec.md) — `contextMode` field
+- [`core:get-artifact-instruction`](../../core/get-artifact-instruction/spec.md) — artifact instructions (separate concern)
+- [`core:get-hook-instructions`](../../core/get-hook-instructions/spec.md) — step hook instructions (separate concern)

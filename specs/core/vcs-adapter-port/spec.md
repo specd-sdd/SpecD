@@ -60,5 +60,6 @@ The null implementation MUST NOT shell out to any external process or perform I/
 
 ## Spec Dependencies
 
-- [`specs/_global/architecture/spec.md`](../../_global/architecture/spec.md) -- hexagonal architecture, port/adapter separation
-- [`specs/core/vcs-adapter/spec.md`](../vcs-adapter/spec.md) -- factory that selects the concrete implementation
+- [`default:_global/architecture`](../../_global/architecture/spec.md) -- hexagonal architecture, port/adapter separation
+
+- [`core:vcs-adapter`](../vcs-adapter/spec.md) -- factory that selects the concrete implementation

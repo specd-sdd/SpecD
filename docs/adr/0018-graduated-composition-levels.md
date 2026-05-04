@@ -78,9 +78,9 @@ The composition API has grown since this ADR was written:
 
 ### Spec
 
-- [`specs/core/kernel/spec.md`](../../specs/core/kernel/spec.md)
-- [`specs/core/composition/spec.md`](../../specs/core/composition/spec.md)
-- [`specs/_global/architecture/spec.md`](../../specs/_global/architecture/spec.md)
+- [`core:kernel`](../../specs/core/kernel/spec.md)
+- [`core:composition`](../../specs/core/composition/spec.md)
+- [`default:_global/architecture`](../../specs/_global/architecture/spec.md)
 
 ### Related ADRs
 

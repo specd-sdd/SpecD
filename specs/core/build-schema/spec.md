@@ -136,7 +136,7 @@ After all validation passes, `buildSchema` SHALL construct and return a `Schema`
 ## Spec Dependencies
 
 - [`default:_global/architecture`](../../_global/architecture/spec.md) — domain layer purity, pure functions for stateless services
-- [`core:core/schema-format`](../schema-format/spec.md) — the schema YAML format that defines the input structure
-- [`core:core/content-extraction`](../content-extraction/spec.md) — `Extractor` and `FieldMapping` value objects built by sub-functions
-- [`core:core/selector-model`](../selector-model/spec.md) — `Selector` value object built by `buildSelector`
-- [`core:core/schema-merge`](../schema-merge/spec.md) — schema merge behaviour for schemas with `extends`
+- [`core:schema-format`](../schema-format/spec.md) — the schema YAML format that defines the input structure
+- [`core:content-extraction`](../content-extraction/spec.md) — `Extractor` and `FieldMapping` value objects built by sub-functions
+- [`core:selector-model`](../selector-model/spec.md) — `Selector` value object built by `buildSelector`
+- [`core:schema-merge`](../schema-merge/spec.md) — schema merge behaviour for schemas with `extends`

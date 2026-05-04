@@ -141,7 +141,7 @@ In `json` or `toon` mode, the output is:
         "type": "specs",
         "files": [
           {
-            "key": "core:core/change",
+            "key": "core:change",
             "filename": "deltas/core/core/change/spec.md.delta.yaml",
             "path": "/abs/path/.specd/changes/<change>/deltas/core/core/change/spec.md.delta.yaml"
           }
@@ -239,6 +239,6 @@ blockers:
 
 ## Spec Dependencies
 
-- [`cli:cli/entrypoint`](../entrypoint/spec.md) — CLI config discovery, exit codes, and output conventions
-- [`core:core/change`](../../core/change/spec.md) — change and artifact state model
-- [`core:core/get-status`](../../core/get-status/spec.md) — status payload returned by core
+- [`cli:entrypoint`](../entrypoint/spec.md) — CLI config discovery, exit codes, and output conventions
+- [`core:change`](../../core/change/spec.md) — change and artifact state model
+- [`core:get-status`](../../core/get-status/spec.md) — status payload returned by core

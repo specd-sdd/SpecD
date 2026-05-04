@@ -432,7 +432,7 @@
 - **GIVEN** a metadata extractor for `dependsOn` captures a canonical dependency label as `value`
 - **AND** the same capture also preserves an optional relative `href` as a transform arg when a link exists
 - **WHEN** `SchemaRegistry.resolve()` loads the schema
-- **THEN** the schema is accepted for both linked entries like ``[`core:core/config`](../config/spec.md)`` and unlinked entries like `` `core:core/config` ``
+- **THEN** the schema is accepted for both linked entries like ``[`core:config`](../config/spec.md)`` and unlinked entries like `` `core:config` ``
 
 #### Scenario: GenerateSpecMetadata produces deterministic output
 

@@ -1,7 +1,7 @@
 {
   "title": "Change Spec Preview",
   "description": "Humans reviewing a change need to see how a spec will look after its deltas are applied, without mentally reconstructing the merge or waiting until archive. The `specd change spec-preview` command renders the merged spec content (or a colorized unified diff) by delegating to the `PreviewSpec` use case, keeping the CLI as a thin adapter.",
-  "dependsOn": ["core:core/preview-spec"],
+  "dependsOn": ["core:preview-spec"],
   "context": [
     "Humans reviewing a change need to see how a spec will look after its deltas are applied, without mentally reconstructing the merge or waiting until archive. The `specd change spec-preview` command renders the merged spec content (or a colorized unified diff) by delegating to the `PreviewSpec` use case, keeping the CLI as a thin adapter."
   ],
@@ -9,13 +9,13 @@
     {
       "requirement": "Command signature",
       "rules": [
-        "```\nspecd changes spec-preview <name> <specId> [--artifact <name>] [--diff] [--format text|json|toon]\n```\n\n- `<name>` — required positional; the change name\n- `<specId>` — required positional; the fully-qualified spec ID to preview (e.g. `core:core/compile-context`); MUST be one of the change's `specIds`\n- `--artifact <name>` — optional; filters the output to only include the artifact with the given ID (e.g. `specs`, `verify`)\n- `--diff` — optional flag; when present, outputs a unified diff instead of the full merged content\n- `--format text|json|toon` — optional; output format, defaults to `text`\n\nCanonical agent-facing guidance MUST use plural command groups (for example `changes`). Singular groups remain alias-compatible."
+        "```\nspecd changes spec-preview <name> <specId> [--artifact <name>] [--diff] [--format text|json|toon]\n```\n\n- `<name>` — required positional; the change name\n- `<specId>` — required positional; the fully-qualified spec ID to preview (e.g. `core:compile-context`); MUST be one of the change's `specIds`\n- `--artifact <name>` — optional; filters the output to only include the artifact with the given ID (e.g. `specs`, `verify`)\n- `--diff` — optional flag; when present, outputs a unified diff instead of the full merged content\n- `--format text|json|toon` — optional; output format, defaults to `text`\n\nCanonical agent-facing guidance MUST use plural command groups (for example `changes`). Singular groups remain alias-compatible."
       ]
     },
     {
       "requirement": "Text output — merged mode (no --diff)",
       "rules": [
-        "When `--diff` is not present, the command MUST output the merged spec content. Artifact files MUST be concatenated in order: `spec.md` first (if present), then remaining files alphabetically. Each file MUST be preceded by a `--- <filename> ---` separator line, matching the format used by `specd spec show`.\n\nIf `--artifact <name>` is provided, the command MUST resolve `<name>` to a filename using the active schema. Only the content of the matching artifact SHALL be printed, still preceded by its `--- <filename> ---` header line."
+        "When `--diff` is not present, the command MUST output the merged spec content. Artifact files MUST be concatenated in order: `spec.md` first (if present), then remaining files alphabetically. Each file MUST be preceded by a separator line formatted as `--- <filename> --- <label>`, where `<label>` depends on the file's status:\n\n- status `merged`: No label (empty)\n- status `no-op`: `(no-op delta, showing original)`\n- status `missing`:\n  - If base is not `null` (delta): `(missing artifact, showing original)`\n  - If base is `null` (new spec): `(missing artifact)`\n\nIf `--artifact <name>` is provided, the command MUST resolve `<name>` to a filename using the active schema. Only the content of the matching artifact SHALL be printed, still preceded by its `--- <filename> --- <label>` header line."
       ]
     },
     {
@@ -33,7 +33,7 @@
     {
       "requirement": "Error handling",
       "rules": [
-        "If the change does not exist, the command MUST print an error message and exit with code 1. If the spec ID is not in the change's `specIds`, the command MUST print an error message and exit with code 1. Parser or delta application warnings from the use case MUST be printed to stderr."
+        "If the change does not exist, the command MUST print an error message and exit with code 1. If the spec ID is not in the change's `specIds`, the command MUST print an error message and exit with code 1; the error message SHALL explicitly suggest using `specd specs show <specId>` to view the canonical spec. Parser or delta application warnings from the use case MUST be printed to stderr."
       ]
     },
     {
@@ -60,36 +60,36 @@
     {
       "requirement": "Command signature",
       "name": "Minimal invocation",
-      "given": ["a valid change my-change with spec core:core/config"],
-      "when": ["specd change spec-preview my-change core:core/config is invoked"],
+      "given": ["a valid change my-change with spec core:config"],
+      "when": ["specd change spec-preview my-change core:config is invoked"],
       "then": ["the command succeeds and outputs the merged spec content in text format"]
     },
     {
       "requirement": "Command signature",
       "name": "Diff flag",
-      "given": ["a valid change with a delta for core:core/config"],
-      "when": ["specd change spec-preview my-change core:core/config --diff is invoked"],
+      "given": ["a valid change with a delta for core:config"],
+      "when": ["specd change spec-preview my-change core:config --diff is invoked"],
       "then": ["the command outputs a unified diff instead of the full merged content"]
     },
     {
       "requirement": "Text output — merged mode",
-      "name": "Files separated by header lines",
-      "given": ["a change producing preview for spec.md and verify.md"],
+      "name": "Files separated by header lines with status labels",
+      "given": ["a change with merged, no-op, and missing artifacts"],
       "when": ["the command is invoked without --diff"],
       "then": [
-        "each file is preceded by a --- <filename> --- separator line",
-        "AND spec.md appears before verify.md"
+        "each file header includes the appropriate label",
+        "AND spec.md with status merged header is --- spec.md ---",
+        "AND verify.md with status no-op header is --- verify.md --- (no-op delta, showing original)",
+        "AND other.md with status missing (delta) header is --- other.md --- (missing artifact, showing original)",
+        "AND new.md with status missing (new spec) header is --- new.md --- (missing artifact)"
       ]
     },
     {
       "requirement": "Text output — merged mode",
-      "name": "Filtered artifact in merged mode",
-      "given": ["a change with spec.md and verify.md"],
+      "name": "Filtered artifact shows status label",
+      "given": ["a change where specs artifact is no-op"],
       "when": ["specd change spec-preview my-change my-spec --artifact specs is run"],
-      "then": [
-        "stdout contains --- spec.md --- and the merged spec content",
-        "AND stdout DOES NOT contain --- verify.md ---"
-      ]
+      "then": ["stdout contains --- spec.md --- (no-op delta, showing original)"]
     },
     {
       "requirement": "Text output — diff mode",
@@ -164,15 +164,19 @@
       "requirement": "Error handling",
       "name": "Non-existent change exits with error",
       "given": ["no change named ghost"],
-      "when": ["specd change spec-preview ghost core:core/config is invoked"],
+      "when": ["specd change spec-preview ghost core:config is invoked"],
       "then": ["the command prints an error message and exits with code 1"]
     },
     {
       "requirement": "Error handling",
-      "name": "Spec not in change exits with error",
-      "given": ["a change my-change that does not include core:core/other"],
-      "when": ["specd change spec-preview my-change core:core/other is invoked"],
-      "then": ["the command prints an error message and exits with code 1"]
+      "name": "Spec not in change exits with error and suggestion",
+      "given": ["a change my-change that does not include core:other"],
+      "when": ["specd change spec-preview my-change core:other is invoked"],
+      "then": [
+        "the command prints an error message",
+        "AND the message includes use specd specs show core:other",
+        "AND the command exits with code 1"
+      ]
     },
     {
       "requirement": "Error handling",
@@ -239,8 +243,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:e9d20f526acec36cbd49ca4a6f8ecfabe9b74387ba01f0b593918ec6a6c3ace7",
-    "verify.md": "sha256:f8ea6cf85136720ea322667430ef56ad9291d2f1bf46bd1d509ab06a53e706b6"
+    "spec.md": "sha256:abf18454b15617245698e4a6da133f86fbe7d399626a3f5221cee0640616ba16",
+    "verify.md": "sha256:9770b07258059490de539773422a35108e50c95da49875acb692d80c38371a01"
   },
   "generatedBy": "core"
 }

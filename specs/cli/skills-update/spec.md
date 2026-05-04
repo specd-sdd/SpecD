@@ -80,6 +80,6 @@ specd skills update --format json
 
 ## Spec Dependencies
 
-- [`cli:cli/entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
-- [`cli:cli/skills-install`](../skills-install/spec.md) — file-write path logic and responsibility split
-- [`core:core/config`](../../core/config/spec.md) — `GetSkillsManifest` use case, `ConfigWriter` port
+- [`cli:entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
+- [`cli:skills-install`](../skills-install/spec.md) — file-write path logic and responsibility split
+- [`core:config`](../../core/config/spec.md) — `GetSkillsManifest` use case, `ConfigWriter` port

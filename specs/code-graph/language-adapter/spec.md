@@ -319,4 +319,4 @@ The TypeScript adapter MUST be registered by default when the registry is create
 
 ## Spec Dependencies
 
-- [`code-graph:code-graph/symbol-model`](../symbol-model/spec.md) — `SymbolNode`, `Relation`, `RelationType`, hierarchy edge semantics
+- [`code-graph:symbol-model`](../symbol-model/spec.md) — `SymbolNode`, `Relation`, `RelationType`, hierarchy edge semantics

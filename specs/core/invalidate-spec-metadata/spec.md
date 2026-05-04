@@ -40,5 +40,5 @@ Because the use case intentionally removes `contentHashes` (a required field in 
 
 ## Spec Dependencies
 
-- [`core:core/spec-metadata`](../spec-metadata/spec.md) — metadata file format and staleness detection rules
-- [`core:core/storage`](../storage/spec.md) — `SpecRepository` port used for read and write
+- [`core:spec-metadata`](../spec-metadata/spec.md) — metadata file format and staleness detection rules
+- [`core:storage`](../storage/spec.md) — `SpecRepository` port used for read and write

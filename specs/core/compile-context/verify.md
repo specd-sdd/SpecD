@@ -6,31 +6,31 @@
 
 #### Scenario: includeChangeSpecs false skips direct change spec seed
 
-- **GIVEN** a change with `specIds: ["core:core/config"]`
-- **AND** `core:core/config` is not matched by include patterns and not discovered via traversal
+- **GIVEN** a change with `specIds: ["core:config"]`
+- **AND** `core:config` is not matched by include patterns and not discovered via traversal
 - **WHEN** `CompileContext.execute` is called with `includeChangeSpecs: false`
-- **THEN** `core:core/config` is not included solely because it is in `change.specIds`
+- **THEN** `core:config` is not included solely because it is in `change.specIds`
 
 #### Scenario: includeChangeSpecs true keeps direct change spec even if excluded
 
-- **GIVEN** a change with `specIds: ["core:core/config"]`
-- **AND** an exclude pattern matches `core:core/config`
+- **GIVEN** a change with `specIds: ["core:config"]`
+- **AND** an exclude pattern matches `core:config`
 - **WHEN** `CompileContext.execute` is called with `includeChangeSpecs: true`
-- **THEN** `core:core/config` remains in the collected set as a mandatory direct seed
+- **THEN** `core:config` remains in the collected set as a mandatory direct seed
 
 #### Scenario: includeChangeSpecs false allows reinjection through include patterns
 
-- **GIVEN** a change with `specIds: ["core:core/config"]`
-- **AND** project include patterns match `core:core/config`
+- **GIVEN** a change with `specIds: ["core:config"]`
+- **AND** project include patterns match `core:config`
 - **WHEN** `CompileContext.execute` is called with `includeChangeSpecs: false`
-- **THEN** `core:core/config` is still included through include-pattern collection
+- **THEN** `core:config` is still included through include-pattern collection
 
 #### Scenario: includeChangeSpecs false allows reinjection through traversal
 
-- **GIVEN** a change with `specIds: ["core:core/config"]`
-- **AND** another spec in traversal depends on `core:core/config`
+- **GIVEN** a change with `specIds: ["core:config"]`
+- **AND** another spec in traversal depends on `core:config`
 - **WHEN** `CompileContext.execute` is called with `includeChangeSpecs: false` and `followDeps: true`
-- **THEN** `core:core/config` is included through `dependsOn` traversal
+- **THEN** `core:config` is included through `dependsOn` traversal
 
 ### Requirement: Context display modes
 
@@ -273,29 +273,29 @@
 
 #### Scenario: Spec with validated delta returns merged content
 
-- **GIVEN** a change with `specIds: ["core:core/config"]` and a validated delta for `spec.md`
+- **GIVEN** a change with `specIds: ["core:config"]` and a validated delta for `spec.md`
 - **AND** `PreviewSpec` returns a `files` entry with `filename: "spec.md"` and `merged: "merged content"`
-- **WHEN** `CompileContext.execute` renders content for `core:core/config` in full mode
+- **WHEN** `CompileContext.execute` renders content for `core:config` in full mode
 - **THEN** the `ContextSpecEntry.content` equals `"merged content"`
 
 #### Scenario: Spec with no delta falls back to base content
 
-- **GIVEN** a change with `specIds: ["core:core/config"]` and no delta files
+- **GIVEN** a change with `specIds: ["core:config"]` and no delta files
 - **AND** `PreviewSpec` returns an empty `files` array
-- **WHEN** `CompileContext.execute` renders content for `core:core/config` in full mode
+- **WHEN** `CompileContext.execute` renders content for `core:config` in full mode
 - **THEN** the `ContextSpecEntry.content` is rendered from metadata or extraction fallback as before
 
 #### Scenario: PreviewSpec failure falls back gracefully
 
-- **GIVEN** a change with `specIds: ["core:core/config"]` and a delta file
+- **GIVEN** a change with `specIds: ["core:config"]` and a delta file
 - **AND** `PreviewSpec` throws an error during execution
-- **WHEN** `CompileContext.execute` renders content for `core:core/config`
+- **WHEN** `CompileContext.execute` renders content for `core:config`
 - **THEN** the `ContextSpecEntry.content` is rendered from metadata or extraction fallback
 - **AND** a warning is added to the result
 
 #### Scenario: Preview only applies to specIds specs
 
-- **GIVEN** a change with `specIds: ["core:core/config"]`
+- **GIVEN** a change with `specIds: ["core:config"]`
 - **AND** the context includes `default:_global/architecture` via include pattern
 - **WHEN** `CompileContext.execute` is called
 - **THEN** `PreviewSpec` is NOT called for `default:_global/architecture`

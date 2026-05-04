@@ -15,13 +15,13 @@
 
 - **GIVEN** cwd is `/project` and workspace `core` has `specsPath: /project/specs/core` with `prefix: core`
 - **WHEN** `specd spec resolve-path specs/core/change` is run
-- **THEN** stdout prints `core:core/change`
+- **THEN** stdout prints `core:change`
 
 #### Scenario: Absolute path resolved directly
 
 - **GIVEN** workspace `core` has `specsPath: /project/specs/core` with `prefix: core`
 - **WHEN** `specd spec resolve-path /project/specs/core/change` is run
-- **THEN** stdout prints `core:core/change`
+- **THEN** stdout prints `core:change`
 
 #### Scenario: File path uses parent directory
 
@@ -39,7 +39,7 @@
 
 - **GIVEN** workspace `default` has `specsPath: /project/specs` and workspace `core` has `specsPath: /project/specs/core` with `prefix: core`
 - **WHEN** `specd spec resolve-path /project/specs/core/change` is run
-- **THEN** stdout prints `core:core/change`
+- **THEN** stdout prints `core:change`
 - **AND** the `default` workspace is not used despite also matching
 
 ### Requirement: Output format
@@ -48,13 +48,13 @@
 
 - **GIVEN** workspace `core` has `specsPath: /project/specs/core` with `prefix: core`
 - **WHEN** `specd spec resolve-path /project/specs/core/change` is run
-- **THEN** stdout prints exactly `core:core/change` followed by a newline
+- **THEN** stdout prints exactly `core:change` followed by a newline
 
 #### Scenario: JSON output structure
 
 - **GIVEN** workspace `core` has `specsPath: /project/specs/core` with `prefix: core`
 - **WHEN** `specd spec resolve-path /project/specs/core/change --format json` is run
-- **THEN** stdout is a valid JSON object with `workspace` equal to `"core"`, `specPath` equal to `"core/change"`, and `specId` equal to `"core:core/change"`
+- **THEN** stdout is a valid JSON object with `workspace` equal to `"core"`, `specPath` equal to `"core/change"`, and `specId` equal to `"core:change"`
 
 ### Requirement: Error cases
 

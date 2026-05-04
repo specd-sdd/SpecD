@@ -53,5 +53,5 @@ specd change discard old-experiment --reason "discarding workflow state despite 
 
 ## Spec Dependencies
 
-- [`cli:cli/entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
-- [`core:core/change`](../../core/change/spec.md) — discard semantics, storage locations
+- [`cli:entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
+- [`core:change`](../../core/change/spec.md) — discard semantics, storage locations

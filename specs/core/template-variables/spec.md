@@ -132,9 +132,9 @@ Namespace names and key names MUST be lowercase alphanumeric with hyphens allowe
 
 ## Spec Dependencies
 
-- [`core:core/hook-runner-port`](../hook-runner-port/spec.md) — `HookRunner` uses `expandForShell()` for `run:` commands
-- [`core:core/hook-execution-model`](../hook-execution-model/spec.md) — instruction hooks and run hooks both support template variables
-- [`core:core/get-hook-instructions`](../get-hook-instructions/spec.md) — expands variables in instruction text via `expand()`
-- [`core:core/get-artifact-instruction`](../get-artifact-instruction/spec.md) — expands variables in instruction and rules text via `expand()`
-- [`core:core/run-step-hooks`](../run-step-hooks/spec.md) — builds variable map for hook execution
-- [`core:core/archive-change`](../archive-change/spec.md) — builds variable map for deterministic hook execution
+- [`core:hook-runner-port`](../hook-runner-port/spec.md) — `HookRunner` uses `expandForShell()` for `run:` commands
+- [`core:hook-execution-model`](../hook-execution-model/spec.md) — instruction hooks and run hooks both support template variables
+- [`core:get-hook-instructions`](../get-hook-instructions/spec.md) — expands variables in instruction text via `expand()`
+- [`core:get-artifact-instruction`](../get-artifact-instruction/spec.md) — expands variables in instruction and rules text via `expand()`
+- [`core:run-step-hooks`](../run-step-hooks/spec.md) — builds variable map for hook execution
+- [`core:archive-change`](../archive-change/spec.md) — builds variable map for deterministic hook execution

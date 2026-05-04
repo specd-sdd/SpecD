@@ -1,7 +1,7 @@
 {
   "title": "plugin-manager:agent-plugin-type",
   "description": "Defines the agent plugin interface that extends `SpecdPlugin` for agent integrations (Claude, Copilot, Codex, etc.).",
-  "dependsOn": ["core:core/config", "plugin-manager:specd-plugin-type"],
+  "dependsOn": ["core:config", "plugin-manager:specd-plugin-type"],
   "context": [
     "Defines the agent plugin interface that extends `SpecdPlugin` for agent integrations (Claude, Copilot, Codex, etc.)."
   ],
@@ -56,7 +56,7 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:63daec08e878746c81e94ca2033f3d7b208dd23b3f08e9fe969cb98d03044904",
+    "spec.md": "sha256:6ef3e5ecf69176e24c90443613bd968fbbd87811312221b40905a6670f018f2f",
     "verify.md": "sha256:9c69a8d95806f821535d36c0b7a2110c990e19155d6380665d0548f2de117672"
   },
   "generatedBy": "core"

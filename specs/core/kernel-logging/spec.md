@@ -1,4 +1,4 @@
-# core:core/kernel-logging
+# core:kernel-logging
 
 ## Purpose
 
@@ -33,7 +33,7 @@ The `Kernel` (or the default logger factory) SHALL ensure that the `{configPath}
 
 ## Spec Dependencies
 
-- [`core:core/logger-port`](../logger-port/spec.md) — The interface and data structures managed by the Kernel.
-- [`core:core/pino-logger`](../pino-logger/spec.md) — The default adapter used by the Kernel.
-- [`core:core/config`](../config/spec.md) — The configuration source for logging settings.
+- [`core:logger-port`](../logger-port/spec.md) — The interface and data structures managed by the Kernel.
+- [`core:pino-logger`](../pino-logger/spec.md) — The default adapter used by the Kernel.
+- [`core:config`](../config/spec.md) — The configuration source for logging settings.
 - [`default:_global/architecture`](../../../default/_global/architecture/spec.md) — Follows the composition root pattern.

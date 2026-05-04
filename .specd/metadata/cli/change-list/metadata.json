@@ -1,0 +1,99 @@
+{
+  "title": "Change List",
+  "description": "Teams need a quick overview of all in-flight work to coordinate and avoid conflicts. `specd changes list` is the canonical form and lists all active changes in the project (those in `changes/`), sorted by creation date.\n\n`specd change list` remains supported as an alias.",
+  "dependsOn": ["cli:entrypoint", "core:change", "cli:command-resource-naming"],
+  "context": [
+    "Teams need a quick overview of all in-flight work to coordinate and avoid conflicts. `specd changes list` is the canonical form and lists all active changes in the project (those in `changes/`), sorted by creation date.\n\n`specd change list` remains supported as an alias."
+  ],
+  "rules": [
+    {
+      "requirement": "Command signature",
+      "rules": [
+        "```\nspecd changes list [--format text|json|toon]\n```\n\nAlias:\n\n```\nspecd change list [--format text|json|toon]\n```\n\n- `--format text|json|toon` — optional; output format, defaults to `text`"
+      ]
+    },
+    {
+      "requirement": "Output format",
+      "rules": [
+        "The command prints a human-readable table to stdout showing only active changes (in `changes/`). Changes are sorted by `createdAt` ascending (oldest first).\n\nThe output has an inverse-video column header row `NAME  STATE  SPECS  SCHEMA` above the data rows. Column widths are fixed at render time, computed from the widest value across all rows for each column (global, not per-group).\n\nEach data row shows:\n\n```\n  <name>  <state>  <specIds>  <schema-name>@<schema-version>\n```\n\nwhere `<specIds>` is a comma-separated list of the spec IDs on the change.\n\nWhen a description is set on the change, a dim indented description line is printed below the main row:\n\n```\n    <description>\n```\n\nDescription sub-rows are NOT part of the column structure — they are printed outside the fixed-width grid.\n\nIn `json` or `toon` format, the output is an array of objects:\n\n```json\n[{\"name\":\"...\",\"state\":\"...\",\"specIds\":[...],\"schema\":{\"name\":\"...\",\"version\":N},\"description\":\"...\"}]\n```\n\n`description` is omitted from the JSON object when not set."
+      ]
+    },
+    {
+      "requirement": "Empty output",
+      "rules": [
+        "If there are no active changes, the command prints `no changes` to stdout in `text` mode, or `[]` as valid JSON in `json`/`toon` mode. The process exits with code 0."
+      ]
+    }
+  ],
+  "constraints": [
+    "Only active changes (in changes/) are listed; drafted and discarded changes have their own noun groups",
+    "No filtering by state or workspace in v1"
+  ],
+  "scenarios": [
+    {
+      "requirement": "Command signature",
+      "name": "Canonical plural command",
+      "when": ["specd changes list is run"],
+      "then": ["the command executes successfully using the canonical group"]
+    },
+    {
+      "requirement": "Command signature",
+      "name": "Singular alias command",
+      "when": ["specd change list is run"],
+      "then": ["it behaves as an alias of specd changes list"]
+    },
+    {
+      "requirement": "Output format",
+      "name": "Only active changes shown",
+      "given": ["the project has one active change in changes/ and one drafted change in drafts/"],
+      "when": ["specd change list is run"],
+      "then": ["stdout shows only the active change", "AND the drafted change is not shown"]
+    },
+    {
+      "requirement": "Output format",
+      "name": "Discarded changes not shown",
+      "given": ["the project has one discarded change in discarded/ and no active changes"],
+      "when": ["specd change list is run"],
+      "then": ["stdout does not show the discarded change", "AND stdout contains no changes"]
+    },
+    {
+      "requirement": "Output format",
+      "name": "Rows contain name, state, specIds, and schema",
+      "given": [
+        "a change named add-login in state designing with specIds ['auth/login'] and schema std version 1"
+      ],
+      "when": ["specd change list is run"],
+      "then": ["the row for add-login shows add-login, designing, auth/login, and std@1"]
+    },
+    {
+      "requirement": "Output format",
+      "name": "JSON format output",
+      "given": [
+        "one active change add-login in state designing with specId auth/login and schema std version 1"
+      ],
+      "when": ["specd change list --format json is run"],
+      "then": [
+        "stdout is a valid JSON array containing one object with name, state, specIds, and schema",
+        "AND schema has name equal to \"std\" and version equal to 1",
+        "AND the process exits with code 0"
+      ]
+    },
+    {
+      "requirement": "Empty output",
+      "name": "No active changes — text mode",
+      "when": ["specd change list is run with no active changes in changes/"],
+      "then": ["stdout contains no changes", "AND the process exits with code 0"]
+    },
+    {
+      "requirement": "Empty output",
+      "name": "No active changes — JSON mode",
+      "when": ["specd change list --format json is run with no active changes"],
+      "then": ["stdout is []", "AND the process exits with code 0"]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:ff8fa450b00918864dce31eedc4e0840544f0b224738a798937bfa848facf81d",
+    "verify.md": "sha256:4aadb61a41565eaf3d3e0f09c25ec7ff6f77c8c06fdabe95410727bdb85f457f"
+  },
+  "generatedBy": "core"
+}

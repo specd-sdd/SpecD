@@ -126,7 +126,7 @@ specd change transition add-login --skip-hooks all
 
 ## Spec Dependencies
 
-- [`cli:cli/entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
-- [`core:core/change`](../../core/change/spec.md) — lifecycle states, approval gates, task completion check
-- [`core:core/transition-change`](../../core/transition-change/spec.md) — requires enforcement, hook execution, skipHooks, progress
-- [`core:core/hook-execution-model`](../../core/hook-execution-model/spec.md) — hook execution and skipping model
+- [`cli:entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
+- [`core:change`](../../core/change/spec.md) — lifecycle states, approval gates, task completion check
+- [`core:transition-change`](../../core/transition-change/spec.md) — requires enforcement, hook execution, skipHooks, progress
+- [`core:hook-execution-model`](../../core/hook-execution-model/spec.md) — hook execution and skipping model

@@ -176,5 +176,5 @@ This decision moves task tracking from a "magic" derivation to a declarative cap
 
 ### Spec
 
-- [`specs/core/schema-format/spec.md`](../../specs/core/schema-format/spec.md)
-- [`specs/core/schema-merge/spec.md`](../../specs/core/schema-merge/spec.md)
+- [`core:schema-format`](../../specs/core/schema-format/spec.md)
+- [`core:schema-merge`](../../specs/core/schema-merge/spec.md)

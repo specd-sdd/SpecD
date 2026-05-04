@@ -151,7 +151,7 @@ If the step is not available (one or more required artifacts are neither `comple
    - `path` (string, only for `file` entries) — the file path
    - `content` (string) — the rendered text content
 2. **Spec entries** (`specs: ContextSpecEntry[]`) — for each spec in the collected context set, produce an entry with: specs MUST appear in stable collection order: direct `change.specIds` seeds for the call (when `includeChangeSpecs: true`), then `change.specDependsOn` seeds, then include-pattern matches in declaration order, then `dependsOn` traversal discoveries.
-   - `specId` (string) — the fully-qualified spec ID (e.g. `core:core/compile-context`)
+   - `specId` (string) — the fully-qualified spec ID (e.g. `core:compile-context`)
    - `title` (string, summary/full modes) — the spec title from metadata or extracted from the artifact set
    - `description` (string, summary/full modes) — the spec description from metadata (2–3 sentence summary)
    - `source` (`'specIds' | 'specDependsOn' | 'includePattern' | 'dependsOnTraversal'`) — how this spec was collected. When a spec qualifies through multiple sources, the highest-priority source wins: `specIds` > `specDependsOn` > `dependsOnTraversal` > `includePattern`.
@@ -272,14 +272,14 @@ const result = await compileContext.execute({
 
 ## Spec Dependencies
 
-- [`core:core/change`](../change/spec.md) — Change entity, `effectiveStatus`, active workspaces
-- [`core:core/config`](../config/spec.md) — 5-step context spec resolution, include/exclude patterns, workspace-level patterns
-- [`core:core/spec-metadata`](../spec-metadata/spec.md) — `.specd-metadata.yaml` format, `dependsOn` traversal, staleness detection
-- [`core:core/schema-format`](../schema-format/spec.md) — `metadataExtraction` (fallback path), `workflow`
-- [`core:core/delta-format`](../delta-format/spec.md) — `ArtifactParser` port (for metadataExtraction fallback)
-- [`core:core/selector-model`](../selector-model/spec.md) — selector fields used in `metadataExtraction` extractors
-- [`core:core/spec-id-format`](../spec-id-format/spec.md) — canonical `workspace:capabilityPath` format, parsing rules for `specIds`
-- [`core:core/workspace`](../workspace/spec.md) — active workspace determination, workspace-level context patterns, port-per-workspace pattern
-- [`core:core/get-artifact-instruction`](../get-artifact-instruction/spec.md) — artifact instructions (separate concern)
-- [`core:core/get-hook-instructions`](../get-hook-instructions/spec.md) — step hook instructions (separate concern)
-- [`core:core/preview-spec`](../preview-spec/spec.md) — delta merge for materialized spec views in context
+- [`core:change`](../change/spec.md) — Change entity, `effectiveStatus`, active workspaces
+- [`core:config`](../config/spec.md) — 5-step context spec resolution, include/exclude patterns, workspace-level patterns
+- [`core:spec-metadata`](../spec-metadata/spec.md) — `.specd-metadata.yaml` format, `dependsOn` traversal, staleness detection
+- [`core:schema-format`](../schema-format/spec.md) — `metadataExtraction` (fallback path), `workflow`
+- [`core:delta-format`](../delta-format/spec.md) — `ArtifactParser` port (for metadataExtraction fallback)
+- [`core:selector-model`](../selector-model/spec.md) — selector fields used in `metadataExtraction` extractors
+- [`core:spec-id-format`](../spec-id-format/spec.md) — canonical `workspace:capabilityPath` format, parsing rules for `specIds`
+- [`core:workspace`](../workspace/spec.md) — active workspace determination, workspace-level context patterns, port-per-workspace pattern
+- [`core:get-artifact-instruction`](../get-artifact-instruction/spec.md) — artifact instructions (separate concern)
+- [`core:get-hook-instructions`](../get-hook-instructions/spec.md) — step hook instructions (separate concern)
+- [`core:preview-spec`](../preview-spec/spec.md) — delta merge for materialized spec views in context

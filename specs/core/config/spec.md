@@ -280,7 +280,7 @@ schemaOverrides:
     description: 'Custom project schema description'
 ```
 
-The five operations (`create`, `remove`, `set`, `append`, `prepend`) are all optional. They follow the same semantics as `mergeSchemaLayers` — see [`specs/core/schema-merge/spec.md`](../schema-merge/spec.md).
+The five operations (`create`, `remove`, `set`, `append`, `prepend`) are all optional. They follow the same semantics as `mergeSchemaLayers` — see [`core:schema-merge`](../schema-merge/spec.md).
 
 `schemaOverrides` is validated structurally at startup (correct shape, valid operation keys). Semantic validation (e.g. removing a non-existent entry) happens at schema resolution time when the merge engine processes the override layer.
 
@@ -327,7 +327,7 @@ The five operations (`create`, `remove`, `set`, `append`, `prepend`) are all opt
 5. Workspace-level exclude patterns from each active workspace (same order as step 4)
 6. All specs reachable via `dependsOn` traversal — starting from the change's `specIds`, following `dependsOn` links (resolved via the three-tier order: `change.specDependsOn`, `.specd-metadata.yaml`, content extraction) transitively until no new specs are found. These specs are **not subject to exclude rules from steps 3 or 5** — a declared dependency is always included regardless of project or workspace excludes.
 
-Specs matched by earlier patterns take priority if the context must be truncated. A spec matched by multiple include patterns appears only once, at the position of the first matching pattern. Specs added in step 6 that were already included in steps 2–5 also appear only once (at their earlier position). Step 1 (`context` entries) is not part of spec collection — those entries are injected as-is and are not deduplicated against specs. See [`specs/core/spec-metadata/spec.md`](../spec-metadata/spec.md) for the `.specd-metadata.yaml` format.
+Specs matched by earlier patterns take priority if the context must be truncated. A spec matched by multiple include patterns appears only once, at the position of the first matching pattern. Specs added in step 6 that were already included in steps 2–5 also appear only once (at their earlier position). Step 1 (`context` entries) is not part of spec collection — those entries are injected as-is and are not deduplicated against specs. See [`core:spec-metadata`](../spec-metadata/spec.md) for the `.specd-metadata.yaml` format.
 
 ```yaml
 # always in context — global constraints regardless of change scope
@@ -668,12 +668,12 @@ schemaOverrides:
 
 ## Spec Dependencies
 
-- [`core:core/schema-format`](../schema-format/spec.md) — schema structure, `kind`, `extends`, and resolution order
-- [`core:core/schema-merge`](../schema-merge/spec.md) — merge engine operations used by `schemaOverrides`
+- [`core:schema-format`](../schema-format/spec.md) — schema structure, `kind`, `extends`, and resolution order
+- [`core:schema-merge`](../schema-merge/spec.md) — merge engine operations used by `schemaOverrides`
 - [`default:_global/architecture`](../../_global/architecture/spec.md) — port and adapter design
-- [`core:core/storage`](../storage/spec.md) — storage adapter behavior
-- [`core:core/spec-metadata`](../spec-metadata/spec.md) — `.specd-metadata.yaml` format, `dependsOn` traversal in step 5
-- [`core:core/workspace`](../workspace/spec.md) — workspace identity, properties, ownership, and prefix semantics
+- [`core:storage`](../storage/spec.md) — storage adapter behavior
+- [`core:spec-metadata`](../spec-metadata/spec.md) — `.specd-metadata.yaml` format, `dependsOn` traversal in step 5
+- [`core:workspace`](../workspace/spec.md) — workspace identity, properties, ownership, and prefix semantics
 - [`default:_global/logging`](../../_global/logging/spec.md) — global logging standards followed by the config schema
 
 ## ADRs

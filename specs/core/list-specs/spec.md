@@ -65,7 +65,7 @@ When workspace filtering is active, the result array contains entries only from 
 
 ## Spec Dependencies
 
-- [`core:core/spec-metadata`](../spec-metadata/spec.md) — metadata structure and `contentHashes`
-- [`core:core/content-extraction`](../content-extraction/spec.md) — `extractSpecSummary` behaviour
-- [`core:core/storage`](../storage/spec.md) — `SpecRepository` contract
-- [`core:core/workspace`](../workspace/spec.md) — workspace ordering semantics
+- [`core:spec-metadata`](../spec-metadata/spec.md) — metadata structure and `contentHashes`
+- [`core:content-extraction`](../content-extraction/spec.md) — `extractSpecSummary` behaviour
+- [`core:storage`](../storage/spec.md) — `SpecRepository` contract
+- [`core:workspace`](../workspace/spec.md) — workspace ordering semantics

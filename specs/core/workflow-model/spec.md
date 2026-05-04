@@ -94,11 +94,11 @@ A workflow step's `requires` array contains **artifact IDs** (e.g. `specs`, `tas
 
 ## Spec Dependencies
 
-- [`core:core/change`](../change/spec.md) — change lifecycle states and artifact state lookup
-- [`core:core/schema-format`](../schema-format/spec.md) — workflow array structure and artifact definitions
-- [`core:core/build-schema`](../build-schema/spec.md) — DAG cycle detection at schema build time
-- [`core:core/compile-context`](../compile-context/spec.md) — step availability during context assembly
-- [`core:core/get-status`](../get-status/spec.md) — status reporting of the active workflow step
-- [`core:core/transition-change`](../transition-change/spec.md) — runtime transition enforcement
-- [`core:core/archive-change`](../archive-change/spec.md) — deterministic archiving step behavior
-- [`core:core/hook-execution-model`](../hook-execution-model/spec.md) — hook execution semantics
+- [`core:change`](../change/spec.md) — change lifecycle states and artifact state lookup
+- [`core:schema-format`](../schema-format/spec.md) — workflow array structure and artifact definitions
+- [`core:build-schema`](../build-schema/spec.md) — DAG cycle detection at schema build time
+- [`core:compile-context`](../compile-context/spec.md) — step availability during context assembly
+- [`core:get-status`](../get-status/spec.md) — status reporting of the active workflow step
+- [`core:transition-change`](../transition-change/spec.md) — runtime transition enforcement
+- [`core:archive-change`](../archive-change/spec.md) — deterministic archiving step behavior
+- [`core:hook-execution-model`](../hook-execution-model/spec.md) — hook execution semantics

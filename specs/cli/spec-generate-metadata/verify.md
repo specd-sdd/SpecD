@@ -13,8 +13,8 @@
 
 #### Scenario: Unknown spec exits 1
 
-- **WHEN** `specd spec generate-metadata core:core/nonexistent --write` is invoked
-- **THEN** stderr contains `error: Spec 'core:core/nonexistent' not found`
+- **WHEN** `specd spec generate-metadata core:nonexistent --write` is invoked
+- **THEN** stderr contains `error: Spec 'core:nonexistent' not found`
 - **AND** exits with code 1
 
 #### Scenario: Unknown workspace exits 1

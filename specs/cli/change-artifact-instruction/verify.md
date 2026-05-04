@@ -54,8 +54,8 @@
 
 #### Scenario: Outline details retrieved on demand via specs outline
 
-- **GIVEN** `availableOutlines` contains `core:core/config`
-- **WHEN** `specd specs outline core:core/config --artifact specs` is executed
+- **GIVEN** `availableOutlines` contains `core:config`
+- **WHEN** `specd specs outline core:config --artifact specs` is executed
 - **THEN** the command returns the full outline structure for the requested artifact
 
 ### Requirement: Command signature

@@ -223,7 +223,7 @@ $ specd spec list --workspace default --format json
 
 ## Spec Dependencies
 
-- [`cli:cli/entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
-- [`core:core/spec`](../../core/spec/spec.md) — spec metadata access and listing model
-- [`cli:cli/command-resource-naming`](../command-resource-naming/spec.md) — canonical plural naming and singular alias policy
-- [`cli:cli/spec-search`](../spec-search/spec.md) — dedicated spec search command; `specs list` does not perform text searches
+- [`cli:entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
+- [`core:spec`](../../core/spec/spec.md) — spec metadata access and listing model
+- [`cli:command-resource-naming`](../command-resource-naming/spec.md) — canonical plural naming and singular alias policy
+- [`cli:spec-search`](../spec-search/spec.md) — dedicated spec search command; `specs list` does not perform text searches

@@ -1,7 +1,7 @@
 {
   "title": "CLI Entrypoint",
   "description": "Every subcommand needs consistent config discovery, output routing, and error reporting — without a shared entrypoint contract, each command would reimplement these concerns differently. This spec defines the global behaviour of the `specd` CLI: configuration discovery (with the `--config` override), stdout/stderr conventions, the `--format` flag, and uniform exit codes.",
-  "dependsOn": ["core:core/config"],
+  "dependsOn": ["core:config"],
   "context": [
     "Every subcommand needs consistent config discovery, output routing, and error reporting — without a shared entrypoint contract, each command would reimplement these concerns differently. This spec defines the global behaviour of the `specd` CLI: configuration discovery (with the `--config` override), stdout/stderr conventions, the `--format` flag, and uniform exit codes."
   ],
@@ -366,8 +366,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:4ef8d703f502ffc6d154132630d0b7c29267f9eb9b39d16042eae4299950f1b2",
-    "verify.md": "sha256:720ac9a402e57fb7f312be14228335f3bb0fd6c2d03a2db1376f46b47af9dc76"
+    "spec.md": "sha256:32cdd478e6eacdbef1c32b472ddaa14a19f80836b66152d0a47b0354331ab767",
+    "verify.md": "sha256:d65df229672bb4d87bbbf7820e45df845430ee3d9989657818ff18f89fb359aa"
   },
   "generatedBy": "core"
 }

@@ -13,7 +13,7 @@ specd changes spec-preview <name> <specId> [--artifact <name>] [--diff] [--forma
 ```
 
 - `<name>` — required positional; the change name
-- `<specId>` — required positional; the fully-qualified spec ID to preview (e.g. `core:core/compile-context`); MUST be one of the change's `specIds`
+- `<specId>` — required positional; the fully-qualified spec ID to preview (e.g. `core:compile-context`); MUST be one of the change's `specIds`
 - `--artifact <name>` — optional; filters the output to only include the artifact with the given ID (e.g. `specs`, `verify`)
 - `--diff` — optional flag; when present, outputs a unified diff instead of the full merged content
 - `--format text|json|toon` — optional; output format, defaults to `text`
@@ -81,4 +81,4 @@ When only one spec-scoped artifact is required for that review, guidance SHOULD 
 
 ## Spec Dependencies
 
-- `core:core/preview-spec` — the use case this command delegates to
+- `core:preview-spec` — the use case this command delegates to

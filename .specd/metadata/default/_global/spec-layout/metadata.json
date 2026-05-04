@@ -1,11 +1,7 @@
 {
   "title": "Spec Layout",
   "description": "Without a consistent layout, specs become hard to discover and tooling cannot locate them reliably. specd specs are organised by scope under `specs/` at the monorepo root — global constraints in `specs/_global/`, package-internal specs in `specs/<package>/`. Every spec subdirectory contains two files: `spec.md` (requirements and design) and `verify.md` (WHEN/THEN scenarios).",
-  "dependsOn": [
-    "core:core/schema-format",
-    "core:core/content-extraction",
-    "core:core/spec-id-format"
-  ],
+  "dependsOn": ["core:schema-format", "core:content-extraction", "core:spec-id-format"],
   "context": [
     "Without a consistent layout, specs become hard to discover and tooling cannot locate them reliably. specd specs are organised by scope under `specs/` at the monorepo root — global constraints in `specs/_global/`, package-internal specs in `specs/<package>/`. Every spec subdirectory contains two files: `spec.md` (requirements and design) and `verify.md` (WHEN/THEN scenarios)."
   ],
@@ -118,9 +114,9 @@
     {
       "requirement": "Spec Dependencies section",
       "name": "Package spec uses canonical dependency label with relative link",
-      "when": ["a package spec depends on core:core/config"],
+      "when": ["a package spec depends on core:config"],
       "then": [
-        "it may list the dependency as [`core:core/config`](../config/spec.md)",
+        "it may list the dependency as [`core:config`](../config/spec.md)",
         "AND the visible label is the canonical spec ID while the href is the relative path to spec.md"
       ]
     },
@@ -128,7 +124,7 @@
       "requirement": "Spec Dependencies section",
       "name": "Package spec may list a canonical dependency without a link",
       "when": ["a package spec needs to declare a dependency but no link is present"],
-      "then": ["it may list the dependency as `core:core/config`"]
+      "then": ["it may list the dependency as `core:config`"]
     },
     {
       "requirement": "Spec Dependencies section",
@@ -140,8 +136,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:dc536a9d1c39e10b307978144bfbbd4143f5f0d2b58d1858bb9938af4fe05d05",
-    "verify.md": "sha256:4e3f613bfc55584afcb370a13de35d0a14d85a54ba261aee879db4745a21d30d"
+    "spec.md": "sha256:64dee3830d5120520694ea893ebf64af031ebad2d87ac360b7dc26d5b633ea7c",
+    "verify.md": "sha256:704547f3ef837fdd8cb6bdde75c41fc0c1e9ca4700907cb5ad999fc644a7e160"
   },
   "generatedBy": "core"
 }

@@ -33,4 +33,4 @@ Compliance is verified structurally: `@specd/core/infrastructure/` must contain 
 
 ### Spec
 
-- [`specs/_global/architecture/spec.md`](../../specs/_global/architecture/spec.md)
+- [`default:_global/architecture`](../../specs/_global/architecture/spec.md)

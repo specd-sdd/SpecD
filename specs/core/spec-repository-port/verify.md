@@ -127,7 +127,7 @@
 
 #### Scenario: Metadata exists
 
-- **GIVEN** a spec `core:core/config` with a `metadata.json` in the metadata storage
+- **GIVEN** a spec `core:config` with a `metadata.json` in the metadata storage
 - **WHEN** `metadata(spec)` is called
 - **THEN** the result contains the parsed JSON content with `originalHash`
 - **AND** `saveMetadata(spec, '{"title":"Config"}')` persists the JSON content

@@ -49,5 +49,5 @@ The `ConfigWriter.initProject` implementation MUST:
 
 ## Spec Dependencies
 
-- [`core:core/config`](../config/spec.md) — defines `ConfigWriter` port contract, `InitProjectOptions`, and `InitProjectResult`
+- [`core:config`](../config/spec.md) — defines `ConfigWriter` port contract, `InitProjectOptions`, and `InitProjectResult`
 - [`default:_global/architecture`](../../_global/architecture/spec.md) — port/adapter design constraints

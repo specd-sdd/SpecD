@@ -61,4 +61,4 @@ Entity unit tests in `packages/core/test/domain/` cover all valid state transiti
 
 ### Spec
 
-- [`specs/_global/architecture/spec.md`](../../specs/_global/architecture/spec.md)
+- [`default:_global/architecture`](../../specs/_global/architecture/spec.md)

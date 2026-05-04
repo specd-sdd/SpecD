@@ -1,4 +1,4 @@
-# Verification: cli:cli/logging-integration
+# Verification: cli:logging-integration
 
 ## Requirements
 

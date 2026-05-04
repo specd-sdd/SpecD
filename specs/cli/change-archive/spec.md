@@ -78,8 +78,8 @@ specd change archive add-oauth-login --skip-hooks pre
 
 ## Spec Dependencies
 
-- [`cli:cli/entrypoint`](../../cli/entrypoint/spec.md) — config discovery, exit codes, output conventions
-- [`core:core/change`](../../core/change/spec.md) — archivable state, archive semantics
-- [`core:core/archive-change`](../../core/archive-change/spec.md) — archive hook phase selectors and hook delegation
-- [`core:core/hook-execution-model`](../../core/hook-execution-model/spec.md) — `--skip-hooks` manual-control pattern
-- [`cli:cli/command-resource-naming`](../command-resource-naming/spec.md) — canonical plural naming and singular alias policy
+- [`cli:entrypoint`](../../cli/entrypoint/spec.md) — config discovery, exit codes, output conventions
+- [`core:change`](../../core/change/spec.md) — archivable state, archive semantics
+- [`core:archive-change`](../../core/archive-change/spec.md) — archive hook phase selectors and hook delegation
+- [`core:hook-execution-model`](../../core/hook-execution-model/spec.md) — `--skip-hooks` manual-control pattern
+- [`cli:command-resource-naming`](../command-resource-naming/spec.md) — canonical plural naming and singular alias policy

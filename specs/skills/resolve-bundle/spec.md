@@ -51,6 +51,6 @@ interface ResolveBundleInput {
 
 ## Spec Dependencies
 
-- [`core:core/config`](../../core/core/config/spec.md) — defines SpecdConfig type
+- [`core:config`](../../core/core/config/spec.md) — defines SpecdConfig type
 - [`skills:skill-bundle`](../skill-bundle/spec.md) — return type
 - [`skills:skill-repository-port`](../skill-repository-port/spec.md) — repository port

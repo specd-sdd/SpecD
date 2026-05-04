@@ -38,7 +38,7 @@ The file's absence is not an error — a spec with no `metadata.json` is treated
 {
   "title": "Change",
   "description": "The central domain entity in specd.",
-  "dependsOn": ["core:core/storage", "core:core/delta-format"],
+  "dependsOn": ["core:storage", "core:delta-format"],
   "contentHashes": {
     "spec.md": "sha256:abc123..."
   },
@@ -125,7 +125,7 @@ Staleness is advisory only. specd does not block any operation because metadata 
 
 `CompileContext` reads metadata via `SpecRepository.metadata()` for two purposes:
 
-1. **Spec collection** — `dependsOn` is followed transitively from `change.specIds` to discover which specs to include in the context. The full resolution order is defined in [`specs/core/config/spec.md`](../config/spec.md) — Requirement: Context spec selection. When metadata is absent for a spec during `dependsOn` traversal, a `missing-metadata` warning is emitted. `CompileContext` then attempts to extract `dependsOn` from the spec content using the schema's `metadataExtraction` declarations as a best-effort fallback.
+1. **Spec collection** — `dependsOn` is followed transitively from `change.specIds` to discover which specs to include in the context. The full resolution order is defined in [`core:config`](../config/spec.md) — Requirement: Context spec selection. When metadata is absent for a spec during `dependsOn` traversal, a `missing-metadata` warning is emitted. `CompileContext` then attempts to extract `dependsOn` from the spec content using the schema's `metadataExtraction` declarations as a best-effort fallback.
 2. **Spec content** — for each spec in the collected context set, if metadata is fresh, `CompileContext` uses `description`, `rules`, `constraints`, and `scenarios` as the compact, machine-optimised representation of that spec. If metadata is absent or stale, `CompileContext` falls back to the schema's `metadataExtraction` declarations to extract the same fields deterministically and emits a staleness warning.
 
 A spec that cannot be resolved (missing file, unknown workspace) is silently skipped with a warning.
@@ -152,8 +152,8 @@ A spec that cannot be resolved (missing file, unknown workspace) is silently ski
 
 ## Spec Dependencies
 
-- [`core:core/config`](../config/spec.md) — context spec selection and resolution order
-- [`core:core/change`](../change/spec.md) — `specDependsOn` in the change manifest, per-spec declared dependencies
-- [`core:core/schema-format`](../schema-format/spec.md) — `requiredSpecArtifacts`, used to determine which files to hash for staleness detection
-- [`core:core/content-extraction`](../content-extraction/spec.md) — the extraction engine used as CompileContext fallback when metadata is stale
-- [`core:core/spec-repository-port`](../spec-repository-port/spec.md) — `metadata()` and `saveMetadata()` methods used for all metadata access
+- [`core:config`](../config/spec.md) — context spec selection and resolution order
+- [`core:change`](../change/spec.md) — `specDependsOn` in the change manifest, per-spec declared dependencies
+- [`core:schema-format`](../schema-format/spec.md) — `requiredSpecArtifacts`, used to determine which files to hash for staleness detection
+- [`core:content-extraction`](../content-extraction/spec.md) — the extraction engine used as CompileContext fallback when metadata is stale
+- [`core:spec-repository-port`](../spec-repository-port/spec.md) — `metadata()` and `saveMetadata()` methods used for all metadata access

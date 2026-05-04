@@ -170,13 +170,13 @@ Unknown variable paths are left unexpanded (the original `{{key.path}}` token is
 
 ## Spec Dependencies
 
-- [`core:core/workflow-model`](../workflow-model/spec.md) — step semantics, step availability
-- [`core:core/schema-format`](../schema-format/spec.md) — `workflow[].hooks` structure, `instruction:` and `run:` entries
-- [`core:core/hook-runner-port`](../hook-runner-port/spec.md) — `HookRunner` interface, `HookResult`, `HookVariables`, template expansion
-- [`core:core/transition-change`](../transition-change/spec.md) — hook execution during transitions
-- [`core:core/archive-change`](../archive-change/spec.md) — hook execution during archiving
-- [`core:core/run-step-hooks`](../run-step-hooks/spec.md) — shared hook execution engine
-- [`core:core/get-hook-instructions`](../get-hook-instructions/spec.md) — `instruction:` hook query
-- [`core:core/config`](../config/spec.md) — project-level hooks via `schemaOverrides`
-- [`cli:cli/change-transition`](../../cli/change-transition/spec.md) — transition `--skip-hooks` selectors
-- [`cli:cli/change-archive`](../../cli/change-archive/spec.md) — archive `--skip-hooks` selectors
+- [`core:workflow-model`](../workflow-model/spec.md) — step semantics, step availability
+- [`core:schema-format`](../schema-format/spec.md) — `workflow[].hooks` structure, `instruction:` and `run:` entries
+- [`core:hook-runner-port`](../hook-runner-port/spec.md) — `HookRunner` interface, `HookResult`, `HookVariables`, template expansion
+- [`core:transition-change`](../transition-change/spec.md) — hook execution during transitions
+- [`core:archive-change`](../archive-change/spec.md) — hook execution during archiving
+- [`core:run-step-hooks`](../run-step-hooks/spec.md) — shared hook execution engine
+- [`core:get-hook-instructions`](../get-hook-instructions/spec.md) — `instruction:` hook query
+- [`core:config`](../config/spec.md) — project-level hooks via `schemaOverrides`
+- [`cli:change-transition`](../../cli/change-transition/spec.md) — transition `--skip-hooks` selectors
+- [`cli:change-archive`](../../cli/change-archive/spec.md) — archive `--skip-hooks` selectors

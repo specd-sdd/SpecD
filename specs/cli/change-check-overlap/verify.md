@@ -19,12 +19,12 @@
 
 #### Scenario: Two specs overlapping across multiple changes
 
-- **GIVEN** changes `alpha` (designing) and `beta` (implementing) both target `core:core/config`
-- **AND** changes `beta` and `gamma` (designing) both target `core:core/kernel`
+- **GIVEN** changes `alpha` (designing) and `beta` (implementing) both target `core:config`
+- **AND** changes `beta` and `gamma` (designing) both target `core:kernel`
 - **WHEN** `specd change check-overlap` is run in text mode
 - **THEN** stdout shows two groups, sorted by spec ID
-- **AND** the first group header is `core:core/config` with `alpha` and `beta` listed below
-- **AND** the second group header is `core:core/kernel` with `beta` and `gamma` listed below
+- **AND** the first group header is `core:config` with `alpha` and `beta` listed below
+- **AND** the second group header is `core:kernel` with `beta` and `gamma` listed below
 
 ### Requirement: JSON output format
 

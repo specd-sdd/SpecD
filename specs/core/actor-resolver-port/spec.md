@@ -48,5 +48,6 @@ Unlike `NullVcsAdapter` (which returns safe defaults for most methods), `NullAct
 
 ## Spec Dependencies
 
-- [`specs/_global/architecture/spec.md`](../../_global/architecture/spec.md) -- hexagonal architecture, port/adapter separation
-- [`specs/core/actor-resolver/spec.md`](../actor-resolver/spec.md) -- factory that selects the concrete implementation
+- [`default:_global/architecture`](../../_global/architecture/spec.md) -- hexagonal architecture, port/adapter separation
+
+- [`core:actor-resolver`](../actor-resolver/spec.md) -- factory that selects the concrete implementation

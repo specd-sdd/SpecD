@@ -1,4 +1,4 @@
-# cli:cli/plugins-uninstall
+# cli:plugins-uninstall
 
 ## Purpose
 
@@ -44,4 +44,4 @@ The format MUST be machine-parseable when invoked with `--format json`.
 
 - [`plugin-manager:uninstall-plugin-use-case`](../plugin-manager/uninstall-plugin-use-case/spec.md) — orchestrates plugin removal
 - [`plugin-manager:load-plugin-use-case`](../plugin-manager/load-plugin-use-case/spec.md) — loads plugin before uninstall
-- [`core:core/config-writer-port`](../core/config-writer-port/spec.md) — removes plugin declaration
+- [`core:config-writer-port`](../core/config-writer-port/spec.md) — removes plugin declaration

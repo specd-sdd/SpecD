@@ -2,7 +2,7 @@
   "title": "plugin-agent-claude:plugin-agent",
   "description": "Claude agent plugin implementation. Exports `create(): AgentPlugin` that provides skill installation with Claude Code frontmatter injection.",
   "dependsOn": [
-    "core:core/config",
+    "core:config",
     "plugin-manager:agent-plugin-type",
     "skills:skill-bundle",
     "skills:skill-repository"
@@ -134,7 +134,7 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:de9dce2d6a065234c642455b27506f8803fa4b601dcf1769329633ee24d1d1e6",
+    "spec.md": "sha256:46ac164143ac4928616a53c15abeca3b9f45d1cd741300c7627d095299da1385",
     "verify.md": "sha256:d2ee9a396ebf75a1293ae059e3f47a491a7064b6a07e12bf219b90bc9d874bdc"
   },
   "generatedBy": "core"

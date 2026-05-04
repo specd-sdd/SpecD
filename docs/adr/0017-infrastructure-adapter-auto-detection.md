@@ -63,6 +63,6 @@ The public export surface has since evolved. Concrete VCS and actor adapters, in
 
 ### Spec
 
-- [`specs/core/vcs-adapter/spec.md`](../../specs/core/vcs-adapter/spec.md)
-- [`specs/core/actor-resolver/spec.md`](../../specs/core/actor-resolver/spec.md)
-- [`specs/_global/architecture/spec.md`](../../specs/_global/architecture/spec.md)
+- [`core:vcs-adapter`](../../specs/core/vcs-adapter/spec.md)
+- [`core:actor-resolver`](../../specs/core/actor-resolver/spec.md)
+- [`default:_global/architecture`](../../specs/_global/architecture/spec.md)

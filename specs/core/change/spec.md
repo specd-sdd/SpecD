@@ -22,7 +22,7 @@ A Change declares:
 
 When `specIds` is updated via `updateSpecIds()`, any `specDependsOn` entry whose key is not present in the new set of spec IDs SHALL be removed. This prevents orphaned dependency entries from persisting through save/load round-trips and from causing `CompileContext` to resolve unnecessary transitive dependencies.
 
-`CompileContext` derives the active workspaces from `specIds` via the `workspaces` getter. It resolves `dependsOn` entries directly from `change.specIds` by reading each spec's `.specd-metadata.yaml`, then follows links transitively. This resolution happens dynamically on every execution, not as a snapshot. See [`specs/core/spec-metadata/spec.md`](../spec-metadata/spec.md) for the `.specd-metadata.yaml` format.
+`CompileContext` derives the active workspaces from `specIds` via the `workspaces` getter. It resolves `dependsOn` entries directly from `change.specIds` by reading each spec's `.specd-metadata.yaml`, then follows links transitively. This resolution happens dynamically on every execution, not as a snapshot. See [`core:spec-metadata`](../spec-metadata/spec.md) for the `.specd-metadata.yaml` format.
 
 ### Requirement: Lifecycle
 
@@ -60,7 +60,7 @@ Returning to `designing` from a later state (e.g. `implementing → designing`, 
 
 The `implementing` and `verifying` states form a loop that repeats until verification passes.
 
-The transition `implementing → verifying` is gated by the workflow model's task completion gating rule (see [`specs/core/workflow-model/spec.md` — Requirement: Task completion gating](../workflow-model/spec.md)). Because the `verifying` step's `requires` includes `tasks` (which declares `taskCompletionCheck`), the transition is automatically blocked when incomplete task items remain. This is a content-level check on the artifact files, not a check on approval state.
+The transition `implementing → verifying` is gated by the workflow model's task completion gating rule (see [`core:workflow-model` — Requirement: Task completion gating](../workflow-model/spec.md)). Because the `verifying` step's `requires` includes `tasks` (which declares `taskCompletionCheck`), the transition is automatically blocked when incomplete task items remain. This is a content-level check on the artifact files, not a check on approval state.
 
 Verification has two distinct outcomes:
 
@@ -166,7 +166,7 @@ A Change can reconcile its artifact map against the current schema's artifact ty
 
 The change manifest contains an **append-only `history` array** of typed events. Every significant operation appends one or more events. Events are never modified or removed.
 
-The **current lifecycle state** of a Change is derived entirely from its history: the `to` field of the most recent `transitioned` event. If no `transitioned` event exists, the state is `drafting`. No separate state snapshot is stored. The JSON serialization of these events in `manifest.json` is defined in [`specs/core/change-manifest/spec.md` — Requirement: Manifest structure](../change-manifest/spec.md).
+The **current lifecycle state** of a Change is derived entirely from its history: the `to` field of the most recent `transitioned` event. If no `transitioned` event exists, the state is `drafting`. No separate state snapshot is stored. The JSON serialization of these events in `manifest.json` is defined in [`core:change-manifest` — Requirement: Manifest structure](../change-manifest/spec.md).
 
 The **current draft/active status** is derived from history: if the most recent `drafted` or `restored` event is of type `drafted`, the change is currently shelved in `drafts/`; otherwise it is active in `changes/`.
 
@@ -210,8 +210,8 @@ Approval invalidation caused by artifact drift MUST capture the full set of affe
 
 #### Scenario: Overlap conflict invalidation
 
-- **GIVEN** change `beta` targets `core:core/config`
-- **AND** change `alpha` also targets `core:core/config` and is archived with `allowOverlap: true`
+- **GIVEN** change `beta` targets `core:config`
+- **AND** change `alpha` also targets `core:config` and is archived with `allowOverlap: true`
 - **WHEN** the archive invalidates `beta`
 - **THEN** an `invalidated` event with `cause: 'spec-overlap-conflict'` is appended to `beta`'s history
 - **AND** a `transitioned` event rolling back to `designing` is appended
@@ -270,7 +270,7 @@ A change may be moved between storage locations without affecting its lifecycle 
 - Both approval gates default to `false` — teams opt in via `approvals` in `specd.yaml`
 - When `approvals.spec: true`, spec approval is required before `implementing`
 - When `approvals.signoff: true`, sign-off is always required before `archivable`, regardless of change content
-- Task completion gating is enforced generically by the workflow model — any step that requires an artifact with `taskCompletionCheck` is automatically gated (see [`specs/core/workflow-model/spec.md`](../workflow-model/spec.md))
+- Task completion gating is enforced generically by the workflow model — any step that requires an artifact with `taskCompletionCheck` is automatically gated (see [`core:workflow-model`](../workflow-model/spec.md))
 - `verifying → implementing` does not trigger approval invalidation
 - History events are never modified or deleted; invalidated approvals are identifiable by a subsequent `invalidated` event
 - Historical implementation detection is derived from append-only history by scanning for any `transitioned` event whose `to` field is `implementing`
@@ -279,8 +279,8 @@ A change may be moved between storage locations without affecting its lifecycle 
 
 ## Spec Dependencies
 
-- [`core:core/change-manifest`](../change-manifest/spec.md) — manifest serialization of artifact and history state
-- [`core:core/workflow-model`](../workflow-model/spec.md) — workflow step semantics and requires gating
-- [`core:core/spec-metadata`](../spec-metadata/spec.md) — dependency metadata resolution used during context compilation
-- [`core:core/spec-id-format`](../spec-id-format/spec.md) — canonical `workspace:capabilityPath` identifiers for spec-scoped files
+- [`core:change-manifest`](../change-manifest/spec.md) — manifest serialization of artifact and history state
+- [`core:workflow-model`](../workflow-model/spec.md) — workflow step semantics and requires gating
+- [`core:spec-metadata`](../spec-metadata/spec.md) — dependency metadata resolution used during context compilation
+- [`core:spec-id-format`](../spec-id-format/spec.md) — canonical `workspace:capabilityPath` identifiers for spec-scoped files
 - [`default:_global/architecture`](../../_global/architecture/spec.md) — domain ownership of lifecycle and artifact invariants

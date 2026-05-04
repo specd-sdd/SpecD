@@ -180,8 +180,8 @@ The previous `postHookFailures` field is removed because both hook phases are no
 
 ## Spec Dependencies
 
-- [`core:core/change`](../change/spec.md) — lifecycle state machine and artifact review downgrade semantics
-- [`core:core/run-step-hooks`](../run-step-hooks/spec.md) — hook execution entry point
-- [`core:core/hook-execution-model`](../hook-execution-model/spec.md) — hook ordering and failure semantics
-- [`core:core/workflow-model`](../workflow-model/spec.md) — workflow `requires` and verification routing
+- [`core:change`](../change/spec.md) — lifecycle state machine and artifact review downgrade semantics
+- [`core:run-step-hooks`](../run-step-hooks/spec.md) — hook execution entry point
+- [`core:hook-execution-model`](../hook-execution-model/spec.md) — hook ordering and failure semantics
+- [`core:workflow-model`](../workflow-model/spec.md) — workflow `requires` and verification routing
 - [`default:_global/architecture`](../../../_global/architecture/spec.md) — application ownership and port boundaries

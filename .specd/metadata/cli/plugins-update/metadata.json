@@ -1,0 +1,61 @@
+{
+  "title": "cli:plugins-update",
+  "description": "Defines the CLI contract for updating installed plugins. The command reinstalls plugins to pick up new versions or configuration changes.",
+  "dependsOn": ["plugin-manager:update-plugin-use-case", "core:config-writer-port"],
+  "context": [
+    "Defines the CLI contract for updating installed plugins. The command reinstalls plugins to pick up new versions or configuration changes."
+  ],
+  "rules": [
+    {
+      "requirement": "Command signature",
+      "rules": [
+        "The command MUST accept optional plugin names as positional arguments:\n\n```bash\nspecd plugins update [<plugin>...]\n```"
+      ]
+    },
+    {
+      "requirement": "Update behavior",
+      "rules": [
+        "- **Without arguments**: Updates all declared plugins in `specd.yaml`.\n- **With plugin names**: Updates only the specified plugins.\n- The command MUST be idempotent — running update multiple times produces the same result.\n- The command MUST NOT mutate the plugin configuration in `specd.yaml`."
+      ]
+    },
+    {
+      "requirement": "Exit code",
+      "rules": ["The command MUST exit with code 1 if any plugin fails to update."]
+    },
+    {
+      "requirement": "Output",
+      "rules": [
+        "For each plugin, the command MUST output:\n\n- Plugin name\n- Update status (`updated`, `skipped`, or error message)\n\nThe format MUST be machine-parseable when invoked with `--format json`."
+      ]
+    }
+  ],
+  "constraints": [
+    "The command MUST be idempotent.",
+    "The command MUST NOT add or remove plugins from config."
+  ],
+  "scenarios": [
+    {
+      "requirement": "Command signature",
+      "name": "Update all plugins",
+      "when": ["specd plugins update is invoked with no arguments"],
+      "then": ["all declared plugins are updated"]
+    },
+    {
+      "requirement": "Command signature",
+      "name": "Update specific plugins",
+      "when": ["specd plugins update @specd/plugin-agent-claude is invoked"],
+      "then": ["only the specified plugin is updated"]
+    },
+    {
+      "requirement": "Exit code",
+      "name": "Update failure",
+      "when": ["any plugin fails to update"],
+      "then": ["the command exits with code 1"]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:1ac372c8f7c79d790bdf7fb1c84a80ba9a3082f3557d2326f9c1944837ea1179",
+    "verify.md": "sha256:b3da793c1adf0c24587c7146db6afe24397563303df812ce70aa7191645ef51d"
+  },
+  "generatedBy": "core"
+}

@@ -1,11 +1,7 @@
 {
   "title": "plugin-manager:update-plugin-use-case",
   "description": "Use case that orchestrates plugin update. This is an idempotent reinstall that does not modify config.",
-  "dependsOn": [
-    "core:core/config",
-    "plugin-manager:agent-plugin-type",
-    "plugin-manager:plugin-loader"
-  ],
+  "dependsOn": ["core:config", "plugin-manager:agent-plugin-type", "plugin-manager:plugin-loader"],
   "context": [
     "Use case that orchestrates plugin update. This is an idempotent reinstall that does not modify config."
   ],
@@ -62,7 +58,7 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:376de1aeb8025b632342921c09e9272d467e4807036c020324ecf0f2c2e988b9",
+    "spec.md": "sha256:931b80e01c87fc7f379047851b95319dba275c076586e3433e5f2b21db81e225",
     "verify.md": "sha256:fe1c708651e29387f372538798ae6ae4e62c7550c7eb968d2a8290f93d897160"
   },
   "generatedBy": "core"

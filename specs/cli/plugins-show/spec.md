@@ -1,4 +1,4 @@
-# cli:cli/plugins-show
+# cli:plugins-show
 
 ## Purpose
 

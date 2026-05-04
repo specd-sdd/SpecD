@@ -108,5 +108,5 @@ When invoked without `--file` and no `specd.yaml` can be discovered, the command
 
 ## Spec Dependencies
 
-- [`cli:cli/entrypoint`](../entrypoint/spec.md) — global CLI conventions (exit codes, `--format`, `--config`, error output)
-- [`core:core/validate-schema`](../../core/validate-schema/spec.md) — the use case that performs validation
+- [`cli:entrypoint`](../entrypoint/spec.md) — global CLI conventions (exit codes, `--format`, `--config`, error output)
+- [`core:validate-schema`](../../core/validate-schema/spec.md) — the use case that performs validation

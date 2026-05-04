@@ -51,6 +51,6 @@ Inside the mutation callback, the repository supplies the fresh persisted `Chang
 
 ## Spec Dependencies
 
-- [`core:core/change`](../change/spec.md)
-- [`core:core/draft-change`](../draft-change/spec.md)
+- [`core:change`](../change/spec.md)
+- [`core:draft-change`](../draft-change/spec.md)
 - [`default:_global/architecture`](../../_global/architecture/spec.md)

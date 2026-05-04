@@ -99,6 +99,6 @@ $ specd spec context default:auth/login --constraints --format json
 
 ## Spec Dependencies
 
-- [`cli:cli/entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
-- [`core:core/config`](../../core/config/spec.md) — `contextMode` accepted values and default
-- [`core:core/get-spec-context`](../../core/get-spec-context/spec.md) — use case and result shape for spec context entries
+- [`cli:entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
+- [`core:config`](../../core/config/spec.md) — `contextMode` accepted values and default
+- [`core:get-spec-context`](../../core/get-spec-context/spec.md) — use case and result shape for spec context entries

@@ -6,24 +6,24 @@
 
 #### Scenario: Basic usage with defaults
 
-- **WHEN** running `specd specs outline core:core/config`
+- **WHEN** running `specd specs outline core:config`
 - **THEN** it resolves ALL spec-scoped artifacts (e.g. `spec.md`, `verify.md`)
 - **AND** outputs the default compact outline subset for each one that exists
 
 #### Scenario: Use artifactId filter
 
-- **WHEN** running `specd specs outline core:core/config --artifact verify`
+- **WHEN** running `specd specs outline core:config --artifact verify`
 - **THEN** it resolves `verify` to `verify.md`
 - **AND** outputs the outline of `verify.md`
 
 #### Scenario: Full mode
 
-- **WHEN** running `specd specs outline core:core/config --artifact specs --full`
+- **WHEN** running `specd specs outline core:config --artifact specs --full`
 - **THEN** the output includes all selector-addressable node families for that parser
 
 #### Scenario: Hints mode
 
-- **WHEN** running `specd specs outline core:core/config --artifact specs --hints`
+- **WHEN** running `specd specs outline core:config --artifact specs --hints`
 - **THEN** the response includes root-level `selectorHints` keyed by returned node type
 - **AND** hint values are placeholders
 
@@ -49,8 +49,8 @@
 
 #### Scenario: Available outline reference resolved on demand
 
-- **GIVEN** another workflow output provides `availableOutlines: ["core:core/config"]`
-- **WHEN** `specd specs outline core:core/config --artifact specs` is executed
+- **GIVEN** another workflow output provides `availableOutlines: ["core:config"]`
+- **WHEN** `specd specs outline core:config --artifact specs` is executed
 - **THEN** outline content is returned for that spec/artifact
 - **AND** no embedded outline payload is required in the source command
 
@@ -58,7 +58,7 @@
 
 #### Scenario: Deduplicate artifact and file flags
 
-- **WHEN** running `specd specs outline core:core/config --artifact specs --file spec.md`
+- **WHEN** running `specd specs outline core:config --artifact specs --file spec.md`
 - **THEN** it only renders the outline for `spec.md` once
 
 ### Requirement: Error Handling

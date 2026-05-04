@@ -1,7 +1,7 @@
 {
   "title": "Command Resource Naming",
   "description": "Inconsistent singular/plural command-group naming increases cognitive load and makes CLI usage less predictable. This spec defines one canonical naming policy for countable CLI resource groups and standardizes alias behavior so commands, docs, and skills stay coherent while preserving compatibility.",
-  "dependsOn": ["cli:cli/entrypoint"],
+  "dependsOn": ["cli:entrypoint"],
   "context": [
     "Inconsistent singular/plural command-group naming increases cognitive load and makes CLI usage less predictable. This spec defines one canonical naming policy for countable CLI resource groups and standardizes alias behavior so commands, docs, and skills stay coherent while preserving compatibility."
   ],
@@ -94,7 +94,7 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:e5067f43c52af9d4c4dec7cce3e88e56459486798a9d0e9b0410d5f59e2370d2",
+    "spec.md": "sha256:b159acf1428275aff42bb08cb60f33d4aedf3c3936dbf571abfa1f684b3d013c",
     "verify.md": "sha256:5467d54c7ce56fac9155ad7d223ba5351700e642096099ae28487a963d3854df"
   },
   "generatedBy": "core"

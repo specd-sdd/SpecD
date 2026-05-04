@@ -1,4 +1,4 @@
-# Verification: cli:cli/plugins-uninstall
+# Verification: cli:plugins-uninstall
 
 ## Requirements
 

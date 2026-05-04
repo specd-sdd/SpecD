@@ -69,7 +69,10 @@ All fields are required and readonly.
 
 ## Spec Dependencies
 
-- [`specs/core/change/spec.md`](../change/spec.md) -- Change entity lifecycle and state machine
-- [`specs/core/schema-format/spec.md`](../schema-format/spec.md) -- schema structure and pre-hash cleanup rules
-- [`specs/core/composition/spec.md`](../composition/spec.md) -- how the use case is wired and injected
-- [`specs/core/kernel/spec.md`](../kernel/spec.md) -- kernel entry under `specs.approveSignoff`
+- [`core:change`](../change/spec.md) -- Change entity lifecycle and state machine
+
+- [`core:schema-format`](../schema-format/spec.md) -- schema structure and pre-hash cleanup rules
+
+- [`core:composition`](../composition/spec.md) -- how the use case is wired and injected
+
+- [`core:kernel`](../kernel/spec.md) -- kernel entry under `specs.approveSignoff`

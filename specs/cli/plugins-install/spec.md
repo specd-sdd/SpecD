@@ -1,4 +1,4 @@
-# cli:cli/plugins-install
+# cli:plugins-install
 
 ## Purpose
 
@@ -59,4 +59,4 @@ The format MUST be machine-parseable when invoked with `--format json`.
 
 - [`plugin-manager:install-plugin-use-case`](../plugin-manager/install-plugin-use-case/spec.md) — orchestrates plugin installation
 - [`plugin-manager:load-plugin-use-case`](../plugin-manager/load-plugin-use-case/spec.md) — validates plugin before installation
-- [`core:core/config-writer-port`](../core/config-writer-port/spec.md) — persists plugin declarations
+- [`core:config-writer-port`](../core/config-writer-port/spec.md) — persists plugin declarations

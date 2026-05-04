@@ -52,7 +52,7 @@ That schema MUST define:
 - relationship tables matching the persisted `RelationType` values used by the code graph, including `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES`
 - any derived or backend-specific storage columns required by the implementation, such as `searchName`
 
-The physical schema is an implementation concern of the Ladybug adapter. Storage-agnostic consumers MUST depend on `code-graph:code-graph/graph-store` instead of this spec.
+The physical schema is an implementation concern of the Ladybug adapter. Storage-agnostic consumers MUST depend on `code-graph:graph-store` instead of this spec.
 
 ### Requirement: Node tables
 
@@ -183,14 +183,14 @@ Backend-specific metadata storage details remain internal to the adapter.
 
 - `LadybugGraphStore` is an infrastructure adapter, not part of the abstract graph-store contract
 - `ladybug` is the stable backend id used to select this adapter from a multi-backend graph-store registry
-- Ladybug-specific file layout, FTS behavior, schema shape, and schema-version handling are defined here, not in `code-graph:code-graph/graph-store`
+- Ladybug-specific file layout, FTS behavior, schema shape, and schema-version handling are defined here, not in `code-graph:graph-store`
 - All Ladybug scratch files and persisted database artifacts are rooted under `configPath`
 - Node table layout, relationship tables, and FTS index shape defined here are Ladybug-specific and MUST NOT be treated as a portable graph-store schema
 - Storage-agnostic use cases and CLI commands MUST NOT depend on this spec unless they truly require Ladybug-specific behavior
 
 ## Spec Dependencies
 
-- [`code-graph:code-graph/graph-store`](../graph-store/spec.md) — abstract graph-store contract implemented by this adapter
-- [`core:core/config`](../../../core/config/spec.md) — `configPath` and derived graph/temp directories
-- [`code-graph:code-graph/symbol-model`](../symbol-model/spec.md) — persisted node and relation concepts
-- [`code-graph:code-graph/workspace-integration`](../workspace-integration/spec.md) — workspace-prefixed file and spec identity rules
+- [`code-graph:graph-store`](../graph-store/spec.md) — abstract graph-store contract implemented by this adapter
+- [`core:config`](../../../core/config/spec.md) — `configPath` and derived graph/temp directories
+- [`code-graph:symbol-model`](../symbol-model/spec.md) — persisted node and relation concepts
+- [`code-graph:workspace-integration`](../workspace-integration/spec.md) — workspace-prefixed file and spec identity rules

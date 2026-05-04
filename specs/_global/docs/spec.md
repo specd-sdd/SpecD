@@ -93,7 +93,7 @@ Chosen option: "{title of option 1}", because {justification. e.g., only option,
 
 ### Spec
 
-- [`specs/path/to/spec.md`](../../specs/path/to/spec.md)
+- [`core:config`](../config/spec.md)
 ```
 
 `## Decision Drivers`, `## Considered Options`, `## Pros and Cons of the Options`, and `## More Information` are optional — omit them when they add no value. `### Confirmation` inside `## Decision Outcome` is always present. `### Spec` inside `## More Information` is always present.

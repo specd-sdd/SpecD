@@ -48,4 +48,4 @@ The timestamp prefix is a **filesystem convention only**. It is never stored in 
 
 ### Spec
 
-- [`specs/core/storage/spec.md`](../../specs/core/storage/spec.md)
+- [`core:storage`](../../specs/core/storage/spec.md)

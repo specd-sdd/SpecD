@@ -1,0 +1,95 @@
+{
+  "title": "RestoreChange",
+  "description": "Drafted changes are only useful if they can be brought back into the active working set when the user is ready to resume. The `RestoreChange` use case recovers a drafted change by appending a `restored` event to its history, and the repository implementation moves the change directory from `drafts/` back to `changes/` when persisted.",
+  "dependsOn": ["core:change", "core:draft-change", "default:_global/architecture"],
+  "context": [
+    "Drafted changes are only useful if they can be brought back into the active working set when the user is ready to resume. The `RestoreChange` use case recovers a drafted change by appending a `restored` event to its history, and the repository implementation moves the change directory from `drafts/` back to `changes/` when persisted."
+  ],
+  "rules": [
+    {
+      "requirement": "Input contract",
+      "rules": [
+        "`RestoreChange.execute` SHALL accept a `RestoreChangeInput` with the following field:\n\n- `name` (string, required) — the drafted change to restore"
+      ]
+    },
+    {
+      "requirement": "Change must exist",
+      "rules": [
+        "The use case MUST load the change from the `ChangeRepository` by name. If no change exists with the given name, it MUST throw `ChangeNotFoundError`."
+      ]
+    },
+    {
+      "requirement": "Actor resolution",
+      "rules": [
+        "The use case MUST resolve the current actor identity via the `ActorResolver` port. The resolved actor is recorded in the `restored` event."
+      ]
+    },
+    {
+      "requirement": "Restored event appended to history",
+      "rules": [
+        "The use case MUST call `change.restore(actor)` to append a `restored` event to the change's history. The event records:\n\n- `type`: `'restored'`\n- `at`: the current timestamp\n- `by`: the resolved actor identity"
+      ]
+    },
+    {
+      "requirement": "Persistence",
+      "rules": [
+        "After appending the restored event, the use case MUST persist the change through `ChangeRepository.mutate(name, fn)`.\n\nInside the mutation callback, the repository supplies the fresh persisted `Change` for `name`; the use case calls `change.restore(actor)` on that instance and returns it. When the callback resolves, the repository persists the updated manifest and performs any required directory relocation back to `changes/`.\n\n`RestoreChange.execute` returns the updated `Change` instance produced by that serialized mutation."
+      ]
+    },
+    {
+      "requirement": "Dependencies",
+      "rules": [
+        "`RestoreChange` depends on two ports injected via constructor:\n\n- `ChangeRepository` — for loading and persistence\n- `ActorResolver` — for resolving the current actor identity"
+      ]
+    }
+  ],
+  "constraints": [
+    "The use case MUST NOT perform any state transitions — restoring is orthogonal to lifecycle state",
+    "The use case delegates directory relocation entirely to the repository layer",
+    "The isDrafted property on the Change entity is derived from the most recent drafted or restored event in history"
+  ],
+  "scenarios": [
+    {
+      "requirement": "Change must exist",
+      "name": "Non-existent change is rejected",
+      "when": ["RestoreChange.execute is called with a name that does not exist in the repository"],
+      "then": ["it throws ChangeNotFoundError"]
+    },
+    {
+      "requirement": "Actor resolution",
+      "name": "Actor identity is recorded in the restored event",
+      "when": ["RestoreChange.execute is called"],
+      "then": [
+        "the restored event's by field matches the identity returned by ActorResolver.identity()"
+      ]
+    },
+    {
+      "requirement": "Restored event appended to history",
+      "name": "Change is no longer drafted after restore",
+      "given": ["a change that has been drafted (isDrafted === true)"],
+      "when": ["RestoreChange.execute is called with its name"],
+      "then": ["the returned change has isDrafted === false"]
+    },
+    {
+      "requirement": "Restored event appended to history",
+      "name": "Restored event is appended to history",
+      "when": ["RestoreChange.execute returns a change"],
+      "then": ["the last event in the change's history is a restored event"]
+    },
+    {
+      "requirement": "Persistence",
+      "name": "Change is persisted through serialized mutation",
+      "when": ["RestoreChange.execute completes successfully"],
+      "then": [
+        "ChangeRepository.mutate(input.name, fn) is called",
+        "AND the callback records the restored event on the fresh persisted Change",
+        "AND the resulting change is relocated back to the active changes area by the repository"
+      ]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:7abeb8679afa1f1532f92a84366bce5c822bb4b577f844d79ea7c9b00788960a",
+    "verify.md": "sha256:5838d0c7d475328e47b135c9be2479b3473744d3e7dcdd299b991c076d56b7df"
+  },
+  "generatedBy": "core"
+}

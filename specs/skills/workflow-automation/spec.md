@@ -61,4 +61,4 @@ When review only needs one spec-scoped artifact, agents SHOULD prefer `specd cha
 
 ## Spec Dependencies
 
-- [`cli:cli/command-resource-naming`](../cli/command-resource-naming/spec.md) — canonical plural naming policy used by agent-facing command examples
+- [`cli:command-resource-naming`](../cli/command-resource-naming/spec.md) — canonical plural naming policy used by agent-facing command examples

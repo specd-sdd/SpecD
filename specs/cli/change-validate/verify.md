@@ -30,7 +30,7 @@
 #### Scenario: File path details come from validation metadata
 
 - **GIVEN** `ValidateArtifacts.execute` returns a file entry with filename `deltas/core/core/config/spec.md.delta.yaml`
-- **WHEN** `specd change validate my-change core:core/config --artifact specs` renders output
+- **WHEN** `specd change validate my-change core:config --artifact specs` renders output
 - **THEN** the CLI prints or serializes that filename from the result metadata
 - **AND** it does not recompute a replacement path in the CLI layer
 
@@ -38,7 +38,7 @@
 
 #### Scenario: Successful validate does not imply semantic approval
 
-- **GIVEN** `specd changes validate my-change core:core/config` passes
+- **GIVEN** `specd changes validate my-change core:config` passes
 - **WHEN** a workflow step evaluates artifact quality
 - **THEN** the pass result is treated as structural/state validation only
 - **AND** semantic/content review remains a separate required activity
@@ -49,28 +49,28 @@
 
 - **GIVEN** a change where all artifacts pass validation
 - **AND** validation reports file `deltas/core/core/config/spec.md.delta.yaml`
-- **WHEN** `specd change validate my-change core:core/config --artifact specs` is run
-- **THEN** stdout contains `validated my-change/core:core/config: all artifacts pass`
+- **WHEN** `specd change validate my-change core:config --artifact specs` is run
+- **THEN** stdout contains `validated my-change/core:config: all artifacts pass`
 - **AND** stdout contains `file: deltas/core/core/config/spec.md.delta.yaml`
-- **AND** stdout contains `specd change spec-preview my-change core:core/config`
+- **AND** stdout contains `specd change spec-preview my-change core:config`
 - **AND** the process exits with code 0
 
 #### Scenario: Pass with notes
 
 - **GIVEN** a change where artifacts pass but there are optimization notes
 - **AND** validation reports file `deltas/core/core/config/spec.md.delta.yaml`
-- **WHEN** `specd change validate my-change core:core/config --artifact specs` is run
+- **WHEN** `specd change validate my-change core:config --artifact specs` is run
 - **THEN** stdout contains a pass message with `pass (N note(s))`
 - **AND** stdout contains `note:` lines for each note
 - **AND** stdout contains `file: deltas/core/core/config/spec.md.delta.yaml`
-- **AND** stdout contains `specd change spec-preview my-change core:core/config`
+- **AND** stdout contains `specd change spec-preview my-change core:config`
 - **AND** the process exits with code 0
 
 #### Scenario: JSON output on pass includes notes and files
 
 - **GIVEN** a change where all artifacts pass validation with optimization notes
 - **AND** validation reports file `deltas/core/core/config/spec.md.delta.yaml`
-- **WHEN** `specd change validate my-change core:core/config --artifact specs --format json` is run
+- **WHEN** `specd change validate my-change core:config --artifact specs --format json` is run
 - **THEN** stdout is valid JSON with `passed` equal to `true`, `failures` equal to `[]`, and a `notes` array
 - **AND** `files` contains an entry with `filename: \"deltas/core/core/config/spec.md.delta.yaml\"`
 - **AND** the process exits with code 0
@@ -81,7 +81,7 @@
 
 - **GIVEN** a change where a required artifact fails validation and has optimization notes
 - **AND** validation reports missing file `deltas/core/core/config/spec.md.delta.yaml`
-- **WHEN** `specd change validate my-change core:core/config --artifact specs` is run
+- **WHEN** `specd change validate my-change core:config --artifact specs` is run
 - **THEN** stdout contains `validation failed`
 - **AND** stdout contains `missing: deltas/core/core/config/spec.md.delta.yaml`
 - **AND** stdout contains `error:` lines for each failure
@@ -91,7 +91,7 @@
 #### Scenario: JSON output on failure includes notes and files
 
 - **GIVEN** a change where a required artifact fails validation and has notes
-- **WHEN** `specd change validate my-change core:core/config --artifact specs --format json` is run
+- **WHEN** `specd change validate my-change core:config --artifact specs --format json` is run
 - **THEN** stdout is valid JSON with `passed` equal to `false`
 - **AND** `failures` contains at least one entry
 - **AND** `notes` contains the optimization suggestions
@@ -100,7 +100,7 @@
 #### Scenario: Dependency-block failure preserves core blocker status context
 
 - **GIVEN** validation reports a dependency-blocked failure from core including dependency status context
-- **WHEN** `specd change validate my-change core:core/config --artifact specs` is run
+- **WHEN** `specd change validate my-change core:config --artifact specs` is run
 - **THEN** stdout contains the failure description exactly as emitted by core validation
 - **AND** the CLI does not replace it with generic "incomplete dependency" wording
 

@@ -22,9 +22,9 @@
 
 #### Scenario: Agent fetches full outline using canonical command
 
-- **GIVEN** artifact-instruction output includes `availableOutlines: ["core:core/config"]`
+- **GIVEN** artifact-instruction output includes `availableOutlines: ["core:config"]`
 - **WHEN** the agent needs full structure for delta authoring
-- **THEN** it runs `specd specs outline core:core/config --artifact specs`
+- **THEN** it runs `specd specs outline core:config --artifact specs`
 - **AND** uses that output as the outline source
 
 #### Scenario: Agent avoids inline outline dependency

@@ -49,5 +49,5 @@ This type guard lives in the domain layer so that application use cases and infr
 
 ## Spec Dependencies
 
-- [`core:core/config`](../../core/core/config/spec.md) — defines SpecdConfig type
+- [`core:config`](../../core/core/config/spec.md) — defines SpecdConfig type
 - [`plugin-manager:specd-plugin-type`](../specd-plugin-type/spec.md) — base plugin interface

@@ -1,4 +1,4 @@
-# cli:cli/logging-integration
+# cli:logging-integration
 
 ## Purpose
 
@@ -38,6 +38,6 @@ The CLI MUST NOT attempt to configure or modify the project-wide file logging, w
 
 ## Spec Dependencies
 
-- [`core:core/kernel-logging`](../../core/core/kernel-logging/spec.md) — The CLI registers its destinations in the Kernel.
-- [`core:core/logger-port`](../../core/core/logger-port/spec.md) — The CLI uses the `LogDestination` and `LogEntry` interfaces.
+- [`core:kernel-logging`](../../core/core/kernel-logging/spec.md) — The CLI registers its destinations in the Kernel.
+- [`core:logger-port`](../../core/core/logger-port/spec.md) — The CLI uses the `LogDestination` and `LogEntry` interfaces.
 - [`default:_global/architecture`](../../../default/_global/architecture/spec.md) — Adheres to the infrastructure-to-core delegation pattern.

@@ -64,8 +64,8 @@ Once a change is archived, the resulting `ArchivedChange` record and its directo
 
 ## Spec Dependencies
 
-- [`core:core/repository-port`](../repository-port/spec.md) — `Repository` base class, `RepositoryConfig`, shared accessors
+- [`core:repository-port`](../repository-port/spec.md) — `Repository` base class, `RepositoryConfig`, shared accessors
 - [`default:_global/architecture`](../../_global/architecture/spec.md) — ports as abstract classes, application layer uses ports only
-- [`core:core/change`](../change/spec.md) — Change entity, `archivable` state, `ActorIdentity`, lifecycle transitions
-- [`core:core/storage`](../storage/spec.md) — archive pattern configuration, archive index format, directory naming
-- [`core:core/archive-change`](../archive-change/spec.md) — ArchiveChange use case that delegates to this port
+- [`core:change`](../change/spec.md) — Change entity, `archivable` state, `ActorIdentity`, lifecycle transitions
+- [`core:storage`](../storage/spec.md) — archive pattern configuration, archive index format, directory naming
+- [`core:archive-change`](../archive-change/spec.md) — ArchiveChange use case that delegates to this port

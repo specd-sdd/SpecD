@@ -46,17 +46,17 @@
 
 #### Scenario: Existing delta-capable spec is persisted as a delta filename
 
-- **GIVEN** `core:core/config` already exists
+- **GIVEN** `core:config` already exists
 - **AND** the active schema artifact `specs` declares `delta: true` and output `spec.md`
-- **WHEN** a change is created for `core:core/config`
-- **THEN** the manifest file entry for `specs:core:core/config` stores `filename: "deltas/core/core/config/spec.md.delta.yaml"`
+- **WHEN** a change is created for `core:config`
+- **THEN** the manifest file entry for `specs:core:config` stores `filename: "deltas/core/core/config/spec.md.delta.yaml"`
 - **AND** it does not first store `specs/core/core/config/spec.md`
 
 #### Scenario: New spec is persisted as a direct specs filename
 
-- **GIVEN** `core:core/new-capability` does not exist
-- **WHEN** a change is created for `core:core/new-capability`
-- **THEN** the manifest file entry for `specs:core:core/new-capability` stores `filename: "specs/core/core/new-capability/spec.md"`
+- **GIVEN** `core:new-capability` does not exist
+- **WHEN** a change is created for `core:new-capability`
+- **THEN** the manifest file entry for `specs:core:new-capability` stores `filename: "specs/core/core/new-capability/spec.md"`
 
 #### Scenario: Legacy stale filename can be normalized on load
 

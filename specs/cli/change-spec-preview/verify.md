@@ -6,14 +6,14 @@
 
 #### Scenario: Minimal invocation
 
-- **GIVEN** a valid change `my-change` with spec `core:core/config`
-- **WHEN** `specd change spec-preview my-change core:core/config` is invoked
+- **GIVEN** a valid change `my-change` with spec `core:config`
+- **WHEN** `specd change spec-preview my-change core:config` is invoked
 - **THEN** the command succeeds and outputs the merged spec content in text format
 
 #### Scenario: Diff flag
 
-- **GIVEN** a valid change with a delta for `core:core/config`
-- **WHEN** `specd change spec-preview my-change core:core/config --diff` is invoked
+- **GIVEN** a valid change with a delta for `core:config`
+- **WHEN** `specd change spec-preview my-change core:config --diff` is invoked
 - **THEN** the command outputs a unified diff instead of the full merged content
 
 ### Requirement: Text output — merged mode
@@ -99,15 +99,15 @@
 #### Scenario: Non-existent change exits with error
 
 - **GIVEN** no change named `ghost`
-- **WHEN** `specd change spec-preview ghost core:core/config` is invoked
+- **WHEN** `specd change spec-preview ghost core:config` is invoked
 - **THEN** the command prints an error message and exits with code 1
 
 #### Scenario: Spec not in change exits with error and suggestion
 
-- **GIVEN** a change `my-change` that does not include `core:core/other`
-- **WHEN** `specd change spec-preview my-change core:core/other` is invoked
+- **GIVEN** a change `my-change` that does not include `core:other`
+- **WHEN** `specd change spec-preview my-change core:other` is invoked
 - **THEN** the command prints an error message
-- **AND** the message includes `use specd specs show core:core/other`
+- **AND** the message includes `use specd specs show core:other`
 - **AND** the command exits with code 1
 
 #### Scenario: Warnings printed to stderr

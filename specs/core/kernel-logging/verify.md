@@ -1,4 +1,4 @@
-# Verification: core:core/kernel-logging
+# Verification: core:kernel-logging
 
 ## Requirements
 

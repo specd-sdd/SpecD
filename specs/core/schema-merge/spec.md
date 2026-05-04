@@ -171,8 +171,8 @@ const merged = mergeSchemaLayers(base, [pluginLayer, overrideLayer])
 
 ## Spec Dependencies
 
-- [`core:core/schema-format`](../schema-format/spec.md) — schema YAML structure, `kind`, `id` format, array entry identity
-- [`core:core/build-schema`](../build-schema/spec.md) — `SchemaYamlData` intermediate type consumed by `buildSchema`
+- [`core:schema-format`](../schema-format/spec.md) — schema YAML structure, `kind`, `id` format, array entry identity
+- [`core:build-schema`](../build-schema/spec.md) — `SchemaYamlData` intermediate type consumed by `buildSchema`
 - [`default:_global/architecture`](../../_global/architecture/spec.md) — domain layer purity, pure functions for stateless services
 
 ## ADRs

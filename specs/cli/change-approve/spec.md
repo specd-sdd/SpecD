@@ -68,5 +68,5 @@ specd change approve signoff add-oauth-login --reason "implementation verified"
 
 ## Spec Dependencies
 
-- [`cli:cli/entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
-- [`core:core/change`](../../core/change/spec.md) — approval gates, spec-approved and signed-off states
+- [`cli:entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
+- [`core:change`](../../core/change/spec.md) — approval gates, spec-approved and signed-off states

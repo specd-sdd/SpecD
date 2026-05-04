@@ -77,10 +77,10 @@ specd changes artifact-instruction add-auth verify --format json
 specd changes artifact-instruction add-auth tasks
 
 # Get full outline for a specific spec/artifact on demand
-specd specs outline core:core/config --artifact specs
+specd specs outline core:config --artifact specs
 ```
 
 ## Spec Dependencies
 
-- [`cli:cli/entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions, `--format` flag
-- [`core:core/get-artifact-instruction`](../../core/get-artifact-instruction/spec.md) — `GetArtifactInstruction` use case, result shape
+- [`cli:entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions, `--format` flag
+- [`core:get-artifact-instruction`](../../core/get-artifact-instruction/spec.md) — `GetArtifactInstruction` use case, result shape

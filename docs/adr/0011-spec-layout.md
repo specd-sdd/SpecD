@@ -50,4 +50,4 @@ The flat layout is simple but conflates cross-cutting constraints with package i
 
 ### Spec
 
-- [`specs/_global/spec-layout/spec.md`](../../specs/_global/spec-layout/spec.md)
+- [`default:_global/spec-layout-layout`](../../specs/_global/spec-layout/spec.md)

@@ -1,11 +1,7 @@
 {
   "title": "plugin-manager:uninstall-plugin-use-case",
   "description": "Use case that orchestrates plugin removal. Loads the plugin and calls its uninstall method.",
-  "dependsOn": [
-    "core:core/config",
-    "plugin-manager:agent-plugin-type",
-    "plugin-manager:plugin-loader"
-  ],
+  "dependsOn": ["core:config", "plugin-manager:agent-plugin-type", "plugin-manager:plugin-loader"],
   "context": [
     "Use case that orchestrates plugin removal. Loads the plugin and calls its uninstall method."
   ],
@@ -53,7 +49,7 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:512d89678ad6cc4b8b6ff06dfb77072be8a413e6c269c7ff13316b52d21c488c",
+    "spec.md": "sha256:0e764256973f5141d1e590c93c2d2e67a67c849d1c40e025b0c9110d2a3041d2",
     "verify.md": "sha256:ee427e2aa3064f24ae80667c024db8256482c1268e0c2a86e422871313df601b"
   },
   "generatedBy": "core"

@@ -61,8 +61,8 @@ Symbols (5):
    5.5  [core] type OnHookProgress  src/use-cases/run-hooks.ts:21 — /** Callback for hook... */
 
 Specs (5):
-  75.1  [core] core:core/hook-execution-model — Workflow steps declare hooks via...
-  57.6  [core] core:core/run-step-hooks — Agent-driven workflow steps declare...
+  75.1  [core] core:hook-execution-model — Workflow steps declare hooks via...
+  57.6  [core] core:run-step-hooks — Agent-driven workflow steps declare...
 ```
 
 Each line shows:
@@ -96,8 +96,8 @@ Symbols (10):
     ...
 
 Specs (10):
-   75.1  [core] core:core/hook-execution-model — Workflow steps declare hooks via...
-   57.6  [cli] cli:cli/change-run-hooks — Agent-driven workflow steps declare...
+   75.1  [core] core:hook-execution-model — Workflow steps declare hooks via...
+   57.6  [cli] cli:change-run-hooks — Agent-driven workflow steps declare...
     ...
 
 $ specd graph search "createKernel" --symbols --limit 3
@@ -108,15 +108,15 @@ Symbols (3):
 
 $ specd graph search "workspace import" --specs
 Specs (10):
-   24.4  [code-graph] code-graph:code-graph/workspace-integration — @specd/code-graph must integrate...
-   23.1  [core] core:core/workspace — Projects often span multiple code...
+   24.4  [code-graph] code-graph:workspace-integration — @specd/code-graph must integrate...
+   23.1  [core] core:workspace — Projects often span multiple code...
     ...
 
 $ specd graph search "nonexistent term"
 No results found.
 
 $ specd graph search "hook" --specs --limit 1 --format json
-{"symbols":[],"specs":[{"workspace":"core","specId":"core:core/hook-execution-model","path":"core/hook-execution-model","title":"Hook Execution Model","description":"Workflow steps declare...","score":61.0}]}
+{"symbols":[],"specs":[{"workspace":"core","specId":"core:hook-execution-model","path":"core/hook-execution-model","title":"Hook Execution Model","description":"Workflow steps declare...","score":61.0}]}
 
 $ specd graph search "transition" --kind method --limit 3
 Symbols (3):
@@ -131,7 +131,7 @@ Symbols (3):
     1.5  [core] interface KernelInternals  src/composition/kernel-internals.ts:38
 
 Specs (3):
-   30.7  [core] core:core/kernel — Consumers of @specd/core need a single...
+   30.7  [core] core:kernel — Consumers of @specd/core need a single...
     ...
 
 $ specd graph search "create" --file "*/composition/*" --symbols --limit 3
@@ -139,7 +139,7 @@ Symbols (1):
     1.8  [code-graph] interface CodeGraphOptions  src/composition/create-code-graph-provider.ts:13
 
 $ specd graph search "hook" --specs --limit 1 --format json --spec-content
-{"symbols":[],"specs":[{"workspace":"core","specId":"core:core/hook-execution-model",...,"content":"# Hook Execution Model\n\n## Purpose\n...","score":61.0}]}
+{"symbols":[],"specs":[{"workspace":"core","specId":"core:hook-execution-model",...,"content":"# Hook Execution Model\n\n## Purpose\n...","score":61.0}]}
 
 $ specd graph search "handle" --exclude-path "test/*" --symbols --limit 5
 Symbols (5):
@@ -159,7 +159,7 @@ Symbols (10):
 
 ## Spec Dependencies
 
-- [`cli:cli/entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, and output conventions
-- [`core:core/config`](../../core/config/spec.md) — configured operation, explicit config path handling, and bootstrap-mode relationship
-- [`code-graph:code-graph/composition`](../../code-graph/composition/spec.md) — `CodeGraphProvider` facade
-- [`code-graph:code-graph/graph-store`](../../code-graph/graph-store/spec.md) — abstract graph-store search capabilities
+- [`cli:entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, and output conventions
+- [`core:config`](../../core/config/spec.md) — configured operation, explicit config path handling, and bootstrap-mode relationship
+- [`code-graph:composition`](../../code-graph/composition/spec.md) — `CodeGraphProvider` facade
+- [`code-graph:graph-store`](../../code-graph/graph-store/spec.md) — abstract graph-store search capabilities

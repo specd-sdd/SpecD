@@ -24,5 +24,5 @@ When the repository contains no discarded changes, `execute()` MUST return an em
 
 ## Spec Dependencies
 
-- [`core:core/change`](../change/spec.md)
-- [`core:core/kernel`](../kernel/spec.md)
+- [`core:change`](../change/spec.md)
+- [`core:kernel`](../kernel/spec.md)

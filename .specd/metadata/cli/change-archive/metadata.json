@@ -1,0 +1,190 @@
+{
+  "title": "Change Archive",
+  "description": "Once a change is fully approved, its spec deltas need to be promoted into the permanent spec tree so they become the source of truth. `specd changes archive <name>` is the canonical form and finalises a change by merging its deltas into the permanent spec directories and moving the change to the archive.\n\n`specd change archive <name>` remains supported as an alias.",
+  "dependsOn": [
+    "cli:entrypoint",
+    "core:change",
+    "core:archive-change",
+    "core:hook-execution-model",
+    "cli:command-resource-naming"
+  ],
+  "context": [
+    "Once a change is fully approved, its spec deltas need to be promoted into the permanent spec tree so they become the source of truth. `specd changes archive <name>` is the canonical form and finalises a change by merging its deltas into the permanent spec directories and moving the change to the archive.\n\n`specd change archive <name>` remains supported as an alias."
+  ],
+  "rules": [
+    {
+      "requirement": "Command signature",
+      "rules": [
+        "```\nspecd changes archive <name> [--skip-hooks <phases>] [--allow-overlap] [--format text|json|toon]\n```\n\nAlias:\n\n```\nspecd change archive <name> [--skip-hooks <phases>] [--allow-overlap] [--format text|json|toon]\n```\n\n- `<name>` — required positional; the name of the change to archive\n- `--skip-hooks <phases>` — optional; comma-separated list of archive hook phases to skip. Valid values: `pre`, `post`, `all`. When `all` is specified, all hook execution is skipped. When omitted, both phases execute.\n- `--allow-overlap` — optional flag; permits archiving despite spec overlap with other active changes\n- `--format text|json|toon` — optional; output format, defaults to `text`"
+      ]
+    },
+    {
+      "requirement": "Prerequisites",
+      "rules": [
+        "The change must be in `archivable` state. If the change is in any other state, the command exits with code 1 and prints an `error:` message to stderr naming the current state."
+      ]
+    },
+    {
+      "requirement": "Behaviour",
+      "rules": [
+        "The command delegates to the `ArchiveChange` use case, which:\n\n1. Merges all spec delta artifacts into the permanent spec directories\n2. Moves the change directory to the archive location determined by `storage.archivePattern`\n3. Records the archive operation in the change history"
+      ]
+    },
+    {
+      "requirement": "Hook execution",
+      "rules": [
+        "By default, the `ArchiveChange` use case executes `run:` hooks for the `archiving` workflow step (pre-hooks before file modifications, post-hooks after the archive). When `--skip-hooks` is passed with specific phases, only those phases are skipped. When `--skip-hooks all` is passed, all hook execution is skipped — the caller is responsible for invoking hooks via `specd change run-hooks`.\n\nThe CLI maps the `--skip-hooks` option to an archive hook-phase selector set on `ArchiveChangeInput`."
+      ]
+    },
+    {
+      "requirement": "Post-archive hooks",
+      "rules": [
+        "After a successful archive, if any post-archive hooks failed, the CLI exits with code 2 and reports the failures."
+      ]
+    },
+    {
+      "requirement": "Output on success",
+      "rules": [
+        "On success, output depends on `--format`:\n\n- `text` (default): prints to stdout: The invalidated changes section is omitted when no changes were invalidated.\n  - The archive path line\n  - If changes were invalidated due to overlap, a summary listing each invalidated change and the overlapping specs:\n- `json` or `toon`: outputs the following to stdout (encoded in the respective format): where `<archive-path>` is the path to the archived change directory relative to the project root, and `invalidatedChanges` is the array from the `ArchiveChange` result (empty when no changes were invalidated)."
+      ]
+    },
+    {
+      "requirement": "Error cases",
+      "rules": [
+        "- If the change does not exist, exits with code 1.\n- If the change is not in `archivable` state, exits with code 1.\n- If a delta merge fails (conflict or parse error), exits with code 1 and prints a descriptive error."
+      ]
+    }
+  ],
+  "constraints": [
+    "Only changes in archivable state may be archived",
+    "The archive path is determined by storage.archivePattern in specd.yaml"
+  ],
+  "scenarios": [
+    {
+      "requirement": "Command signature",
+      "name": "Missing name argument",
+      "when": ["specd changes archive is run without a name"],
+      "then": ["the command exits with code 1 and prints a usage error to stderr"]
+    },
+    {
+      "requirement": "Command signature",
+      "name": "Skip hooks accepts archive phases",
+      "when": ["specd changes archive my-change --skip-hooks pre,post is run"],
+      "then": [
+        "the command accepts the invocation",
+        "AND it forwards both archive hook phases to the use case"
+      ]
+    },
+    {
+      "requirement": "Command signature",
+      "name": "Singular alias invocation",
+      "when": ["specd change archive my-change is run"],
+      "then": ["it is accepted as an alias of specd changes archive my-change"]
+    },
+    {
+      "requirement": "Prerequisites",
+      "name": "Change not in archivable state",
+      "given": ["a change my-change in done state (not yet archivable)"],
+      "when": ["specd change archive my-change is run"],
+      "then": [
+        "the command exits with code 1",
+        "AND stderr contains an error: message mentioning the current state"
+      ]
+    },
+    {
+      "requirement": "Behaviour",
+      "name": "Successful archive",
+      "given": ["a change my-change in archivable state"],
+      "when": ["specd change archive my-change is run"],
+      "then": [
+        "spec deltas are merged into the permanent spec directories",
+        "AND the change directory is moved to the archive path",
+        "AND the process exits with code 0"
+      ]
+    },
+    {
+      "requirement": "Hook execution",
+      "name": "Skip all archive hooks",
+      "when": ["specd change archive my-change --skip-hooks all is run"],
+      "then": [
+        "the command skips all archive hook execution",
+        "AND the archive still delegates the rest of the work to ArchiveChange"
+      ]
+    },
+    {
+      "requirement": "Hook execution",
+      "name": "Skip only pre-archive hooks",
+      "when": ["specd change archive my-change --skip-hooks pre is run"],
+      "then": ["pre-archive hooks are skipped", "AND post-archive hooks remain enabled"]
+    },
+    {
+      "requirement": "Hook execution",
+      "name": "Skip only post-archive hooks",
+      "when": ["specd change archive my-change --skip-hooks post is run"],
+      "then": ["post-archive hooks are skipped", "AND pre-archive hooks remain enabled"]
+    },
+    {
+      "requirement": "Post-archive hooks",
+      "name": "Post-hook failure",
+      "given": ["a run: post-hook that exits with code 1 is declared on the archivable step"],
+      "when": ["specd change archive my-change is run after successful merge"],
+      "then": ["the process exits with code 2"]
+    },
+    {
+      "requirement": "Output on success",
+      "name": "Archive path in output",
+      "when": ["specd change archive my-change succeeds"],
+      "then": [
+        "stdout contains archived change my-change → followed by the archive path",
+        "AND the process exits with code 0"
+      ]
+    },
+    {
+      "requirement": "Error cases",
+      "name": "Change not found",
+      "when": ["specd change archive nonexistent is run"],
+      "then": ["the command exits with code 1", "AND stderr contains an error: message"]
+    },
+    {
+      "requirement": "Output on success (extended)",
+      "name": "Text output shows invalidated changes when overlap occurred",
+      "given": ["ArchiveChange returns invalidatedChanges with two entries"],
+      "when": ["specd change archive <name> --allow-overlap succeeds in text mode"],
+      "then": [
+        "stdout includes the archive path line",
+        "AND stdout includes an \"invalidated N overlapping changes:\" section listing each change and its overlapping specs"
+      ]
+    },
+    {
+      "requirement": "Output on success (extended)",
+      "name": "Text output omits invalidated section when no changes were invalidated",
+      "given": ["ArchiveChange returns an empty invalidatedChanges array"],
+      "when": ["specd change archive <name> succeeds in text mode"],
+      "then": [
+        "stdout includes only the archive path line",
+        "AND no invalidated changes section is shown"
+      ]
+    },
+    {
+      "requirement": "Output on success (extended)",
+      "name": "JSON output includes invalidatedChanges array",
+      "given": ["ArchiveChange returns invalidatedChanges with one entry"],
+      "when": ["specd change archive <name> --allow-overlap --format json succeeds"],
+      "then": ["the JSON output includes invalidatedChanges with the entry's name and specIds"]
+    },
+    {
+      "requirement": "Output on success",
+      "name": "JSON output on success",
+      "when": ["specd change archive my-change --format json succeeds"],
+      "then": [
+        "stdout is valid JSON with result equal to \"ok\", name equal to \"my-change\", and archivePath containing the archive path",
+        "AND the process exits with code 0"
+      ]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:3a86bc9088d1599b948e220d2b28a6ec12c95f9a6525269ba798f2b22919e5e8",
+    "verify.md": "sha256:90461f6aef9d3309978f73aa9de6079880d2f98b6d0c46b10f8c9d7f1ea8cd82"
+  },
+  "generatedBy": "core"
+}

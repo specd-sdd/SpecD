@@ -22,7 +22,7 @@ Two `FileNode` values are equal if and only if their `path` fields match (since 
 
 A `SpecNode` SHALL represent a spec directory in the workspace. It contains:
 
-- **`specId`** (`string`) — the spec identifier in `workspace:package/topic` format (e.g. `core:core/change`, `_global:_global/architecture`). This is the node's identity.
+- **`specId`** (`string`) — the spec identifier in `workspace:package/topic` format (e.g. `core:change`, `_global:_global/architecture`). This is the node's identity.
 - **`path`** (`string`) — workspace-relative path to the spec directory (e.g. `specs/core/change`).
 - **`title`** (`string`) — from `.specd-metadata.yaml` `title` field. Defaults to the `specId` if metadata is absent.
 - **`description`** (`string`) — from `.specd-metadata.yaml` `description` field. Empty string if absent.
@@ -207,13 +207,13 @@ const symbol: SymbolNode = {
 
 // SpecNode — includes description, content, workspace
 const spec: SpecNode = {
-  specId: 'core:core/change',
+  specId: 'core:change',
   path: 'specs/core/change',
   title: 'Change',
   description: 'Without a single entity that owns spec work...',
   contentHash: 'sha256:def456...',
   content: '# Change\n\n## Purpose\n...',
-  dependsOn: ['core:core/config', 'core:core/storage'],
+  dependsOn: ['core:config', 'core:storage'],
   workspace: 'core',
 }
 
@@ -226,8 +226,8 @@ const relation: Relation = {
 
 // Spec dependency relation
 const specRelation: Relation = {
-  source: 'core:core/change',
-  target: 'core:core/config',
+  source: 'core:change',
+  target: 'core:config',
   type: RelationType.DEPENDS_ON,
 }
 ```

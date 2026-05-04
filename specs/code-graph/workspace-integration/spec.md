@@ -29,7 +29,7 @@ This follows naturally from `SymbolNode.filePath` being the `FileNode.path`.
 
 - **`workspace`** (`string`) — the workspace name this spec belongs to (e.g. `core`, `_global`)
 
-Spec IDs use the format `{workspace}:{specPath}` (e.g. `core:core/change`, `default:_global/architecture`), matching the format produced by `SpecRepository`. The workspace name prefix in the specPath comes from the workspace's configured `prefix` in `specd.yaml`.
+Spec IDs use the format `{workspace}:{specPath}` (e.g. `core:change`, `default:_global/architecture`), matching the format produced by `SpecRepository`. The workspace name prefix in the specPath comes from the workspace's configured `prefix` in `specd.yaml`.
 
 ### Requirement: File discovery from codeRoot
 
@@ -55,7 +55,7 @@ The `specs` callback is implemented by the CLI/MCP integration layer using `Spec
 2. For each spec, load all artifacts via `repo.artifact(spec, filename)` — artifact filenames come from `spec.filenames` and no longer include metadata files
 3. Concatenate artifact contents for hashing: `spec.md` first (if present), then the remaining artifacts in alphabetical order
 4. Load metadata via `repo.metadata(spec)` to extract `title`, `description`, and `dependsOn`. If metadata is absent (`null`), `title` defaults to the `specId`, `description` to `''`, and `dependsOn` to `[]`. There is no fallback to parsing headings or sections from `spec.md`.
-5. Build the `specId` as `{workspace}:{specPath}` (e.g. `core:core/change`), matching the format produced by `SpecRepository.resolveFromPath`
+5. Build the `specId` as `{workspace}:{specPath}` (e.g. `core:change`), matching the format produced by `SpecRepository.resolveFromPath`
 
 This decouples the indexer from spec storage and respects workspace prefixes, ownership, and locality as configured in `specd.yaml`.
 
@@ -182,7 +182,7 @@ const symbol: SymbolNode = {
 
 // SpecNode with workspace
 const spec: SpecNode = {
-  specId: 'core:core/change',
+  specId: 'core:change',
   path: 'specs/core/change',
   title: 'Change',
   description: 'Defines the Change entity and its lifecycle transitions',
@@ -195,4 +195,4 @@ const spec: SpecNode = {
 
 ## Spec Dependencies
 
-- `core:core/config` — `SpecdWorkspaceConfig.graph` fields (`excludePaths`, `respectGitignore`) are the source for `WorkspaceIndexTarget` exclusion options
+- `core:config` — `SpecdWorkspaceConfig.graph` fields (`excludePaths`, `respectGitignore`) are the source for `WorkspaceIndexTarget` exclusion options

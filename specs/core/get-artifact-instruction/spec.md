@@ -85,8 +85,8 @@ The caller decides which parts to use. A subagent creating artifacts from scratc
 
 ## Spec Dependencies
 
-- [`core:core/schema-format`](../schema-format/spec.md) — artifact `instruction`, `rules.pre`, `rules.post`, `delta`, `deltaInstruction`, `format`
-- [`core:core/delta-format`](../delta-format/spec.md) — `ArtifactParser` port, `deltaInstructions()`, `outline()`
-- [`core:core/change`](../change/spec.md) — Change entity, `specIds`, `schemaName`
-- [`core:core/schema-merge`](../schema-merge/spec.md) — schema composition via `rules.pre`/`rules.post`
-- [`core:core/template-variables`](../template-variables/spec.md) — `TemplateExpander`, `TemplateVariables`, expansion semantics
+- [`core:schema-format`](../schema-format/spec.md) — artifact `instruction`, `rules.pre`, `rules.post`, `delta`, `deltaInstruction`, `format`
+- [`core:delta-format`](../delta-format/spec.md) — `ArtifactParser` port, `deltaInstructions()`, `outline()`
+- [`core:change`](../change/spec.md) — Change entity, `specIds`, `schemaName`
+- [`core:schema-merge`](../schema-merge/spec.md) — schema composition via `rules.pre`/`rules.post`
+- [`core:template-variables`](../template-variables/spec.md) — `TemplateExpander`, `TemplateVariables`, expansion semantics

@@ -1,7 +1,7 @@
 {
   "title": "plugin-manager:specd-plugin-type",
   "description": "Defines the base plugin interface (`SpecdPlugin`) that all specd plugins must implement. This is the foundation for extensible plugin types.",
-  "dependsOn": ["core:core/config", "default:_global/architecture"],
+  "dependsOn": ["core:config", "default:_global/architecture"],
   "context": [
     "Defines the base plugin interface (`SpecdPlugin`) that all specd plugins must implement. This is the foundation for extensible plugin types."
   ],
@@ -90,7 +90,7 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:2e5cc9297d7b38c42d366bd1bc296c720205e476e1fec32524b359d1aa5b1f75",
+    "spec.md": "sha256:4bcf43c289de774e4e0486400bab8c1c97927ab226899d6786ae87529371af84",
     "verify.md": "sha256:9a8c42abc2354d044d3efd96517465ebf448c533ac9a736d5989dfe6e5ad6e04"
   },
   "generatedBy": "core"

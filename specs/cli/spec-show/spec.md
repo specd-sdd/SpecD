@@ -71,4 +71,4 @@ $ specd spec show default:auth/login
 
 ## Spec Dependencies
 
-- [`cli:cli/entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
+- [`cli:entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions

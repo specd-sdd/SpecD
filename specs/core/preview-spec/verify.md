@@ -6,8 +6,8 @@
 
 #### Scenario: specId not in change throws error
 
-- **GIVEN** a change with `specIds: ["core:core/config"]`
-- **WHEN** `PreviewSpec.execute` is called with `specId: "core:core/other"`
+- **GIVEN** a change with `specIds: ["core:config"]`
+- **WHEN** `PreviewSpec.execute` is called with `specId: "core:other"`
 - **THEN** the use case throws a `SpecNotInChangeError` (or equivalent)
 
 ### Requirement: File discovery via change artifacts

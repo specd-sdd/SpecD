@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Without a single declarative definition of a project's artifact workflow, every tool in the ecosystem would need to hardcode artifact types, validation rules, and AI instructions independently. A specd schema is a YAML file that solves this by defining which artifacts exist, how they relate to each other, how they are validated, which sections to extract for AI context, and what instructions the AI should follow when creating each artifact. Schemas are resolved at runtime via `SchemaRegistry` using a prefix convention that checks project-local directories, user overrides, or installed npm packages. The delta mechanism (file format, AST selectors, application algorithm, structural validation) is defined in [`specs/core/delta-format/spec.md`](../delta-format/spec.md).
+Without a single declarative definition of a project's artifact workflow, every tool in the ecosystem would need to hardcode artifact types, validation rules, and AI instructions independently. A specd schema is a YAML file that solves this by defining which artifacts exist, how they relate to each other, how they are validated, which sections to extract for AI context, and what instructions the AI should follow when creating each artifact. Schemas are resolved at runtime via `SchemaRegistry` using a prefix convention that checks project-local directories, user overrides, or installed npm packages. The delta mechanism (file format, AST selectors, application algorithm, structural validation) is defined in [`core:delta-format`](../delta-format/spec.md).
 
 ## Requirements
 
@@ -117,7 +117,7 @@ A validation rule is an object with:
 
 **Node identification** — one of two mutually exclusive approaches:
 
-- **Selector fields** — the selector fields defined in [`specs/core/selector-model/spec.md`](../selector-model/spec.md): `type`, `matches`, `contains`, `parent`, `index`, `where`. Identifies nodes by type, label pattern, value pattern, ancestry, or position.
+- **Selector fields** — the selector fields defined in [`core:selector-model`](../selector-model/spec.md): `type`, `matches`, `contains`, `parent`, `index`, `where`. Identifies nodes by type, label pattern, value pattern, ancestry, or position.
 - **`path`** (string) — a JSONPath expression (RFC 9535) evaluated against the normalized AST. Use when the structural query requires more expressive power than the selector fields provide.
 
 **Additional fields** — compatible with both identification styles:
@@ -198,7 +198,7 @@ Each metadata field maps to one or more `MetadataExtractorEntry` objects with:
 
 - `artifact` (string, required) — the artifact ID whose content to extract from (for example `specs`, `verify`)
 - `extractor` (object, required) — an `Extractor` declaring how to extract content:
-  - `selector` (selector, required) — identifies which node(s) to extract, using the selector model defined in [`specs/core/selector-model/spec.md`](../selector-model/spec.md)
+  - `selector` (selector, required) — identifies which node(s) to extract, using the selector model defined in [`core:selector-model`](../selector-model/spec.md)
   - `extract` (`content` | `label` | `both`, optional, default `content`) — what to extract for each matched node
   - `capture` (string, optional) — regex applied to the extracted text. When present, the main extracted `value` becomes the first capture group (`$1`), while `$0` remains available as the full match and higher groups remain available for placeholder interpolation. This allows one extractor to capture a canonical dependency label as `value` while also exposing an optional relative `href` as an arg.
   - `strip` (string, optional) — regex removed from labels or values
@@ -210,8 +210,8 @@ Transform execution uses a runtime registry assembled during kernel composition.
 
 For `dependsOn`, schemas SHOULD use one extractor that captures the visible dependency label as `value` and any optional link target as an interpolated arg. The standard runtime transform then tries the captured `value` first and falls back to interpolated args in order, so the same extractor supports:
 
-- linked canonical entries such as ``[`core:core/config`](../config/spec.md)``
-- unlinked canonical entries such as `` `core:core/config` ``
+- linked canonical entries such as ``[`core:config`](../config/spec.md)``
+- unlinked canonical entries such as `` `core:config` ``
 - legacy labels where only the `href` is resolvable
 
 Once a transform receives an extracted value, it must return a non-null normalized string. A transform that cannot normalize the value must fail explicitly instead of silently omitting the metadata field entry.
@@ -531,10 +531,10 @@ metadataExtraction:
 
 ## Spec Dependencies
 
-- [`core:core/delta-format`](../delta-format/spec.md) — delta file format, ArtifactParser port, and structural validation rules
-- [`core:core/selector-model`](../selector-model/spec.md) — selector fields used in `validations`, `deltaValidations`, and `metadataExtraction`
-- [`core:core/content-extraction`](../content-extraction/spec.md) — `Extractor` and `FieldMapping` value objects used in `metadataExtraction` declarations
-- [`core:core/schema-merge`](../schema-merge/spec.md) — merge engine for `extends`, plugins, and overrides
+- [`core:delta-format`](../delta-format/spec.md) — delta file format, ArtifactParser port, and structural validation rules
+- [`core:selector-model`](../selector-model/spec.md) — selector fields used in `validations`, `deltaValidations`, and `metadataExtraction`
+- [`core:content-extraction`](../content-extraction/spec.md) — `Extractor` and `FieldMapping` value objects used in `metadataExtraction` declarations
+- [`core:schema-merge`](../schema-merge/spec.md) — merge engine for `extends`, plugins, and overrides
 
 ## ADRs
 

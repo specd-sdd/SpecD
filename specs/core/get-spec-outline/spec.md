@@ -59,6 +59,6 @@ When hint mode is enabled by the caller, each result also contains:
 
 ## Spec Dependencies
 
-- [`core:core/get-spec`](../get-spec/spec.md) — for reading spec artifact content.
-- [`core:core/artifact-parser-port`](../artifact-parser-port/spec.md) — for generating the outline from the AST.
-- [`core:core/get-active-schema`](../get-active-schema/spec.md) — for resolving artifact IDs to filenames.
+- [`core:get-spec`](../get-spec/spec.md) — for reading spec artifact content.
+- [`core:artifact-parser-port`](../artifact-parser-port/spec.md) — for generating the outline from the AST.
+- [`core:get-active-schema`](../get-active-schema/spec.md) — for resolving artifact IDs to filenames.

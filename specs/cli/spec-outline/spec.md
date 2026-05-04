@@ -80,5 +80,5 @@ The command SHALL provide clear error messages when:
 
 ## Spec Dependencies
 
-- [`core:core/get-spec-outline`](../../../core/core/get-spec-outline/spec.md) — for retrieving the outline data.
-- [`cli:cli/command-resource-naming`](../command-resource-naming/spec.md) — for canonical resource naming conventions.
+- [`core:get-spec-outline`](../../../core/core/get-spec-outline/spec.md) — for retrieving the outline data.
+- [`cli:command-resource-naming`](../command-resource-naming/spec.md) — for canonical resource naming conventions.

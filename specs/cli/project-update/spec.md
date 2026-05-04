@@ -51,6 +51,6 @@ specd project update --format json
 
 ## Spec Dependencies
 
-- [`cli:cli/entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
-- [`cli:cli/skills-update`](../skills-update/spec.md) — skills update logic and output format
-- [`core:core/config`](../../core/config/spec.md) — specd.yaml structure and skills manifest
+- [`cli:entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
+- [`cli:skills-update`](../skills-update/spec.md) — skills update logic and output format
+- [`core:config`](../../core/config/spec.md) — specd.yaml structure and skills manifest

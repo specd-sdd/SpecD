@@ -69,4 +69,4 @@ It MUST return `Promise<void>`. The method MUST add the plugin to the `plugins.<
 ## Spec Dependencies
 
 - [`default:_global/architecture`](../../_global/architecture/spec.md) — hexagonal architecture and port placement rules
-- [`core:core/config`](../config/spec.md) — `specd.yaml` configuration structure
+- [`core:config`](../config/spec.md) — `specd.yaml` configuration structure

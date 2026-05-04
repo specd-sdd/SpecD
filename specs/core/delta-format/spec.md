@@ -66,7 +66,7 @@ When clients request hint metadata, hints are returned as a root-level type-keye
 
 ### Requirement: Selector model
 
-The selector model is defined in [`specs/core/selector-model/spec.md`](../selector-model/spec.md). Selectors are used in delta entries to target nodes for modification or removal, and in `position.after`/`position.before` hints for positioned insertion.
+The selector model is defined in [`core:selector-model`](../selector-model/spec.md). Selectors are used in delta entries to target nodes for modification or removal, and in `position.after`/`position.before` hints for positioned insertion.
 
 In the context of delta application, the following additional constraints apply to the selector model:
 
@@ -241,7 +241,7 @@ For markdown serialization after delta apply, list/emphasis/strong marker output
 
 ### Requirement: Delta structural validation
 
-The `deltaValidations` field on a schema artifact allows schema authors to define JSONPath-based structural constraints checked against the normalized YAML AST of the delta file before application. The delta file is parsed by the YAML adapter to produce a normalized AST; `ValidateArtifacts` then evaluates each rule's `selector` JSONPath expression against that AST — the same mechanism used for `validations` against the artifact AST. The full rule format is specified in [`specs/core/schema-format/spec.md` — Requirement: Delta validation rules](../schema-format/spec.md).
+The `deltaValidations` field on a schema artifact allows schema authors to define JSONPath-based structural constraints checked against the normalized YAML AST of the delta file before application. The delta file is parsed by the YAML adapter to produce a normalized AST; `ValidateArtifacts` then evaluates each rule's `selector` JSONPath expression against that AST — the same mechanism used for `validations` against the artifact AST. The full rule format is specified in [`core:schema-format` — Requirement: Delta validation rules](../schema-format/spec.md).
 
 ## Examples
 
@@ -581,6 +581,6 @@ workflow:
 
 ## Spec Dependencies
 
-- [`core:core/artifact-ast`](../artifact-ast/spec.md) — normalized AST format produced and consumed by all adapters; defines node types, `label`/`value` semantics, and round-trip contract
-- [`core:core/selector-model`](../selector-model/spec.md) — selector fields, node type vocabulary, and multi/no-match semantics
-- [`core:core/schema-format`](../schema-format/spec.md) — schema artifact configuration including `deltaValidations` rules for structural validation of delta files
+- [`core:artifact-ast`](../artifact-ast/spec.md) — normalized AST format produced and consumed by all adapters; defines node types, `label`/`value` semantics, and round-trip contract
+- [`core:selector-model`](../selector-model/spec.md) — selector fields, node type vocabulary, and multi/no-match semantics
+- [`core:schema-format`](../schema-format/spec.md) — schema artifact configuration including `deltaValidations` rules for structural validation of delta files

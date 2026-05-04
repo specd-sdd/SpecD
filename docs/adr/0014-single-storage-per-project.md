@@ -48,4 +48,4 @@ Per-workspace storage would either force artificial change boundaries (splitting
 
 ### Spec
 
-- [`specs/core/config/spec.md`](../../specs/core/config/spec.md)
+- [`core:config`](../../specs/core/config/spec.md)

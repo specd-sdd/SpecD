@@ -1,12 +1,7 @@
 {
   "title": "Change Validate",
   "description": "Before a change can advance, its artifacts must be verified against the schema to catch structural errors and missing content early. `specd change validate <name> <workspace:capability-path>` validates a change's artifact files against the active schema for a specific spec and marks passing artifacts as complete.",
-  "dependsOn": [
-    "cli:cli/entrypoint",
-    "core:core/change",
-    "core:core/validate-artifacts",
-    "core:core/spec-id-format"
-  ],
+  "dependsOn": ["cli:entrypoint", "core:change", "core:validate-artifacts", "core:spec-id-format"],
   "context": [
     "Before a change can advance, its artifacts must be verified against the schema to catch structural errors and missing content early. `specd change validate <name> <workspace:capability-path>` validates a change's artifact files against the active schema for a specific spec and marks passing artifacts as complete."
   ],
@@ -110,7 +105,7 @@
       "given": [
         "ValidateArtifacts.execute returns a file entry with filename deltas/core/core/config/spec.md.delta.yaml"
       ],
-      "when": ["specd change validate my-change core:core/config --artifact specs renders output"],
+      "when": ["specd change validate my-change core:config --artifact specs renders output"],
       "then": [
         "the CLI prints or serializes that filename from the result metadata",
         "AND it does not recompute a replacement path in the CLI layer"
@@ -119,7 +114,7 @@
     {
       "requirement": "Structural validation scope",
       "name": "Successful validate does not imply semantic approval",
-      "given": ["specd changes validate my-change core:core/config passes"],
+      "given": ["specd changes validate my-change core:config passes"],
       "when": ["a workflow step evaluates artifact quality"],
       "then": [
         "the pass result is treated as structural/state validation only",
@@ -133,11 +128,11 @@
         "a change where all artifacts pass validation",
         "AND validation reports file deltas/core/core/config/spec.md.delta.yaml"
       ],
-      "when": ["specd change validate my-change core:core/config --artifact specs is run"],
+      "when": ["specd change validate my-change core:config --artifact specs is run"],
       "then": [
-        "stdout contains validated my-change/core:core/config: all artifacts pass",
+        "stdout contains validated my-change/core:config: all artifacts pass",
         "AND stdout contains file: deltas/core/core/config/spec.md.delta.yaml",
-        "AND stdout contains specd change spec-preview my-change core:core/config",
+        "AND stdout contains specd change spec-preview my-change core:config",
         "AND the process exits with code 0"
       ]
     },
@@ -148,12 +143,12 @@
         "a change where artifacts pass but there are optimization notes",
         "AND validation reports file deltas/core/core/config/spec.md.delta.yaml"
       ],
-      "when": ["specd change validate my-change core:core/config --artifact specs is run"],
+      "when": ["specd change validate my-change core:config --artifact specs is run"],
       "then": [
         "stdout contains a pass message with pass (N note(s))",
         "AND stdout contains note: lines for each note",
         "AND stdout contains file: deltas/core/core/config/spec.md.delta.yaml",
-        "AND stdout contains specd change spec-preview my-change core:core/config",
+        "AND stdout contains specd change spec-preview my-change core:config",
         "AND the process exits with code 0"
       ]
     },
@@ -164,9 +159,7 @@
         "a change where all artifacts pass validation with optimization notes",
         "AND validation reports file deltas/core/core/config/spec.md.delta.yaml"
       ],
-      "when": [
-        "specd change validate my-change core:core/config --artifact specs --format json is run"
-      ],
+      "when": ["specd change validate my-change core:config --artifact specs --format json is run"],
       "then": [
         "stdout is valid JSON with passed equal to true, failures equal to [], and a notes array",
         "AND files contains an entry with filename: \\\"deltas/core/core/config/spec.md.delta.yaml\\\"",
@@ -180,7 +173,7 @@
         "a change where a required artifact fails validation and has optimization notes",
         "AND validation reports missing file deltas/core/core/config/spec.md.delta.yaml"
       ],
-      "when": ["specd change validate my-change core:core/config --artifact specs is run"],
+      "when": ["specd change validate my-change core:config --artifact specs is run"],
       "then": [
         "stdout contains validation failed",
         "AND stdout contains missing: deltas/core/core/config/spec.md.delta.yaml",
@@ -193,9 +186,7 @@
       "requirement": "Output on failure",
       "name": "JSON output on failure includes notes and files",
       "given": ["a change where a required artifact fails validation and has notes"],
-      "when": [
-        "specd change validate my-change core:core/config --artifact specs --format json is run"
-      ],
+      "when": ["specd change validate my-change core:config --artifact specs --format json is run"],
       "then": [
         "stdout is valid JSON with passed equal to false",
         "AND failures contains at least one entry",
@@ -209,7 +200,7 @@
       "given": [
         "validation reports a dependency-blocked failure from core including dependency status context"
       ],
-      "when": ["specd change validate my-change core:core/config --artifact specs is run"],
+      "when": ["specd change validate my-change core:config --artifact specs is run"],
       "then": [
         "stdout contains the failure description exactly as emitted by core validation",
         "AND the CLI does not replace it with generic \"incomplete dependency\" wording"
@@ -311,8 +302,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:856a888c7347a758d859b0b2416a4d9ab752212bd87798edca8dee94400b6c11",
-    "verify.md": "sha256:61b820e663f0a2d1770aa778dc192f19ff0979c6165a456d92b6a994052adaff"
+    "spec.md": "sha256:74615e7038b2612b6218ee14e503c63b1e194e4425ca84b5f9e3b6b6ceef6239",
+    "verify.md": "sha256:3e1f766011b67648c707f14a4738c9a592c934cdebad829f26f78ddef8581642"
   },
   "generatedBy": "core"
 }

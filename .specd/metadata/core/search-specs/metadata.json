@@ -1,0 +1,118 @@
+{
+  "title": "Search Specs",
+  "description": "Consumers need a core-level use case to search spec content by keyword without depending on the code graph. `SearchSpecs` provides content-based search across all configured workspaces by delegating to each workspace's `SpecRepository.search()` method. It is the fallback search path when the code graph is unavailable, and the primary search path for consumers that do not have graph access.",
+  "dependsOn": ["core:spec-repository-port", "core:list-specs", "core:workspace"],
+  "context": [
+    "Consumers need a core-level use case to search spec content by keyword without depending on the code graph. `SearchSpecs` provides content-based search across all configured workspaces by delegating to each workspace's `SpecRepository.search()` method. It is the fallback search path when the code graph is unavailable, and the primary search path for consumers that do not have graph access."
+  ],
+  "rules": [
+    {
+      "requirement": "Search across all configured workspaces",
+      "rules": [
+        "`SearchSpecs.execute(query, options?)` SHALL iterate every configured workspace in declaration order and call `SpecRepository.search(query, options)` on each repository. Results from all workspaces MUST be merged into a single flat array sorted by score descending across all workspaces."
+      ]
+    },
+    {
+      "requirement": "Optional workspace filter",
+      "rules": [
+        "When `options.workspaces` is provided as a non-empty array of workspace names, only those workspaces SHALL be searched. Workspace names that do not match any configured workspace SHALL be silently ignored. When `options.workspaces` is omitted or empty, all configured workspaces are searched."
+      ]
+    },
+    {
+      "requirement": "Optional summary resolution",
+      "rules": [
+        "When `options.includeSummary` is `true`, each result MUST include a `summary` field resolved using the same algorithm as `ListSpecs`: metadata `description` first, then `spec.md` extraction fallback.\n\nWhen `options.includeSummary` is `false` or omitted, `summary` MUST NOT appear on any result."
+      ]
+    },
+    {
+      "requirement": "Result shape",
+      "rules": [
+        "Each entry in the result array MUST include:\n\n- `workspace` — the workspace name\n- `path` — the spec's capability path\n- `title` — the resolved title (same resolution as `ListSpecs`)\n- `score` — the relevance score from the repository search\n- `matches` — the array of `SpecSearchMatch` objects from the repository\n\nOptional fields:\n\n- `summary` — present only when `includeSummary` is `true` and a summary is available"
+      ]
+    },
+    {
+      "requirement": "Silent error handling",
+      "rules": [
+        "Errors encountered while searching an individual workspace MUST be silently caught. Results from that workspace MUST be omitted from the output, but results from other workspaces MUST still be returned. The use case SHALL NOT propagate I/O errors from individual repository searches to the caller."
+      ]
+    },
+    {
+      "requirement": "Empty results",
+      "rules": [
+        "When no specs match across all searched workspaces, the use case MUST return an empty array (not an error)."
+      ]
+    }
+  ],
+  "constraints": [
+    "The use case receives a ReadonlyMap<string, SpecRepository> — it MUST NOT modify the map or the repositories",
+    "Search quality depends on the adapter implementation; the use case defines the orchestration contract, not the matching algorithm",
+    "Title resolution reuses the same logic as ListSpecs — no separate title extraction in this use case"
+  ],
+  "scenarios": [
+    {
+      "requirement": "Search across all configured workspaces",
+      "name": "Results merged and sorted by score",
+      "given": [
+        "workspace alpha has a spec scoring 0.8 and workspace beta has a spec scoring 0.9 for the same query"
+      ],
+      "when": ["execute(\"test\") is called"],
+      "then": ["the result array has two entries sorted with the beta entry first (higher score)"]
+    },
+    {
+      "requirement": "Search across all configured workspaces",
+      "name": "Empty result when nothing matches",
+      "given": ["no spec in any workspace matches the query"],
+      "when": ["execute(\"zzzznonexistent\") is called"],
+      "then": ["the result array is empty"]
+    },
+    {
+      "requirement": "Optional workspace filter",
+      "name": "Filter to single workspace",
+      "given": ["specs matching the query exist in both alpha and beta workspaces"],
+      "when": ["execute(\"test\", { workspaces: [\"alpha\"] }) is called"],
+      "then": ["only entries from workspace alpha appear in results"]
+    },
+    {
+      "requirement": "Optional workspace filter",
+      "name": "Unknown workspace name silently ignored",
+      "given": ["no workspace named nonexistent is configured"],
+      "when": ["execute(\"test\", { workspaces: [\"nonexistent\"] }) is called"],
+      "then": ["the result array is empty and no error is thrown"]
+    },
+    {
+      "requirement": "Optional summary resolution",
+      "name": "Summary included when requested",
+      "given": ["a matching spec has metadata with description: \"Handles auth\""],
+      "when": ["execute(\"auth\", { includeSummary: true }) is called"],
+      "then": ["the result entry includes summary: \"Handles auth\""]
+    },
+    {
+      "requirement": "Optional summary resolution",
+      "name": "Summary absent when not requested",
+      "given": ["a matching spec has metadata with a description"],
+      "when": ["execute(\"auth\") is called without includeSummary"],
+      "then": ["the result entry has no summary property"]
+    },
+    {
+      "requirement": "Result shape",
+      "name": "Entry contains required fields",
+      "given": ["a spec at path auth/login in workspace default matches with score 0.75"],
+      "when": ["execute(\"login\") is called"],
+      "then": [
+        "the entry has workspace: \"default\", path: \"auth/login\", title (string), score: 0.75, and matches (array)"
+      ]
+    },
+    {
+      "requirement": "Silent error handling",
+      "name": "One workspace fails, others still returned",
+      "given": ["workspace alpha search throws an I/O error and workspace beta returns results"],
+      "when": ["execute(\"test\") is called"],
+      "then": ["results from beta are returned", "AND no error propagates to the caller"]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:0f40d528e06e7222067eb499c1f2db4d8634260f0a2efd7ab85f4bd27cdc821d",
+    "verify.md": "sha256:eb2ce47616f93dd5a7beec0956dafec9e7241c59390cc4acebaf13baee48b1d2"
+  },
+  "generatedBy": "core"
+}

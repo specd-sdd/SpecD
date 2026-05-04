@@ -100,5 +100,5 @@ The composition surface has evolved since this ADR was accepted:
 
 ### Spec
 
-- [`specs/_global/architecture/spec.md`](../../specs/_global/architecture/spec.md)
-- [`specs/core/composition/spec.md`](../../specs/core/composition/spec.md)
+- [`default:_global/architecture`](../../specs/_global/architecture/spec.md)
+- [`core:composition`](../../specs/core/composition/spec.md)

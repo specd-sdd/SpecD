@@ -82,7 +82,7 @@
 #### Scenario: Unique specIds across workspaces
 
 - **WHEN** `core` and `cli` both have a spec named `spec-metadata`
-- **THEN** specIds SHALL be `core:core/spec-metadata` and `cli:cli/spec-metadata` respectively
+- **THEN** specIds SHALL be `core:spec-metadata` and `cli:spec-metadata` respectively
 - **AND** no primary key collision SHALL occur
 
 ### Requirement: Cross-workspace import resolution

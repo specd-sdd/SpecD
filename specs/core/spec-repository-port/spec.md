@@ -97,11 +97,11 @@ This method is the port-level search primitive — it performs a content scan wi
 
 ## Spec Dependencies
 
-- [`core:core/repository-port`](../repository-port/spec.md) — `Repository` base class, `RepositoryConfig`, shared accessors
+- [`core:repository-port`](../repository-port/spec.md) — `Repository` base class, `RepositoryConfig`, shared accessors
 - [`default:_global/architecture`](../../_global/architecture/spec.md) — ports as abstract classes, application layer uses ports only
-- [`core:core/change`](../change/spec.md) — Change entity references specIds that resolve to specs managed by this port
-- [`core:core/storage`](../storage/spec.md) — storage layer design, filesystem adapter constraints
-- [`core:core/workspace`](../workspace/spec.md) — workspace identity and scoping semantics
-- [`core:core/spec-id-format`](../spec-id-format/spec.md) — canonical spec ID format used in `resolveFromPath` results
-- [`core:core/spec-metadata`](../spec-metadata/spec.md) — metadata file format and structure returned by `metadata()`
-- [`core:core/search-specs`](../search-specs/spec.md) — use case that orchestrates `search()` across workspaces
+- [`core:change`](../change/spec.md) — Change entity references specIds that resolve to specs managed by this port
+- [`core:storage`](../storage/spec.md) — storage layer design, filesystem adapter constraints
+- [`core:workspace`](../workspace/spec.md) — workspace identity and scoping semantics
+- [`core:spec-id-format`](../spec-id-format/spec.md) — canonical spec ID format used in `resolveFromPath` results
+- [`core:spec-metadata`](../spec-metadata/spec.md) — metadata file format and structure returned by `metadata()`
+- [`core:search-specs`](../search-specs/spec.md) — use case that orchestrates `search()` across workspaces

@@ -73,9 +73,9 @@ Each entry MUST include the canonical spec label and its display mode. List entr
 
 ## Spec Dependencies
 
-- [`core:core/config`](../config/spec.md) — `contextMode` accepted values and default
-- [`core:core/compile-context`](../compile-context/spec.md) — shared display-mode vocabulary and context entry semantics
-- [`core:core/spec-metadata`](../spec-metadata/spec.md) — metadata structure, `dependsOn`, and `contentHashes`
-- [`core:core/storage`](../storage/spec.md) — `SpecRepository` contract
-- [`core:core/workspace`](../workspace/spec.md) — workspace resolution
-- [`core:core/spec-id-format`](../spec-id-format/spec.md) — `parseSpecId` behaviour and default workspace
+- [`core:config`](../config/spec.md) — `contextMode` accepted values and default
+- [`core:compile-context`](../compile-context/spec.md) — shared display-mode vocabulary and context entry semantics
+- [`core:spec-metadata`](../spec-metadata/spec.md) — metadata structure, `dependsOn`, and `contentHashes`
+- [`core:storage`](../storage/spec.md) — `SpecRepository` contract
+- [`core:workspace`](../workspace/spec.md) — workspace resolution
+- [`core:spec-id-format`](../spec-id-format/spec.md) — `parseSpecId` behaviour and default workspace

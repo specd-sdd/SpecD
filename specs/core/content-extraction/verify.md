@@ -197,9 +197,9 @@
 #### Scenario: resolveSpecPath accepts a canonical spec ID directly
 
 - **GIVEN** an extractor captures the dependency label as `value`
-- **AND** the extracted value is already the canonical spec ID `core:core/storage`
+- **AND** the extracted value is already the canonical spec ID `core:storage`
 - **WHEN** `extractContent` runs with a registry containing `resolveSpecPath`
-- **THEN** the transform returns `core:core/storage` as-is instead of failing or discarding the value
+- **THEN** the transform returns `core:storage` as-is instead of failing or discarding the value
 
 #### Scenario: resolveSpecPath falls back from value to captured href args
 
@@ -209,4 +209,4 @@
 - **WHEN** `extractContent` runs with a registry containing `resolveSpecPath`
 - **THEN** the transform first attempts to resolve `value`
 - **AND** when `value` is not resolvable as a canonical spec ID it attempts the href args in order
-- **AND** the transform returns `core:core/storage` from the first resolvable fallback candidate
+- **AND** the transform returns `core:storage` from the first resolvable fallback candidate

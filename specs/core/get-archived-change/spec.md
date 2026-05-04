@@ -48,8 +48,8 @@ When `ArchiveRepository.get(name)` returns `null`, `GetArchivedChange` MUST thro
 
 ## Spec Dependencies
 
-- [`specs/core/archive-change/spec.md`](../archive-change/spec.md) -- `ArchiveChange` use case that produces archived changes; `ArchivedChange` entity
-- [`specs/core/storage/spec.md`](../storage/spec.md) -- `ArchiveRepository` port, `get()` lookup strategy with index search and fallback glob scan
-- [`specs/core/change/spec.md`](../change/spec.md) -- `ChangeNotFoundError` shared error type
-- [`specs/core/kernel/spec.md`](../kernel/spec.md) -- kernel wiring under `changes.getArchived`
-- [`specs/_global/architecture/spec.md`](../../_global/architecture/spec.md) -- port-based architecture, manual DI
+- [`core:archive-change`](../archive-change/spec.md) -- `ArchiveChange` use case that produces archived changes; `ArchivedChange` entity
+- [`core:storage`](../storage/spec.md) -- `ArchiveRepository` port, `get()` lookup strategy with index search and fallback glob scan
+- [`core:change`](../change/spec.md) -- `ChangeNotFoundError` shared error type
+- [`core:kernel`](../kernel/spec.md) -- kernel wiring under `changes.getArchived`
+- [`default:_global/architecture`](../../_global/architecture/spec.md) -- port-based architecture, manual DI

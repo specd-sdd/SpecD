@@ -93,6 +93,6 @@ specd skills install all --format json
 
 ## Spec Dependencies
 
-- [`cli:cli/entrypoint`](../entrypoint/spec.md) — exit codes, output conventions
-- [`cli:cli/skills-list`](../skills-list/spec.md) — available skills source (`@specd/skills`)
-- [`core:core/config`](../../core/config/spec.md) — `RecordSkillInstall` use case, `ConfigWriter` port, skills manifest format
+- [`cli:entrypoint`](../entrypoint/spec.md) — exit codes, output conventions
+- [`cli:skills-list`](../skills-list/spec.md) — available skills source (`@specd/skills`)
+- [`core:config`](../../core/config/spec.md) — `RecordSkillInstall` use case, `ConfigWriter` port, skills manifest format

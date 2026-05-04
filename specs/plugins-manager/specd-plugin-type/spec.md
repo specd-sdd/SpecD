@@ -78,5 +78,5 @@ The `type` check against `PLUGIN_TYPES` ensures unknown plugin types are rejecte
 
 ## Spec Dependencies
 
-- [`core:core/config`](../../core/core/config/spec.md) — defines SpecdConfig type
+- [`core:config`](../../core/core/config/spec.md) — defines SpecdConfig type
 - [`default:_global/architecture`](../default/_global/architecture/spec.md) — architecture constraints

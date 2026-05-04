@@ -59,6 +59,6 @@ On failure, the use case MUST throw an appropriate error:
 
 ## Spec Dependencies
 
-- [`core:core/config`](../../core/core/config/spec.md) — defines SpecdConfig type
+- [`core:config`](../../core/core/config/spec.md) — defines SpecdConfig type
 - [`plugin-manager:agent-plugin-type`](../agent-plugin-type/spec.md) — plugin interface
 - [`plugin-manager:plugin-loader`](../plugin-loader/spec.md) — loads plugins

@@ -28,7 +28,7 @@ All are injected at kernel composition time, not passed per invocation.
 `PreviewSpec.execute` receives:
 
 - `name` — the change name
-- `specId` — the fully-qualified spec ID to preview (e.g. `core:core/compile-context`); MUST be one of the change's `specIds`
+- `specId` — the fully-qualified spec ID to preview (e.g. `core:compile-context`); MUST be one of the change's `specIds`
 
 ### Requirement: Spec ID validation
 
@@ -121,7 +121,7 @@ After obtaining the schema from `SchemaProvider`, `PreviewSpec` MUST compare `sc
 
 ## Spec Dependencies
 
-- `core:core/delta-format` — delta file format, `parseDelta`, and `apply` semantics
-- `core:core/artifact-parser-port` — `ArtifactParser` interface for parse/apply/serialize
-- `core:core/change-layout` — directory layout for locating delta and new-spec files
-- `core:core/file-reader-port` — not directly used; `ChangeRepository` and `SpecRepository` handle file access
+- `core:delta-format` — delta file format, `parseDelta`, and `apply` semantics
+- `core:artifact-parser-port` — `ArtifactParser` interface for parse/apply/serialize
+- `core:change-layout` — directory layout for locating delta and new-spec files
+- `core:file-reader-port` — not directly used; `ChangeRepository` and `SpecRepository` handle file access

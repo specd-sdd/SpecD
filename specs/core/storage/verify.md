@@ -167,7 +167,7 @@
 - **WHEN** the change is persisted to disk
 - **THEN** `manifest.json` contains the fields and structure defined in the change-manifest spec
 
-> Full scenarios are in [`specs/core/change-manifest/verify.md`](../change-manifest/verify.md).
+> Full scenarios are in [`core:change-manifest`](../change-manifest/verify.md).
 
 ### Requirement: Change locks directory placement
 

@@ -138,8 +138,8 @@ Each project's `specd.yaml` is the sole source of truth for that project's view 
 
 ## Spec Dependencies
 
-- [`core:core/config`](../config/spec.md) — workspace properties are declared in the project configuration
-- [`core:core/spec-id-format`](../spec-id-format/spec.md) — spec IDs use workspace-qualified format
+- [`core:config`](../config/spec.md) — workspace properties are declared in the project configuration
+- [`core:spec-id-format`](../spec-id-format/spec.md) — spec IDs use workspace-qualified format
 
 ## ADRs
 

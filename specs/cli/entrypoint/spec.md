@@ -158,4 +158,4 @@ specd change transition my-change implementing
 
 ## Spec Dependencies
 
-- [`core:core/config`](../../core/config/spec.md) — SpecdConfig shape and config file format
+- [`core:config`](../../core/config/spec.md) — SpecdConfig shape and config file format

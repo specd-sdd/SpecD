@@ -86,5 +86,5 @@ tasks                         missing       no
 
 ## Spec Dependencies
 
-- [`cli:cli/entrypoint`](../entrypoint/spec.md) — CLI config discovery, exit codes, and output conventions
-- [`core:core/change`](../../core/change/spec.md) — artifact and file state model used for listing
+- [`cli:entrypoint`](../entrypoint/spec.md) — CLI config discovery, exit codes, and output conventions
+- [`core:change`](../../core/change/spec.md) — artifact and file state model used for listing
