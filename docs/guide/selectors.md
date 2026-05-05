@@ -441,6 +441,22 @@ Validation rules assert structural constraints on artifact content. They appear 
 | `contentMatches` | string   | Regex the rendered node content must match.                                                                                                          |
 | `children`       | array    | Nested validation rules evaluated against the matched node's children.                                                                               |
 
+### Cross-field validation in structured artifacts
+
+A powerful feature of `contentMatches` is that it operates on the **full rendered text of the matched node's subtree**. For structured formats like YAML or JSON, this enables **cross-field validation** within a single rule.
+
+When you select a `sequence-item` in a delta file, `contentMatches` sees the entire YAML block for that entry, including the `op`, `selector`, and `content` fields. You can use a single regex to enforce logical dependencies between these fields — for example, "IF the selector targets a Requirement, THEN the content must include a Scenario":
+
+```yaml
+deltaValidations:
+  - id: modified-requirement-has-scenario
+    type: sequence-item
+    where: { op: 'modified' }
+    # Using [^]* for multiline matching in JavaScript.
+    # Logic: (No 'matches:.*Requirement:' in the YAML block) OR (Contains '#### Scenario:')
+    contentMatches: '^(?:(?![^]*matches:[^]*Requirement:)[^]*|[^]*#### Scenario:[^]*)$'
+```
+
 ### Asserting a section exists
 
 ```yaml

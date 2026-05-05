@@ -72,6 +72,24 @@ Both approaches support the same additional fields:
 
 **Vacuous pass** — a rule that matches zero nodes always passes, regardless of `required`. This allows rules to assert properties of nodes that must exist elsewhere — the existence check and the property check are expressed as separate rules.
 
+### Cross-field validation (Requirement implies Scenario)
+
+Because `contentMatches` on a `sequence-item` operates on the full rendered YAML block of that entry, you can use it to enforce logical relationships between different fields (like `selector` and `content`).
+
+This example ensures that if a delta modification targets a requirement, it must also provide at least one scenario in the new content:
+
+```yaml
+deltaValidations:
+  - id: modified-requirement-has-scenario
+    type: sequence-item
+    where:
+      op: 'modified'
+    # Uses [^]* to match across multiple lines in the YAML entry.
+    # Logic: OR( does NOT contain 'Requirement:', DOES contain '#### Scenario:' )
+    contentMatches: '^(?:(?![^]*matches:[^]*Requirement:)[^]*|[^]*#### Scenario:[^]*)$'
+    required: true
+```
+
 ## validations examples
 
 ### Enforcing spec structure (markdown)

@@ -278,12 +278,26 @@ artifacts:
             requirement is missing verification coverage, add a scenario
             before proceeding.
     deltaValidations:
-      - id: added-has-scenario
+      # 1. Validate only when a new Requirement is ADDED
+      - id: added-requirement-has-scenario
         type: sequence-item
         where:
-          op: 'added|modified'
+          op: 'added'
+          content: '### Requirement:' # Only triggers if the content is a requirement
         contentMatches: '#### Scenario:'
-        required: true
+        required: true # Mandatory if the 'where' condition is met
+
+      # 2. Validate only when an existing Requirement is MODIFIED
+      - id: modified-requirement-has-scenario
+        type: sequence-item
+        where:
+          op: 'modified'
+        # Logic: (NOT matches:.*Requirement:) OR (contains #### Scenario:)
+        # This ensures that non-requirement modifications (like Purpose) are ignored,
+        # while requirement modifications are forced to include at least one scenario.
+        # [^]* is used to ensure multiline matching in the JS regex engine.
+        contentMatches: '^(?:(?![^]*matches:[^]*Requirement:)[^]*|[^]*#### Scenario:[^]*)$'
+        required: true # Mandatory if the 'where' condition is met
     validations:
       - id: has-requirements
         type: section

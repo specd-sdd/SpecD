@@ -197,16 +197,42 @@ For the full delta file format with all options, position hints, rename, and mer
 
 See [Selector model](#selector-model) for how to identify nodes. See [examples/validations-and-delta-validations.md](examples/validations-and-delta-validations.md) for annotated examples.
 
+### deltaValidations
+
+`deltaValidations` defines structural rules checked against the delta file's AST before application. It works identically to `validations`, but the document root is the normalized YAML AST of the delta file itself. This allows you to enforce that the AI agent follows specific conventions when proposing changes — for example, that every new requirement must have at least one verification scenario.
+
+## Validation rules
+
+Both `validations` and `deltaValidations` use the same rule format.
+
+| Field            | Type     | Default | Description                                                                                                                                                                                           |
+| ---------------- | -------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`             | string   | —       | Optional identifier for the rule. Used for error reporting and targeting with overrides.                                                                                                              |
+| `selector`       | selector | —       | A selector object identifying the nodes to validate. Mutually exclusive with `path`.                                                                                                                 |
+| `path`           | string   | —       | A JSONPath expression identifying the nodes to validate. Mutually exclusive with `selector`.                                                                                                          |
+| `required`       | boolean  | `true`  | When `true`, the rule fails if zero nodes match. When `false`, absence is a warning. If nodes match, `contentMatches` and `children` are always enforced.                                             |
+| `contentMatches` | string   | —       | Regex matched against the serialized text of the matched node's subtree.                                                                                                                              |
+| `children`       | array    | —       | Nested validation rules evaluated with each matched node as the root.                                                                                                                                |
+
+### Cross-field validation with `contentMatches`
+
+A powerful feature of `contentMatches` is that it operates on the **serialized native format** of the matched node's full subtree. For structured formats like YAML (used in `deltaValidations`) or JSON, this allows for **cross-field validation** within a single rule.
+
+When you select a `sequence-item` in a delta file, `contentMatches` sees the entire YAML block for that entry, including the `op`, `selector`, and `content` fields. You can use a single regex to enforce logical dependencies between these fields — for example, "IF the selector targets a Requirement, THEN the content must include a Scenario":
+
 ```yaml
-validations:
-  - type: section
-    matches: '^Requirements$'
-    required: true
-    children:
-      - type: section
-        matches: '^Requirement:'
-        required: true
+deltaValidations:
+  - id: modified-requirement-has-scenario
+    type: sequence-item
+    where: { op: 'modified' }
+    # Using [^]* for multiline matching in JavaScript.
+    # Logic: (No 'matches:.*Requirement:' in the YAML block) OR (Contains '#### Scenario:')
+    contentMatches: '^(?:(?![^]*matches:[^]*Requirement:)[^]*|[^]*#### Scenario:[^]*)$'
 ```
+
+### Vacuous pass
+
+If a rule has a `selector` or `where` filter that matches zero nodes in the entire document, the rule is considered "non-applicable" and passes vacuously, even if `required: true`. This allows you to define rules that only trigger when specific content is present without making that content mandatory for every file.
 
 ### metadataExtraction
 
