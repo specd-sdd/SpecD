@@ -80,13 +80,12 @@ This example ensures that if a delta modification targets a requirement, it must
 
 ```yaml
 deltaValidations:
-  - id: modified-requirement-has-scenario
+  - id: verify-requirement-delta-has-scenario
     type: sequence-item
-    where:
-      op: 'modified'
-    # Uses [^]* to match across multiple lines in the YAML entry.
-    # Logic: OR( does NOT contain 'Requirement:', DOES contain '#### Scenario:' )
-    contentMatches: '^(?:(?![^]*matches:[^]*Requirement:)[^]*|[^]*#### Scenario:[^]*)$'
+    # Logic: IF ((op:added AND content:### Requirement:) OR (op:modified AND matches:Requirement:))
+    #        THEN MUST have #### Scenario:
+    # We use lookaheads (?=...) with [\s\S]* to ensure we match across lines regardless of field order.
+    contentMatches: '^(?:(?!(?=[\s\S]*op: added)(?=[\s\S]*content:[^]*### Requirement:)|(?=[\s\S]*op: modified)(?=[\s\S]*matches:[^]*Requirement:))[\s\S]*|[\s\S]*#### Scenario:[\s\S]*)$'
     required: true
 ```
 

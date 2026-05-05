@@ -9,29 +9,15 @@ describe('Real Delta Validation Logic', () => {
 
   const rules: ValidationRule[] = [
     {
-      id: 'added-requirement-has-scenario',
+      id: 'verify-requirement-delta-has-scenario',
       selector: {
-        type: 'sequence-item',
-        where: {
-          op: 'added',
-          content: '### Requirement:'
-        }
+        type: 'sequence-item'
       },
-      contentMatches: '#### Scenario:',
-      required: false
-    },
-    {
-      id: 'modified-requirement-has-scenario',
-      selector: {
-        type: 'sequence-item',
-        where: {
-          op: 'modified'
-        }
-      },
-      // Logic: (NOT matches:.*Requirement:) OR (contains #### Scenario:)
-      // Using [^] as a safe JS multiline dot substitute
-      contentMatches: '^(?:(?![^]*matches:[^]*Requirement:)[^]*|[^]*#### Scenario:[^]*)$',
-      required: false
+      // Logic: IF ((op:added AND content:### Requirement:) OR (op:modified AND matches:Requirement:))
+      //        THEN MUST have #### Scenario:
+      // We use lookaheads (?=...) with [\s\S]* to ensure we match across lines and regardless of field order.
+      contentMatches: '^(?:(?!(?=^[\\s\\S]*op: added)(?=[\\s\\S]*content:[^]*### Requirement:)|(?=[\\s\\S]*op: modified)(?=[\\s\\S]*matches:[^]*Requirement:))[\\s\\S]*|[\\s\\S]*#### Scenario:[\\s\\S]*)$',
+      required: true
     }
   ]
 

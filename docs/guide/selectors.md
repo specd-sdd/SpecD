@@ -449,12 +449,12 @@ When you select a `sequence-item` in a delta file, `contentMatches` sees the ent
 
 ```yaml
 deltaValidations:
-  - id: modified-requirement-has-scenario
+  - id: verify-requirement-delta-has-scenario
     type: sequence-item
-    where: { op: 'modified' }
-    # Using [^]* for multiline matching in JavaScript.
-    # Logic: (No 'matches:.*Requirement:' in the YAML block) OR (Contains '#### Scenario:')
-    contentMatches: '^(?:(?![^]*matches:[^]*Requirement:)[^]*|[^]*#### Scenario:[^]*)$'
+    # Logic: IF ((op:added AND content:### Requirement:) OR (op:modified AND matches:Requirement:))
+    #        THEN MUST have #### Scenario:
+    # We use lookaheads (?=...) with [\s\S]* to ensure we match across lines regardless of field order.
+    contentMatches: '^(?:(?!(?=[\s\S]*op: added)(?=[\s\S]*content:[^]*### Requirement:)|(?=[\s\S]*op: modified)(?=[\s\S]*matches:[^]*Requirement:))[\s\S]*|[\s\S]*#### Scenario:[\s\S]*)$'
 ```
 
 ### Asserting a section exists

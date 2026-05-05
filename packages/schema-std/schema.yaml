@@ -278,26 +278,16 @@ artifacts:
             requirement is missing verification coverage, add a scenario
             before proceeding.
     deltaValidations:
-      # 1. Validate only when a new Requirement is ADDED
-      - id: added-requirement-has-scenario
+      # Requirements in verify.md MUST have at least one scenario.
+      # This rule targets all delta entries but only enforces the scenario
+      # if the entry is adding or modifying a Requirement section.
+      - id: verify-requirement-delta-has-scenario
         type: sequence-item
-        where:
-          op: 'added'
-          content: '### Requirement:' # Only triggers if the content is a requirement
-        contentMatches: '#### Scenario:'
-        required: true # Mandatory if the 'where' condition is met
-
-      # 2. Validate only when an existing Requirement is MODIFIED
-      - id: modified-requirement-has-scenario
-        type: sequence-item
-        where:
-          op: 'modified'
-        # Logic: (NOT matches:.*Requirement:) OR (contains #### Scenario:)
-        # This ensures that non-requirement modifications (like Purpose) are ignored,
-        # while requirement modifications are forced to include at least one scenario.
-        # [^]* is used to ensure multiline matching in the JS regex engine.
-        contentMatches: '^(?:(?![^]*matches:[^]*Requirement:)[^]*|[^]*#### Scenario:[^]*)$'
-        required: true # Mandatory if the 'where' condition is met
+        # Logic: IF ((op:added AND content:### Requirement:) OR (op:modified AND matches:Requirement:))
+        #        THEN MUST have #### Scenario:
+        # We use lookaheads (?=...) with [\s\S]* to ensure we match across lines regardless of field order.
+        contentMatches: '^(?:(?!(?=[\s\S]*op: added)(?=[\s\S]*content:[^]*### Requirement:)|(?=[\s\S]*op: modified)(?=[\s\S]*matches:[^]*Requirement:))[\s\S]*|[\s\S]*#### Scenario:[\s\S]*)$'
+        required: true
     validations:
       - id: has-requirements
         type: section
