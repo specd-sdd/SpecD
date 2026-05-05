@@ -92,4 +92,63 @@ This requirement appears after the merge target and must remain unchanged.`
     expect(merged).not.toContain('\\<')
     expect(merged).not.toContain('\\>')
   })
+
+  it('added with two sections in content inserts both sections under parent scope', () => {
+    const base = `## Requirements
+
+### Requirement: Existing req
+
+Some existing content.
+
+## Purpose
+
+Some purpose.`
+
+    const deltaRaw = `- op: added
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+  content: |
+    ### Requirement: Ports and constructor
+
+    #### Scenario: GetArtifactInstruction is constructed with LifecycleEngine
+
+    - **WHEN** \`GetArtifactInstruction\` is assembled
+    - **THEN** it receives \`LifecycleEngine\` together with its repositories, parser registry, schema provider, and template expander
+
+    ### Requirement: Input
+
+    #### Scenario: Omitted artifactId uses engine-derived readiness
+
+    - **GIVEN** \`proposal\` is effectively complete
+    - **AND** \`specs\` is not effectively complete
+    - **AND** \`LifecycleEngine.evaluate\` reports \`specs\` as the first effectively ready incomplete artifact
+    - **WHEN** \`GetArtifactInstruction.execute\` is called without \`artifactId\`
+    - **THEN** the returned \`artifactId\` is \`specs\`
+
+    #### Scenario: Omitted artifactId ignores persisted complete when engine reports dependency blockage
+
+    - **GIVEN** an artifact's persisted state is \`complete\`
+    - **AND** \`LifecycleEngine.evaluate\` reports its effective status as \`pending-parent-artifact-review\`
+    - **WHEN** \`GetArtifactInstruction.execute\` is called without \`artifactId\`
+    - **THEN** that artifact is not selected as complete/resolved by auto-resolution`
+
+    const md = new MarkdownParser()
+    const yaml = new YamlParser()
+    const delta = yaml.parseDelta(deltaRaw)
+    const merged = md.serialize(md.apply(md.parse(base), delta).ast)
+
+    expect(merged).toContain('### Requirement: Existing req')
+    expect(merged).toContain('### Requirement: Ports and constructor')
+    expect(merged).toContain('### Requirement: Input')
+    expect(merged).toContain(
+      '#### Scenario: GetArtifactInstruction is constructed with LifecycleEngine',
+    )
+    expect(merged).toContain('#### Scenario: Omitted artifactId uses engine-derived readiness')
+    expect(merged).toContain(
+      '#### Scenario: Omitted artifactId ignores persisted complete when engine reports dependency blockage',
+    )
+    expect(merged).toContain('## Purpose')
+  })
 })

@@ -647,6 +647,7 @@ export function applyDelta(
             }
           } else {
             newNode = firstChild
+            extraNodes = parsed.root.children?.slice(1) ?? []
           }
         } else {
           newNode = parsed.root
