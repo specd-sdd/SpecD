@@ -248,6 +248,19 @@ A change may be moved between storage locations without affecting its lifecycle 
   - **`at`** — timestamp
   - **`supersededBy`** — optional list of change names that replace this one
 
+### Requirement: Lifecycle interpretation authority
+
+The `Change` entity is the source of truth for persisted lifecycle facts: history, the current persisted state, artifact files, aggregate artifact states, approvals, and invalidation events.
+
+Dependency-aware lifecycle interpretation is a separate concern. Any decision that depends on the schema DAG, workflow `requires`, recursive parent blocking, approval-gate routing, or step availability SHALL be interpreted by `LifecycleEngine`, not by the `Change` entity itself.
+
+This separation ensures the entity does not need schema knowledge in order to answer questions such as:
+
+- whether an artifact is effectively blocked by an upstream parent
+- which lifecycle step is reachable next under the active schema
+- whether a requested transition must route through an approval boundary
+- which blocker or next action should be surfaced to callers
+
 ## Constraints
 
 - `name` and `createdAt` are set at creation and never changed
@@ -276,6 +289,7 @@ A change may be moved between storage locations without affecting its lifecycle 
 - Historical implementation detection is derived from append-only history by scanning for any `transitioned` event whose `to` field is `implementing`
 - Drafting or discarding after historical implementation requires an explicit force override because implementation may already exist and specs and code could otherwise be left out of sync
 - Discarding a change requires a `discarded` event with mandatory `reason` and `by`; it is irreversible
+- Schema-aware effective artifact status, recursive blocker resolution, and workflow-step availability are not entity-owned concerns; they are interpreted by `LifecycleEngine` from persisted change facts plus the active schema
 
 ## Spec Dependencies
 
@@ -284,3 +298,4 @@ A change may be moved between storage locations without affecting its lifecycle 
 - [`core:spec-metadata`](../spec-metadata/spec.md) — dependency metadata resolution used during context compilation
 - [`core:spec-id-format`](../spec-id-format/spec.md) — canonical `workspace:capabilityPath` identifiers for spec-scoped files
 - [`default:_global/architecture`](../../_global/architecture/spec.md) — domain ownership of lifecycle and artifact invariants
+- [`core:lifecycle-engine`](../lifecycle-engine/spec.md) — interprets schema-aware lifecycle and dependency status from persisted change facts

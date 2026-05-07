@@ -49,7 +49,45 @@
 - **AND** it renders the artifact dependency tree using ASCII characters
 - **AND** each node includes a status symbol (e.g., `[✓]`, `[~]`), a scope label (e.g., `[scope: change]`), and the `[hasTasks]` tag if enabled
 
-### Requirement: spec-overlap-conflict review reason display
+#### Scenario: Text output preserves core blocker messages
+
+- **GIVEN** `GetStatus` returns lifecycle blockers
+- **WHEN** `specd change status <name>` is run
+- **THEN** the command prints those blocker codes and messages
+- **AND** it does not substitute a locally recomputed explanation
+
+### Requirement: Schema version warning
+
+#### Scenario: Schema mismatch
+
+- **GIVEN** the change was created with schema version 1 and the active schema is version 2
+- **WHEN** `specd change status <name>` is run
+- **THEN** stderr contains a `warning:` line mentioning both schema versions
+- **AND** the process exits with code 0
+
+### Requirement: Change not found
+
+#### Scenario: Unknown change name
+
+- **WHEN** `specd change status nonexistent` is run
+- **THEN** the command exits with code 1
+- **AND** stderr contains an `error:` message
+
+### Requirement: Schema-derived fields
+
+#### Scenario: JSON output includes artifactDag
+
+- **GIVEN** a change using a schema where one artifact has `hasTasks: true`
+- **WHEN** `specd change status <name> --format json` is run
+- **THEN** the JSON output includes `schema.artifactDag` array
+- **AND** each entry includes id, scope, optional, requires, hasTasks, output
+- **AND** the `hasTasks` boolean reflects the schema definition
+
+#### Scenario: JSON output for non-schema-std also includes artifactDag
+
+- **GIVEN** a change using a custom schema
+- **WHEN** `specd change status <name> --format json` is run
+- **THEN** the JSON output includes `schema.artifactDag` array
 
 #### Scenario: Text output shows overlap entries when reason is spec-overlap-conflict
 
@@ -85,36 +123,3 @@
 - **GIVEN** `GetStatus` returns `review.required: true` with `reason: 'artifact-review-required'`
 - **WHEN** `specd change status <name>` is run
 - **THEN** no `overlap:` subsection appears in the review section
-
-### Requirement: Schema version warning
-
-#### Scenario: Schema mismatch
-
-- **GIVEN** the change was created with schema version 1 and the active schema is version 2
-- **WHEN** `specd change status <name>` is run
-- **THEN** stderr contains a `warning:` line mentioning both schema versions
-- **AND** the process exits with code 0
-
-### Requirement: Change not found
-
-#### Scenario: Unknown change name
-
-- **WHEN** `specd change status nonexistent` is run
-- **THEN** the command exits with code 1
-- **AND** stderr contains an `error:` message
-
-### Requirement: Schema-derived fields
-
-#### Scenario: JSON output includes artifactDag
-
-- **GIVEN** a change using a schema where one artifact has `hasTasks: true`
-- **WHEN** `specd change status <name> --format json` is run
-- **THEN** the JSON output includes `schema.artifactDag` array
-- **AND** each entry includes id, scope, optional, requires, hasTasks, output
-- **AND** the `hasTasks` boolean reflects the schema definition
-
-#### Scenario: JSON output for non-schema-std also includes artifactDag
-
-- **GIVEN** a change using a custom schema
-- **WHEN** `specd change status <name> --format json` is run
-- **THEN** the JSON output includes `schema.artifactDag` array

@@ -54,7 +54,8 @@
 #### Scenario: Valid transition — drafting to designing
 
 - **WHEN** a Change in `drafting` state is transitioned to `designing`
-- **THEN** a `transitioned` event with `from: 'drafting'` and `to: 'designing'` is appended and deriving state returns `designing`
+- **THEN** the `LifecycleEngine` confirms the transition is valid
+- **AND** a `transitioned` event with `from: 'drafting'` and `to: 'designing'` is appended
 
 #### Scenario: Valid transition — verifying back to implementing for implementation-only failure
 
@@ -176,26 +177,12 @@
 - **THEN** every other file becomes `pending-review`
 - **AND** the drifted file remains `drifted-pending-review`
 
-#### Scenario: Requires satisfied only by complete or skipped
-
-- **GIVEN** artifact B requires artifact A
-- **AND** artifact A is `pending-review`
-- **WHEN** dependency satisfaction is evaluated
-- **THEN** artifact A does not satisfy the requirement
-
 #### Scenario: markComplete sets file and artifact state to complete
 
 - **GIVEN** an artifact file in `in-progress`
 - **WHEN** `markComplete(key, hash)` is called through validation
 - **THEN** the file state becomes `complete`
 - **AND** the parent artifact state is recomputed
-
-#### Scenario: Artifact aggregate status is pending-parent-artifact-review
-
-- **GIVEN** an artifact with all files in `complete` state
-- **AND** the artifact depends on a parent artifact that is `pending-review`
-- **WHEN** the artifact aggregate state is computed
-- **THEN** the artifact state SHALL be `pending-parent-artifact-review`
 
 ### Requirement: History and event sourcing
 
@@ -352,3 +339,21 @@
 
 - **WHEN** a discard operation is attempted to be reversed
 - **THEN** no operation exists to move a change out of `discarded/`
+
+### Requirement: Artifact sync
+
+#### Scenario: syncArtifacts appends artifacts-synced when schema artifact set changes
+
+- **GIVEN** the schema artifact set changes for an existing Change
+- **WHEN** artifact sync reconciles the artifact map
+- **THEN** an `artifacts-synced` event is appended describing the added and removed files and artifact types
+
+### Requirement: Lifecycle interpretation authority
+
+#### Scenario: Dependency-aware lifecycle interpretation is external to Change
+
+- **GIVEN** an artifact appears persisted as `complete`
+- **AND** an upstream dependency requires review under the active schema DAG
+- **WHEN** lifecycle interpretation is requested
+- **THEN** the `Change` entity remains the source of persisted facts only
+- **AND** `LifecycleEngine` is responsible for deriving the dependency-aware lifecycle meaning

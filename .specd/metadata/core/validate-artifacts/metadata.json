@@ -5,6 +5,7 @@
     "core:change",
     "core:change-layout",
     "core:change-manifest",
+    "core:lifecycle-engine",
     "core:schema-format",
     "core:delta-format",
     "core:selector-model",
@@ -19,7 +20,7 @@
     {
       "requirement": "Ports and constructor",
       "rules": [
-        "`ValidateArtifacts` receives at construction time: `ChangeRepository`, a map of `SpecRepository` instances (one per configured workspace), `SchemaProvider`, `ArtifactParserRegistry`, `ActorResolver`, and `ContentHasher`.\n\n```typescript\nclass ValidateArtifacts {\n  constructor(\n    changes: ChangeRepository,\n    specs: ReadonlyMap<string, SpecRepository>,\n    schemaProvider: SchemaProvider,\n    parsers: ArtifactParserRegistry,\n    actor: ActorResolver,\n    hasher: ContentHasher,\n  )\n}\n```\n\n`SchemaProvider` is a lazy, caching port that returns the fully-resolved schema (with plugins and overrides applied). It replaces the previous `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths` triple. All are injected at kernel composition time, not passed per invocation.\n\n`ActorResolver` supplies the identity recorded on approval invalidation events. `ContentHasher` is used both for approval drift detection and for the cleaned hashes persisted when validation succeeds."
+        "`ValidateArtifacts` receives at construction time: `ChangeRepository`, a map of `SpecRepository` instances (one per configured workspace), `SchemaProvider`, `ArtifactParserRegistry`, `ActorResolver`, `ContentHasher`, and `LifecycleEngine`.\n\n```typescript\nclass ValidateArtifacts {\n  constructor(\n    changes: ChangeRepository,\n    specs: ReadonlyMap<string, SpecRepository>,\n    schemaProvider: SchemaProvider,\n    parsers: ArtifactParserRegistry,\n    actor: ActorResolver,\n    hasher: ContentHasher,\n    lifecycle: LifecycleEngine,\n  )\n}\n```\n\n`SchemaProvider` is a lazy, caching port that returns the fully-resolved schema (with plugins and overrides applied). It replaces the previous `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths` triple. All are injected at kernel composition time, not passed per invocation.\n\n`ActorResolver` supplies the identity recorded on approval invalidation events. `ContentHasher` is used both for approval drift detection and for the cleaned hashes persisted when validation succeeds. `LifecycleEngine` is used only for schema-aware dependency interpretation; structural validation, delta preview, metadata extraction, and artifact completion remain owned by `ValidateArtifacts`."
       ]
     },
     {
@@ -43,7 +44,7 @@
     {
       "requirement": "Dependency order check",
       "rules": [
-        "Before validating an artifact, `ValidateArtifacts` must check that all artifact IDs in its `requires` list are either `complete` or `skipped` (via `change.effectiveStatus(type)`). If a required dependency is neither `complete` nor `skipped`, validation of the dependent artifact is skipped and reported as a dependency-blocked failure. A `skipped` optional artifact satisfies the dependency. `skipped` artifacts are not validated — there is no file to check.\n\nDependency-blocked failures MUST include the dependency artifact ID and its effective status as observed at validation time.\n\nWhen the dependency status is `pending-parent-artifact-review`, the failure description MUST also include the upstream parent blocker context (artifact ID and status) when available from recursive blocker resolution (`findBlockingParent`).\n\nFor blockers outside review-propagation (`missing` and `in-progress`), the failure description MUST still include the dependency status and MUST NOT degrade to generic \"incomplete dependency\" wording.\n\n`pending-review` and `drifted-pending-review` are review blockers. For these statuses, the failure description MUST present them as review-state blockers (not generic incompleteness) and MUST include the status explicitly."
+        "Before validating an artifact, `ValidateArtifacts` must check that all artifact IDs in its `requires` list are either `complete` or `skipped`.\n\nThe dependency-aware status lookup SHALL be interpreted through `LifecycleEngine`, since recursive parent blocking and schema DAG semantics do not belong on the `Change` entity. If a required dependency is neither `complete` nor `skipped`, validation of the dependent artifact is skipped and reported as a dependency-blocked failure. A `skipped` optional artifact satisfies the dependency. `skipped` artifacts are not validated — there is no file to check.\n\nDependency-blocked failures MUST include the dependency artifact ID and its effective status as observed at validation time.\n\nWhen the dependency status is `pending-parent-artifact-review`, the failure description MUST also include the upstream parent blocker context (artifact ID and status) when available from recursive blocker resolution.\n\nFor blockers outside review-propagation (`missing` and `in-progress`), the failure description MUST still include the dependency status and MUST NOT degrade to generic \"incomplete dependency\" wording.\n\n`pending-review` and `drifted-pending-review` are review blockers. For these statuses, the failure description MUST present them as review-state blockers (not generic incompleteness) and MUST include the status explicitly."
       ]
     },
     {
@@ -169,80 +170,36 @@
       ]
     },
     {
-      "requirement": "Input — artifactId filter",
-      "name": "Validating one spec does not fail on missing artifacts from other specs",
-      "given": [
-        "a change with two specs: specA and specB",
-        "AND specA has all its artifact files present",
-        "AND specB does not have its artifact files yet (not yet created)"
-      ],
-      "when": ["ValidateArtifacts.execute is called with specPath: 'specA'"],
-      "then": [
-        "only specA's artifacts are validated",
-        "AND missing artifacts from specB do NOT cause validation failure",
-        "AND result.passed is true if specA's artifacts pass validation"
-      ]
-    },
-    {
-      "requirement": "Input — artifactId filter",
-      "name": "Only the specified artifact is validated",
-      "given": [
-        "the schema has artifacts proposal, specs, and verify",
-        "AND artifactId is \"specs\""
-      ],
-      "when": ["ValidateArtifacts.execute is called"],
-      "then": [
-        "only specs goes through dependency check, delta validation, structural validation, and hash computation",
-        "AND proposal and verify are not checked, not reported as missing, and not included in the result"
-      ]
-    },
-    {
-      "requirement": "Input — artifactId filter",
-      "name": "Dependency order still applies to the specified artifact",
-      "given": [
-        "artifactId is \"specs\" and artifact specs requires proposal",
-        "AND proposal is not complete or skipped"
-      ],
-      "when": ["ValidateArtifacts.execute is called"],
-      "then": ["specs is reported as dependency-blocked and markComplete is not called"]
-    },
-    {
-      "requirement": "Input — artifactId filter",
-      "name": "Specified artifact with satisfied dependencies proceeds normally",
-      "given": [
-        "artifactId is \"specs\" and artifact specs requires proposal",
-        "AND proposal is complete"
-      ],
-      "when": ["ValidateArtifacts.execute is called"],
-      "then": ["specs is validated normally and markComplete is called if all validations pass"]
-    },
-    {
       "requirement": "Dependency order check",
       "name": "Dependency complete — validation proceeds",
-      "given": ["artifact specs requires proposal, and proposal is complete"],
+      "given": [
+        "artifact specs requires proposal, and LifecycleEngine reports proposal as complete"
+      ],
       "when": ["ValidateArtifacts.execute is called for specs"],
       "then": ["validation of specs proceeds normally"]
     },
     {
       "requirement": "Dependency order check",
       "name": "Dependency skipped — validation proceeds",
-      "given": [
-        "artifact tasks requires design, and design is optional: true with validatedHash === \"__skipped__\""
-      ],
+      "given": ["artifact tasks requires design, and LifecycleEngine reports design as skipped"],
       "when": ["ValidateArtifacts.execute is called for tasks"],
       "then": ["validation of tasks proceeds — skipped satisfies the dependency"]
     },
     {
       "requirement": "Dependency order check",
       "name": "Dependency incomplete — validation blocked",
-      "given": ["artifact specs requires proposal, and proposal is in-progress"],
+      "given": [
+        "artifact specs requires proposal, and LifecycleEngine reports proposal as in-progress"
+      ],
       "when": ["ValidateArtifacts.execute is called for specs"],
       "then": ["specs is reported as dependency-blocked and markComplete is not called for it"]
     },
     {
       "requirement": "Dependency order check",
       "name": "Dependency-block failure includes effective dependency status",
-      "given": ["artifact specs requires proposal, and proposal effective status is missing"],
+      "given": [
+        "artifact specs requires proposal, and LifecycleEngine reports proposal effective status as missing"
+      ],
       "when": ["ValidateArtifacts.execute is called for specs"],
       "then": [
         "the dependency-blocked failure description includes dependency proposal",
@@ -254,7 +211,7 @@
       "name": "Review-propagation blocker includes recursive parent context",
       "given": [
         "artifact verify depends on specs",
-        "AND specs effective status is pending-parent-artifact-review",
+        "AND LifecycleEngine reports specs effective status as pending-parent-artifact-review",
         "AND recursive blocker resolution identifies parent artifact proposal with status pending-review"
       ],
       "when": ["ValidateArtifacts.execute is called for verify"],
@@ -268,7 +225,7 @@
       "name": "Direct review blocker status is reported as review-state",
       "given": [
         "artifact verify depends on specs",
-        "AND specs effective status is pending-review or drifted-pending-review"
+        "AND LifecycleEngine reports specs effective status as pending-review or drifted-pending-review"
       ],
       "when": ["ValidateArtifacts.execute is called for verify"],
       "then": [
@@ -645,7 +602,84 @@
       ]
     },
     {
-      "requirement": "Automatic dependsOn extraction",
+      "requirement": "Ports and constructor",
+      "name": "ValidateArtifacts is constructed with LifecycleEngine",
+      "when": ["ValidateArtifacts is assembled"],
+      "then": [
+        "it receives LifecycleEngine alongside its existing repositories, parser registry, actor resolver, and hasher"
+      ]
+    },
+    {
+      "requirement": "Input",
+      "name": "Change-scoped validation does not require specPath",
+      "given": ["a change-scoped artifact such as design"],
+      "when": ["ValidateArtifacts.execute is called for that artifact"],
+      "then": ["specPath is optional"]
+    },
+    {
+      "requirement": "Schema name guard",
+      "name": "Schema mismatch throws before validation",
+      "given": ["the change was created under a different schema name"],
+      "when": ["ValidateArtifacts.execute is called"],
+      "then": ["it throws SchemaMismatchError before validating artifacts"]
+    },
+    {
+      "requirement": "MetadataExtraction validation failures are validation failures",
+      "name": "Invalid extracted metadata prevents completion",
+      "given": ["metadata extraction succeeds but its result fails schema validation"],
+      "when": ["ValidateArtifacts.execute processes the artifact"],
+      "then": ["a validation failure is recorded", "AND the artifact is not marked complete"]
+    },
+    {
+      "requirement": "MetadataExtraction validation failures are validation failures",
+      "name": "Validating one spec does not fail on missing artifacts from other specs",
+      "given": [
+        "a change with two specs: specA and specB",
+        "AND specA has all its artifact files present",
+        "AND specB does not have its artifact files yet (not yet created)"
+      ],
+      "when": ["ValidateArtifacts.execute is called with specPath: 'specA'"],
+      "then": [
+        "only specA's artifacts are validated",
+        "AND missing artifacts from specB do NOT cause validation failure",
+        "AND result.passed is true if specA's artifacts pass validation"
+      ]
+    },
+    {
+      "requirement": "MetadataExtraction validation failures are validation failures",
+      "name": "Only the specified artifact is validated",
+      "given": [
+        "the schema has artifacts proposal, specs, and verify",
+        "AND artifactId is \"specs\""
+      ],
+      "when": ["ValidateArtifacts.execute is called"],
+      "then": [
+        "only specs goes through dependency check, delta validation, structural validation, and hash computation",
+        "AND proposal and verify are not checked, not reported as missing, and not included in the result"
+      ]
+    },
+    {
+      "requirement": "MetadataExtraction validation failures are validation failures",
+      "name": "Dependency order still applies to the specified artifact",
+      "given": [
+        "artifactId is \"specs\" and artifact specs requires proposal",
+        "AND LifecycleEngine reports proposal as not complete or skipped"
+      ],
+      "when": ["ValidateArtifacts.execute is called"],
+      "then": ["specs is reported as dependency-blocked and markComplete is not called"]
+    },
+    {
+      "requirement": "MetadataExtraction validation failures are validation failures",
+      "name": "Specified artifact with satisfied dependencies proceeds normally",
+      "given": [
+        "artifactId is \"specs\" and artifact specs requires proposal",
+        "AND LifecycleEngine reports proposal as complete"
+      ],
+      "when": ["ValidateArtifacts.execute is called"],
+      "then": ["specs is validated normally and markComplete is called if all validations pass"]
+    },
+    {
+      "requirement": "MetadataExtraction validation failures are validation failures",
       "name": "Transformed dependsOn values are persisted on the change",
       "given": [
         "a validated scope: spec artifact whose metadata extraction declares transform: resolveSpecPath",
@@ -658,7 +692,7 @@
       ]
     },
     {
-      "requirement": "Automatic dependsOn extraction",
+      "requirement": "MetadataExtraction validation failures are validation failures",
       "name": "Transform failure blocks dependsOn extraction persistence",
       "given": ["a declared transform throws because required origin context is absent"],
       "when": ["ValidateArtifacts.execute attempts automatic dependsOn extraction"],
@@ -668,7 +702,7 @@
       ]
     },
     {
-      "requirement": "Automatic dependsOn extraction",
+      "requirement": "MetadataExtraction validation failures are validation failures",
       "name": "Found dependency values may not be silently discarded by transform execution",
       "given": [
         "extraction finds dependency values in the validated artifact content",
@@ -679,8 +713,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:e2879dc4003de251d77a2ce5c0393eb0b38dfebbdcdae65cf5e7a8da4d222557",
-    "verify.md": "sha256:a7860eb2a78ae2fff803212b8854ee248bcdc5801204376ba7c8c91b03ec6720"
+    "spec.md": "sha256:989d1f91f2b078b4106d34eb8f481486dde2151dcb1c83b0910d5f6c3f9f654c",
+    "verify.md": "sha256:26998d10abd759010b64378b107246d36575e8adedae081d53d5df04aa897f18"
   },
   "generatedBy": "core"
 }

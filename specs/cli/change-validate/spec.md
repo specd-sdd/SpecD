@@ -102,7 +102,7 @@ For change-scoped validation targets, no preview hint is emitted.
 
 Missing path lines MUST be derived from `ValidateArtifacts` result metadata. For an existing spec with a delta-capable artifact, this path is the expected `deltas/.../*.delta.yaml` file, even if a direct `specs/...` file exists.
 
-For dependency-blocked failures, `<description>` MUST be rendered exactly from the core validation failure entry and therefore MUST preserve dependency status context. When core reports review-propagation context (for example, a blocker status of `pending-parent-artifact-review` and an upstream parent blocker), the CLI MUST surface that context verbatim instead of replacing it with generic "incomplete dependency" wording.
+For dependency-blocked failures, `<description>` MUST be rendered exactly from the core validation failure entry and therefore MUST preserve dependency status context. Because core dependency interpretation is lifecycle-engine-driven, the CLI MUST surface that wording verbatim instead of replacing it with generic "incomplete dependency" wording or recomputing blocker semantics locally.
 
 In `json` or `toon` mode:
 

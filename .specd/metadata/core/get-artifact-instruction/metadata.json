@@ -6,7 +6,8 @@
     "core:delta-format",
     "core:change",
     "core:schema-merge",
-    "core:template-variables"
+    "core:template-variables",
+    "core:lifecycle-engine"
   ],
   "context": [
     "When an agent is creating or modifying a specific artifact during the designing step, it needs the artifact's instruction along with its composition rules and delta guidance — but this is instruction content, not context. `CompileContext` handles context (specs, metadata, available steps); `GetArtifactInstruction` handles the artifact-specific instructions: the schema instruction, composition rules (`rules.pre`/`rules.post`), and delta instructions with existing artifact outlines. The skill retrieves these at the right moment — after loading context but before doing the work."
@@ -15,13 +16,13 @@
     {
       "requirement": "Ports and constructor",
       "rules": [
-        "`GetArtifactInstruction` receives at construction time: `ChangeRepository`, a map of `SpecRepository` instances, `SchemaProvider`, `ArtifactParserRegistry`, and `TemplateExpander`.\n\n```typescript\nclass GetArtifactInstruction {\n  constructor(\n    changes: ChangeRepository,\n    specs: ReadonlyMap<string, SpecRepository>,\n    schemaProvider: SchemaProvider,\n    parsers: ArtifactParserRegistry,\n    expander: TemplateExpander,\n  )\n}\n```\n\n`ArtifactParserRegistry` is needed to generate delta format instructions and existing artifact outlines. `SpecRepository` is needed to read existing artifact files for outlines. `TemplateExpander.expand()` is called on `instruction`, `template`, `deltaInstruction`, and `rules` text before returning them (verbatim expansion, no shell escaping). `SchemaProvider` provides the fully-resolved schema (with plugins and overrides applied), which includes pre-loaded template content in each `ArtifactType`. It replaces the previous `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths` triple. The use case builds contextual variables (`change` namespace) from the resolved change and `ChangeRepository.changePath()`, passing them to the expander."
+        "`GetArtifactInstruction` receives at construction time: `ChangeRepository`, a map of `SpecRepository` instances, `SchemaProvider`, `ArtifactParserRegistry`, `TemplateExpander`, and `LifecycleEngine`.\n\n```typescript\nclass GetArtifactInstruction {\n  constructor(\n    changes: ChangeRepository,\n    specs: ReadonlyMap<string, SpecRepository>,\n    schemaProvider: SchemaProvider,\n    parsers: ArtifactParserRegistry,\n    expander: TemplateExpander,\n    lifecycle: LifecycleEngine,\n  )\n}\n```\n\n`ArtifactParserRegistry` is needed to generate delta format instructions and existing artifact outlines. `SpecRepository` is needed to read existing artifact files for outlines. `TemplateExpander.expand()` is called on `instruction`, `template`, `deltaInstruction`, and `rules` text before returning them. `SchemaProvider` provides the fully-resolved schema. `LifecycleEngine` provides the DAG-aware readiness interpretation used for auto-selection when `artifactId` is omitted."
       ]
     },
     {
       "requirement": "Input",
       "rules": [
-        "`GetArtifactInstruction.execute` receives:\n\n- `name` (string, required) — the change name\n- `artifactId` (string, optional) — the artifact ID from the schema (e.g. `specs`, `verify`, `tasks`). When omitted, the use case auto-resolves the next artifact to work on by walking the schema's artifact list in declaration order: the first artifact whose `requires` dependencies are all satisfied (complete or skipped) but that is itself not yet complete or skipped. If all artifacts are already complete/skipped, it throws `ArtifactNotFoundError`."
+        "`GetArtifactInstruction.execute` receives:\n\n- `name` (string, required) — the change name\n- `artifactId` (string, optional) — the artifact ID from the schema (e.g. `specs`, `verify`, `tasks`). When omitted, the use case auto-resolves the next artifact to work on using `LifecycleEngine`: the first artifact in schema declaration order whose dependencies are effectively satisfied (`complete` or `skipped`) but that is itself not yet effectively complete or skipped. If all artifacts are already complete/skipped, it throws `ArtifactNotFoundError`."
       ]
     },
     {
@@ -147,11 +148,40 @@
         "delta.availableOutlines is present as string[]",
         "AND consumers can retrieve full outline content on demand using specd specs outline <specPath> --artifact <artifactId>"
       ]
+    },
+    {
+      "requirement": "Ports and constructor",
+      "name": "GetArtifactInstruction is constructed with LifecycleEngine",
+      "when": ["GetArtifactInstruction is assembled"],
+      "then": [
+        "it receives LifecycleEngine together with its repositories, parser registry, schema provider, and template expander"
+      ]
+    },
+    {
+      "requirement": "Input",
+      "name": "Omitted artifactId uses engine-derived readiness",
+      "given": [
+        "proposal is effectively complete",
+        "AND specs is not effectively complete",
+        "AND LifecycleEngine.evaluate reports specs as the first effectively ready incomplete artifact"
+      ],
+      "when": ["GetArtifactInstruction.execute is called without artifactId"],
+      "then": ["the returned artifactId is specs"]
+    },
+    {
+      "requirement": "Input",
+      "name": "Omitted artifactId ignores persisted complete when engine reports dependency blockage",
+      "given": [
+        "an artifact's persisted state is complete",
+        "AND LifecycleEngine.evaluate reports its effective status as pending-parent-artifact-review"
+      ],
+      "when": ["GetArtifactInstruction.execute is called without artifactId"],
+      "then": ["that artifact is not selected as complete/resolved by auto-resolution"]
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:6a93d195d5b4950d49ea6f2c87d2036965245192a34a1372f88982f0ec19f0c5",
-    "verify.md": "sha256:5c817a4318e7536f872a6dd362fe53aecdc11f09e620e2feab104f4d1ffd2a91"
+    "spec.md": "sha256:d78fef66624cde3606e7987d50297a368ac3b1d18ac2a40397eebae40047636d",
+    "verify.md": "sha256:cf55690591b8b1d4d73a4f4a84cd812526890f5a16b8fb313ac9233f66f277de"
   },
   "generatedBy": "core"
 }

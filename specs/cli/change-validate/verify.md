@@ -103,6 +103,7 @@
 - **WHEN** `specd change validate my-change core:config --artifact specs` is run
 - **THEN** stdout contains the failure description exactly as emitted by core validation
 - **AND** the CLI does not replace it with generic "incomplete dependency" wording
+- **AND** the CLI does not recompute blocker semantics locally
 
 ### Requirement: Spec ID not in change
 

@@ -6,7 +6,9 @@
     "core:workflow-model",
     "core:spec-metadata",
     "core:spec-id-format",
-    "default:_global/architecture"
+    "default:_global/architecture",
+    "core:lifecycle-engine",
+    "core:lifecycle-engine"
   ],
   "context": [
     "Without a single entity that owns spec work end-to-end, lifecycle state, approval gates, and artifact tracking would scatter across uncoordinated subsystems. A Change is the central domain entity in specd — a discrete, named unit of in-progress spec work covering one or more workspaces that moves from drafting through implementation and into the archive. Every specd operation targets a Change, and the Change enforces its own lifecycle and invariants; no external code may bypass them."
@@ -83,6 +85,12 @@
       "rules": [
         "A change may be moved between storage locations without affecting its lifecycle state. All operations are recorded as events in history.\n\n- **Draft** (`changes/` → `drafts/`) — shelves the change. Appends a `drafted` event with: Drafting remains orthogonal to the current lifecycle state, but it is guarded by historical implementation detection. If the change has ever reached `implementing`, drafting SHALL fail by default because implementation may already exist and shelving the change would risk leaving permanent specs and code out of sync. The operation MAY proceed only when the caller explicitly forces it.\n  - **`by`** — mandatory git identity (name + email) of the person shelving\n  - **`at`** — timestamp\n  - **`reason`** — optional explanation\n- **Restore** (`drafts/` → `changes/`) — recovers a drafted change. Appends a `restored` event. The change resumes from its preserved state.\n- **Discard** (`changes/` or `drafts/` → `discarded/`) — permanently abandons the change. Appends a `discarded` event with: Discarding is irreversible. A change may be drafted and restored multiple times before being discarded; the full cycle is preserved in history. If the change has ever reached `implementing`, discarding SHALL fail by default because implementation may already exist and abandoning the workflow would risk leaving permanent specs and code out of sync. The operation MAY proceed only when the caller explicitly forces it.\n  - **`reason`** — mandatory human-provided explanation\n  - **`by`** — mandatory git identity (name + email) of the person discarding\n  - **`at`** — timestamp\n  - **`supersededBy`** — optional list of change names that replace this one"
       ]
+    },
+    {
+      "requirement": "Lifecycle interpretation authority",
+      "rules": [
+        "The `Change` entity is the source of truth for persisted lifecycle facts: history, the current persisted state, artifact files, aggregate artifact states, approvals, and invalidation events.\n\nDependency-aware lifecycle interpretation is a separate concern. Any decision that depends on the schema DAG, workflow `requires`, recursive parent blocking, approval-gate routing, or step availability SHALL be interpreted by `LifecycleEngine`, not by the `Change` entity itself.\n\nThis separation ensures the entity does not need schema knowledge in order to answer questions such as:\n\n- whether an artifact is effectively blocked by an upstream parent\n- which lifecycle step is reachable next under the active schema\n- whether a requested transition must route through an approval boundary\n- which blocker or next action should be surfaced to callers"
+      ]
     }
   ],
   "constraints": [
@@ -111,7 +119,8 @@
     "History events are never modified or deleted; invalidated approvals are identifiable by a subsequent invalidated event",
     "Historical implementation detection is derived from append-only history by scanning for any transitioned event whose to field is implementing",
     "Drafting or discarding after historical implementation requires an explicit force override because implementation may already exist and specs and code could otherwise be left out of sync",
-    "Discarding a change requires a discarded event with mandatory reason and by; it is irreversible"
+    "Discarding a change requires a discarded event with mandatory reason and by; it is irreversible",
+    "Schema-aware effective artifact status, recursive blocker resolution, and workflow-step availability are not entity-owned concerns; they are interpreted by LifecycleEngine from persisted change facts plus the active schema"
   ],
   "scenarios": [
     {
@@ -178,7 +187,8 @@
       "name": "Valid transition — drafting to designing",
       "when": ["a Change in drafting state is transitioned to designing"],
       "then": [
-        "a transitioned event with from: 'drafting' and to: 'designing' is appended and deriving state returns designing"
+        "the LifecycleEngine confirms the transition is valid",
+        "AND a transitioned event with from: 'drafting' and to: 'designing' is appended"
       ]
     },
     {
@@ -346,27 +356,10 @@
     },
     {
       "requirement": "Artifacts",
-      "name": "Requires satisfied only by complete or skipped",
-      "given": ["artifact B requires artifact A", "AND artifact A is pending-review"],
-      "when": ["dependency satisfaction is evaluated"],
-      "then": ["artifact A does not satisfy the requirement"]
-    },
-    {
-      "requirement": "Artifacts",
       "name": "markComplete sets file and artifact state to complete",
       "given": ["an artifact file in in-progress"],
       "when": ["markComplete(key, hash) is called through validation"],
       "then": ["the file state becomes complete", "AND the parent artifact state is recomputed"]
-    },
-    {
-      "requirement": "Artifacts",
-      "name": "Artifact aggregate status is pending-parent-artifact-review",
-      "given": [
-        "an artifact with all files in complete state",
-        "AND the artifact depends on a parent artifact that is pending-review"
-      ],
-      "when": ["the artifact aggregate state is computed"],
-      "then": ["the artifact state SHALL be pending-parent-artifact-review"]
     },
     {
       "requirement": "History and event sourcing",
@@ -559,11 +552,33 @@
       "name": "Discarded change cannot be restored",
       "when": ["a discard operation is attempted to be reversed"],
       "then": ["no operation exists to move a change out of discarded/"]
+    },
+    {
+      "requirement": "Artifact sync",
+      "name": "syncArtifacts appends artifacts-synced when schema artifact set changes",
+      "given": ["the schema artifact set changes for an existing Change"],
+      "when": ["artifact sync reconciles the artifact map"],
+      "then": [
+        "an artifacts-synced event is appended describing the added and removed files and artifact types"
+      ]
+    },
+    {
+      "requirement": "Lifecycle interpretation authority",
+      "name": "Dependency-aware lifecycle interpretation is external to Change",
+      "given": [
+        "an artifact appears persisted as complete",
+        "AND an upstream dependency requires review under the active schema DAG"
+      ],
+      "when": ["lifecycle interpretation is requested"],
+      "then": [
+        "the Change entity remains the source of persisted facts only",
+        "AND LifecycleEngine is responsible for deriving the dependency-aware lifecycle meaning"
+      ]
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:1c666830ad271655b99b4c1df37137bdd70663b258818281402aaa10d4649784",
-    "verify.md": "sha256:59128180e0a21e8935ff055a928f4f9c2dffb73b226e257c8496e11697de6aa8"
+    "spec.md": "sha256:9afaab41c0699aeb7153a1bfcca6c7b8fb29eb114bc35879d9f48921cd19978b",
+    "verify.md": "sha256:f7773bd1e7e08827507bf1c7a02d055ee7523c138e42509716540c673c74284f"
   },
   "generatedBy": "core"
 }

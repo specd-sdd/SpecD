@@ -15,13 +15,15 @@
 
 - **GIVEN** a change in `ready` state
 - **WHEN** `execute` is called with `to: 'implementing'` and `approvalsSpec: true`
-- **THEN** the change transitions to `pending-spec-approval`
+- **THEN** the `LifecycleEngine` identifies `pending-spec-approval` as the effective target
+- **AND** the change transitions to `pending-spec-approval`
 
 #### Scenario: Ready to implementing is direct when spec approval is inactive
 
 - **GIVEN** a change in `ready` state
 - **WHEN** `execute` is called with `to: 'implementing'` and `approvalsSpec: false`
-- **THEN** the change transitions to `implementing`
+- **THEN** the `LifecycleEngine` identifies `implementing` as the effective target
+- **AND** the change transitions to `implementing`
 
 ### Requirement: Approval-gate routing for signoff
 
@@ -29,13 +31,15 @@
 
 - **GIVEN** a change in `done` state
 - **WHEN** `execute` is called with `to: 'archivable'` and `approvalsSignoff: true`
-- **THEN** the change transitions to `pending-signoff`
+- **THEN** the `LifecycleEngine` identifies `pending-signoff` as the effective target
+- **AND** the change transitions to `pending-signoff`
 
 #### Scenario: Done to archivable is direct when signoff is inactive
 
 - **GIVEN** a change in `done` state
 - **WHEN** `execute` is called with `to: 'archivable'` and `approvalsSignoff: false`
-- **THEN** the change transitions to `archivable`
+- **THEN** the `LifecycleEngine` identifies `archivable` as the effective target
+- **AND** the change transitions to `archivable`
 
 ### Requirement: Human-approval pending states produce explicit transition failures
 
@@ -43,14 +47,16 @@
 
 - **GIVEN** a change in `pending-spec-approval` state
 - **WHEN** `execute` is called with `to: 'spec-approved'`
-- **THEN** it throws `InvalidStateTransitionError`
+- **THEN** the `LifecycleEngine` identifies an approval-required blocker
+- **AND** it throws `InvalidStateTransitionError`
 - **AND** the error reason equals `{ type: 'approval-required', gate: 'spec' }`
 
 #### Scenario: Pending signoff blocks normal forward transition
 
 - **GIVEN** a change in `pending-signoff` state
 - **WHEN** `execute` is called with `to: 'signed-off'`
-- **THEN** it throws `InvalidStateTransitionError`
+- **THEN** the `LifecycleEngine` identifies an approval-required blocker
+- **AND** it throws `InvalidStateTransitionError`
 - **AND** the error reason equals `{ type: 'approval-required', gate: 'signoff' }`
 
 #### Scenario: Pending approval still allows redesign
@@ -65,6 +71,7 @@
 
 - **GIVEN** a change in `implementing` state
 - **AND** the `verifying` step declares `requiresTaskCompletion: [tasks]`
+- **AND** the `LifecycleEngine` has already identified `verifying` as the effective target
 - **AND** the `tasks` artifact file contains `- [ ] unfinished task`
 - **WHEN** `execute` is called with `to: 'verifying'`
 - **THEN** it throws `InvalidStateTransitionError` with reason `incomplete-tasks`
@@ -80,6 +87,7 @@
 
 - **GIVEN** a change in `implementing` state
 - **AND** the `verifying` step declares `requiresTaskCompletion: [tasks]`
+- **AND** the `LifecycleEngine` has already identified `verifying` as the effective target
 - **AND** the tasks file contains only `- [x] done task`
 - **WHEN** `execute` is called with `to: 'verifying'`
 - **THEN** the change transitions to `verifying`
@@ -117,15 +125,15 @@
 #### Scenario: Unsatisfied requirement throws with structured reason
 
 - **GIVEN** a workflow step with `requires: [specs, tasks]`
-- **AND** `specs` has effective status `in-progress`
+- **AND** `LifecycleEngine` reports `specs` with effective status `in-progress`
 - **WHEN** `execute` is called
 - **THEN** `InvalidStateTransitionError` is thrown with reason `incomplete-artifact` and blocking artifact `specs`
 
 #### Scenario: Transition blocked by recursive parent review
 
 - **GIVEN** a workflow step requires artifact `design`
-- **AND** `design` is `complete` but depends on `specs` which is `pending-review`
-- **AND** `design` effective status is `'pending-parent-artifact-review'`
+- **AND** `LifecycleEngine` reports `design` as `pending-parent-artifact-review`
+- **AND** the detailed blocker context includes `blockedBy: { artifactId: 'specs', status: 'pending-review' }`
 - **WHEN** `execute` is called
 - **THEN** it throws `InvalidStateTransitionError`
 - **AND** the error reason includes `status: 'pending-parent-artifact-review'`
@@ -274,3 +282,54 @@
 - **WHEN** `TransitionChange.execute` completes successfully
 - **THEN** `ChangeRepository.mutate(input.name, fn)` was called for the final persisted mutation
 - **AND** the callback applied any redesign invalidation, validation clearing, and lifecycle transition on the fresh persisted `Change`
+
+### Requirement: Input contract
+
+#### Scenario: Input accepts approvals and hook-skipping controls
+
+- **WHEN** `TransitionChange.execute` is called
+- **THEN** its input accepts `name`, `to`, `approvalsSpec`, `approvalsSignoff`, and optional `skipHookPhases`
+
+### Requirement: Direct transition when gates are inactive
+
+#### Scenario: Requested target is used directly when no gate reroutes it
+
+- **GIVEN** no approval gate applies to the requested target
+- **WHEN** `execute` is called
+- **THEN** the requested target state is used directly
+
+### Requirement: Pre-hook execution
+
+#### Scenario: Target pre-hooks run before the state mutation
+
+- **GIVEN** the target workflow step defines pre-hooks
+- **WHEN** `execute` is called and hooks are not skipped
+- **THEN** those target pre-hooks execute before the lifecycle transition
+
+### Requirement: Transition event
+
+#### Scenario: Successful transition emits transitioned progress event
+
+- **WHEN** a state transition succeeds
+- **THEN** a `transitioned` progress event is emitted with the source and target states
+
+### Requirement: Result type
+
+#### Scenario: Successful execution returns the updated change
+
+- **WHEN** `TransitionChange.execute` succeeds
+- **THEN** the returned result contains the updated `change`
+
+### Requirement: Progress callback
+
+#### Scenario: Progress callback receives hook and requires events
+
+- **WHEN** `TransitionChange.execute` is called with an `onProgress` callback
+- **THEN** the callback receives lifecycle progress events such as `requires-check`, `hook-start`, `hook-done`, and `transitioned`
+
+### Requirement: Dependencies
+
+#### Scenario: TransitionChange depends on LifecycleEngine and RunStepHooks
+
+- **WHEN** `TransitionChange` is assembled
+- **THEN** it receives `ChangeRepository`, `ActorResolver`, `SchemaProvider`, `LifecycleEngine`, and `RunStepHooks`

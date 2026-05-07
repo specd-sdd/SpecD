@@ -12,11 +12,13 @@ import { type SchemaRepository } from '../../application/ports/schema-repository
 import { createSchemaRepository } from '../schema-repository.js'
 import { ResolveSchema } from '../../application/use-cases/resolve-schema.js'
 import { LazySchemaProvider } from '../lazy-schema-provider.js'
+import { Logger } from '../../application/logger.js'
 import { FsFileReader } from '../../infrastructure/fs/file-reader.js'
 import { NodeContentHasher } from '../../infrastructure/node/content-hasher.js'
 import { createBuiltinExtractorTransforms } from '../extractor-transforms/index.js'
 import { createSpecWorkspaceRoutes } from '../spec-workspace-routes.js'
 import { type SpecWorkspaceRoute } from '../../application/use-cases/_shared/spec-reference-resolver.js'
+import { LifecycleEngine } from '../../domain/services/lifecycle-engine.js'
 
 /**
  * Domain context for the primary (default) workspace used by `CompileContext`.
@@ -182,5 +184,6 @@ export function createCompileContext(
     previewSpec,
     createBuiltinExtractorTransforms(),
     opts.workspaceRoutes ?? [],
+    new LifecycleEngine(Logger.debug.bind(Logger)),
   )
 }

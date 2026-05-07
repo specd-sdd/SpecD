@@ -116,18 +116,18 @@
 
 ### Requirement: Step availability
 
-#### Scenario: Step unavailable when required artifact not complete
+#### Scenario: Step availability is derived from LifecycleEngine
 
-- **GIVEN** `workflow.implementing.requires: ['tasks']`
-- **AND** the `tasks` artifact's effective status is `in-progress`
-- **WHEN** `CompileContext.execute` is called with `step: 'implementing'`
-- **THEN** `result.stepAvailable` is `false`
-- **AND** `result.blockingArtifacts` includes `'tasks'`
+- **GIVEN** a requested step that is blocked according to the engine
+- **WHEN** `CompileContext.execute` is called
+- **THEN** it calls `LifecycleEngine.evaluate`
+- **AND** `result.stepAvailable` matches the engine's verdict
+- **AND** `result.blockingArtifacts` is populated from the engine's blockers
 
 #### Scenario: Step available when all required artifacts are complete
 
 - **GIVEN** `workflow.implementing.requires: ['tasks']`
-- **AND** the `tasks` artifact's effective status is `complete`
+- **AND** the `tasks` artifact's effective status is `complete` according to the engine
 - **WHEN** `CompileContext.execute` is called with `step: 'implementing'`
 - **THEN** `result.stepAvailable` is `true`
 - **AND** `result.blockingArtifacts` is empty
@@ -137,32 +137,6 @@
 - **GIVEN** the requested step's required artifacts are not complete
 - **WHEN** `CompileContext.execute` is called
 - **THEN** the result is returned normally — no exception is thrown
-
-### Requirement: Structured result assembly
-
-#### Scenario: availableSteps includes all workflow steps
-
-- **WHEN** `CompileContext.execute` is called
-- **THEN** `availableSteps` includes all steps from the active schema workflow
-
-#### Scenario: List-mode structured entry omits summary and content fields
-
-- **GIVEN** `contextMode: "list"`
-- **WHEN** `CompileContext.execute` is called
-- **THEN** each list entry includes `specId`, `source`, and `mode`
-- **AND** list entries omit full content
-
-#### Scenario: Summary-mode structured entry omits content
-
-- **GIVEN** `contextMode: "summary"`
-- **WHEN** `CompileContext.execute` is called
-- **THEN** each summary entry omits full content
-
-#### Scenario: Full-mode structured entry includes content
-
-- **GIVEN** `contextMode: "full"`
-- **WHEN** `CompileContext.execute` is called
-- **THEN** each full entry includes content
 
 ### Requirement: Missing spec IDs emit a warning
 
@@ -269,7 +243,69 @@
 - **WHEN** the same context is requested through a different presentation format such as `text` or `json`
 - **THEN** the fingerprint remains unchanged
 
-### Requirement: Materialized delta view
+### Requirement: Structured result assembly
+
+#### Scenario: availableSteps includes all workflow steps
+
+- **WHEN** `CompileContext.execute` is called
+- **THEN** `availableSteps` includes all steps from the active schema workflow
+- **AND** each entry contains `available`, `isReady`, `isPermitted`, `blockingArtifacts`, and `blockers` from the engine
+
+#### Scenario: List-mode structured entry omits summary and content fields
+
+- **GIVEN** `contextMode: "list"`
+- **WHEN** `CompileContext.execute` is called
+- **THEN** each list entry includes `specId`, `source`, and `mode`
+- **AND** list entries omit full content
+
+#### Scenario: Summary-mode structured entry omits content
+
+- **GIVEN** `contextMode: "summary"`
+- **WHEN** `CompileContext.execute` is called
+- **THEN** each summary entry omits full content
+
+#### Scenario: Full-mode structured entry includes content
+
+- **GIVEN** `contextMode: "full"`
+- **WHEN** `CompileContext.execute` is called
+- **THEN** each full entry includes content
+
+### Requirement: Ports and constructor
+
+#### Scenario: CompileContext is constructed with LifecycleEngine
+
+- **WHEN** `CompileContext` is assembled
+- **THEN** it receives `PreviewSpec` and `LifecycleEngine` alongside its existing repositories and utilities
+
+### Requirement: Input
+
+#### Scenario: Input includes step, config, and optional traversal controls
+
+- **WHEN** `CompileContext.execute` is called
+- **THEN** it accepts the change name, target step, resolved config, and optional flags such as `includeChangeSpecs`, `followDeps`, `depth`, `sections`, and `fingerprint`
+
+### Requirement: Schema name guard
+
+#### Scenario: Schema mismatch throws before context compilation
+
+- **GIVEN** the change was created under a different schema name
+- **WHEN** `CompileContext.execute` is called
+- **THEN** it throws `SchemaMismatchError` before collecting context
+
+### Requirement: Workspace resolution for spec IDs
+
+#### Scenario: Unqualified include pattern resolves to default workspace
+
+- **GIVEN** a project-level include pattern with no workspace qualifier
+- **WHEN** `CompileContext.execute` resolves that pattern
+- **THEN** it treats the pattern as targeting the `default` workspace
+
+### Requirement: Result shape
+
+#### Scenario: Result contains fingerprint, availability, context entries, and warnings
+
+- **WHEN** `CompileContext.execute` returns a changed result
+- **THEN** the payload includes `contextFingerprint`, `stepAvailable`, `blockingArtifacts`, `projectContext`, `specs`, `availableSteps`, and `warnings`
 
 #### Scenario: Spec with validated delta returns merged content
 

@@ -13,7 +13,7 @@ specd change artifact-instruction <name> [artifact-id] [--format text|json|toon]
 ```
 
 - `<name>` — required positional; the change name
-- `[artifact-id]` — optional positional; the artifact ID from the schema (e.g. `specs`, `verify`, `tasks`). When omitted, the use case auto-resolves the next artifact to work on based on the dependency graph — the first artifact whose `requires` are all satisfied but that is not yet complete
+- `[artifact-id]` — optional positional; the artifact ID from the schema (e.g. `specs`, `verify`, `tasks`). When omitted, the use case auto-resolves the next artifact to work on using core lifecycle interpretation — the first artifact whose dependencies are effectively satisfied but that is not yet effectively complete
 - `--format text|json|toon` — optional; output format, defaults to `text`
 
 ### Requirement: Delegates to GetArtifactInstruction
@@ -63,6 +63,7 @@ When `--format` is `json` or `toon`, output to stdout:
 
 - The command is read-only — it never modifies state
 - Text output uses labelled section headers (`[rules.pre]`, `[instruction]`, etc.) to separate parts
+- Next-artifact auto-selection is delegated entirely to `GetArtifactInstruction`; the CLI must not walk artifact dependencies or effective statuses itself
 
 ## Examples
 

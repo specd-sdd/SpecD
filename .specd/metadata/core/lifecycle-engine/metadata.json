@@ -1,0 +1,134 @@
+{
+  "title": "Lifecycle Engine",
+  "description": "Unifying lifecycle validation, artifact status, and repair diagnostics into a single source of truth is critical to preventing \"liar context\" and ensuring consistent system behavior. The `LifecycleEngine` is a centralized domain service that combines the change's persisted state with schema-defined workflow rules to derive the authoritative effective state, available transitions, and machine-readable blockers.",
+  "dependsOn": [
+    "core:change",
+    "core:workflow-model",
+    "core:schema-format",
+    "default:_global/architecture"
+  ],
+  "context": [
+    "Unifying lifecycle validation, artifact status, and repair diagnostics into a single source of truth is critical to preventing \"liar context\" and ensuring consistent system behavior. The `LifecycleEngine` is a centralized domain service that combines the change's persisted state with schema-defined workflow rules to derive the authoritative effective state, available transitions, and machine-readable blockers."
+  ],
+  "rules": [
+    {
+      "requirement": "Centralized validation logic",
+      "rules": [
+        "The `LifecycleEngine` SHALL be the sole authority for interpreting a change's state within a project's workflow. It MUST unify three validation dimensions:\n\n1. **Protocol Validation**: Enforcing the valid state transition graph.\n2. **Artifact Validation**: Verifying structural completion of required artifacts.\n3. **Content Validation**: Checking internal task completion within artifacts."
+      ]
+    },
+    {
+      "requirement": "Effective artifact status computation",
+      "rules": [
+        "Artifacts may contain multiple files (e.g., one per spec ID). The `Change` entity persists an *aggregated* state for the artifact based on its files. The engine MUST compute the logical (effective) status of every artifact by combining this aggregated persisted state with its dependency chain.\n\nThe public contract remains centered on `LifecycleEngine.evaluate(...)`. Effective artifact statuses are returned as part of that verdict; callers MUST NOT depend on a separate public `computeEffectiveStatus(...)` API.\n\nThe engine exists specifically because the entity does not know the schema artifact DAG. Persisted aggregate status and history remain on `Change`; dependency-aware effective status is derived here.\n\n**Mapping Rules:**\n\n- If the aggregated state is `drifted-pending-review`, its effective status remains `drifted-pending-review`.\n- If the aggregated state is `pending-review`, its effective status remains `pending-review`.\n- If the aggregated state is `complete` but any of its required upstream dependencies is not `complete` or `skipped`, its effective status SHALL be `pending-parent-artifact-review`.\n- In any other case, the effective status matches the aggregated persisted state (`missing`, `in-progress`, `complete`, `skipped`).\n\nThe engine MUST detect recursive blocks: if Spec B depends on Spec A, and Spec A is `pending-review`, Spec B's effective status becomes `pending-parent-artifact-review`."
+      ]
+    },
+    {
+      "requirement": "Machine-readable blockers",
+      "rules": [
+        "For every condition that prevents a transition or marks an artifact as incomplete, the engine MUST provide a structured `Blocker` object containing:\n\n- `code`: A unique machine-readable identifier.\n- `message`: A human-readable description.\n- `isSkippable`: Boolean indicating if the blocker can be bypassed via a CLI flag or configuration.\n- `bypassFlag`: (Optional) The name of the flag that bypasses this blocker (e.g., `--allow-overlap`).\n- `affectedArtifacts` (optional): Detail identifying the specific artifact IDs and files.\n\nIf a blocker is skippable and the corresponding bypass is active in the engine's input, the engine SHALL treat the condition as a warning rather than a transition blocker.\n\n**Mandatory Blocker Codes:**\n\n- `MISSING_ARTIFACT`: A required artifact is completely absent (state: `missing`).\n- `INCOMPLETE_ARTIFACT`: An artifact exists but has not been validated (state: `in-progress`).\n- `ARTIFACT_DRIFT`: An artifact has changed on disk since its last validation (state: `drifted-pending-review`).\n- `REVIEW_REQUIRED`: An artifact was invalidated or downgraded and requires review (state: `pending-review`).\n- `PENDING_PARENT_REVIEW`: An artifact is blocked because one of its upstream dependencies requires review.\n- `INCOMPLETE_TASKS`: An artifact contains unfinished checklist items (e.g., `- [ ]`).\n- `OVERLAP_CONFLICT`: The change scope overlaps with specs modified by a recently archived change.\n- `INVALID_TRANSITION`: The requested transition is not permitted by the lifecycle state machine.\n- `APPROVAL_REQUIRED`: The transition is gated by a required human approval (spec approval or sign-off).\n\nFor file-level blockers (drift, review, parent review), the `affectedArtifacts` field MUST contain a grouped list identifying the specific artifact IDs and the exact filenames/paths that triggered the blocker."
+      ]
+    },
+    {
+      "requirement": "Available steps and next action",
+      "rules": [
+        "The engine MUST derive the set of `AvailableStep` entries and the authoritative `EffectiveTarget` based on the current change state, project configuration (approval gates), and active bypass flags.\n\n**Approval Gate Routing:**\n\n- If a transition to a gated step (e.g., `implementing`) is requested and the corresponding gate is active (e.g., `approvals.spec: true`), the engine MUST route the transition to the intermediate pending state (e.g., `pending-spec-approval`).\n- If a gate is disabled, any attempt to reach its corresponding pending or approved states MUST be blocked with an `INVALID_TRANSITION` code.\n\n**Step Availability:**\n\n- `isReady`: Whether all required artifacts for the step are logically complete/skipped.\n- `isPermitted`: Whether the lifecycle protocol allows the transition. This check MUST combine the static `VALID_TRANSITIONS` graph with the dynamic approval status and active skippable blockers.\n\nBased on the current state and blockers, the engine MUST recommend a single `NextAction` (cognitive or mechanical) to guide the user or agent toward the next valid state."
+      ]
+    },
+    {
+      "requirement": "Review summary integration",
+      "rules": [
+        "The engine MUST detect and report **Drift** (physical content changes since last validation) and **Overlap** (conflicts with specs targeted by other archived changes) as part of the blocking diagnostics."
+      ]
+    },
+    {
+      "requirement": "Shared lifecycle interpretation for consumers",
+      "rules": [
+        "Use cases that need DAG-aware lifecycle answers MUST consume `LifecycleEngine` rather than reimplementing schema interpretation locally.\n\nThis includes, at minimum:\n\n- status/reporting consumers that need effective artifact status or blockers\n- transition consumers that need routing and gated availability\n- validation consumers that need dependency-order checks or recursive blocker context\n- instruction consumers that need to determine which artifact is next in the DAG"
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "Centralized validation logic",
+      "name": "Engine unifies three validation dimensions",
+      "given": ["a change in designing state with a missing required artifact"],
+      "when": ["LifecycleEngine.evaluate is called"],
+      "then": [
+        "it returns a MISSING_ARTIFACT blocker (structural)",
+        "AND isReady is false for the target state",
+        "AND isPermitted is true (protocol allowing the move if artifacts were ready)"
+      ]
+    },
+    {
+      "requirement": "Effective artifact status computation",
+      "name": "Recursive block through dependency chain",
+      "given": [
+        "Spec B depends on Spec A",
+        "AND Spec A is in pending-review",
+        "AND Spec B is physically complete"
+      ],
+      "when": ["LifecycleEngine.evaluate is called"],
+      "then": [
+        "the returned verdict reports Spec B with effective status pending-parent-artifact-review",
+        "AND the blockers identify Spec A as the cause"
+      ]
+    },
+    {
+      "requirement": "Machine-readable blockers",
+      "name": "Detailed affected artifacts for drift",
+      "given": [
+        "a change with two spec-scoped files in the specs artifact",
+        "AND one file has drifted on disk"
+      ],
+      "when": ["LifecycleEngine.evaluate is called"],
+      "then": [
+        "it returns a blocker with code ARTIFACT_DRIFT",
+        "AND affectedArtifacts contains exactly the drifted filename and spec ID"
+      ]
+    },
+    {
+      "requirement": "Available steps and next action",
+      "name": "Skip bypass allows transition despite blocker",
+      "given": [
+        "an OVERLAP_CONFLICT blocker that is skippable",
+        "AND the --allow-overlap bypass flag is provided"
+      ],
+      "when": ["LifecycleEngine.evaluate is called"],
+      "then": [
+        "the blocker is downgraded to a warning",
+        "AND isPermitted for the target step is true"
+      ]
+    },
+    {
+      "requirement": "Review summary integration",
+      "name": "Overlap conflict detection from history",
+      "given": [
+        "a change history containing a recent invalidated event with cause: 'spec-overlap-conflict'",
+        "AND no subsequent transition out of designing has occurred"
+      ],
+      "when": ["LifecycleEngine.evaluate is called"],
+      "then": [
+        "it identifies an OVERLAP_CONFLICT blocker",
+        "AND includes details about the overlapping archived change"
+      ]
+    },
+    {
+      "requirement": "Shared lifecycle interpretation for consumers",
+      "name": "Consumers rely on one shared lifecycle verdict",
+      "given": [
+        "GetStatus, CompileContext, TransitionChange, ValidateArtifacts, and GetArtifactInstruction"
+      ],
+      "when": ["each consumer needs DAG-aware lifecycle answers for the same change"],
+      "then": [
+        "they all obtain those answers from LifecycleEngine.evaluate",
+        "AND none of them reimplements dependency-aware lifecycle interpretation locally"
+      ]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:f30eb32094db999e93ade146e132b7120c40da50321bdf0e5d43fa2aded6771e",
+    "verify.md": "sha256:3bf7661c44cfe78112207d6d8de2d7f5e9196ed1520d5eb0ba651e8a6685186d"
+  },
+  "generatedBy": "core"
+}

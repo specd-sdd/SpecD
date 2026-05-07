@@ -8,7 +8,7 @@ Artifacts must be structurally valid and conflict-free before a change can progr
 
 ### Requirement: Ports and constructor
 
-`ValidateArtifacts` receives at construction time: `ChangeRepository`, a map of `SpecRepository` instances (one per configured workspace), `SchemaProvider`, `ArtifactParserRegistry`, `ActorResolver`, and `ContentHasher`.
+`ValidateArtifacts` receives at construction time: `ChangeRepository`, a map of `SpecRepository` instances (one per configured workspace), `SchemaProvider`, `ArtifactParserRegistry`, `ActorResolver`, `ContentHasher`, and `LifecycleEngine`.
 
 ```typescript
 class ValidateArtifacts {
@@ -19,13 +19,14 @@ class ValidateArtifacts {
     parsers: ArtifactParserRegistry,
     actor: ActorResolver,
     hasher: ContentHasher,
+    lifecycle: LifecycleEngine,
   )
 }
 ```
 
 `SchemaProvider` is a lazy, caching port that returns the fully-resolved schema (with plugins and overrides applied). It replaces the previous `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths` triple. All are injected at kernel composition time, not passed per invocation.
 
-`ActorResolver` supplies the identity recorded on approval invalidation events. `ContentHasher` is used both for approval drift detection and for the cleaned hashes persisted when validation succeeds.
+`ActorResolver` supplies the identity recorded on approval invalidation events. `ContentHasher` is used both for approval drift detection and for the cleaned hashes persisted when validation succeeds. `LifecycleEngine` is used only for schema-aware dependency interpretation; structural validation, delta preview, metadata extraction, and artifact completion remain owned by `ValidateArtifacts`.
 
 ### Requirement: Input
 
@@ -47,11 +48,13 @@ This check is skipped when `artifactId` is provided — single-artifact validati
 
 ### Requirement: Dependency order check
 
-Before validating an artifact, `ValidateArtifacts` must check that all artifact IDs in its `requires` list are either `complete` or `skipped` (via `change.effectiveStatus(type)`). If a required dependency is neither `complete` nor `skipped`, validation of the dependent artifact is skipped and reported as a dependency-blocked failure. A `skipped` optional artifact satisfies the dependency. `skipped` artifacts are not validated — there is no file to check.
+Before validating an artifact, `ValidateArtifacts` must check that all artifact IDs in its `requires` list are either `complete` or `skipped`.
+
+The dependency-aware status lookup SHALL be interpreted through `LifecycleEngine`, since recursive parent blocking and schema DAG semantics do not belong on the `Change` entity. If a required dependency is neither `complete` nor `skipped`, validation of the dependent artifact is skipped and reported as a dependency-blocked failure. A `skipped` optional artifact satisfies the dependency. `skipped` artifacts are not validated — there is no file to check.
 
 Dependency-blocked failures MUST include the dependency artifact ID and its effective status as observed at validation time.
 
-When the dependency status is `pending-parent-artifact-review`, the failure description MUST also include the upstream parent blocker context (artifact ID and status) when available from recursive blocker resolution (`findBlockingParent`).
+When the dependency status is `pending-parent-artifact-review`, the failure description MUST also include the upstream parent blocker context (artifact ID and status) when available from recursive blocker resolution.
 
 For blockers outside review-propagation (`missing` and `in-progress`), the failure description MUST still include the dependency status and MUST NOT degrade to generic "incomplete dependency" wording.
 
@@ -206,6 +209,7 @@ If metadataExtraction validation fails, `ValidateArtifacts` MUST record the fail
 - [`core:change`](../change/spec.md) — change entity, approval invalidation, and artifact state
 - [`core:change-layout`](../change-layout/spec.md) — expected file paths for new spec artifacts and delta artifacts
 - [`core:change-manifest`](../change-manifest/spec.md) — persisted artifact filenames used by validation
+- [`core:lifecycle-engine`](../lifecycle-engine/spec.md) — schema-aware dependency interpretation and recursive blocker resolution
 - [`core:schema-format`](../schema-format/spec.md) — artifact definition, validations, delta behavior, and pre-hash cleanup
 - [`core:delta-format`](../delta-format/spec.md) — parser contract and delta application errors
 - [`core:selector-model`](../selector-model/spec.md) — selector rules for validations and delta validations

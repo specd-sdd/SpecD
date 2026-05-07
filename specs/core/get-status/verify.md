@@ -8,7 +8,8 @@
 
 - **GIVEN** a change with one artifact in `pending-review`
 - **WHEN** `execute({ name: 'add-login' })` is called
-- **THEN** the artifact entry includes its persisted `state`
+- **THEN** `GetStatus` uses `LifecycleEngine` to derive lifecycle interpretation
+- **AND** the artifact entry includes its persisted `state`
 - **AND** it includes `effectiveStatus`
 - **AND** each file entry includes its own persisted `state`
 
@@ -58,7 +59,7 @@
 - **AND** `spec` hashes match (would be `complete` in isolation)
 - **AND** `proposal` is `in-progress`
 - **WHEN** `execute()` is called for this change
-- **THEN** the `effectiveStatus` for `spec` is `in-progress` (cascaded from its dependency)
+- **THEN** the `effectiveStatus` for `spec` is `in-progress` (cascaded from its dependency as derived by `LifecycleEngine`)
 - **AND** the `effectiveStatus` for `proposal` is `in-progress`
 
 #### Scenario: Skipped artifacts satisfy dependencies
@@ -157,3 +158,26 @@
 - **AND** `lifecycle.nextArtifact` is `null`
 - **AND** `lifecycle.changePath` is populated normally
 - **AND** `lifecycle.schemaInfo` is `null`
+
+### Requirement: Accepts a change name as input
+
+#### Scenario: Input accepts a named change identifier
+
+- **WHEN** `GetStatus.execute({ name: 'add-login' })` is called
+- **THEN** the use case resolves the named change from the repository
+
+### Requirement: Constructor dependencies
+
+#### Scenario: GetStatus receives LifecycleEngine through construction
+
+- **GIVEN** `GetStatus` is assembled by the kernel
+- **WHEN** the use case is constructed
+- **THEN** it receives `ChangeRepository`, `SchemaProvider`, approval config, and `LifecycleEngine`
+
+### Requirement: Identifies blockers
+
+#### Scenario: Blockers are surfaced from lifecycle interpretation
+
+- **GIVEN** lifecycle interpretation finds artifact drift or missing required artifacts
+- **WHEN** `execute()` is called
+- **THEN** the returned `blockers` array contains machine-readable blocker entries describing those conditions

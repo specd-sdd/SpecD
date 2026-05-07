@@ -12,6 +12,8 @@ import { Spec } from '../../domain/entities/spec.js'
 import { SpecPath } from '../../domain/value-objects/spec-path.js'
 import { parseSpecId } from '../../domain/services/parse-spec-id.js'
 import { inferFormat } from '../../domain/services/format-inference.js'
+import { LifecycleEngine } from '../../domain/services/lifecycle-engine.js'
+import { Logger } from '../logger.js'
 
 /** Input for the {@link GetArtifactInstruction} use case. */
 export interface GetArtifactInstructionInput {
@@ -53,6 +55,7 @@ export class GetArtifactInstruction {
   private readonly _schemaProvider: SchemaProvider
   private readonly _parsers: ArtifactParserRegistry
   private readonly _templates: TemplateExpander
+  private readonly _lifecycle: LifecycleEngine
 
   /**
    * Creates a new `GetArtifactInstruction` use case.
@@ -62,6 +65,7 @@ export class GetArtifactInstruction {
    * @param schemaProvider - Provider for the fully-resolved schema
    * @param parsers - Registry of artifact parsers by format
    * @param templates - Template expander for variable substitution
+   * @param lifecycle - Shared lifecycle interpreter
    */
   constructor(
     changes: ChangeRepository,
@@ -69,12 +73,14 @@ export class GetArtifactInstruction {
     schemaProvider: SchemaProvider,
     parsers: ArtifactParserRegistry,
     templates: TemplateExpander,
+    lifecycle: LifecycleEngine = new LifecycleEngine(Logger.debug.bind(Logger)),
   ) {
     this._changes = changes
     this._specs = specs
     this._schemaProvider = schemaProvider
     this._parsers = parsers
     this._templates = templates
+    this._lifecycle = lifecycle
   }
 
   /**
@@ -94,9 +100,18 @@ export class GetArtifactInstruction {
     }
 
     // Resolve artifact ID — explicit or auto-detected from dependency graph
-    const resolvedId = input.artifactId ?? this._resolveNextArtifact(change, schema)
+    const lifecycle = this._lifecycle.evaluate(change, schema)
+    const resolvedId = input.artifactId ?? lifecycle.nextArtifact
     if (resolvedId === null) {
       throw new ArtifactNotFoundError('(auto)', change.name)
+    }
+
+    if (input.artifactId === undefined) {
+      Logger.debug('GetArtifactInstruction auto-selected next artifact from lifecycle engine', {
+        change: change.name,
+        artifactId: resolvedId,
+        blockerCodes: lifecycle.blockers.map((blocker) => blocker.code),
+      })
     }
 
     const artifactType = schema.artifact(resolvedId)
@@ -172,32 +187,5 @@ export class GetArtifactInstruction {
       delta,
       rulesPost,
     }
-  }
-
-  /**
-   * Walks the schema's artifact list in declaration order and returns the ID
-   * of the first artifact whose dependencies are all satisfied (complete or
-   * skipped) but that is itself not yet complete or skipped.
-   *
-   * @param change - The active change entity
-   * @param schema - The resolved schema
-   * @returns The next artifact ID, or `null` when all are complete/skipped
-   */
-  private _resolveNextArtifact(
-    change: import('../../domain/entities/change.js').Change,
-    schema: import('../../domain/value-objects/schema.js').Schema,
-  ): string | null {
-    for (const art of schema.artifacts()) {
-      const status = change.effectiveStatus(art.id)
-      if (status === 'complete' || status === 'skipped') continue
-
-      // Check that all requires are satisfied
-      const depsOk = art.requires.every((req) => {
-        const reqStatus = change.effectiveStatus(req)
-        return reqStatus === 'complete' || reqStatus === 'skipped'
-      })
-      if (depsOk) return art.id
-    }
-    return null
   }
 }

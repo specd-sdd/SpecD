@@ -60,7 +60,9 @@ When `--fingerprint` is provided and matches the current fingerprint, text mode 
 
 ### Requirement: Step availability warning
 
-If the requested step is not currently available (i.e. `stepAvailable: false`), the command prints a warning to stderr listing the blocking artifacts and still prints the context block to stdout. The process exits with code 0.
+If the requested step is not currently available (i.e. `stepAvailable: false`), the command prints a warning to stderr listing the blocking artifacts returned by `CompileContext` and still prints the context block to stdout. The process exits with code 0.
+
+The CLI must treat these fields as projections of core lifecycle interpretation; it MUST NOT re-evaluate workflow readiness independently.
 
 ### Requirement: Context warnings
 
@@ -83,6 +85,7 @@ Any warnings from the `CompileContext` use case (for example stale metadata, mis
 - `dependsOn` traversal is opt-in via `--follow-deps`; without the flag, deps are not followed
 - `--include-change-specs` is opt-in; without the flag, `change.specIds` are not direct seeds
 - `--depth` without `--follow-deps` is a CLI usage error (exit code 1)
+- `availableSteps`, `stepAvailable`, and `blockingArtifacts` are rendered from `CompileContext` output; the CLI must not re-derive lifecycle readiness locally
 
 ## Examples
 

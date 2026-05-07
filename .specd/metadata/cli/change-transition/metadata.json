@@ -26,7 +26,7 @@
     {
       "requirement": "Approval-gate routing",
       "rules": [
-        "The CLI passes the `approvalsSpec` and `approvalsSignoff` flags from the loaded `SpecdConfig` to the `TransitionChange` use case. The use case then applies smart routing:\n\n- When the change is in `ready` and `approvalsSpec: true`, `implementing` is silently routed to `pending-spec-approval`\n- When the change is in `done` and `approvalsSignoff: true`, `archivable` is silently routed to `pending-signoff`\n\nThe user always specifies the logical target state; routing is transparent."
+        "The CLI passes the `approvalsSpec` and `approvalsSignoff` flags from the loaded `SpecdConfig` to the `TransitionChange` use case. The use case, via `LifecycleEngine`, applies smart routing:\n\n- When the change is in `ready` and `approvalsSpec: true`, `implementing` is silently routed to `pending-spec-approval`\n- When the change is in `done` and `approvalsSignoff: true`, `archivable` is silently routed to `pending-signoff`\n\nThe user always specifies the logical target state; routing is transparent, and the CLI must not duplicate routing logic beyond choosing the requested target or `--next` target."
       ]
     },
     {
@@ -73,7 +73,8 @@
     }
   ],
   "constraints": [
-    "The user specifies the logical target state; the CLI never exposes the routing logic in its help text"
+    "The user specifies the logical target state; the CLI never exposes the routing logic in its help text",
+    "Repair-guide blockers and next-action data are projected from core lifecycle diagnostics (TransitionChange failure plus GetStatus), not recomputed in the CLI layer"
   ],
   "scenarios": [
     {
@@ -260,11 +261,46 @@
         "specd change transition my-change verifying --skip-hooks target.pre,source.post is run"
       ],
       "then": ["both target pre and source post hooks are skipped"]
+    },
+    {
+      "requirement": "Progress output",
+      "name": "Text mode renders progress feedback",
+      "when": ["specd change transition my-change designing is run in text mode"],
+      "then": ["lifecycle progress feedback may be rendered to stdout while the transition runs"]
+    },
+    {
+      "requirement": "Post-hook failure warning",
+      "name": "Hook failure exits with error instead of post-transition warning",
+      "given": ["a hook fails during transition execution"],
+      "when": ["the command runs"],
+      "then": [
+        "it exits with code 1 and prints an error: message instead of a separate post-hook warning state"
+      ]
+    },
+    {
+      "requirement": "Unsatisfied requires error",
+      "name": "Requires blocker is surfaced to the user",
+      "given": ["a required artifact is incomplete"],
+      "when": ["specd change transition my-change ready is run"],
+      "then": ["the command exits with code 1 and surfaces the requires blocker"]
+    },
+    {
+      "requirement": "Unsatisfied requires error",
+      "name": "Repair guide uses blocker and next-action data from core",
+      "given": [
+        "TransitionChange fails",
+        "AND a follow-up GetStatus call returns blocker codes and a next action"
+      ],
+      "when": ["specd change transition my-change <step> is run in text mode"],
+      "then": [
+        "the repair guide shows those blocker codes and that next action",
+        "AND the CLI does not invent an alternative repair route"
+      ]
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:68ee2f51def8efca29713f53a227bfa6f75dae567bc6667e0768e2ab71b0bfac",
-    "verify.md": "sha256:c70e39e523c81a55807b5904fed4fe19df8ca3af5a792a0d768aebff2a2a418f"
+    "spec.md": "sha256:4695aebcb64d7a62565bb7d403ab0287e6474c97e8457c7847e604f023a19110",
+    "verify.md": "sha256:a9e624ebd5b19ce79edd1e6d9cd49daf0ed22004c3e92b259e6abe5fc531ba6a"
   },
   "generatedBy": "core"
 }

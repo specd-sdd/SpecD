@@ -83,6 +83,7 @@ If no change with the given name exists in the repository, `execute()` MUST thro
 
 - `changes: ChangeRepository` — for loading changes by name
 - `schemaProvider: SchemaProvider` — for obtaining the fully-resolved active schema
+- `lifecycle: LifecycleEngine` — for deriving effective artifact status, blockers, routing, and next-action guidance from the change plus active schema
 - `approvals: { readonly spec: boolean; readonly signoff: boolean }` — whether approval gates are active
 
 It MUST delegate to `ChangeRepository.get(name)` to load the change. `SchemaProvider` replaces the previous `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths` triple, providing the fully-resolved schema with plugins and overrides applied.
@@ -90,6 +91,8 @@ It MUST delegate to `ChangeRepository.get(name)` to load the change. `SchemaProv
 ### Requirement: Reports effective status for every artifact
 
 The `artifactStatuses` array MUST contain exactly one entry per artifact in the change's artifact map. It MUST NOT omit artifacts and MUST NOT include entries for artifacts that do not exist on the change.
+
+`GetStatus` MUST derive each entry's `effectiveStatus` through `LifecycleEngine` so the reported value reflects recursive dependency blocking, workflow requirements, and approval-gate semantics from the active schema rather than only persisted aggregate artifact state.
 
 ### Requirement: Returns lifecycle context
 
@@ -101,6 +104,8 @@ The review check MUST follow this priority order:
 2. **Else if any artifact file is in `pending-review` state and there are unhandled `spec-overlap-conflict` invalidations:** `required` is `true`, `reason` is `'spec-overlap-conflict'`, `route` is `'designing'`.
 3. **Else if any artifact file is in `pending-review` state:** `required` is `true`, `reason` is `'artifact-review-required'`, `route` is `'designing'`.
 4. **Else:** `required` is `false`, `reason` is `null`, `route` is `null`.
+
+`GetStatus` MAY compute this summary directly from the loaded change facts or obtain it from `LifecycleEngine`, but the outward-facing result MUST reflect the same authoritative lifecycle interpretation used by transition and validation flows.
 
 **Unhandled overlap collection:** To determine unhandled `spec-overlap-conflict` invalidations, `GetStatus` MUST scan `change.history` in reverse (newest to oldest) collecting `invalidated` events with `cause: 'spec-overlap-conflict'`. The scan MUST stop at the first `transitioned` event whose `to` field is not `'designing'` — this indicates the change moved forward from a prior invalidation and those earlier overlaps were already handled. If no such boundary event is found, the scan includes all matching events back to the beginning of history.
 
@@ -126,6 +131,8 @@ Blockers MUST be collected for:
 - **Overlap Conflict**: code `'OVERLAP_CONFLICT'` if `review.reason` is `'spec-overlap-conflict'`.
 - **Missing Artifacts**: code `'MISSING_ARTIFACT'` for each artifact in the current state's `requires` list that is in `missing` or `in-progress` state.
 
+`GetStatus` MAY assemble these blockers directly or obtain them from `LifecycleEngine`, but the blocker set MUST be derived from the same authoritative lifecycle interpretation used for effective statuses and transition validation.
+
 ### Requirement: Graceful degradation when schema resolution fails
 
 If `SchemaProvider.get()` throws, the `lifecycle` object MUST still be present with degraded values:
@@ -144,8 +151,8 @@ The use case MUST NOT throw when schema resolution fails — it degrades the lif
 
 - The use case does not modify the change — it is a read-only query
 - Artifact content is not loaded; only status metadata is returned
-- The effective status computation is delegated to the `Change` entity, not performed by the use case itself
-- The `lifecycle` computation adds zero additional I/O beyond schema resolution — `VALID_TRANSITIONS` is a static lookup, `effectiveStatus` is already computed, and `schema.workflowStep()` / `schema.artifacts()` are in-memory after resolution
+- The effective status computation may be delegated to `LifecycleEngine`; it is not an entity-owned concern of `Change`
+- The `lifecycle` computation adds zero additional I/O beyond schema resolution — `VALID_TRANSITIONS` is a static lookup, while derived lifecycle interpretation is computed in memory from the loaded change, schema, and approval config
 - `changePath` is obtained from `ChangeRepository.changePath(change)` which the repository already exposes
 
 ## Spec Dependencies
@@ -155,3 +162,4 @@ The use case MUST NOT throw when schema resolution fails — it degrades the lif
 - [`core:transition-change`](../transition-change/spec.md) — lifecycle gating and transition rules
 - [`core:schema-format`](../schema-format/spec.md) — `SchemaProvider`, workflow, and artifact definitions
 - [`core:config`](../config/spec.md) — project approval configuration
+- [`core:lifecycle-engine`](../lifecycle-engine/spec.md) — authoritative schema-aware lifecycle interpretation reused by status, validation, and transition flows

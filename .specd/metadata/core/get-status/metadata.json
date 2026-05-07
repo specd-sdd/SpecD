@@ -6,7 +6,9 @@
     "core:kernel",
     "core:transition-change",
     "core:schema-format",
-    "core:config"
+    "core:config",
+    "core:lifecycle-engine",
+    "core:lifecycle-engine"
   ],
   "context": [
     "Users and tooling need a quick way to see where a change stands — both its lifecycle state and which artifacts are actually ready — without loading file content. The `GetStatus` use case loads a single change by name and reports its current lifecycle state along with the effective status of each artifact, cascading through dependency chains so that an artifact whose hashes match may still show `in-progress` if any of its required dependencies are not `complete`."
@@ -33,25 +35,25 @@
     {
       "requirement": "Constructor dependencies",
       "rules": [
-        "`GetStatus` MUST accept the following constructor arguments:\n\n- `changes: ChangeRepository` — for loading changes by name\n- `schemaProvider: SchemaProvider` — for obtaining the fully-resolved active schema\n- `approvals: { readonly spec: boolean; readonly signoff: boolean }` — whether approval gates are active\n\nIt MUST delegate to `ChangeRepository.get(name)` to load the change. `SchemaProvider` replaces the previous `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths` triple, providing the fully-resolved schema with plugins and overrides applied."
+        "`GetStatus` MUST accept the following constructor arguments:\n\n- `changes: ChangeRepository` — for loading changes by name\n- `schemaProvider: SchemaProvider` — for obtaining the fully-resolved active schema\n- `lifecycle: LifecycleEngine` — for deriving effective artifact status, blockers, routing, and next-action guidance from the change plus active schema\n- `approvals: { readonly spec: boolean; readonly signoff: boolean }` — whether approval gates are active\n\nIt MUST delegate to `ChangeRepository.get(name)` to load the change. `SchemaProvider` replaces the previous `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths` triple, providing the fully-resolved schema with plugins and overrides applied."
       ]
     },
     {
       "requirement": "Reports effective status for every artifact",
       "rules": [
-        "The `artifactStatuses` array MUST contain exactly one entry per artifact in the change's artifact map. It MUST NOT omit artifacts and MUST NOT include entries for artifacts that do not exist on the change."
+        "The `artifactStatuses` array MUST contain exactly one entry per artifact in the change's artifact map. It MUST NOT omit artifacts and MUST NOT include entries for artifacts that do not exist on the change.\n\n`GetStatus` MUST derive each entry's `effectiveStatus` through `LifecycleEngine` so the reported value reflects recursive dependency blocking, workflow requirements, and approval-gate semantics from the active schema rather than only persisted aggregate artifact state."
       ]
     },
     {
       "requirement": "Returns lifecycle context",
       "rules": [
-        "`GetStatus` MUST compute a `ReviewSummary` that determines whether the change requires artifact review and why.\n\nThe review check MUST follow this priority order:\n\n1. **If any artifact file is in `drifted-pending-review` state:** `required` is `true`, `reason` is `'artifact-drift'`, `route` is `'designing'`.\n2. **Else if any artifact file is in `pending-review` state and there are unhandled `spec-overlap-conflict` invalidations:** `required` is `true`, `reason` is `'spec-overlap-conflict'`, `route` is `'designing'`.\n3. **Else if any artifact file is in `pending-review` state:** `required` is `true`, `reason` is `'artifact-review-required'`, `route` is `'designing'`.\n4. **Else:** `required` is `false`, `reason` is `null`, `route` is `null`.\n\n**Unhandled overlap collection:** To determine unhandled `spec-overlap-conflict` invalidations, `GetStatus` MUST scan `change.history` in reverse (newest to oldest) collecting `invalidated` events with `cause: 'spec-overlap-conflict'`. The scan MUST stop at the first `transitioned` event whose `to` field is not `'designing'` — this indicates the change moved forward from a prior invalidation and those earlier overlaps were already handled. If no such boundary event is found, the scan includes all matching events back to the beginning of history.\n\n`ReviewSummary.reason` type MUST be extended to: `'artifact-drift' | 'artifact-review-required' | 'spec-overlap-conflict' | null`.\n\nWhen `reason` is `'spec-overlap-conflict'`, `ReviewSummary` MUST additionally include:\n\n- `overlapDetail` — an array of `OverlapEntry` objects, one per unhandled `spec-overlap-conflict` invalidation event, each containing:\n  - `archivedChangeName` — the name of the archived change that caused the overlap (extracted from the `invalidated.message`)\n  - `overlappingSpecIds` — readonly array of spec IDs that overlapped (extracted from the `invalidated.message`)\n    The array is ordered newest-first (matching the reverse scan order). This preserves the full picture when multiple changes were archived with overlapping specs before the current change was able to address any of them.\n\nWhen `reason` is not `'spec-overlap-conflict'`, `overlapDetail` MUST be an empty array."
+        "`GetStatus` MUST compute a `ReviewSummary` that determines whether the change requires artifact review and why.\n\nThe review check MUST follow this priority order:\n\n1. **If any artifact file is in `drifted-pending-review` state:** `required` is `true`, `reason` is `'artifact-drift'`, `route` is `'designing'`.\n2. **Else if any artifact file is in `pending-review` state and there are unhandled `spec-overlap-conflict` invalidations:** `required` is `true`, `reason` is `'spec-overlap-conflict'`, `route` is `'designing'`.\n3. **Else if any artifact file is in `pending-review` state:** `required` is `true`, `reason` is `'artifact-review-required'`, `route` is `'designing'`.\n4. **Else:** `required` is `false`, `reason` is `null`, `route` is `null`.\n\n`GetStatus` MAY compute this summary directly from the loaded change facts or obtain it from `LifecycleEngine`, but the outward-facing result MUST reflect the same authoritative lifecycle interpretation used by transition and validation flows.\n\n**Unhandled overlap collection:** To determine unhandled `spec-overlap-conflict` invalidations, `GetStatus` MUST scan `change.history` in reverse (newest to oldest) collecting `invalidated` events with `cause: 'spec-overlap-conflict'`. The scan MUST stop at the first `transitioned` event whose `to` field is not `'designing'` — this indicates the change moved forward from a prior invalidation and those earlier overlaps were already handled. If no such boundary event is found, the scan includes all matching events back to the beginning of history.\n\n`ReviewSummary.reason` type MUST be extended to: `'artifact-drift' | 'artifact-review-required' | 'spec-overlap-conflict' | null`.\n\nWhen `reason` is `'spec-overlap-conflict'`, `ReviewSummary` MUST additionally include:\n\n- `overlapDetail` — an array of `OverlapEntry` objects, one per unhandled `spec-overlap-conflict` invalidation event, each containing:\n  - `archivedChangeName` — the name of the archived change that caused the overlap (extracted from the `invalidated.message`)\n  - `overlappingSpecIds` — readonly array of spec IDs that overlapped (extracted from the `invalidated.message`)\n    The array is ordered newest-first (matching the reverse scan order). This preserves the full picture when multiple changes were archived with overlapping specs before the current change was able to address any of them.\n\nWhen `reason` is not `'spec-overlap-conflict'`, `overlapDetail` MUST be an empty array."
       ]
     },
     {
       "requirement": "Identifies blockers",
       "rules": [
-        "`GetStatus` MUST identify explicit blockers that prevent lifecycle progression.\n\nBlockers MUST be collected for:\n\n- **Artifact Drift**: code `'ARTIFACT_DRIFT'` if `review.reason` is `'artifact-drift'`.\n- **Review Required**: code `'REVIEW_REQUIRED'` if `review.reason` is `'artifact-review-required'`.\n- **Overlap Conflict**: code `'OVERLAP_CONFLICT'` if `review.reason` is `'spec-overlap-conflict'`.\n- **Missing Artifacts**: code `'MISSING_ARTIFACT'` for each artifact in the current state's `requires` list that is in `missing` or `in-progress` state."
+        "`GetStatus` MUST identify explicit blockers that prevent lifecycle progression.\n\nBlockers MUST be collected for:\n\n- **Artifact Drift**: code `'ARTIFACT_DRIFT'` if `review.reason` is `'artifact-drift'`.\n- **Review Required**: code `'REVIEW_REQUIRED'` if `review.reason` is `'artifact-review-required'`.\n- **Overlap Conflict**: code `'OVERLAP_CONFLICT'` if `review.reason` is `'spec-overlap-conflict'`.\n- **Missing Artifacts**: code `'MISSING_ARTIFACT'` for each artifact in the current state's `requires` list that is in `missing` or `in-progress` state.\n\n`GetStatus` MAY assemble these blockers directly or obtain them from `LifecycleEngine`, but the blocker set MUST be derived from the same authoritative lifecycle interpretation used for effective statuses and transition validation."
       ]
     },
     {
@@ -64,8 +66,8 @@
   "constraints": [
     "The use case does not modify the change — it is a read-only query",
     "Artifact content is not loaded; only status metadata is returned",
-    "The effective status computation is delegated to the Change entity, not performed by the use case itself",
-    "The lifecycle computation adds zero additional I/O beyond schema resolution — VALID_TRANSITIONS is a static lookup, effectiveStatus is already computed, and schema.workflowStep() / schema.artifacts() are in-memory after resolution",
+    "The effective status computation may be delegated to LifecycleEngine; it is not an entity-owned concern of Change",
+    "The lifecycle computation adds zero additional I/O beyond schema resolution — VALID_TRANSITIONS is a static lookup, while derived lifecycle interpretation is computed in memory from the loaded change, schema, and approval config",
     "changePath is obtained from ChangeRepository.changePath(change) which the repository already exposes"
   ],
   "scenarios": [
@@ -75,7 +77,8 @@
       "given": ["a change with one artifact in pending-review"],
       "when": ["execute({ name: 'add-login' }) is called"],
       "then": [
-        "the artifact entry includes its persisted state",
+        "GetStatus uses LifecycleEngine to derive lifecycle interpretation",
+        "AND the artifact entry includes its persisted state",
         "AND it includes effectiveStatus",
         "AND each file entry includes its own persisted state"
       ]
@@ -138,7 +141,7 @@
       ],
       "when": ["execute() is called for this change"],
       "then": [
-        "the effectiveStatus for spec is in-progress (cascaded from its dependency)",
+        "the effectiveStatus for spec is in-progress (cascaded from its dependency as derived by LifecycleEngine)",
         "AND the effectiveStatus for proposal is in-progress"
       ]
     },
@@ -271,11 +274,33 @@
         "AND lifecycle.changePath is populated normally",
         "AND lifecycle.schemaInfo is null"
       ]
+    },
+    {
+      "requirement": "Accepts a change name as input",
+      "name": "Input accepts a named change identifier",
+      "when": ["GetStatus.execute({ name: 'add-login' }) is called"],
+      "then": ["the use case resolves the named change from the repository"]
+    },
+    {
+      "requirement": "Constructor dependencies",
+      "name": "GetStatus receives LifecycleEngine through construction",
+      "given": ["GetStatus is assembled by the kernel"],
+      "when": ["the use case is constructed"],
+      "then": ["it receives ChangeRepository, SchemaProvider, approval config, and LifecycleEngine"]
+    },
+    {
+      "requirement": "Identifies blockers",
+      "name": "Blockers are surfaced from lifecycle interpretation",
+      "given": ["lifecycle interpretation finds artifact drift or missing required artifacts"],
+      "when": ["execute() is called"],
+      "then": [
+        "the returned blockers array contains machine-readable blocker entries describing those conditions"
+      ]
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:66300fc696247d6683d7f698f6ec1405713bbedd5a5cfe699a85b132eb76324a",
-    "verify.md": "sha256:9c3ff6c3a6d0d71568e5627262287274ede3b2faef836b892d171b8aa35b6079"
+    "spec.md": "sha256:18922ef264a2265b451d50104e0ec41057e3c08be4cd8467629c43b053f50b1e",
+    "verify.md": "sha256:c3d9ee9a1ae1fc8660d9dbcee6e79b0b5617d251721efbeebdd8dcba5f824b62"
   },
   "generatedBy": "core"
 }

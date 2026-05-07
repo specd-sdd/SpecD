@@ -22,6 +22,7 @@ import { parseSpecId } from '../../domain/services/parse-spec-id.js'
 import { expectedArtifactFilename } from '../../domain/services/artifact-filename.js'
 import { evaluateRules } from '../../domain/services/rule-evaluator.js'
 import { inferFormat } from '../../domain/services/format-inference.js'
+import { LifecycleEngine } from '../../domain/services/lifecycle-engine.js'
 import { type ContentHasher } from '../ports/content-hasher.js'
 import {
   extractMetadata,
@@ -35,6 +36,7 @@ import {
   createSpecReferenceResolver,
   type SpecWorkspaceRoute,
 } from './_shared/spec-reference-resolver.js'
+import { Logger } from '../logger.js'
 
 /** Input for the {@link ValidateArtifacts} use case. */
 export interface ValidateArtifactsInput {
@@ -117,6 +119,7 @@ export class ValidateArtifacts {
   private readonly _hasher: ContentHasher
   private readonly _extractorTransforms: ExtractorTransformRegistry
   private readonly _workspaceRoutes: readonly SpecWorkspaceRoute[]
+  private readonly _lifecycle: LifecycleEngine
 
   /**
    * Creates a new `ValidateArtifacts` use case instance.
@@ -129,6 +132,7 @@ export class ValidateArtifacts {
    * @param hasher - Content hasher for computing artifact hashes
    * @param extractorTransforms - Shared extractor transform registry
    * @param workspaceRoutes - Workspace routing metadata for cross-workspace resolution
+   * @param lifecycle - Shared lifecycle interpreter
    */
   constructor(
     changes: ChangeRepository,
@@ -139,6 +143,7 @@ export class ValidateArtifacts {
     hasher: ContentHasher,
     extractorTransforms: ExtractorTransformRegistry = new Map(),
     workspaceRoutes: readonly SpecWorkspaceRoute[] = [],
+    lifecycle: LifecycleEngine = new LifecycleEngine(Logger.debug.bind(Logger)),
   ) {
     this._changes = changes
     this._specs = specs
@@ -148,6 +153,7 @@ export class ValidateArtifacts {
     this._hasher = hasher
     this._extractorTransforms = extractorTransforms
     this._workspaceRoutes = workspaceRoutes
+    this._lifecycle = lifecycle
   }
 
   /**
@@ -201,6 +207,17 @@ export class ValidateArtifacts {
       readonly validatedHash: string
     }> = []
     const specDependsOnUpdates = new Map<string, readonly string[]>()
+    const lifecycle = this._lifecycle.evaluate(change, schema)
+    const artifactVerdicts = new Map(
+      lifecycle.artifacts.map((artifact) => [artifact.type, artifact]),
+    )
+
+    Logger.debug('ValidateArtifacts projected lifecycle engine dependency state', {
+      change: change.name,
+      specPath: input.specPath,
+      artifactId: input.artifactId ?? null,
+      blockerCodes: lifecycle.blockers.map((blocker) => blocker.code),
+    })
 
     const { workspace, capPath: capabilityPath } = parseSpecId(input.specPath)
     const specRepo = this._specs.get(workspace)
@@ -224,7 +241,10 @@ export class ValidateArtifacts {
     // --- Required artifacts check (skipped when artifactId is provided) ---
     if (input.artifactId === undefined) {
       for (const artifactType of schema.artifacts()) {
-        if (!artifactType.optional && change.effectiveStatus(artifactType.id) === 'missing') {
+        if (
+          !artifactType.optional &&
+          (artifactVerdicts.get(artifactType.id)?.effectiveStatus ?? 'missing') === 'missing'
+        ) {
           failures.push({
             artifactId: artifactType.id,
             description: `Required artifact '${artifactType.id}' is missing`,
@@ -276,12 +296,16 @@ export class ValidateArtifacts {
       if (input.artifactId !== undefined && artifactType.id !== input.artifactId) continue
 
       const blockedDep = artifactType.requires
-        .map((reqId) => ({ reqId, status: change.effectiveStatus(reqId) }))
+        .map((reqId) => ({
+          reqId,
+          status: artifactVerdicts.get(reqId)?.effectiveStatus ?? 'missing',
+        }))
         .find(({ status }) => status !== 'complete' && status !== 'skipped')
       if (blockedDep !== undefined) {
         const blockedByParent =
           blockedDep.status === 'pending-parent-artifact-review'
-            ? (change.findBlockingParent(artifactType.id) ?? change.findBlockingParent(blockedDep.reqId))
+            ? (this._lifecycle.findBlockingParent(change, schema, artifactType.id) ??
+              this._lifecycle.findBlockingParent(change, schema, blockedDep.reqId))
             : null
         failures.push({
           artifactId: artifactType.id,
@@ -594,7 +618,10 @@ export class ValidateArtifacts {
     readonly artifactId: string
     readonly dependencyId: string
     readonly dependencyStatus: ArtifactStatus
-    readonly blockedByParent: { readonly artifactId: string; readonly status: ArtifactStatus } | null
+    readonly blockedByParent: {
+      readonly artifactId: string
+      readonly status: ArtifactStatus
+    } | null
   }): string {
     const base = `Artifact '${args.artifactId}'`
     const dependency = `'${args.dependencyId}'`

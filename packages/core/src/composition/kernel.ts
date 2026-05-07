@@ -40,6 +40,7 @@ import { DetectOverlap } from '../application/use-cases/detect-overlap.js'
 import { PreviewSpec } from '../application/use-cases/preview-spec.js'
 import { GetSpecOutline } from '../application/use-cases/get-spec-outline.js'
 import { buildSchema } from '../domain/services/build-schema.js'
+import { LifecycleEngine } from '../domain/services/lifecycle-engine.js'
 import { type ChangeRepository } from '../application/ports/change-repository.js'
 import { type SchemaRegistry } from '../application/ports/schema-registry.js'
 import { type SpecRepository } from '../application/ports/spec-repository.js'
@@ -233,6 +234,7 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
 
   // PreviewSpec — used by CompileContext and exposed as changes.preview
   const previewSpec = new PreviewSpec(i.changes, i.specs, schemaProvider, i.parsers)
+  const lifecycle = new LifecycleEngine(Logger.debug.bind(Logger))
 
   return {
     registry,
@@ -240,11 +242,16 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
     changes: {
       repo: i.changes,
       create: new CreateChange(i.changes, i.specs, i.actor),
-      status: new GetStatus(i.changes, schemaProvider, {
-        spec: config.approvals.spec,
-        signoff: config.approvals.signoff,
-      }),
-      transition: new TransitionChange(i.changes, i.actor, schemaProvider, runStepHooks),
+      status: new GetStatus(
+        i.changes,
+        schemaProvider,
+        {
+          spec: config.approvals.spec,
+          signoff: config.approvals.signoff,
+        },
+        lifecycle,
+      ),
+      transition: new TransitionChange(i.changes, i.actor, schemaProvider, runStepHooks, lifecycle),
       draft: new DraftChange(i.changes, i.actor),
       restore: new RestoreChange(i.changes, i.actor),
       discard: new DiscardChange(i.changes, i.actor),
@@ -275,6 +282,7 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
         i.hasher,
         i.registry.extractorTransforms,
         workspaceRoutes,
+        lifecycle,
       ),
       compile: new CompileContext(
         i.changes,
@@ -286,6 +294,7 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
         previewSpec,
         i.registry.extractorTransforms,
         workspaceRoutes,
+        lifecycle,
       ),
       list: new ListChanges(i.changes),
       listDrafts: new ListDrafts(i.changes),
@@ -310,6 +319,7 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
         schemaProvider,
         i.parsers,
         i.expander,
+        lifecycle,
       ),
     },
     specs: {

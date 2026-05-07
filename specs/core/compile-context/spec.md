@@ -8,7 +8,7 @@ AI agents entering a lifecycle step need relevant spec content and project conte
 
 ### Requirement: Ports and constructor
 
-`CompileContext` receives at construction time: `ChangeRepository`, a map of `SpecRepository` instances (one per configured workspace), `SchemaProvider`, `FileReader`, `ArtifactParserRegistry`, `ContentHasher`, and `PreviewSpec`.
+`CompileContext` receives at construction time: `ChangeRepository`, a map of `SpecRepository` instances (one per configured workspace), `SchemaProvider`, `FileReader`, `ArtifactParserRegistry`, `ContentHasher`, `PreviewSpec`, and `LifecycleEngine`.
 
 ```typescript
 class CompileContext {
@@ -20,13 +20,14 @@ class CompileContext {
     parsers: ArtifactParserRegistry,
     hasher: ContentHasher,
     previewSpec: PreviewSpec,
+    lifecycle: LifecycleEngine,
   )
 }
 ```
 
 `SchemaProvider` is a lazy, caching port that returns the fully-resolved schema (with plugins and overrides applied). It replaces the previous `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths` triple. All are injected at kernel composition time, not passed per invocation.
 
-`PreviewSpec` is the use case `CompileContext` delegates to when it needs a materialized merged view of a spec with validated deltas applied. `ContentHasher` is used for metadata freshness checks and context fingerprint inputs.
+`PreviewSpec` is the use case `CompileContext` delegates to when it needs a materialized merged view of a spec with validated deltas applied. `ContentHasher` is used for metadata freshness checks and context fingerprint inputs. `LifecycleEngine` provides the schema-aware lifecycle interpretation needed for step availability and available-step diagnostics.
 
 ### Requirement: Input
 
@@ -138,9 +139,18 @@ When `sections` is absent, full-mode spec content is rendered from ordered spec-
 
 ### Requirement: Step availability
 
-`CompileContext` must evaluate whether the requested step is available for the current change. A step is available if all artifact IDs in the matching `workflow` entry's `requires` list (the entry whose `step` field equals the requested step name) have effective status `complete` or `skipped` via `change.effectiveStatus(type)`. A skipped optional artifact satisfies the requirement in the same way a completed artifact does.
+`CompileContext` must evaluate whether the requested step is available for the current change using `LifecycleEngine`.
 
-If the step is not available (one or more required artifacts are neither `complete` nor `skipped`), `CompileContext` must include the availability status and the list of blocking artifacts in the result. It must not throw — unavailability is surfaced to the caller, not treated as an error.
+A step is considered available when the engine determines that the step is both:
+
+- **ready** — all required artifacts are effectively `complete` or `skipped`
+- **permitted** — the lifecycle protocol allows entry into that step under the current transition and approval state
+
+A skipped optional artifact satisfies the requirement in the same way a completed artifact does.
+
+If the step is not available, `CompileContext` must include the availability status and the list of blocking artifacts in the result. It must not throw — unavailability is surfaced to the caller, not treated as an error.
+
+For backward compatibility, the top-level `stepAvailable` and `blockingArtifacts` fields remain part of the result. The richer per-step blocker diagnostics are exposed through `availableSteps`.
 
 ### Requirement: Structured result assembly
 
@@ -169,6 +179,9 @@ Full-mode rendering follows these rules:
    - `step` (string) — the step name
    - `available` (boolean) — whether the step is currently available
    - `blockingArtifacts` (string\[]) — artifact IDs blocking the step (empty if available)
+   - `isReady` (boolean, optional enrichment) — whether all required artifacts are effectively complete or skipped
+   - `isPermitted` (boolean, optional enrichment) — whether the lifecycle protocol currently permits the step
+   - `blockers` (`Blocker[]`, optional enrichment) — detailed blocker diagnostics from `LifecycleEngine`
 
 ### Requirement: Result shape
 
@@ -186,6 +199,8 @@ Full-mode rendering follows these rules:
 Each spec entry MUST include `specId`, `source`, and `mode`. `mode` is one of `'list'`, `'summary'`, or `'full'`. Summary and full entries include `title` and `description`; list entries do not require them. Full entries include `content`; list and summary entries MUST NOT include `content`.
 
 `contextMode`, `includeChangeSpecs`, `followDeps`, `depth`, `sections`, warnings, available steps, project context entries, and emitted specs are part of the logical context and MUST affect the fingerprint when they change. Presentation-only flags such as `--format` MUST NOT affect the fingerprint.
+
+When `availableSteps` carries enriched `LifecycleEngine` diagnostics such as `isReady`, `isPermitted`, or detailed `blockers`, those fields are part of the logical context as well and therefore MUST affect the fingerprint when they change.
 
 ### Requirement: Missing spec IDs emit a warning
 
@@ -283,3 +298,4 @@ const result = await compileContext.execute({
 - [`core:get-artifact-instruction`](../get-artifact-instruction/spec.md) — artifact instructions (separate concern)
 - [`core:get-hook-instructions`](../get-hook-instructions/spec.md) — step hook instructions (separate concern)
 - [`core:preview-spec`](../preview-spec/spec.md) — delta merge for materialized spec views in context
+- [`core:lifecycle-engine`](../lifecycle-engine/spec.md) — shared schema-aware lifecycle interpretation for step availability and blocker diagnostics

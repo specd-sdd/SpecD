@@ -211,6 +211,7 @@ This allows design/implement skills to replace `schema show` calls.
 - `effectiveStatus` reflects dependency cascading — an artifact may be `in-progress` because a dependency is incomplete even if its own hash matches
 - The CLI command is a pure serializer — all lifecycle computation is performed by the `GetStatus` use case in `@specd/core`
 - The CLI command MUST NOT call `SchemaRegistry`, `config show`, or any other use case to compute lifecycle data — it serializes what `GetStatus` returns
+- Lifecycle semantics shown by the command (effective artifact status, blockers, available transitions, next artifact, review summary, next action) are projections of the `GetStatus` result, which is itself derived from `LifecycleEngine`; the CLI must not re-derive them independently
 
 ## Examples
 

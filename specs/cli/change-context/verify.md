@@ -128,3 +128,17 @@
 - **WHEN** `specd change context nonexistent designing` is run
 - **THEN** the command exits with code 1
 - **AND** stderr contains an `error:` message
+
+### Requirement: Behaviour
+
+#### Scenario: CLI forwards traversal and fingerprint options to CompileContext
+
+- **WHEN** `specd change context` is run with flags such as `--include-change-specs`, `--follow-deps`, `--depth`, or `--fingerprint`
+- **THEN** the command forwards those options into the `CompileContext` request
+
+#### Scenario: Blocking artifacts come from CompileContext output
+
+- **GIVEN** `CompileContext` returns `stepAvailable: false` and `blockingArtifacts: ['tasks']`
+- **WHEN** `specd change context my-change implementing` is run
+- **THEN** stderr names `tasks` as the blocking artifact
+- **AND** the CLI does not recompute a different blocking set locally

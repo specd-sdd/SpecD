@@ -8,6 +8,8 @@ import { type SchemaRepository } from '../../application/ports/schema-repository
 import { createSchemaRepository } from '../schema-repository.js'
 import { ResolveSchema } from '../../application/use-cases/resolve-schema.js'
 import { LazySchemaProvider } from '../lazy-schema-provider.js'
+import { Logger } from '../../application/logger.js'
+import { LifecycleEngine } from '../../domain/services/lifecycle-engine.js'
 
 /**
  * Domain context for a `ChangeRepository` bound to a single workspace.
@@ -131,5 +133,10 @@ export function createGetStatus(
   })
   const resolveSchema = new ResolveSchema(schemas, opts.schemaRef, [], undefined)
   const schemaProvider = new LazySchemaProvider(resolveSchema)
-  return new GetStatus(changeRepo, schemaProvider, opts.approvals)
+  return new GetStatus(
+    changeRepo,
+    schemaProvider,
+    opts.approvals,
+    new LifecycleEngine(Logger.debug.bind(Logger)),
+  )
 }

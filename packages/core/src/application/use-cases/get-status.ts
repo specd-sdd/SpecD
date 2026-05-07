@@ -5,9 +5,12 @@ import { type ArtifactType } from '../../domain/value-objects/artifact-type.js'
 import { type ChangeState, VALID_TRANSITIONS } from '../../domain/value-objects/change-state.js'
 import { type ChangeRepository } from '../ports/change-repository.js'
 import { type SchemaProvider } from '../ports/schema-provider.js'
-import { type Schema } from '../../domain/value-objects/schema.js'
 import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
-import { type InvalidatedEvent } from '../../domain/entities/change.js'
+import {
+  LifecycleEngine,
+  type LifecycleReviewSummary,
+} from '../../domain/services/lifecycle-engine.js'
+import { Logger } from '../logger.js'
 
 /** Input for the {@link GetStatus} use case. */
 export interface GetStatusInput {
@@ -155,6 +158,7 @@ export class GetStatus {
   private readonly _changes: ChangeRepository
   private readonly _schemaProvider: SchemaProvider
   private readonly _approvals: { readonly spec: boolean; readonly signoff: boolean }
+  private readonly _lifecycle: LifecycleEngine
 
   /**
    * Creates a new `GetStatus` use case instance.
@@ -164,15 +168,18 @@ export class GetStatus {
    * @param approvals - Whether approval gates are active
    * @param approvals.spec - Whether the spec approval gate is enabled
    * @param approvals.signoff - Whether the signoff gate is enabled
+   * @param lifecycle - Shared lifecycle interpreter
    */
   constructor(
     changes: ChangeRepository,
     schemaProvider: SchemaProvider,
     approvals: { readonly spec: boolean; readonly signoff: boolean },
+    lifecycle: LifecycleEngine = new LifecycleEngine(Logger.debug.bind(Logger)),
   ) {
     this._changes = changes
     this._schemaProvider = schemaProvider
     this._approvals = approvals
+    this._lifecycle = lifecycle
   }
 
   /**
@@ -188,89 +195,88 @@ export class GetStatus {
       throw new ChangeNotFoundError(input.name)
     }
 
-    const artifactStatuses: ArtifactStatusEntry[] = []
-    for (const [type, artifact] of change.artifacts) {
-      const files: ArtifactFileStatus[] = []
-      for (const [key, file] of artifact.files) {
-        files.push({
-          key,
-          filename: file.filename,
-          state: file.status,
-          ...(file.validatedHash !== undefined ? { validatedHash: file.validatedHash } : {}),
-        })
-      }
-      artifactStatuses.push({
-        type,
-        state: artifact.status,
-        effectiveStatus: change.effectiveStatus(type),
-        files,
-      })
-    }
-
     const changePath = this._changes.changePath(change)
-    const review = this._deriveReview(change, artifactStatuses, changePath)
-
-    // --- Lifecycle computation ---
-
-    // 1. Valid transitions (static, always works)
-    const validTransitions = VALID_TRANSITIONS[change.state]
-
-    // 2. Resolve schema (may fail — graceful degradation)
-    let schema: Schema | null = null
+    const artifactStatuses: ArtifactStatusEntry[] = []
     let schemaInfo: LifecycleContext['schemaInfo'] = null
+    let review: ReviewSummary = {
+      required: false,
+      route: null,
+      reason: null,
+      affectedArtifacts: [],
+      overlapDetail: [],
+    }
+    let blockers: Blocker[] = []
+    let nextAction: NextAction = {
+      targetStep: change.state,
+      actionType: 'cognitive',
+      reason: 'Proceed to next lifecycle step',
+      command: null,
+    }
+    let validTransitions: readonly ChangeState[] = VALID_TRANSITIONS[change.state]
+    let availableTransitions: readonly ChangeState[] = []
+    let transitionBlockers: readonly TransitionBlocker[] = []
+    let nextArtifact: string | null = null
+
     try {
-      schema = await this._schemaProvider.get()
+      const schema = await this._schemaProvider.get()
       schemaInfo = {
         name: schema.name(),
         version: schema.version(),
         artifacts: schema.artifacts(),
       }
-    } catch {
-      // Schema-dependent fields will use defaults
-    }
-
-    // 3. Available transitions and blockers
-    const availableTransitions: ChangeState[] = []
-    const transitionBlockers: TransitionBlocker[] = []
-
-    if (schema !== null) {
-      for (const target of validTransitions) {
-        const workflowStep = schema.workflowStep(target)
-        if (workflowStep === null || workflowStep.requires.length === 0) {
-          availableTransitions.push(target)
-          continue
-        }
-        const blocking: string[] = []
-        for (const artifactId of workflowStep.requires) {
-          const status = change.getArtifact(artifactId)?.status
-          if (status !== 'complete' && status !== 'skipped') {
-            blocking.push(artifactId)
-          }
-        }
-        if (blocking.length === 0) {
-          availableTransitions.push(target)
-        } else {
-          transitionBlockers.push({ transition: target, reason: 'requires', blocking })
-        }
-      }
-    }
-
-    // 4. Next artifact
-    let nextArtifact: string | null = null
-    if (schema !== null) {
-      for (const artifactType of schema.artifacts()) {
-        const ownStatus = change.getArtifact(artifactType.id)?.status ?? 'missing'
-        if (ownStatus === 'complete' || ownStatus === 'skipped') {
-          continue
-        }
-        const requiresSatisfied = artifactType.requires.every((reqId) => {
-          const reqStatus = change.getArtifact(reqId)?.status
-          return reqStatus === 'complete' || reqStatus === 'skipped'
+      const verdict = this._lifecycle.evaluate(change, schema, {
+        approvals: this._approvals,
+      })
+      const artifactStatusByType = new Map(
+        verdict.artifacts.map((artifact) => [artifact.type, artifact]),
+      )
+      for (const [type, artifact] of change.artifacts) {
+        const files: ArtifactFileStatus[] = [...artifact.files.values()].map((file) => ({
+          key: file.key,
+          filename: file.filename,
+          state: file.status,
+          ...(file.validatedHash !== undefined ? { validatedHash: file.validatedHash } : {}),
+        }))
+        artifactStatuses.push({
+          type,
+          state: artifact.status,
+          effectiveStatus: artifactStatusByType.get(type)?.effectiveStatus ?? artifact.status,
+          files,
         })
-        if (requiresSatisfied) {
-          nextArtifact = artifactType.id
-          break
-        }
+      }
+
+      review = this._projectReview(verdict.review, changePath)
+      blockers = verdict.blockers.map((blocker) => ({
+        code: blocker.code,
+        message: blocker.message,
+      }))
+      nextAction = verdict.nextAction
+      validTransitions = verdict.validTransitions
+      availableTransitions = verdict.availableTransitions
+      transitionBlockers = verdict.transitionBlockers
+      nextArtifact = verdict.nextArtifact
+
+      Logger.debug('GetStatus projected lifecycle engine verdict', {
+        change: change.name,
+        blockerCodes: verdict.blockers.map((blocker) => blocker.code),
+        reviewReason: verdict.review.reason,
+        nextAction: verdict.nextAction.command,
+      })
+    } catch {
+      validTransitions = VALID_TRANSITIONS[change.state]
+      for (const [type, artifact] of change.artifacts) {
+        const files: ArtifactFileStatus[] = [...artifact.files.values()].map((file) => ({
+          key: file.key,
+          filename: file.filename,
+          state: file.status,
+          ...(file.validatedHash !== undefined ? { validatedHash: file.validatedHash } : {}),
+        }))
+        artifactStatuses.push({
+          type,
+          state: artifact.status,
+          effectiveStatus: artifact.status,
+          files,
+        })
       }
     }
 
@@ -284,235 +290,33 @@ export class GetStatus {
       schemaInfo,
     }
 
-    const blockers = this._deriveBlockers(review, transitionBlockers, change)
-    const nextAction = this._deriveNextAction(change.state, review, availableTransitions)
-
     return { change, artifactStatuses, lifecycle, review, blockers, nextAction }
   }
 
   /**
-   * Identifies explicit blockers that prevent lifecycle progression.
+   * Projects engine review details into the public GetStatus shape with absolute file paths.
    *
-   * @param review - Current review summary
-   * @param transitionBlockers - Structural transition blockers
-   * @param change - Loaded change entity
-   * @returns Array of active blockers
-   */
-  private _deriveBlockers(
-    review: ReviewSummary,
-    transitionBlockers: TransitionBlocker[],
-    change: Change,
-  ): Blocker[] {
-    const blockers: Blocker[] = []
-
-    if (review.reason === 'artifact-drift') {
-      blockers.push({
-        code: 'ARTIFACT_DRIFT',
-        message: 'Validated artifact content drifted from disk',
-      })
-    } else if (review.reason === 'spec-overlap-conflict') {
-      blockers.push({
-        code: 'OVERLAP_CONFLICT',
-        message: 'Conflict detected with archived overlapping specs',
-      })
-    } else if (review.reason === 'artifact-review-required') {
-      blockers.push({
-        code: 'REVIEW_REQUIRED',
-        message: 'Artifacts require review before proceeding',
-      })
-    }
-
-    // Identify missing required artifacts for next step
-    const nextStepBlocker = transitionBlockers.find((b) => b.reason === 'requires')
-    if (nextStepBlocker) {
-      for (const artifactId of nextStepBlocker.blocking) {
-        const artifact = change.getArtifact(artifactId)
-        if (!artifact || artifact.status === 'missing' || artifact.status === 'in-progress') {
-          blockers.push({
-            code: 'MISSING_ARTIFACT',
-            message: `Required artifact '${artifactId}' is incomplete`,
-          })
-        }
-      }
-    }
-
-    return blockers
-  }
-
-  /**
-   * Recommends the next action to guide the agent or user.
-   *
-   * @param state - Current change state
-   * @param review - Current review summary
-   * @param availableTransitions - Transitions currently available
-   * @returns NextAction recommendation
-   */
-  private _deriveNextAction(
-    state: ChangeState,
-    review: ReviewSummary,
-    availableTransitions: ChangeState[],
-  ): NextAction {
-    if (review.required) {
-      return {
-        targetStep: state,
-        actionType: 'cognitive',
-        reason: review.reason ?? 'Review required',
-        command: '/specd-design',
-      }
-    }
-
-    if (state === 'drafting' || state === 'designing') {
-      return {
-        targetStep: 'designing',
-        actionType: 'cognitive',
-        reason: 'Elaborating design artifacts',
-        command: '/specd-design',
-      }
-    }
-
-    if (state === 'ready' && availableTransitions.includes('implementing')) {
-      return {
-        targetStep: 'implementing',
-        actionType: 'mechanical',
-        reason: 'Design complete, ready to implement',
-        command: '/specd-implement',
-      }
-    }
-
-    if (state === 'implementing') {
-      return {
-        targetStep: 'implementing',
-        actionType: 'cognitive',
-        reason: 'Implementing planned tasks',
-        command: '/specd-implement',
-      }
-    }
-
-    if (state === 'verifying') {
-      return {
-        targetStep: 'verifying',
-        actionType: 'mechanical',
-        reason: 'Verifying implementation against scenarios',
-        command: '/specd-verify',
-      }
-    }
-
-    return {
-      targetStep: state,
-      actionType: 'cognitive',
-      reason: 'Proceed to next lifecycle step',
-      command: null,
-    }
-  }
-
-  /**
-   * Derives the outward-facing review summary from current artifact/file states.
-   *
-   * @param change - Change whose history may refine the affected-file ordering
-   * @param artifactStatuses - Current persisted artifact/file states
+   * @param review - Engine-derived review summary
    * @param changePath - Absolute path to the change directory
-   * @returns A stable review summary for CLI and skills
+   * @returns Review summary with absolute file paths
    */
-  private _deriveReview(
-    change: Change,
-    artifactStatuses: ArtifactStatusEntry[],
-    changePath: string,
-  ): ReviewSummary {
-    const outstandingFilesByArtifact = new Map<string, Map<string, ReviewArtifactFileSummary>>()
-    for (const artifact of artifactStatuses) {
-      const files = artifact.files
-        .filter(
-          (file) => file.state === 'pending-review' || file.state === 'drifted-pending-review',
-        )
-        .map((file) => ({
+  private _projectReview(review: LifecycleReviewSummary, changePath: string): ReviewSummary {
+    return {
+      required: review.required,
+      route: review.route,
+      reason: review.reason,
+      affectedArtifacts: review.affectedArtifacts.map((artifact) => ({
+        type: artifact.type,
+        files: artifact.files.map((file) => ({
           key: file.key,
           filename: file.filename,
           path: path.resolve(changePath, file.filename),
-        }))
-
-      if (files.length === 0) continue
-      outstandingFilesByArtifact.set(artifact.type, new Map(files.map((file) => [file.key, file])))
+        })),
+      })),
+      overlapDetail: review.overlapDetail.map((entry) => ({
+        archivedChangeName: entry.archivedChangeName,
+        overlappingSpecIds: [...entry.overlappingSpecIds],
+      })),
     }
-
-    if (outstandingFilesByArtifact.size === 0) {
-      return {
-        required: false,
-        route: null,
-        reason: null,
-        affectedArtifacts: [],
-        overlapDetail: [],
-      }
-    }
-
-    const latestInvalidated = [...change.history]
-      .reverse()
-      .find((event): event is InvalidatedEvent => event.type === 'invalidated')
-    const hasDrift = artifactStatuses.some((artifact) =>
-      artifact.files.some((file) => file.state === 'drifted-pending-review'),
-    )
-
-    const unhandledOverlaps = this._collectUnhandledOverlaps(change)
-    const overlapReason: 'spec-overlap-conflict' | null =
-      !hasDrift && unhandledOverlaps.length > 0 ? 'spec-overlap-conflict' : null
-
-    const projectedLatestAffectedArtifacts =
-      latestInvalidated === undefined
-        ? []
-        : latestInvalidated.affectedArtifacts
-            .map((artifact): ReviewArtifactSummary | null => {
-              const currentFiles = outstandingFilesByArtifact.get(artifact.type)
-              if (currentFiles === undefined) return null
-              const files = artifact.files
-                .map((fileKey) => currentFiles.get(fileKey))
-                .filter((file): file is ReviewArtifactFileSummary => file !== undefined)
-              return files.length === 0 ? null : { type: artifact.type, files }
-            })
-            .filter((artifact): artifact is ReviewArtifactSummary => artifact !== null)
-
-    const fallbackAffectedArtifacts: ReviewArtifactSummary[] = [
-      ...outstandingFilesByArtifact.entries(),
-    ].map(([type, files]) => ({
-      type,
-      files: [...files.values()],
-    }))
-
-    return {
-      required: true,
-      route: 'designing',
-      reason: hasDrift ? 'artifact-drift' : (overlapReason ?? 'artifact-review-required'),
-      affectedArtifacts:
-        projectedLatestAffectedArtifacts.length > 0
-          ? projectedLatestAffectedArtifacts
-          : fallbackAffectedArtifacts,
-      overlapDetail: overlapReason !== null ? unhandledOverlaps : [],
-    }
-  }
-
-  /**
-   * Collects unhandled spec-overlap-conflict invalidation events from history.
-   *
-   * Scans in reverse, collecting events until a forward-transition boundary
-   * is reached (a transition to a non-designing state).
-   *
-   * @param change - The change whose history to scan
-   * @returns Overlap entries ordered newest-first
-   */
-  private _collectUnhandledOverlaps(change: Change): ReviewOverlapEntry[] {
-    const entries: ReviewOverlapEntry[] = []
-    for (const event of [...change.history].reverse()) {
-      if (event.type === 'invalidated' && event.cause === 'spec-overlap-conflict') {
-        const nameMatch = event.message.match(/change '([^']+)'/)
-        const specsMatch = event.message.match(/specs:\s*(.+)$/)
-        entries.push({
-          archivedChangeName: nameMatch?.[1] ?? '',
-          overlappingSpecIds: specsMatch?.[1]?.split(',').map((s) => s.trim()) ?? [],
-        })
-        continue
-      }
-      if (event.type === 'transitioned' && event.to !== 'designing') {
-        break
-      }
-    }
-    return entries
   }
 }

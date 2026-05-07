@@ -6,8 +6,10 @@ import { type SchemaProvider } from '../ports/schema-provider.js'
 import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
 import { InvalidStateTransitionError } from '../../domain/errors/invalid-state-transition-error.js'
 import { HookFailedError } from '../../domain/errors/hook-failed-error.js'
+import { LifecycleEngine } from '../../domain/services/lifecycle-engine.js'
 import { safeRegex } from '../../domain/services/safe-regex.js'
 import { type RunStepHooks, type OnHookProgress } from './run-step-hooks.js'
+import { Logger } from '../logger.js'
 
 /** Selectors for granular hook phase skipping during transitions. */
 export type HookPhaseSelector = 'source.pre' | 'source.post' | 'target.pre' | 'target.post' | 'all'
@@ -98,6 +100,7 @@ export class TransitionChange {
   private readonly _actor: ActorResolver
   private readonly _schemaProvider: SchemaProvider
   private readonly _runStepHooks: RunStepHooks
+  private readonly _lifecycle: LifecycleEngine
 
   /**
    * Creates a new `TransitionChange` use case instance.
@@ -106,17 +109,20 @@ export class TransitionChange {
    * @param actor - Resolver for the actor identity
    * @param schemaProvider - Provider for the fully-resolved schema
    * @param runStepHooks - Use case for executing workflow hooks
+   * @param lifecycle - Shared lifecycle interpreter
    */
   constructor(
     changes: ChangeRepository,
     actor: ActorResolver,
     schemaProvider: SchemaProvider,
     runStepHooks: RunStepHooks,
+    lifecycle: LifecycleEngine = new LifecycleEngine(Logger.debug.bind(Logger)),
   ) {
     this._changes = changes
     this._actor = actor
     this._schemaProvider = schemaProvider
     this._runStepHooks = runStepHooks
+    this._lifecycle = lifecycle
   }
 
   /**
@@ -140,25 +146,23 @@ export class TransitionChange {
 
     const actor = await this._actor.identity()
     const fromState = change.state
-    const effectiveTarget = this._resolveTarget(change.state, input)
 
-    if (
-      fromState === 'ready' &&
-      effectiveTarget === 'pending-spec-approval' &&
-      !input.approvalsSpec
-    ) {
-      throw new InvalidStateTransitionError(fromState, effectiveTarget, {
-        type: 'gate-not-required',
-        gate: 'spec',
-      })
-    }
+    // --- Resolve schema and workflow step ---
+    const schema = await this._schemaProvider.get()
+    const lifecycle = this._lifecycle.evaluate(change, schema, {
+      requestedTarget: input.to,
+      approvals: { spec: input.approvalsSpec, signoff: input.approvalsSignoff },
+    })
+    const effectiveTarget = lifecycle.effectiveTarget ?? input.to
+    const workflowStep = schema.workflowStep(effectiveTarget) ?? null
 
-    if (fromState === 'done' && effectiveTarget === 'pending-signoff' && !input.approvalsSignoff) {
-      throw new InvalidStateTransitionError(fromState, effectiveTarget, {
-        type: 'gate-not-required',
-        gate: 'signoff',
-      })
-    }
+    Logger.debug('TransitionChange projected lifecycle engine routing', {
+      change: change.name,
+      fromState,
+      requestedTarget: input.to,
+      effectiveTarget,
+      blockerCodes: lifecycle.blockers.map((blocker) => blocker.code),
+    })
 
     if (fromState === 'pending-spec-approval' && effectiveTarget !== 'designing') {
       throw new InvalidStateTransitionError(fromState, effectiveTarget, {
@@ -174,23 +178,43 @@ export class TransitionChange {
       })
     }
 
-    // --- Resolve schema and workflow step ---
-    const schema = await this._schemaProvider.get()
-    const workflowStep = schema.workflowStep(effectiveTarget) ?? null
+    if (
+      (input.to === 'pending-spec-approval' || input.to === 'spec-approved') &&
+      !input.approvalsSpec
+    ) {
+      throw new InvalidStateTransitionError(fromState, effectiveTarget, {
+        type: 'gate-not-required',
+        gate: 'spec',
+      })
+    }
+
+    if ((input.to === 'pending-signoff' || input.to === 'signed-off') && !input.approvalsSignoff) {
+      throw new InvalidStateTransitionError(fromState, effectiveTarget, {
+        type: 'gate-not-required',
+        gate: 'signoff',
+      })
+    }
+
+    if (lifecycle.blockers.some((blocker) => blocker.code === 'INVALID_TRANSITION')) {
+      throw new InvalidStateTransitionError(fromState, effectiveTarget, {
+        type: 'invalid-transition',
+      })
+    }
 
     // --- Enforce workflow requires ---
     if (workflowStep !== null && workflowStep.requires.length > 0) {
       for (const artifactId of workflowStep.requires) {
-        const status = change.effectiveStatus(artifactId)
+        const verdict = lifecycle.artifacts.find((artifact) => artifact.type === artifactId)
+        const status = verdict?.effectiveStatus ?? 'missing'
         const satisfied = status === 'complete' || status === 'skipped'
         onProgress?.({ type: 'requires-check', artifactId, satisfied })
         if (!satisfied) {
-          const blockedBy = change.findBlockingParent(artifactId)
+          const blockedBy = this._lifecycle.findBlockingParent(change, schema, artifactId)
           throw new InvalidStateTransitionError(change.state, effectiveTarget, {
             type: 'incomplete-artifact',
             artifactId,
             status,
-            ...(blockedBy ? { blockedBy } : {}),
+            ...(blockedBy !== null ? { blockedBy } : {}),
           })
         }
       }
@@ -356,22 +380,5 @@ export class TransitionChange {
         total,
       })
     }
-  }
-
-  /**
-   * Resolves the actual target state after applying approval-gate routing.
-   *
-   * @param currentState - The change's current lifecycle state
-   * @param input - The use case input containing routing flags
-   * @returns The effective target state to transition to
-   */
-  private _resolveTarget(currentState: ChangeState, input: TransitionChangeInput): ChangeState {
-    if (currentState === 'ready' && input.to === 'implementing' && input.approvalsSpec) {
-      return 'pending-spec-approval'
-    }
-    if (currentState === 'done' && input.to === 'archivable' && input.approvalsSignoff) {
-      return 'pending-signoff'
-    }
-    return input.to
   }
 }

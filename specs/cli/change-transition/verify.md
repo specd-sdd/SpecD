@@ -150,3 +150,34 @@
 
 - **WHEN** `specd change transition my-change verifying --skip-hooks target.pre,source.post` is run
 - **THEN** both target pre and source post hooks are skipped
+
+### Requirement: Progress output
+
+#### Scenario: Text mode renders progress feedback
+
+- **WHEN** `specd change transition my-change designing` is run in text mode
+- **THEN** lifecycle progress feedback may be rendered to stdout while the transition runs
+
+### Requirement: Post-hook failure warning
+
+#### Scenario: Hook failure exits with error instead of post-transition warning
+
+- **GIVEN** a hook fails during transition execution
+- **WHEN** the command runs
+- **THEN** it exits with code 1 and prints an `error:` message instead of a separate post-hook warning state
+
+### Requirement: Unsatisfied requires error
+
+#### Scenario: Requires blocker is surfaced to the user
+
+- **GIVEN** a required artifact is incomplete
+- **WHEN** `specd change transition my-change ready` is run
+- **THEN** the command exits with code 1 and surfaces the requires blocker
+
+#### Scenario: Repair guide uses blocker and next-action data from core
+
+- **GIVEN** `TransitionChange` fails
+- **AND** a follow-up `GetStatus` call returns blocker codes and a next action
+- **WHEN** `specd change transition my-change <step>` is run in text mode
+- **THEN** the repair guide shows those blocker codes and that next action
+- **AND** the CLI does not invent an alternative repair route

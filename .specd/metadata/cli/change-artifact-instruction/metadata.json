@@ -9,7 +9,7 @@
     {
       "requirement": "Command signature",
       "rules": [
-        "```\nspecd change artifact-instruction <name> [artifact-id] [--format text|json|toon]\n```\n\n- `<name>` — required positional; the change name\n- `[artifact-id]` — optional positional; the artifact ID from the schema (e.g. `specs`, `verify`, `tasks`). When omitted, the use case auto-resolves the next artifact to work on based on the dependency graph — the first artifact whose `requires` are all satisfied but that is not yet complete\n- `--format text|json|toon` — optional; output format, defaults to `text`"
+        "```\nspecd change artifact-instruction <name> [artifact-id] [--format text|json|toon]\n```\n\n- `<name>` — required positional; the change name\n- `[artifact-id]` — optional positional; the artifact ID from the schema (e.g. `specs`, `verify`, `tasks`). When omitted, the use case auto-resolves the next artifact to work on using core lifecycle interpretation — the first artifact whose dependencies are effectively satisfied but that is not yet effectively complete\n- `--format text|json|toon` — optional; output format, defaults to `text`"
       ]
     },
     {
@@ -45,7 +45,8 @@
   ],
   "constraints": [
     "The command is read-only — it never modifies state",
-    "Text output uses labelled section headers ([rules.pre], [instruction], etc.) to separate parts"
+    "Text output uses labelled section headers ([rules.pre], [instruction], etc.) to separate parts",
+    "Next-artifact auto-selection is delegated entirely to GetArtifactInstruction; the CLI must not walk artifact dependencies or effective statuses itself"
   ],
   "scenarios": [
     {
@@ -113,11 +114,27 @@
       "then": [
         "examples use canonical plural command form specd specs outline <specPath> --artifact <artifactId>"
       ]
+    },
+    {
+      "requirement": "Delegates to GetArtifactInstruction",
+      "name": "CLI delegates directly to the use case",
+      "when": ["specd change artifact-instruction add-auth specs is run"],
+      "then": ["the command delegates instruction resolution to GetArtifactInstruction"]
+    },
+    {
+      "requirement": "Delegates to GetArtifactInstruction",
+      "name": "Omitted artifact-id uses use-case-selected artifact",
+      "given": ["GetArtifactInstruction auto-resolves specs as the next artifact"],
+      "when": ["specd change artifact-instruction add-auth is run without an explicit artifact ID"],
+      "then": [
+        "the returned instruction block is for specs",
+        "AND the CLI does not walk artifact dependencies on its own"
+      ]
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:b356e527aaa87b253b4064234bf9c3eb5283e117b8d4bf7ac7d6a89e75e4cd15",
-    "verify.md": "sha256:0fdc4ec56072e214d59f098cedf34e48241c932617abff54525b517529b289c7"
+    "spec.md": "sha256:4912acf50434e2815eeb19865a196c49882922af0a08da1700440042e9604306",
+    "verify.md": "sha256:c0c322bf4f896b0f3f22638254b59bc41ea8408293a007f7739affd7ef931adc"
   },
   "generatedBy": "core"
 }

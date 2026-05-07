@@ -33,63 +33,29 @@
 - **THEN** `result.passed` is `true` (assuming `proposal` passes validation)
 - **AND** the missing `specs` artifact is not reported as a failure
 
-### Requirement: Input — artifactId filter
-
-#### Scenario: Validating one spec does not fail on missing artifacts from other specs
-
-- **GIVEN** a change with two specs: `specA` and `specB`
-- **AND** `specA` has all its artifact files present
-- **AND** `specB` does not have its artifact files yet (not yet created)
-- **WHEN** `ValidateArtifacts.execute` is called with `specPath: 'specA'`
-- **THEN** only `specA`'s artifacts are validated
-- **AND** missing artifacts from `specB` do NOT cause validation failure
-- **AND** `result.passed` is `true` if `specA`'s artifacts pass validation
-
-#### Scenario: Only the specified artifact is validated
-
-- **GIVEN** the schema has artifacts `proposal`, `specs`, and `verify`
-- **AND** `artifactId` is `"specs"`
-- **WHEN** `ValidateArtifacts.execute` is called
-- **THEN** only `specs` goes through dependency check, delta validation, structural validation, and hash computation
-- **AND** `proposal` and `verify` are not checked, not reported as missing, and not included in the result
-
-#### Scenario: Dependency order still applies to the specified artifact
-
-- **GIVEN** `artifactId` is `"specs"` and artifact `specs` requires `proposal`
-- **AND** `proposal` is not `complete` or `skipped`
-- **WHEN** `ValidateArtifacts.execute` is called
-- **THEN** `specs` is reported as dependency-blocked and `markComplete` is not called
-
-#### Scenario: Specified artifact with satisfied dependencies proceeds normally
-
-- **GIVEN** `artifactId` is `"specs"` and artifact `specs` requires `proposal`
-- **AND** `proposal` is `complete`
-- **WHEN** `ValidateArtifacts.execute` is called
-- **THEN** `specs` is validated normally and `markComplete` is called if all validations pass
-
 ### Requirement: Dependency order check
 
 #### Scenario: Dependency complete — validation proceeds
 
-- **GIVEN** artifact `specs` requires `proposal`, and `proposal` is `complete`
+- **GIVEN** artifact `specs` requires `proposal`, and `LifecycleEngine` reports `proposal` as `complete`
 - **WHEN** `ValidateArtifacts.execute` is called for `specs`
 - **THEN** validation of `specs` proceeds normally
 
 #### Scenario: Dependency skipped — validation proceeds
 
-- **GIVEN** artifact `tasks` requires `design`, and `design` is `optional: true` with `validatedHash === "__skipped__"`
+- **GIVEN** artifact `tasks` requires `design`, and `LifecycleEngine` reports `design` as `skipped`
 - **WHEN** `ValidateArtifacts.execute` is called for `tasks`
 - **THEN** validation of `tasks` proceeds — `skipped` satisfies the dependency
 
 #### Scenario: Dependency incomplete — validation blocked
 
-- **GIVEN** artifact `specs` requires `proposal`, and `proposal` is `in-progress`
+- **GIVEN** artifact `specs` requires `proposal`, and `LifecycleEngine` reports `proposal` as `in-progress`
 - **WHEN** `ValidateArtifacts.execute` is called for `specs`
 - **THEN** `specs` is reported as dependency-blocked and `markComplete` is not called for it
 
 #### Scenario: Dependency-block failure includes effective dependency status
 
-- **GIVEN** artifact `specs` requires `proposal`, and `proposal` effective status is `missing`
+- **GIVEN** artifact `specs` requires `proposal`, and `LifecycleEngine` reports `proposal` effective status as `missing`
 - **WHEN** `ValidateArtifacts.execute` is called for `specs`
 - **THEN** the dependency-blocked failure description includes dependency `proposal`
 - **AND** the description includes status `missing`
@@ -97,7 +63,7 @@
 #### Scenario: Review-propagation blocker includes recursive parent context
 
 - **GIVEN** artifact `verify` depends on `specs`
-- **AND** `specs` effective status is `pending-parent-artifact-review`
+- **AND** `LifecycleEngine` reports `specs` effective status as `pending-parent-artifact-review`
 - **AND** recursive blocker resolution identifies parent artifact `proposal` with status `pending-review`
 - **WHEN** `ValidateArtifacts.execute` is called for `verify`
 - **THEN** the dependency-blocked failure description includes status `pending-parent-artifact-review`
@@ -106,7 +72,7 @@
 #### Scenario: Direct review blocker status is reported as review-state
 
 - **GIVEN** artifact `verify` depends on `specs`
-- **AND** `specs` effective status is `pending-review` or `drifted-pending-review`
+- **AND** `LifecycleEngine` reports `specs` effective status as `pending-review` or `drifted-pending-review`
 - **WHEN** `ValidateArtifacts.execute` is called for `verify`
 - **THEN** the dependency-blocked failure description includes the exact dependency status
 - **AND** the status is presented as a review blocker, not as generic incompleteness
@@ -383,7 +349,69 @@
 - **THEN** the mutation callback receives a freshly reloaded `Change`
 - **AND** validation updates are applied on top of that fresh state instead of overwriting it with an older snapshot
 
-### Requirement: Automatic dependsOn extraction
+### Requirement: Ports and constructor
+
+#### Scenario: ValidateArtifacts is constructed with LifecycleEngine
+
+- **WHEN** `ValidateArtifacts` is assembled
+- **THEN** it receives `LifecycleEngine` alongside its existing repositories, parser registry, actor resolver, and hasher
+
+### Requirement: Input
+
+#### Scenario: Change-scoped validation does not require specPath
+
+- **GIVEN** a change-scoped artifact such as `design`
+- **WHEN** `ValidateArtifacts.execute` is called for that artifact
+- **THEN** `specPath` is optional
+
+### Requirement: Schema name guard
+
+#### Scenario: Schema mismatch throws before validation
+
+- **GIVEN** the change was created under a different schema name
+- **WHEN** `ValidateArtifacts.execute` is called
+- **THEN** it throws `SchemaMismatchError` before validating artifacts
+
+### Requirement: MetadataExtraction validation failures are validation failures
+
+#### Scenario: Invalid extracted metadata prevents completion
+
+- **GIVEN** metadata extraction succeeds but its result fails schema validation
+- **WHEN** `ValidateArtifacts.execute` processes the artifact
+- **THEN** a validation failure is recorded
+- **AND** the artifact is not marked complete
+
+#### Scenario: Validating one spec does not fail on missing artifacts from other specs
+
+- **GIVEN** a change with two specs: `specA` and `specB`
+- **AND** `specA` has all its artifact files present
+- **AND** `specB` does not have its artifact files yet (not yet created)
+- **WHEN** `ValidateArtifacts.execute` is called with `specPath: 'specA'`
+- **THEN** only `specA`'s artifacts are validated
+- **AND** missing artifacts from `specB` do NOT cause validation failure
+- **AND** `result.passed` is `true` if `specA`'s artifacts pass validation
+
+#### Scenario: Only the specified artifact is validated
+
+- **GIVEN** the schema has artifacts `proposal`, `specs`, and `verify`
+- **AND** `artifactId` is `"specs"`
+- **WHEN** `ValidateArtifacts.execute` is called
+- **THEN** only `specs` goes through dependency check, delta validation, structural validation, and hash computation
+- **AND** `proposal` and `verify` are not checked, not reported as missing, and not included in the result
+
+#### Scenario: Dependency order still applies to the specified artifact
+
+- **GIVEN** `artifactId` is `"specs"` and artifact `specs` requires `proposal`
+- **AND** `LifecycleEngine` reports `proposal` as not `complete` or `skipped`
+- **WHEN** `ValidateArtifacts.execute` is called
+- **THEN** `specs` is reported as dependency-blocked and `markComplete` is not called
+
+#### Scenario: Specified artifact with satisfied dependencies proceeds normally
+
+- **GIVEN** `artifactId` is `"specs"` and artifact `specs` requires `proposal`
+- **AND** `LifecycleEngine` reports `proposal` as `complete`
+- **WHEN** `ValidateArtifacts.execute` is called
+- **THEN** `specs` is validated normally and `markComplete` is called if all validations pass
 
 #### Scenario: Transformed dependsOn values are persisted on the change
 

@@ -41,12 +41,12 @@ After resolving the target, the command MUST execute the normal `TransitionChang
 
 ### Requirement: Approval-gate routing
 
-The CLI passes the `approvalsSpec` and `approvalsSignoff` flags from the loaded `SpecdConfig` to the `TransitionChange` use case. The use case then applies smart routing:
+The CLI passes the `approvalsSpec` and `approvalsSignoff` flags from the loaded `SpecdConfig` to the `TransitionChange` use case. The use case, via `LifecycleEngine`, applies smart routing:
 
 - When the change is in `ready` and `approvalsSpec: true`, `implementing` is silently routed to `pending-spec-approval`
 - When the change is in `done` and `approvalsSignoff: true`, `archivable` is silently routed to `pending-signoff`
 
-The user always specifies the logical target state; routing is transparent.
+The user always specifies the logical target state; routing is transparent, and the CLI must not duplicate routing logic beyond choosing the requested target or `--next` target.
 
 ### Requirement: Hook execution
 
@@ -113,6 +113,7 @@ If the target workflow step has `requires` and any required artifact is not `com
 ## Constraints
 
 - The user specifies the logical target state; the CLI never exposes the routing logic in its help text
+- Repair-guide blockers and next-action data are projected from core lifecycle diagnostics (`TransitionChange` failure plus `GetStatus`), not recomputed in the CLI layer
 
 ## Examples
 

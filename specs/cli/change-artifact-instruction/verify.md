@@ -64,3 +64,17 @@
 
 - **WHEN** users inspect command examples for outline retrieval
 - **THEN** examples use canonical plural command form `specd specs outline <specPath> --artifact <artifactId>`
+
+### Requirement: Delegates to GetArtifactInstruction
+
+#### Scenario: CLI delegates directly to the use case
+
+- **WHEN** `specd change artifact-instruction add-auth specs` is run
+- **THEN** the command delegates instruction resolution to `GetArtifactInstruction`
+
+#### Scenario: Omitted artifact-id uses use-case-selected artifact
+
+- **GIVEN** `GetArtifactInstruction` auto-resolves `specs` as the next artifact
+- **WHEN** `specd change artifact-instruction add-auth` is run without an explicit artifact ID
+- **THEN** the returned instruction block is for `specs`
+- **AND** the CLI does not walk artifact dependencies on its own

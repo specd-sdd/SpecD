@@ -33,7 +33,7 @@
     {
       "requirement": "Output on failure",
       "rules": [
-        "In `text` mode, the command prints each failure to stdout, exits with code 1, and includes any expected file paths that could not be validated.\nFor spec-scoped validation targets, it also prints a merged-preview hint:\n\n```text\nvalidation failed <name>/<workspace:capability-path>:\n  missing: <path>\n    error: <artifactId> — <description>\n    ...\n    note: <artifactId> — <description>\n    ...\n  note: inspect merged spec output with `specd changes spec-preview <name> <workspace:capability-path>`\n```\n\nWhen validation targets a spec-scoped artifact via `--artifact <artifactId>`, the preview hint SHOULD include the same artifact filter:\n\n```text\nnote: inspect merged spec output with `specd changes spec-preview <name> <workspace:capability-path> --artifact <artifactId>`\n```\n\nFor change-scoped validation targets, no preview hint is emitted.\n\nMissing path lines MUST be derived from `ValidateArtifacts` result metadata. For an existing spec with a delta-capable artifact, this path is the expected `deltas/.../*.delta.yaml` file, even if a direct `specs/...` file exists.\n\nFor dependency-blocked failures, `<description>` MUST be rendered exactly from the core validation failure entry and therefore MUST preserve dependency status context. When core reports review-propagation context (for example, a blocker status of `pending-parent-artifact-review` and an upstream parent blocker), the CLI MUST surface that context verbatim instead of replacing it with generic \"incomplete dependency\" wording.\n\nIn `json` or `toon` mode:\n\n```json\n{\n  \"passed\": false,\n  \"failures\": [{ \"artifactId\": \"...\", \"description\": \"...\", \"filename\": \"...\" }],\n  \"notes\": [],\n  \"files\": [{ \"artifactId\": \"...\", \"key\": \"...\", \"filename\": \"...\", \"status\": \"missing\" }]\n}\n```\n\nThe process exits with code 1 when `passed` is `false`, regardless of format."
+        "In `text` mode, the command prints each failure to stdout, exits with code 1, and includes any expected file paths that could not be validated.\nFor spec-scoped validation targets, it also prints a merged-preview hint:\n\n```text\nvalidation failed <name>/<workspace:capability-path>:\n  missing: <path>\n    error: <artifactId> — <description>\n    ...\n    note: <artifactId> — <description>\n    ...\n  note: inspect merged spec output with `specd changes spec-preview <name> <workspace:capability-path>`\n```\n\nWhen validation targets a spec-scoped artifact via `--artifact <artifactId>`, the preview hint SHOULD include the same artifact filter:\n\n```text\nnote: inspect merged spec output with `specd changes spec-preview <name> <workspace:capability-path> --artifact <artifactId>`\n```\n\nFor change-scoped validation targets, no preview hint is emitted.\n\nMissing path lines MUST be derived from `ValidateArtifacts` result metadata. For an existing spec with a delta-capable artifact, this path is the expected `deltas/.../*.delta.yaml` file, even if a direct `specs/...` file exists.\n\nFor dependency-blocked failures, `<description>` MUST be rendered exactly from the core validation failure entry and therefore MUST preserve dependency status context. Because core dependency interpretation is lifecycle-engine-driven, the CLI MUST surface that wording verbatim instead of replacing it with generic \"incomplete dependency\" wording or recomputing blocker semantics locally.\n\nIn `json` or `toon` mode:\n\n```json\n{\n  \"passed\": false,\n  \"failures\": [{ \"artifactId\": \"...\", \"description\": \"...\", \"filename\": \"...\" }],\n  \"notes\": [],\n  \"files\": [{ \"artifactId\": \"...\", \"key\": \"...\", \"filename\": \"...\", \"status\": \"missing\" }]\n}\n```\n\nThe process exits with code 1 when `passed` is `false`, regardless of format."
       ]
     },
     {
@@ -203,7 +203,8 @@
       "when": ["specd change validate my-change core:config --artifact specs is run"],
       "then": [
         "stdout contains the failure description exactly as emitted by core validation",
-        "AND the CLI does not replace it with generic \"incomplete dependency\" wording"
+        "AND the CLI does not replace it with generic \"incomplete dependency\" wording",
+        "AND the CLI does not recompute blocker semantics locally"
       ]
     },
     {
@@ -302,8 +303,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:74615e7038b2612b6218ee14e503c63b1e194e4425ca84b5f9e3b6b6ceef6239",
-    "verify.md": "sha256:3e1f766011b67648c707f14a4738c9a592c934cdebad829f26f78ddef8581642"
+    "spec.md": "sha256:7f9ff6a09b9c56d6090a7cde538174fbf283cdd6251309535cbb0786e537f9d9",
+    "verify.md": "sha256:b8019cf10b147dbdc0fdf65dd50711e9bcba2dca94c1dab0cce1ad3f4d1e53da"
   },
   "generatedBy": "core"
 }

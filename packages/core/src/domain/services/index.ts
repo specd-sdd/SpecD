@@ -64,3 +64,17 @@ export {
   type RuleEvaluatorParser,
 } from './rule-evaluator.js'
 export { detectSpecOverlap } from './detect-spec-overlap.js'
+export {
+  LifecycleEngine,
+  type LifecycleEngineOptions,
+  type LifecycleAffectedFile,
+  type LifecycleAffectedArtifact,
+  type LifecycleBlocker,
+  type LifecycleReviewOverlapEntry,
+  type LifecycleReviewSummary,
+  type LifecycleNextAction,
+  type LifecycleArtifactVerdict,
+  type LifecycleTransitionBlocker,
+  type LifecycleStepVerdict,
+  type LifecycleVerdict,
+} from './lifecycle-engine.js'

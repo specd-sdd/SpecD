@@ -8,7 +8,7 @@ When an agent is creating or modifying a specific artifact during the designing 
 
 ### Requirement: Ports and constructor
 
-`GetArtifactInstruction` receives at construction time: `ChangeRepository`, a map of `SpecRepository` instances, `SchemaProvider`, `ArtifactParserRegistry`, and `TemplateExpander`.
+`GetArtifactInstruction` receives at construction time: `ChangeRepository`, a map of `SpecRepository` instances, `SchemaProvider`, `ArtifactParserRegistry`, `TemplateExpander`, and `LifecycleEngine`.
 
 ```typescript
 class GetArtifactInstruction {
@@ -18,18 +18,19 @@ class GetArtifactInstruction {
     schemaProvider: SchemaProvider,
     parsers: ArtifactParserRegistry,
     expander: TemplateExpander,
+    lifecycle: LifecycleEngine,
   )
 }
 ```
 
-`ArtifactParserRegistry` is needed to generate delta format instructions and existing artifact outlines. `SpecRepository` is needed to read existing artifact files for outlines. `TemplateExpander.expand()` is called on `instruction`, `template`, `deltaInstruction`, and `rules` text before returning them (verbatim expansion, no shell escaping). `SchemaProvider` provides the fully-resolved schema (with plugins and overrides applied), which includes pre-loaded template content in each `ArtifactType`. It replaces the previous `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths` triple. The use case builds contextual variables (`change` namespace) from the resolved change and `ChangeRepository.changePath()`, passing them to the expander.
+`ArtifactParserRegistry` is needed to generate delta format instructions and existing artifact outlines. `SpecRepository` is needed to read existing artifact files for outlines. `TemplateExpander.expand()` is called on `instruction`, `template`, `deltaInstruction`, and `rules` text before returning them. `SchemaProvider` provides the fully-resolved schema. `LifecycleEngine` provides the DAG-aware readiness interpretation used for auto-selection when `artifactId` is omitted.
 
 ### Requirement: Input
 
 `GetArtifactInstruction.execute` receives:
 
 - `name` (string, required) — the change name
-- `artifactId` (string, optional) — the artifact ID from the schema (e.g. `specs`, `verify`, `tasks`). When omitted, the use case auto-resolves the next artifact to work on by walking the schema's artifact list in declaration order: the first artifact whose `requires` dependencies are all satisfied (complete or skipped) but that is itself not yet complete or skipped. If all artifacts are already complete/skipped, it throws `ArtifactNotFoundError`.
+- `artifactId` (string, optional) — the artifact ID from the schema (e.g. `specs`, `verify`, `tasks`). When omitted, the use case auto-resolves the next artifact to work on using `LifecycleEngine`: the first artifact in schema declaration order whose dependencies are effectively satisfied (`complete` or `skipped`) but that is itself not yet effectively complete or skipped. If all artifacts are already complete/skipped, it throws `ArtifactNotFoundError`.
 
 ### Requirement: Change lookup
 
@@ -90,3 +91,4 @@ The caller decides which parts to use. A subagent creating artifacts from scratc
 - [`core:change`](../change/spec.md) — Change entity, `specIds`, `schemaName`
 - [`core:schema-merge`](../schema-merge/spec.md) — schema composition via `rules.pre`/`rules.post`
 - [`core:template-variables`](../template-variables/spec.md) — `TemplateExpander`, `TemplateVariables`, expansion semantics
+- [`core:lifecycle-engine`](../lifecycle-engine/spec.md) — DAG-aware artifact readiness and effective status interpretation

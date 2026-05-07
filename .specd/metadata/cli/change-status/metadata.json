@@ -41,7 +41,8 @@
     "The output includes all artifacts declared by the schema, not only those present on disk",
     "effectiveStatus reflects dependency cascading — an artifact may be in-progress because a dependency is incomplete even if its own hash matches",
     "The CLI command is a pure serializer — all lifecycle computation is performed by the GetStatus use case in @specd/core",
-    "The CLI command MUST NOT call SchemaRegistry, config show, or any other use case to compute lifecycle data — it serializes what GetStatus returns"
+    "The CLI command MUST NOT call SchemaRegistry, config show, or any other use case to compute lifecycle data — it serializes what GetStatus returns",
+    "Lifecycle semantics shown by the command (effective artifact status, blockers, available transitions, next artifact, review summary, next action) are projections of the GetStatus result, which is itself derived from LifecycleEngine; the CLI must not re-derive them independently"
   ],
   "scenarios": [
     {
@@ -104,54 +105,14 @@
       ]
     },
     {
-      "requirement": "spec-overlap-conflict review reason display",
-      "name": "Text output shows overlap entries when reason is spec-overlap-conflict",
-      "given": [
-        "GetStatus returns review.required: true with reason: 'spec-overlap-conflict'",
-        "AND review.overlapDetail has two entries: [{ archivedChangeName: 'beta', overlappingSpecIds: ['core:config'] }, { archivedChangeName: 'alpha', overlappingSpecIds: ['core:kernel'] }]"
-      ],
+      "requirement": "Output format",
+      "name": "Text output preserves core blocker messages",
+      "given": ["GetStatus returns lifecycle blockers"],
       "when": ["specd change status <name> is run"],
       "then": [
-        "the review section shows reason: spec-overlap-conflict",
-        "AND an overlap: subsection lists both entries as bullets"
+        "the command prints those blocker codes and messages",
+        "AND it does not substitute a locally recomputed explanation"
       ]
-    },
-    {
-      "requirement": "spec-overlap-conflict review reason display",
-      "name": "Text output with single overlap entry",
-      "given": [
-        "GetStatus returns review.required: true with reason: 'spec-overlap-conflict'",
-        "AND review.overlapDetail has one entry"
-      ],
-      "when": ["specd change status <name> is run"],
-      "then": ["the overlap subsection shows one bullet with the archived change name and specs"]
-    },
-    {
-      "requirement": "spec-overlap-conflict review reason display",
-      "name": "JSON output includes overlapDetail array when reason is spec-overlap-conflict",
-      "given": [
-        "GetStatus returns review.required: true with reason: 'spec-overlap-conflict'",
-        "AND review.overlapDetail has two entries"
-      ],
-      "when": ["specd change status <name> --format json is run"],
-      "then": [
-        "review.overlapDetail is an array with two entries ordered newest-first",
-        "AND each entry has archivedChangeName and overlappingSpecIds"
-      ]
-    },
-    {
-      "requirement": "spec-overlap-conflict review reason display",
-      "name": "JSON output has empty overlapDetail array for other reasons",
-      "given": ["GetStatus returns review.required: true with reason: 'artifact-drift'"],
-      "when": ["specd change status <name> --format json is run"],
-      "then": ["review.overlapDetail is []"]
-    },
-    {
-      "requirement": "spec-overlap-conflict review reason display",
-      "name": "Overlap subsection omitted in text when reason is not spec-overlap-conflict",
-      "given": ["GetStatus returns review.required: true with reason: 'artifact-review-required'"],
-      "when": ["specd change status <name> is run"],
-      "then": ["no overlap: subsection appears in the review section"]
     },
     {
       "requirement": "Schema version warning",
@@ -186,11 +147,61 @@
       "given": ["a change using a custom schema"],
       "when": ["specd change status <name> --format json is run"],
       "then": ["the JSON output includes schema.artifactDag array"]
+    },
+    {
+      "requirement": "Schema-derived fields",
+      "name": "Text output shows overlap entries when reason is spec-overlap-conflict",
+      "given": [
+        "GetStatus returns review.required: true with reason: 'spec-overlap-conflict'",
+        "AND review.overlapDetail has two entries: [{ archivedChangeName: 'beta', overlappingSpecIds: ['core:config'] }, { archivedChangeName: 'alpha', overlappingSpecIds: ['core:kernel'] }]"
+      ],
+      "when": ["specd change status <name> is run"],
+      "then": [
+        "the review section shows reason: spec-overlap-conflict",
+        "AND an overlap: subsection lists both entries as bullets"
+      ]
+    },
+    {
+      "requirement": "Schema-derived fields",
+      "name": "Text output with single overlap entry",
+      "given": [
+        "GetStatus returns review.required: true with reason: 'spec-overlap-conflict'",
+        "AND review.overlapDetail has one entry"
+      ],
+      "when": ["specd change status <name> is run"],
+      "then": ["the overlap subsection shows one bullet with the archived change name and specs"]
+    },
+    {
+      "requirement": "Schema-derived fields",
+      "name": "JSON output includes overlapDetail array when reason is spec-overlap-conflict",
+      "given": [
+        "GetStatus returns review.required: true with reason: 'spec-overlap-conflict'",
+        "AND review.overlapDetail has two entries"
+      ],
+      "when": ["specd change status <name> --format json is run"],
+      "then": [
+        "review.overlapDetail is an array with two entries ordered newest-first",
+        "AND each entry has archivedChangeName and overlappingSpecIds"
+      ]
+    },
+    {
+      "requirement": "Schema-derived fields",
+      "name": "JSON output has empty overlapDetail array for other reasons",
+      "given": ["GetStatus returns review.required: true with reason: 'artifact-drift'"],
+      "when": ["specd change status <name> --format json is run"],
+      "then": ["review.overlapDetail is []"]
+    },
+    {
+      "requirement": "Schema-derived fields",
+      "name": "Overlap subsection omitted in text when reason is not spec-overlap-conflict",
+      "given": ["GetStatus returns review.required: true with reason: 'artifact-review-required'"],
+      "when": ["specd change status <name> is run"],
+      "then": ["no overlap: subsection appears in the review section"]
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:318bc36294a9a14b374a380463defac3d6aafe89e30b6c5d36592ffcd2316637",
-    "verify.md": "sha256:473bf4428601ece3a2338d9405a6f9d2521ea7c5d953253506a75a8b6f7282df"
+    "spec.md": "sha256:90b6b99d67150463dc1259b53a5d0e6b66600c1f4c36c3649cf2893295c82113",
+    "verify.md": "sha256:4690a7a818183d5f6ecc0bbe32f189012cce520363de6798a60e0983f6d5387a"
   },
   "generatedBy": "core"
 }
