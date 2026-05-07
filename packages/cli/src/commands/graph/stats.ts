@@ -1,10 +1,13 @@
 import { Command } from 'commander'
 import { createVcsAdapter } from '@specd/core'
+import { parseFingerprintMap, detectFingerprintMismatch } from '@specd/code-graph'
 import { output, parseFormat } from '../../formatter.js'
 import { cliError } from '../../handle-error.js'
 import { resolveGraphCliContext } from './resolve-graph-cli-context.js'
 import { withProvider } from './with-provider.js'
 import { assertGraphIndexUnlocked } from './graph-index-lock.js'
+import { buildWorkspaceTargets } from './build-workspace-targets.js'
+import { codeGraphVersion } from './code-graph-version.js'
 
 /**
  * Registers the `graph stats` command.
@@ -40,7 +43,7 @@ JSON/TOON output schema:
       if (opts.config !== undefined && opts.path !== undefined) {
         cliError('--config and --path are mutually exclusive', opts.format, 1)
       }
-      const { config } = await resolveGraphCliContext({
+      const { config, kernel } = await resolveGraphCliContext({
         configPath: opts.config,
         repoPath: opts.path,
       }).catch((err: unknown) =>
@@ -64,6 +67,17 @@ JSON/TOON output schema:
         }
 
         const stale = computeStaleness(stats.lastIndexedRef, currentRef)
+
+        let fingerprintMismatch: boolean | null = null
+        if (kernel !== null && stats.graphFingerprint !== null) {
+          try {
+            const workspaces = await buildWorkspaceTargets(config, kernel)
+            const storedMap = parseFingerprintMap(stats.graphFingerprint)
+            fingerprintMismatch = detectFingerprintMismatch(storedMap, codeGraphVersion, workspaces)
+          } catch {
+            fingerprintMismatch = null
+          }
+        }
 
         if (fmt === 'text') {
           const lines = [
@@ -91,9 +105,15 @@ JSON/TOON output schema:
             )
           }
 
+          if (fingerprintMismatch === true) {
+            lines.push(
+              '⚠ Derivation fingerprint mismatch — code-graph version or workspace configuration changed since last index',
+            )
+          }
+
           output(lines.join('\n'), 'text')
         } else {
-          output({ ...stats, stale, currentRef }, fmt)
+          output({ ...stats, stale, currentRef, fingerprintMismatch }, fmt)
         }
       })
     })

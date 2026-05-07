@@ -10,13 +10,14 @@ A code graph needs a unified, language-agnostic representation of source code st
 
 A `FileNode` SHALL represent a single source file in the workspace. It contains:
 
-- **`path`** (`string`) — globally unique path in format `{workspaceName}:{relativeToCodeRoot}` (e.g. `core:src/index.ts`). Forward-slash-normalized. This is the node's identity.
+- **`path`** (`string`) — globally unique path in format `{workspaceName}:{relativeToCodeRoot}` (e.g. `core:src/index.ts`). Forward-slash-normalized. This is the node's canonical identity.
+- **`configRelativePath`** (`string`) — forward-slash-normalized path from the directory containing the `specd.yaml` used for indexing to the file on disk (e.g. `packages/core/src/index.ts`). This path is not the node identity and MAY include `..` segments when the file lives outside the config directory.
 - **`language`** (`string`) — language identifier (e.g. `typescript`, `python`). Determined by the language adapter at index time.
 - **`contentHash`** (`string`) — hash of the file's content at last index. Used for incremental diffing.
 - **`workspace`** (`string`) — the workspace name this file belongs to (e.g. `core`, `cli`, `default`).
 - **`embedding`** (`Float32Array | undefined`) — optional vector embedding for semantic search. Deferred to v2+.
 
-Two `FileNode` values are equal if and only if their `path` fields match (since path includes the workspace name prefix).
+Two `FileNode` values are equal if and only if their `path` fields match (since `path` includes the workspace name prefix and remains the canonical graph identity). `configRelativePath` exists for user-facing lookup and diagnostics; it MUST NOT replace the canonical workspace-prefixed path in persisted relations or symbol identifiers.
 
 ### Requirement: Spec node
 
@@ -37,15 +38,13 @@ Two `SpecNode` values are equal if their `specId` fields match.
 
 A `SymbolNode` SHALL represent a named code construct extracted from a file. It contains:
 
-- **`id`** (`string`) — deterministic identifier computed from `filePath + kind + name + line` (e.g. `core:src/index.ts:function:main:1`). Since `filePath` is workspace-prefixed, the id is globally unique across workspaces. The same symbol at the same location always produces the same id.
+- **`id`** (`string`) — deterministic identifier computed from `filePath + kind + name + line + column` (e.g. `core:src/index.ts:function:main:1:0`). Since `filePath` is workspace-prefixed, the id is globally unique across workspaces. The same symbol at the same location always produces the same id.
 - **`name`** (`string`) — the symbol's declared name (e.g. `createUser`, `AuthService`).
 - **`kind`** (`SymbolKind`) — the category of this symbol.
 - **`filePath`** (`string`) — workspace-prefixed path of the file containing this symbol (e.g. `core:src/index.ts`).
 - **`line`** (`number`) — 1-based line number of the symbol's declaration.
 - **`column`** (`number`) — 0-based column offset of the symbol's declaration.
 - **`comment`** (`string | undefined`) — the raw comment or JSDoc text immediately preceding the symbol's declaration. Stored verbatim (no parsing) to enable full-text search. Language adapters extract this from the AST; symbols without a preceding comment have `undefined`.
-
-The `id` field is the symbol's identity for graph operations. Two `SymbolNode` values with the same `id` are considered the same symbol.
 
 ### Requirement: SymbolKind enum
 

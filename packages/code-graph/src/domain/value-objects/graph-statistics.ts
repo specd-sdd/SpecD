@@ -11,4 +11,5 @@ export interface GraphStatistics {
   readonly languages: readonly string[]
   readonly lastIndexedAt: string | undefined
   readonly lastIndexedRef: string | null
+  readonly graphFingerprint: string | null
 }

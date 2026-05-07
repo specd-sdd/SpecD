@@ -156,6 +156,22 @@ class Service:
         callFacts.some((fact) => fact.form === CallForm.Constructor && fact.name === 'UserRepo'),
       ).toBe(true)
     })
+
+    it('emits ImportedType facts from type alias RHS', () => {
+      const code = `
+from typing import Dict
+ParserRegistry = Dict[str, ArtifactParser]
+HandlerFn: TypeAlias = Callable[[Event], Result]
+`
+      const symbols = adapter.extractSymbols('main.py', code)
+      const imports = adapter.extractImportedNames('main.py', code)
+      const facts = adapter.extractBindingFacts('main.py', code, symbols, imports)
+
+      const registryFacts = facts.filter(
+        (f) => f.name === 'ParserRegistry' && f.sourceKind === BindingSourceKind.ImportedType,
+      )
+      expect(registryFacts.some((f) => f.targetName === 'ArtifactParser')).toBe(true)
+    })
   })
 
   describe('extractImportedNames', () => {

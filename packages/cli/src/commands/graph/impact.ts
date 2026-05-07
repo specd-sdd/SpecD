@@ -5,6 +5,7 @@ import { output, parseFormat } from '../../formatter.js'
 import { resolveGraphCliContext } from './resolve-graph-cli-context.js'
 import { withProvider } from './with-provider.js'
 import { assertGraphIndexUnlocked } from './graph-index-lock.js'
+import { resolveImpactFileSelectors } from './resolve-impact-file-selectors.js'
 
 /** Provider-supported graph impact traversal directions. */
 type ImpactDirection = 'upstream' | 'downstream' | 'both'
@@ -113,10 +114,12 @@ export function registerGraphImpact(parent: Command): void {
   parent
     .command('impact')
     .allowExcessArguments(false)
-    .description('Analyze impact of changes to a file, symbol, or set of files')
-    .option('--file <path>', 'analyze impact of a single file')
+    .description('Analyze impact of changes to one or more files or a symbol')
+    .option(
+      '--file <path...>',
+      'analyze impact of one or more files (workspace:path, config-relative, or absolute)',
+    )
     .option('--symbol <name>', 'analyze impact of a symbol by name')
-    .option('--changes <files...>', 'detect impact of changes to multiple files')
     .addOption(
       new Option(
         '--direction <dir>',
@@ -130,30 +133,33 @@ export function registerGraphImpact(parent: Command): void {
     .addHelpText(
       'after',
       `
+File selectors:
+  --file packages/core/src/model.ts          config-relative path
+  --file core:src/model.ts                   workspace-prefixed canonical path
+  --file /abs/path/to/packages/core/model.ts absolute path
+  --file a.ts --file b.ts                    multiple files (aggregated impact)
+
 JSON/TOON output schema:
   --symbol (single match):
     { symbol: { id, name, kind, filePath, line, column, comment }, impact: ImpactResult }
   --symbol (multiple matches):
     Array<{ symbol: { id, name, kind, filePath, line, column, comment }, impact: ImpactResult }>
-  --file:
+  --file (single):
     FileImpactResult (ImpactResult + symbols: ImpactResult[])
-  --changes:
-    { changedFiles: string[], changedSymbols: SymbolNode[], affectedSymbols: SymbolNode[],
-      affectedFiles: string[], riskLevel: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL", summary: string }
+  --file (multiple):
+    AggregatedFileImpactResult
+  --symbol (no match):
+    { error: "not_found", symbol: string }
 
   ImpactResult: { target, directDependents, indirectDependents, transitiveDependents,
     riskLevel: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL", affectedFiles: string[],
     affectedSymbols: Array<{ id, name, filePath }>, affectedProcesses: string[] }
-
-  --symbol (no match):
-    { error: "not_found", symbol: string }
 `,
     )
     .action(
       async (opts: {
-        file?: string
+        file?: string[]
         symbol?: string
-        changes?: string[]
         direction: string
         depth: string
         config?: string
@@ -167,9 +173,9 @@ JSON/TOON output schema:
           cliError('--depth must be a positive integer', opts.format, 1)
         }
 
-        const selectorCount = (opts.symbol ? 1 : 0) + (opts.changes ? 1 : 0) + (opts.file ? 1 : 0)
+        const selectorCount = (opts.symbol ? 1 : 0) + (opts.file ? 1 : 0)
         if (selectorCount !== 1) {
-          cliError('provide exactly one of --file, --symbol, or --changes', opts.format, 1)
+          cliError('provide exactly one of --file or --symbol', opts.format, 1)
         }
         if (opts.config !== undefined && opts.path !== undefined) {
           cliError('--config and --path are mutually exclusive', opts.format, 1)
@@ -190,10 +196,15 @@ JSON/TOON output schema:
         await withProvider(config, opts.format, async (provider) => {
           if (opts.symbol) {
             await handleSymbolImpact(provider, opts.symbol, direction, maxDepth, fmt)
-          } else if (opts.changes) {
-            await handleChangesImpact(provider, opts.changes, maxDepth, fmt)
           } else if (opts.file) {
-            await handleFileImpact(provider, opts.file, direction, maxDepth, fmt)
+            await handleFilesImpact(
+              provider,
+              opts.file,
+              config.projectRoot,
+              direction,
+              maxDepth,
+              fmt,
+            )
           }
         })
       },
@@ -203,34 +214,138 @@ JSON/TOON output schema:
 /**
  * Handles file-level impact analysis.
  * @param provider - The code graph provider.
- * @param file - The file path to analyze.
+ * @param rawSelectors - The file selectors to resolve and analyze.
+ * @param projectRoot - The project root directory.
  * @param direction - The traversal direction.
  * @param maxDepth - Maximum traversal depth.
  * @param fmt - The output format.
  */
-async function handleFileImpact(
+async function handleFilesImpact(
   provider: Awaited<ReturnType<typeof createCodeGraphProvider>>,
-  file: string,
+  rawSelectors: string[],
+  projectRoot: string,
   direction: 'upstream' | 'downstream' | 'both',
   maxDepth: number,
   fmt: 'text' | 'json' | 'toon',
 ): Promise<void> {
-  const result = await provider.analyzeFileImpact(file, direction, maxDepth)
+  const resolved = await resolveImpactFileSelectors(provider, rawSelectors, projectRoot).catch(
+    (err: unknown) => {
+      cliError(err instanceof Error ? err.message : 'failed to resolve file selectors', fmt, 1)
+    },
+  )
+
+  if (resolved.length === 1) {
+    const file = resolved[0]!
+    const result = await provider.analyzeFileImpact(file.path, direction, maxDepth)
+
+    if (fmt === 'text') {
+      const lines = formatImpact(file.path, result, maxDepth)
+
+      if (result.symbols.length > 0) {
+        lines.push('')
+        lines.push('Changed symbols:')
+        for (const s of result.symbols) {
+          const segments = s.target.split(':')
+          const nameIdx = segments.length >= 4 ? segments.length - 3 : -1
+          const lineIdx = segments.length >= 2 ? segments.length - 2 : -1
+          const name = nameIdx >= 0 ? segments[nameIdx] : s.target
+          const line = lineIdx >= 0 ? segments[lineIdx] : ''
+          lines.push(`  ${name}:${line}`)
+        }
+      }
+
+      if (result.symbols.length > 0) {
+        lines.push('')
+        lines.push('Per-symbol breakdown:')
+        for (const s of result.symbols) {
+          lines.push(`  ${s.target}  risk=${s.riskLevel} direct=${String(s.directDependents)}`)
+        }
+      }
+      output(lines.join('\n'), 'text')
+    } else {
+      output(result, fmt)
+    }
+    return
+  }
+
+  const perFile = await Promise.all(
+    resolved.map(async (f) => {
+      const result = await provider.analyzeFileImpact(f.path, direction, maxDepth)
+      return { file: f, result }
+    }),
+  )
+
+  const allAffectedFiles = new Set<string>()
+  let directDependents = 0
+  let indirectDependents = 0
+  let transitiveDependents = 0
+  let overallRisk: string = 'LOW'
+  const riskOrder = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'] as const
+
+  for (const { result } of perFile) {
+    for (const f of result.affectedFiles) allAffectedFiles.add(f)
+    directDependents += result.directDependents
+    indirectDependents += result.indirectDependents
+    transitiveDependents += result.transitiveDependents
+    const ri = riskOrder.indexOf(result.riskLevel as (typeof riskOrder)[number])
+    const oi = riskOrder.indexOf(overallRisk as (typeof riskOrder)[number])
+    if (ri > oi) overallRisk = result.riskLevel
+  }
 
   if (fmt === 'text') {
-    const lines = formatImpact(file, result, maxDepth)
+    const label =
+      resolved.length <= 3
+        ? resolved.map((f) => f.path).join(', ')
+        : `${String(resolved.length)} files`
+    const lines = formatImpact(
+      label,
+      {
+        riskLevel: overallRisk,
+        directDependents,
+        indirectDependents,
+        transitiveDependents,
+        affectedFiles: [...allAffectedFiles],
+      },
+      maxDepth,
+    )
 
-    if (result.symbols.length > 0) {
+    const allChangedSymbols = perFile.flatMap(({ file, result }) =>
+      result.symbols.map((s) => ({ file: file.path, symbol: s })),
+    )
+    if (allChangedSymbols.length > 0) {
       lines.push('')
-      lines.push('Per-symbol breakdown:')
-      for (const s of result.symbols) {
-        lines.push(`  ${s.target}  risk=${s.riskLevel} direct=${String(s.directDependents)}`)
+      lines.push('Changed symbols:')
+      for (const { file, symbol: s } of allChangedSymbols) {
+        const segments = s.target.split(':')
+        const nameIdx = segments.length >= 4 ? segments.length - 3 : -1
+        const lineIdx = segments.length >= 2 ? segments.length - 2 : -1
+        const name = nameIdx >= 0 ? segments[nameIdx] : s.target
+        const line = lineIdx >= 0 ? segments[lineIdx] : ''
+        lines.push(`  ${file}: ${name}:${line}`)
       }
     }
 
+    lines.push('')
+    lines.push('Per-file breakdown:')
+    for (const { file, result } of perFile) {
+      lines.push(
+        `  ${file.path}  risk=${result.riskLevel} direct=${String(result.directDependents)} files=${String(result.affectedFiles.length)}`,
+      )
+    }
     output(lines.join('\n'), 'text')
   } else {
-    output(result, fmt)
+    output(
+      {
+        targets: resolved.map((f) => f.path),
+        riskLevel: overallRisk,
+        directDependents,
+        indirectDependents,
+        transitiveDependents,
+        affectedFiles: [...allAffectedFiles],
+        perFile: perFile.map(({ file, result }) => ({ file: file.path, result })),
+      },
+      fmt,
+    )
   }
 }
 
@@ -302,35 +417,5 @@ async function handleSymbolImpact(
       })),
     )
     output(results, fmt)
-  }
-}
-
-/**
- * Handles change detection across multiple files.
- * @param provider - The code graph provider.
- * @param files - The list of changed file paths.
- * @param maxDepth - Maximum traversal depth.
- * @param fmt - The output format.
- */
-async function handleChangesImpact(
-  provider: Awaited<ReturnType<typeof createCodeGraphProvider>>,
-  files: string[],
-  maxDepth: number,
-  fmt: 'text' | 'json' | 'toon',
-): Promise<void> {
-  const result = await provider.detectChanges(files, maxDepth)
-
-  if (fmt === 'text') {
-    output(result.summary, 'text')
-
-    if (result.affectedFiles.length > 0) {
-      const lines = ['', 'Affected files:']
-      for (const f of result.affectedFiles) {
-        lines.push(`  ${f}`)
-      }
-      output(lines.join('\n'), 'text')
-    }
-  } else {
-    output(result, fmt)
   }
 }

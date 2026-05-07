@@ -1,13 +1,15 @@
 # specd — entry point
 
-Read @../\_specd-shared/shared.md before doing anything.
-
 ## What this does
 
 Detects the current state of a change and tells you what to do next.
 This skill does NOT execute lifecycle phases — it routes to the right skill.
 
 ## Steps
+
+### 0. Bootstrap and load shared context
+
+You MUST read @../\_specd-shared/shared.md before doing anything, if you can't find it using Glob or Read tools, use Bash tools like `ls` and `cat` to find and read it. If you can't find it at all, tell the user: "Shared context not found. Please ensure shared.md is available." and stop.
 
 ### 1. Show project welcome
 

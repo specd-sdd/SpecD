@@ -37,6 +37,23 @@
 - **THEN** the staleness state SHALL be unknown
 - **AND** the system SHALL NOT treat it as stale
 
+### Requirement: Graph derivation freshness
+
+#### Scenario: Derivation mismatch despite matching VCS ref
+
+- **GIVEN** `lastIndexedRef` is `"abc1234"`
+- **AND** the current VCS ref is also `"abc1234"`
+- **AND** the persisted graph fingerprint differs from the fingerprint computed for the current config and code-graph package version
+- **WHEN** freshness is checked
+- **THEN** VCS freshness remains fresh
+- **AND** derivation freshness is reported as mismatched
+
+#### Scenario: Derivation fingerprint absent remains unknown
+
+- **GIVEN** the graph store has no persisted graph fingerprint
+- **WHEN** derivation freshness is checked
+- **THEN** the derivation-freshness state is unknown rather than silently treated as matching
+
 ### Requirement: Warn-not-block policy
 
 #### Scenario: Stale graph still returns results
@@ -45,6 +62,29 @@
 - **WHEN** `graph stats` is executed
 - **THEN** a staleness warning SHALL be displayed
 - **AND** the command SHALL still return results from the current graph data
+
+### Requirement: Derivation mismatch policy
+
+#### Scenario: Read command surfaces derivation mismatch without blocking
+
+- **GIVEN** the persisted graph fingerprint differs from the fingerprint computed for the current run
+- **WHEN** `graph stats` is executed
+- **THEN** the command returns graph results
+- **AND** the output explicitly indicates a derivation mismatch
+
+#### Scenario: graph index repairs derivation mismatch by full rebuild
+
+- **GIVEN** the persisted graph fingerprint differs from the fingerprint computed for the current run
+- **WHEN** `graph index` is executed
+- **THEN** the command either performs a full rebuild with a visible reason
+- **OR** fails with a clear message requiring an explicit force re-index
+
+#### Scenario: Derivation mismatch is independent from stale-by-VCS
+
+- **GIVEN** the current VCS ref differs from `lastIndexedRef`
+- **AND** the persisted graph fingerprint also differs from the fingerprint computed for the current run
+- **WHEN** graph freshness diagnostics are rendered
+- **THEN** the output can distinguish both stale-by-VCS and derivation-mismatch states
 
 ### Requirement: GraphStatistics extension
 

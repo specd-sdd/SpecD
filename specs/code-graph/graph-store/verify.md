@@ -23,16 +23,22 @@
 
 ### Requirement: Minimum graph semantics
 
-#### Scenario: Backend preserves the core node families
+#### Scenario: Backend preserves canonical and config-relative file identity
 
 - **WHEN** indexing and query features use the abstract `GraphStore`
-- **THEN** they can persist and retrieve file, symbol, and spec nodes without depending on backend-specific table or label names
+- **THEN** file nodes retain both canonical workspace-prefixed `path` values and `configRelativePath` values needed for CLI lookup
+- **AND** storage-agnostic consumers do not depend on backend-specific column or label names
 
-#### Scenario: COVERS belongs to the abstract graph model
+#### Scenario: Backend persists scoped-binding dependency relations
 
 - **WHEN** a backend advertises conformance to `GraphStore`
-- **THEN** its persisted relation model includes a `COVERS` family reserved for spec-to-code linkage
-- **AND** the relation family may remain unpopulated until higher-level indexing behavior starts emitting it
+- **THEN** its persisted relation model includes `CALLS`, `CONSTRUCTS`, and `USES_TYPE`
+- **AND** these relations remain queryable through the abstract dependency methods
+
+#### Scenario: Backend persists derivation metadata
+
+- **WHEN** a graph has been indexed successfully
+- **THEN** the store can persist and later return `lastIndexedAt`, `lastIndexedRef`, and the graph fingerprint
 
 ### Requirement: Store recreation
 
@@ -147,84 +153,55 @@
 
 ### Requirement: Query methods
 
-#### Scenario: getSpecDependencies returns outgoing DEPENDS_ON
+#### Scenario: findFilesByConfigRelativePath returns exact matches
 
-- **GIVEN** spec A depends on specs B and C
-- **WHEN** `getSpecDependencies(A.specId)` is called
-- **THEN** two `DEPENDS_ON` relations are returned with targets B and C
+- **GIVEN** indexed files `core:src/index.ts` with `configRelativePath` `packages/core/src/index.ts`
+- **AND** `cli:src/index.ts` with `configRelativePath` `packages/cli/src/index.ts`
+- **WHEN** `findFilesByConfigRelativePath('packages/core/src/index.ts')` is called
+- **THEN** only the `core:src/index.ts` file node is returned
 
-#### Scenario: getSpecDependents returns incoming DEPENDS_ON
+#### Scenario: findFilesByConfigRelativePath may return multiple canonical files
 
-- **GIVEN** specs A and B both depend on spec C
-- **WHEN** `getSpecDependents(C.specId)` is called
-- **THEN** two `DEPENDS_ON` relations are returned with sources A and B
+- **GIVEN** two indexed files from different workspaces share the same `configRelativePath`
+- **WHEN** `findFilesByConfigRelativePath('src/index.ts')` is called
+- **THEN** both canonical file nodes are returned so the caller can raise an ambiguity error
 
-#### Scenario: getCallers returns only incoming CALLS relations
+#### Scenario: getCallers includes USES_TYPE and CONSTRUCTS dependents
 
-- **GIVEN** symbol B has two callers (A and C) and one callee (D)
-- **WHEN** `getCallers(B.id)` is called
-- **THEN** two relations are returned with `source` being A and C
+- **GIVEN** symbol `TemplateExpander` has one incoming `CALLS`, one incoming `CONSTRUCTS`, and one incoming `USES_TYPE` relation
+- **WHEN** `getCallers(TemplateExpander.id)` is called
+- **THEN** all three dependency relations are returned
 
-#### Scenario: findSymbols filters by kind
+#### Scenario: getCallees includes USES_TYPE and CONSTRUCTS dependencies
 
-- **GIVEN** the store contains functions, classes, and methods
-- **WHEN** `findSymbols({ kind: SymbolKind.Class })` is called
-- **THEN** only class symbols are returned
-
-#### Scenario: findSymbols with name pattern
-
-- **GIVEN** symbols named `createUser`, `createOrder`, `deleteUser`
-- **WHEN** `findSymbols({ name: 'create*' })` is called
-- **THEN** `createUser` and `createOrder` are returned
-
-#### Scenario: findSymbols filters by comment text
-
-- **GIVEN** symbols with comments containing "validates user input" and "computes hash"
-- **WHEN** `findSymbols({ comment: 'validates' })` is called
-- **THEN** only the symbol with "validates user input" in its comment is returned
-
-#### Scenario: getExtenders returns incoming EXTENDS relations
-
-- **GIVEN** type B and type C both extend type A
-- **WHEN** `getExtenders(A.id)` is called
-- **THEN** `EXTENDS` relations are returned with sources B and C
-
-#### Scenario: getImplementors returns incoming IMPLEMENTS relations
-
-- **GIVEN** types B and C both implement contract A
-- **WHEN** `getImplementors(A.id)` is called
-- **THEN** `IMPLEMENTS` relations are returned with sources B and C
-
-#### Scenario: getOverriders returns incoming OVERRIDES relations
-
-- **GIVEN** methods B and C both override method A
-- **WHEN** `getOverriders(A.id)` is called
-- **THEN** `OVERRIDES` relations are returned with sources B and C
+- **GIVEN** symbol `createKernel` has outgoing `CALLS`, `CONSTRUCTS`, and `USES_TYPE` relations
+- **WHEN** `getCallees(createKernel.id)` is called
+- **THEN** all three dependency relations are returned
 
 ### Requirement: Graph statistics
 
 #### Scenario: Statistics include all expected fields
 
 - **WHEN** `getStatistics()` is called on a populated store
-- **THEN** the result SHALL include `fileCount`, `symbolCount`, `specCount`, `relationCounts`, `languages`, `lastIndexedAt`, and `lastIndexedRef`
+- **THEN** the result includes `fileCount`, `symbolCount`, `specCount`, `relationCounts`, `languages`, `lastIndexedAt`, `lastIndexedRef`, and `graphFingerprint`
 
-#### Scenario: lastIndexedRef defaults to null
+#### Scenario: graphFingerprint defaults to null
 
-- **GIVEN** no VCS ref has been stored
+- **GIVEN** no derivation fingerprint has been stored yet
 - **WHEN** `getStatistics()` is called
-- **THEN** `lastIndexedRef` SHALL be `null`
+- **THEN** `graphFingerprint` is `null`
 
-#### Scenario: lastIndexedRef reflects stored value
+#### Scenario: Statistics include scoped-binding relation counts
 
-- **GIVEN** the `lastIndexedRef` meta key has been set to `"abc1234"`
+- **GIVEN** the store contains persisted `CONSTRUCTS` and `USES_TYPE` relations
 - **WHEN** `getStatistics()` is called
-- **THEN** `lastIndexedRef` SHALL be `"abc1234"`
+- **THEN** `relationCounts` includes counts for both relation types
 
-#### Scenario: Statistics include hierarchy relation counts
+#### Scenario: graphFingerprint reflects stored value
 
-- **GIVEN** the store contains persisted `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES` relations
+- **GIVEN** the graph fingerprint meta key has been set to `code-graph@0.2.0:workspaces:abc123`
 - **WHEN** `getStatistics()` is called
-- **THEN** `relationCounts` includes counts for all three hierarchy relation types
+- **THEN** `graphFingerprint` is `code-graph@0.2.0:workspaces:abc123`
 
 ### Requirement: Bulk operations
 

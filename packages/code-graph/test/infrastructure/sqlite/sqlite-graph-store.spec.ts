@@ -44,6 +44,7 @@ describe('SQLiteGraphStore', () => {
 
     const file = createFileNode({
       path: 'src/types.ts',
+      configRelativePath: '',
       language: 'typescript',
       contentHash: 'sha256:abc',
       workspace: '/project',
@@ -137,6 +138,7 @@ describe('SQLiteGraphStore', () => {
 
     const file = createFileNode({
       path: 'src/kernel.ts',
+      configRelativePath: '',
       language: 'typescript',
       contentHash: 'sha256:kernel',
       workspace: '/project',
@@ -204,7 +206,7 @@ describe('SQLiteGraphStore', () => {
   })
 
   it('declares sqlite schema version and fts-backed ddl', () => {
-    expect(SQLITE_SCHEMA_VERSION).toBe(1)
+    expect(SQLITE_SCHEMA_VERSION).toBe(2)
     expect(SQLITE_SCHEMA_DDL).toContain('CREATE TABLE IF NOT EXISTS files')
     expect(SQLITE_SCHEMA_DDL).toContain('CREATE VIRTUAL TABLE IF NOT EXISTS symbol_fts')
     expect(SQLITE_SCHEMA_DDL).toContain('CREATE VIRTUAL TABLE IF NOT EXISTS spec_fts')
@@ -218,12 +220,14 @@ describe('SQLiteGraphStore', () => {
 
     const fileOne = createFileNode({
       path: 'src/alpha.ts',
+      configRelativePath: '',
       language: 'typescript',
       contentHash: 'sha256:alpha',
       workspace: '/project',
     })
     const fileTwo = createFileNode({
       path: 'src/beta.ts',
+      configRelativePath: '',
       language: 'typescript',
       contentHash: 'sha256:beta',
       workspace: '/project',
@@ -275,6 +279,7 @@ describe('SQLiteGraphStore', () => {
 
     const sourceFile = createFileNode({
       path: 'src/consumer.ts',
+      configRelativePath: '',
       language: 'typescript',
       contentHash: 'sha256:consumer',
       workspace: '/project',

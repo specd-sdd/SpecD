@@ -4,30 +4,36 @@
 
 ### Requirement: File node
 
-#### Scenario: FileNode equality by path
+#### Scenario: FileNode equality still uses canonical path
 
-- **GIVEN** two `FileNode` values with the same `path` but different `contentHash`
+- **GIVEN** two `FileNode` values with the same canonical `path` but different `contentHash` and `configRelativePath`
 - **WHEN** equality is checked
-- **THEN** they are considered equal (since path includes the workspace name prefix and is globally unique)
+- **THEN** they are considered equal because `path` remains the canonical graph identity
 
 #### Scenario: FileNode path normalization
 
-- **GIVEN** a file at OS path `src\domain\entities\change.ts`
+- **GIVEN** a file discovered under workspace `core` at OS path `src\\domain\\entities\\change.ts`
 - **WHEN** a `FileNode` is created
-- **THEN** `path` is stored as `src/domain/entities/change.ts` (forward-slash-normalized)
+- **THEN** `path` is stored as `core:src/domain/entities/change.ts`
 
-#### Scenario: FileNode workspace is a name string
+#### Scenario: FileNode configRelativePath is repository-style
 
-- **GIVEN** a file discovered in workspace `core`
+- **GIVEN** the active `specd.yaml` lives at `/project/specd.yaml`
+- **AND** workspace `core` has codeRoot `/project/packages/core`
+- **AND** the discovered file is `/project/packages/core/src/index.ts`
 - **WHEN** a `FileNode` is created
-- **THEN** `workspace` is `'core'` (the workspace name, not an absolute path)
+- **THEN** `path` is `core:src/index.ts`
+- **AND** `configRelativePath` is `packages/core/src/index.ts`
+- **AND** `workspace` is `core`
 
-#### Scenario: FileNode path includes workspace prefix
+#### Scenario: FileNode configRelativePath may include parent segments
 
-- **GIVEN** a file `src/index.ts` discovered in workspace `core`
-- **WHEN** a `FileNode` is created by the indexer
-- **THEN** `path` is `'core/src/index.ts'`
-- **AND** `workspace` is `'core'`
+- **GIVEN** the active `specd.yaml` lives at `/project/apps/web/specd.yaml`
+- **AND** workspace `core` has codeRoot `/project/packages/core`
+- **AND** the discovered file is `/project/packages/core/src/index.ts`
+- **WHEN** a `FileNode` is created
+- **THEN** `configRelativePath` is `../../packages/core/src/index.ts`
+- **AND** it does not replace the canonical `path`
 
 ### Requirement: Spec node
 
@@ -59,9 +65,9 @@
 
 #### Scenario: Deterministic id generation
 
-- **GIVEN** a symbol with `filePath: 'core/src/utils.ts'`, `kind: function`, `name: 'hash'`, `line: 10`
+- **GIVEN** a symbol with `filePath: 'core/src/utils.ts'`, `kind: function`, `name: 'hash'`, `line: 10`, `column: 0`
 - **WHEN** the id is computed
-- **THEN** it produces `'core/src/utils.ts:function:hash:10'` every time for these inputs
+- **THEN** it produces `'core/src/utils.ts:function:hash:10:0'` every time for these inputs
 
 #### Scenario: Different line produces different id
 
@@ -71,9 +77,9 @@
 
 #### Scenario: Id includes workspace-prefixed path
 
-- **GIVEN** a symbol in file `core/src/index.ts` (workspace-prefixed path)
+- **GIVEN** a symbol in file `core:src/index.ts` (workspace-prefixed path)
 - **WHEN** the id is computed
-- **THEN** the id starts with `core/src/index.ts:`
+- **THEN** the id starts with `core:src/index.ts:`
 - **AND** the id is globally unique across workspaces
 
 #### Scenario: Comment extracted from JSDoc

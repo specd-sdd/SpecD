@@ -344,7 +344,7 @@ Use the code graph to assess the downstream impact of the planned implementation
 This surfaces hidden risks early, when the design can still be adjusted.
 
 ```bash
-specd graph impact --changes <workspace:path1> <workspace:path2> ... --format json
+specd graph impact --file <workspace:path1> --file <workspace:path2> ... --format json
 ```
 
 File paths must use the `{workspace}:{relativePath}` format (e.g. `core:src/auth.ts`,

@@ -18,11 +18,11 @@ Every `GraphStore` implementation SHALL support the code-graph package's minimum
 
 At minimum, the abstract store contract MUST support:
 
-- file nodes carrying the `FileNode` data needed by indexing, traversal, and CLI queries
+- file nodes carrying the `FileNode` data needed by indexing, traversal, and CLI queries, including both canonical workspace-prefixed paths and config-relative file paths
 - symbol nodes carrying the `SymbolNode` data needed by indexing, traversal, and CLI queries
 - spec nodes carrying the `SpecNode` data needed by spec indexing and search
-- persisted relations for the relation families used by the package: `IMPORTS`, `DEFINES`, `CALLS`, `EXPORTS`, `DEPENDS_ON`, `COVERS`, `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES`
-- store-level metadata sufficient to satisfy abstract statistics and staleness-facing fields such as `lastIndexedAt` and `lastIndexedRef`
+- persisted relations for the relation families used by the package: `IMPORTS`, `DEFINES`, `CALLS`, `CONSTRUCTS`, `USES_TYPE`, `EXPORTS`, `DEPENDS_ON`, `COVERS`, `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES`
+- store-level metadata sufficient to satisfy abstract statistics and derivation-freshness fields such as `lastIndexedAt`, `lastIndexedRef`, and the persisted graph fingerprint
 
 `COVERS` is the abstract relation family reserved for linking specs to code artifacts. A backend MAY leave it unpopulated until the package introduces the corresponding indexing and query behavior, but the relation family itself belongs to the abstract graph model rather than to any one backend.
 
@@ -64,10 +64,11 @@ Unlike `upsertFile` which replaces all data for a file, `addRelations` is purely
 
 `GraphStore` SHALL provide the following query methods:
 
-- **`getFile(path: string): Promise<FileNode | undefined>`** — retrieve a file node by path
+- **`getFile(path: string): Promise<FileNode | undefined>`** — retrieve a file node by canonical workspace-prefixed path
+- **`findFilesByConfigRelativePath(path: string): Promise<FileNode[]>`** — retrieve all file nodes whose `configRelativePath` exactly matches the given normalized config-relative path
 - **`getSymbol(id: string): Promise<SymbolNode | undefined>`** — retrieve a symbol by id
-- **`getCallers(symbolId: string): Promise<Relation[]>`** — all `CALLS` relations where `target` matches
-- **`getCallees(symbolId: string): Promise<Relation[]>`** — all `CALLS` relations where `source` matches
+- **`getCallers(symbolId: string): Promise<Relation[]>`** — all incoming symbol dependency relations where `target` matches. At minimum this includes `CALLS`, `CONSTRUCTS`, and `USES_TYPE`.
+- **`getCallees(symbolId: string): Promise<Relation[]>`** — all outgoing symbol dependency relations where `source` matches. At minimum this includes `CALLS`, `CONSTRUCTS`, and `USES_TYPE`.
 - **`getImporters(filePath: string): Promise<Relation[]>`** — all `IMPORTS` relations where `target` matches
 - **`getImportees(filePath: string): Promise<Relation[]>`** — all `IMPORTS` relations where `source` matches
 - **`getExtenders(symbolId: string): Promise<Relation[]>`** — all `EXTENDS` relations where `target` matches
@@ -81,7 +82,7 @@ Unlike `upsertFile` which replaces all data for a file, `addRelations` is purely
 - **`getSpecDependents(specId: string): Promise<Relation[]>`** — all `DEPENDS_ON` relations where `target` matches
 - **`findSymbols(query: SymbolQuery): Promise<SymbolNode[]>`** — search symbols by name pattern, kind, or file path
 
-`SymbolQuery` is a value object with optional fields: `name` (glob or regex), `kind` (SymbolKind), `filePath` (exact match or glob), `comment` (substring match for full-text search within symbol comments), `caseSensitive` (boolean, defaults to `false` — when `false`, `name` and `comment` matching is case insensitive).
+`SymbolQuery` is a value object with optional fields: `name` (glob or regex), `kinds` (array of `SymbolKind` for filtering by one or more kinds), `filePath` (exact match or glob), `comment` (substring match for full-text search within symbol comments), `caseSensitive` (boolean, defaults to `false` — when `false`, `name` and `comment` matching is case insensitive).
 
 ### Requirement: Graph statistics
 
@@ -90,10 +91,11 @@ Unlike `upsertFile` which replaces all data for a file, `addRelations` is purely
 - **`fileCount`** — total number of `FileNode` entries
 - **`symbolCount`** — total number of `SymbolNode` entries
 - **`specCount`** — total number of `SpecNode` entries
-- **`relationCounts`** — a `Record<RelationType, number>` with counts per relation type, including `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES`
+- **`relationCounts`** — a `Record<RelationType, number>` with counts per relation type, including `CONSTRUCTS`, `USES_TYPE`, `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES`
 - **`languages`** — array of distinct language identifiers across all files
 - **`lastIndexedAt`** — ISO 8601 timestamp of the most recent `upsertFile` call
 - **`lastIndexedRef`** — VCS ref (commit hash, changeset ID) at the time of the last index, or `null` if no ref was stored. This value is persisted as a meta key alongside `lastIndexedAt` and is read-only from the statistics interface.
+- **`graphFingerprint`** — the persisted graph derivation fingerprint for the current store contents, or `null` if no fingerprint has been recorded yet
 
 ### Requirement: Spec upsert and removal
 

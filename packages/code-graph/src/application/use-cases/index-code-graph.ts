@@ -1,5 +1,5 @@
 import { readFileSync, writeFileSync, statSync, rmSync, existsSync, mkdirSync } from 'node:fs'
-import { join } from 'node:path'
+import { join, relative } from 'node:path'
 import { type GraphStore } from '../../domain/ports/graph-store.js'
 import { type FileNode, createFileNode } from '../../domain/value-objects/file-node.js'
 import { type SymbolNode } from '../../domain/value-objects/symbol-node.js'
@@ -24,6 +24,12 @@ import {
 } from '../../domain/services/scoped-binding-environment.js'
 import { discoverFiles } from './discover-files.js'
 import { computeContentHash } from './compute-content-hash.js'
+import {
+  computeWorkspaceFingerprint,
+  parseFingerprintMap,
+  serializeFingerprintMap,
+  detectFingerprintMismatch,
+} from './_shared/compute-graph-fingerprint.js'
 
 const DEFAULT_CHUNK_BYTES = 20 * 1024 * 1024
 
@@ -326,6 +332,7 @@ export class IndexCodeGraph {
       const allDiscoveredPaths: string[] = []
       const fileHashes = new Map<string, string>()
       const absolutePaths = new Map<string, string>() // prefixed path -> absolute path
+      const configRelativePaths = new Map<string, string>() // prefixed path -> configRelativePath
 
       for (const ws of options.workspaces) {
         wsBreakdowns.set(ws.name, {
@@ -352,53 +359,97 @@ export class IndexCodeGraph {
         for (const relPath of relFiles) {
           const prefixedPath = `${ws.name}:${relPath}`
           allDiscoveredPaths.push(prefixedPath)
-          absolutePaths.set(prefixedPath, join(ws.codeRoot, relPath))
+          const absPath = join(ws.codeRoot, relPath)
+          absolutePaths.set(prefixedPath, absPath)
+          const crp = relative(options.projectRoot, absPath).replaceAll('\\', '/')
+          configRelativePaths.set(prefixedPath, crp.startsWith('./') ? crp.slice(2) : crp)
         }
       }
-      // Hash all files
-      progress(2, 'Hashing files', `${String(allDiscoveredPaths.length)} files`)
-      for (let i = 0; i < allDiscoveredPaths.length; i++) {
-        const prefixedPath = allDiscoveredPaths[i]!
-        const absPath = absolutePaths.get(prefixedPath)!
-        try {
-          fileHashes.set(prefixedPath, computeContentHash(readFileSync(absPath, 'utf-8')))
-        } catch (err) {
-          errors.push({ filePath: prefixedPath, message: String(err) })
-        }
-        if (i % 200 === 0) {
-          progress(
-            2 + Math.round((i / allDiscoveredPaths.length) * 3),
-            'Hashing files',
-            `${String(i)}/${String(allDiscoveredPaths.length)}`,
-          )
+
+      // ── Fingerprint comparison ──
+      const version = options.codeGraphVersion ?? '0.0.0'
+      const currentFingerprintMap = new Map<string, string>()
+      for (const ws of options.workspaces) {
+        currentFingerprintMap.set(ws.name, computeWorkspaceFingerprint(version, ws))
+      }
+      const stats = await this.store.getStatistics()
+      const storedFingerprintMap = parseFingerprintMap(stats.graphFingerprint)
+      const fingerprintMismatch = detectFingerprintMismatch(
+        storedFingerprintMap,
+        version,
+        options.workspaces,
+      )
+
+      // Merge stored fingerprints for workspaces NOT being indexed into the current map
+      for (const [wsName, fp] of storedFingerprintMap) {
+        if (!currentFingerprintMap.has(wsName)) {
+          currentFingerprintMap.set(wsName, fp)
         }
       }
-      // ── Diff (5-6%) ──
-      progress(5, 'Computing diff')
-      const discoveredSet = new Set(allDiscoveredPaths)
+
+      let fullRebuildReason: string | null = null
       const newFiles: string[] = []
       const changedFiles: string[] = []
       const deletedFiles: string[] = []
-
       const skippedFiles: string[] = []
-      for (const prefixedPath of allDiscoveredPaths) {
-        const hash = fileHashes.get(prefixedPath)
-        const existing = existingMap.get(prefixedPath)
-        if (!existing) {
-          newFiles.push(prefixedPath)
-        } else if (hash && existing.contentHash !== hash) {
-          changedFiles.push(prefixedPath)
-        } else if (hash && existing.contentHash === hash) {
-          skippedFiles.push(prefixedPath)
-        }
-        // Files with no hash (hash error) are neither new, changed, nor skipped
-      }
-
-      // Only consider files from the workspaces being indexed as candidates for deletion
       const indexedWorkspaceNames = new Set(options.workspaces.map((ws) => ws.name))
-      for (const existing of existingFiles) {
-        if (!discoveredSet.has(existing.path) && indexedWorkspaceNames.has(existing.workspace)) {
-          deletedFiles.push(existing.path)
+
+      if (fingerprintMismatch) {
+        fullRebuildReason =
+          'Graph derivation fingerprint mismatch — code-graph version or workspace configuration changed since last index'
+        progress(5, 'Fingerprint mismatch', 'Forcing re-index of mismatched workspaces')
+        // Remove all files from mismatched workspaces so they get re-processed
+        // but do NOT recreate the store — other workspaces are unaffected
+        const existingFiles = await this.store.getAllFiles()
+        for (const ef of existingFiles) {
+          const storedFp = storedFingerprintMap.get(ef.workspace)
+          const currentFp = currentFingerprintMap.get(ef.workspace)
+          if (storedFp !== undefined && currentFp !== undefined && storedFp !== currentFp) {
+            await this.store.removeFile(ef.path)
+          }
+        }
+        // Treat all discovered files as new — no content hash skip for mismatched workspaces
+        newFiles.push(...allDiscoveredPaths)
+      } else {
+        // Hash all files
+        progress(2, 'Hashing files', `${String(allDiscoveredPaths.length)} files`)
+        for (let i = 0; i < allDiscoveredPaths.length; i++) {
+          const prefixedPath = allDiscoveredPaths[i]!
+          const absPath = absolutePaths.get(prefixedPath)!
+          try {
+            fileHashes.set(prefixedPath, computeContentHash(readFileSync(absPath, 'utf-8')))
+          } catch (err) {
+            errors.push({ filePath: prefixedPath, message: String(err) })
+          }
+          if (i % 200 === 0) {
+            progress(
+              2 + Math.round((i / allDiscoveredPaths.length) * 3),
+              'Hashing files',
+              `${String(i)}/${String(allDiscoveredPaths.length)}`,
+            )
+          }
+        }
+        // ── Diff (5-6%) ──
+        progress(5, 'Computing diff')
+        const discoveredSet = new Set(allDiscoveredPaths)
+
+        for (const prefixedPath of allDiscoveredPaths) {
+          const hash = fileHashes.get(prefixedPath)
+          const existing = existingMap.get(prefixedPath)
+          if (!existing) {
+            newFiles.push(prefixedPath)
+          } else if (hash && existing.contentHash !== hash) {
+            changedFiles.push(prefixedPath)
+          } else if (hash && existing.contentHash === hash) {
+            skippedFiles.push(prefixedPath)
+          }
+        }
+
+        // Only consider files from the workspaces being indexed as candidates for deletion
+        for (const existing of existingFiles) {
+          if (!discoveredSet.has(existing.path) && indexedWorkspaceNames.has(existing.workspace)) {
+            deletedFiles.push(existing.path)
+          }
         }
       }
 
@@ -514,6 +565,7 @@ export class IndexCodeGraph {
             chunkFiles.push(
               createFileNode({
                 path: prefixedPath,
+                configRelativePath: configRelativePaths.get(prefixedPath) ?? '',
                 language,
                 contentHash: hash,
                 workspace: wsName,
@@ -757,6 +809,7 @@ export class IndexCodeGraph {
         'Bulk loading',
         `${String(stagedFileCount)} files, ${String(stagedSymbolCount)} symbols, ${String(stagedRelationCount + specRelations.length)} relations`,
       )
+      const serializedFingerprintMap = serializeFingerprintMap(currentFingerprintMap)
       if (
         stagedFileCount > 0 ||
         allSpecs.length > 0 ||
@@ -798,7 +851,7 @@ export class IndexCodeGraph {
             onProgress: onBulkStep,
           })
         }
-        if (specRelations.length > 0 || options.vcsRef !== undefined) {
+        if (specRelations.length > 0 || options.vcsRef !== undefined || serializedFingerprintMap) {
           await this.store.bulkLoad({
             files: [],
             symbols: [],
@@ -806,6 +859,7 @@ export class IndexCodeGraph {
             relations: specRelations,
             onProgress: onBulkStep,
             ...(options.vcsRef !== undefined ? { vcsRef: options.vcsRef } : {}),
+            graphFingerprint: serializedFingerprintMap,
           })
         }
       }
@@ -849,6 +903,8 @@ export class IndexCodeGraph {
         duration: Date.now() - start,
         workspaces,
         vcsRef: options.vcsRef ?? null,
+        graphFingerprint: serializedFingerprintMap,
+        fullRebuildReason,
       }
     } finally {
       rmSync(stageDir, { recursive: true, force: true })

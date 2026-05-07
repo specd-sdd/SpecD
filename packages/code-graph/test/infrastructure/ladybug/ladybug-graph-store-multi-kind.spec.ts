@@ -24,6 +24,7 @@ describe('LadybugGraphStore searchSymbols multi-kind', () => {
 
     const file = createFileNode({
       path: 'ws:src/main.ts',
+      configRelativePath: '',
       language: 'typescript',
       contentHash: 'sha256:abc',
       workspace: 'ws',

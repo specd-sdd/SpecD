@@ -26,11 +26,33 @@ A graph is **fresh** when:
 
 When `lastIndexedRef` is `null`, the staleness state is **unknown** — no comparison is possible. The system SHALL NOT treat unknown as stale.
 
+### Requirement: Graph derivation freshness
+
+Graph freshness SHALL distinguish VCS freshness from graph-derivation freshness.
+
+A graph has a **derivation mismatch** when the persisted graph fingerprint differs from the fingerprint computed for the current run configuration. For this iteration, the fingerprint SHALL be derived from:
+
+- the effective `@specd/code-graph` package version loaded by the running CLI process
+- a canonical hash of the resolved workspace objects derived from the active `specd.yaml`
+
+A derivation mismatch means the graph was built under a different code-graph version or workspace layout, even if the current VCS ref is unchanged. This state is distinct from ordinary stale-by-VCS results and SHALL be surfaced explicitly in diagnostics.
+
 ### Requirement: Warn-not-block policy
 
 Commands that read from the graph (e.g. `graph stats`, `graph search`, `graph impact`, `graph hotspots`) SHALL **warn** when the graph is stale but SHALL NOT block execution. The command SHALL always return results based on the current (possibly stale) graph data.
 
 This is a deliberate design choice: stale results are better than no results, and the user can decide whether to re-index.
+
+### Requirement: Derivation mismatch policy
+
+Commands that read from the graph (e.g. `graph stats`, `graph search`, `graph impact`, `graph hotspots`) SHALL surface derivation-mismatch metadata when it is known, but they SHALL NOT silently reinterpret a mismatched graph as fresh.
+
+`graph index` is the repair path for derivation mismatch. When indexing detects that the persisted graph fingerprint differs from the current fingerprint, it SHALL either:
+
+- recreate the active graph and perform a full rebuild while printing a visible reason, or
+- fail with a clear message that a force re-index is required because the stored graph was built with a different code-graph version or workspace configuration
+
+This policy is independent of VCS freshness. A graph MAY be VCS-fresh and still require rebuild because its derivation fingerprint no longer matches.
 
 ### Requirement: GraphStatistics extension
 
@@ -38,19 +60,17 @@ This is a deliberate design choice: stale results are better than no results, an
 
 ### Requirement: Staleness in graph stats output
 
-The `graph stats` command SHALL resolve the current VCS ref and compare it against `lastIndexedRef`:
+**Text output**:
 
-- **Text output**: If stale, append a warning line after `Last indexed`:
+- After `Last indexed`, when stale, append: `⚠ Graph is stale (indexed at <7-char-ref>, current: <7-char-ref>)`
+- When `lastIndexedRef` is `null`, no staleness line SHALL be shown
+- When a derivation fingerprint mismatch is detected, append: `⚠ Derivation fingerprint mismatch — graph built with different code-graph version or workspace configuration`
 
-  ```
-  ⚠ Graph is stale (indexed at <short-ref>, current: <short-ref>)
-  ```
+**JSON/TOON output**:
 
-  Where `<short-ref>` is the first 7 characters of the ref. If `lastIndexedRef` is `null`, no staleness line is shown.
-
-- **JSON/TOON output**: Add two fields to the output object:
-  - `stale: boolean | null` — `true` if stale, `false` if fresh, `null` if unknown
-  - `currentRef: string | null` — the current VCS ref, or `null` if unavailable
+- `stale` (`boolean | null`) — `true` if stale, `false` if fresh, `null` if unknown
+- `currentRef` (`string | null`) — the current VCS ref, or `null` if unavailable
+- `fingerprintMismatch` (`boolean | null`) — `true` if derivation fingerprint differs, `false` if it matches, `null` if no stored fingerprint exists
 
 ## Constraints
 

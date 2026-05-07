@@ -60,6 +60,7 @@ export class LadybugGraphStore extends GraphStore {
   private _isOpen = false
   private _lastIndexedAt: string | undefined
   private _lastIndexedRef: string | null = null
+  private _graphFingerprint: string | null = null
 
   /**
    * Asserts the store is open and the connection is available.
@@ -129,6 +130,14 @@ export class LadybugGraphStore extends GraphStore {
     )
     if (refRows.length > 0 && refRows[0]) {
       this._lastIndexedRef = refRows[0]['v'] as string
+    }
+
+    const fpRows = await exec(
+      this.conn,
+      `MATCH (m:Meta {key: 'graphFingerprint'}) RETURN m.value AS v`,
+    )
+    if (fpRows.length > 0 && fpRows[0]) {
+      this._graphFingerprint = fpRows[0]['v'] as string
     }
 
     this._isOpen = true
@@ -257,12 +266,13 @@ export class LadybugGraphStore extends GraphStore {
       await this.deleteFileLocalState(conn, file.path)
 
       const escapedPath = this.escape(file.path)
+      const escapedConfigRel = this.escape(file.configRelativePath)
       const escapedLang = this.escape(file.language)
       const escapedHash = this.escape(file.contentHash)
       const escapedWorkspace = this.escape(file.workspace)
 
       await conn.query(
-        `CREATE (f:File {path: '${escapedPath}', language: '${escapedLang}', contentHash: '${escapedHash}', workspace: '${escapedWorkspace}'})`,
+        `CREATE (f:File {path: '${escapedPath}', configRelativePath: '${escapedConfigRel}', language: '${escapedLang}', contentHash: '${escapedHash}', workspace: '${escapedWorkspace}'})`,
       )
 
       for (const symbol of symbols) {
@@ -365,6 +375,7 @@ export class LadybugGraphStore extends GraphStore {
    * @param data.relations - Relations to load.
    * @param data.onProgress - Optional progress callback.
    * @param data.vcsRef - Optional VCS ref to persist as `lastIndexedRef`.
+   * @param data.graphFingerprint - Optional fingerprint for derivation mismatch detection.
    */
   async bulkLoad(data: {
     files: FileNode[]
@@ -373,6 +384,7 @@ export class LadybugGraphStore extends GraphStore {
     relations: Relation[]
     onProgress?: (step: string) => void
     vcsRef?: string
+    graphFingerprint?: string
   }): Promise<void> {
     this.ensureOpen()
     const conn = this.conn!
@@ -393,10 +405,10 @@ export class LadybugGraphStore extends GraphStore {
           const batch = data.files.slice(i, i + batchSize)
           const fileCsv = prefix + `files-${i}.csv`
           csvFiles.push(fileCsv)
-          const fileRows = ['path,language,contentHash,workspace']
+          const fileRows = ['path,configRelativePath,language,contentHash,workspace']
           for (const f of batch) {
             fileRows.push(
-              `${csvEscape(f.path)},${csvEscape(f.language)},${csvEscape(f.contentHash)},${csvEscape(f.workspace)}`,
+              `${csvEscape(f.path)},${csvEscape(f.configRelativePath)},${csvEscape(f.language)},${csvEscape(f.contentHash)},${csvEscape(f.workspace)}`,
             )
           }
           writeFileSync(fileCsv, fileRows.join('\n') + '\n')
@@ -476,10 +488,16 @@ export class LadybugGraphStore extends GraphStore {
       if (data.vcsRef !== undefined) {
         await this.updateMeta(conn, 'lastIndexedRef', data.vcsRef)
       }
+      if (data.graphFingerprint !== undefined) {
+        await this.updateMeta(conn, 'graphFingerprint', data.graphFingerprint)
+      }
       await conn.query('COMMIT')
       this._lastIndexedAt = now
       if (data.vcsRef !== undefined) {
         this._lastIndexedRef = data.vcsRef
+      }
+      if (data.graphFingerprint !== undefined) {
+        this._graphFingerprint = data.graphFingerprint
       }
     } catch (err) {
       await conn.query('ROLLBACK').catch(() => {})
@@ -546,17 +564,39 @@ export class LadybugGraphStore extends GraphStore {
     this.ensureOpen()
     const rows = await exec(
       this.conn!,
-      `MATCH (f:File {path: '${this.escape(path)}'}) RETURN f.path AS path, f.language AS language, f.contentHash AS contentHash, f.workspace AS workspace`,
+      `MATCH (f:File {path: '${this.escape(path)}'}) RETURN f.path AS path, f.configRelativePath AS configRelativePath, f.language AS language, f.contentHash AS contentHash, f.workspace AS workspace`,
     )
     if (rows.length === 0 || !rows[0]) return undefined
     const row = rows[0]
     return {
       path: row['path'] as string,
+      configRelativePath: (row['configRelativePath'] as string) ?? '',
       language: row['language'] as string,
       contentHash: row['contentHash'] as string,
       workspace: row['workspace'] as string,
       embedding: undefined,
     }
+  }
+
+  /**
+   * Finds files by their config-relative path.
+   * @param configRelativePath - The config-relative path to search for.
+   * @returns Matching file nodes.
+   */
+  async findFilesByConfigRelativePath(configRelativePath: string): Promise<FileNode[]> {
+    this.ensureOpen()
+    const rows = await exec(
+      this.conn!,
+      `MATCH (f:File {configRelativePath: '${this.escape(configRelativePath)}'}) RETURN f.path AS path, f.configRelativePath AS configRelativePath, f.language AS language, f.contentHash AS contentHash, f.workspace AS workspace`,
+    )
+    return rows.map((row) => ({
+      path: row['path'] as string,
+      configRelativePath: (row['configRelativePath'] as string) ?? '',
+      language: row['language'] as string,
+      contentHash: row['contentHash'] as string,
+      workspace: row['workspace'] as string,
+      embedding: undefined,
+    }))
   }
 
   /**
@@ -892,6 +932,7 @@ export class LadybugGraphStore extends GraphStore {
       languages,
       lastIndexedAt: this._lastIndexedAt,
       lastIndexedRef: this._lastIndexedRef,
+      graphFingerprint: this._graphFingerprint,
     }
   }
 
@@ -903,10 +944,11 @@ export class LadybugGraphStore extends GraphStore {
     this.ensureOpen()
     const rows = await exec(
       this.conn!,
-      'MATCH (f:File) RETURN f.path AS path, f.language AS language, f.contentHash AS contentHash, f.workspace AS workspace',
+      'MATCH (f:File) RETURN f.path AS path, f.configRelativePath AS configRelativePath, f.language AS language, f.contentHash AS contentHash, f.workspace AS workspace',
     )
     return rows.map((r) => ({
       path: r['path'] as string,
+      configRelativePath: (r['configRelativePath'] as string) ?? '',
       language: r['language'] as string,
       contentHash: r['contentHash'] as string,
       workspace: r['workspace'] as string,
@@ -1121,6 +1163,7 @@ export class LadybugGraphStore extends GraphStore {
     await this.rebuildFtsIndexes()
     this._lastIndexedAt = undefined
     this._lastIndexedRef = null
+    this._graphFingerprint = null
   }
 
   /**
@@ -1134,6 +1177,7 @@ export class LadybugGraphStore extends GraphStore {
     rmSync(this.graphDir, { recursive: true, force: true })
     this._lastIndexedAt = undefined
     this._lastIndexedRef = null
+    this._graphFingerprint = null
   }
 
   /**

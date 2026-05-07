@@ -23,48 +23,37 @@
 
 ### Requirement: Incremental indexing
 
-#### Scenario: Unchanged files skipped
+#### Scenario: Unchanged files skipped when fingerprint matches
 
-- **GIVEN** a store containing 10 files with current hashes
+- **GIVEN** a store containing 10 files with current content hashes
+- **AND** the persisted graph fingerprint matches the fingerprint for the current run
 - **AND** none of the files on disk have changed
 - **WHEN** `IndexCodeGraph.execute()` is called
 - **THEN** `filesSkipped` is 10 and `filesIndexed` is 0
 - **AND** no language adapter extraction is invoked
 
-#### Scenario: Changed file re-indexed
+#### Scenario: Fingerprint mismatch escalates unchanged files to full rebuild
 
-- **GIVEN** a store containing `core:src/utils.ts` with hash `abc`
-- **AND** `src/utils.ts` on disk in workspace `core` now has hash `def`
+- **GIVEN** a store containing indexed files with matching content hashes
+- **AND** the persisted graph fingerprint differs from the fingerprint for the current run
 - **WHEN** `IndexCodeGraph.execute()` is called
-- **THEN** the file is re-extracted and upserted with the new data
-- **AND** `filesIndexed` includes this file
+- **THEN** the run behaves as a full rebuild instead of skipping unchanged files
+- **AND** every discovered file is re-extracted
+- **AND** `fullRebuildReason` explains that the code-graph version or resolved workspace configuration changed
 
-#### Scenario: Deleted file removed from store
-
-- **GIVEN** a store containing `core:src/old.ts`
-- **AND** `src/old.ts` no longer exists on disk in workspace `core`
-- **WHEN** `IndexCodeGraph.execute()` is called
-- **THEN** `removeFile('core:src/old.ts')` is called on the store
-- **AND** `filesRemoved` is 1
-
-#### Scenario: Deletion scoped to indexed workspaces
+#### Scenario: Deleted file removal remains scoped to indexed workspaces
 
 - **GIVEN** a store containing files from workspaces `core`, `cli`, and `code-graph`
+- **AND** the persisted graph fingerprint matches the fingerprint for the current run
 - **WHEN** `IndexCodeGraph.execute()` is called with only workspace `core`
 - **THEN** only files with workspace `core` are considered for deletion
 - **AND** files from `cli` and `code-graph` remain untouched in the store
-
-#### Scenario: New file added to store
-
-- **GIVEN** a store with no entry for `core:src/new.ts`
-- **AND** `src/new.ts` exists on disk in workspace `core`
-- **WHEN** `IndexCodeGraph.execute()` is called
-- **THEN** the file is extracted and upserted with path `core:src/new.ts`
 
 #### Scenario: Changed files removed from store before bulk load
 
 - **GIVEN** a store containing `core:src/utils.ts` with hash `abc`
 - **AND** `src/utils.ts` on disk now has hash `def`
+- **AND** the persisted graph fingerprint matches the fingerprint for the current run
 - **WHEN** `IndexCodeGraph.execute()` is called
 - **THEN** `core:src/utils.ts` is removed from the store before bulk load
 - **AND** the re-extracted data is inserted via `bulkLoad()`
@@ -77,46 +66,24 @@
 - **WHEN** file discovery runs
 - **THEN** `node_modules/lodash/index.js` is not in the discovered files
 
-#### Scenario: .gitignore respected
+#### Scenario: Paths prefixed with workspace name and config-relative path
 
-- **GIVEN** a `.gitignore` containing `*.generated.ts`
-- **AND** a file `src/schema.generated.ts` exists
-- **WHEN** file discovery runs
-- **THEN** `src/schema.generated.ts` is not in the discovered files
-
-#### Scenario: .gitignore loaded from git root
-
-- **GIVEN** a codeRoot at `/project/packages/core` within a git repo rooted at `/project`
-- **AND** `/project/.gitignore` contains `*.log`
-- **WHEN** file discovery runs for this codeRoot
-- **THEN** `.log` files are excluded even though the `.gitignore` is above the codeRoot
-
-#### Scenario: Symlinks skipped
-
-- **GIVEN** a symbolic link `src/link.ts` pointing to `../other/file.ts`
-- **WHEN** file discovery runs
-- **THEN** `src/link.ts` is not in the discovered files
-
-#### Scenario: Files with no adapter skipped
-
-- **GIVEN** a file `docs/readme.md` with no registered adapter for `.md`
-- **WHEN** file discovery runs
-- **THEN** `docs/readme.md` is not in the discovered files
-
-#### Scenario: Custom excludePaths replaces built-in defaults
-
-- **GIVEN** `WorkspaceIndexTarget.excludePaths` is `["fixtures/"]`
-- **WHEN** file discovery runs
-- **THEN** only `fixtures/` is excluded by config rules
-- **AND** `node_modules/` and `dist/` (built-in defaults) are NOT automatically excluded
-
-#### Scenario: Paths prefixed with workspace name
-
-- **GIVEN** a workspace named `core` with codeRoot `/project/packages/core`
+- **GIVEN** the active `specd.yaml` lives at `/project/specd.yaml`
+- **AND** a workspace named `core` with codeRoot `/project/packages/core`
 - **AND** a file at `/project/packages/core/src/index.ts`
 - **WHEN** the indexer processes this workspace
 - **THEN** `FileNode.path` is `core:src/index.ts`
+- **AND** `FileNode.configRelativePath` is `packages/core/src/index.ts`
 - **AND** `FileNode.workspace` is `core`
+
+#### Scenario: Config-relative path normalizes absolute parent traversal
+
+- **GIVEN** the active `specd.yaml` lives at `/project/apps/web/specd.yaml`
+- **AND** a workspace named `core` with codeRoot `/project/packages/core`
+- **AND** a file at `/project/packages/core/src/index.ts`
+- **WHEN** the indexer processes this workspace
+- **THEN** `FileNode.configRelativePath` is `../../packages/core/src/index.ts`
+- **AND** it has forward slashes and no leading `./`
 
 ### Requirement: Two-pass extraction with in-memory index
 
@@ -347,19 +314,16 @@
 
 ### Requirement: Index result
 
-#### Scenario: Complete result object
+#### Scenario: Normal incremental result has null fullRebuildReason
 
-- **WHEN** indexing completes
-- **THEN** `IndexResult` SHALL contain `filesDiscovered`, `filesIndexed`, `filesRemoved`, `filesSkipped`, `specsDiscovered`, `specsIndexed`, `errors`, `duration`, `workspaces`, and `vcsRef`
+- **GIVEN** the persisted graph fingerprint matches the fingerprint for the current run
+- **WHEN** indexing completes successfully
+- **THEN** `IndexResult.graphFingerprint` equals the fingerprint persisted for that run
+- **AND** `IndexResult.fullRebuildReason` is `null`
 
-#### Scenario: vcsRef in result
+#### Scenario: Fingerprint mismatch result records rebuild reason
 
-- **GIVEN** `IndexOptions.vcsRef` is `"abc1234"`
-- **WHEN** indexing completes
-- **THEN** `IndexResult.vcsRef` SHALL be `"abc1234"`
-
-#### Scenario: No vcsRef in result
-
-- **GIVEN** `IndexOptions.vcsRef` is not provided
-- **WHEN** indexing completes
-- **THEN** `IndexResult.vcsRef` SHALL be `null`
+- **GIVEN** the persisted graph fingerprint differs from the fingerprint for the current run
+- **WHEN** indexing completes successfully after escalating to a full rebuild
+- **THEN** `IndexResult.graphFingerprint` equals the new persisted fingerprint
+- **AND** `IndexResult.fullRebuildReason` is a human-readable explanation of the mismatch

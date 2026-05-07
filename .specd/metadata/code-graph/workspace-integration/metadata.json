@@ -9,13 +9,13 @@
     {
       "requirement": "FileNode path and workspace semantics",
       "rules": [
-        "`FileNode.path` SHALL be globally unique by prefixing the workspace name to the code-root-relative path:\n\n- **`path`** = `{workspaceName}:{relativeToCodeRoot}` (e.g. `core:src/index.ts`)\n- **`workspace`** = workspace name string (e.g. `core`, `cli`, `default`)\n\nThis ensures that two workspaces with identical relative paths (e.g. both having `src/index.ts`) produce distinct `FileNode.path` values. The workspace name is the `SpecdWorkspaceConfig.name` from the specd configuration."
+        "`FileNode.path` SHALL be globally unique by prefixing the workspace name to the code-root-relative path:\n\n- **`path`** = `{workspaceName}:{relativeToCodeRoot}` (e.g. `core:src/index.ts`)\n- **`workspace`** = workspace name string (e.g. `core`, `cli`, `default`)\n- **`configRelativePath`** = path from the directory containing the active `specd.yaml` to the same file on disk (e.g. `packages/core/src/index.ts`)\n\n`path` remains the canonical graph identity used by `SymbolNode.filePath`, symbol ids, and persisted relations. `configRelativePath` exists for user-facing lookup when commands receive file paths without an explicit workspace prefix.\n\nThis ensures that two workspaces with identical relative paths (e.g. both having `src/index.ts`) produce distinct `FileNode.path` values while still allowing CLI users to resolve file arguments using repository-style paths relative to the active config. The workspace name is the `SpecdWorkspaceConfig.name` from the specd configuration."
       ]
     },
     {
       "requirement": "SymbolNode ID includes workspace",
       "rules": [
-        "`SymbolNode.id` SHALL include the workspace-prefixed path:\n\n- **`id`** = `{workspace}:{relativePath}:{kind}:{name}:{line}` (e.g. `core:src/index.ts:function:main:1`)\n\nThis follows naturally from `SymbolNode.filePath` being the `FileNode.path`."
+        "`SymbolNode.id` SHALL include the workspace-prefixed path:\n\n- **`id`** = `{filePath}:{kind}:{name}:{line}:{column}` (e.g. `core:src/index.ts:function:main:1:0`)\n\nThis follows naturally from `SymbolNode.filePath` being the `FileNode.path`. The `column` component provides additional disambiguation for overloaded declarations on the same line."
       ]
     },
     {
@@ -28,6 +28,12 @@
       "requirement": "File discovery from codeRoot",
       "rules": [
         "For each workspace with a `codeRoot`, the indexer SHALL discover files starting from the workspace's `codeRoot` (an absolute path). The `codeRoot` is provided by `SpecdWorkspaceConfig.codeRoot` from the specd configuration.\n\nFiles are discovered per workspace and their paths are prefixed with the workspace name before being stored in the graph. The `discoverFiles` function itself has no workspace knowledge — it accepts a root directory and returns paths relative to that root."
+      ]
+    },
+    {
+      "requirement": "Config-relative file lookup",
+      "rules": [
+        "The graph SHALL support resolving file selectors by a path relative to the directory containing the active `specd.yaml`.\n\nFor a configured project:\n\n1. The indexer computes `configRelativePath` for every indexed file from the active config directory to the file on disk.\n2. The value is normalized to forward slashes and MUST NOT include a leading `./`.\n3. Files outside the config directory remain representable by a relative path containing `..` segments.\n4. CLI commands that accept file selectors MAY use this field to resolve inputs that do not include a `{workspace}:` prefix.\n\nThis lookup is in addition to canonical workspace-prefixed graph identity; it does not replace it."
       ]
     },
     {
@@ -64,9 +70,9 @@
   "constraints": [
     "@specd/code-graph depends on @specd/core as a runtime dependency (types, domain services)",
     "Single .specd/code-graph.lbug file for the whole project",
-    "The discoverFiles function remains workspace-agnostic — workspace prefixing happens in the indexer",
+    "The discoverFiles function remains workspace-agnostic — workspace prefixing and config-relative path derivation happen in the indexer",
     "Spec resolution uses SpecRepository exclusively — no filesystem fallback",
-    "Existing .specd/code-graph.lbug files are incompatible with the new path format — --force re-index is required after upgrading"
+    "Existing graph stores are incompatible when file identity metadata changes (for example adding configRelativePath) — a full rebuild is required after upgrading"
   ],
   "scenarios": [
     {
@@ -75,24 +81,45 @@
       "when": [
         "a file src/index.ts is discovered in workspace core with codeRoot /project/packages/core"
       ],
-      "then": ["FileNode.path SHALL be core/src/index.ts", "AND FileNode.workspace SHALL be core"]
+      "then": ["FileNode.path is core:src/index.ts", "AND FileNode.workspace is core"]
     },
     {
       "requirement": "FileNode path and workspace semantics",
-      "name": "Duplicate filenames across workspaces",
+      "name": "Config-relative path stored alongside canonical identity",
+      "given": ["the active specd.yaml lives at /project/specd.yaml"],
+      "when": [
+        "a file src/index.ts is discovered in workspace core with codeRoot /project/packages/core"
+      ],
+      "then": [
+        "FileNode.path is core:src/index.ts",
+        "AND FileNode.configRelativePath is packages/core/src/index.ts"
+      ]
+    },
+    {
+      "requirement": "FileNode path and workspace semantics",
+      "name": "Duplicate filenames across workspaces remain distinct",
       "when": ["two workspaces core and cli both contain src/index.ts"],
       "then": [
-        "their FileNode paths SHALL be core/src/index.ts and cli/src/index.ts respectively",
-        "AND both SHALL be stored in the same graph without conflict"
+        "their canonical FileNode paths are core:src/index.ts and cli:src/index.ts",
+        "AND both can still be stored in the same graph without conflict"
       ]
     },
     {
       "requirement": "SymbolNode ID includes workspace",
-      "name": "Symbol ID format",
-      "when": ["a function main is found at line 1 of src/index.ts in workspace core"],
+      "name": "Symbol ID format with column zero",
+      "when": ["a function main is found at line 1, column 0 of src/index.ts in workspace core"],
       "then": [
-        "SymbolNode.id SHALL be core/src/index.ts:function:main:1",
-        "AND SymbolNode.filePath SHALL be core/src/index.ts"
+        "SymbolNode.id SHALL be core:src/index.ts:function:main:1:0",
+        "AND SymbolNode.filePath SHALL be core:src/index.ts"
+      ]
+    },
+    {
+      "requirement": "SymbolNode ID includes workspace",
+      "name": "Symbol ID with non-zero column",
+      "when": ["a function parse is found at line 10, column 15 of src/parser.ts in workspace cli"],
+      "then": [
+        "SymbolNode.id SHALL be cli:src/parser.ts:function:parse:10:15",
+        "AND SymbolNode.filePath SHALL be cli:src/parser.ts"
       ]
     },
     {
@@ -122,6 +149,39 @@
       "name": "Single-workspace equivalence",
       "when": ["IndexOptions contains a single workspace"],
       "then": ["the indexer SHALL behave identically to multi-workspace with one entry"]
+    },
+    {
+      "requirement": "Config-relative file lookup",
+      "name": "Unprefixed selector resolves through configRelativePath",
+      "given": [
+        "the active specd.yaml lives at /project/specd.yaml",
+        "AND file core:src/index.ts is indexed with configRelativePath packages/core/src/index.ts"
+      ],
+      "when": ["a CLI command resolves the selector packages/core/src/index.ts"],
+      "then": ["it can map that selector back to canonical file core:src/index.ts"]
+    },
+    {
+      "requirement": "Config-relative file lookup",
+      "name": "Absolute selector normalizes to configRelativePath before lookup",
+      "given": [
+        "the active specd.yaml lives at /project/specd.yaml",
+        "AND file core:src/index.ts is indexed with configRelativePath packages/core/src/index.ts"
+      ],
+      "when": ["a CLI command resolves /project/packages/core/src/index.ts"],
+      "then": [
+        "it normalizes the absolute path to packages/core/src/index.ts",
+        "AND resolves the canonical file core:src/index.ts"
+      ]
+    },
+    {
+      "requirement": "Config-relative file lookup",
+      "name": "Config-relative lookup supports parent segments",
+      "given": [
+        "the active specd.yaml lives at /project/apps/web/specd.yaml",
+        "AND file core:src/index.ts is indexed with configRelativePath ../../packages/core/src/index.ts"
+      ],
+      "when": ["a CLI command resolves ../../packages/core/src/index.ts"],
+      "then": ["it resolves the canonical file core:src/index.ts"]
     },
     {
       "requirement": "Spec resolution via SpecRepository",
@@ -235,8 +295,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:e54a078f69de62d15fa76a6254809635b24fa49af2494e451c9d9c3bdda6282c",
-    "verify.md": "sha256:193dc71622077a19b476ba67d97873a9c9c0dcf6a51896d34fb69f0347e0c033"
+    "spec.md": "sha256:c97ac5da6fe6bd1a2d396c3d03d664ba139a993cba140a692bc69571a6c3658a",
+    "verify.md": "sha256:892b1c0f0e4c272137aca30557d39206b6933e70cd09afd3bbd25fc15b30e7ca"
   },
   "generatedBy": "core"
 }

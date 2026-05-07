@@ -9,14 +9,13 @@ Before modifying code, developers and agents need to understand the blast radius
 ### Requirement: Command signature
 
 ```text
-specd graph impact [--file <path>] [--symbol <name>] [--changes <files...>] [--direction dependents|dependencies|upstream|downstream|both] [--depth <n>] [--config <path> | --path <path>] [--format text|json|toon]
+specd graph impact [--file <paths...>] [--symbol <name>] [--direction dependents|dependencies|upstream|downstream|both] [--depth <n>] [--config <path> | --path <path>] [--format text|json|toon]
 ```
 
-Exactly one of `--file`, `--symbol`, or `--changes` must be provided.
+Exactly one of `--file` or `--symbol` must be provided.
 
-- `--file` — analyze impact of a single file
+- `--file` — analyze impact of one or more files. Each path MAY be workspace-prefixed, config-relative, or absolute.
 - `--symbol` — analyze impact of a symbol by name. If multiple symbols match, all are analyzed and results listed
-- `--changes` — detect impact of changes to multiple files (variadic; accepts multiple space-separated paths)
 - `--direction` — optional; analysis direction, defaults to `upstream`. Values:
   - `dependents` — find symbols and files that depend on the target; alias of `upstream`
   - `dependencies` — find symbols and files that the target depends on; alias of `downstream`
@@ -28,7 +27,7 @@ Exactly one of `--file`, `--symbol`, or `--changes` must be provided.
 - `--path <path>` — optional; repo-root bootstrap mode
 - `--format text|json|toon` — optional; output format, defaults to `text`
 
-The CLI SHALL normalize `dependents` to `upstream` and `dependencies` to `downstream` before calling `analyzeImpact()` or `analyzeFileImpact()`. Invalid direction values SHALL fail with a CLI usage error before opening the graph provider.
+The CLI SHALL normalize `dependents` to `upstream` and `dependencies` to `downstream` before calling `analyzeImpact()` or file-impact analysis. Invalid direction values SHALL fail with a CLI usage error before opening the graph provider.
 
 User-facing documentation for this command MUST prefer the concrete aliases `dependents` and `dependencies` before the compatibility graph-theory terms `upstream` and `downstream`. Documentation MAY mention the compatibility values, but it MUST NOT describe `downstream` as dependents.
 
@@ -43,9 +42,15 @@ When `--file` is provided:
 1. Resolves graph context using explicit config, autodetected config, or bootstrap mode according to the graph CLI precedence rules
 2. Creates a `CodeGraphProvider` from the resolved graph context
 3. Opens the provider
-4. Calls `analyzeFileImpact(file, direction)` to compute the impact
-5. Outputs the `FileImpactResult` including per-symbol breakdown
-6. Closes the provider and exits
+4. Resolves each requested file path to canonical graph files using the following rules:
+   - workspace-prefixed inputs resolve directly by canonical graph path
+   - unprefixed relative inputs resolve by exact match against persisted `configRelativePath`
+   - absolute inputs are normalized to a path relative to the active config directory and then resolved by exact `configRelativePath` match
+5. If an unprefixed input resolves to multiple files, the command fails with an ambiguity error listing the canonical workspace-prefixed matches
+6. For a single resolved file, calls `analyzeFileImpact(file, direction)` and outputs the `FileImpactResult`
+7. For multiple resolved files, computes per-file file impact with the same semantics as single-file analysis, then aggregates changed symbols, affected symbols, affected files, and overall risk across the requested files
+8. Outputs the aggregated result including changed-symbol detail and per-file impact breakdown
+9. Closes the provider and exits
 
 In bootstrap mode, the command SHALL behave as if there were a single `default` workspace whose `codeRoot` is the resolved VCS root.
 
@@ -58,14 +63,6 @@ When `--symbol` is provided:
 3. If no symbol is found, outputs `No symbol found matching "<name>".`
 4. If one symbol is found, calls `analyzeImpact(symbolId, direction)` and outputs the result
 5. If multiple symbols match, analyzes each one and outputs all results
-
-### Requirement: Change detection
-
-When `--changes` is provided:
-
-1. Resolves graph context using explicit config, autodetected config, or bootstrap mode according to the graph CLI precedence rules
-2. Calls `detectChanges(files)` with the list of file paths
-3. Outputs the summary and affected files
 
 ### Requirement: Concurrent indexing guard
 
@@ -87,6 +84,10 @@ Impact analysis for src/auth.ts (depth=5)
   Transitive deps:  1
   Affected files:   8
 
+Changed symbols:
+  validate:10
+  AuthService:20
+
 Affected files:
   src/login.ts: handleLogin:12 (d=1), validateSession:45 (d=1)
   src/session.ts: createSession:8 (d=2)
@@ -95,6 +96,8 @@ Per-symbol breakdown:
   src/auth.ts:function:validate:10:0  risk=HIGH direct=4
   src/auth.ts:class:AuthService:20:0  risk=MEDIUM direct=2
 ```
+
+For multiple files, text output SHALL show one aggregated summary plus a `Changed symbols:` block grouped by input file, an `Affected files:` block, and a `Per-file breakdown:` or equivalent structure that lets a human see which input files contributed to the overall result.
 
 When affected symbols are available, each file line shows the symbols grouped after a colon with depth indicators: `path: name:line (d=N), name:line (d=N)`. Files reached only via IMPORTS (file-level) are listed without symbols. The depth value `d=N` indicates the distance from the analysis target (1 = direct, 2 = indirect, 3+ = transitive).
 
@@ -119,15 +122,17 @@ Affected files:
 
 When multiple symbols match, each analysis is listed sequentially.
 
-**Change detection** in `text` mode outputs the summary string from `ChangeDetectionResult.summary` followed by the affected files list.
-
 In `json` or `toon` mode, the full result object is output as-is. The `AffectedSymbol` entries in JSON include the `depth` field.
 
 ### Requirement: Error cases
 
-Exactly one of `--file`, `--symbol`, or `--changes` must be provided. If none or more than one is given, the command exits with code 1 and prints `error: provide exactly one of --file, --symbol, or --changes`.
+Exactly one of `--file` or `--symbol` must be provided. If none or more than one is given, the command exits with code 1 and prints `error: provide exactly one of --file or --symbol`.
 
 If both `--config` and `--path` are passed, the command SHALL fail with a CLI error before attempting graph access.
+
+If a `--file` input without a workspace prefix does not resolve by config-relative path, the command SHALL fail with a not-found error that includes the normalized config-relative path it searched.
+
+If a `--file` input without a workspace prefix resolves to more than one canonical graph file, the command SHALL fail with an ambiguity error listing the matching workspace-prefixed paths rather than guessing a workspace.
 
 If the shared graph indexing lock is present, the command SHALL exit with code 3 after printing a user-facing retry-later message.
 
@@ -137,9 +142,9 @@ If the provider cannot be opened, the command exits with code 3.
 
 - The CLI does not contain impact analysis logic — it delegates entirely to `@specd/code-graph`
 - `process.exit(0)` is called explicitly after closing the provider
-- All file paths are workspace-relative, not absolute
-- `--direction` only applies to `--file` and `--symbol`, not to `--changes`
-- `--depth` applies to all selectors (`--file`, `--symbol`, `--changes`)
+- Canonical graph file identities are workspace-prefixed, but user-facing `--file` inputs MAY be workspace-prefixed, config-relative, or absolute
+- `--direction` applies to both `--file` and `--symbol`
+- `--depth` applies to both selectors
 - `--depth` must be a positive integer; invalid values exit with code 1
 - Context resolution SHALL use the shared graph CLI model rather than command-local path semantics
 - The command checks the shared graph indexing lock before opening the provider and fails fast while indexing is in progress
@@ -158,20 +163,17 @@ Impact analysis for function createKernel (packages/core/src/composition/kernel.
   Direct deps:      1
   ...
 
-$ specd graph impact --changes src/auth.ts src/user.ts
-2 symbol(s) changed across 2 file(s). 5 symbol(s) in 3 file(s) may be affected. Risk: MEDIUM.
-
-Affected files:
-  src/login.ts
-  src/session.ts
-  src/middleware.ts
+$ specd graph impact --file src/auth.ts src/user.ts
+Impact analysis for 2 files
+  Risk level:       MEDIUM
+  ...
 
 $ specd graph impact --symbol handleError --direction both
 Impact analysis for function handleError (packages/cli/src/handle-error.ts:66)
   ...
 
-$ specd graph impact --file src/auth.ts --format json
-{"target":"src/auth.ts","riskLevel":"HIGH",...}
+$ specd graph impact --file /repo/packages/core/src/auth.ts --format json
+{"target":"core:src/auth.ts","riskLevel":"HIGH",...}
 ```
 
 ## Spec Dependencies
@@ -180,3 +182,4 @@ $ specd graph impact --file src/auth.ts --format json
 - [`core:config`](../../core/config/spec.md) — configured operation, explicit config path handling, and bootstrap-mode relationship
 - [`code-graph:composition`](../../code-graph/composition/spec.md) — CodeGraphProvider facade
 - [`code-graph:traversal`](../../code-graph/traversal/spec.md) — impact analysis semantics
+- [`code-graph:workspace-integration`](../../code-graph/workspace-integration/spec.md) — canonical workspace paths and config-relative file lookup semantics

@@ -1,10 +1,17 @@
 import path from 'node:path'
-import { createCodeGraphProvider, type GraphStatistics } from '@specd/code-graph'
+import {
+  createCodeGraphProvider,
+  parseFingerprintMap,
+  detectFingerprintMismatch,
+  type GraphStatistics,
+} from '@specd/code-graph'
 import { createVcsAdapter, type SpecdConfig } from '@specd/core'
 import { type Command } from 'commander'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { handleError } from '../../handle-error.js'
 import { output, parseFormat } from '../../formatter.js'
+import { buildWorkspaceTargets } from '../graph/build-workspace-targets.js'
+import { codeGraphVersion } from '../graph/code-graph-version.js'
 
 /** Parsed options accepted by the `project status` command. */
 interface ProjectStatusOptions {
@@ -56,6 +63,7 @@ export function registerProjectStatus(parent: Command): void {
 
         const graphFreshness = graphStats?.lastIndexedAt ?? null
         let graphStale: boolean | null = null
+        let fingerprintMismatch: boolean | null = null
         if (graphStats !== null) {
           let currentRef: string | null = null
           try {
@@ -68,6 +76,20 @@ export function registerProjectStatus(parent: Command): void {
             graphStale = graphStats.lastIndexedRef !== currentRef
           } else if (graphFreshness !== null) {
             graphStale = Date.now() - new Date(graphFreshness).getTime() > 24 * 60 * 60 * 1000
+          }
+
+          if (graphStats.graphFingerprint !== null) {
+            try {
+              const workspaces = await buildWorkspaceTargets(config, kernel)
+              const storedMap = parseFingerprintMap(graphStats.graphFingerprint)
+              fingerprintMismatch = detectFingerprintMismatch(
+                storedMap,
+                codeGraphVersion,
+                workspaces,
+              )
+            } catch {
+              fingerprintMismatch = null
+            }
           }
         }
 
@@ -142,6 +164,7 @@ export function registerProjectStatus(parent: Command): void {
               graph: {
                 freshness: graphFreshness,
                 stale: graphStale,
+                fingerprintMismatch,
                 ...(opts.graph && graphStats
                   ? {
                       fileCount: graphStats.fileCount,
@@ -175,6 +198,9 @@ export function registerProjectStatus(parent: Command): void {
           ...Object.entries(specsByWorkspace).map(([ws, n]) => `  ${ws}: ${n}`),
           `changes: ${activeChanges.length} active, ${drafts.length} drafts, ${discarded.length} discarded`,
           `graph.freshness: ${graphFreshness ?? 'never indexed'} (${graphStale ? 'stale' : 'fresh'})`,
+          ...(fingerprintMismatch === true
+            ? ['graph.derivation: ⚠ fingerprint mismatch — reindex recommended']
+            : []),
           ...(opts.graph && graphStats
             ? [
                 `graph.files: ${graphStats.fileCount}`,

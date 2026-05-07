@@ -36,8 +36,6 @@ The traversal follows `CALLS` relations in reverse (target → source). Cycles a
 
 ### Requirement: Impact analysis
 
-### Requirement: Impact analysis
-
 `analyzeImpact(store: GraphStore, target: string, direction: 'upstream' | 'downstream' | 'both', maxDepth?: number): Promise<ImpactResult>` SHALL compute the blast radius of modifying the target symbol. The optional `maxDepth` parameter (default: 3) controls how deep the traversal goes — it is passed through to `getUpstream`/`getDownstream` and limits the IMPORTS BFS loop.
 
 The function produces an `ImpactResult` containing:
@@ -74,7 +72,18 @@ Risk level thresholds:
 | `HIGH`     | 6+ direct dependents, or 10+ total dependents            |
 | `CRITICAL` | 20+ total dependents, or target is in 3+ execution flows |
 
-### Requirement: File impact
+### Requirement: Static type dependency impact
+
+Impact traversal SHALL treat all persisted symbol dependency relations as first-class blast-radius inputs, not only ordinary call edges.
+
+Specifically:
+
+- changing a symbol MUST affect symbols connected through `CALLS`, `CONSTRUCTS`, and `USES_TYPE` according to traversal direction
+- changing a type symbol MUST affect symbols connected through `EXTENDS` and `IMPLEMENTS` according to traversal direction
+- changing a method symbol MUST affect symbols connected through `OVERRIDES` according to traversal direction
+- hierarchy-derived and static-type-derived affected symbols participate in depth counts, risk calculation, and affected-file aggregation the same way as call-derived affected symbols
+
+This requirement applies to symbol impact and any file-impact operation that aggregates symbol impact results.
 
 ### Requirement: File impact
 

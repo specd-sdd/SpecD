@@ -1,7 +1,5 @@
 # specd-archive — finalize and archive
 
-Read @../\_specd-shared/shared.md before doing anything.
-
 ## What this does
 
 Reviews deltas and archives the change. Archiving merges deltas into project specs
@@ -9,6 +7,10 @@ and is irreversible. The change MUST already be in `archivable` state — the si
 gate is handled by `/specd-verify`, not by this skill.
 
 ## Steps
+
+### 0. Bootstrap and load shared context
+
+You MUST read @../\_specd-shared/shared.md before doing anything, if you can't find it using Glob or Read tools, use Bash tools like `ls` and `cat` to find and read it. If you can't find it at all, tell the user: "Shared context not found. Please ensure shared.md is available." and stop.
 
 ### 1. Load change state
 

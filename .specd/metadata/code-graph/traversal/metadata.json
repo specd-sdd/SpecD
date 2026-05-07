@@ -27,14 +27,18 @@
     {
       "requirement": "Impact analysis",
       "rules": [
-        "### Requirement: Impact analysis",
         "`analyzeImpact(store: GraphStore, target: string, direction: 'upstream' | 'downstream' | 'both', maxDepth?: number): Promise<ImpactResult>` SHALL compute the blast radius of modifying the target symbol. The optional `maxDepth` parameter (default: 3) controls how deep the traversal goes — it is passed through to `getUpstream`/`getDownstream` and limits the IMPORTS BFS loop.\n\nThe function produces an `ImpactResult` containing:\n\n- **`target`** — the symbol being analyzed\n- **`directDependents`** — count of depth-1 results (WILL BREAK)\n- **`indirectDependents`** — count of depth-2 results (LIKELY AFFECTED)\n- **`transitiveDependents`** — count of depth-3+ results (MAY NEED TESTING)\n- **`riskLevel`** — computed from dependent counts: `LOW`, `MEDIUM`, `HIGH`, or `CRITICAL`\n- **`affectedFiles`** — unique file paths containing any affected symbol\n- **`affectedSymbols`** — array of `AffectedSymbol` entries with depth information\n- **`affectedProcesses`** — execution flows that include the target or any affected symbol (when process data is available)\n\n`AffectedSymbol` SHALL contain:\n\n- **`id`** (`string`) — the symbol identifier\n- **`name`** (`string`) — the symbol's declared name\n- **`filePath`** (`string`) — workspace-prefixed file path\n- **`line`** (`number`) — 1-based line number\n- **`depth`** (`number`) — distance from the target: 1 = direct dependent, 2 = indirect, 3+ = transitive\n\nImpact analysis MUST include hierarchy relations in addition to existing call/import reachability:\n\n- changing a type symbol MUST affect symbols connected through `EXTENDS` and `IMPLEMENTS` according to traversal direction\n- changing a method symbol MUST affect symbols connected through `OVERRIDES` according to traversal direction\n- hierarchy-derived affected symbols participate in depth counts, risk calculation, and affected-file aggregation the same way as other affected symbols\n\nRisk level thresholds:\n\n| Level      | Condition                                                |\n| ---------- | -------------------------------------------------------- |\n| `LOW`      | 0–2 direct dependents, no indirect                       |\n| `MEDIUM`   | 3–5 direct dependents, or any indirect                   |\n| `HIGH`     | 6+ direct dependents, or 10+ total dependents            |\n| `CRITICAL` | 20+ total dependents, or target is in 3+ execution flows |"
+      ]
+    },
+    {
+      "requirement": "Static type dependency impact",
+      "rules": [
+        "Impact traversal SHALL treat all persisted symbol dependency relations as first-class blast-radius inputs, not only ordinary call edges.\n\nSpecifically:\n\n- changing a symbol MUST affect symbols connected through `CALLS`, `CONSTRUCTS`, and `USES_TYPE` according to traversal direction\n- changing a type symbol MUST affect symbols connected through `EXTENDS` and `IMPLEMENTS` according to traversal direction\n- changing a method symbol MUST affect symbols connected through `OVERRIDES` according to traversal direction\n- hierarchy-derived and static-type-derived affected symbols participate in depth counts, risk calculation, and affected-file aggregation the same way as call-derived affected symbols\n\nThis requirement applies to symbol impact and any file-impact operation that aggregates symbol impact results."
       ]
     },
     {
       "requirement": "File impact",
       "rules": [
-        "### Requirement: File impact",
         "`analyzeFileImpact(store: GraphStore, filePath: string, direction: 'upstream' | 'downstream' | 'both', maxDepth?: number): Promise<FileImpactResult>` SHALL compute aggregate impact for all symbols defined in the given file. The optional `maxDepth` parameter (default: 3) is passed through to each per-symbol `analyzeImpact` call and limits the file-level IMPORTS BFS.\n\nIt:\n\n1. Retrieves all symbols in the file via `findSymbols({ filePath })`\n2. Runs `analyzeImpact` for each symbol with the given `maxDepth`\n3. Merges results: deduplicates affected symbols (keeping the shallowest depth), takes the maximum risk level, unions affected files\n\n`FileImpactResult` extends `ImpactResult` with:\n\n- **`symbols`** — array of per-symbol `ImpactResult` entries\n- **`riskLevel`** — the maximum risk level across all symbols in the file\n\nWhen symbols in the file participate in `EXTENDS`, `IMPLEMENTS`, or `OVERRIDES`, their hierarchy-derived impact MUST be reflected in the aggregate result."
       ]
     },
@@ -191,6 +195,44 @@
       "then": ["overriding methods are included in affectedSymbols"]
     },
     {
+      "requirement": "Static type dependency impact",
+      "name": "USES_TYPE dependent contributes to upstream impact",
+      "given": [
+        "class ArtifactParserRegistry has an incoming USES_TYPE relation from GenerateSpecMetadata"
+      ],
+      "when": ["analyzeImpact(store, ArtifactParserRegistry.id, 'upstream') is called"],
+      "then": [
+        "GenerateSpecMetadata appears in affectedSymbols",
+        "AND its file contributes to affectedFiles"
+      ]
+    },
+    {
+      "requirement": "Static type dependency impact",
+      "name": "CONSTRUCTS dependency contributes to downstream impact",
+      "given": ["function createKernel has an outgoing CONSTRUCTS relation to TemplateExpander"],
+      "when": ["analyzeImpact(store, createKernel.id, 'downstream') is called"],
+      "then": ["TemplateExpander appears in affectedSymbols"]
+    },
+    {
+      "requirement": "Static type dependency impact",
+      "name": "Static type and hierarchy dependents affect depth and risk",
+      "given": [
+        "a target symbol has one direct USES_TYPE dependent, one depth-2 CALLS dependent, and one overriding method dependent"
+      ],
+      "when": ["analyzeImpact(store, target.id, 'upstream') is called"],
+      "then": [
+        "all three relations contribute to depth counts",
+        "AND risk calculation treats them the same as ordinary call-derived dependents"
+      ]
+    },
+    {
+      "requirement": "Static type dependency impact",
+      "name": "File impact aggregates USES_TYPE-derived dependents",
+      "given": ["a file defines a type symbol with upstream USES_TYPE dependents in other files"],
+      "when": ["analyzeFileImpact(store, filePath, 'upstream') is called"],
+      "then": ["those dependents are included in the aggregate affectedSymbols and affectedFiles"]
+    },
+    {
       "requirement": "File impact",
       "name": "Aggregate risk is maximum across symbols",
       "given": ["file src/auth.ts contains symbols X (LOW risk) and Y (HIGH risk)"],
@@ -252,8 +294,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:06bf54dc877ec2f07e27f05e84304eb58374d4451e5449e50d1548b752aa3cf0",
-    "verify.md": "sha256:89a2a70346865ea34a5cad67dab5fa960af807ed65f4a13135bfc79105f878bf"
+    "spec.md": "sha256:ef44fe17ebbfd8e1e4bfd6da6cc80829465942f1b8dc63994d8f1861de176e7a",
+    "verify.md": "sha256:ccad07a52d5e056eb431f1a417193f758059aff251f15506ab22afbdf472a306"
   },
   "generatedBy": "core"
 }

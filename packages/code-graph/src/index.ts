@@ -70,6 +70,14 @@ export {
 
 // Domain services
 export { expandSymbolName } from './domain/services/expand-symbol-name.js'
+export {
+  computeGraphFingerprint,
+  computeWorkspaceFingerprint,
+  parseFingerprintMap,
+  serializeFingerprintMap,
+  detectFingerprintMismatch,
+  type GraphFingerprintInput,
+} from './application/use-cases/_shared/compute-graph-fingerprint.js'
 
 // Errors
 export { CodeGraphError } from './domain/errors/code-graph-error.js'

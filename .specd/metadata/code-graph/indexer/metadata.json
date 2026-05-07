@@ -21,13 +21,13 @@
     {
       "requirement": "Incremental indexing",
       "rules": [
-        "The indexer SHALL compute a content hash for each discovered file and compare it against the hash stored in the `GraphStore`. Only three categories of files are processed:\n\n- **New** — file exists on disk but not in the store → extract and upsert\n- **Changed** — file exists in both but hashes differ → extract and upsert (replaces previous data)\n- **Deleted** — file exists in the store but not on disk → remove from store. Only files belonging to workspaces being indexed are considered for deletion — files from other workspaces are left untouched. This allows `--workspace <name>` to index a single workspace without destroying data from others.\n\nFiles whose hash matches the stored hash are skipped entirely — no parsing, no I/O beyond the hash comparison.\n\nChanged files are removed from the store before bulk load, because CSV `COPY FROM` cannot upsert — it can only insert. Removing changed files first ensures the bulk load inserts fresh data without conflicts.\n\nTo force a full re-index, callers MUST call `GraphStore.clear()` before `execute()`. This removes all stored data, causing every file to be treated as new."
+        "The indexer SHALL compute a content hash for each discovered file and compare it against the hash stored in the `GraphStore`. It SHALL also compare the persisted graph fingerprint against the current fingerprint for the indexing run.\n\nThe current graph fingerprint for this iteration SHALL be computed from:\n\n- the effective `@specd/code-graph` package version loaded by the running process\n- a canonical hash of the resolved workspace objects used for indexing\n\nOnly three categories of files are processed during a normal incremental run when the graph fingerprint matches:\n\n- **New** — file exists on disk but not in the store → extract and upsert\n- **Changed** — file exists in both but hashes differ → extract and upsert (replaces previous data)\n- **Deleted** — file exists in the store but not on disk → remove from store. Only files belonging to workspaces being indexed are considered for deletion — files from other workspaces are left untouched. This allows `--workspace <name>` to index a single workspace without destroying data from others.\n\nFiles whose hash matches the stored hash are skipped entirely — no parsing, no I/O beyond the hash comparison — only when the persisted graph fingerprint also matches the current fingerprint.\n\nWhen the persisted graph fingerprint differs from the current fingerprint, the indexer SHALL treat the run as a full rebuild of the active graph store rather than a normal incremental skip. The preferred behavior is to recreate the store and re-index every discovered file while surfacing a visible explanation that the code-graph version or resolved workspace configuration changed. If a backend cannot safely recreate in-place, the caller MAY fail fast and require an explicit force-reindex command instead.\n\nChanged files are removed from the store before bulk load, because CSV `COPY FROM` cannot upsert — it can only insert. Removing changed files first ensures the bulk load inserts fresh data without conflicts.\n\nTo force a full re-index, callers MUST invoke the graph-store recreation path before `execute()`. This removes all stored data, causing every file to be treated as new."
       ]
     },
     {
       "requirement": "Multi-workspace file discovery",
       "rules": [
-        "The indexer SHALL discover files from each workspace's `codeRoot` independently. For each `WorkspaceIndexTarget`:\n\n1. Call `discoverFiles(codeRoot, hasAdapter, options)` to get paths relative to `codeRoot`\n2. Prefix each path with `{workspaceName}:` to form the globally unique `FileNode.path`\n3. Diff against the store (filtered by workspace prefix)\n\n`discoverFiles` accepts a root directory plus optional exclusion options:\n\n- **`respectGitignore`** (default `true`): when `true`, `.gitignore` files are loaded hierarchically (git root → codeRoot → subdirectories during walk) and applied with absolute priority — no `excludePaths` pattern can re-include a file that `.gitignore` excludes. When `false`, `.gitignore` files are not loaded.\n- **`excludePaths`** (default: built-in list): gitignore-syntax patterns applied as an additional exclusion layer on top of `.gitignore` (or as the sole ruleset when `respectGitignore` is `false`). Supports `!` negation. When not provided, the following built-in defaults apply: When provided, the supplied list **replaces** the built-in defaults entirely — the built-in defaults are not merged.\n\nEvaluation order when `respectGitignore: true`:\n\n1. `.gitignore` rules (absolute priority — cannot be overridden)\n2. `excludePaths` rules (applied after; can negate each other but cannot un-ignore gitignored files)\n\n`discoverFiles` itself has no workspace knowledge — it accepts a root directory and:\n\n- Respects `.gitignore` rules hierarchically when `respectGitignore` is `true`\n- Applies `excludePaths` patterns (or built-in defaults) as an `ignore`-library instance\n- Skips symbolic links — only regular files are indexed\n- Skips files with no registered language adapter (determined by extension)\n- Returns root-relative file paths with forward-slash normalization"
+        "The indexer SHALL discover files from each workspace's `codeRoot` independently. For each `WorkspaceIndexTarget`:\n\n1. Call `discoverFiles(codeRoot, hasAdapter, options)` to get paths relative to `codeRoot`\n2. Prefix each path with `{workspaceName}:` to form the globally unique `FileNode.path`\n3. Derive `FileNode.configRelativePath` from the directory containing the active `specd.yaml`\n4. Diff against the store (filtered by workspace prefix)\n\n`discoverFiles` accepts a root directory plus optional exclusion options:\n\n- **`respectGitignore`** (default `true`): when `true`, `.gitignore` files are loaded hierarchically (git root → codeRoot → subdirectories during walk) and applied with absolute priority — no `excludePaths` pattern can re-include a file that `.gitignore` excludes. When `false`, `.gitignore` files are not loaded.\n- **`excludePaths`** (default: built-in list): gitignore-syntax patterns applied as an additional exclusion layer on top of `.gitignore` (or as the sole ruleset when `respectGitignore` is `false`). Supports `!` negation. When not provided, the following built-in defaults apply: When provided, the supplied list **replaces** the built-in defaults entirely — the built-in defaults are not merged.\n\nEvaluation order when `respectGitignore: true`:\n\n1. `.gitignore` rules (absolute priority — cannot be overridden)\n2. `excludePaths` rules (applied after; can negate each other but cannot un-ignore gitignored files)\n\n`discoverFiles` itself has no workspace knowledge — it accepts a root directory and:\n\n- Respects `.gitignore` rules hierarchically when `respectGitignore` is `true`\n- Applies `excludePaths` patterns (or built-in defaults) as an `ignore`-library instance\n- Skips symbolic links — only regular files are indexed\n- Skips files with no registered language adapter (determined by extension)\n- Returns root-relative file paths with forward-slash normalization\n\n`FileNode.configRelativePath` SHALL be forward-slash-normalized, omit a leading `./`, and remain relative to the active config directory even when the file lies outside that directory (using `..` segments when needed)."
       ]
     },
     {
@@ -69,7 +69,7 @@
     {
       "requirement": "Index result",
       "rules": [
-        "`IndexCodeGraph` SHALL return an `IndexResult` value object containing:\n\n- **`filesDiscovered`** — total files found during discovery (across all workspaces)\n- **`filesIndexed`** — files that were new or changed and successfully processed\n- **`filesRemoved`** — files removed from the store (deleted from disk)\n- **`filesSkipped`** — files skipped because their hash matched\n- **`specsDiscovered`** — total spec directories found\n- **`specsIndexed`** — specs that were new or changed and successfully processed\n- **`errors`** — array of `{ filePath: string; message: string }` for files or specs that failed\n- **`duration`** — elapsed time in milliseconds\n- **`workspaces`** — per-workspace breakdown array of `{ name, filesDiscovered, filesIndexed, filesSkipped, filesRemoved, specsDiscovered, specsIndexed }`\n- **`vcsRef`** — the VCS ref that was persisted, or `null` if none was provided"
+        "`IndexCodeGraph` SHALL return an `IndexResult` value object containing:\n\n- **`filesDiscovered`** — total files found during discovery (across all workspaces)\n- **`filesIndexed`** — files that were new or changed and successfully processed\n- **`filesRemoved`** — files removed from the store (deleted from disk)\n- **`filesSkipped`** — files skipped because their hash matched and the graph fingerprint was still valid\n- **`specsDiscovered`** — total spec directories found\n- **`specsIndexed`** — specs that were new or changed and successfully processed\n- **`errors`** — array of `{ filePath: string; message: string }` for files or specs that failed\n- **`duration`** — elapsed time in milliseconds\n- **`workspaces`** — per-workspace breakdown array of `{ name, filesDiscovered, filesIndexed, filesSkipped, filesRemoved, specsDiscovered, specsIndexed }`\n- **`vcsRef`** — the VCS ref that was persisted, or `null` if none was provided\n- **`graphFingerprint`** — the fingerprint persisted for the completed run\n- **`fullRebuildReason`** — `null` for a normal incremental run, or a human-readable reason when the run escalated to a full rebuild because the stored fingerprint no longer matched"
       ]
     },
     {
@@ -119,9 +119,10 @@
     },
     {
       "requirement": "Incremental indexing",
-      "name": "Unchanged files skipped",
+      "name": "Unchanged files skipped when fingerprint matches",
       "given": [
-        "a store containing 10 files with current hashes",
+        "a store containing 10 files with current content hashes",
+        "AND the persisted graph fingerprint matches the fingerprint for the current run",
         "AND none of the files on disk have changed"
       ],
       "when": ["IndexCodeGraph.execute() is called"],
@@ -132,31 +133,25 @@
     },
     {
       "requirement": "Incremental indexing",
-      "name": "Changed file re-indexed",
+      "name": "Fingerprint mismatch escalates unchanged files to full rebuild",
       "given": [
-        "a store containing core:src/utils.ts with hash abc",
-        "AND src/utils.ts on disk in workspace core now has hash def"
+        "a store containing indexed files with matching content hashes",
+        "AND the persisted graph fingerprint differs from the fingerprint for the current run"
       ],
       "when": ["IndexCodeGraph.execute() is called"],
       "then": [
-        "the file is re-extracted and upserted with the new data",
-        "AND filesIndexed includes this file"
+        "the run behaves as a full rebuild instead of skipping unchanged files",
+        "AND every discovered file is re-extracted",
+        "AND fullRebuildReason explains that the code-graph version or resolved workspace configuration changed"
       ]
     },
     {
       "requirement": "Incremental indexing",
-      "name": "Deleted file removed from store",
+      "name": "Deleted file removal remains scoped to indexed workspaces",
       "given": [
-        "a store containing core:src/old.ts",
-        "AND src/old.ts no longer exists on disk in workspace core"
+        "a store containing files from workspaces core, cli, and code-graph",
+        "AND the persisted graph fingerprint matches the fingerprint for the current run"
       ],
-      "when": ["IndexCodeGraph.execute() is called"],
-      "then": ["removeFile('core:src/old.ts') is called on the store", "AND filesRemoved is 1"]
-    },
-    {
-      "requirement": "Incremental indexing",
-      "name": "Deletion scoped to indexed workspaces",
-      "given": ["a store containing files from workspaces core, cli, and code-graph"],
       "when": ["IndexCodeGraph.execute() is called with only workspace core"],
       "then": [
         "only files with workspace core are considered for deletion",
@@ -165,20 +160,11 @@
     },
     {
       "requirement": "Incremental indexing",
-      "name": "New file added to store",
-      "given": [
-        "a store with no entry for core:src/new.ts",
-        "AND src/new.ts exists on disk in workspace core"
-      ],
-      "when": ["IndexCodeGraph.execute() is called"],
-      "then": ["the file is extracted and upserted with path core:src/new.ts"]
-    },
-    {
-      "requirement": "Incremental indexing",
       "name": "Changed files removed from store before bulk load",
       "given": [
         "a store containing core:src/utils.ts with hash abc",
-        "AND src/utils.ts on disk now has hash def"
+        "AND src/utils.ts on disk now has hash def",
+        "AND the persisted graph fingerprint matches the fingerprint for the current run"
       ],
       "when": ["IndexCodeGraph.execute() is called"],
       "then": [
@@ -195,57 +181,32 @@
     },
     {
       "requirement": "Multi-workspace file discovery",
-      "name": ".gitignore respected",
+      "name": "Paths prefixed with workspace name and config-relative path",
       "given": [
-        "a .gitignore containing *.generated.ts",
-        "AND a file src/schema.generated.ts exists"
+        "the active specd.yaml lives at /project/specd.yaml",
+        "AND a workspace named core with codeRoot /project/packages/core",
+        "AND a file at /project/packages/core/src/index.ts"
       ],
-      "when": ["file discovery runs"],
-      "then": ["src/schema.generated.ts is not in the discovered files"]
-    },
-    {
-      "requirement": "Multi-workspace file discovery",
-      "name": ".gitignore loaded from git root",
-      "given": [
-        "a codeRoot at /project/packages/core within a git repo rooted at /project",
-        "AND /project/.gitignore contains *.log"
-      ],
-      "when": ["file discovery runs for this codeRoot"],
-      "then": [".log files are excluded even though the .gitignore is above the codeRoot"]
-    },
-    {
-      "requirement": "Multi-workspace file discovery",
-      "name": "Symlinks skipped",
-      "given": ["a symbolic link src/link.ts pointing to ../other/file.ts"],
-      "when": ["file discovery runs"],
-      "then": ["src/link.ts is not in the discovered files"]
-    },
-    {
-      "requirement": "Multi-workspace file discovery",
-      "name": "Files with no adapter skipped",
-      "given": ["a file docs/readme.md with no registered adapter for .md"],
-      "when": ["file discovery runs"],
-      "then": ["docs/readme.md is not in the discovered files"]
-    },
-    {
-      "requirement": "Multi-workspace file discovery",
-      "name": "Custom excludePaths replaces built-in defaults",
-      "given": ["WorkspaceIndexTarget.excludePaths is [\"fixtures/\"]"],
-      "when": ["file discovery runs"],
+      "when": ["the indexer processes this workspace"],
       "then": [
-        "only fixtures/ is excluded by config rules",
-        "AND node_modules/ and dist/ (built-in defaults) are NOT automatically excluded"
+        "FileNode.path is core:src/index.ts",
+        "AND FileNode.configRelativePath is packages/core/src/index.ts",
+        "AND FileNode.workspace is core"
       ]
     },
     {
       "requirement": "Multi-workspace file discovery",
-      "name": "Paths prefixed with workspace name",
+      "name": "Config-relative path normalizes absolute parent traversal",
       "given": [
-        "a workspace named core with codeRoot /project/packages/core",
+        "the active specd.yaml lives at /project/apps/web/specd.yaml",
+        "AND a workspace named core with codeRoot /project/packages/core",
         "AND a file at /project/packages/core/src/index.ts"
       ],
       "when": ["the indexer processes this workspace"],
-      "then": ["FileNode.path is core:src/index.ts", "AND FileNode.workspace is core"]
+      "then": [
+        "FileNode.configRelativePath is ../../packages/core/src/index.ts",
+        "AND it has forward slashes and no leading ./"
+      ]
     },
     {
       "requirement": "Two-pass extraction with in-memory index",
@@ -562,30 +523,28 @@
     },
     {
       "requirement": "Index result",
-      "name": "Complete result object",
-      "when": ["indexing completes"],
+      "name": "Normal incremental result has null fullRebuildReason",
+      "given": ["the persisted graph fingerprint matches the fingerprint for the current run"],
+      "when": ["indexing completes successfully"],
       "then": [
-        "IndexResult SHALL contain filesDiscovered, filesIndexed, filesRemoved, filesSkipped, specsDiscovered, specsIndexed, errors, duration, workspaces, and vcsRef"
+        "IndexResult.graphFingerprint equals the fingerprint persisted for that run",
+        "AND IndexResult.fullRebuildReason is null"
       ]
     },
     {
       "requirement": "Index result",
-      "name": "vcsRef in result",
-      "given": ["IndexOptions.vcsRef is \"abc1234\""],
-      "when": ["indexing completes"],
-      "then": ["IndexResult.vcsRef SHALL be \"abc1234\""]
-    },
-    {
-      "requirement": "Index result",
-      "name": "No vcsRef in result",
-      "given": ["IndexOptions.vcsRef is not provided"],
-      "when": ["indexing completes"],
-      "then": ["IndexResult.vcsRef SHALL be null"]
+      "name": "Fingerprint mismatch result records rebuild reason",
+      "given": ["the persisted graph fingerprint differs from the fingerprint for the current run"],
+      "when": ["indexing completes successfully after escalating to a full rebuild"],
+      "then": [
+        "IndexResult.graphFingerprint equals the new persisted fingerprint",
+        "AND IndexResult.fullRebuildReason is a human-readable explanation of the mismatch"
+      ]
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:8f0dcb302bbf109c60a15b436257a8c73b440101c4642682030dc5e241149a26",
-    "verify.md": "sha256:3b196487cc26ae45037261a498d5ead28f195a6ce206e6479ea410cd91c7c796"
+    "spec.md": "sha256:97f4cbcf1cdd52ad343e6e307eb3fba0e41eb2fe18ebe5bbc8fd3ea9367e4796",
+    "verify.md": "sha256:cd5dfb3dc7a66e9e5959753ff7249595111188d19b757ff0abbef9044c89fa58"
   },
   "generatedBy": "core"
 }

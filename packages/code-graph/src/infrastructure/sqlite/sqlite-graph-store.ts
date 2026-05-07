@@ -1,5 +1,5 @@
 /* eslint-disable jsdoc/require-jsdoc, @typescript-eslint/require-await */
-import { mkdirSync, rmSync } from 'node:fs'
+import { existsSync, mkdirSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import Database, { type Statement } from 'better-sqlite3'
 import { GraphStore } from '../../domain/ports/graph-store.js'
@@ -42,6 +42,7 @@ export class SQLiteGraphStore extends GraphStore {
   private db: SqliteDatabase | undefined
   private _lastIndexedAt: string | undefined
   private _lastIndexedRef: string | null = null
+  private _graphFingerprint: string | null = null
   private readonly preparedStatements = new Map<string, SqliteStatement>()
 
   private readonly graphDir: string
@@ -64,6 +65,8 @@ export class SQLiteGraphStore extends GraphStore {
     if (this.db !== undefined) return
     mkdirSync(this.graphDir, { recursive: true })
     mkdirSync(this.tmpDir, { recursive: true })
+
+    this.migrateSchemaIfNeeded()
 
     const db = new Database(this.dbPath)
     db.pragma('foreign_keys = ON')
@@ -140,6 +143,7 @@ export class SQLiteGraphStore extends GraphStore {
     relations: Relation[]
     onProgress?: (step: string) => void
     vcsRef?: string
+    graphFingerprint?: string
   }): Promise<void> {
     const db = this.ensureOpen()
     const tx = db.transaction(() => {
@@ -156,6 +160,10 @@ export class SQLiteGraphStore extends GraphStore {
         this.setMeta(db, 'lastIndexedRef', data.vcsRef)
         this._lastIndexedRef = data.vcsRef
       }
+      if (data.graphFingerprint !== undefined) {
+        this.setMeta(db, 'graphFingerprint', data.graphFingerprint)
+        this._graphFingerprint = data.graphFingerprint
+      }
     })
     tx()
     await this.rebuildFtsIndexes()
@@ -163,10 +171,11 @@ export class SQLiteGraphStore extends GraphStore {
 
   async getFile(path: string): Promise<FileNode | undefined> {
     const row = this.statement(
-      'SELECT path, language, content_hash, workspace, embedding FROM files WHERE path = ?',
+      'SELECT path, config_relative_path, language, content_hash, workspace, embedding FROM files WHERE path = ?',
     ).get(path) as
       | {
           path: string
+          config_relative_path: string
           language: string
           content_hash: string
           workspace: string
@@ -174,6 +183,20 @@ export class SQLiteGraphStore extends GraphStore {
         }
       | undefined
     return row === undefined ? undefined : this.mapFileRow(row)
+  }
+
+  async findFilesByConfigRelativePath(configRelativePath: string): Promise<FileNode[]> {
+    const rows = this.statement(
+      'SELECT path, config_relative_path, language, content_hash, workspace, embedding FROM files WHERE config_relative_path = ?',
+    ).all(configRelativePath) as Array<{
+      path: string
+      config_relative_path: string
+      language: string
+      content_hash: string
+      workspace: string
+      embedding: Buffer | null
+    }>
+    return rows.map((row) => this.mapFileRow(row))
   }
 
   async getSymbol(id: string): Promise<SymbolNode | undefined> {
@@ -383,14 +406,18 @@ export class SQLiteGraphStore extends GraphStore {
       languages,
       lastIndexedAt: this._lastIndexedAt,
       lastIndexedRef: this._lastIndexedRef,
+      graphFingerprint: this._graphFingerprint,
     }
   }
 
   async getAllFiles(): Promise<FileNode[]> {
     const rows = this.ensureOpen()
-      .prepare('SELECT path, language, content_hash, workspace, embedding FROM files')
+      .prepare(
+        'SELECT path, config_relative_path, language, content_hash, workspace, embedding FROM files',
+      )
       .all() as Array<{
       path: string
+      config_relative_path: string
       language: string
       content_hash: string
       workspace: string
@@ -610,13 +637,16 @@ export class SQLiteGraphStore extends GraphStore {
       db.prepare('DELETE FROM symbols').run()
       db.prepare('DELETE FROM specs').run()
       db.prepare('DELETE FROM files').run()
-      db.prepare("DELETE FROM meta WHERE key IN ('lastIndexedAt', 'lastIndexedRef')").run()
+      db.prepare(
+        "DELETE FROM meta WHERE key IN ('lastIndexedAt', 'lastIndexedRef', 'graphFingerprint')",
+      ).run()
       db.prepare('DELETE FROM symbol_fts').run()
       db.prepare('DELETE FROM spec_fts').run()
     })()
 
     this._lastIndexedAt = undefined
     this._lastIndexedRef = null
+    this._graphFingerprint = null
   }
 
   async recreate(): Promise<void> {
@@ -624,6 +654,7 @@ export class SQLiteGraphStore extends GraphStore {
     rmSync(this.graphDir, { recursive: true, force: true })
     this._lastIndexedAt = undefined
     this._lastIndexedRef = null
+    this._graphFingerprint = null
   }
 
   private ensureOpen(): SqliteDatabase {
@@ -631,6 +662,26 @@ export class SQLiteGraphStore extends GraphStore {
       throw new StoreNotOpenError()
     }
     return this.db
+  }
+
+  private migrateSchemaIfNeeded(): void {
+    if (!existsSync(this.dbPath)) return
+    try {
+      const db = new Database(this.dbPath, { readonly: true })
+      try {
+        const row = db.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get() as
+          | { value: string }
+          | undefined
+        if (row !== undefined && Number(row.value) < SQLITE_SCHEMA_VERSION) {
+          db.close()
+          rmSync(this.dbPath, { force: true })
+        }
+      } finally {
+        if (db.open) db.close()
+      }
+    } catch {
+      rmSync(this.dbPath, { force: true })
+    }
   }
 
   private ensureSchemaVersion(): void {
@@ -643,9 +694,19 @@ export class SQLiteGraphStore extends GraphStore {
       return
     }
     if (Number(current.value) !== SQLITE_SCHEMA_VERSION) {
-      throw new Error(
-        `sqlite graph-store schema version ${current.value} is incompatible with ${SQLITE_SCHEMA_VERSION}`,
-      )
+      db.close()
+      this.db = undefined
+      this.preparedStatements.clear()
+      rmSync(this.dbPath, { force: true })
+      const freshDb = new Database(this.dbPath)
+      freshDb.pragma('foreign_keys = ON')
+      freshDb.pragma('journal_mode = WAL')
+      freshDb.pragma(`busy_timeout = ${SQLiteGraphStore.SQLITE_BUSY_TIMEOUT_MS}`)
+      freshDb.pragma('synchronous = NORMAL')
+      freshDb.pragma('temp_store = MEMORY')
+      freshDb.exec(SQLITE_SCHEMA_DDL)
+      this.db = freshDb
+      this.setMeta(freshDb, 'schemaVersion', String(SQLITE_SCHEMA_VERSION))
     }
   }
 
@@ -657,9 +718,13 @@ export class SQLiteGraphStore extends GraphStore {
     const lastIndexedRef = db
       .prepare('SELECT value FROM meta WHERE key = ?')
       .get('lastIndexedRef') as { value: string } | undefined
+    const graphFingerprint = db
+      .prepare('SELECT value FROM meta WHERE key = ?')
+      .get('graphFingerprint') as { value: string } | undefined
 
     this._lastIndexedAt = lastIndexedAt?.value
     this._lastIndexedRef = lastIndexedRef?.value ?? null
+    this._graphFingerprint = graphFingerprint?.value ?? null
   }
 
   private setMeta(db: SqliteDatabase, key: string, value: string): void {
@@ -676,9 +741,10 @@ export class SQLiteGraphStore extends GraphStore {
   private insertFile(db: SqliteDatabase, file: FileNode): void {
     db.prepare(
       `
-        INSERT INTO files (path, language, content_hash, workspace, embedding)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO files (path, config_relative_path, language, content_hash, workspace, embedding)
+        VALUES (?, ?, ?, ?, ?, ?)
         ON CONFLICT(path) DO UPDATE SET
+          config_relative_path = excluded.config_relative_path,
           language = excluded.language,
           content_hash = excluded.content_hash,
           workspace = excluded.workspace,
@@ -686,6 +752,7 @@ export class SQLiteGraphStore extends GraphStore {
       `,
     ).run(
       file.path,
+      file.configRelativePath,
       file.language,
       file.contentHash,
       file.workspace,
@@ -929,6 +996,7 @@ export class SQLiteGraphStore extends GraphStore {
 
   private mapFileRow(row: {
     path: string
+    config_relative_path: string
     language: string
     content_hash: string
     workspace: string
@@ -936,6 +1004,7 @@ export class SQLiteGraphStore extends GraphStore {
   }): FileNode {
     return createFileNode({
       path: row.path,
+      configRelativePath: row.config_relative_path,
       language: row.language,
       contentHash: row.content_hash,
       workspace: row.workspace,

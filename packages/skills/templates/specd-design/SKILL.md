@@ -1,7 +1,5 @@
 # specd-design — write artifacts
 
-Read @../\_specd-shared/shared.md before doing anything.
-
 ## What this does
 
 Writes ONE artifact for the change, validates it, and stops. If the user says
@@ -28,6 +26,10 @@ schema or lifecycle semantics.
   not write any additional files until the user explicitly tells you to continue.
 
 ## Steps
+
+### 0. Bootstrap and load shared context
+
+You MUST read @../\_specd-shared/shared.md before doing anything, if you can't find it using Glob or Read tools, use Bash tools like `ls` and `cat` to find and read it. If you can't find it at all, tell the user: "Shared context not found. Please ensure shared.md is available." and stop.
 
 ### 1. Load change state
 
@@ -121,19 +123,7 @@ External workspaces remain valid read targets during design:
   outside the current git root.
 - `isExternal` changes location only. `ownership` still governs writes.
 
-### 3. Load schema
-
-```bash
-specd schema show --format toon
-```
-
-Skip this command only when a fresh `changes status --format toon` or
-`changes artifact-instruction --format toon` result from the current design step
-already contains the schema artifact metadata needed for the next decision. If the
-artifact definitions, `hasTasks`, validations, or instruction payload are not present,
-run `schema show`.
-
-### 4. Load context
+### 3. Load context
 
 ```bash
 specd changes context <name> designing --follow-deps --depth 1 --rules --constraints --format text [--fingerprint <stored-value>]
@@ -179,12 +169,12 @@ the original plan still holds or needs adjustment before writing artifacts.
 
 If the file does not exist, stop and tell the user you're missing the exploration context.
 Have a natural conversation to fill in the gaps, then write a `<changePath>/.specd-exploration.md`
-yourself to capture what you learned before continuing with step 5.
+yourself to capture what you learned before continuing with step 4.
 
 If `review: required: yes` was shown in step 1, use the reason and affected artifacts
 together with the current context to decide what actually needs revision.
 
-### 5. Show context summary
+### 4. Show context summary
 
 Before asking the user about review mode, show a brief summary:
 
@@ -198,7 +188,7 @@ Before asking the user about review mode, show a brief summary:
 >
 > **Next up:** `<nextArtifactId>` — <brief description of what this artifact covers>
 
-### 6. Choose mode — MANDATORY
+### 5. Choose mode — MANDATORY
 
 **You MUST ask the user this question. Do NOT skip it. Do NOT assume a mode.**
 
@@ -216,7 +206,7 @@ as done immediately. Otherwise:
 
 3. **STOP.** End your response here.
 
-### 7. Get next artifact
+### 6. Get next artifact
 
 ```bash
 specd changes artifact-instruction <name> --format toon
@@ -224,7 +214,7 @@ specd changes artifact-instruction <name> --format toon
 
 Returns `artifactId`, `instruction`, `template`, `delta`, `rulesPre`, `rulesPost`.
 
-If the next artifact is `null`, go to step 10.
+If the next artifact is `null`, go to step 9.
 
 Immediately after reading `changes artifact-instruction`:
 
@@ -241,7 +231,7 @@ specd specs outline <specPath> --artifact <artifactId>
 - Add `--hints` when you need root-level selector hint placeholders by type.
 - Run this before writing any delta so selector targeting uses real structure, not guesses.
 
-### 8. Write the artifact
+### 7. Write the artifact
 
 **`rulesPre`, `instruction`, and `rulesPost` are a single mandatory block.** You MUST
 read and follow all three, in this exact order: rulesPre → instruction → rulesPost.
@@ -264,7 +254,7 @@ After writing, check if the artifact implies scope changes:
 specd specs list --format text --summary
 ```
 
-### 9. Validate
+### 8. Validate
 
 Run in **text mode** to ensure visibility of notes (optimisation hints):
 
@@ -297,9 +287,9 @@ review those files directly in the change directory.
 
 Wait for user response. **Stop completely.**
 
-**Fast-forward mode:** show a one-line summary and go to step 7.
+**Fast-forward mode:** show a one-line summary and go to step 6.
 
-### 10. All artifacts done — run exit hooks immediately
+### 9. All artifacts done — run exit hooks immediately
 
 ```bash
 specd changes run-hooks <name> designing --phase post
@@ -308,12 +298,12 @@ specd changes hook-instruction <name> designing --phase post --format text
 
 Follow guidance.
 
-### 10b. Blast radius check
+### 9b. Blast radius check
 
 Use the code graph to assess the dependent impact of the planned implementation:
 
 ```bash
-specd graph impact --changes <workspace:path1> <workspace:path2> ... --format toon
+specd graph impact --file <workspace:path1> --file <workspace:path2> ... --format toon
 ```
 
 If an equivalent fresh impact result for the exact same planned file set was already
@@ -323,7 +313,7 @@ check, run this command again.
 
 If risk is HIGH or CRITICAL, surface it to the user and confirm before continuing.
 
-### 10c. Implementation scope guard — mandatory before `ready`
+### 9c. Implementation scope guard — mandatory before `ready`
 
 Before entering `ready`, verify that the implementation targets described by the design
 stay inside the change's writable workspace code roots.
@@ -346,7 +336,7 @@ user the blocked paths.
 If any target is **Out of scope** (but not `readOnly`), show the user and ask
 whether to update scope or continue. **Stop and wait.**
 
-### 10d. Enter `ready`
+### 9d. Enter `ready`
 
 Run ready pre-hooks, then transition:
 
@@ -361,7 +351,7 @@ Follow guidance.
 specd changes transition <name> ready --skip-hooks all
 ```
 
-### 11. Mandatory review stop
+### 10. Mandatory review stop
 
 Show summary of all artifacts and specs.
 
@@ -382,7 +372,7 @@ specd changes run-hooks <name> ready --phase post
 specd changes hook-instruction <name> ready --phase post --format text
 ```
 
-### 12. Handle approval gate
+### 11. Handle approval gate
 
 Run `changes status <name> --format text` and check `approvals:` line.
 
@@ -399,7 +389,7 @@ Do not invoke `/specd-implement` automatically; wait for explicit user confirmat
 ## Session tasks
 
 1. `Load state & hooks`
-2. `Load schema & context`
+2. `Load context`
 3. `Choose review mode`
 4. For each artifact: `Write <artifactId>`
 5. `Transition to ready`

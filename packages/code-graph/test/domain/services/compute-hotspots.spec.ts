@@ -13,7 +13,13 @@ function sym(name: string, filePath: string, line: number, kind: SymbolKind = Sy
 }
 
 function file(path: string, workspace = 'ws-a') {
-  return createFileNode({ path, language: 'typescript', contentHash: 'sha256:x', workspace })
+  return createFileNode({
+    path,
+    configRelativePath: '',
+    language: 'typescript',
+    contentHash: 'sha256:x',
+    workspace,
+  })
 }
 
 describe('computeHotspots', () => {

@@ -29,12 +29,28 @@ vi.mock('@specd/core', async () => {
   }
 })
 
+import { createVcsAdapter } from '@specd/core'
 import { resolveGraphCliContext } from '../../src/commands/graph/resolve-graph-cli-context.js'
 import { withProvider } from '../../src/commands/graph/with-provider.js'
 import { assertGraphIndexUnlocked } from '../../src/commands/graph/graph-index-lock.js'
 import { registerGraphStats } from '../../src/commands/graph/stats.js'
 
-function setup(mode: 'configured' | 'bootstrap' = 'configured') {
+const DEFAULT_STATS = {
+  fileCount: 1,
+  symbolCount: 2,
+  specCount: 0,
+  relationCounts: {},
+  languages: ['typescript'],
+  lastIndexedAt: '2026-03-31T10:00:00.000Z',
+  lastIndexedRef: 'abc1234def',
+}
+
+const { lastIndexedRef: _, ...DEFAULT_STATS_NO_REF } = DEFAULT_STATS
+
+function setup(
+  mode: 'configured' | 'bootstrap' = 'configured',
+  statOverrides: Record<string, unknown> = {},
+) {
   const config = makeMockConfig()
   vi.mocked(resolveGraphCliContext).mockResolvedValue({
     mode,
@@ -47,13 +63,8 @@ function setup(mode: 'configured' | 'bootstrap' = 'configured') {
 
   const mockProvider = {
     getStatistics: vi.fn().mockResolvedValue({
-      fileCount: 1,
-      symbolCount: 2,
-      specCount: 0,
-      relationCounts: {},
-      languages: ['typescript'],
-      lastIndexedAt: '2026-03-31T10:00:00.000Z',
-      lastIndexedRef: 'abc1234def',
+      ...DEFAULT_STATS,
+      ...statOverrides,
     }),
   }
   vi.mocked(withProvider).mockImplementation(async (_config, _format, fn) => {
@@ -150,5 +161,134 @@ describe('graph stats', () => {
     }
 
     expect(getStderr()).toContain('--config and --path are mutually exclusive')
+  })
+})
+
+describe('graph stats — staleness detection', () => {
+  it('reports stale when lastIndexedRef differs from currentRef', async () => {
+    const { getStdout } = setup('configured', { lastIndexedRef: 'abc1234def' })
+    vi.mocked(createVcsAdapter).mockResolvedValue({
+      ref: vi.fn().mockResolvedValue('fff9999aaa'),
+    } as never)
+
+    const program = makeStatsProgram()
+    await program.parseAsync(['node', 'specd', 'graph', 'stats', '--format', 'json'])
+
+    const parsed = JSON.parse(getStdout())
+    expect(parsed.stale).toBe(true)
+    expect(parsed.currentRef).toBe('fff9999aaa')
+  })
+
+  it('reports fresh when lastIndexedRef equals currentRef', async () => {
+    const { getStdout } = setup('configured', { lastIndexedRef: 'abc1234def' })
+    vi.mocked(createVcsAdapter).mockResolvedValue({
+      ref: vi.fn().mockResolvedValue('abc1234def'),
+    } as never)
+
+    const program = makeStatsProgram()
+    await program.parseAsync(['node', 'specd', 'graph', 'stats', '--format', 'json'])
+
+    const parsed = JSON.parse(getStdout())
+    expect(parsed.stale).toBe(false)
+    expect(parsed.currentRef).toBe('abc1234def')
+  })
+
+  it('reports unknown staleness when lastIndexedRef is null', async () => {
+    const { getStdout } = setup('configured', {
+      ...DEFAULT_STATS_NO_REF,
+      lastIndexedRef: null as unknown as string,
+    })
+    vi.mocked(createVcsAdapter).mockResolvedValue({
+      ref: vi.fn().mockResolvedValue('abc1234def'),
+    } as never)
+
+    const program = makeStatsProgram()
+    await program.parseAsync(['node', 'specd', 'graph', 'stats', '--format', 'json'])
+
+    const parsed = JSON.parse(getStdout())
+    expect(parsed.stale).toBeNull()
+    expect(parsed.currentRef).toBe('abc1234def')
+  })
+
+  it('reports unknown staleness when VCS ref is unavailable', async () => {
+    const { getStdout } = setup('configured', { lastIndexedRef: 'abc1234def' })
+    vi.mocked(createVcsAdapter).mockRejectedValue(new Error('no VCS'))
+
+    const program = makeStatsProgram()
+    await program.parseAsync(['node', 'specd', 'graph', 'stats', '--format', 'json'])
+
+    const parsed = JSON.parse(getStdout())
+    expect(parsed.stale).toBeNull()
+    expect(parsed.currentRef).toBeNull()
+  })
+
+  it('still outputs full stats when graph is stale (warn, not block)', async () => {
+    const { getStdout } = setup('configured', { lastIndexedRef: 'abc1234def' })
+    vi.mocked(createVcsAdapter).mockResolvedValue({
+      ref: vi.fn().mockResolvedValue('fff9999aaa'),
+    } as never)
+
+    const program = makeStatsProgram()
+    await program.parseAsync(['node', 'specd', 'graph', 'stats'])
+
+    const stdout = getStdout()
+    expect(stdout).toContain('Files:     1')
+    expect(stdout).toContain('Symbols:   2')
+    expect(stdout).toContain('Specs:     0')
+    expect(stdout).toContain('⚠ Graph is stale')
+  })
+
+  it('shows exact stale warning with truncated refs in text output', async () => {
+    const { getStdout } = setup('configured', { lastIndexedRef: 'abc1234def' })
+    vi.mocked(createVcsAdapter).mockResolvedValue({
+      ref: vi.fn().mockResolvedValue('fff9999aaa'),
+    } as never)
+
+    const program = makeStatsProgram()
+    await program.parseAsync(['node', 'specd', 'graph', 'stats'])
+
+    expect(getStdout()).toContain('⚠ Graph is stale (indexed at abc1234, current: fff9999)')
+  })
+
+  it('omits staleness line when lastIndexedRef is null in text output', async () => {
+    const { getStdout } = setup('configured', {
+      ...DEFAULT_STATS_NO_REF,
+      lastIndexedRef: null as unknown as string,
+    })
+
+    const program = makeStatsProgram()
+    await program.parseAsync(['node', 'specd', 'graph', 'stats'])
+
+    expect(getStdout()).not.toContain('Graph is stale')
+  })
+
+  it('includes stale, currentRef, and fingerprintMismatch in JSON output', async () => {
+    const { getStdout } = setup('configured', { lastIndexedRef: 'abc1234def' })
+    vi.mocked(createVcsAdapter).mockResolvedValue({
+      ref: vi.fn().mockResolvedValue('fff9999aaa'),
+    } as never)
+
+    const program = makeStatsProgram()
+    await program.parseAsync(['node', 'specd', 'graph', 'stats', '--format', 'json'])
+
+    const parsed = JSON.parse(getStdout())
+    expect(parsed).toHaveProperty('stale', true)
+    expect(parsed).toHaveProperty('currentRef', 'fff9999aaa')
+    expect(parsed).toHaveProperty('fingerprintMismatch', null)
+  })
+
+  it('includes stale, currentRef, and fingerprintMismatch in TOON output', async () => {
+    const { getStdout } = setup('configured', { lastIndexedRef: 'abc1234def' })
+    vi.mocked(createVcsAdapter).mockResolvedValue({
+      ref: vi.fn().mockResolvedValue('fff9999aaa'),
+    } as never)
+
+    const program = makeStatsProgram()
+    await program.parseAsync(['node', 'specd', 'graph', 'stats', '--format', 'toon'])
+
+    const stdout = getStdout()
+    expect(stdout).toContain('stale')
+    expect(stdout).toContain('currentRef')
+    expect(stdout).toContain('fingerprintMismatch')
   })
 })

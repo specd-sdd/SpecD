@@ -40,6 +40,7 @@ describe('LadybugGraphStore hierarchy persistence', () => {
 
     const file = createFileNode({
       path: 'src/types.ts',
+      configRelativePath: '',
       language: 'typescript',
       contentHash: 'sha256:abc',
       workspace: '/project',
@@ -133,6 +134,7 @@ describe('LadybugGraphStore hierarchy persistence', () => {
 
     const file = createFileNode({
       path: 'src/kernel.ts',
+      configRelativePath: '',
       language: 'typescript',
       contentHash: 'sha256:kernel',
       workspace: '/project',

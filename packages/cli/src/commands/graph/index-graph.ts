@@ -1,5 +1,9 @@
 import { Command } from 'commander'
-import { type IndexOptions, DEFAULT_EXCLUDE_PATHS } from '@specd/code-graph'
+import {
+  type IndexOptions,
+  DEFAULT_EXCLUDE_PATHS,
+  type WorkspaceIndexTarget,
+} from '@specd/code-graph'
 import { existsSync } from 'node:fs'
 import { spawn } from 'node:child_process'
 import { createVcsAdapter } from '@specd/core'
@@ -8,8 +12,8 @@ import { cliError } from '../../handle-error.js'
 import { resolveGraphCliContext } from './resolve-graph-cli-context.js'
 import { withProvider } from './with-provider.js'
 import { buildWorkspaceTargets } from './build-workspace-targets.js'
-import { type WorkspaceIndexTarget } from '@specd/code-graph'
 import { acquireGraphIndexLock } from './graph-index-lock.js'
+import { codeGraphVersion } from './code-graph-version.js'
 
 const GRAPH_INDEX_WORKER_ENV = 'SPECD_GRAPH_INDEX_WORKER'
 const GRAPH_INDEX_LOCK_HELD_ENV = 'SPECD_GRAPH_INDEX_LOCK_HELD'
@@ -139,11 +143,17 @@ JSON/TOON output schema:
               const indexOpts: IndexOptions = {
                 workspaces,
                 projectRoot: config.projectRoot,
+                codeGraphVersion,
                 ...(isTTY ? { onProgress: progressFn } : {}),
                 ...(vcsRef !== undefined ? { vcsRef } : {}),
               }
 
               const result = await provider.index(indexOpts)
+
+              if (opts.force && result.fullRebuildReason === null) {
+                ;(result as { fullRebuildReason: string | null }).fullRebuildReason =
+                  'Explicit --force reindex requested'
+              }
 
               if (isTTY) {
                 process.stderr.write('\r\x1b[K')
@@ -157,6 +167,9 @@ JSON/TOON output schema:
                   `  removed:    ${String(result.filesRemoved)}`,
                   `  specs:      ${String(result.specsIndexed)}`,
                 ]
+                if (result.fullRebuildReason !== null) {
+                  lines.push(`  rebuild:    ${result.fullRebuildReason}`)
+                }
                 if (result.errors.length > 0) {
                   lines.push(`  errors:     ${String(result.errors.length)}`)
                   for (const err of result.errors) {

@@ -1019,20 +1019,27 @@ If a graph index is currently running, this command fails fast with: `The code g
 specd graph impact [options]
 ```
 
-Analyze dependents or dependencies of a symbol or file. Context resolution follows the same configured-vs-bootstrap rules as `graph index`.
+Analyze dependents or dependencies of a symbol or one or more files. Context resolution follows the same configured-vs-bootstrap rules as `graph index`.
 
 If a graph index is currently running, this command fails fast with: `The code graph is currently being indexed. Try again in a few seconds.`
 
-| Option                                                             | Description                                                    |
-| ------------------------------------------------------------------ | -------------------------------------------------------------- |
-| `--symbol <name>`                                                  | Symbol name to analyze.                                        |
-| `--file <path>`                                                    | File path to analyze.                                          |
-| `--changes <files...>`                                             | Analyze impact of a set of changed files.                      |
-| `--direction dependents\|dependencies\|upstream\|downstream\|both` | Impact direction (default: `dependents`).                      |
-| `--depth <n>`                                                      | Maximum traversal depth (default: `3`).                        |
-| `--config <path>`                                                  | Config file path. Mutually exclusive with `--path`.            |
-| `--path <path>`                                                    | Repository root bootstrap path. Ignores any discovered config. |
-| `--format text\|json\|toon`                                        | Output format.                                                 |
+File selectors accept three forms:
+
+- **Config-relative path**: `packages/core/src/model.ts`
+- **Workspace-prefixed canonical path**: `core:src/model.ts`
+- **Absolute path**: `/abs/path/to/packages/core/model.ts`
+
+Multiple `--file` flags aggregate impact across all specified files.
+
+| Option                                                             | Description                                                                           |
+| ------------------------------------------------------------------ | ------------------------------------------------------------------------------------- |
+| `--symbol <name>`                                                  | Symbol name to analyze.                                                               |
+| `--file <path...>`                                                 | One or more file paths to analyze (config-relative, workspace-prefixed, or absolute). |
+| `--direction dependents\|dependencies\|upstream\|downstream\|both` | Impact direction (default: `dependents`).                                             |
+| `--depth <n>`                                                      | Maximum traversal depth (default: `3`).                                               |
+| `--config <path>`                                                  | Config file path. Mutually exclusive with `--path`.                                   |
+| `--path <path>`                                                    | Repository root bootstrap path. Ignores any discovered config.                        |
+| `--format text\|json\|toon`                                        | Output format.                                                                        |
 
 `dependents` is the preferred name for blast-radius analysis: it reports code that
 depends on the target. `dependencies` reports code the target depends on. The legacy

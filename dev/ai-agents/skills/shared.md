@@ -285,7 +285,7 @@ specd graph search "<query>" --specs --spec-content --format json
 ```bash
 specd graph impact --symbol "<name>" --direction both --format json
 specd graph impact --file "<workspace:path>" --format json
-specd graph impact --changes <workspace:path1> <workspace:path2> --format json
+specd graph impact --file <workspace:path1> --file <workspace:path2> --format json
 ```
 
 Returns `riskLevel` (LOW/MEDIUM/HIGH/CRITICAL), affected files, and affected symbols.
@@ -301,16 +301,16 @@ Score = `(sameWsCallers × 3) + (crossWsCallers × 5) + fileImporters`.
 
 ### When to use graph commands in each skill
 
-| Skill              | When                 | Command                  | Why                                                      |
-| ------------------ | -------------------- | ------------------------ | -------------------------------------------------------- |
-| `/specd`           | Welcome              | `graph stats`            | Show graph freshness alongside project status            |
-| `/specd-new`       | Understanding intent | `graph search`           | Find related specs and symbols by keyword                |
-| `/specd-new`       | Proposing specs      | `graph impact --file`    | Assess which areas a file change would affect            |
-| `/specd-design`    | Before `ready`       | `graph impact --changes` | Check blast radius of planned implementation targets     |
-| `/specd-design`    | Loading context      | `graph search --specs`   | Find specs related to the artifact being written         |
-| `/specd-design`    | Writing design/tasks | `graph hotspots`         | Identify high-risk symbols the design should account for |
-| `/specd-implement` | Before coding        | `graph impact --symbol`  | Understand blast radius of symbols you'll modify         |
-| `/specd-implement` | Before coding        | `graph hotspots --file`  | Spot risky symbols in files you'll touch                 |
+| Skill              | When                 | Command                 | Why                                                      |
+| ------------------ | -------------------- | ----------------------- | -------------------------------------------------------- |
+| `/specd`           | Welcome              | `graph stats`           | Show graph freshness alongside project status            |
+| `/specd-new`       | Understanding intent | `graph search`          | Find related specs and symbols by keyword                |
+| `/specd-new`       | Proposing specs      | `graph impact --file`   | Assess which areas a file change would affect            |
+| `/specd-design`    | Before `ready`       | `graph impact --file`   | Check blast radius of planned implementation targets     |
+| `/specd-design`    | Loading context      | `graph search --specs`  | Find specs related to the artifact being written         |
+| `/specd-design`    | Writing design/tasks | `graph hotspots`        | Identify high-risk symbols the design should account for |
+| `/specd-implement` | Before coding        | `graph impact --symbol` | Understand blast radius of symbols you'll modify         |
+| `/specd-implement` | Before coding        | `graph hotspots --file` | Spot risky symbols in files you'll touch                 |
 
 Graph queries are the **primary** way to understand the codebase. Always prefer graph
 commands over manual exploration (Glob/Grep). If a graph query returns useful results,

@@ -704,4 +704,52 @@ describe('Workspace indexing', () => {
       }),
     )
   })
+
+  it('persists configRelativePath for discovered files', async () => {
+    const coreRoot = createWorkspace(tempDir, 'core', {
+      'src/model.ts': 'export interface Model { id: string }',
+    })
+
+    provider = createCodeGraphProvider({ storagePath: tempDir })
+    await provider.open()
+
+    await provider.index({
+      workspaces: [{ name: 'core', codeRoot: coreRoot, specs: async () => [] }],
+      projectRoot: tempDir,
+      codeGraphVersion: '0.1.0',
+    })
+
+    const file = await provider.getFile('core:src/model.ts')
+    expect(file).toBeDefined()
+    expect(file!.configRelativePath).toContain('src/model.ts')
+  })
+
+  it('stores per-workspace fingerprint map and detects mismatch', async () => {
+    const coreRoot = createWorkspace(tempDir, 'core', {
+      'src/a.ts': 'export const a = 1',
+    })
+
+    provider = createCodeGraphProvider({ storagePath: tempDir })
+    await provider.open()
+
+    await provider.index({
+      workspaces: [{ name: 'core', codeRoot: coreRoot, specs: async () => [] }],
+      projectRoot: tempDir,
+      codeGraphVersion: '0.1.0',
+    })
+
+    const stats = await provider.getStatistics()
+    expect(stats.graphFingerprint).not.toBeNull()
+    const parsed = JSON.parse(stats.graphFingerprint!) as Record<string, string>
+    expect(parsed).toHaveProperty('core')
+
+    const result = await provider.index({
+      workspaces: [{ name: 'core', codeRoot: coreRoot, specs: async () => [] }],
+      projectRoot: tempDir,
+      codeGraphVersion: '0.2.0',
+    })
+
+    expect(result.fullRebuildReason).not.toBeNull()
+    expect(result.fullRebuildReason).toContain('fingerprint mismatch')
+  })
 })

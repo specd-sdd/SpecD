@@ -21,13 +21,14 @@ Each skill directory contains `.md` files (without frontmatter).
 
 ### Requirement: Graph impact terminology in workflow templates
 
-Workflow skill templates that instruct agents to run `specd graph impact` SHALL use clear user-facing terminology for impact direction:
+Workflow skill templates that instruct agents to run `specd graph impact` SHALL use clear user-facing terminology for impact direction and selector semantics:
 
 - **dependents** — symbols and files that depend on the target; implemented by `--direction dependents`, with `--direction upstream` as a compatibility value
 - **dependencies** — symbols and files the target depends on; implemented by `--direction dependencies`, with `--direction downstream` as a compatibility value
 - **both** — combined dependents and dependencies analysis; implemented by `--direction both`
+- **file selectors** — blast-radius queries over files use `--file`, including multiple file inputs when needed; templates MUST NOT instruct agents to use `--changes`
 
-Templates MUST NOT ask for "downstream dependents" or otherwise describe `downstream` as dependents. When a skill needs the blast radius of changing a symbol or file, it SHALL use `--direction dependents` or describe the query as dependents.
+Templates MUST NOT ask for "downstream dependents" or otherwise describe `downstream` as dependents. When a skill needs the blast radius of changing a symbol or file, it SHALL use `--direction dependents` or describe the query as dependents. When a workflow needs the blast radius of several files, it SHALL use `specd graph impact --file <path1> <path2> ...` rather than a separate change-detection selector.
 
 ### Requirement: Frontmatter source
 
@@ -60,6 +61,7 @@ The skills package does not include frontmatter because each agent environment h
 - Agent plugins MUST model the full supported frontmatter field set for their target runtime.
 - Agent plugins MUST NOT emit fields unsupported by their target runtime.
 - Workflow templates MUST use dependents/dependencies wording for graph impact guidance and MUST prefer `--direction dependents` / `--direction dependencies`; `upstream` / `downstream` may appear only as compatibility values.
+- Workflow templates MUST use `specd graph impact --file` for file-based blast-radius checks and MUST NOT reference `specd graph impact --changes`.
 
 ## Spec Dependencies
 

@@ -55,10 +55,9 @@ current turn when the active skill says to stop or let the user decide:
 - restore or continue a different change or draft
 - add or remove specs from a change
 - write artifacts, spec files, verify files, or deltas
-- run `change validate`
-- run `change transition`
-- run `change approve`
-- run `change archive`
+- run `specd change transition`
+- run `specd change approve`
+- run `specd change archive`
 
 ## Explicit User Override: Escape Hatch
 
@@ -108,44 +107,27 @@ MUST obey the skill.
 ```
 specd/
 ├── packages/
-│   ├── core/              # @specd/core — domain, application, infrastructure
-│   ├── cli/               # @specd/cli — CLI adapter
-│   ├── code-graph/        # @specd/code-graph — code graph indexing and analysis
-│   ├── mcp/               # @specd/mcp — MCP server adapter (stub)
-│   ├── skills/            # @specd/skills — skill registry API
-│   ├── schema-std/        # @specd/schema-std — default schema
-│   └── plugins/
-│       ├── claude/        # @specd/plugin-claude (stub)
-│       ├── copilot/       # @specd/plugin-copilot (stub)
-│       └── codex/         # @specd/plugin-codex (stub)
-├── specs/
-│   ├── _global/           # Global constraints — apply to ALL packages (7 specs)
-│   │   ├── architecture/  # spec.md + verify.md
-│   │   ├── conventions/   # spec.md + verify.md
-│   │   ├── commits/       # spec.md + verify.md
-│   │   ├── testing/       # spec.md + verify.md
-│   │   ├── docs/          # spec.md + verify.md
-│   │   ├── eslint/        # spec.md + verify.md
-│   │   └── spec-layout/   # spec.md + verify.md
-│   ├── core/              # Package specs for @specd/core (77 specs)
-│   ├── cli/               # Package specs for @specd/cli (55 specs)
-│   └── code-graph/        # Package specs for @specd/code-graph (10 specs)
-├── docs/
-│   ├── adr/               # 19 Architecture Decision Records
-│   ├── guide/             # Getting started, workflow, schemas, workspaces, config, selectors
-│   ├── cli/               # CLI reference
-│   ├── core/              # Core API docs (domain model, ports, services, use cases, errors)
-│   ├── config/            # Config reference + examples
-│   └── schemas/           # Schema format reference + examples
-└── .specd/
-    ├── archive/           # Archived changes (by year/month)
-    ├── changes/           # Active changes
-    ├── drafts/            # Draft changes
-    ├── discarded/         # Discarded changes
-    ├── metadata/          # Spec metadata (177 files)
-    ├── schemas/           # Custom schemas
-    ├── skills/            # Shared skill notes
-    └── code-graph.lbug    # Persisted code graph index
+│   ├── core/                 # @specd/core
+│   ├── cli/                  # @specd/cli
+│   ├── skills/               # @specd/skills
+│   ├── code-graph/           # @specd/code-graph
+│   ├── schema-std/           # @specd/schema-std
+│   ├── mcp/                  # @specd/mcp
+│   ├── plugin-manager/       # @specd/plugin-manager
+│   ├── plugin-agent-claude/  # @specd/plugin-agent-claude
+│   ├── plugin-agent-codex/   # @specd/plugin-agent-codex
+│   ├── plugin-agent-copilot/ # @specd/plugin-agent-copilot
+│   ├── plugin-agent-opencode/# @specd/plugin-agent-opencode
+│   ├── plugin-agent-standard/# @specd/plugin-agent-standard
+│   └── specd/                # @specd/specd (main)
+├── apps/
+│   └── public-web/           # @specd/public-web
+├── dev/
+│   ├── ai-agents/
+│   └── scripts/
+├── specs/                    # Specifications (managed via specd workflow or `specd` cli)
+├── docs/                     # Documentation (including ADRs)
+└── .specd/                   # Change workflow (changes/, drafts/, metadata/)
 ```
 
 ---
@@ -162,18 +144,7 @@ Before writing any code, you MUST read the following specs in full. They are bin
 - [`specs/_global/eslint/spec.md`](specs/_global/eslint/spec.md)
 - [`specs/_global/spec-layout/spec.md`](specs/_global/spec-layout/spec.md)
 
-**Contextual reads** — read these when working on the relevant area:
-
-- [`specs/core/schema-format/spec.md`](specs/core/schema-format/spec.md) — when working on schema loading, parsing, or validation
-- [`specs/core/config/spec.md`](specs/core/config/spec.md) — when working on config loading, resolution, or validation
-
 Each `spec.md` has a paired `verify.md` in the same directory with WHEN/THEN scenarios. Read it if you need to verify expected behaviour or understand edge cases for a requirement.
-
-**Package specs:** before working on a specific package, also read `specs/<package>/` if it exists. Spec workspaces with specs:
-
-- `specs/core/` (77 specs) — when working on `@specd/core`
-- `specs/cli/` (55 specs) — when working on `@specd/cli`
-- `specs/code-graph/` (10 specs) — when working on `@specd/code-graph`
 
 ---
 
@@ -200,3 +171,61 @@ Key decisions:
 - Manual dependency injection at entry points — no IoC container
 - `fs` is the only storage adapter in v1
 - All packages are ESM (`"type": "module"`, `NodeNext` resolution)
+
+---
+
+## Using Code Graph
+
+Use the code graph for intelligent code search and impact analysis. All graph commands require an index to be built first.
+
+### Index the codebase
+
+```bash
+node packages/cli/dist/index.js graph index
+```
+
+### Available commands
+
+| Command                         | Description                                       |
+| ------------------------------- | ------------------------------------------------- |
+| `graph index`                   | Build the code graph index                        |
+| `graph stats`                   | Show index statistics (files, symbols, languages) |
+| `graph search <query>`          | Full-text search across symbols and specs         |
+| `graph search --symbols`        | Search only symbols                               |
+| `graph search --specs`          | Search only specs                                 |
+| `graph impact --file <path...>` | Analyze impact on one or more files               |
+| `graph impact --symbol <name>`  | Analyze impact on a symbol                        |
+| `graph hotspots`                | Rank symbols by impact score (callers, importers) |
+
+### Examples
+
+```bash
+# Search for a function across the codebase
+node packages/cli/dist/index.js graph search "parseSpec" --format toon
+
+# Find all usages of a symbol
+node packages/cli/dist/index.js graph impact --symbol "mergeSpecs" --format toon
+
+# Check what breaks if you modify a file
+node packages/cli/dist/index.js graph impact --file packages/core/src/model.ts --format toon
+
+# Analyze impact of multiple files
+node packages/cli/dist/index.js graph impact --file a.ts --file b.ts --format toon
+
+# Find high-impact symbols in the codebase
+node packages/cli/dist/index.js graph hotspots --format toon
+```
+
+---
+
+## Project Status
+
+Use `project status` to get a consolidated overview of the project:
+
+```bash
+node packages/cli/dist/index.js project status --format toon
+node packages/cli/dist/index.js project status --format toon --graph      # Include extended graph stats
+node packages/cli/dist/index.js project status --format toon --context   # Include context references (instructions, files, specs to read)
+```
+
+Shows: workspaces, spec counts per workspace, active changes, drafts, discarded, graph freshness, and optionally context.

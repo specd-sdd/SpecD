@@ -399,6 +399,24 @@
       "then": ["its cause is artifact-review-required", "AND it is distinct from artifact-drift"]
     },
     {
+      "requirement": "History and event sourcing",
+      "name": "Description update appends description-updated event",
+      "given": ["a Change with description \"Original\""],
+      "when": ["updateDescription(\"New description\", actor) is called"],
+      "then": [
+        "a description-updated event is appended to history",
+        "AND the event contains description: \"New description\"",
+        "AND the event contains by with the actor identity"
+      ]
+    },
+    {
+      "requirement": "History and event sourcing",
+      "name": "Description update does not append invalidated event",
+      "given": ["a Change in spec-approved state with active approval"],
+      "when": ["updateDescription(\"New description\", actor) is called"],
+      "then": ["no invalidated event is appended", "AND the change remains in spec-approved state"]
+    },
+    {
       "requirement": "Historical implementation detection",
       "name": "Historical detection becomes true after implementing",
       "given": [
@@ -541,29 +559,11 @@
       "name": "Discarded change cannot be restored",
       "when": ["a discard operation is attempted to be reversed"],
       "then": ["no operation exists to move a change out of discarded/"]
-    },
-    {
-      "requirement": "History and event sourcing",
-      "name": "Description update appends description-updated event",
-      "given": ["a Change with description \"Original\""],
-      "when": ["updateDescription(\"New description\", actor) is called"],
-      "then": [
-        "a description-updated event is appended to history",
-        "AND the event contains description: \"New description\"",
-        "AND the event contains by with the actor identity"
-      ]
-    },
-    {
-      "requirement": "History and event sourcing",
-      "name": "Description update does not append invalidated event",
-      "given": ["a Change in spec-approved state with active approval"],
-      "when": ["updateDescription(\"New description\", actor) is called"],
-      "then": ["no invalidated event is appended", "AND the change remains in spec-approved state"]
     }
   ],
   "contentHashes": {
     "spec.md": "sha256:1c666830ad271655b99b4c1df37137bdd70663b258818281402aaa10d4649784",
-    "verify.md": "sha256:69007cfa1c505c39d4bfe6212670714218170ee3794d5f048ebddb43dc287323"
+    "verify.md": "sha256:59128180e0a21e8935ff055a928f4f9c2dffb73b226e257c8496e11697de6aa8"
   },
   "generatedBy": "core"
 }

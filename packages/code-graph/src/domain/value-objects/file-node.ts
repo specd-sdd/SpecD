@@ -3,6 +3,7 @@
  */
 export interface FileNode {
   readonly path: string
+  readonly configRelativePath: string
   readonly language: string
   readonly contentHash: string
   readonly workspace: string
@@ -22,6 +23,7 @@ function normalizePath(filePath: string): string {
  * Creates a new FileNode with a normalized path.
  * @param params - The file node properties.
  * @param params.path - Workspace-relative file path.
+ * @param params.configRelativePath - Path relative to the config directory.
  * @param params.language - Language identifier.
  * @param params.contentHash - Content hash for incremental diffing.
  * @param params.workspace - Workspace name (e.g. 'core', 'cli').
@@ -30,6 +32,7 @@ function normalizePath(filePath: string): string {
  */
 export function createFileNode(params: {
   path: string
+  configRelativePath: string
   language: string
   contentHash: string
   workspace: string
@@ -37,6 +40,7 @@ export function createFileNode(params: {
 }): FileNode {
   return {
     path: normalizePath(params.path),
+    configRelativePath: normalizePath(params.configRelativePath),
     language: params.language,
     contentHash: params.contentHash,
     workspace: params.workspace,

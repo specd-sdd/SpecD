@@ -21,7 +21,7 @@
     {
       "requirement": "Graph impact terminology in workflow templates",
       "rules": [
-        "Workflow skill templates that instruct agents to run `specd graph impact` SHALL use clear user-facing terminology for impact direction:\n\n- **dependents** — symbols and files that depend on the target; implemented by `--direction dependents`, with `--direction upstream` as a compatibility value\n- **dependencies** — symbols and files the target depends on; implemented by `--direction dependencies`, with `--direction downstream` as a compatibility value\n- **both** — combined dependents and dependencies analysis; implemented by `--direction both`\n\nTemplates MUST NOT ask for \"downstream dependents\" or otherwise describe `downstream` as dependents. When a skill needs the blast radius of changing a symbol or file, it SHALL use `--direction dependents` or describe the query as dependents."
+        "Workflow skill templates that instruct agents to run `specd graph impact` SHALL use clear user-facing terminology for impact direction and selector semantics:\n\n- **dependents** — symbols and files that depend on the target; implemented by `--direction dependents`, with `--direction upstream` as a compatibility value\n- **dependencies** — symbols and files the target depends on; implemented by `--direction dependencies`, with `--direction downstream` as a compatibility value\n- **both** — combined dependents and dependencies analysis; implemented by `--direction both`\n- **file selectors** — blast-radius queries over files use `--file`, including multiple file inputs when needed; templates MUST NOT instruct agents to use `--changes`\n\nTemplates MUST NOT ask for \"downstream dependents\" or otherwise describe `downstream` as dependents. When a skill needs the blast radius of changing a symbol or file, it SHALL use `--direction dependents` or describe the query as dependents. When a workflow needs the blast radius of several files, it SHALL use `specd graph impact --file <path1> <path2> ...` rather than a separate change-detection selector."
       ]
     },
     {
@@ -54,7 +54,8 @@
     "Each agent plugin is responsible for storing and injecting its own frontmatter.",
     "Agent plugins MUST model the full supported frontmatter field set for their target runtime.",
     "Agent plugins MUST NOT emit fields unsupported by their target runtime.",
-    "Workflow templates MUST use dependents/dependencies wording for graph impact guidance and MUST prefer --direction dependents / --direction dependencies; upstream / downstream may appear only as compatibility values."
+    "Workflow templates MUST use dependents/dependencies wording for graph impact guidance and MUST prefer --direction dependents / --direction dependencies; upstream / downstream may appear only as compatibility values.",
+    "Workflow templates MUST use specd graph impact --file for file-based blast-radius checks and MUST NOT reference specd graph impact --changes."
   ],
   "scenarios": [
     {
@@ -94,13 +95,20 @@
     },
     {
       "requirement": "Graph impact terminology in workflow templates",
-      "name": "Workflow templates prefer CLI direction aliases",
-      "when": [
-        "workflow skill templates include concrete specd graph impact --direction examples for dependents or dependencies queries"
-      ],
+      "name": "Workflow templates use --file instead of --changes",
+      "when": ["workflow skill templates include a concrete file-impact command example"],
       "then": [
-        "they prefer --direction dependents and --direction dependencies",
-        "AND --direction upstream and --direction downstream appear only as compatibility wording when needed"
+        "they use specd graph impact --file ...",
+        "AND they do not reference specd graph impact --changes"
+      ]
+    },
+    {
+      "requirement": "Graph impact terminology in workflow templates",
+      "name": "Workflow templates prefer workspace-aware file selectors",
+      "when": ["workflow skill templates show file selector examples for configured projects"],
+      "then": [
+        "they prefer canonical workspace-prefixed paths or config-relative paths",
+        "AND they do not rely on implicit default: resolution"
       ]
     },
     {
@@ -142,8 +150,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:6a4355ff12669929859ef4d3904e5e704efa0c944968de2254161e3ea452c3f6",
-    "verify.md": "sha256:f393ae97e995c9a9f531a6e6c820429572361fdf368e8c1028dc7edf4b3e967b"
+    "spec.md": "sha256:89513ed2222104b6537e18ff15c2b68c820d3c5018fbd36fd9d607ae4cb88669",
+    "verify.md": "sha256:eb887c481dd709f9bea16aca94bfbe74eb3415a7fa82df879899b3974f48fd72"
   },
   "generatedBy": "core"
 }

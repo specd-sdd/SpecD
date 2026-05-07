@@ -44,14 +44,10 @@ export interface WorkspaceIndexTarget {
  * Options for configuring a code graph indexing operation.
  */
 export interface IndexOptions {
-  /** Workspaces to index. */
   readonly workspaces: readonly WorkspaceIndexTarget[]
-  /** Absolute path to the project root (for monorepo package resolution). */
   readonly projectRoot: string
-  /** Optional callback invoked to report indexing progress. */
   readonly onProgress?: IndexProgressCallback
-  /** Maximum source bytes per processing chunk. Defaults to 20MB. */
   readonly chunkBytes?: number
-  /** VCS ref (commit hash) to persist as lastIndexedRef after indexing. */
   readonly vcsRef?: string
+  readonly codeGraphVersion?: string
 }

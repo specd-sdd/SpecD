@@ -272,6 +272,27 @@ describe('TypeScriptLanguageAdapter', () => {
         ),
       ).toBe(true)
     })
+
+    it('emits ImportedType facts from type alias RHS', () => {
+      const code = `
+        type ParserRegistry = ReadonlyMap<string, ArtifactParser>
+        type HandlerFn = (event: Event) => Result
+      `
+      const symbols = adapter.extractSymbols('main.ts', code)
+      const imports = adapter.extractImportedNames('main.ts', code)
+      const facts = adapter.extractBindingFacts('main.ts', code, symbols, imports)
+
+      const registryFacts = facts.filter(
+        (f) => f.name === 'ParserRegistry' && f.sourceKind === BindingSourceKind.ImportedType,
+      )
+      expect(registryFacts.some((f) => f.targetName === 'ArtifactParser')).toBe(true)
+
+      const handlerFacts = facts.filter(
+        (f) => f.name === 'HandlerFn' && f.sourceKind === BindingSourceKind.ImportedType,
+      )
+      expect(handlerFacts.some((f) => f.targetName === 'Event')).toBe(true)
+      expect(handlerFacts.some((f) => f.targetName === 'Result')).toBe(true)
+    })
   })
 
   describe('CALLS extraction', () => {

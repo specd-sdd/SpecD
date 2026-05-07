@@ -98,9 +98,17 @@ export abstract class GraphStore {
     relations: Relation[]
     onProgress?: (step: string) => void
     vcsRef?: string
+    graphFingerprint?: string
   }): Promise<void>
 
   abstract getFile(path: string): Promise<FileNode | undefined>
+
+  /**
+   * Retrieves all file nodes whose configRelativePath exactly matches the given path.
+   * @param configRelativePath - The normalized config-relative path to search.
+   * @returns An array of matching file nodes.
+   */
+  abstract findFilesByConfigRelativePath(configRelativePath: string): Promise<FileNode[]>
 
   /**
    * Retrieves a symbol node by its id.

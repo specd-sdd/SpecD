@@ -31,11 +31,17 @@
 - **THEN** they describe it as dependencies: symbols and files the target depends on
 - **AND** combined analysis is described as both dependents and dependencies
 
-#### Scenario: Workflow templates prefer CLI direction aliases
+#### Scenario: Workflow templates use --file instead of --changes
 
-- **WHEN** workflow skill templates include concrete `specd graph impact --direction` examples for dependents or dependencies queries
-- **THEN** they prefer `--direction dependents` and `--direction dependencies`
-- **AND** `--direction upstream` and `--direction downstream` appear only as compatibility wording when needed
+- **WHEN** workflow skill templates include a concrete file-impact command example
+- **THEN** they use `specd graph impact --file ...`
+- **AND** they do not reference `specd graph impact --changes`
+
+#### Scenario: Workflow templates prefer workspace-aware file selectors
+
+- **WHEN** workflow skill templates show file selector examples for configured projects
+- **THEN** they prefer canonical workspace-prefixed paths or config-relative paths
+- **AND** they do not rely on implicit `default:` resolution
 
 ### Requirement: Frontmatter source
 

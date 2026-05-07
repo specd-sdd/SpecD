@@ -1,13 +1,15 @@
 # specd-verify — check implementation against specs
 
-Read @../\_specd-shared/shared.md before doing anything.
-
 ## What this does
 
 Runs through verification scenarios for each spec in the change. If all pass,
 transitions to `done`. If any fail, loops back to implementing.
 
 ## Steps
+
+### 0. Bootstrap and load shared context
+
+You MUST read @../\_specd-shared/shared.md before doing anything, if you can't find it using Glob or Read tools, use Bash tools like `ls` and `cat` to find and read it. If you can't find it at all, tell the user: "Shared context not found. Please ensure shared.md is available." and stop.
 
 ### 1. Load change state
 
@@ -231,10 +233,23 @@ specd changes hook-instruction <name> archivable --phase post --format text
 **Stop.**
 Do not invoke `/specd-archive` automatically; wait for explicit user confirmation.
 
-> All scenarios pass. Change is ready to archive. Run `/specd-archive <name>`.
+#### 7. Optional Change Audit
 
-**Stop.**
-Do not invoke `/specd-archive` automatically; wait for explicit user confirmation.
+After the verification process is complete (regardless of the outcome, but usually after a success or when discrepancies are suspected), you MUST ask the user:
+
+> "Would you like to perform a full compliance audit of this change?"
+
+**If the user agrees:**
+
+1. Execute the `specd-compliance` skill for the current change: `/specd-compliance --change <name>`
+2. Obtain the audit results and present them clearly to the user.
+3. Based on the findings, ALWAYS ask the user what to do next. Provide these options:
+   - **"Update Specs"**: If the audit identifies spec-level issues or drift, suggest `/specd-design <name>`.
+   - **"Fix Implementation"**: If the audit identifies code or test gaps, suggest `/specd-implement <name>`.
+   - **"Both"**: If both specs and code need updates, instruct the user to run `/specd-design <name>` FIRST (to establish the requirement), followed by `/specd-implement <name>`.
+   - **"Proceed"**: If the audit is clean or issues are dismissed, continue with the standard workflow.
+
+You MUST NOT proceed to any of these skills automatically; the user must explicitly choose the next action.
 
 ## Session tasks
 
@@ -242,6 +257,7 @@ Do not invoke `/specd-archive` automatically; wait for explicit user confirmatio
 2. `Load verification context`
 3. For each spec: `Verify: <specId>`
 4. `Report results & transition`
+5. `Audit Selection (Optional)`
 
 ## Handling failed transitions
 
@@ -269,3 +285,4 @@ specd changes transition <name> designing --skip-hooks all
 - Run actual tests where applicable
 - Any time a fresh `changes status` shows `review: required: yes`, stop
   verification and redirect to `/specd-design <name>`
+- ALWAYS ask the user for the next action after an optional audit

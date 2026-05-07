@@ -12,16 +12,19 @@
 
 - **`path`** = `{workspaceName}:{relativeToCodeRoot}` (e.g. `core:src/index.ts`)
 - **`workspace`** = workspace name string (e.g. `core`, `cli`, `default`)
+- **`configRelativePath`** = path from the directory containing the active `specd.yaml` to the same file on disk (e.g. `packages/core/src/index.ts`)
 
-This ensures that two workspaces with identical relative paths (e.g. both having `src/index.ts`) produce distinct `FileNode.path` values. The workspace name is the `SpecdWorkspaceConfig.name` from the specd configuration.
+`path` remains the canonical graph identity used by `SymbolNode.filePath`, symbol ids, and persisted relations. `configRelativePath` exists for user-facing lookup when commands receive file paths without an explicit workspace prefix.
+
+This ensures that two workspaces with identical relative paths (e.g. both having `src/index.ts`) produce distinct `FileNode.path` values while still allowing CLI users to resolve file arguments using repository-style paths relative to the active config. The workspace name is the `SpecdWorkspaceConfig.name` from the specd configuration.
 
 ### Requirement: SymbolNode ID includes workspace
 
 `SymbolNode.id` SHALL include the workspace-prefixed path:
 
-- **`id`** = `{workspace}:{relativePath}:{kind}:{name}:{line}` (e.g. `core:src/index.ts:function:main:1`)
+- **`id`** = `{filePath}:{kind}:{name}:{line}:{column}` (e.g. `core:src/index.ts:function:main:1:0`)
 
-This follows naturally from `SymbolNode.filePath` being the `FileNode.path`.
+This follows naturally from `SymbolNode.filePath` being the `FileNode.path`. The `column` component provides additional disambiguation for overloaded declarations on the same line.
 
 ### Requirement: SpecNode workspace field
 
@@ -36,6 +39,19 @@ Spec IDs use the format `{workspace}:{specPath}` (e.g. `core:change`, `default:_
 For each workspace with a `codeRoot`, the indexer SHALL discover files starting from the workspace's `codeRoot` (an absolute path). The `codeRoot` is provided by `SpecdWorkspaceConfig.codeRoot` from the specd configuration.
 
 Files are discovered per workspace and their paths are prefixed with the workspace name before being stored in the graph. The `discoverFiles` function itself has no workspace knowledge — it accepts a root directory and returns paths relative to that root.
+
+### Requirement: Config-relative file lookup
+
+The graph SHALL support resolving file selectors by a path relative to the directory containing the active `specd.yaml`.
+
+For a configured project:
+
+1. The indexer computes `configRelativePath` for every indexed file from the active config directory to the file on disk.
+2. The value is normalized to forward slashes and MUST NOT include a leading `./`.
+3. Files outside the config directory remain representable by a relative path containing `..` segments.
+4. CLI commands that accept file selectors MAY use this field to resolve inputs that do not include a `{workspace}:` prefix.
+
+This lookup is in addition to canonical workspace-prefixed graph identity; it does not replace it.
 
 ### Requirement: Spec resolution via SpecRepository
 
@@ -143,9 +159,9 @@ When `respectGitignore` is `false`:
 
 - `@specd/code-graph` depends on `@specd/core` as a runtime dependency (types, domain services)
 - Single `.specd/code-graph.lbug` file for the whole project
-- The `discoverFiles` function remains workspace-agnostic — workspace prefixing happens in the indexer
+- The `discoverFiles` function remains workspace-agnostic — workspace prefixing and config-relative path derivation happen in the indexer
 - Spec resolution uses `SpecRepository` exclusively — no filesystem fallback
-- Existing `.specd/code-graph.lbug` files are incompatible with the new path format — `--force` re-index is required after upgrading
+- Existing graph stores are incompatible when file identity metadata changes (for example adding `configRelativePath`) — a full rebuild is required after upgrading
 
 ## Examples
 

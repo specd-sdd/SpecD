@@ -33,4 +33,6 @@ export interface IndexResult {
   readonly duration: number
   readonly workspaces: readonly WorkspaceIndexBreakdown[]
   readonly vcsRef: string | null
+  readonly graphFingerprint: string
+  readonly fullRebuildReason: string | null
 }

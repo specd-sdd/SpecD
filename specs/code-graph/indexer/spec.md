@@ -23,17 +23,26 @@ The use case accepts a `GraphStore` (already opened) and an `AdapterRegistry` vi
 
 ### Requirement: Incremental indexing
 
-The indexer SHALL compute a content hash for each discovered file and compare it against the hash stored in the `GraphStore`. Only three categories of files are processed:
+The indexer SHALL compute a content hash for each discovered file and compare it against the hash stored in the `GraphStore`. It SHALL also compare the persisted graph fingerprint against the current fingerprint for the indexing run.
+
+The current graph fingerprint for this iteration SHALL be computed from:
+
+- the effective `@specd/code-graph` package version loaded by the running process
+- a canonical hash of the resolved workspace objects used for indexing
+
+Only three categories of files are processed during a normal incremental run when the graph fingerprint matches:
 
 - **New** — file exists on disk but not in the store → extract and upsert
 - **Changed** — file exists in both but hashes differ → extract and upsert (replaces previous data)
 - **Deleted** — file exists in the store but not on disk → remove from store. Only files belonging to workspaces being indexed are considered for deletion — files from other workspaces are left untouched. This allows `--workspace <name>` to index a single workspace without destroying data from others.
 
-Files whose hash matches the stored hash are skipped entirely — no parsing, no I/O beyond the hash comparison.
+Files whose hash matches the stored hash are skipped entirely — no parsing, no I/O beyond the hash comparison — only when the persisted graph fingerprint also matches the current fingerprint.
+
+When the persisted graph fingerprint differs from the current fingerprint, the indexer SHALL treat the run as a full rebuild of the active graph store rather than a normal incremental skip. The preferred behavior is to recreate the store and re-index every discovered file while surfacing a visible explanation that the code-graph version or resolved workspace configuration changed. If a backend cannot safely recreate in-place, the caller MAY fail fast and require an explicit force-reindex command instead.
 
 Changed files are removed from the store before bulk load, because CSV `COPY FROM` cannot upsert — it can only insert. Removing changed files first ensures the bulk load inserts fresh data without conflicts.
 
-To force a full re-index, callers MUST call `GraphStore.clear()` before `execute()`. This removes all stored data, causing every file to be treated as new.
+To force a full re-index, callers MUST invoke the graph-store recreation path before `execute()`. This removes all stored data, causing every file to be treated as new.
 
 ### Requirement: Multi-workspace file discovery
 
@@ -41,7 +50,8 @@ The indexer SHALL discover files from each workspace's `codeRoot` independently.
 
 1. Call `discoverFiles(codeRoot, hasAdapter, options)` to get paths relative to `codeRoot`
 2. Prefix each path with `{workspaceName}:` to form the globally unique `FileNode.path`
-3. Diff against the store (filtered by workspace prefix)
+3. Derive `FileNode.configRelativePath` from the directory containing the active `specd.yaml`
+4. Diff against the store (filtered by workspace prefix)
 
 `discoverFiles` accepts a root directory plus optional exclusion options:
 
@@ -60,6 +70,8 @@ Evaluation order when `respectGitignore: true`:
 - Skips symbolic links — only regular files are indexed
 - Skips files with no registered language adapter (determined by extension)
 - Returns root-relative file paths with forward-slash normalization
+
+`FileNode.configRelativePath` SHALL be forward-slash-normalized, omit a leading `./`, and remain relative to the active config directory even when the file lies outside that directory (using `..` segments when needed).
 
 ### Requirement: Two-pass extraction with in-memory index
 
@@ -144,13 +156,15 @@ Only infrastructure-level errors (e.g. store connection lost, disk full) may abo
 - **`filesDiscovered`** — total files found during discovery (across all workspaces)
 - **`filesIndexed`** — files that were new or changed and successfully processed
 - **`filesRemoved`** — files removed from the store (deleted from disk)
-- **`filesSkipped`** — files skipped because their hash matched
+- **`filesSkipped`** — files skipped because their hash matched and the graph fingerprint was still valid
 - **`specsDiscovered`** — total spec directories found
 - **`specsIndexed`** — specs that were new or changed and successfully processed
 - **`errors`** — array of `{ filePath: string; message: string }` for files or specs that failed
 - **`duration`** — elapsed time in milliseconds
 - **`workspaces`** — per-workspace breakdown array of `{ name, filesDiscovered, filesIndexed, filesSkipped, filesRemoved, specsDiscovered, specsIndexed }`
 - **`vcsRef`** — the VCS ref that was persisted, or `null` if none was provided
+- **`graphFingerprint`** — the fingerprint persisted for the completed run
+- **`fullRebuildReason`** — `null` for a normal incremental run, or a human-readable reason when the run escalated to a full rebuild because the stored fingerprint no longer matched
 
 ### Requirement: Spec dependency indexing
 

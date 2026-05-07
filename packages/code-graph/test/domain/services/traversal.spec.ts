@@ -16,7 +16,13 @@ function sym(name: string, filePath: string, line: number) {
 }
 
 function file(path: string) {
-  return createFileNode({ path, language: 'typescript', contentHash: 'sha256:x', workspace: '/p' })
+  return createFileNode({
+    path,
+    configRelativePath: '',
+    language: 'typescript',
+    contentHash: 'sha256:x',
+    workspace: '/p',
+  })
 }
 
 describe('Traversal services', () => {

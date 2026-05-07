@@ -162,6 +162,20 @@ func New(repo UserRepo) UserRepo {
         callFacts.some((fact) => fact.form === CallForm.Constructor && fact.name === 'UserRepo'),
       ).toBe(true)
     })
+
+    it('emits ImportedType facts from type alias RHS', () => {
+      const code = `package main
+type ParserRegistry = map[string]ArtifactParser
+type HandlerFn func(event Event) Result`
+      const symbols = adapter.extractSymbols('main.go', code)
+      const imports = adapter.extractImportedNames('main.go', code)
+      const facts = adapter.extractBindingFacts('main.go', code, symbols, imports)
+
+      const registryFacts = facts.filter(
+        (f) => f.name === 'ParserRegistry' && f.sourceKind === BindingSourceKind.ImportedType,
+      )
+      expect(registryFacts.some((f) => f.targetName === 'ArtifactParser')).toBe(true)
+    })
   })
 
   describe('extractImportedNames', () => {

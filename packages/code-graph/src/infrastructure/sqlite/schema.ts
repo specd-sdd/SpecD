@@ -1,10 +1,11 @@
-export const SQLITE_SCHEMA_VERSION = 1
+export const SQLITE_SCHEMA_VERSION = 2
 
 export const SQLITE_SCHEMA_DDL = `
 PRAGMA foreign_keys = ON;
 
 CREATE TABLE IF NOT EXISTS files (
   path TEXT PRIMARY KEY,
+  config_relative_path TEXT NOT NULL DEFAULT '',
   language TEXT NOT NULL,
   content_hash TEXT NOT NULL,
   workspace TEXT NOT NULL,
@@ -47,6 +48,7 @@ CREATE TABLE IF NOT EXISTS meta (
   value TEXT NOT NULL
 );
 
+CREATE INDEX IF NOT EXISTS idx_files_config_relative_path ON files(config_relative_path);
 CREATE INDEX IF NOT EXISTS idx_symbols_file_path ON symbols(file_path);
 CREATE INDEX IF NOT EXISTS idx_symbols_kind ON symbols(kind);
 CREATE INDEX IF NOT EXISTS idx_specs_workspace ON specs(workspace);

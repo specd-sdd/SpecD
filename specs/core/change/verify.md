@@ -224,6 +224,21 @@
 - **THEN** its `cause` is `artifact-review-required`
 - **AND** it is distinct from `artifact-drift`
 
+#### Scenario: Description update appends description-updated event
+
+- **GIVEN** a Change with description "Original"
+- **WHEN** `updateDescription("New description", actor)` is called
+- **THEN** a `description-updated` event is appended to history
+- **AND** the event contains `description: "New description"`
+- **AND** the event contains `by` with the actor identity
+
+#### Scenario: Description update does not append invalidated event
+
+- **GIVEN** a Change in `spec-approved` state with active approval
+- **WHEN** `updateDescription("New description", actor)` is called
+- **THEN** no `invalidated` event is appended
+- **AND** the change remains in `spec-approved` state
+
 ### Requirement: Historical implementation detection
 
 #### Scenario: Historical detection becomes true after implementing
@@ -337,20 +352,3 @@
 
 - **WHEN** a discard operation is attempted to be reversed
 - **THEN** no operation exists to move a change out of `discarded/`
-
-### Requirement: History and event sourcing
-
-#### Scenario: Description update appends description-updated event
-
-- **GIVEN** a Change with description "Original"
-- **WHEN** `updateDescription("New description", actor)` is called
-- **THEN** a `description-updated` event is appended to history
-- **AND** the event contains `description: "New description"`
-- **AND** the event contains `by` with the actor identity
-
-#### Scenario: Description update does not append invalidated event
-
-- **GIVEN** a Change in `spec-approved` state with active approval
-- **WHEN** `updateDescription("New description", actor)` is called
-- **THEN** no `invalidated` event is appended
-- **AND** the change remains in `spec-approved` state

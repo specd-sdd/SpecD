@@ -562,6 +562,7 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
     this.extractReturnTypeFacts(content, addFact)
     this.extractPropertyTypeFacts(content, addFact)
     this.extractConstructionAliasFacts(content, addFact)
+    this.extractTypeAliasRhsFacts(content, addFact)
 
     return facts
   }
@@ -756,6 +757,33 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
       const targetName = match[2]
       if (name === undefined || targetName === undefined) continue
       addFact(name, BindingSourceKind.ConstructorCall, targetName, match.index ?? 0)
+    }
+  }
+
+  /**
+   * Extracts binding facts from type alias RHS references.
+   * @param content - Source file content.
+   * @param addFact - Callback to register a discovered binding fact.
+   */
+  private extractTypeAliasRhsFacts(
+    content: string,
+    addFact: (
+      name: string,
+      sourceKind: BindingSourceKind,
+      targetName: string | undefined,
+      index: number,
+      metadata?: Readonly<Record<string, unknown>>,
+    ) => void,
+  ): void {
+    const typeAliasPattern = /\btype\s+([A-Za-z_$][\w$]*)\s*=\s*([^;\n]+)/g
+    for (const match of content.matchAll(typeAliasPattern)) {
+      const aliasName = match[1]
+      const rhsText = match[2]
+      if (aliasName === undefined || rhsText === undefined) continue
+      for (const targetName of extractTypeReferenceNames(rhsText)) {
+        if (targetName === aliasName) continue
+        addFact(aliasName, BindingSourceKind.ImportedType, targetName, match.index ?? 0)
+      }
     }
   }
 

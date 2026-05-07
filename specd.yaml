@@ -50,6 +50,14 @@ workspaces:
     codeRoot: packages/core
     ownership: owned
 
+  schema-std:
+    specs:
+      adapter: fs
+      fs:
+        path: specs/schema-std
+    codeRoot: packages/schema-std
+    ownership: owned
+
   cli:
     specs:
       adapter: fs

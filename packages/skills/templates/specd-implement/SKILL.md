@@ -1,13 +1,15 @@
 # specd-implement — write code
 
-Read @../\_specd-shared/shared.md before doing anything.
-
 ## What this does
 
 Implements the code described by the change's design and tasks artifacts.
 Works through tasks one by one and marks them done.
 
 ## Steps
+
+### 0. Bootstrap and load shared context
+
+You MUST read @../\_specd-shared/shared.md before doing anything, if you can't find it using Glob or Read tools, use Bash tools like `ls` and `cat` to find and read it. If you can't find it at all, tell the user: "Shared context not found. Please ensure shared.md is available." and stop.
 
 ### 1. Load change state
 

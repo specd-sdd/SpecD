@@ -9,7 +9,7 @@
     {
       "requirement": "File node",
       "rules": [
-        "A `FileNode` SHALL represent a single source file in the workspace. It contains:\n\n- **`path`** (`string`) — globally unique path in format `{workspaceName}:{relativeToCodeRoot}` (e.g. `core:src/index.ts`). Forward-slash-normalized. This is the node's identity.\n- **`language`** (`string`) — language identifier (e.g. `typescript`, `python`). Determined by the language adapter at index time.\n- **`contentHash`** (`string`) — hash of the file's content at last index. Used for incremental diffing.\n- **`workspace`** (`string`) — the workspace name this file belongs to (e.g. `core`, `cli`, `default`).\n- **`embedding`** (`Float32Array | undefined`) — optional vector embedding for semantic search. Deferred to v2+.\n\nTwo `FileNode` values are equal if and only if their `path` fields match (since path includes the workspace name prefix)."
+        "A `FileNode` SHALL represent a single source file in the workspace. It contains:\n\n- **`path`** (`string`) — globally unique path in format `{workspaceName}:{relativeToCodeRoot}` (e.g. `core:src/index.ts`). Forward-slash-normalized. This is the node's canonical identity.\n- **`configRelativePath`** (`string`) — forward-slash-normalized path from the directory containing the `specd.yaml` used for indexing to the file on disk (e.g. `packages/core/src/index.ts`). This path is not the node identity and MAY include `..` segments when the file lives outside the config directory.\n- **`language`** (`string`) — language identifier (e.g. `typescript`, `python`). Determined by the language adapter at index time.\n- **`contentHash`** (`string`) — hash of the file's content at last index. Used for incremental diffing.\n- **`workspace`** (`string`) — the workspace name this file belongs to (e.g. `core`, `cli`, `default`).\n- **`embedding`** (`Float32Array | undefined`) — optional vector embedding for semantic search. Deferred to v2+.\n\nTwo `FileNode` values are equal if and only if their `path` fields match (since `path` includes the workspace name prefix and remains the canonical graph identity). `configRelativePath` exists for user-facing lookup and diagnostics; it MUST NOT replace the canonical workspace-prefixed path in persisted relations or symbol identifiers."
       ]
     },
     {
@@ -21,7 +21,7 @@
     {
       "requirement": "Symbol node",
       "rules": [
-        "A `SymbolNode` SHALL represent a named code construct extracted from a file. It contains:\n\n- **`id`** (`string`) — deterministic identifier computed from `filePath + kind + name + line` (e.g. `core:src/index.ts:function:main:1`). Since `filePath` is workspace-prefixed, the id is globally unique across workspaces. The same symbol at the same location always produces the same id.\n- **`name`** (`string`) — the symbol's declared name (e.g. `createUser`, `AuthService`).\n- **`kind`** (`SymbolKind`) — the category of this symbol.\n- **`filePath`** (`string`) — workspace-prefixed path of the file containing this symbol (e.g. `core:src/index.ts`).\n- **`line`** (`number`) — 1-based line number of the symbol's declaration.\n- **`column`** (`number`) — 0-based column offset of the symbol's declaration.\n- **`comment`** (`string | undefined`) — the raw comment or JSDoc text immediately preceding the symbol's declaration. Stored verbatim (no parsing) to enable full-text search. Language adapters extract this from the AST; symbols without a preceding comment have `undefined`.\n\nThe `id` field is the symbol's identity for graph operations. Two `SymbolNode` values with the same `id` are considered the same symbol."
+        "A `SymbolNode` SHALL represent a named code construct extracted from a file. It contains:\n\n- **`id`** (`string`) — deterministic identifier computed from `filePath + kind + name + line + column` (e.g. `core:src/index.ts:function:main:1:0`). Since `filePath` is workspace-prefixed, the id is globally unique across workspaces. The same symbol at the same location always produces the same id.\n- **`name`** (`string`) — the symbol's declared name (e.g. `createUser`, `AuthService`).\n- **`kind`** (`SymbolKind`) — the category of this symbol.\n- **`filePath`** (`string`) — workspace-prefixed path of the file containing this symbol (e.g. `core:src/index.ts`).\n- **`line`** (`number`) — 1-based line number of the symbol's declaration.\n- **`column`** (`number`) — 0-based column offset of the symbol's declaration.\n- **`comment`** (`string | undefined`) — the raw comment or JSDoc text immediately preceding the symbol's declaration. Stored verbatim (no parsing) to enable full-text search. Language adapters extract this from the AST; symbols without a preceding comment have `undefined`."
       ]
     },
     {
@@ -93,33 +93,50 @@
   "scenarios": [
     {
       "requirement": "File node",
-      "name": "FileNode equality by path",
-      "given": ["two FileNode values with the same path but different contentHash"],
+      "name": "FileNode equality still uses canonical path",
+      "given": [
+        "two FileNode values with the same canonical path but different contentHash and configRelativePath"
+      ],
       "when": ["equality is checked"],
-      "then": [
-        "they are considered equal (since path includes the workspace name prefix and is globally unique)"
-      ]
+      "then": ["they are considered equal because path remains the canonical graph identity"]
     },
     {
       "requirement": "File node",
       "name": "FileNode path normalization",
-      "given": ["a file at OS path src\\domain\\entities\\change.ts"],
+      "given": [
+        "a file discovered under workspace core at OS path src\\\\domain\\\\entities\\\\change.ts"
+      ],
       "when": ["a FileNode is created"],
-      "then": ["path is stored as src/domain/entities/change.ts (forward-slash-normalized)"]
+      "then": ["path is stored as core:src/domain/entities/change.ts"]
     },
     {
       "requirement": "File node",
-      "name": "FileNode workspace is a name string",
-      "given": ["a file discovered in workspace core"],
+      "name": "FileNode configRelativePath is repository-style",
+      "given": [
+        "the active specd.yaml lives at /project/specd.yaml",
+        "AND workspace core has codeRoot /project/packages/core",
+        "AND the discovered file is /project/packages/core/src/index.ts"
+      ],
       "when": ["a FileNode is created"],
-      "then": ["workspace is 'core' (the workspace name, not an absolute path)"]
+      "then": [
+        "path is core:src/index.ts",
+        "AND configRelativePath is packages/core/src/index.ts",
+        "AND workspace is core"
+      ]
     },
     {
       "requirement": "File node",
-      "name": "FileNode path includes workspace prefix",
-      "given": ["a file src/index.ts discovered in workspace core"],
-      "when": ["a FileNode is created by the indexer"],
-      "then": ["path is 'core/src/index.ts'", "AND workspace is 'core'"]
+      "name": "FileNode configRelativePath may include parent segments",
+      "given": [
+        "the active specd.yaml lives at /project/apps/web/specd.yaml",
+        "AND workspace core has codeRoot /project/packages/core",
+        "AND the discovered file is /project/packages/core/src/index.ts"
+      ],
+      "when": ["a FileNode is created"],
+      "then": [
+        "configRelativePath is ../../packages/core/src/index.ts",
+        "AND it does not replace the canonical path"
+      ]
     },
     {
       "requirement": "Spec node",
@@ -155,10 +172,10 @@
       "requirement": "Symbol node",
       "name": "Deterministic id generation",
       "given": [
-        "a symbol with filePath: 'core/src/utils.ts', kind: function, name: 'hash', line: 10"
+        "a symbol with filePath: 'core/src/utils.ts', kind: function, name: 'hash', line: 10, column: 0"
       ],
       "when": ["the id is computed"],
-      "then": ["it produces 'core/src/utils.ts:function:hash:10' every time for these inputs"]
+      "then": ["it produces 'core/src/utils.ts:function:hash:10:0' every time for these inputs"]
     },
     {
       "requirement": "Symbol node",
@@ -170,10 +187,10 @@
     {
       "requirement": "Symbol node",
       "name": "Id includes workspace-prefixed path",
-      "given": ["a symbol in file core/src/index.ts (workspace-prefixed path)"],
+      "given": ["a symbol in file core:src/index.ts (workspace-prefixed path)"],
       "when": ["the id is computed"],
       "then": [
-        "the id starts with core/src/index.ts:",
+        "the id starts with core:src/index.ts:",
         "AND the id is globally unique across workspaces"
       ]
     },
@@ -391,8 +408,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:3b12265931df4b7aaaa45065b34712296f2d9f3f298ca33f8bae7f7d3d68461a",
-    "verify.md": "sha256:1b062c5e671fbe0fe96a51a32aa42d36eb48ec3f4b4d2278472c4682ff3de74d"
+    "spec.md": "sha256:100d0d88756ebe3cc167851231c506670bfd72fcc2cbfab398dc64386eddfa57",
+    "verify.md": "sha256:da1c6bd1cbf1b3ecc4518174dd79dbf29d37e2f45e8e86fcab4fa8f7a010be42"
   },
   "generatedBy": "core"
 }

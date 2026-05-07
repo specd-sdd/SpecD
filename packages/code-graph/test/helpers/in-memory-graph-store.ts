@@ -34,6 +34,7 @@ export class InMemoryGraphStore extends GraphStore {
   private relations: Relation[] = []
   private _lastIndexedAt: string | undefined
   private _lastIndexedRef: string | null = null
+  private _graphFingerprint: string | null = null
 
   constructor() {
     super(':memory:')
@@ -139,6 +140,7 @@ export class InMemoryGraphStore extends GraphStore {
     relations: Relation[]
     onProgress?: (step: string) => void
     vcsRef?: string
+    graphFingerprint?: string
   }): Promise<void> {
     this.ensureOpen()
     for (const f of data.files) this.files.set(f.path, f)
@@ -148,6 +150,9 @@ export class InMemoryGraphStore extends GraphStore {
     this._lastIndexedAt = new Date().toISOString()
     if (data.vcsRef !== undefined) {
       this._lastIndexedRef = data.vcsRef
+    }
+    if (data.graphFingerprint !== undefined) {
+      this._graphFingerprint = data.graphFingerprint
     }
   }
 
@@ -173,6 +178,17 @@ export class InMemoryGraphStore extends GraphStore {
   async getFile(path: string): Promise<FileNode | undefined> {
     this.ensureOpen()
     return this.files.get(path)
+  }
+
+  async findFilesByConfigRelativePath(configRelativePath: string): Promise<FileNode[]> {
+    this.ensureOpen()
+    const results: FileNode[] = []
+    for (const file of this.files.values()) {
+      if (file.configRelativePath === configRelativePath) {
+        results.push(file)
+      }
+    }
+    return results
   }
 
   async getSymbol(id: string): Promise<SymbolNode | undefined> {
@@ -326,6 +342,7 @@ export class InMemoryGraphStore extends GraphStore {
       languages,
       lastIndexedAt: this._lastIndexedAt,
       lastIndexedRef: this._lastIndexedRef,
+      graphFingerprint: this._graphFingerprint,
     }
   }
 
@@ -417,6 +434,7 @@ export class InMemoryGraphStore extends GraphStore {
     this.relations = []
     this._lastIndexedAt = undefined
     this._lastIndexedRef = null
+    this._graphFingerprint = null
   }
 
   async recreate(): Promise<void> {
@@ -426,5 +444,6 @@ export class InMemoryGraphStore extends GraphStore {
     this.relations = []
     this._lastIndexedAt = undefined
     this._lastIndexedRef = null
+    this._graphFingerprint = null
   }
 }

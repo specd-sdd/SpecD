@@ -1,8 +1,9 @@
-export const SCHEMA_VERSION = 6
+export const SCHEMA_VERSION = 7
 
 export const SCHEMA_DDL = `
 CREATE NODE TABLE IF NOT EXISTS File(
   path STRING,
+  configRelativePath STRING,
   language STRING,
   contentHash STRING,
   workspace STRING,

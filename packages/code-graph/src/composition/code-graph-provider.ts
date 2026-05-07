@@ -87,6 +87,15 @@ export class CodeGraphProvider {
   }
 
   /**
+   * Finds files by their config-relative path.
+   * @param configRelativePath - The config-relative path to search for.
+   * @returns Matching file nodes.
+   */
+  async findFilesByConfigRelativePath(configRelativePath: string): Promise<FileNode[]> {
+    return this.store.findFilesByConfigRelativePath(configRelativePath)
+  }
+
+  /**
    * Retrieves a spec node by its identifier.
    * @param specId - The spec identifier.
    * @returns The spec node, or undefined if not found.

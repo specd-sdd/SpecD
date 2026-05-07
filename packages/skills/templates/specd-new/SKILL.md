@@ -1,13 +1,15 @@
 # specd-new — discover and create
 
-Read @../\_specd-shared/shared.md before doing anything.
-
 ## What this does
 
 Explores what the user wants to accomplish, surfaces affected specs, and creates a
 change when the picture is clear. Does NOT write any artifacts — that's `/specd-design`.
 
 ## Steps
+
+### 0. Bootstrap and load shared context
+
+You MUST read @../\_specd-shared/shared.md before doing anything, if you can't find it using Glob or Read tools, use Bash tools like `ls` and `cat` to find and read it. If you can't find it at all, tell the user: "Shared context not found. Please ensure shared.md is available." and stop.
 
 ### 1. Load project context
 

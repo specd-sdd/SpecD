@@ -554,6 +554,19 @@ export class GoLanguageAdapter implements LanguageAdapter {
       addFact(targetName, BindingSourceKind.Property, targetName, match.index ?? 0)
     }
 
+    const typeAliasPattern = /\btype\s+([A-Z][A-Za-z0-9_]*)\s*(?:=\s*|=)\s*([^\n{]+)/g
+    for (const match of content.matchAll(typeAliasPattern)) {
+      const aliasName = match[1]
+      const rhsText = match[2]
+      if (aliasName === undefined || rhsText === undefined) continue
+      const identPattern = /[A-Z][A-Za-z0-9_]*/g
+      for (const refMatch of rhsText.matchAll(identPattern)) {
+        const targetName = refMatch[0]
+        if (targetName === undefined || targetName === aliasName) continue
+        addFact(aliasName, BindingSourceKind.ImportedType, targetName, match.index ?? 0)
+      }
+    }
+
     return facts
   }
 

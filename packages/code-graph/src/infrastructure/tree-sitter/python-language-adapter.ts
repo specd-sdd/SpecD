@@ -520,6 +520,42 @@ export class PythonLanguageAdapter implements LanguageAdapter {
       addFact(name, BindingSourceKind.ConstructorCall, targetName, match.index ?? 0)
     }
 
+    const typeAliasPattern =
+      /\b([A-Za-z_]\w*)\s*(?::\s*TypeAlias\s*)?=\s*(?:typing\.)?(?:Dict|List|Tuple|Set|FrozenSet|Sequence|Mapping|MutableMapping|Optional|Union|Callable|Final|Literal|Type)\b\[([^\]]+)\]/g
+    for (const match of content.matchAll(typeAliasPattern)) {
+      const aliasName = match[1]
+      const rhsText = match[2]
+      if (aliasName === undefined || rhsText === undefined) continue
+      if (aliasName.length > 0 && aliasName[0] === aliasName[0]!.toUpperCase()) {
+        const identPattern = /[A-Z][A-Za-z_]\w*/g
+        for (const refMatch of rhsText.matchAll(identPattern)) {
+          const targetName = refMatch[0]
+          if (targetName === undefined || targetName === aliasName) continue
+          addFact(
+            aliasName,
+            BindingSourceKind.ImportedType,
+            normalizePythonTypeName(targetName),
+            match.index ?? 0,
+          )
+        }
+      }
+    }
+
+    const simpleTypeAliasPattern =
+      /\b([A-Z][A-Za-z_]\w*)\s*(?::\s*TypeAlias\s*)?=\s*([A-Z][A-Za-z_]\w*)\s*$/gm
+    for (const match of content.matchAll(simpleTypeAliasPattern)) {
+      const aliasName = match[1]
+      const targetName = match[2]
+      if (aliasName === undefined || targetName === undefined) continue
+      if (aliasName === targetName) continue
+      addFact(
+        aliasName,
+        BindingSourceKind.ImportedType,
+        normalizePythonTypeName(targetName),
+        match.index ?? 0,
+      )
+    }
+
     return facts
   }
 

@@ -39,6 +39,7 @@ export function graphStoreContractTests(
     it('upserts and retrieves a file', async () => {
       const file = createFileNode({
         path: 'src/main.ts',
+        configRelativePath: '',
         language: 'typescript',
         contentHash: 'sha256:abc',
         workspace: '/project',
@@ -54,6 +55,7 @@ export function graphStoreContractTests(
     it('upserts a file with symbols and relations', async () => {
       const file = createFileNode({
         path: 'src/main.ts',
+        configRelativePath: '',
         language: 'typescript',
         contentHash: 'sha256:abc',
         workspace: '/project',
@@ -84,6 +86,7 @@ export function graphStoreContractTests(
     it('removeFile removes file, symbols, and relations', async () => {
       const file = createFileNode({
         path: 'src/main.ts',
+        configRelativePath: '',
         language: 'typescript',
         contentHash: 'sha256:abc',
         workspace: '/project',
@@ -110,6 +113,7 @@ export function graphStoreContractTests(
     it('upsertFile replaces previous data atomically', async () => {
       const file = createFileNode({
         path: 'src/main.ts',
+        configRelativePath: '',
         language: 'typescript',
         contentHash: 'sha256:v1',
         workspace: '/project',
@@ -125,6 +129,7 @@ export function graphStoreContractTests(
 
       const fileV2 = createFileNode({
         path: 'src/main.ts',
+        configRelativePath: '',
         language: 'typescript',
         contentHash: 'sha256:v2',
         workspace: '/project',
@@ -148,6 +153,7 @@ export function graphStoreContractTests(
     it('findSymbols by kind', async () => {
       const file = createFileNode({
         path: 'src/main.ts',
+        configRelativePath: '',
         language: 'typescript',
         contentHash: 'sha256:abc',
         workspace: '/project',
@@ -176,6 +182,7 @@ export function graphStoreContractTests(
     it('getStatistics returns correct counts', async () => {
       const file = createFileNode({
         path: 'src/main.ts',
+        configRelativePath: '',
         language: 'typescript',
         contentHash: 'sha256:abc',
         workspace: '/project',
@@ -202,6 +209,7 @@ export function graphStoreContractTests(
     it('persists and queries CONSTRUCTS and USES_TYPE as symbol dependency relations', async () => {
       const file = createFileNode({
         path: 'src/composition.ts',
+        configRelativePath: '',
         language: 'typescript',
         contentHash: 'sha256:deps',
         workspace: '/project',
@@ -259,6 +267,7 @@ export function graphStoreContractTests(
     it('returns incoming EXTENDS relations via getExtenders', async () => {
       const file = createFileNode({
         path: 'src/types.ts',
+        configRelativePath: '',
         language: 'typescript',
         contentHash: 'sha256:abc',
         workspace: '/project',
@@ -295,6 +304,7 @@ export function graphStoreContractTests(
     it('returns incoming IMPLEMENTS relations via getImplementors', async () => {
       const file = createFileNode({
         path: 'src/contracts.ts',
+        configRelativePath: '',
         language: 'typescript',
         contentHash: 'sha256:def',
         workspace: '/project',
@@ -331,6 +341,7 @@ export function graphStoreContractTests(
     it('returns incoming OVERRIDES relations via getOverriders', async () => {
       const file = createFileNode({
         path: 'src/methods.ts',
+        configRelativePath: '',
         language: 'typescript',
         contentHash: 'sha256:ghi',
         workspace: '/project',
@@ -373,6 +384,92 @@ export function graphStoreContractTests(
       expect(stats.lastIndexedRef).toBeNull()
     })
 
+    it('graphFingerprint defaults to null', async () => {
+      const stats = await store.getStatistics()
+      expect(stats.graphFingerprint).toBeNull()
+    })
+
+    it('graphFingerprint is set after bulkLoad', async () => {
+      await store.bulkLoad({
+        files: [],
+        symbols: [],
+        specs: [],
+        relations: [],
+        vcsRef: 'abc1234def',
+        graphFingerprint: 'sha256:fp1',
+      })
+      const stats = await store.getStatistics()
+      expect(stats.graphFingerprint).toBe('sha256:fp1')
+    })
+
+    it('graphFingerprint is cleared on clear()', async () => {
+      await store.bulkLoad({
+        files: [],
+        symbols: [],
+        specs: [],
+        relations: [],
+        vcsRef: 'abc1234def',
+        graphFingerprint: 'sha256:fp1',
+      })
+      await store.clear()
+      const stats = await store.getStatistics()
+      expect(stats.graphFingerprint).toBeNull()
+    })
+
+    it('findFilesByConfigRelativePath returns exact matches', async () => {
+      const file = createFileNode({
+        path: 'core:src/model.ts',
+        configRelativePath: 'packages/core/src/model.ts',
+        language: 'typescript',
+        contentHash: 'sha256:abc',
+        workspace: 'core',
+      })
+      await store.upsertFile(file, [], [])
+      const found = await store.findFilesByConfigRelativePath('packages/core/src/model.ts')
+      expect(found).toHaveLength(1)
+      expect(found[0]!.path).toBe('core:src/model.ts')
+    })
+
+    it('findFilesByConfigRelativePath returns empty for no match', async () => {
+      const found = await store.findFilesByConfigRelativePath('nonexistent/path.ts')
+      expect(found).toHaveLength(0)
+    })
+
+    it('findFilesByConfigRelativePath returns multiple files across workspaces', async () => {
+      const file1 = createFileNode({
+        path: 'core:src/model.ts',
+        configRelativePath: 'packages/core/src/model.ts',
+        language: 'typescript',
+        contentHash: 'sha256:1',
+        workspace: 'core',
+      })
+      const file2 = createFileNode({
+        path: 'cli:src/model.ts',
+        configRelativePath: 'packages/core/src/model.ts',
+        language: 'typescript',
+        contentHash: 'sha256:2',
+        workspace: 'cli',
+      })
+      await store.upsertFile(file1, [], [])
+      await store.upsertFile(file2, [], [])
+      const found = await store.findFilesByConfigRelativePath('packages/core/src/model.ts')
+      expect(found).toHaveLength(2)
+    })
+
+    it('getFile returns configRelativePath', async () => {
+      const file = createFileNode({
+        path: 'core:src/model.ts',
+        configRelativePath: 'packages/core/src/model.ts',
+        language: 'typescript',
+        contentHash: 'sha256:abc',
+        workspace: 'core',
+      })
+      await store.upsertFile(file, [], [])
+      const retrieved = await store.getFile('core:src/model.ts')
+      expect(retrieved).toBeDefined()
+      expect(retrieved!.configRelativePath).toBe('packages/core/src/model.ts')
+    })
+
     it('lastIndexedRef is set after bulkLoad with vcsRef', async () => {
       await store.bulkLoad({
         files: [],
@@ -401,6 +498,7 @@ export function graphStoreContractTests(
     it('clear removes everything', async () => {
       const file = createFileNode({
         path: 'src/main.ts',
+        configRelativePath: '',
         language: 'typescript',
         contentHash: 'sha256:abc',
         workspace: '/project',
@@ -416,12 +514,14 @@ export function graphStoreContractTests(
     it('getAllFiles returns all files', async () => {
       const file1 = createFileNode({
         path: 'a.ts',
+        configRelativePath: '',
         language: 'typescript',
         contentHash: 'sha256:1',
         workspace: '/project',
       })
       const file2 = createFileNode({
         path: 'b.ts',
+        configRelativePath: '',
         language: 'typescript',
         contentHash: 'sha256:2',
         workspace: '/project',
