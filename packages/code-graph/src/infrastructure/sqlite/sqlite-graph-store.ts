@@ -447,7 +447,7 @@ export class SQLiteGraphStore extends GraphStore {
   async searchSymbols(
     options: SearchOptions,
   ): Promise<Array<{ symbol: SymbolNode; score: number }>> {
-    const query = options.query.trim()
+    const query = sanitizeFtsQuery(options.query)
     if (query.length === 0) return []
 
     const rows = this.ensureOpen()
@@ -503,7 +503,7 @@ export class SQLiteGraphStore extends GraphStore {
   }
 
   async searchSpecs(options: SearchOptions): Promise<Array<{ spec: SpecNode; score: number }>> {
-    const query = options.query.trim()
+    const query = sanitizeFtsQuery(options.query)
     if (query.length === 0) return []
 
     const rows = this.ensureOpen()
@@ -1062,4 +1062,12 @@ export class SQLiteGraphStore extends GraphStore {
     const copy = buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength)
     return new Float32Array(copy)
   }
+}
+
+function sanitizeFtsQuery(query: string): string {
+  const trimmed = query.trim()
+  if (trimmed.length === 0) return ''
+  const tokens = trimmed.split(/\s+/).filter((t) => t.length > 0)
+  if (tokens.length === 0) return ''
+  return tokens.map((token) => '"' + token.replaceAll('"', '""') + '"').join(' AND ')
 }

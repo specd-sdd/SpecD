@@ -92,6 +92,20 @@
 - **WHEN** `rebuildFtsIndexes()` is invoked
 - **THEN** subsequent abstract search queries see the newly indexed data
 
+#### Scenario: Queries with hyphens do not crash FTS5
+
+- **GIVEN** symbols and specs have been indexed into SQLite
+- **WHEN** `searchSymbols({ query: 'pending-parent-artifact-review' })` is called
+- **THEN** no `SqliteError` is thrown
+- **AND** results matching the literal search term are returned
+
+#### Scenario: Queries with FTS5 operators are treated as literal text
+
+- **GIVEN** symbols and specs have been indexed into SQLite
+- **WHEN** `searchSpecs({ query: 'AND OR NOT' })` is called
+- **THEN** the query does not perform boolean logic
+- **AND** results matching the literal terms are returned
+
 ### Requirement: Transactional mutation model
 
 #### Scenario: File upsert is all-or-nothing

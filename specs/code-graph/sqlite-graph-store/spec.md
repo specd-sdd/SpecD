@@ -131,6 +131,9 @@ The adapter MUST:
   `GraphStore.searchSymbols()`
 - provide full-text search over spec title, description, and searchable content for
   `GraphStore.searchSpecs()`
+- sanitize the FTS query string before passing it to the FTS5 MATCH clause so that
+  user input is treated as literal text and not interpreted as FTS5 query syntax
+  (boolean operators, column filters, prefix wildcards, etc.)
 - return results ordered by descending relevance score
 - rebuild or refresh backend-specific FTS structures when required after bulk data
   changes

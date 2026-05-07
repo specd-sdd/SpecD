@@ -76,6 +76,12 @@
       "rules": [
         "`LadybugGraphStore` SHALL persist store-level metadata needed by the abstract graph-store contract, including the values surfaced through `GraphStatistics` such as `lastIndexedAt` and `lastIndexedRef`.\n\nBackend-specific metadata storage details remain internal to the adapter."
       ]
+    },
+    {
+      "requirement": "Prepared statement usage",
+      "rules": [
+        "`LadybugGraphStore` SHALL use LadybugDB's prepared statement API for all Cypher queries\nthat accept user-supplied or externally-derived parameter values.\n\nThe adapter MUST:\n\n- use `conn.prepare(statement)` and `conn.execute(preparedStatement, params)` with `$param`\n  bindings for all queries where node properties, relation endpoints, or metadata values\n  come from function arguments or external data\n- pass parameter values as a `Record<string, LbugValue>` object rather than interpolating\n  them into the Cypher query string\n- avoid manual string escaping functions for values that can be bound through prepared\n  statement parameters\n\nThe adapter MAY continue to use direct `conn.query()` for DDL statements, DML with\ncompile-time constant values (such as `RelationType` enum values used as relationship\nlabels), COPY commands with internally generated file paths, and backend-specific\nadministrative queries where no external values are involved."
+      ]
     }
   ],
   "constraints": [
@@ -213,11 +219,39 @@
         "the returned GraphStatistics reflects those persisted values",
         "AND callers do not depend on how Ladybug stores them physically"
       ]
+    },
+    {
+      "requirement": "Prepared statement usage",
+      "name": "User-supplied values are bound via prepared statement parameters",
+      "given": ["LadybugGraphStore is open and ready for queries"],
+      "when": ["getFile('core:src/index.ts') is called"],
+      "then": [
+        "the Cypher query uses conn.prepare() with $path parameter binding",
+        "AND the path value is passed through conn.execute(stmt, { path: 'core:src/index.ts' })",
+        "AND no string interpolation of the path value occurs in the Cypher query"
+      ]
+    },
+    {
+      "requirement": "Prepared statement usage",
+      "name": "Relation type labels remain as compile-time constants",
+      "given": ["LadybugGraphStore is executing a traversal query"],
+      "when": ["getCallers(symbolId) builds a Cypher query with CALLS|CONSTRUCTS|USES_TYPE labels"],
+      "then": [
+        "the relationship type labels MAY be interpolated directly from RelationType enum values",
+        "AND user-supplied values within the same query are still bound via $param"
+      ]
+    },
+    {
+      "requirement": "Prepared statement usage",
+      "name": "DDL and COPY queries may use direct conn.query",
+      "given": ["LadybugGraphStore is executing schema DDL or a bulk COPY command"],
+      "when": ["the query contains no user-supplied parameter values"],
+      "then": ["conn.query() MAY be used directly without prepared statements"]
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:600ab2e8ebe6bfa4f53f1a1117cbb67ab6bb27d0a9933455253b51a00d6c8234",
-    "verify.md": "sha256:112024164e31ead6bbf1c9adb89f3336c7b205b6e20a52445314d69d68f4a6fb"
+    "spec.md": "sha256:1b2ddfad28bbeaa07d46cdf08afaa11b4492264069fbf851ebe735b6c44282c1",
+    "verify.md": "sha256:5c9a6db65f750789285cdf5cc91f37b6de2433737f39e1e6b7d3e94681847fe5"
   },
   "generatedBy": "core"
 }

@@ -41,6 +41,38 @@ async function exec(conn: Connection, query: string): Promise<Record<string, Lbu
 }
 
 /**
+ * Executes a prepared Cypher query on a connection with parameters and returns all result rows.
+ * @param conn - The Ladybug database connection.
+ * @param query - The Cypher query string with `$param` placeholders.
+ * @param params - Parameter values to bind.
+ * @returns An array of row records.
+ */
+async function execPrepared(
+  conn: Connection,
+  query: string,
+  params: Record<string, LbugValue>,
+): Promise<Record<string, LbugValue>[]> {
+  const stmt = await conn.prepare(query)
+  const result = await conn.execute(stmt, params)
+  return getAll(result)
+}
+
+/**
+ * Executes a prepared Cypher query on a connection with parameters, discarding result rows.
+ * @param conn - The Ladybug database connection.
+ * @param query - The Cypher query string with `$param` placeholders.
+ * @param params - Parameter values to bind.
+ */
+async function runPrepared(
+  conn: Connection,
+  query: string,
+  params: Record<string, LbugValue>,
+): Promise<void> {
+  const stmt = await conn.prepare(query)
+  await conn.execute(stmt, params)
+}
+
+/**
  * Escapes a value for CSV output (RFC 4180).
  * Wraps in double quotes and doubles any internal double quotes.
  * @param value - The string value to escape.
@@ -166,23 +198,22 @@ export class LadybugGraphStore extends GraphStore {
    * @param filePath - Path of the file to remove.
    */
   private async deleteFileLocalState(conn: Connection, filePath: string): Promise<void> {
-    const escaped = this.escape(filePath)
-
-    const symbolRows = await exec(
+    const symbolRows = await execPrepared(
       conn,
-      `MATCH (s:Symbol {filePath: '${escaped}'}) RETURN s.id AS id`,
+      `MATCH (s:Symbol {filePath: $filePath}) RETURN s.id AS id`,
+      { filePath },
     )
 
     for (const row of symbolRows) {
       const symbolId = row['id'] as string
-      await conn.query(`MATCH (s:Symbol {id: '${this.escape(symbolId)}'})-[r]->() DELETE r`)
-      await conn.query(`MATCH ()-[r]->(s:Symbol {id: '${this.escape(symbolId)}'}) DELETE r`)
-      await conn.query(`MATCH (s:Symbol {id: '${this.escape(symbolId)}'}) DELETE s`)
+      await runPrepared(conn, `MATCH (s:Symbol {id: $id})-[r]->() DELETE r`, { id: symbolId })
+      await runPrepared(conn, `MATCH ()-[r]->(s:Symbol {id: $id}) DELETE r`, { id: symbolId })
+      await runPrepared(conn, `MATCH (s:Symbol {id: $id}) DELETE s`, { id: symbolId })
     }
 
-    await conn.query(`MATCH (f:File {path: '${escaped}'})-[r]->() DELETE r`)
-    await conn.query(`MATCH ()-[r]->(f:File {path: '${escaped}'}) DELETE r`)
-    await conn.query(`MATCH (f:File {path: '${escaped}'}) DELETE f`)
+    await runPrepared(conn, `MATCH (f:File {path: $path})-[r]->() DELETE r`, { path: filePath })
+    await runPrepared(conn, `MATCH ()-[r]->(f:File {path: $path}) DELETE r`, { path: filePath })
+    await runPrepared(conn, `MATCH (f:File {path: $path}) DELETE f`, { path: filePath })
   }
 
   /**
@@ -191,11 +222,9 @@ export class LadybugGraphStore extends GraphStore {
    * @param specId - Identifier of the spec to remove.
    */
   private async deleteSpecLocalState(conn: Connection, specId: string): Promise<void> {
-    const escaped = this.escape(specId)
-
-    await conn.query(`MATCH (s:Spec {specId: '${escaped}'})-[r]->() DELETE r`)
-    await conn.query(`MATCH ()-[r]->(s:Spec {specId: '${escaped}'}) DELETE r`)
-    await conn.query(`MATCH (s:Spec {specId: '${escaped}'}) DELETE s`)
+    await runPrepared(conn, `MATCH (s:Spec {specId: $specId})-[r]->() DELETE r`, { specId })
+    await runPrepared(conn, `MATCH ()-[r]->(s:Spec {specId: $specId}) DELETE r`, { specId })
+    await runPrepared(conn, `MATCH (s:Spec {specId: $specId}) DELETE s`, { specId })
   }
 
   /**
@@ -265,19 +294,32 @@ export class LadybugGraphStore extends GraphStore {
     try {
       await this.deleteFileLocalState(conn, file.path)
 
-      const escapedPath = this.escape(file.path)
-      const escapedConfigRel = this.escape(file.configRelativePath)
-      const escapedLang = this.escape(file.language)
-      const escapedHash = this.escape(file.contentHash)
-      const escapedWorkspace = this.escape(file.workspace)
-
-      await conn.query(
-        `CREATE (f:File {path: '${escapedPath}', configRelativePath: '${escapedConfigRel}', language: '${escapedLang}', contentHash: '${escapedHash}', workspace: '${escapedWorkspace}'})`,
+      await runPrepared(
+        conn,
+        `CREATE (f:File {path: $path, configRelativePath: $configRelativePath, language: $language, contentHash: $contentHash, workspace: $workspace})`,
+        {
+          path: file.path,
+          configRelativePath: file.configRelativePath,
+          language: file.language,
+          contentHash: file.contentHash,
+          workspace: file.workspace,
+        },
       )
 
       for (const symbol of symbols) {
-        await conn.query(
-          `CREATE (s:Symbol {id: '${this.escape(symbol.id)}', name: '${this.escape(symbol.name)}', searchName: '${this.escape(expandSymbolName(symbol.name))}', kind: '${this.escape(symbol.kind)}', filePath: '${escapedPath}', line: ${symbol.line}, col: ${symbol.column}, comment: '${this.escape(symbol.comment ?? '')}'})`,
+        await runPrepared(
+          conn,
+          `CREATE (s:Symbol {id: $id, name: $name, searchName: $searchName, kind: $kind, filePath: $filePath, line: $line, col: $col, comment: $comment})`,
+          {
+            id: symbol.id,
+            name: symbol.name,
+            searchName: expandSymbolName(symbol.name),
+            kind: symbol.kind,
+            filePath: file.path,
+            line: symbol.line,
+            col: symbol.column,
+            comment: symbol.comment ?? '',
+          },
         )
       }
 
@@ -528,8 +570,18 @@ export class LadybugGraphStore extends GraphStore {
     try {
       await this.deleteSpecLocalState(conn, spec.specId)
 
-      await conn.query(
-        `CREATE (s:Spec {specId: '${this.escape(spec.specId)}', path: '${this.escape(spec.path)}', title: '${this.escape(spec.title)}', description: '${this.escape(spec.description)}', contentHash: '${this.escape(spec.contentHash)}', content: '${this.escape(spec.content)}', workspace: '${this.escape(spec.workspace)}'})`,
+      await runPrepared(
+        conn,
+        `CREATE (s:Spec {specId: $specId, path: $path, title: $title, description: $description, contentHash: $contentHash, content: $content, workspace: $workspace})`,
+        {
+          specId: spec.specId,
+          path: spec.path,
+          title: spec.title,
+          description: spec.description,
+          contentHash: spec.contentHash,
+          content: spec.content,
+          workspace: spec.workspace,
+        },
       )
 
       for (const rel of relations) {
@@ -562,9 +614,10 @@ export class LadybugGraphStore extends GraphStore {
    */
   async getFile(path: string): Promise<FileNode | undefined> {
     this.ensureOpen()
-    const rows = await exec(
+    const rows = await execPrepared(
       this.conn!,
-      `MATCH (f:File {path: '${this.escape(path)}'}) RETURN f.path AS path, f.configRelativePath AS configRelativePath, f.language AS language, f.contentHash AS contentHash, f.workspace AS workspace`,
+      `MATCH (f:File {path: $path}) RETURN f.path AS path, f.configRelativePath AS configRelativePath, f.language AS language, f.contentHash AS contentHash, f.workspace AS workspace`,
+      { path },
     )
     if (rows.length === 0 || !rows[0]) return undefined
     const row = rows[0]
@@ -585,9 +638,10 @@ export class LadybugGraphStore extends GraphStore {
    */
   async findFilesByConfigRelativePath(configRelativePath: string): Promise<FileNode[]> {
     this.ensureOpen()
-    const rows = await exec(
+    const rows = await execPrepared(
       this.conn!,
-      `MATCH (f:File {configRelativePath: '${this.escape(configRelativePath)}'}) RETURN f.path AS path, f.configRelativePath AS configRelativePath, f.language AS language, f.contentHash AS contentHash, f.workspace AS workspace`,
+      `MATCH (f:File {configRelativePath: $configRelativePath}) RETURN f.path AS path, f.configRelativePath AS configRelativePath, f.language AS language, f.contentHash AS contentHash, f.workspace AS workspace`,
+      { configRelativePath },
     )
     return rows.map((row) => ({
       path: row['path'] as string,
@@ -606,9 +660,10 @@ export class LadybugGraphStore extends GraphStore {
    */
   async getSymbol(id: string): Promise<SymbolNode | undefined> {
     this.ensureOpen()
-    const rows = await exec(
+    const rows = await execPrepared(
       this.conn!,
-      `MATCH (s:Symbol {id: '${this.escape(id)}'}) RETURN s.id AS id, s.name AS name, s.kind AS kind, s.filePath AS filePath, s.line AS line, s.col AS col, s.comment AS comment`,
+      `MATCH (s:Symbol {id: $id}) RETURN s.id AS id, s.name AS name, s.kind AS kind, s.filePath AS filePath, s.line AS line, s.col AS col, s.comment AS comment`,
+      { id },
     )
     if (rows.length === 0 || !rows[0]) return undefined
     return this.rowToSymbol(rows[0])
@@ -621,16 +676,18 @@ export class LadybugGraphStore extends GraphStore {
    */
   async getSpec(specId: string): Promise<SpecNode | undefined> {
     this.ensureOpen()
-    const rows = await exec(
+    const rows = await execPrepared(
       this.conn!,
-      `MATCH (s:Spec {specId: '${this.escape(specId)}'}) RETURN s.specId AS specId, s.path AS path, s.title AS title, s.description AS description, s.contentHash AS contentHash, s.content AS content, s.workspace AS workspace`,
+      `MATCH (s:Spec {specId: $specId}) RETURN s.specId AS specId, s.path AS path, s.title AS title, s.description AS description, s.contentHash AS contentHash, s.content AS content, s.workspace AS workspace`,
+      { specId },
     )
     if (rows.length === 0 || !rows[0]) return undefined
     const row = rows[0]
 
-    const depRows = await exec(
+    const depRows = await execPrepared(
       this.conn!,
-      `MATCH (s:Spec {specId: '${this.escape(specId)}'})-[:DEPENDS_ON]->(t:Spec) RETURN t.specId AS specId`,
+      `MATCH (s:Spec {specId: $specId})-[:DEPENDS_ON]->(t:Spec) RETURN t.specId AS specId`,
+      { specId },
     )
 
     return {
@@ -680,9 +737,10 @@ export class LadybugGraphStore extends GraphStore {
    */
   async getImporters(filePath: string): Promise<Relation[]> {
     this.ensureOpen()
-    const rows = await exec(
+    const rows = await execPrepared(
       this.conn!,
-      `MATCH (importer:File)-[:IMPORTS]->(f:File {path: '${this.escape(filePath)}'}) RETURN importer.path AS source`,
+      `MATCH (importer:File)-[:IMPORTS]->(f:File {path: $filePath}) RETURN importer.path AS source`,
+      { filePath },
     )
     return rows.map((r) => ({
       source: r['source'] as string,
@@ -699,9 +757,10 @@ export class LadybugGraphStore extends GraphStore {
    */
   async getImportees(filePath: string): Promise<Relation[]> {
     this.ensureOpen()
-    const rows = await exec(
+    const rows = await execPrepared(
       this.conn!,
-      `MATCH (f:File {path: '${this.escape(filePath)}'})-[:IMPORTS]->(imported:File) RETURN imported.path AS target`,
+      `MATCH (f:File {path: $filePath})-[:IMPORTS]->(imported:File) RETURN imported.path AS target`,
+      { filePath },
     )
     return rows.map((r) => ({
       source: filePath,
@@ -772,9 +831,10 @@ export class LadybugGraphStore extends GraphStore {
    */
   async getExportedSymbols(filePath: string): Promise<SymbolNode[]> {
     this.ensureOpen()
-    const rows = await exec(
+    const rows = await execPrepared(
       this.conn!,
-      `MATCH (f:File {path: '${this.escape(filePath)}'})-[:EXPORTS]->(s:Symbol) RETURN s.id AS id, s.name AS name, s.kind AS kind, s.filePath AS filePath, s.line AS line, s.col AS col, s.comment AS comment`,
+      `MATCH (f:File {path: $filePath})-[:EXPORTS]->(s:Symbol) RETURN s.id AS id, s.name AS name, s.kind AS kind, s.filePath AS filePath, s.line AS line, s.col AS col, s.comment AS comment`,
+      { filePath },
     )
     return rows.map((r) => ({
       id: r['id'] as string,
@@ -794,9 +854,10 @@ export class LadybugGraphStore extends GraphStore {
    */
   async getSpecDependencies(specId: string): Promise<Relation[]> {
     this.ensureOpen()
-    const rows = await exec(
+    const rows = await execPrepared(
       this.conn!,
-      `MATCH (s:Spec {specId: '${this.escape(specId)}'})-[:DEPENDS_ON]->(t:Spec) RETURN t.specId AS target`,
+      `MATCH (s:Spec {specId: $specId})-[:DEPENDS_ON]->(t:Spec) RETURN t.specId AS target`,
+      { specId },
     )
     return rows.map((r) => ({
       source: specId,
@@ -813,9 +874,10 @@ export class LadybugGraphStore extends GraphStore {
    */
   async getSpecDependents(specId: string): Promise<Relation[]> {
     this.ensureOpen()
-    const rows = await exec(
+    const rows = await execPrepared(
       this.conn!,
-      `MATCH (s:Spec)-[:DEPENDS_ON]->(t:Spec {specId: '${this.escape(specId)}'}) RETURN s.specId AS source`,
+      `MATCH (s:Spec)-[:DEPENDS_ON]->(t:Spec {specId: $specId}) RETURN s.specId AS source`,
+      { specId },
     )
     return rows.map((r) => ({
       source: r['source'] as string,
@@ -834,15 +896,19 @@ export class LadybugGraphStore extends GraphStore {
     this.ensureOpen()
 
     const conditions: string[] = []
+    const params: Record<string, LbugValue> = {}
     if (query.kind !== undefined) {
-      conditions.push(`s.kind = '${this.escape(query.kind)}'`)
+      conditions.push(`s.kind = $kind`)
+      params.kind = query.kind
     }
     if (query.filePath !== undefined) {
       if (query.filePath.includes('*')) {
         const regex = query.filePath.replaceAll('.', '\\.').replaceAll('*', '.*')
-        conditions.push(`s.filePath =~ '${this.escape(regex)}'`)
+        conditions.push(`s.filePath =~ $filePathRegex`)
+        params.filePathRegex = regex
       } else {
-        conditions.push(`s.filePath = '${this.escape(query.filePath)}'`)
+        conditions.push(`s.filePath = $filePath`)
+        params.filePath = query.filePath
       }
     }
     if (query.name !== undefined) {
@@ -850,29 +916,36 @@ export class LadybugGraphStore extends GraphStore {
       if (query.name.includes('*')) {
         const regex = query.name.replaceAll('.', '\\.').replaceAll('*', '.*')
         if (ci) {
-          conditions.push(`lower(s.name) =~ '${this.escape(regex.toLowerCase())}'`)
+          conditions.push(`lower(s.name) =~ $nameRegex`)
+          params.nameRegex = regex.toLowerCase()
         } else {
-          conditions.push(`s.name =~ '${this.escape(regex)}'`)
+          conditions.push(`s.name =~ $nameRegex`)
+          params.nameRegex = regex
         }
       } else if (ci) {
-        conditions.push(`lower(s.name) = '${this.escape(query.name.toLowerCase())}'`)
+        conditions.push(`lower(s.name) = $nameLower`)
+        params.nameLower = query.name.toLowerCase()
       } else {
-        conditions.push(`s.name = '${this.escape(query.name)}'`)
+        conditions.push(`s.name = $name`)
+        params.name = query.name
       }
     }
     if (query.comment !== undefined) {
       const ci = query.caseSensitive !== true
       if (ci) {
-        conditions.push(`lower(s.comment) CONTAINS '${this.escape(query.comment.toLowerCase())}'`)
+        conditions.push(`lower(s.comment) CONTAINS $commentLower`)
+        params.commentLower = query.comment.toLowerCase()
       } else {
-        conditions.push(`s.comment CONTAINS '${this.escape(query.comment)}'`)
+        conditions.push(`s.comment CONTAINS $comment`)
+        params.comment = query.comment
       }
     }
 
     const where = conditions.length > 0 ? ` WHERE ${conditions.join(' AND ')}` : ''
-    const rows = await exec(
+    const rows = await execPrepared(
       this.conn!,
       `MATCH (s:Symbol)${where} RETURN s.id AS id, s.name AS name, s.kind AS kind, s.filePath AS filePath, s.line AS line, s.col AS col, s.comment AS comment`,
+      params,
     )
     return rows.map((r) => this.rowToSymbol(r))
   }
@@ -970,9 +1043,10 @@ export class LadybugGraphStore extends GraphStore {
     const specs: SpecNode[] = []
     for (const row of rows) {
       const specId = row['specId'] as string
-      const depRows = await exec(
+      const depRows = await execPrepared(
         this.conn!,
-        `MATCH (s:Spec {specId: '${this.escape(specId)}'})-[:DEPENDS_ON]->(t:Spec) RETURN t.specId AS target`,
+        `MATCH (s:Spec {specId: $specId})-[:DEPENDS_ON]->(t:Spec) RETURN t.specId AS target`,
+        { specId },
       )
       specs.push({
         specId,
@@ -1003,35 +1077,45 @@ export class LadybugGraphStore extends GraphStore {
     const top = options.limit ?? 20
 
     const conditions: string[] = []
+    const params: Record<string, LbugValue> = { query: options.query }
     if (options.kinds && options.kinds.length > 0) {
-      const kindCondition = options.kinds
-        .map((kind) => `node.kind = '${this.escape(kind)}'`)
-        .join(' OR ')
-      conditions.push(`(${kindCondition})`)
+      const kindConditions = options.kinds.map((kind, i) => {
+        const key = `kind${i}`
+        params[key] = kind
+        return `node.kind = $${key}`
+      })
+      conditions.push(`(${kindConditions.join(' OR ')})`)
     }
     if (options.filePattern) {
       const regex = options.filePattern.replaceAll('.', '\\.').replaceAll('*', '.*')
-      conditions.push(`node.filePath =~ '(?i)${this.escape(regex)}'`)
+      params.filePatternRegex = `(?i)${regex}`
+      conditions.push(`node.filePath =~ $filePatternRegex`)
     }
     if (options.workspace) {
-      conditions.push(`starts_with(node.filePath, '${this.escape(options.workspace + ':')}')`)
+      params.wsPrefix = options.workspace + ':'
+      conditions.push(`starts_with(node.filePath, $wsPrefix)`)
     }
     if (options.excludePaths && options.excludePaths.length > 0) {
-      for (const pattern of options.excludePaths) {
+      options.excludePaths.forEach((pattern, i) => {
         const regex = pattern.replaceAll('.', '\\.').replaceAll('*', '.*')
-        conditions.push(`NOT node.filePath =~ '(?i)${this.escape(regex)}'`)
-      }
+        const key = `excludePath${i}`
+        params[key] = `(?i)${regex}`
+        conditions.push(`NOT node.filePath =~ $${key}`)
+      })
     }
     if (options.excludeWorkspaces && options.excludeWorkspaces.length > 0) {
-      for (const ws of options.excludeWorkspaces) {
-        conditions.push(`NOT starts_with(node.filePath, '${this.escape(ws + ':')}')`)
-      }
+      options.excludeWorkspaces.forEach((ws, i) => {
+        const key = `excludeWs${i}`
+        params[key] = ws + ':'
+        conditions.push(`NOT starts_with(node.filePath, $${key})`)
+      })
     }
 
     const where = conditions.length > 0 ? ` WHERE ${conditions.join(' AND ')}` : ''
-    const rows = await exec(
+    const rows = await execPrepared(
       this.conn!,
-      `CALL QUERY_FTS_INDEX('Symbol', 'symbol_fts', '${this.escape(options.query)}', k := 1000)${where} RETURN node.id AS id, node.name AS name, node.kind AS kind, node.filePath AS filePath, node.line AS line, node.col AS col, node.comment AS comment, score ORDER BY score DESC LIMIT ${String(top)}`,
+      `CALL QUERY_FTS_INDEX('Symbol', 'symbol_fts', $query, k := 1000)${where} RETURN node.id AS id, node.name AS name, node.kind AS kind, node.filePath AS filePath, node.line AS line, node.col AS col, node.comment AS comment, score ORDER BY score DESC LIMIT ${String(top)}`,
+      params,
     )
     return rows.map((r) => ({
       symbol: this.rowToSymbol(r),
@@ -1050,33 +1134,41 @@ export class LadybugGraphStore extends GraphStore {
     const top = options.limit ?? 20
 
     const conditions: string[] = []
+    const params: Record<string, LbugValue> = { query: options.query }
     if (options.workspace) {
-      conditions.push(`node.workspace = '${this.escape(options.workspace)}'`)
+      params.workspace = options.workspace
+      conditions.push(`node.workspace = $workspace`)
     }
     if (options.excludeWorkspaces && options.excludeWorkspaces.length > 0) {
-      for (const ws of options.excludeWorkspaces) {
-        conditions.push(`node.workspace <> '${this.escape(ws)}'`)
-      }
+      options.excludeWorkspaces.forEach((ws, i) => {
+        const key = `exclWs${i}`
+        params[key] = ws
+        conditions.push(`node.workspace <> $${key}`)
+      })
     }
     if (options.excludePaths && options.excludePaths.length > 0) {
-      for (const pattern of options.excludePaths) {
+      options.excludePaths.forEach((pattern, i) => {
         const regex = pattern.replaceAll('.', '\\.').replaceAll('*', '.*')
-        conditions.push(`NOT node.path =~ '(?i)${this.escape(regex)}'`)
-      }
+        const key = `exclPath${i}`
+        params[key] = `(?i)${regex}`
+        conditions.push(`NOT node.path =~ $${key}`)
+      })
     }
 
     const where = conditions.length > 0 ? ` WHERE ${conditions.join(' AND ')}` : ''
-    const rows = await exec(
+    const rows = await execPrepared(
       this.conn!,
-      `CALL QUERY_FTS_INDEX('Spec', 'spec_fts', '${this.escape(options.query)}', k := 1000)${where} RETURN node.specId AS specId, node.path AS path, node.title AS title, node.description AS description, node.contentHash AS contentHash, node.content AS content, node.workspace AS workspace, score ORDER BY score DESC LIMIT ${String(top)}`,
+      `CALL QUERY_FTS_INDEX('Spec', 'spec_fts', $query, k := 1000)${where} RETURN node.specId AS specId, node.path AS path, node.title AS title, node.description AS description, node.contentHash AS contentHash, node.content AS content, node.workspace AS workspace, score ORDER BY score DESC LIMIT ${String(top)}`,
+      params,
     )
 
     const results: Array<{ spec: SpecNode; score: number }> = []
     for (const row of rows) {
       const specId = row['specId'] as string
-      const depRows = await exec(
+      const depRows = await execPrepared(
         this.conn!,
-        `MATCH (s:Spec {specId: '${this.escape(specId)}'})-[:DEPENDS_ON]->(t:Spec) RETURN t.specId AS target`,
+        `MATCH (s:Spec {specId: $specId})-[:DEPENDS_ON]->(t:Spec) RETURN t.specId AS target`,
+        { specId },
       )
       results.push({
         spec: {
@@ -1188,58 +1280,80 @@ export class LadybugGraphStore extends GraphStore {
   private async createRelation(conn: Connection, rel: Relation): Promise<void> {
     switch (rel.type) {
       case RT.Imports:
-        await conn.query(
-          `MATCH (a:File {path: '${this.escape(rel.source)}'}), (b:File {path: '${this.escape(rel.target)}'}) CREATE (a)-[:IMPORTS]->(b)`,
+        await runPrepared(
+          conn,
+          `MATCH (a:File {path: $source}), (b:File {path: $target}) CREATE (a)-[:IMPORTS]->(b)`,
+          { source: rel.source, target: rel.target },
         )
         break
       case RT.Defines:
-        await conn.query(
-          `MATCH (a:File {path: '${this.escape(rel.source)}'}), (b:Symbol {id: '${this.escape(rel.target)}'}) CREATE (a)-[:DEFINES]->(b)`,
+        await runPrepared(
+          conn,
+          `MATCH (a:File {path: $source}), (b:Symbol {id: $target}) CREATE (a)-[:DEFINES]->(b)`,
+          { source: rel.source, target: rel.target },
         )
         break
       case RT.Calls:
-        await conn.query(
-          `MATCH (a:Symbol {id: '${this.escape(rel.source)}'}), (b:Symbol {id: '${this.escape(rel.target)}'}) CREATE (a)-[:CALLS]->(b)`,
+        await runPrepared(
+          conn,
+          `MATCH (a:Symbol {id: $source}), (b:Symbol {id: $target}) CREATE (a)-[:CALLS]->(b)`,
+          { source: rel.source, target: rel.target },
         )
         break
       case RT.Constructs:
-        await conn.query(
-          `MATCH (a:Symbol {id: '${this.escape(rel.source)}'}), (b:Symbol {id: '${this.escape(rel.target)}'}) CREATE (a)-[:CONSTRUCTS]->(b)`,
+        await runPrepared(
+          conn,
+          `MATCH (a:Symbol {id: $source}), (b:Symbol {id: $target}) CREATE (a)-[:CONSTRUCTS]->(b)`,
+          { source: rel.source, target: rel.target },
         )
         break
       case RT.UsesType:
-        await conn.query(
-          `MATCH (a:Symbol {id: '${this.escape(rel.source)}'}), (b:Symbol {id: '${this.escape(rel.target)}'}) CREATE (a)-[:USES_TYPE]->(b)`,
+        await runPrepared(
+          conn,
+          `MATCH (a:Symbol {id: $source}), (b:Symbol {id: $target}) CREATE (a)-[:USES_TYPE]->(b)`,
+          { source: rel.source, target: rel.target },
         )
         break
       case RT.Exports:
-        await conn.query(
-          `MATCH (a:File {path: '${this.escape(rel.source)}'}), (b:Symbol {id: '${this.escape(rel.target)}'}) CREATE (a)-[:EXPORTS]->(b)`,
+        await runPrepared(
+          conn,
+          `MATCH (a:File {path: $source}), (b:Symbol {id: $target}) CREATE (a)-[:EXPORTS]->(b)`,
+          { source: rel.source, target: rel.target },
         )
         break
       case RT.DependsOn:
-        await conn.query(
-          `MATCH (a:Spec {specId: '${this.escape(rel.source)}'}), (b:Spec {specId: '${this.escape(rel.target)}'}) CREATE (a)-[:DEPENDS_ON]->(b)`,
+        await runPrepared(
+          conn,
+          `MATCH (a:Spec {specId: $source}), (b:Spec {specId: $target}) CREATE (a)-[:DEPENDS_ON]->(b)`,
+          { source: rel.source, target: rel.target },
         )
         break
       case RT.Covers:
-        await conn.query(
-          `MATCH (a:Spec {specId: '${this.escape(rel.source)}'}), (b:File {path: '${this.escape(rel.target)}'}) CREATE (a)-[:COVERS]->(b)`,
+        await runPrepared(
+          conn,
+          `MATCH (a:Spec {specId: $source}), (b:File {path: $target}) CREATE (a)-[:COVERS]->(b)`,
+          { source: rel.source, target: rel.target },
         )
         break
       case RT.Extends:
-        await conn.query(
-          `MATCH (a:Symbol {id: '${this.escape(rel.source)}'}), (b:Symbol {id: '${this.escape(rel.target)}'}) CREATE (a)-[:EXTENDS]->(b)`,
+        await runPrepared(
+          conn,
+          `MATCH (a:Symbol {id: $source}), (b:Symbol {id: $target}) CREATE (a)-[:EXTENDS]->(b)`,
+          { source: rel.source, target: rel.target },
         )
         break
       case RT.Implements:
-        await conn.query(
-          `MATCH (a:Symbol {id: '${this.escape(rel.source)}'}), (b:Symbol {id: '${this.escape(rel.target)}'}) CREATE (a)-[:IMPLEMENTS]->(b)`,
+        await runPrepared(
+          conn,
+          `MATCH (a:Symbol {id: $source}), (b:Symbol {id: $target}) CREATE (a)-[:IMPLEMENTS]->(b)`,
+          { source: rel.source, target: rel.target },
         )
         break
       case RT.Overrides:
-        await conn.query(
-          `MATCH (a:Symbol {id: '${this.escape(rel.source)}'}), (b:Symbol {id: '${this.escape(rel.target)}'}) CREATE (a)-[:OVERRIDES]->(b)`,
+        await runPrepared(
+          conn,
+          `MATCH (a:Symbol {id: $source}), (b:Symbol {id: $target}) CREATE (a)-[:OVERRIDES]->(b)`,
+          { source: rel.source, target: rel.target },
         )
         break
     }
@@ -1256,9 +1370,10 @@ export class LadybugGraphStore extends GraphStore {
     symbolId: string,
   ): Promise<Relation[]> {
     this.ensureOpen()
-    const rows = await exec(
+    const rows = await execPrepared(
       this.conn!,
-      `MATCH (source:Symbol)-[r:${relationType}]->(target:Symbol {id: '${this.escape(symbolId)}'}) RETURN source.id AS source`,
+      `MATCH (source:Symbol)-[r:${relationType}]->(target:Symbol {id: $symbolId}) RETURN source.id AS source`,
+      { symbolId },
     )
     return rows.map((row) => ({
       source: row['source'] as string,
@@ -1279,9 +1394,10 @@ export class LadybugGraphStore extends GraphStore {
     symbolId: string,
   ): Promise<Relation[]> {
     this.ensureOpen()
-    const rows = await exec(
+    const rows = await execPrepared(
       this.conn!,
-      `MATCH (source:Symbol {id: '${this.escape(symbolId)}'})-[r:${relationType}]->(target:Symbol) RETURN target.id AS target`,
+      `MATCH (source:Symbol {id: $symbolId})-[r:${relationType}]->(target:Symbol) RETURN target.id AS target`,
+      { symbolId },
     )
     return rows.map((row) => ({
       source: symbolId,
@@ -1298,21 +1414,8 @@ export class LadybugGraphStore extends GraphStore {
    * @param value - The metadata value.
    */
   private async updateMeta(conn: Connection, key: string, value: string): Promise<void> {
-    await conn.query(`MATCH (m:Meta {key: '${this.escape(key)}'}) DELETE m`)
-    await conn.query(`CREATE (m:Meta {key: '${this.escape(key)}', value: '${this.escape(value)}'})`)
-  }
-
-  /**
-   * Escapes single quotes, backslashes, and newlines for safe inclusion in Cypher query strings.
-   * @param value - The string value to escape.
-   * @returns The escaped string.
-   */
-  private escape(value: string): string {
-    return value
-      .replaceAll('\\', '\\\\')
-      .replaceAll("'", "\\'")
-      .replaceAll('\n', '\\n')
-      .replaceAll('\r', '\\r')
+    await runPrepared(conn, `MATCH (m:Meta {key: $key}) DELETE m`, { key })
+    await runPrepared(conn, `CREATE (m:Meta {key: $key, value: $value})`, { key, value })
   }
 
   /**

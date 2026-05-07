@@ -109,3 +109,26 @@
 - **WHEN** `GraphStore.getStatistics()` is called through the abstract port
 - **THEN** the returned `GraphStatistics` reflects those persisted values
 - **AND** callers do not depend on how Ladybug stores them physically
+
+### Requirement: Prepared statement usage
+
+#### Scenario: User-supplied values are bound via prepared statement parameters
+
+- **GIVEN** `LadybugGraphStore` is open and ready for queries
+- **WHEN** `getFile('core:src/index.ts')` is called
+- **THEN** the Cypher query uses `conn.prepare()` with `$path` parameter binding
+- **AND** the path value is passed through `conn.execute(stmt, { path: 'core:src/index.ts' })`
+- **AND** no string interpolation of the path value occurs in the Cypher query
+
+#### Scenario: Relation type labels remain as compile-time constants
+
+- **GIVEN** `LadybugGraphStore` is executing a traversal query
+- **WHEN** `getCallers(symbolId)` builds a Cypher query with `CALLS|CONSTRUCTS|USES_TYPE` labels
+- **THEN** the relationship type labels MAY be interpolated directly from `RelationType` enum values
+- **AND** user-supplied values within the same query are still bound via `$param`
+
+#### Scenario: DDL and COPY queries may use direct conn.query
+
+- **GIVEN** `LadybugGraphStore` is executing schema DDL or a bulk COPY command
+- **WHEN** the query contains no user-supplied parameter values
+- **THEN** `conn.query()` MAY be used directly without prepared statements

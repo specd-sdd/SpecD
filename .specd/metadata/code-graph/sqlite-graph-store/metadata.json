@@ -56,7 +56,7 @@
     {
       "requirement": "SQLite full-text search",
       "rules": [
-        "`SQLiteGraphStore` SHALL implement symbol and spec search using SQLite full-text search\ncapabilities.\n\nThe adapter MUST:\n\n- provide full-text search over symbol search text and symbol comments for\n  `GraphStore.searchSymbols()`\n- provide full-text search over spec title, description, and searchable content for\n  `GraphStore.searchSpecs()`\n- return results ordered by descending relevance score\n- rebuild or refresh backend-specific FTS structures when required after bulk data\n  changes\n\nThe implementation MAY use SQLite FTS5 virtual tables or another SQLite-native full-text\nsearch mechanism, provided the abstract graph-store search contract remains satisfied."
+        "`SQLiteGraphStore` SHALL implement symbol and spec search using SQLite full-text search\ncapabilities.\n\nThe adapter MUST:\n\n- provide full-text search over symbol search text and symbol comments for\n  `GraphStore.searchSymbols()`\n- provide full-text search over spec title, description, and searchable content for\n  `GraphStore.searchSpecs()`\n- sanitize the FTS query string before passing it to the FTS5 MATCH clause so that\n  user input is treated as literal text and not interpreted as FTS5 query syntax\n  (boolean operators, column filters, prefix wildcards, etc.)\n- return results ordered by descending relevance score\n- rebuild or refresh backend-specific FTS structures when required after bulk data\n  changes\n\nThe implementation MAY use SQLite FTS5 virtual tables or another SQLite-native full-text\nsearch mechanism, provided the abstract graph-store search contract remains satisfied."
       ]
     },
     {
@@ -174,6 +174,26 @@
       "then": ["subsequent abstract search queries see the newly indexed data"]
     },
     {
+      "requirement": "SQLite full-text search",
+      "name": "Queries with hyphens do not crash FTS5",
+      "given": ["symbols and specs have been indexed into SQLite"],
+      "when": ["searchSymbols({ query: 'pending-parent-artifact-review' }) is called"],
+      "then": [
+        "no SqliteError is thrown",
+        "AND results matching the literal search term are returned"
+      ]
+    },
+    {
+      "requirement": "SQLite full-text search",
+      "name": "Queries with FTS5 operators are treated as literal text",
+      "given": ["symbols and specs have been indexed into SQLite"],
+      "when": ["searchSpecs({ query: 'AND OR NOT' }) is called"],
+      "then": [
+        "the query does not perform boolean logic",
+        "AND results matching the literal terms are returned"
+      ]
+    },
+    {
       "requirement": "Transactional mutation model",
       "name": "File upsert is all-or-nothing",
       "given": ["a file already has persisted graph state in SQLite"],
@@ -214,8 +234,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:6d54d254becb70b06d4080558e831bceb08327e2ed2bce14940f59669c812929",
-    "verify.md": "sha256:65e4928ea29b2c0b2b39ad8c890198e16a80259c96b7a6d8d43cd83526142f50"
+    "spec.md": "sha256:21b7bd5b753bee986bdcbf1c1641d01f750f1b92641bd7bd8bd2b04dced862d3",
+    "verify.md": "sha256:6e64fb63bba2f3805d46ed8a30c5e65f6208c1e40ff1ec3e01dbb3274fab9bef"
   },
   "generatedBy": "core"
 }

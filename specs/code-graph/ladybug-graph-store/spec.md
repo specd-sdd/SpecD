@@ -179,6 +179,26 @@ The adapter MAY create backend-specific companion files such as lock or WAL file
 
 Backend-specific metadata storage details remain internal to the adapter.
 
+### Requirement: Prepared statement usage
+
+`LadybugGraphStore` SHALL use LadybugDB's prepared statement API for all Cypher queries
+that accept user-supplied or externally-derived parameter values.
+
+The adapter MUST:
+
+- use `conn.prepare(statement)` and `conn.execute(preparedStatement, params)` with `$param`
+  bindings for all queries where node properties, relation endpoints, or metadata values
+  come from function arguments or external data
+- pass parameter values as a `Record<string, LbugValue>` object rather than interpolating
+  them into the Cypher query string
+- avoid manual string escaping functions for values that can be bound through prepared
+  statement parameters
+
+The adapter MAY continue to use direct `conn.query()` for DDL statements, DML with
+compile-time constant values (such as `RelationType` enum values used as relationship
+labels), COPY commands with internally generated file paths, and backend-specific
+administrative queries where no external values are involved.
+
 ## Constraints
 
 - `LadybugGraphStore` is an infrastructure adapter, not part of the abstract graph-store contract

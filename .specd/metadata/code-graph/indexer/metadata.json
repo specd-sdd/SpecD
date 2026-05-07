@@ -543,8 +543,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:97f4cbcf1cdd52ad343e6e307eb3fba0e41eb2fe18ebe5bbc8fd3ea9367e4796",
-    "verify.md": "sha256:cd5dfb3dc7a66e9e5959753ff7249595111188d19b757ff0abbef9044c89fa58"
+    "spec.md": "sha256:6b53aa2fcc34fa279d0d6dfd3493bc76e74607310d156e03e81d4ab517ef6360",
+    "verify.md": "sha256:81928cbc4a678156512d6a13038688b519ef579c88dfa63f1d6b866ebce65bc0"
   },
   "generatedBy": "core"
 }

@@ -323,4 +323,76 @@ describe('SQLiteGraphStore', () => {
 
     await store.close()
   })
+
+  describe('FTS sanitization', () => {
+    it('returns matching symbol for hyphenated query without crashing', async () => {
+      tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-test-'))
+      const file = createFileNode({
+        path: 'src/artifacts.ts',
+        configRelativePath: '',
+        language: 'typescript',
+        contentHash: 'sha256:abc',
+        workspace: 'core',
+      })
+      const symbol = createSymbolNode({
+        name: 'pending-parent-artifact-review',
+        kind: SymbolKind.Function,
+        filePath: file.path,
+        line: 1,
+        column: 0,
+      })
+
+      const store = new SQLiteGraphStore(tempDir)
+      await store.open()
+      await store.upsertFile(file, [symbol], [])
+      const results = await store.searchSymbols({ query: 'pending-parent-artifact-review' })
+      expect(results).toHaveLength(1)
+      expect(results[0]!.symbol.name).toBe('pending-parent-artifact-review')
+      await store.close()
+    })
+
+    it('treats FTS operators as literal text and returns matching symbols', async () => {
+      tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-test-'))
+      const file = createFileNode({
+        path: 'src/logic.ts',
+        configRelativePath: '',
+        language: 'typescript',
+        contentHash: 'sha256:abc',
+        workspace: 'core',
+      })
+      const symNot = createSymbolNode({
+        name: 'assertNot',
+        kind: SymbolKind.Function,
+        filePath: file.path,
+        line: 1,
+        column: 0,
+        comment: 'checks NOT condition',
+      })
+      const symUnrelated = createSymbolNode({
+        name: 'fetchData',
+        kind: SymbolKind.Function,
+        filePath: file.path,
+        line: 5,
+        column: 0,
+      })
+
+      const store = new SQLiteGraphStore(tempDir)
+      await store.open()
+      await store.upsertFile(file, [symNot, symUnrelated], [])
+      const results = await store.searchSymbols({ query: 'NOT' })
+      const names = results.map((r) => r.symbol.name)
+      expect(names).toContain('assertNot')
+      expect(names).not.toContain('fetchData')
+      await store.close()
+    })
+
+    it('handles empty query gracefully', async () => {
+      tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-test-'))
+      const store = new SQLiteGraphStore(tempDir)
+      await store.open()
+      const results = await store.searchSymbols({ query: '' })
+      expect(results).toEqual([])
+      await store.close()
+    })
+  })
 })
