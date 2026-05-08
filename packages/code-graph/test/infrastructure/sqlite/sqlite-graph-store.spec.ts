@@ -386,6 +386,92 @@ describe('SQLiteGraphStore', () => {
       await store.close()
     })
 
+    it('uses OR logic for multi-token discovery', async () => {
+      tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-test-'))
+      const file1 = createFileNode({
+        path: 'src/status.ts',
+        configRelativePath: '',
+        language: 'typescript',
+        contentHash: 'sha256:1',
+        workspace: 'core',
+      })
+      const sym1 = createSymbolNode({
+        name: 'effectiveStatus',
+        kind: SymbolKind.Method,
+        filePath: file1.path,
+        line: 1,
+        column: 0,
+      })
+      const file2 = createFileNode({
+        path: 'src/lifecycle.ts',
+        configRelativePath: '',
+        language: 'typescript',
+        contentHash: 'sha256:2',
+        workspace: 'core',
+      })
+      const sym2 = createSymbolNode({
+        name: 'findBlockingParent',
+        kind: SymbolKind.Method,
+        filePath: file2.path,
+        line: 1,
+        column: 0,
+      })
+
+      const store = new SQLiteGraphStore(tempDir)
+      await store.open()
+      await store.upsertFile(file1, [sym1], [])
+      await store.upsertFile(file2, [sym2], [])
+
+      // Combined search for terms in different files
+      const results = await store.searchSymbols({ query: 'effectiveStatus findBlockingParent' })
+      const ids = results.map((r) => r.symbol.id)
+
+      expect(ids).toContain(sym1.id)
+      expect(ids).toContain(sym2.id)
+      expect(results).toHaveLength(2)
+
+      await store.close()
+    })
+
+    it('ranks results matching more tokens higher (BM25 precision)', async () => {
+      tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-test-'))
+      const file = createFileNode({
+        path: 'src/relevance.ts',
+        configRelativePath: '',
+        language: 'typescript',
+        contentHash: 'sha256:3',
+        workspace: 'core',
+      })
+      const partialMatch = createSymbolNode({
+        name: 'getStatus',
+        kind: SymbolKind.Method,
+        filePath: file.path,
+        line: 1,
+        column: 0,
+      })
+      const fullMatch = createSymbolNode({
+        name: 'getEffectiveStatus',
+        kind: SymbolKind.Method,
+        filePath: file.path,
+        line: 5,
+        column: 0,
+      })
+
+      const store = new SQLiteGraphStore(tempDir)
+      await store.open()
+      await store.upsertFile(file, [partialMatch, fullMatch], [])
+
+      const results = await store.searchSymbols({ query: 'effective status' })
+
+      // Both match "status" (expanded from getStatus/getEffectiveStatus)
+      // but "getEffectiveStatus" also matches "effective"
+      expect(results[0]!.symbol.name).toBe('getEffectiveStatus')
+      expect(results[1]!.symbol.name).toBe('getStatus')
+      expect(results[0]!.score).toBeGreaterThan(results[1]!.score)
+
+      await store.close()
+    })
+
     it('handles empty query gracefully', async () => {
       tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-test-'))
       const store = new SQLiteGraphStore(tempDir)

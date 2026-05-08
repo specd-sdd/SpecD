@@ -56,7 +56,7 @@
     {
       "requirement": "SQLite full-text search",
       "rules": [
-        "`SQLiteGraphStore` SHALL implement symbol and spec search using SQLite full-text search\ncapabilities.\n\nThe adapter MUST:\n\n- provide full-text search over symbol search text and symbol comments for\n  `GraphStore.searchSymbols()`\n- provide full-text search over spec title, description, and searchable content for\n  `GraphStore.searchSpecs()`\n- sanitize the FTS query string before passing it to the FTS5 MATCH clause so that\n  user input is treated as literal text and not interpreted as FTS5 query syntax\n  (boolean operators, column filters, prefix wildcards, etc.)\n- return results ordered by descending relevance score\n- rebuild or refresh backend-specific FTS structures when required after bulk data\n  changes\n\nThe implementation MAY use SQLite FTS5 virtual tables or another SQLite-native full-text\nsearch mechanism, provided the abstract graph-store search contract remains satisfied."
+        "`SQLiteGraphStore` SHALL implement symbol and spec search using SQLite full-text search\ncapabilities.\n\nThe adapter MUST:\n\n- provide full-text search over symbol search text and symbol comments for\n  `GraphStore.searchSymbols()`\n- provide full-text search over spec title, description, and searchable content for\n  `GraphStore.searchSpecs()`\n- sanitize the FTS query string before passing it to the FTS5 MATCH clause so that\n  user input is treated as literal text and not interpreted as FTS5 query syntax\n  (boolean operators, column filters, prefix wildcards, etc.)\n- join multiple search tokens using the `OR` operator in the sanitized FTS5 query\n  so that results matching any of the terms are returned (discovery mode)\n- return results ordered by descending relevance score, relying on the backend's\n  BM25 ranking to prioritize records matching more search terms (precision mode)\n- rebuild or refresh backend-specific FTS structures when required after bulk data\n  changes\n\nThe implementation MAY use SQLite FTS5 virtual tables or another SQLite-native full-text\nsearch mechanism, provided the abstract graph-store search contract remains satisfied."
       ]
     },
     {
@@ -168,6 +168,26 @@
     },
     {
       "requirement": "SQLite full-text search",
+      "name": "Multi-token search uses OR logic for discovery",
+      "given": ["symbols \"effectiveStatus\" and \"findBlockingParent\" exist in different files"],
+      "when": ["searchSymbols({ query: 'effectiveStatus findBlockingParent' }) is called"],
+      "then": [
+        "both symbols are returned in the results",
+        "AND the FTS5 MATCH clause uses the OR operator between tokens"
+      ]
+    },
+    {
+      "requirement": "SQLite full-text search",
+      "name": "BM25 ranking prioritizes multiple matches for precision",
+      "given": ["symbol A contains \"status\", symbol B contains \"effective status\""],
+      "when": ["searchSymbols({ query: 'effective status' }) is called"],
+      "then": [
+        "symbol B has a higher relevance score than symbol A",
+        "AND symbol B appears first in the results"
+      ]
+    },
+    {
+      "requirement": "SQLite full-text search",
       "name": "FTS structures can be refreshed after bulk writes",
       "given": ["the backend has inserted symbols and specs through bulk-loading operations"],
       "when": ["rebuildFtsIndexes() is invoked"],
@@ -234,8 +254,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:21b7bd5b753bee986bdcbf1c1641d01f750f1b92641bd7bd8bd2b04dced862d3",
-    "verify.md": "sha256:6e64fb63bba2f3805d46ed8a30c5e65f6208c1e40ff1ec3e01dbb3274fab9bef"
+    "spec.md": "sha256:09299494b0043129616aa6f38136693c42515f7983f451959efa1654bd24b860",
+    "verify.md": "sha256:abdf8921a6a39fcc3dbb53aae8a4cbcdb92777aaf796c46718f745368cb2a666"
   },
   "generatedBy": "core"
 }

@@ -686,7 +686,7 @@ export class LadybugGraphStore extends GraphStore {
 
     const depRows = await execPrepared(
       this.conn!,
-      `MATCH (s:Spec {specId: $specId})-[:DEPENDS_ON]->(t:Spec) RETURN t.specId AS specId`,
+      `MATCH (s:Spec {specId: $specId})-[:DEPENDS_ON]->(t:Spec) RETURN t.specId AS target`,
       { specId },
     )
 
@@ -697,7 +697,7 @@ export class LadybugGraphStore extends GraphStore {
       description: (row['description'] as string) ?? '',
       contentHash: row['contentHash'] as string,
       content: (row['content'] as string) ?? '',
-      dependsOn: depRows.map((r) => r['specId'] as string),
+      dependsOn: depRows.map((r) => r['target'] as string),
       workspace: (row['workspace'] as string) ?? '',
     }
   }
@@ -1112,6 +1112,11 @@ export class LadybugGraphStore extends GraphStore {
     }
 
     const where = conditions.length > 0 ? ` WHERE ${conditions.join(' AND ')}` : ''
+    const query = sanitizeFtsQuery(options.query)
+    if (query.length === 0) return []
+
+    params.query = query
+
     const rows = await execPrepared(
       this.conn!,
       `CALL QUERY_FTS_INDEX('Symbol', 'symbol_fts', $query, k := 1000)${where} RETURN node.id AS id, node.name AS name, node.kind AS kind, node.filePath AS filePath, node.line AS line, node.col AS col, node.comment AS comment, score ORDER BY score DESC LIMIT ${String(top)}`,
@@ -1156,6 +1161,11 @@ export class LadybugGraphStore extends GraphStore {
     }
 
     const where = conditions.length > 0 ? ` WHERE ${conditions.join(' AND ')}` : ''
+    const query = sanitizeFtsQuery(options.query)
+    if (query.length === 0) return []
+
+    params.query = query
+
     const rows = await execPrepared(
       this.conn!,
       `CALL QUERY_FTS_INDEX('Spec', 'spec_fts', $query, k := 1000)${where} RETURN node.specId AS specId, node.path AS path, node.title AS title, node.description AS description, node.contentHash AS contentHash, node.content AS content, node.workspace AS workspace, score ORDER BY score DESC LIMIT ${String(top)}`,
@@ -1434,4 +1444,18 @@ export class LadybugGraphStore extends GraphStore {
       comment: (row['comment'] as string) || undefined,
     }
   }
+}
+
+/**
+ * Sanitizes a search query for Ladybug FTS.
+ * Splits by whitespace, wraps tokens in double quotes, and joins with OR.
+ * @param query - Raw user search input.
+ * @returns Sanitized query string for discovery mode.
+ */
+function sanitizeFtsQuery(query: string): string {
+  const trimmed = query.trim()
+  if (trimmed.length === 0) return ''
+  const tokens = trimmed.split(/\s+/).filter((t) => t.length > 0)
+  if (tokens.length === 0) return ''
+  return tokens.map((token) => '"' + token.replaceAll('"', '""') + '"').join(' OR ')
 }

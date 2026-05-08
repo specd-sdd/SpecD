@@ -1069,5 +1069,5 @@ function sanitizeFtsQuery(query: string): string {
   if (trimmed.length === 0) return ''
   const tokens = trimmed.split(/\s+/).filter((t) => t.length > 0)
   if (tokens.length === 0) return ''
-  return tokens.map((token) => '"' + token.replaceAll('"', '""') + '"').join(' AND ')
+  return tokens.map((token) => '"' + token.replaceAll('"', '""') + '"').join(' OR ')
 }

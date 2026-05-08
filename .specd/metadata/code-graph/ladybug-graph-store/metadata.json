@@ -50,7 +50,7 @@
     {
       "requirement": "Full-text search implementation",
       "rules": [
-        "`LadybugGraphStore` SHALL implement symbol and spec search using Ladybug's full-text search facilities.\n\nThe adapter MUST:\n\n- create the Ladybug FTS indexes needed to satisfy the abstract `GraphStore.searchSymbols()` and `GraphStore.searchSpecs()` contract\n- index symbols using both the stored symbol name and the backend-specific expanded search text used for compound-name matching\n- index spec title, description, and full content for spec search\n- rebuild or recreate FTS indexes when required by the backend after bulk data changes\n\nThe relevance scores returned through the abstract store contract MAY be backend-specific, but results SHALL be ordered from highest to lowest relevance.\n\nThe Ladybug FTS schema MUST include:\n\n- **`symbol_fts`** — covering `Symbol.searchName` and `Symbol.comment`\n- **`spec_fts`** — covering `Spec.title`, `Spec.description`, and `Spec.content`\n\nThe implementation MAY use stemming or other backend-supported ranking/indexing options, provided the abstract graph-store contract remains satisfied."
+        "`LadybugGraphStore` SHALL implement symbol and spec search using Ladybug's full-text search facilities.\n\nThe adapter MUST:\n\n- create the Ladybug FTS indexes needed to satisfy the abstract `GraphStore.searchSymbols()` and `GraphStore.searchSpecs()` contract\n- index symbols using both the stored symbol name and the backend-specific expanded search text used for compound-name matching\n- index spec title, description, and full content for spec search\n- join multiple search tokens using the `OR` operator in the sanitized FTS query so that results matching any of the terms are returned (discovery mode)\n- return results ordered from highest to lowest relevance, relying on the backend's ranking to prioritize records matching more search terms (precision mode)\n- rebuild or recreate FTS indexes when required by the backend after bulk data changes\n\nThe Ladybug FTS schema MUST include:\n\n- **`symbol_fts`** — covering `Symbol.searchName` and `Symbol.comment`\n- **`spec_fts`** — covering `Spec.title`, `Spec.description`, and `Spec.content`\n\nThe implementation MAY use stemming or other backend-supported ranking/indexing options, provided the abstract graph-store contract remains satisfied."
       ]
     },
     {
@@ -171,6 +171,26 @@
       ]
     },
     {
+      "requirement": "Full-text search implementation",
+      "name": "Multi-token search uses OR logic for discovery",
+      "given": ["symbols \"effectiveStatus\" and \"findBlockingParent\" exist in different files"],
+      "when": ["searchSymbols({ query: 'effectiveStatus findBlockingParent' }) is called"],
+      "then": [
+        "both symbols are returned in the results",
+        "AND the Ladybug FTS query uses the OR operator between tokens"
+      ]
+    },
+    {
+      "requirement": "Full-text search implementation",
+      "name": "Ranking prioritizes multiple matches for precision",
+      "given": ["symbol A contains \"status\", symbol B contains \"effective status\""],
+      "when": ["searchSymbols({ query: 'effective status' }) is called"],
+      "then": [
+        "symbol B has a higher relevance score than symbol A",
+        "AND symbol B appears first in the results"
+      ]
+    },
+    {
       "requirement": "Schema versioning",
       "name": "Incompatible schema version permits rebuild strategy",
       "given": [
@@ -250,8 +270,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:1b2ddfad28bbeaa07d46cdf08afaa11b4492264069fbf851ebe735b6c44282c1",
-    "verify.md": "sha256:5c9a6db65f750789285cdf5cc91f37b6de2433737f39e1e6b7d3e94681847fe5"
+    "spec.md": "sha256:bd98a12ccccef1d5c9263f851209d69a7629ad31cba493a2b25fd1e674d906e6",
+    "verify.md": "sha256:3701f846c6061b39d729efbb17c24a16eb3577c80dad5c6fe2dd3ff9ec225c2d"
   },
   "generatedBy": "core"
 }

@@ -86,6 +86,20 @@
 - **THEN** results come back in descending relevance order from SQLite-backed full-text
   search structures
 
+#### Scenario: Multi-token search uses OR logic for discovery
+
+- **GIVEN** symbols "effectiveStatus" and "findBlockingParent" exist in different files
+- **WHEN** `searchSymbols({ query: 'effectiveStatus findBlockingParent' })` is called
+- **THEN** both symbols are returned in the results
+- **AND** the FTS5 MATCH clause uses the `OR` operator between tokens
+
+#### Scenario: BM25 ranking prioritizes multiple matches for precision
+
+- **GIVEN** symbol A contains "status", symbol B contains "effective status"
+- **WHEN** `searchSymbols({ query: 'effective status' })` is called
+- **THEN** symbol B has a higher relevance score than symbol A
+- **AND** symbol B appears first in the results
+
 #### Scenario: FTS structures can be refreshed after bulk writes
 
 - **GIVEN** the backend has inserted symbols and specs through bulk-loading operations

@@ -134,7 +134,10 @@ The adapter MUST:
 - sanitize the FTS query string before passing it to the FTS5 MATCH clause so that
   user input is treated as literal text and not interpreted as FTS5 query syntax
   (boolean operators, column filters, prefix wildcards, etc.)
-- return results ordered by descending relevance score
+- join multiple search tokens using the `OR` operator in the sanitized FTS5 query
+  so that results matching any of the terms are returned (discovery mode)
+- return results ordered by descending relevance score, relying on the backend's
+  BM25 ranking to prioritize records matching more search terms (precision mode)
 - rebuild or refresh backend-specific FTS structures when required after bulk data
   changes
 

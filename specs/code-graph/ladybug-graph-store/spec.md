@@ -130,9 +130,9 @@ The adapter MUST:
 - create the Ladybug FTS indexes needed to satisfy the abstract `GraphStore.searchSymbols()` and `GraphStore.searchSpecs()` contract
 - index symbols using both the stored symbol name and the backend-specific expanded search text used for compound-name matching
 - index spec title, description, and full content for spec search
+- join multiple search tokens using the `OR` operator in the sanitized FTS query so that results matching any of the terms are returned (discovery mode)
+- return results ordered from highest to lowest relevance, relying on the backend's ranking to prioritize records matching more search terms (precision mode)
 - rebuild or recreate FTS indexes when required by the backend after bulk data changes
-
-The relevance scores returned through the abstract store contract MAY be backend-specific, but results SHALL be ordered from highest to lowest relevance.
 
 The Ladybug FTS schema MUST include:
 
