@@ -1,7 +1,12 @@
 {
   "title": "Storage",
   "description": "The domain and application layers must remain agnostic to where changes, drafts, and archives physically live, so that future storage backends can be swapped without touching business logic. specd's storage layer achieves this through port interfaces in `@specd/core` with adapter-specific implementations; the v1 implementation ships one adapter for all storage ports: `fs` (local filesystem).",
-  "dependsOn": ["default:_global/architecture", "core:change", "core:change-manifest"],
+  "dependsOn": [
+    "default:_global/architecture",
+    "core:change",
+    "core:change-manifest",
+    "default:_global/logging"
+  ],
   "context": [
     "The domain and application layers must remain agnostic to where changes, drafts, and archives physically live, so that future storage backends can be swapped without touching business logic. specd's storage layer achieves this through port interfaces in `@specd/core` with adapter-specific implementations; the v1 implementation ships one adapter for all storage ports: `fs` (local filesystem)."
   ],
@@ -70,6 +75,24 @@
       "requirement": "Change manifest format",
       "rules": [
         "The format of `manifest.json` — its fields, event shapes, and schema version behavior — is defined in [`core:change-manifest`](../change-manifest/spec.md). `FsChangeRepository` reads and writes the manifest according to that format and must write it atomically (temp file + rename) to prevent partial reads."
+      ]
+    },
+    {
+      "requirement": "Repository path confinement",
+      "rules": [
+        "Fs-backed repositories MUST treat path confinement as a storage invariant.\n\nChange, spec, archive, and metadata operations MUST reject any derived path that would escape their configured storage root or address an arbitrary untracked file outside the permitted artifact set for the operation."
+      ]
+    },
+    {
+      "requirement": "Staged archive persistence",
+      "rules": [
+        "Fs-backed archive persistence MUST prefer staged commit semantics over ad hoc rollback.\n\nWhen archive requires multiple durable updates, storage behavior MUST prepare the complete result first and only then expose the committed archive result, so failures before commit do not leave partially visible permanent archive state."
+      ]
+    },
+    {
+      "requirement": "Storage debug logging",
+      "rules": [
+        "Fs-backed repositories SHOULD emit debug-level logs for tracked artifact resolution, path-confinement rejections, staged archive commit progress, and archive failure diagnostics.\n\nThese logs MUST follow the project's global logging conventions."
       ]
     },
     {
@@ -279,6 +302,50 @@
       ]
     },
     {
+      "requirement": "Repository path confinement",
+      "name": "Change storage rejects paths outside the change root",
+      "when": ["a change-storage operation derives a path outside its configured root"],
+      "then": ["the operation is rejected"]
+    },
+    {
+      "requirement": "Repository path confinement",
+      "name": "Spec storage rejects untracked or escaping artifact paths",
+      "when": [
+        "a spec-storage operation targets an artifact path outside the permitted artifact set or outside the spec root"
+      ],
+      "then": ["the operation is rejected"]
+    },
+    {
+      "requirement": "Repository path confinement",
+      "name": "Archive storage rejects archive paths outside the archive root",
+      "when": ["an archive-storage operation derives a path outside the configured archive root"],
+      "then": ["the operation is rejected"]
+    },
+    {
+      "requirement": "Staged archive persistence",
+      "name": "Failure before staged commit leaves no partially visible archive result",
+      "given": [
+        "fs-backed archive persistence has prepared some intermediate data",
+        "AND a failure occurs before commit"
+      ],
+      "when": ["the archive attempt aborts"],
+      "then": ["the permanent archive view does not expose a partially committed result"]
+    },
+    {
+      "requirement": "Staged archive persistence",
+      "name": "Permanent archive view changes only after successful commit",
+      "when": ["fs-backed archive persistence completes successfully"],
+      "then": ["the permanent archive view changes only after the staged commit succeeds"]
+    },
+    {
+      "requirement": "Storage debug logging",
+      "name": "Debug logs cover storage diagnostics",
+      "when": ["debug logging is enabled for fs-backed storage adapters"],
+      "then": [
+        "logs include tracked artifact resolution, path-confinement rejections, staged archive commit progress, and archive failure diagnostics"
+      ]
+    },
+    {
       "requirement": "Change locks directory placement",
       "name": "Locks derived from configPath field",
       "given": ["ChangeRepositoryConfig includes configPath: /project/.specd/config"],
@@ -307,8 +374,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:2469c3e5853fc18af2ab107d9696f77b871951eca542269ff79d32609e6b1709",
-    "verify.md": "sha256:dc046bac25a521505ab137bf0af6a3400d1cd189472d5d6b34620c5e83cb2a16"
+    "spec.md": "sha256:5782bc8ba5af26f7edc1a713b79b6fba5b863b70ae8ef2e3072b55ba9415f7fd",
+    "verify.md": "sha256:adeced1c264f947e6f2900eeec114fa71d8427b26727563bf8a3273d51ee60f2"
   },
   "generatedBy": "core"
 }

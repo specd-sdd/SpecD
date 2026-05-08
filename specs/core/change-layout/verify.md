@@ -78,6 +78,23 @@
 - **WHEN** a direct file also exists at `specs/default/core/config/spec.md`
 - **THEN** tooling still reports and validates only the delta path
 
+### Requirement: Tracked artifact filename is authoritative
+
+#### Scenario: Tracked direct file is not reinterpreted after partial repo side effect
+
+- **GIVEN** a change tracks `verify.md` as `specs/core/core/new-capability/verify.md`
+- **AND** a failed archive attempt has already materialized `specs/core/new-capability/spec.md` in the permanent repository
+- **WHEN** tooling reloads or consumes the tracked artifact file
+- **THEN** the tracked filename remains `specs/core/core/new-capability/verify.md`
+- **AND** tooling does not reinterpret it as `deltas/core/core/new-capability/verify.md.delta.yaml`
+
+#### Scenario: Alternate syntactically valid path does not override tracked file
+
+- **GIVEN** a tracked artifact file already points to one valid change-directory path
+- **AND** another syntactically valid `specs/...` or `deltas/...` path exists for the same artifact name
+- **WHEN** downstream tooling consumes that artifact
+- **THEN** only the tracked filename is used
+
 ### Requirement: Workspace segment is always present
 
 #### Scenario: Single workspace — segment still required

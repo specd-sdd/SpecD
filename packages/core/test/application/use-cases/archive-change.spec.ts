@@ -311,7 +311,7 @@ describe('ArchiveChange', () => {
               'default:auth/oauth',
               new ArtifactFile({
                 key: 'default:auth/oauth',
-                filename: 'specs/default/auth/oauth/spec.md',
+                filename: 'deltas/default/auth/oauth/spec.md.delta.yaml',
                 status: 'complete',
                 validatedHash: 'abc123',
               }),
@@ -366,7 +366,7 @@ describe('ArchiveChange', () => {
               'default:auth/oauth',
               new ArtifactFile({
                 key: 'default:auth/oauth',
-                filename: 'specs/default/auth/oauth/spec.md',
+                filename: 'deltas/default/auth/oauth/spec.md.delta.yaml',
                 status: 'complete',
                 validatedHash: 'abc123',
               }),
@@ -687,7 +687,7 @@ describe('ArchiveChange', () => {
               'default:auth/oauth',
               new ArtifactFile({
                 key: 'default:auth/oauth',
-                filename: 'specs/default/auth/oauth/spec.md',
+                filename: 'deltas/default/auth/oauth/spec.md.delta.yaml',
                 status: 'complete',
                 validatedHash: 'abc123',
               }),
@@ -732,7 +732,7 @@ describe('ArchiveChange', () => {
               'default:auth/oauth',
               new ArtifactFile({
                 key: 'default:auth/oauth',
-                filename: 'specs/default/auth/oauth/spec.md',
+                filename: 'deltas/default/auth/oauth/spec.md.delta.yaml',
                 status: 'complete',
                 validatedHash: 'abc123',
               }),
@@ -930,7 +930,7 @@ describe('ArchiveChange', () => {
               'default:auth/oauth',
               new ArtifactFile({
                 key: 'default:auth/oauth',
-                filename: 'specs/default/auth/oauth/spec.md',
+                filename: 'deltas/default/auth/oauth/spec.md.delta.yaml',
                 status: 'complete',
                 validatedHash: 'abc123',
               }),
@@ -987,7 +987,7 @@ describe('ArchiveChange', () => {
               'default:auth/oauth',
               new ArtifactFile({
                 key: 'default:auth/oauth',
-                filename: 'specs/default/auth/oauth/spec.md',
+                filename: 'deltas/default/auth/oauth/spec.md.delta.yaml',
                 status: 'complete',
                 validatedHash: 'abc123',
               }),
@@ -1005,7 +1005,9 @@ describe('ArchiveChange', () => {
 
       const uc = new ArchiveChange(
         changeRepo,
-        new Map([['default', makeSpecRepository()]]),
+        new Map([
+          ['default', makeSpecRepository({ artifacts: { 'auth/oauth/spec.md': '# Base' } })],
+        ]),
         makeArchiveRepository(),
         makeRunStepHooks(),
         makeActorResolver(),
@@ -1049,7 +1051,7 @@ describe('ArchiveChange', () => {
               'default:auth/oauth',
               new ArtifactFile({
                 key: 'default:auth/oauth',
-                filename: 'specs/default/auth/oauth/spec.md',
+                filename: 'deltas/default/auth/oauth/spec.md.delta.yaml',
                 status: 'complete',
                 validatedHash: 'abc123',
               }),
@@ -1114,7 +1116,7 @@ describe('ArchiveChange', () => {
               'default:auth/oauth',
               new ArtifactFile({
                 key: 'default:auth/oauth',
-                filename: 'specs/default/auth/oauth/spec.md',
+                filename: 'deltas/default/auth/oauth/spec.md.delta.yaml',
                 status: 'complete',
                 validatedHash: 'abc123',
               }),
@@ -1182,7 +1184,7 @@ describe('ArchiveChange', () => {
               'default:auth/oauth',
               new ArtifactFile({
                 key: 'default:auth/oauth',
-                filename: 'specs/default/auth/oauth/spec.md',
+                filename: 'deltas/default/auth/oauth/spec.md.delta.yaml',
                 status: 'complete',
                 validatedHash: 'abc123',
               }),
@@ -1247,7 +1249,7 @@ describe('ArchiveChange', () => {
               'default:auth/oauth',
               new ArtifactFile({
                 key: 'default:auth/oauth',
-                filename: 'specs/default/auth/oauth/spec.md',
+                filename: 'deltas/default/auth/oauth/spec.md.delta.yaml',
                 status: 'complete',
                 validatedHash: 'abc123',
               }),
@@ -1312,7 +1314,7 @@ describe('ArchiveChange', () => {
               'default:auth/oauth',
               new ArtifactFile({
                 key: 'default:auth/oauth',
-                filename: 'specs/default/auth/oauth/spec.md',
+                filename: 'deltas/default/auth/oauth/spec.md.delta.yaml',
                 status: 'complete',
                 validatedHash: 'abc123',
               }),
@@ -1480,7 +1482,7 @@ describe('ArchiveChange', () => {
               'default:auth/oauth',
               new ArtifactFile({
                 key: 'default:auth/oauth',
-                filename: 'specs/default/auth/oauth/spec.md',
+                filename: 'deltas/default/auth/oauth/spec.md.delta.yaml',
                 status: 'complete',
                 validatedHash: 'abc123',
               }),

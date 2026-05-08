@@ -169,6 +169,44 @@
 
 > Full scenarios are in [`core:change-manifest`](../change-manifest/verify.md).
 
+### Requirement: Repository path confinement
+
+#### Scenario: Change storage rejects paths outside the change root
+
+- **WHEN** a change-storage operation derives a path outside its configured root
+- **THEN** the operation is rejected
+
+#### Scenario: Spec storage rejects untracked or escaping artifact paths
+
+- **WHEN** a spec-storage operation targets an artifact path outside the permitted artifact set or outside the spec root
+- **THEN** the operation is rejected
+
+#### Scenario: Archive storage rejects archive paths outside the archive root
+
+- **WHEN** an archive-storage operation derives a path outside the configured archive root
+- **THEN** the operation is rejected
+
+### Requirement: Staged archive persistence
+
+#### Scenario: Failure before staged commit leaves no partially visible archive result
+
+- **GIVEN** fs-backed archive persistence has prepared some intermediate data
+- **AND** a failure occurs before commit
+- **WHEN** the archive attempt aborts
+- **THEN** the permanent archive view does not expose a partially committed result
+
+#### Scenario: Permanent archive view changes only after successful commit
+
+- **WHEN** fs-backed archive persistence completes successfully
+- **THEN** the permanent archive view changes only after the staged commit succeeds
+
+### Requirement: Storage debug logging
+
+#### Scenario: Debug logs cover storage diagnostics
+
+- **WHEN** debug logging is enabled for fs-backed storage adapters
+- **THEN** logs include tracked artifact resolution, path-confinement rejections, staged archive commit progress, and archive failure diagnostics
+
 ### Requirement: Change locks directory placement
 
 #### Scenario: Locks derived from configPath field

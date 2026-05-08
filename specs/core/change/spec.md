@@ -217,6 +217,16 @@ Approval invalidation caused by artifact drift MUST capture the full set of affe
 - **AND** a `transitioned` event rolling back to `designing` is appended
 - **AND** the `invalidated.message` includes the archived change name and the overlapping spec IDs
 
+### Requirement: Archive outcome history
+
+A failed archive attempt MUST be traceable through change history without making a failed pre-commit attempt appear as a completed archive.
+
+The `archive-failed` event records that an archive attempt failed while the change was still active.
+
+`archive-failed` captures diagnostics for the failed attempt. It does not by itself advance the external archive lifecycle outcome. If the failure occurs before the archive commit succeeds, the change remains pending archive from an external workflow perspective.
+
+Successful archive completion is not represented by appending another event to the active change's history after the change has ceased to be an active change. Success traceability belongs to the archived record and archived manifest metadata.
+
 ### Requirement: Historical implementation detection
 
 A Change SHALL treat any historical transition to `implementing` as evidence that implementation may already exist, even if the current lifecycle state later returns to `designing`, `verifying`, or another non-terminal state.
@@ -299,3 +309,4 @@ This separation ensures the entity does not need schema knowledge in order to an
 - [`core:spec-id-format`](../spec-id-format/spec.md) — canonical `workspace:capabilityPath` identifiers for spec-scoped files
 - [`default:_global/architecture`](../../_global/architecture/spec.md) — domain ownership of lifecycle and artifact invariants
 - [`core:lifecycle-engine`](../lifecycle-engine/spec.md) — interprets schema-aware lifecycle and dependency status from persisted change facts
+- [`default:_global/logging`](../../_global/logging/spec.md) — debug logging conventions for archive-attempt diagnostics reflected in change history

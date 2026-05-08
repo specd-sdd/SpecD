@@ -26,6 +26,24 @@ Each `SpecRepository` instance is bound to exactly one workspace. All operations
 
 `artifact(spec, filename)` MUST load the content of the specified artifact file within the spec directory. It MUST return a `SpecArtifact` with the file content, or `null` if the file does not exist. When loaded from storage, the `SpecArtifact`'s `originalHash` MUST be set to enable conflict detection on subsequent saves.
 
+### Requirement: Spec artifact access is limited to expected artifact files
+
+`artifact(spec, filename)` and `save(spec, artifact, options?)` MUST operate only on artifact filenames that are valid for that spec under the active schema or adapter-owned metadata contract.
+
+The repository MUST NOT treat the spec directory as a general-purpose file container for arbitrary extra filenames when serving the normal artifact API.
+
+### Requirement: Spec artifact path confinement
+
+`artifact(spec, filename)` and `save(spec, artifact, options?)` MUST enforce strict confinement to the target spec directory.
+
+The repository MUST reject any filename that would escape the spec directory or address a non-artifact path outside the permitted artifact set.
+
+### Requirement: Spec artifact resolution debug logging
+
+Implementations SHOULD emit debug-level logs when resolving expected spec artifact files, rejecting unsupported filenames, or rejecting a path-confinement violation.
+
+These logs MUST follow the project's global logging conventions.
+
 ### Requirement: save persists a single artifact with conflict detection
 
 `save(spec, artifact, options?)` MUST first check `this.ownership()`. If the ownership is `readOnly`, the method MUST throw `ReadOnlyWorkspaceError` with a message indicating the spec ID and workspace name. This check MUST occur before any filesystem operation or conflict detection.
@@ -105,3 +123,4 @@ This method is the port-level search primitive — it performs a content scan wi
 - [`core:spec-id-format`](../spec-id-format/spec.md) — canonical spec ID format used in `resolveFromPath` results
 - [`core:spec-metadata`](../spec-metadata/spec.md) — metadata file format and structure returned by `metadata()`
 - [`core:search-specs`](../search-specs/spec.md) — use case that orchestrates `search()` across workspaces
+- [`default:_global/logging`](../../_global/logging/spec.md) — debug logging requirements for expected artifact resolution and path-confinement diagnostics

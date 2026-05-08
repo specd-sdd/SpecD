@@ -22,6 +22,24 @@ When `options.actor` is provided, the `ActorIdentity` MUST be recorded in the ar
 
 The destination path MUST be computed from the archive pattern configured at construction time (e.g. `{{year}}/{{change.archivedName}}`). The source path MUST be resolved from the change name using the changes path configuration.
 
+### Requirement: archive persists through a staged commit
+
+`archive(change, options?)` MUST treat archive persistence as a staged commit rather than a sequence of partially visible permanent writes.
+
+When archive storage needs to materialize multiple durable effects, the repository MUST prepare the destination state so that a failure before commit does not leave a partially committed archive result visible as a successful archive.
+
+### Requirement: Archive path confinement
+
+Archive path resolution derived from archive patterns, stored index entries, or recovered manifest locations MUST remain confined to the configured archive root.
+
+Implementations MUST reject any derived path that would escape the archive root or reinterpret archive metadata as an unchecked arbitrary filesystem path.
+
+### Requirement: Archive repository debug logging
+
+Implementations SHOULD emit debug-level logs for archive path resolution, staged commit start, staged commit completion, and confinement-related archive failures.
+
+These logs MUST follow the project's global logging conventions.
+
 ### Requirement: archive rejects non-archivable state
 
 When a change is not in `archivable` state and `options.force` is not `true`, `archive()` MUST throw `InvalidStateTransitionError`. The change directory MUST NOT be moved and no index entry MUST be written.
@@ -69,3 +87,4 @@ Once a change is archived, the resulting `ArchivedChange` record and its directo
 - [`core:change`](../change/spec.md) — Change entity, `archivable` state, `ActorIdentity`, lifecycle transitions
 - [`core:storage`](../storage/spec.md) — archive pattern configuration, archive index format, directory naming
 - [`core:archive-change`](../archive-change/spec.md) — ArchiveChange use case that delegates to this port
+- [`default:_global/logging`](../../_global/logging/spec.md) — debug logging requirements for archive staging, path resolution, and failure diagnostics

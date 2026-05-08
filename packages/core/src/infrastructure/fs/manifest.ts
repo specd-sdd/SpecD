@@ -136,6 +136,22 @@ export interface RawInvalidatedEvent {
   readonly affectedArtifacts: RawInvalidatedArtifactEntry[]
 }
 
+/** Raw JSON shape of an `archive-failed` event. */
+export interface RawArchiveFailedEvent {
+  /** Event discriminant. */
+  readonly type: 'archive-failed'
+  /** ISO 8601 timestamp. */
+  readonly at: string
+  /** Actor who triggered the archive attempt. */
+  readonly by: ManifestActorIdentity
+  /** Archive phase that failed. */
+  readonly step: 'prepare' | 'commit' | 'archive' | 'metadata'
+  /** Human-readable failure summary. */
+  readonly message: string
+  /** Whether permanent archive commit had already begun. */
+  readonly commitStarted: boolean
+}
+
 /** Raw JSON shape of a `drafted` event. */
 export interface RawDraftedEvent {
   /** Event discriminant. */
@@ -219,6 +235,7 @@ export type RawChangeEvent =
   | RawSpecApprovedEvent
   | RawSignedOffEvent
   | RawInvalidatedEvent
+  | RawArchiveFailedEvent
   | RawDraftedEvent
   | RawRestoredEvent
   | RawDiscardedEvent

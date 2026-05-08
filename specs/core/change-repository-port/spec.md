@@ -136,6 +136,24 @@ operations (`get`, `list`, `listDrafts`, `listDiscarded`, `save`, `delete`, `art
 MUST be declared as `abstract` methods. This follows the architecture spec requirement that
 ports with shared construction are abstract classes.
 
+### Requirement: artifact only loads tracked change artifact files
+
+`artifact(change, filename)` MUST accept only filenames that correspond to tracked artifact files declared on the change's artifact file list.
+
+If `filename` does not match a tracked artifact file for that change, the repository MUST reject the read rather than treating the change directory as a general-purpose file container.
+
+### Requirement: Change artifact path confinement
+
+`artifact(change, filename)`, `artifactExists(change, filename)`, and any related change-artifact file lookup MUST enforce strict confinement to the change directory.
+
+The repository MUST reject any path that would escape the change directory or address an arbitrary file outside the tracked artifact set, including path traversal forms and alternate relative-path encodings.
+
+### Requirement: Change artifact resolution debug logging
+
+Implementations SHOULD emit debug-level logs when resolving tracked change artifact files, rejecting untracked filenames, or rejecting a path-confinement violation.
+
+These logs MUST follow the project's global logging conventions.
+
 ## Constraints
 
 - Changes are stored globally, not per-workspace — the inherited workspace context is unused
@@ -154,3 +172,4 @@ ports with shared construction are abstract classes.
 - [`core:change`](../change/spec.md) — change entity state, invalidation, and artifact semantics
 - [`core:storage`](../storage/spec.md) — filesystem persistence and change directory layout
 - [`core:change-manifest`](../change-manifest/spec.md) — manifest fields persisted by the repository
+- [`default:_global/logging`](../../_global/logging/spec.md) — debug logging requirements for tracked artifact resolution and path-confinement diagnostics

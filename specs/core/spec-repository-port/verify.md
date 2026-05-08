@@ -55,6 +55,40 @@
 - **WHEN** `artifact(spec, "nonexistent.md")` is called
 - **THEN** `null` is returned
 
+### Requirement: Spec artifact access is limited to expected artifact files
+
+#### Scenario: Expected spec artifact file can be read
+
+- **GIVEN** `spec.md` is a valid artifact file for the target spec
+- **WHEN** `artifact(spec, "spec.md")` is called
+- **THEN** the repository returns that artifact
+
+#### Scenario: Unexpected extra file is rejected
+
+- **GIVEN** an extra file exists in the spec directory but is not a valid artifact or adapter-owned metadata file
+- **WHEN** `artifact(spec, "<extra-file>")` or `save(spec, artifact("<extra-file>"))` is called
+- **THEN** the repository rejects the operation
+
+### Requirement: Spec artifact path confinement
+
+#### Scenario: Read rejects escaping path
+
+- **WHEN** `artifact(spec, "../other-spec/spec.md")` or an equivalent escape path is requested
+- **THEN** the repository rejects the request
+
+#### Scenario: Save rejects escaping path
+
+- **WHEN** `save(spec, artifact("../other-spec/spec.md"))` or an equivalent escape path is requested
+- **THEN** the repository rejects the request
+
+### Requirement: Spec artifact resolution debug logging
+
+#### Scenario: Debug logs cover expected-file resolution and rejection
+
+- **WHEN** debug logging is enabled for `SpecRepository`
+- **THEN** successful expected-artifact resolution emits debug output
+- **AND** unsupported filename rejection or path-confinement rejection also emits debug output
+
 ### Requirement: save persists a single artifact with conflict detection
 
 #### Scenario: ReadOnly workspace rejects save

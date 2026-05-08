@@ -95,6 +95,25 @@ For change-scoped artifacts, the expected path remains the artifact output basen
 
 If the expected file does not exist and the artifact is not optional, validation MUST record a failure that includes the expected file path. The file MUST NOT be marked complete.
 
+### Requirement: Delta eligibility uses artifact-level base existence
+
+For a delta-capable spec-scoped artifact, delta eligibility MUST be decided at the concrete artifact-file level, not by a coarse "the spec exists" check.
+
+A spec having one existing artifact file (for example `spec.md`) MUST NOT make a different artifact file (for example `verify.md`) delta-eligible unless that specific base artifact file already exists in the target spec repository.
+
+When the concrete base artifact file is absent, validation MUST treat a delta file for that artifact as invalid even if some other artifact file already exists for the same spec ID.
+
+### Requirement: Invalid mixed representation for new specs
+
+When a spec is new to the target repository, `ValidateArtifacts` MUST reject any artifact representation that mixes direct `specs/...` files with delta-backed files for the same new spec unless the concrete base artifact exists for each delta-backed artifact.
+
+For a new spec:
+
+- direct `specs/...` files are valid
+- delta files are valid only when the concrete target base artifact already exists for that artifact file
+
+A new spec with `spec.md` authored directly under `specs/...` and `verify.md` authored as a delta without an existing base `verify.md` MUST fail validation before archive.
+
 ### Requirement: Delta validation
 
 If the schema artifact declares `deltaValidations[]` and a delta file exists for the artifact at `deltas/<workspace>/<capability-path>/<filename>.delta.yaml`, `ValidateArtifacts` must validate the delta file before attempting application.

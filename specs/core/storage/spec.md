@@ -59,6 +59,24 @@ When storage selection requires workspace-specific VCS or null-VCS handling, tha
 
 The format of `manifest.json` — its fields, event shapes, and schema version behavior — is defined in [`core:change-manifest`](../change-manifest/spec.md). `FsChangeRepository` reads and writes the manifest according to that format and must write it atomically (temp file + rename) to prevent partial reads.
 
+### Requirement: Repository path confinement
+
+Fs-backed repositories MUST treat path confinement as a storage invariant.
+
+Change, spec, archive, and metadata operations MUST reject any derived path that would escape their configured storage root or address an arbitrary untracked file outside the permitted artifact set for the operation.
+
+### Requirement: Staged archive persistence
+
+Fs-backed archive persistence MUST prefer staged commit semantics over ad hoc rollback.
+
+When archive requires multiple durable updates, storage behavior MUST prepare the complete result first and only then expose the committed archive result, so failures before commit do not leave partially visible permanent archive state.
+
+### Requirement: Storage debug logging
+
+Fs-backed repositories SHOULD emit debug-level logs for tracked artifact resolution, path-confinement rejections, staged archive commit progress, and archive failure diagnostics.
+
+These logs MUST follow the project's global logging conventions.
+
 ### Requirement: Change locks directory placement
 
 The `FsChangeRepository` implementation derives its change lock directory path internally
@@ -81,6 +99,7 @@ at construction time. The repository derives the locks directory internally as
 - [`default:_global/architecture`](../../_global/architecture/spec.md) — infrastructure layer constraints
 - [`core:change`](../change/spec.md) — Change domain model; defines event types, lifecycle states, and derivation rules serialized in the manifest
 - [`core:change-manifest`](../change-manifest/spec.md) — manifest format, event shapes, and schema version behavior
+- [`default:_global/logging`](../../_global/logging/spec.md) — debug logging requirements for repository diagnostics and staged archive persistence
 
 ## ADRs
 

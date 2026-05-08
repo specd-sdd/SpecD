@@ -42,6 +42,22 @@
 - **WHEN** the manifest is loaded and saved again
 - **THEN** both states are preserved
 
+### Requirement: Archive outcome history events
+
+#### Scenario: Failed archive attempt appends archive-failed event
+
+- **GIVEN** an archive attempt starts for an active change
+- **AND** execution fails before successful archive commit completes
+- **WHEN** the manifest is persisted after that failure
+- **THEN** `history` includes an `archive-failed` event with `step`, `message`, and `commitStarted`
+
+#### Scenario: Successful archive completion is not appended to active history
+
+- **GIVEN** a change archives successfully
+- **WHEN** the active change manifest is considered complete
+- **THEN** no additional active-history success event is appended
+- **AND** success remains traceable through archived manifest metadata
+
 ### Requirement: Artifact filenames use expected paths
 
 #### Scenario: Existing delta-capable spec is persisted as a delta filename
@@ -64,6 +80,22 @@
 - **WHEN** the change repository loads or syncs that change
 - **THEN** the artifact filename may be normalized to `deltas/core/core/config/spec.md.delta.yaml`
 - **AND** the file state and `validatedHash` semantics are preserved
+
+### Requirement: Filename normalization preserves tracked intent
+
+#### Scenario: Partial spec materialization does not flip tracked direct file into delta
+
+- **GIVEN** a manifest tracks `verify.md` for a new capability as `specs/core/core/new-capability/verify.md`
+- **AND** a failed archive attempt has already materialized some permanent files for that capability
+- **WHEN** the change is reloaded
+- **THEN** filename normalization preserves the tracked `specs/.../verify.md` filename
+- **AND** it does not silently rewrite it to `deltas/.../verify.md.delta.yaml`
+
+#### Scenario: Representation-changing normalization is rejected
+
+- **GIVEN** a normalization step would change a tracked artifact from direct to delta representation or vice versa
+- **WHEN** exact semantic equivalence for that artifact file has not been proven
+- **THEN** the normalization is rejected
 
 ### Requirement: Schema version
 

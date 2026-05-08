@@ -138,6 +138,40 @@
 - **WHEN** `artifact(change, "nonexistent.md")` is called
 - **THEN** `null` is returned
 
+### Requirement: artifact only loads tracked change artifact files
+
+#### Scenario: Tracked artifact file can be read
+
+- **GIVEN** `proposal.md` is listed in the change's tracked artifact files
+- **WHEN** `artifact(change, "proposal.md")` is called
+- **THEN** the repository returns that tracked artifact content
+
+#### Scenario: Untracked file is rejected even when present on disk
+
+- **GIVEN** a file exists inside the change directory but is not listed in the change's tracked artifact files
+- **WHEN** `artifact(change, "<that-file>")` is called
+- **THEN** the repository rejects the read instead of returning arbitrary content
+
+### Requirement: Change artifact path confinement
+
+#### Scenario: Path traversal is rejected on artifact read
+
+- **WHEN** `artifact(change, "../outside.txt")` or an equivalent escape path is requested
+- **THEN** the repository rejects the request
+
+#### Scenario: Path traversal is rejected on existence check
+
+- **WHEN** `artifactExists(change, "../outside.txt")` or an equivalent escape path is requested
+- **THEN** the repository rejects the request
+
+### Requirement: Change artifact resolution debug logging
+
+#### Scenario: Debug logs cover tracked resolution and rejection
+
+- **WHEN** debug logging is enabled for `ChangeRepository`
+- **THEN** successful tracked artifact resolution emits debug output
+- **AND** untracked filename rejection or path-confinement rejection also emits debug output
+
 ### Requirement: saveArtifact with optimistic concurrency
 
 #### Scenario: No conflict — originalHash matches

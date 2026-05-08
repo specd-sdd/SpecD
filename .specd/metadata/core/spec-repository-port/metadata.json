@@ -9,7 +9,8 @@
     "core:workspace",
     "core:spec-id-format",
     "core:spec-metadata",
-    "core:search-specs"
+    "core:search-specs",
+    "default:_global/logging"
   ],
   "context": [
     "Use cases need to read and write specs without knowing how or where they are stored on disk, so a port boundary is essential for testability and storage-strategy independence. `SpecRepository` is the application-layer port for reading and writing specs within a single workspace, extending the shared `Repository` base class with immutable `workspace()`, `ownership()`, and `isExternal()` accessors set at construction time. Use cases that need multiple workspaces receive a separate `SpecRepository` instance per workspace."
@@ -43,6 +44,24 @@
       "requirement": "artifact loads a single artifact file",
       "rules": [
         "`artifact(spec, filename)` MUST load the content of the specified artifact file within the spec directory. It MUST return a `SpecArtifact` with the file content, or `null` if the file does not exist. When loaded from storage, the `SpecArtifact`'s `originalHash` MUST be set to enable conflict detection on subsequent saves."
+      ]
+    },
+    {
+      "requirement": "Spec artifact access is limited to expected artifact files",
+      "rules": [
+        "`artifact(spec, filename)` and `save(spec, artifact, options?)` MUST operate only on artifact filenames that are valid for that spec under the active schema or adapter-owned metadata contract.\n\nThe repository MUST NOT treat the spec directory as a general-purpose file container for arbitrary extra filenames when serving the normal artifact API."
+      ]
+    },
+    {
+      "requirement": "Spec artifact path confinement",
+      "rules": [
+        "`artifact(spec, filename)` and `save(spec, artifact, options?)` MUST enforce strict confinement to the target spec directory.\n\nThe repository MUST reject any filename that would escape the spec directory or address a non-artifact path outside the permitted artifact set."
+      ]
+    },
+    {
+      "requirement": "Spec artifact resolution debug logging",
+      "rules": [
+        "Implementations SHOULD emit debug-level logs when resolving expected spec artifact files, rejecting unsupported filenames, or rejecting a path-confinement violation.\n\nThese logs MUST follow the project's global logging conventions."
       ]
     },
     {
@@ -156,6 +175,49 @@
       "name": "Artifact does not exist",
       "when": ["artifact(spec, \"nonexistent.md\") is called"],
       "then": ["null is returned"]
+    },
+    {
+      "requirement": "Spec artifact access is limited to expected artifact files",
+      "name": "Expected spec artifact file can be read",
+      "given": ["spec.md is a valid artifact file for the target spec"],
+      "when": ["artifact(spec, \"spec.md\") is called"],
+      "then": ["the repository returns that artifact"]
+    },
+    {
+      "requirement": "Spec artifact access is limited to expected artifact files",
+      "name": "Unexpected extra file is rejected",
+      "given": [
+        "an extra file exists in the spec directory but is not a valid artifact or adapter-owned metadata file"
+      ],
+      "when": [
+        "artifact(spec, \"<extra-file>\") or save(spec, artifact(\"<extra-file>\")) is called"
+      ],
+      "then": ["the repository rejects the operation"]
+    },
+    {
+      "requirement": "Spec artifact path confinement",
+      "name": "Read rejects escaping path",
+      "when": [
+        "artifact(spec, \"../other-spec/spec.md\") or an equivalent escape path is requested"
+      ],
+      "then": ["the repository rejects the request"]
+    },
+    {
+      "requirement": "Spec artifact path confinement",
+      "name": "Save rejects escaping path",
+      "when": [
+        "save(spec, artifact(\"../other-spec/spec.md\")) or an equivalent escape path is requested"
+      ],
+      "then": ["the repository rejects the request"]
+    },
+    {
+      "requirement": "Spec artifact resolution debug logging",
+      "name": "Debug logs cover expected-file resolution and rejection",
+      "when": ["debug logging is enabled for SpecRepository"],
+      "then": [
+        "successful expected-artifact resolution emits debug output",
+        "AND unsupported filename rejection or path-confinement rejection also emits debug output"
+      ]
     },
     {
       "requirement": "save persists a single artifact with conflict detection",
@@ -292,8 +354,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:90fccc6a38e81be5d5199f7252f319df5310b32ce3e170b3d3c938a279d6f79c",
-    "verify.md": "sha256:112d20fc38f2cf0815283777f25689cbeb87d1c3581f266573bcad0284611c85"
+    "spec.md": "sha256:fb1b4d0100cda117afdff3315158941a20addc57617da573b363b11b6a95dbb2",
+    "verify.md": "sha256:be29717815138b648788ebeeb0e1a8ddcd9d261ec0745e2bc7ffa47d25d4407d"
   },
   "generatedBy": "core"
 }

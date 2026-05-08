@@ -316,6 +316,15 @@ function cloneChangeEvent(event: Change['history'][number]): Change['history'][n
         by: { ...event.by },
         description: event.description,
       }
+    case 'archive-failed':
+      return {
+        type: 'archive-failed',
+        at: new Date(event.at),
+        by: { ...event.by },
+        step: event.step,
+        message: event.message,
+        commitStarted: event.commitStarted,
+      }
   }
 }
 

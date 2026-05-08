@@ -882,7 +882,7 @@ describe('Change', () => {
       })
     }
 
-    it('normalizes stale filenames for existing specs and preserves status/hash', () => {
+    it('preserves validated tracked filenames across representation-class changes', () => {
       const c = new Change({
         name: 'sync-artifacts',
         createdAt: new Date('2024-01-01T00:00:00Z'),
@@ -921,7 +921,7 @@ describe('Change', () => {
       const artifact = c.getArtifact('specs')
       expect(artifact).not.toBeNull()
       const existing = artifact?.getFile('default:auth/login')
-      expect(existing?.filename).toBe('deltas/default/auth/login/spec.md.delta.yaml')
+      expect(existing?.filename).toBe('specs/default/auth/login/spec.md')
       expect(existing?.status).toBe('complete')
       expect(existing?.validatedHash).toBe('sha256:abc')
       expect(artifact?.getFile('default:auth/register')?.filename).toBe(

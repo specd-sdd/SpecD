@@ -38,6 +38,12 @@
       ]
     },
     {
+      "requirement": "Tracked artifact filename is authoritative",
+      "rules": [
+        "Once a spec-scoped artifact path has been resolved and persisted as the tracked filename for a change artifact file, downstream tooling MUST treat that tracked filename as the authoritative representation choice for that artifact.\n\nTooling that consumes a tracked artifact file MUST NOT probe an alternate `specs/...` or `deltas/...` location for the same artifact just because that alternate path would also be syntactically valid for some other repository state.\n\nRepository-side path normalization MUST preserve this tracked-intent rule unless the normalization is explicitly proven to preserve the same artifact representation for the same file."
+      ]
+    },
+    {
       "requirement": "Workspace segment is always present",
       "rules": [
         "Both `specs/<workspace>/` and `deltas/<workspace>/` always include an explicit workspace segment, even when only one workspace is configured. Omitting the workspace segment is not valid. This ensures that multi-workspace changes are unambiguous and that tooling can resolve the correct `SpecRepository` for each file without inspecting `specd.yaml` at read time."
@@ -169,6 +175,29 @@
       "then": ["tooling still reports and validates only the delta path"]
     },
     {
+      "requirement": "Tracked artifact filename is authoritative",
+      "name": "Tracked direct file is not reinterpreted after partial repo side effect",
+      "given": [
+        "a change tracks verify.md as specs/core/core/new-capability/verify.md",
+        "AND a failed archive attempt has already materialized specs/core/new-capability/spec.md in the permanent repository"
+      ],
+      "when": ["tooling reloads or consumes the tracked artifact file"],
+      "then": [
+        "the tracked filename remains specs/core/core/new-capability/verify.md",
+        "AND tooling does not reinterpret it as deltas/core/core/new-capability/verify.md.delta.yaml"
+      ]
+    },
+    {
+      "requirement": "Tracked artifact filename is authoritative",
+      "name": "Alternate syntactically valid path does not override tracked file",
+      "given": [
+        "a tracked artifact file already points to one valid change-directory path",
+        "AND another syntactically valid specs/... or deltas/... path exists for the same artifact name"
+      ],
+      "when": ["downstream tooling consumes that artifact"],
+      "then": ["only the tracked filename is used"]
+    },
+    {
       "requirement": "Workspace segment is always present",
       "name": "Single workspace — segment still required",
       "when": ["a project has only one workspace named default and a change creates a new spec"],
@@ -204,8 +233,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:c49ad5c5c00fe28c63b826ca6a39c191d156a7f00de8aeb5afa9070fdf0349e3",
-    "verify.md": "sha256:fed8b7c229ea81dcc595a2c07859cac41c8b7565042d342428f54771ed5dbcae"
+    "spec.md": "sha256:8a55aaa7d8e314dfdc6d6bb1d139bae5324f99589e83aa72a2c775cb62b82f24",
+    "verify.md": "sha256:566ee083774943c626402c9062c9dab45d73b021851056669b418fa05af5e15e"
   },
   "generatedBy": "core"
 }

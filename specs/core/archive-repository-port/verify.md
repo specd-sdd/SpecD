@@ -24,6 +24,42 @@
 - **WHEN** `archive(change)` is called
 - **THEN** the `archiveDirPath` reflects the pattern with variables resolved (e.g. `2026/add-oauth-login`)
 
+### Requirement: archive persists through a staged commit
+
+#### Scenario: Failure before commit does not expose a successful archive result
+
+- **GIVEN** archive persistence requires more than one durable update
+- **AND** a failure occurs before commit completes
+- **WHEN** `archive(change)` aborts
+- **THEN** no partial archive result is visible as a successful archived change
+- **AND** no final archive index entry is exposed as committed
+
+#### Scenario: Successful commit exposes the archive result once
+
+- **WHEN** `archive(change)` completes successfully
+- **THEN** the archived manifest and index entry become visible as one committed archive result
+
+### Requirement: Archive path confinement
+
+#### Scenario: Escaping archive pattern is rejected
+
+- **GIVEN** archive path derivation from pattern variables would resolve outside the configured archive root
+- **WHEN** `archive(change)` or `archivePath(archivedChange)` resolves that path
+- **THEN** the repository rejects the path
+
+#### Scenario: Recovered index path outside root is rejected
+
+- **GIVEN** a stored or recovered archive location points outside the configured archive root
+- **WHEN** the repository consumes that location
+- **THEN** it is rejected instead of being treated as a valid archive entry
+
+### Requirement: Archive repository debug logging
+
+#### Scenario: Debug logs cover staging and confinement diagnostics
+
+- **WHEN** debug logging is enabled for `ArchiveRepository`
+- **THEN** logs include archive path resolution, staged commit start, staged commit completion, and confinement-related failures
+
 ### Requirement: archive rejects non-archivable state
 
 #### Scenario: Change not in archivable state

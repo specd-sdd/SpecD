@@ -247,6 +247,22 @@
 - **WHEN** historical implementation detection is evaluated
 - **THEN** it reports that implementation may not yet exist
 
+### Requirement: Archive outcome history
+
+#### Scenario: Failed archive attempt appends archive-failed event
+
+- **GIVEN** a change has entered archive execution
+- **AND** archive fails before completion
+- **WHEN** the change history is inspected
+- **THEN** it includes an `archive-failed` event with phase diagnostics for that attempt
+
+#### Scenario: Successful archive does not append a new active-change success event
+
+- **GIVEN** a change archives successfully
+- **WHEN** active-change history is considered
+- **THEN** no new success event is appended there
+- **AND** archive completion is represented by the archived record instead
+
 ### Requirement: Schema version
 
 #### Scenario: Schema version mismatch warns

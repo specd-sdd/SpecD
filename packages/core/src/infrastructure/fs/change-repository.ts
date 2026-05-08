@@ -20,10 +20,12 @@ import { parseSpecId } from '../../domain/services/parse-spec-id.js'
 import { expectedArtifactFilename } from '../../domain/services/artifact-filename.js'
 import { type PreHashCleanup } from '../../domain/value-objects/validation-rule.js'
 import { applyPreHashCleanup } from '../../domain/services/pre-hash-cleanup.js'
+import { Logger } from '../../application/logger.js'
 import { changeDirName } from './dir-name.js'
 import { sha256 } from './hash.js'
 import { isEnoent } from './is-enoent.js'
 import { moveDir } from './move-dir.js'
+import { normalizeRelativePath, resolveConfinedPath } from './path-confinement.js'
 import { writeFileAtomic } from './write-atomic.js'
 import {
   type ChangeManifest,
@@ -347,7 +349,7 @@ export class FsChangeRepository extends ChangeRepository {
     const dir = await this._resolveDir(change.name)
     if (dir === null) return null
 
-    const filePath = path.join(dir, filename)
+    const filePath = resolveConfinedPath(dir, filename, trackedArtifactFilenames(change))
     let content: string
     try {
       content = await fs.readFile(filePath, 'utf8')
@@ -356,6 +358,10 @@ export class FsChangeRepository extends ChangeRepository {
       throw err
     }
 
+    Logger.debug('FsChangeRepository resolved tracked artifact file', {
+      change: change.name,
+      filename: normalizeRelativePath(filename),
+    })
     return new SpecArtifact(filename, content, sha256(content))
   }
 
@@ -382,7 +388,7 @@ export class FsChangeRepository extends ChangeRepository {
       throw new ChangeNotFoundError(change.name)
     }
 
-    const filePath = path.join(dir, artifact.filename)
+    const filePath = resolveConfinedPath(dir, artifact.filename, trackedArtifactFilenames(change))
 
     if (artifact.originalHash !== undefined && options?.force !== true) {
       // Conflict check: read current content and compare hashes
@@ -420,7 +426,12 @@ export class FsChangeRepository extends ChangeRepository {
     const dir = await this._resolveDir(change.name)
     if (dir === null) return false
     try {
-      await fs.lstat(path.join(dir, filename))
+      const filePath = resolveConfinedPath(dir, filename, trackedArtifactFilenames(change))
+      await fs.lstat(filePath)
+      Logger.debug('FsChangeRepository checked tracked artifact presence', {
+        change: change.name,
+        filename: normalizeRelativePath(filename),
+      })
       return true
     } catch {
       return false
@@ -876,11 +887,16 @@ export class FsChangeRepository extends ChangeRepository {
             })
           } else if (specExistence !== undefined) {
             const specExists = specExistence.get(rawFile.key)
-            resolvedFilename = expectedArtifactFilename({
+            const expectedFilename = expectedArtifactFilename({
               artifactType: artType,
               key: rawFile.key,
               ...(specExists !== undefined ? { specExists } : {}),
             })
+            resolvedFilename =
+              artifactRepresentationClass(rawFile.filename) ===
+                artifactRepresentationClass(expectedFilename) || rawFile.validatedHash === null
+                ? expectedFilename
+                : rawFile.filename
           }
         }
         if (resolvedFilename !== rawFile.filename) {
@@ -1179,6 +1195,15 @@ function serializeEvent(event: ChangeEvent): RawChangeEvent {
           files: [...artifact.files],
         })),
       }
+    case 'archive-failed':
+      return {
+        type: 'archive-failed',
+        at: event.at.toISOString(),
+        by: event.by,
+        step: event.step,
+        message: event.message,
+        commitStarted: event.commitStarted,
+      }
     case 'drafted':
       return event.reason !== undefined
         ? { type: 'drafted', at: event.at.toISOString(), by: event.by, reason: event.reason }
@@ -1325,6 +1350,15 @@ function deserializeEvent(raw: RawChangeEvent): ChangeEvent {
           files: artifact.files,
         })),
       }
+    case 'archive-failed':
+      return {
+        type: 'archive-failed',
+        at: new Date(raw.at),
+        by: raw.by,
+        step: raw.step,
+        message: raw.message,
+        commitStarted: raw.commitStarted,
+      }
     case 'drafted':
       return raw.reason !== undefined
         ? { type: 'drafted', at: new Date(raw.at), by: raw.by, reason: raw.reason }
@@ -1369,6 +1403,32 @@ function deserializeEvent(raw: RawChangeEvent): ChangeEvent {
         description: raw.description,
       }
   }
+}
+
+/**
+ * Builds the normalized tracked-artifact filename set for a change.
+ *
+ * @param change - Change whose tracked files define the allowed set
+ * @returns Allowed normalized relative filenames
+ */
+function trackedArtifactFilenames(change: Change): ReadonlySet<string> | undefined {
+  const allowed = new Set<string>()
+  for (const artifact of change.artifacts.values()) {
+    for (const file of artifact.files.values()) {
+      allowed.add(normalizeRelativePath(file.filename))
+    }
+  }
+  return allowed.size > 0 ? allowed : undefined
+}
+
+/**
+ * Returns the tracked representation class for a change artifact filename.
+ *
+ * @param filename - The tracked change-directory filename
+ * @returns `delta` for `deltas/...` files, otherwise `direct`
+ */
+function artifactRepresentationClass(filename: string): 'delta' | 'direct' {
+  return normalizeRelativePath(filename).startsWith('deltas/') ? 'delta' : 'direct'
 }
 
 // changeManifestSchema imported from ./manifest.js

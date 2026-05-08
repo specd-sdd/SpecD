@@ -20,9 +20,21 @@
       ]
     },
     {
+      "requirement": "Archive outcome history events",
+      "rules": [
+        "The active change manifest history MUST preserve explicit failed-archive traceability.\n\nThe `archive-failed` event is appended when an archive attempt fails after archive execution begins but before a successful archive commit is completed.\n\n`archive-failed` MUST include:\n\n- `step` — the archive phase in which the failure occurred\n- `message` — a human-readable diagnostic summary\n- `commitStarted` — whether staged archive commit had already begun\n\nSuccessful archive completion MUST remain traceable through the archived manifest metadata (`archivedAt`, `archivedBy`, and archive location data) rather than by appending a new active-change history event after the change has ceased to be an active change.\n\nA failed pre-commit archive attempt MUST NOT by itself imply that archive completed or that permanent specs were partially accepted."
+      ]
+    },
+    {
       "requirement": "Artifact filenames use expected paths",
       "rules": [
         "Every `ManifestArtifactFile.filename` MUST be the expected change-directory path for that artifact, as defined by `core:change-layout`.\n\nWhen a change is created or its spec scope changes, persisted spec-scoped artifact filenames MUST be resolved using the target spec's existence and the schema artifact's delta capability before the manifest is written. Existing specs with delta-capable artifacts MUST be persisted as `deltas/<workspace>/<capability-path>/<artifact-filename>.delta.yaml`; new specs MUST be persisted as `specs/<workspace>/<capability-path>/<artifact-filename>`.\n\nThe manifest MUST NOT initially persist a `specs/...` filename for an existing delta-capable spec and rely on a later read, validation, or delta creation pass to repair it. The manifest is a user- and agent-visible contract from creation time.\n\nWhen loading older manifests that contain a stale `specs/...` filename for an existing delta-capable spec, the repository MAY normalize the filename to the expected `deltas/...` path while preserving the file state and validation hash semantics."
+      ]
+    },
+    {
+      "requirement": "Filename normalization preserves tracked intent",
+      "rules": [
+        "Manifest filename normalization MUST preserve the tracked artifact representation already validated for the change.\n\nLoading or syncing a manifest MUST NOT reinterpret a tracked direct `specs/...` filename as a delta-backed `deltas/...` filename merely because the repository now contains a partially materialized spec directory or some other partial side effect from a failed archive attempt.\n\nAny normalization that changes the representation class of a tracked artifact file MUST be rejected unless it is explicitly proven to preserve the same artifact semantics for that exact artifact file."
       ]
     },
     {
@@ -105,6 +117,26 @@
       "then": ["both states are preserved"]
     },
     {
+      "requirement": "Archive outcome history events",
+      "name": "Failed archive attempt appends archive-failed event",
+      "given": [
+        "an archive attempt starts for an active change",
+        "AND execution fails before successful archive commit completes"
+      ],
+      "when": ["the manifest is persisted after that failure"],
+      "then": ["history includes an archive-failed event with step, message, and commitStarted"]
+    },
+    {
+      "requirement": "Archive outcome history events",
+      "name": "Successful archive completion is not appended to active history",
+      "given": ["a change archives successfully"],
+      "when": ["the active change manifest is considered complete"],
+      "then": [
+        "no additional active-history success event is appended",
+        "AND success remains traceable through archived manifest metadata"
+      ]
+    },
+    {
       "requirement": "Artifact filenames use expected paths",
       "name": "Existing delta-capable spec is persisted as a delta filename",
       "given": [
@@ -137,6 +169,28 @@
         "the artifact filename may be normalized to deltas/core/core/config/spec.md.delta.yaml",
         "AND the file state and validatedHash semantics are preserved"
       ]
+    },
+    {
+      "requirement": "Filename normalization preserves tracked intent",
+      "name": "Partial spec materialization does not flip tracked direct file into delta",
+      "given": [
+        "a manifest tracks verify.md for a new capability as specs/core/core/new-capability/verify.md",
+        "AND a failed archive attempt has already materialized some permanent files for that capability"
+      ],
+      "when": ["the change is reloaded"],
+      "then": [
+        "filename normalization preserves the tracked specs/.../verify.md filename",
+        "AND it does not silently rewrite it to deltas/.../verify.md.delta.yaml"
+      ]
+    },
+    {
+      "requirement": "Filename normalization preserves tracked intent",
+      "name": "Representation-changing normalization is rejected",
+      "given": [
+        "a normalization step would change a tracked artifact from direct to delta representation or vice versa"
+      ],
+      "when": ["exact semantic equivalence for that artifact file has not been proven"],
+      "then": ["the normalization is rejected"]
     },
     {
       "requirement": "Schema version",
@@ -182,8 +236,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:1be677de1ef6f32e463bdd0a4393250ca93a180a761d922c7d31294883246afe",
-    "verify.md": "sha256:c6aebc0b898cdf05582b4305442e31a478b8650543bba399a5e44f898229abd5"
+    "spec.md": "sha256:e49c7716c1e77cb7acb34536fc7861cf0ac176e66988b340263243267521867b",
+    "verify.md": "sha256:e19d066ed00f8719696fbfa0c3715569dad063c9c0f12d8725646971064d5204"
   },
   "generatedBy": "core"
 }

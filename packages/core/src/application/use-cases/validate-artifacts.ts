@@ -328,29 +328,39 @@ export class ValidateArtifacts {
 
       const changeArtifact = change.getArtifact(artifactType.id)
       const trackedFile = changeArtifact?.getFile(fileKey)
+      const validationFilename = resolveArtifactValidationFilename(trackedFile, expectedFilename)
       if (trackedFile?.status === 'skipped') {
         files.push({
           artifactId: artifactType.id,
           key: fileKey,
-          filename: expectedFilename,
+          filename: validationFilename,
           status: 'skipped',
         })
         continue
       }
 
-      const expectedFile = await this._changes.artifact(change, expectedFilename)
-      if (expectedFile === null) {
+      Logger.debug('ValidateArtifacts selected tracked artifact file', {
+        change: change.name,
+        artifactId: artifactType.id,
+        fileKey,
+        trackedFilename: trackedFile?.filename ?? null,
+        expectedFilename,
+        validationFilename,
+      })
+
+      const effectiveFile = await this._changes.artifact(change, validationFilename)
+      if (effectiveFile === null) {
         files.push({
           artifactId: artifactType.id,
           key: fileKey,
-          filename: expectedFilename,
+          filename: validationFilename,
           status: 'missing',
         })
         if (!artifactType.optional) {
           failures.push({
             artifactId: artifactType.id,
-            description: `Expected artifact file '${expectedFilename}' is missing`,
-            filename: expectedFilename,
+            description: `Expected artifact file '${validationFilename}' is missing`,
+            filename: validationFilename,
           })
         }
         continue
@@ -359,7 +369,7 @@ export class ValidateArtifacts {
       files.push({
         artifactId: artifactType.id,
         key: fileKey,
-        filename: expectedFilename,
+        filename: validationFilename,
         status: 'validated',
       })
 
@@ -367,18 +377,21 @@ export class ValidateArtifacts {
       const format = artifactType.format ?? inferFormat(outputBasename)
       const parser = format !== undefined ? this._parsers.get(format) : undefined
       const yamlParser = this._parsers.get('yaml')
-      const shouldApplyDelta = artifactType.delta && artifactType.scope === 'spec' && specExists
+      const shouldApplyDelta =
+        artifactType.delta &&
+        artifactType.scope === 'spec' &&
+        isDeltaTrackedFilename(validationFilename)
 
-      let validationContent: string | null = shouldApplyDelta ? null : expectedFile.content
+      let validationContent: string | null = shouldApplyDelta ? null : effectiveFile.content
       let artifactFailed = false
       let extractedMetadataForArtifact: ExtractedMetadata | undefined
 
       if (shouldApplyDelta) {
         if (yamlParser !== undefined) {
-          const deltaEntries = yamlParser.parseDelta(expectedFile.content)
+          const deltaEntries = yamlParser.parseDelta(effectiveFile.content)
           if (deltaEntries.length > 0 && deltaEntries.every((entry) => entry.op === 'no-op')) {
             const cleanedContent = this._applyCleanup(
-              expectedFile.content,
+              effectiveFile.content,
               artifactType.preHashCleanup,
             )
             completedValidations.push({
@@ -391,7 +404,7 @@ export class ValidateArtifacts {
         }
 
         if (artifactType.deltaValidations.length > 0 && yamlParser !== undefined) {
-          const deltaAST = yamlParser.parse(expectedFile.content)
+          const deltaAST = yamlParser.parse(effectiveFile.content)
           const result = evaluateRules(
             artifactType.deltaValidations,
             deltaAST.root,
@@ -411,12 +424,12 @@ export class ValidateArtifacts {
                 failures.push({
                   artifactId: artifactType.id,
                   description: `Base artifact '${outputBasename}' is missing for spec '${input.specPath}'`,
-                  filename: expectedFilename,
+                  filename: validationFilename,
                 })
                 artifactFailed = true
               } else {
                 const baseAST = parser.parse(baseArtifact.content)
-                const deltaEntries = yamlParser.parseDelta(expectedFile.content)
+                const deltaEntries = yamlParser.parseDelta(effectiveFile.content)
                 const mergedResult = parser.apply(baseAST, deltaEntries)
                 const mergedAST = mergedResult.ast
                 validationContent = parser.serialize(mergedAST)
@@ -429,7 +442,7 @@ export class ValidateArtifacts {
                 failures.push({
                   artifactId: artifactType.id,
                   description: `Delta application failed: ${err.message}`,
-                  filename: expectedFilename,
+                  filename: validationFilename,
                 })
                 artifactFailed = true
               } else {
@@ -440,7 +453,7 @@ export class ValidateArtifacts {
             failures.push({
               artifactId: artifactType.id,
               description: `Cannot apply delta for '${input.specPath}' because the base spec is unavailable`,
-              filename: expectedFilename,
+              filename: validationFilename,
             })
             artifactFailed = true
           }
@@ -515,7 +528,7 @@ export class ValidateArtifacts {
                 failures.push({
                   artifactId: artifactType.id,
                   description: `MetadataExtraction validation failed: ${validationResult.error.message}`,
-                  filename: expectedFilename,
+                  filename: validationFilename,
                 })
                 artifactFailed = true
               }
@@ -523,7 +536,7 @@ export class ValidateArtifacts {
               failures.push({
                 artifactId: artifactType.id,
                 description: `MetadataExtraction validation failed: ${(err as Error).message}`,
-                filename: expectedFilename,
+                filename: validationFilename,
               })
               artifactFailed = true
             }
@@ -533,7 +546,7 @@ export class ValidateArtifacts {
 
       // --- Mark complete ---
       if (!artifactFailed) {
-        const contentToHash = shouldApplyDelta ? expectedFile.content : validationContent
+        const contentToHash = shouldApplyDelta ? effectiveFile.content : validationContent
         const cleanedContent = this._applyCleanup(contentToHash, artifactType.preHashCleanup)
         completedValidations.push({
           artifactId: artifactType.id,
@@ -642,4 +655,44 @@ export class ValidateArtifacts {
         return `${base} is blocked by dependency ${dependency} [status: ${args.dependencyStatus}]`
     }
   }
+}
+
+/** Minimal tracked-file view needed during validation filename resolution. */
+interface TrackedValidationFile {
+  readonly filename: string
+  readonly validatedHash: string | undefined
+}
+
+/**
+ * Returns whether a tracked change-artifact filename is delta-backed.
+ *
+ * @param filename - Change-directory filename under validation
+ * @returns `true` when the tracked file lives under `deltas/`
+ */
+function isDeltaTrackedFilename(filename: string): boolean {
+  return filename.startsWith('deltas/')
+}
+
+/**
+ * Resolves the authoritative filename to validate for an artifact.
+ *
+ * Preserves tracked filenames once validated, but still repairs legacy or
+ * unvalidated representation-class mismatches back to the current expected path.
+ *
+ * @param trackedFile - Tracked artifact file from the change, when present
+ * @param expectedFilename - Current schema-derived expected filename
+ * @returns Filename to validate
+ */
+function resolveArtifactValidationFilename(
+  trackedFile: TrackedValidationFile | undefined,
+  expectedFilename: string,
+): string {
+  if (trackedFile === undefined) return expectedFilename
+  if (
+    trackedFile.validatedHash === undefined &&
+    isDeltaTrackedFilename(trackedFile.filename) !== isDeltaTrackedFilename(expectedFilename)
+  ) {
+    return expectedFilename
+  }
+  return trackedFile.filename
 }

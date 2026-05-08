@@ -349,6 +349,41 @@
 - **THEN** the mutation callback receives a freshly reloaded `Change`
 - **AND** validation updates are applied on top of that fresh state instead of overwriting it with an older snapshot
 
+### Requirement: Delta eligibility uses artifact-level base existence
+
+#### Scenario: Existing spec with missing verify base rejects verify delta
+
+- **GIVEN** a spec already exists in the repository because `spec.md` is present
+- **AND** `verify.md` does not exist for that spec in the repository
+- **AND** the change tracks `verify` as a delta-backed artifact
+- **WHEN** `ValidateArtifacts.execute` validates that `verify` artifact
+- **THEN** validation fails because the base artifact for `verify.md` is missing
+- **AND** spec-level existence does not make the delta eligible
+
+#### Scenario: Delta remains eligible when the artifact base exists
+
+- **GIVEN** a delta-backed artifact whose exact target file already exists in the repository
+- **WHEN** `ValidateArtifacts.execute` validates the artifact
+- **THEN** delta eligibility is satisfied for that artifact file
+
+### Requirement: Invalid mixed representation for new specs
+
+#### Scenario: New spec with direct spec and delta verify fails validation
+
+- **GIVEN** a change introduces a new spec capability
+- **AND** `spec.md` is tracked as a direct file under `specs/...`
+- **AND** `verify.md` is tracked as a delta under `deltas/...`
+- **AND** there is no repository base `verify.md` for that capability
+- **WHEN** `ValidateArtifacts.execute` validates the change
+- **THEN** validation fails before archive is attempted
+
+#### Scenario: Invalid mixed representation reports the tracked expected filename
+
+- **GIVEN** validation rejects a new-spec artifact because its tracked representation requires a missing base file
+- **WHEN** `ValidateArtifacts.execute` returns the failure
+- **THEN** the reported file entry names the tracked expected filename for that artifact
+- **AND** it does not report an arbitrary alternate path as accepted input
+
 ### Requirement: Ports and constructor
 
 #### Scenario: ValidateArtifacts is constructed with LifecycleEngine

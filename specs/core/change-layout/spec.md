@@ -74,6 +74,14 @@ When the schema artifact does not declare `delta: true`, the expected path SHALL
 
 Tools MUST NOT treat the `specs/...` and `deltas/...` locations as interchangeable alternatives for the same artifact.
 
+### Requirement: Tracked artifact filename is authoritative
+
+Once a spec-scoped artifact path has been resolved and persisted as the tracked filename for a change artifact file, downstream tooling MUST treat that tracked filename as the authoritative representation choice for that artifact.
+
+Tooling that consumes a tracked artifact file MUST NOT probe an alternate `specs/...` or `deltas/...` location for the same artifact just because that alternate path would also be syntactically valid for some other repository state.
+
+Repository-side path normalization MUST preserve this tracked-intent rule unless the normalization is explicitly proven to preserve the same artifact representation for the same file.
+
 ### Requirement: Workspace segment is always present
 
 Both `specs/<workspace>/` and `deltas/<workspace>/` always include an explicit workspace segment, even when only one workspace is configured. Omitting the workspace segment is not valid. This ensures that multi-workspace changes are unambiguous and that tooling can resolve the correct `SpecRepository` for each file without inspecting `specd.yaml` at read time.

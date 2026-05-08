@@ -9,9 +9,11 @@ import {
 import { ChangeNotFoundError } from '../../application/errors/change-not-found-error.js'
 import { UnsupportedPatternError } from '../../domain/errors/unsupported-pattern-error.js'
 import { CorruptedManifestError } from '../../domain/errors/corrupted-manifest-error.js'
+import { Logger } from '../../application/logger.js'
 import { changeDirName } from './dir-name.js'
 import { isEnoent } from './is-enoent.js'
 import { moveDir } from './move-dir.js'
+import { normalizeRelativePath, resolveConfinedPath } from './path-confinement.js'
 import { writeFileAtomic } from './write-atomic.js'
 import { type ChangeManifest, changeManifestSchema } from './manifest.js'
 
@@ -155,33 +157,53 @@ export class FsArchiveRepository extends ArchiveRepository {
       archivedAt,
       change.workspaces[0] ?? 'default',
     )
-    const archiveDir = path.join(this._archivePath, ...relPath.split('/'))
+    const archiveDir = this._resolveArchiveDirPath(relPath)
+    const stageRelPath = `.staging/${archivedName}-${Date.now()}`
+    const stageDir = this._resolveArchiveDirPath(stageRelPath)
 
     const sourceDir = await this._resolveChangeDir(change.name)
     if (sourceDir === null) {
       throw new ChangeNotFoundError(change.name)
     }
 
-    // Move the change directory into the archive
-    await fs.mkdir(path.dirname(archiveDir), { recursive: true })
-    await moveDir(sourceDir, archiveDir)
+    Logger.debug('FsArchiveRepository starting staged archive commit', {
+      change: change.name,
+      archiveRelPath: normalizeRelativePath(relPath),
+      stageRelPath: normalizeRelativePath(stageRelPath),
+    })
 
-    // Augment the manifest with archivedAt and optional archivedBy
-    const manifest = await this._loadManifest(archiveDir)
-    const archivedManifest: ChangeManifest = {
-      ...manifest,
-      archivedAt: archivedAt.toISOString(),
-      ...(options?.actor !== undefined ? { archivedBy: options.actor } : {}),
+    await fs.mkdir(path.dirname(stageDir), { recursive: true })
+    await moveDir(sourceDir, stageDir)
+
+    try {
+      const manifest = await this._loadManifest(stageDir)
+      const archivedManifest: ChangeManifest = {
+        ...manifest,
+        archivedAt: archivedAt.toISOString(),
+        ...(options?.actor !== undefined ? { archivedBy: options.actor } : {}),
+      }
+      await this._writeManifestAtomic(stageDir, archivedManifest)
+
+      const archivedChange = this._buildArchivedChange(archivedManifest, archivedName, archivedAt)
+
+      await fs.mkdir(path.dirname(archiveDir), { recursive: true })
+      await moveDir(stageDir, archiveDir)
+      await this._appendIndex(this._buildIndexEntry(archivedManifest, relPath))
+
+      Logger.debug('FsArchiveRepository completed staged archive commit', {
+        change: change.name,
+        archiveRelPath: normalizeRelativePath(relPath),
+      })
+
+      return { archivedChange, archiveDirPath: archiveDir }
+    } catch (error) {
+      Logger.debug('FsArchiveRepository archive staging failed', {
+        change: change.name,
+        archiveRelPath: normalizeRelativePath(relPath),
+      })
+      await this._rollbackStagedArchive(sourceDir, stageDir, archiveDir)
+      throw error
     }
-    await this._writeManifestAtomic(archiveDir, archivedManifest)
-
-    // Build the domain record
-    const archivedChange = this._buildArchivedChange(archivedManifest, archivedName, archivedAt)
-
-    // Append enriched index entry (O(1))
-    await this._appendIndex(this._buildIndexEntry(archivedManifest, relPath))
-
-    return { archivedChange, archiveDirPath: archiveDir }
   }
 
   /**
@@ -221,7 +243,7 @@ export class FsArchiveRepository extends ArchiveRepository {
           )
         } else {
           // Legacy index entry — fall back to reading manifest
-          const archiveDir = path.join(this._archivePath, ...entry.path.split('/'))
+          const archiveDir = this._resolveArchiveDirPath(entry.path)
           const manifest = await this._loadManifest(archiveDir)
           const archivedName = changeDirName(manifest.name, new Date(manifest.createdAt))
           const archivedAt = new Date(manifest.archivedAt ?? manifest.createdAt)
@@ -251,7 +273,7 @@ export class FsArchiveRepository extends ArchiveRepository {
   override async get(name: string): Promise<ArchivedChange | null> {
     const entry = await this._findInIndexReverse(name)
     if (entry !== null) {
-      const archiveDir = path.join(this._archivePath, ...entry.path.split('/'))
+      const archiveDir = this._resolveArchiveDirPath(entry.path)
       const manifest = await this._loadManifest(archiveDir)
       const archivedName = changeDirName(manifest.name, new Date(manifest.createdAt))
       const archivedAt = new Date(manifest.archivedAt ?? manifest.createdAt)
@@ -306,7 +328,7 @@ export class FsArchiveRepository extends ArchiveRepository {
       archivedChange.archivedAt,
       archivedChange.workspaces[0] ?? 'default',
     )
-    return path.join(this._archivePath, ...relPath.split('/'))
+    return resolveArchiveDirPathSync(this._archivePath, relPath)
   }
 
   // ---- Private helpers ----
@@ -401,7 +423,7 @@ export class FsArchiveRepository extends ArchiveRepository {
   private _buildIndexEntry(manifest: ChangeManifest, relPath: string): IndexEntry {
     return {
       name: manifest.name,
-      path: relPath,
+      path: normalizeRelativePath(relPath),
       createdAt: manifest.createdAt,
       archivedAt: manifest.archivedAt,
       ...(manifest.archivedBy !== undefined ? { archivedBy: manifest.archivedBy } : {}),
@@ -541,6 +563,44 @@ export class FsArchiveRepository extends ArchiveRepository {
     const indexPath = path.join(this._archivePath, INDEX_FILE)
     await fs.mkdir(this._archivePath, { recursive: true })
     await fs.appendFile(indexPath, JSON.stringify(entry) + '\n', 'utf8')
+  }
+
+  /**
+   * Resolves an archive-relative path while enforcing archive-root confinement.
+   *
+   * @param relPath - Forward-slash archive-relative path
+   * @returns Absolute confined archive path
+   */
+  private _resolveArchiveDirPath(relPath: string): string {
+    return resolveConfinedPath(this._archivePath, relPath)
+  }
+
+  /**
+   * Attempts to restore the pre-archive layout after a staged archive failure.
+   *
+   * @param sourceDir - Original active change directory path
+   * @param stageDir - Temporary staging directory path
+   * @param archiveDir - Final archive directory path
+   */
+  private async _rollbackStagedArchive(
+    sourceDir: string,
+    stageDir: string,
+    archiveDir: string,
+  ): Promise<void> {
+    try {
+      await fs.mkdir(path.dirname(sourceDir), { recursive: true })
+      await moveDir(stageDir, sourceDir)
+      return
+    } catch (stageError) {
+      if (!isEnoent(stageError)) throw stageError
+    }
+
+    try {
+      await fs.mkdir(path.dirname(sourceDir), { recursive: true })
+      await moveDir(archiveDir, sourceDir)
+    } catch (archiveError) {
+      if (!isEnoent(archiveError)) throw archiveError
+    }
   }
 
   /**
@@ -748,4 +808,29 @@ export class FsArchiveRepository extends ArchiveRepository {
   }
 }
 
+/**
+ * Resolves an archive-relative path synchronously while enforcing confinement.
+ *
+ * @param root - Archive root directory
+ * @param relPath - Archive-relative path
+ * @returns Absolute confined archive path
+ * @throws {PathTraversalError} When the candidate escapes the archive root
+ */
+function resolveArchiveDirPathSync(root: string, relPath: string): string {
+  const normalizedRoot = path.resolve(root)
+  const normalizedRelative = normalizeRelativePath(relPath)
+  if (
+    normalizedRelative === '..' ||
+    normalizedRelative.startsWith('../') ||
+    path.posix.isAbsolute(normalizedRelative)
+  ) {
+    throw new CorruptedManifestError(relPath)
+  }
 
+  const resolved = path.resolve(normalizedRoot, ...normalizedRelative.split('/'))
+  if (resolved !== normalizedRoot && !resolved.startsWith(normalizedRoot + path.sep)) {
+    throw new CorruptedManifestError(relPath)
+  }
+
+  return resolved
+}

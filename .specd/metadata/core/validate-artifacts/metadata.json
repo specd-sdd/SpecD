@@ -66,6 +66,18 @@
       ]
     },
     {
+      "requirement": "Delta eligibility uses artifact-level base existence",
+      "rules": [
+        "For a delta-capable spec-scoped artifact, delta eligibility MUST be decided at the concrete artifact-file level, not by a coarse \"the spec exists\" check.\n\nA spec having one existing artifact file (for example `spec.md`) MUST NOT make a different artifact file (for example `verify.md`) delta-eligible unless that specific base artifact file already exists in the target spec repository.\n\nWhen the concrete base artifact file is absent, validation MUST treat a delta file for that artifact as invalid even if some other artifact file already exists for the same spec ID."
+      ]
+    },
+    {
+      "requirement": "Invalid mixed representation for new specs",
+      "rules": [
+        "When a spec is new to the target repository, `ValidateArtifacts` MUST reject any artifact representation that mixes direct `specs/...` files with delta-backed files for the same new spec unless the concrete base artifact exists for each delta-backed artifact.\n\nFor a new spec:\n\n- direct `specs/...` files are valid\n- delta files are valid only when the concrete target base artifact already exists for that artifact file\n\nA new spec with `spec.md` authored directly under `specs/...` and `verify.md` authored as a delta without an existing base `verify.md` MUST fail validation before archive."
+      ]
+    },
+    {
       "requirement": "Delta validation",
       "rules": [
         "If the schema artifact declares `deltaValidations[]` and a delta file exists for the artifact at `deltas/<workspace>/<capability-path>/<filename>.delta.yaml`, `ValidateArtifacts` must validate the delta file before attempting application.\n\n**No-op delta bypass:** If the parsed delta entries consist exclusively of `no-op` operations, `ValidateArtifacts` MUST skip `deltaValidations`, delta application preview, and structural validation entirely. Instead, it proceeds directly to hash computation and `markComplete` using the raw delta file content. This is because `no-op` declares that the existing artifact content is already valid — there are no operations to validate or apply.\n\nFor non-no-op deltas, the delta file is parsed by the YAML adapter to produce a normalized YAML AST. Each `deltaValidations` rule is then evaluated against this AST using the same algorithm as structural validation (see Requirement: Structural validation), with the delta AST as the document root.\n\nFor each rule in `deltaValidations[]`, apply the rule evaluation algorithm (identical for both `validations` and `deltaValidations`; only the document root differs):\n\n1. Select candidate nodes from the document root using one of:\n   - **Selector fields** (`type`, `matches`, `contains`, `parent`, `index`, `where`): apply the selector model defined in [`core:selector-model`](../selector-model/spec.md) against the AST.\n   - **`path`** (JSONPath string): evaluate the JSONPath expression against the document root.\n2. If zero nodes are selected: if `required: true`, record a failure; if `required: false`, record a warning. Skip `children` and `contentMatches` evaluation.\n3. If one or more nodes are selected: for each matched node:\n   - If `contentMatches` is present: call `parser.renderSubtree(node)` to serialize the subtree to its native format, then test the regex against the result. A non-matching node records a failure.\n   - Evaluate any `children` rules recursively, using the matched node as the document root.\n\nA rule passes vacuously when zero nodes are selected. If any `required: true` delta validation rule fails, the artifact is not advanced to the delta application preview step — the failure is reported immediately."
@@ -602,6 +614,51 @@
       ]
     },
     {
+      "requirement": "Delta eligibility uses artifact-level base existence",
+      "name": "Existing spec with missing verify base rejects verify delta",
+      "given": [
+        "a spec already exists in the repository because spec.md is present",
+        "AND verify.md does not exist for that spec in the repository",
+        "AND the change tracks verify as a delta-backed artifact"
+      ],
+      "when": ["ValidateArtifacts.execute validates that verify artifact"],
+      "then": [
+        "validation fails because the base artifact for verify.md is missing",
+        "AND spec-level existence does not make the delta eligible"
+      ]
+    },
+    {
+      "requirement": "Delta eligibility uses artifact-level base existence",
+      "name": "Delta remains eligible when the artifact base exists",
+      "given": ["a delta-backed artifact whose exact target file already exists in the repository"],
+      "when": ["ValidateArtifacts.execute validates the artifact"],
+      "then": ["delta eligibility is satisfied for that artifact file"]
+    },
+    {
+      "requirement": "Invalid mixed representation for new specs",
+      "name": "New spec with direct spec and delta verify fails validation",
+      "given": [
+        "a change introduces a new spec capability",
+        "AND spec.md is tracked as a direct file under specs/...",
+        "AND verify.md is tracked as a delta under deltas/...",
+        "AND there is no repository base verify.md for that capability"
+      ],
+      "when": ["ValidateArtifacts.execute validates the change"],
+      "then": ["validation fails before archive is attempted"]
+    },
+    {
+      "requirement": "Invalid mixed representation for new specs",
+      "name": "Invalid mixed representation reports the tracked expected filename",
+      "given": [
+        "validation rejects a new-spec artifact because its tracked representation requires a missing base file"
+      ],
+      "when": ["ValidateArtifacts.execute returns the failure"],
+      "then": [
+        "the reported file entry names the tracked expected filename for that artifact",
+        "AND it does not report an arbitrary alternate path as accepted input"
+      ]
+    },
+    {
       "requirement": "Ports and constructor",
       "name": "ValidateArtifacts is constructed with LifecycleEngine",
       "when": ["ValidateArtifacts is assembled"],
@@ -713,8 +770,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:989d1f91f2b078b4106d34eb8f481486dde2151dcb1c83b0910d5f6c3f9f654c",
-    "verify.md": "sha256:26998d10abd759010b64378b107246d36575e8adedae081d53d5df04aa897f18"
+    "spec.md": "sha256:aa39a7bfc0e9389c52e4ebf27be21efea5b6c7ef197d90e755ba295302d0d77f",
+    "verify.md": "sha256:103683af019031cf76363132493005b846c821b69d0afd2b62334069a6e27827"
   },
   "generatedBy": "core"
 }

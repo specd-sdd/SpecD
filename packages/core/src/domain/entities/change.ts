@@ -99,6 +99,19 @@ export interface DiscardedEvent {
   readonly supersededBy?: readonly string[]
 }
 
+/** Archive execution phase used for failed-attempt diagnostics. */
+export type ArchiveFailureStep = 'prepare' | 'commit' | 'archive' | 'metadata'
+
+/** Appended when an archive attempt fails before successful completion. */
+export interface ArchiveFailedEvent {
+  readonly type: 'archive-failed'
+  readonly at: Date
+  readonly by: ActorIdentity
+  readonly step: ArchiveFailureStep
+  readonly message: string
+  readonly commitStarted: boolean
+}
+
 /** Appended when an optional artifact is explicitly skipped. */
 export interface ArtifactSkippedEvent {
   readonly type: 'artifact-skipped'
@@ -141,6 +154,7 @@ export type ChangeEvent =
   | SpecApprovedEvent
   | SignedOffEvent
   | InvalidatedEvent
+  | ArchiveFailedEvent
   | DraftedEvent
   | RestoredEvent
   | DiscardedEvent
@@ -471,6 +485,30 @@ export class Change {
   }
 
   /**
+   * Records a failed archive attempt without implying archive completion.
+   *
+   * @param step - The archive phase that failed
+   * @param message - Human-readable failure summary
+   * @param actor - Identity of the actor attempting the archive
+   * @param commitStarted - Whether permanent archive commit had already begun
+   */
+  recordArchiveFailure(
+    step: ArchiveFailureStep,
+    message: string,
+    actor: ActorIdentity,
+    commitStarted: boolean,
+  ): void {
+    this._history.push({
+      type: 'archive-failed',
+      at: new Date(),
+      by: actor,
+      step,
+      message,
+      commitStarted,
+    })
+  }
+
+  /**
    * Records that an optional artifact was explicitly skipped.
    *
    * @param artifactId - The artifact type ID that was skipped
@@ -701,7 +739,12 @@ export class Change {
                 key: specId,
                 ...(specExists !== undefined ? { specExists } : {}),
               })
-              if (existing.filename !== expectedFilename) {
+              if (
+                existing.filename !== expectedFilename &&
+                (artifactRepresentationClass(existing.filename) ===
+                  artifactRepresentationClass(expectedFilename) ||
+                  existing.validatedHash === undefined)
+              ) {
                 artifact.setFile(
                   new ArtifactFile({
                     key: existing.key,
@@ -782,4 +825,14 @@ export class Change {
     }
     return event
   }
+}
+
+/**
+ * Returns the tracked representation class for a change artifact filename.
+ *
+ * @param filename - The tracked change-directory filename
+ * @returns `delta` for `deltas/...` files, otherwise `direct`
+ */
+function artifactRepresentationClass(filename: string): 'delta' | 'direct' {
+  return filename.startsWith('deltas/') ? 'delta' : 'direct'
 }

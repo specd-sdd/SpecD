@@ -108,6 +108,51 @@ If any pre-archive `run:` hook fails, `ArchiveChange` must throw `HookFailedErro
 
 When `'all'` or `'pre'` is in `skipHookPhases`, pre-archive hook execution is skipped entirely.
 
+### Requirement: Tracked artifact selection at archive time
+
+For every spec-scoped artifact, `ArchiveChange` MUST select the source file from the tracked `ArtifactFile.filename` declared on the change state for that spec ID and artifact type.
+
+`ArchiveChange` MUST NOT derive, probe, or prefer an alternate `deltas/...` or `specs/...` path at archive time when that path is not the tracked filename for the artifact file being archived.
+
+If the tracked file for a delta-capable artifact is a direct `specs/...` file, `ArchiveChange` MUST treat that direct file as authoritative even when another file happens to exist at a delta-shaped path on disk.
+
+### Requirement: Prepare archive plan before permanent writes
+
+Before writing any permanent spec artifact, `ArchiveChange` MUST build a complete archive plan that resolves every tracked spec-scoped artifact in the change.
+
+The prepare phase MUST:
+
+1. Load the tracked artifact file selected for each spec-scoped artifact.
+2. For delta-backed artifacts, resolve the concrete base artifact for that specific artifact file.
+3. Apply each delta and compute the final merged content in memory.
+4. Collect every permanent spec write that would be needed for the archive.
+
+If any tracked artifact cannot be loaded, any required base artifact is unavailable, or any delta application fails, `ArchiveChange` MUST abort before any permanent spec write is performed.
+
+### Requirement: Staged archive commit and failed-attempt visibility
+
+After the archive plan has been prepared successfully, `ArchiveChange` MUST delegate the permanent archive persistence as a staged commit through storage behavior instead of interleaving merge work and permanent spec writes in the same loop.
+
+If archive fails before that staged commit completes successfully, the failure MUST leave no externally visible partial archive result:
+
+- no permanent spec artifact write is visible in the project spec tree
+- the change remains pending archive from an external workflow perspective
+- no alternate artifact-path interpretation is introduced by partial repo side effects
+
+Diagnostic history and debug logging MAY record the failed attempt, but a failed pre-commit archive attempt MUST NOT be treated as a successful or partially completed archive.
+
+### Requirement: Archive debug logging
+
+`ArchiveChange` MUST emit debug-level logs for archive preparation and commit diagnostics, including:
+
+- the tracked artifact file selected for each spec-scoped artifact
+- whether the artifact is treated as direct or delta-backed
+- prepare-plan construction progress
+- staged commit start and completion
+- archive failure points before or during commit
+
+These logs MUST follow the project's global logging conventions.
+
 ### Requirement: Delta merge and spec sync
 
 After all pre-archive hooks succeed, `ArchiveChange` must merge each delta artifact into the project spec and sync the result to `SpecRepository`.
@@ -201,3 +246,4 @@ After merging deltas and archiving the change, the archive process generates met
 - [`core:workspace`](../workspace/spec.md) — primary workspace for archive path template resolution
 - [`core:spec-id-format`](../spec-id-format/spec.md) — canonical `workspace:capabilityPath` format for `specIds`
 - [`core:spec-overlap`](../spec-overlap/spec.md) — `detectSpecOverlap` domain service for overlap detection
+- [`default:_global/logging`](../../_global/logging/spec.md) — debug logging requirements for archive preparation, staged commit, and failure diagnostics

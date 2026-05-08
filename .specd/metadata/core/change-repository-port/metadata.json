@@ -6,7 +6,8 @@
     "default:_global/architecture",
     "core:change",
     "core:storage",
-    "core:change-manifest"
+    "core:change-manifest",
+    "default:_global/logging"
   ],
   "context": [
     "Without an abstraction over change storage, use cases would couple directly to filesystem layout and I/O, making them untestable and locked to a single storage strategy. `ChangeRepository` is the application-layer port for reading and writing changes, extending the shared `Repository` base class for interface consistency while operating globally — changes live in a single `changes/` directory, not per-workspace. This spec defines the contract that all implementations must satisfy."
@@ -112,6 +113,24 @@
       "requirement": "Abstract class with abstract methods",
       "rules": [
         "`ChangeRepository` MUST be defined as an `abstract class`, not an `interface`. All storage\noperations (`get`, `list`, `listDrafts`, `listDiscarded`, `save`, `delete`, `artifact`,\n`saveArtifact`, `artifactExists`, `deltaExists`, `changePath`, `scaffold`, `unscaffold`)\nMUST be declared as `abstract` methods. This follows the architecture spec requirement that\nports with shared construction are abstract classes."
+      ]
+    },
+    {
+      "requirement": "artifact only loads tracked change artifact files",
+      "rules": [
+        "`artifact(change, filename)` MUST accept only filenames that correspond to tracked artifact files declared on the change's artifact file list.\n\nIf `filename` does not match a tracked artifact file for that change, the repository MUST reject the read rather than treating the change directory as a general-purpose file container."
+      ]
+    },
+    {
+      "requirement": "Change artifact path confinement",
+      "rules": [
+        "`artifact(change, filename)`, `artifactExists(change, filename)`, and any related change-artifact file lookup MUST enforce strict confinement to the change directory.\n\nThe repository MUST reject any path that would escape the change directory or address an arbitrary file outside the tracked artifact set, including path traversal forms and alternate relative-path encodings."
+      ]
+    },
+    {
+      "requirement": "Change artifact resolution debug logging",
+      "rules": [
+        "Implementations SHOULD emit debug-level logs when resolving tracked change artifact files, rejecting untracked filenames, or rejecting a path-confinement violation.\n\nThese logs MUST follow the project's global logging conventions."
       ]
     }
   ],
@@ -291,6 +310,45 @@
       "then": ["null is returned"]
     },
     {
+      "requirement": "artifact only loads tracked change artifact files",
+      "name": "Tracked artifact file can be read",
+      "given": ["proposal.md is listed in the change's tracked artifact files"],
+      "when": ["artifact(change, \"proposal.md\") is called"],
+      "then": ["the repository returns that tracked artifact content"]
+    },
+    {
+      "requirement": "artifact only loads tracked change artifact files",
+      "name": "Untracked file is rejected even when present on disk",
+      "given": [
+        "a file exists inside the change directory but is not listed in the change's tracked artifact files"
+      ],
+      "when": ["artifact(change, \"<that-file>\") is called"],
+      "then": ["the repository rejects the read instead of returning arbitrary content"]
+    },
+    {
+      "requirement": "Change artifact path confinement",
+      "name": "Path traversal is rejected on artifact read",
+      "when": ["artifact(change, \"../outside.txt\") or an equivalent escape path is requested"],
+      "then": ["the repository rejects the request"]
+    },
+    {
+      "requirement": "Change artifact path confinement",
+      "name": "Path traversal is rejected on existence check",
+      "when": [
+        "artifactExists(change, \"../outside.txt\") or an equivalent escape path is requested"
+      ],
+      "then": ["the repository rejects the request"]
+    },
+    {
+      "requirement": "Change artifact resolution debug logging",
+      "name": "Debug logs cover tracked resolution and rejection",
+      "when": ["debug logging is enabled for ChangeRepository"],
+      "then": [
+        "successful tracked artifact resolution emits debug output",
+        "AND untracked filename rejection or path-confinement rejection also emits debug output"
+      ]
+    },
+    {
       "requirement": "saveArtifact with optimistic concurrency",
       "name": "No conflict — originalHash matches",
       "given": ["an artifact loaded with originalHash and the file on disk has not changed"],
@@ -375,8 +433,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:232b1ed15239394f53592b221b85c8cd0c39c9c2731ee7f67a5cafd181309e20",
-    "verify.md": "sha256:66c045867897537e2150200f12769e80fb11d008ba944935ab2446473e707f71"
+    "spec.md": "sha256:39bf9751c8fa54d3c3166cae3bec9713794e32d6ad2eef91178240ed2f9e5c7b",
+    "verify.md": "sha256:c2ff063703df66861efba3cb40ac50f63e82b390a6eb49a9c8a483a64d618685"
   },
   "generatedBy": "core"
 }

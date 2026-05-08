@@ -11,9 +11,9 @@ import { type ActorResolver } from '../ports/actor-resolver.js'
 import { type ArtifactParserRegistry } from '../ports/artifact-parser.js'
 import { type SchemaProvider } from '../ports/schema-provider.js'
 import { type ArchivedChange } from '../../domain/entities/archived-change.js'
-import { type Change } from '../../domain/entities/change.js'
+import { type ActorIdentity, type Change } from '../../domain/entities/change.js'
 import { SYSTEM_ACTOR } from '../../domain/entities/change.js'
-import { type ArtifactFile } from '../../domain/value-objects/artifact-file.js'
+import { type Schema } from '../../domain/value-objects/schema.js'
 import { Spec } from '../../domain/entities/spec.js'
 import { SpecPath } from '../../domain/value-objects/spec-path.js'
 import { parseSpecId } from '../../domain/services/parse-spec-id.js'
@@ -24,6 +24,7 @@ import { inferFormat } from '../../domain/services/format-inference.js'
 import { type GenerateSpecMetadata } from './generate-spec-metadata.js'
 import { type SaveSpecMetadata } from './save-spec-metadata.js'
 import { type RunStepHooks } from './run-step-hooks.js'
+import { Logger } from '../logger.js'
 
 /** Selectors for granular hook-phase skipping during archiving. */
 export type ArchiveHookPhaseSelector = 'pre' | 'post' | 'all'
@@ -71,6 +72,27 @@ export interface ArchiveChangeResult {
   readonly staleMetadataSpecPaths: string[]
   /** Changes that were invalidated due to spec overlap; empty when no invalidation occurred. */
   readonly invalidatedChanges: readonly InvalidatedChangesEntry[]
+}
+
+/** Prepared permanent write for one archived spec artifact. */
+interface PreparedArchiveWrite {
+  readonly specId: string
+  readonly spec: Spec
+  readonly specRepo: SpecRepository
+  readonly outputFilename: string
+  readonly content: string
+}
+
+/** In-memory archive plan built before any permanent writes begin. */
+interface PreparedArchivePlan {
+  readonly writes: readonly PreparedArchiveWrite[]
+  readonly staleSpecIds: readonly string[]
+}
+
+/** Minimal tracked-file view needed during archive filename resolution. */
+interface TrackedArchiveFile {
+  readonly filename: string
+  readonly validatedHash: string | undefined
 }
 
 /**
@@ -253,91 +275,40 @@ export class ArchiveChange {
       }
     }
 
-    // --- Delta merge and spec sync ---
-    const staleSpecIds = new Set<string>()
-    const yamlParser = this._parsers.get('yaml')
+    let preparedPlan: PreparedArchivePlan
+    try {
+      preparedPlan = await this._prepareArchivePlan(change, schema)
+    } catch (error) {
+      await this._recordArchiveFailure(input.name, 'prepare', error, archivingActor, false)
+      throw error
+    }
 
-    for (const specId of change.specIds) {
-      const { workspace, capPath: capabilityPath } = parseSpecId(specId)
-      const specRepo = this._specs.get(workspace)
-      if (specRepo === undefined) continue
-
-      const spec = new Spec(workspace, SpecPath.parse(capabilityPath), [])
-      let synced = false
-
-      for (const artifactType of schema.artifacts()) {
-        if (artifactType.scope !== 'spec') continue
-
-        // Check per-file status for this specId
-        const changeArtifact = change.getArtifact(artifactType.id)
-        if (changeArtifact === null) continue
-        const specFile = changeArtifact.getFile(specId)
-        if (
-          specFile === undefined ||
-          specFile.status === 'missing' ||
-          specFile.status === 'skipped'
+    try {
+      for (const write of preparedPlan.writes) {
+        await write.specRepo.save(
+          write.spec,
+          new SpecArtifact(write.outputFilename, write.content),
+          { force: true },
         )
-          continue
-
-        const outputBasename = path.basename(artifactType.output)
-
-        if (artifactType.delta) {
-          // Delta artifact: parse and apply delta file onto base spec
-          const deltaFilename =
-            capabilityPath.length > 0
-              ? `deltas/${workspace}/${capabilityPath}/${outputBasename}.delta.yaml`
-              : `deltas/${workspace}/${outputBasename}.delta.yaml`
-          const deltaFile = await this._changes.artifact(change, deltaFilename)
-
-          if (deltaFile !== null) {
-            const format = artifactType.format ?? inferFormat(outputBasename) ?? 'plaintext'
-            const formatParser = this._parsers.get(format)
-            if (formatParser === undefined) {
-              throw new ParserNotRegisteredError(format, `artifact '${artifactType.id}'`)
-            }
-            if (yamlParser === undefined) {
-              throw new ParserNotRegisteredError('yaml', 'required for delta file parsing')
-            }
-
-            const deltaEntries = yamlParser.parseDelta(deltaFile.content)
-            const baseArtifact = await specRepo.artifact(spec, outputBasename)
-            const baseContent = baseArtifact?.content ?? ''
-            const baseAst = formatParser.parse(baseContent)
-            const mergedResult = formatParser.apply(baseAst, deltaEntries)
-            const mergedAst = mergedResult.ast
-            const mergedContent = formatParser.serialize(mergedAst)
-
-            await specRepo.save(spec, new SpecArtifact(outputBasename, mergedContent), {
-              force: true,
-            })
-            synced = true
-          } else {
-            // No delta file — new spec, copy primary file directly
-            if (await this._copyPrimaryFile(change, specFile, spec, outputBasename, specRepo)) {
-              synced = true
-            }
-          }
-        } else {
-          // Non-delta spec-scoped artifact: copy from change dir to spec
-          if (await this._copyPrimaryFile(change, specFile, spec, outputBasename, specRepo)) {
-            synced = true
-          }
-        }
       }
-
-      if (synced) staleSpecIds.add(specId)
-
-      // Specs with manifest-declared dependencies also need metadata regeneration
-      // so that dependsOn flows into metadata.json
-      if (change.specDependsOn.get(specId) !== undefined) {
-        staleSpecIds.add(specId)
-      }
+    } catch (error) {
+      await this._recordArchiveFailure(input.name, 'commit', error, archivingActor, true)
+      throw error
     }
 
     // --- Archive ---
-    const { archivedChange, archiveDirPath } = await this._archive.archive(change, {
-      actor: archivingActor,
-    })
+    let archivedChange: ArchivedChange
+    let archiveDirPath: string
+    try {
+      const archived = await this._archive.archive(change, {
+        actor: archivingActor,
+      })
+      archivedChange = archived.archivedChange
+      archiveDirPath = archived.archiveDirPath
+    } catch (error) {
+      await this._recordArchiveFailure(input.name, 'archive', error, archivingActor, true)
+      throw error
+    }
 
     // --- Post-archive hooks (delegated to RunStepHooks) ---
     const postHookFailures: string[] = []
@@ -357,7 +328,7 @@ export class ArchiveChange {
     // --- Spec metadata generation ---
     const failedMetadataSpecPaths: string[] = []
 
-    for (const specId of staleSpecIds) {
+    for (const specId of preparedPlan.staleSpecIds) {
       try {
         const result = await this._generateMetadata.execute({ specId })
         if (!result.hasExtraction || Object.keys(result.metadata).length === 0) {
@@ -404,18 +375,176 @@ export class ArchiveChange {
    * @param specRepo - The spec repository to save to
    * @returns `true` if the file was found and saved, `false` if missing
    */
-  private async _copyPrimaryFile(
-    change: Change,
-    specFile: ArtifactFile,
-    spec: Spec,
-    outputBasename: string,
-    specRepo: SpecRepository,
-  ): Promise<boolean> {
-    const artifactFile = await this._changes.artifact(change, specFile.filename)
-    if (artifactFile === null) return false
-    await specRepo.save(spec, new SpecArtifact(outputBasename, artifactFile.content), {
-      force: true,
-    })
-    return true
+  /**
+   * Prepares the complete set of permanent spec writes in memory before commit.
+   *
+   * @param change - Active change being archived
+   * @param schema - Resolved active schema
+   * @returns Prepared write plan and metadata-staleness set
+   */
+  private async _prepareArchivePlan(change: Change, schema: Schema): Promise<PreparedArchivePlan> {
+    const writes: PreparedArchiveWrite[] = []
+    const staleSpecIds = new Set<string>()
+    const yamlParser = this._parsers.get('yaml')
+
+    for (const specId of change.specIds) {
+      const { workspace, capPath: capabilityPath } = parseSpecId(specId)
+      const specRepo = this._specs.get(workspace)
+      if (specRepo === undefined) continue
+
+      const spec = new Spec(workspace, SpecPath.parse(capabilityPath), [])
+
+      for (const artifactType of schema.artifacts()) {
+        if (artifactType.scope !== 'spec') continue
+
+        const changeArtifact = change.getArtifact(artifactType.id)
+        const specFile = changeArtifact?.getFile(specId)
+        if (
+          specFile === undefined ||
+          specFile.status === 'missing' ||
+          specFile.status === 'skipped'
+        ) {
+          continue
+        }
+
+        const outputBasename = path.basename(artifactType.output)
+        const baseArtifact =
+          artifactType.delta && artifactType.scope === 'spec'
+            ? await specRepo.artifact(spec, outputBasename)
+            : null
+        const expectedFilename =
+          artifactType.delta && artifactType.scope === 'spec' && baseArtifact !== null
+            ? capabilityPath.length > 0
+              ? `deltas/${workspace}/${capabilityPath}/${outputBasename}.delta.yaml`
+              : `deltas/${workspace}/${outputBasename}.delta.yaml`
+            : capabilityPath.length > 0
+              ? `specs/${workspace}/${capabilityPath}/${outputBasename}`
+              : `specs/${workspace}/${outputBasename}`
+        const trackedFilename = resolveTrackedArchiveFilename(specFile, expectedFilename)
+        const trackedArtifact = await this._changes.artifact(change, trackedFilename)
+        if (trackedArtifact === null) {
+          throw new Error(`Tracked artifact '${trackedFilename}' is missing for '${specId}'`)
+        }
+
+        Logger.debug('ArchiveChange selected tracked artifact file', {
+          change: change.name,
+          specId,
+          artifactId: artifactType.id,
+          filename: trackedFilename,
+        })
+
+        if (artifactType.delta && isDeltaTrackedFilename(trackedFilename)) {
+          const format = artifactType.format ?? inferFormat(outputBasename) ?? 'plaintext'
+          const formatParser = this._parsers.get(format)
+          if (formatParser === undefined) {
+            throw new ParserNotRegisteredError(format, `artifact '${artifactType.id}'`)
+          }
+          if (yamlParser === undefined) {
+            throw new ParserNotRegisteredError('yaml', 'required for delta file parsing')
+          }
+
+          if (baseArtifact === null) {
+            throw new Error(`Base artifact '${outputBasename}' is missing for '${specId}'`)
+          }
+
+          const deltaEntries = yamlParser.parseDelta(trackedArtifact.content)
+          const mergedResult = formatParser.apply(
+            formatParser.parse(baseArtifact.content),
+            deltaEntries,
+          )
+          writes.push({
+            specId,
+            spec,
+            specRepo,
+            outputFilename: outputBasename,
+            content: formatParser.serialize(mergedResult.ast),
+          })
+        } else {
+          writes.push({
+            specId,
+            spec,
+            specRepo,
+            outputFilename: outputBasename,
+            content: trackedArtifact.content,
+          })
+        }
+
+        staleSpecIds.add(specId)
+      }
+
+      if (change.specDependsOn.get(specId) !== undefined) {
+        staleSpecIds.add(specId)
+      }
+    }
+
+    return { writes, staleSpecIds: [...staleSpecIds] }
   }
+
+  /**
+   * Records a failed archive attempt on the still-active change when possible.
+   *
+   * @param changeName - Active change name
+   * @param step - Archive phase that failed
+   * @param error - Failure object
+   * @param actor - Actor attempting the archive
+   * @param commitStarted - Whether permanent archive commit had already begun
+   */
+  private async _recordArchiveFailure(
+    changeName: string,
+    step: 'prepare' | 'commit' | 'archive' | 'metadata',
+    error: unknown,
+    actor: ActorIdentity,
+    commitStarted: boolean,
+  ): Promise<void> {
+    const message = error instanceof Error ? error.message : String(error)
+    const failureActor = { name: actor.name, email: actor.email } satisfies ActorIdentity
+    Logger.debug('ArchiveChange recorded failed archive attempt', {
+      change: changeName,
+      step,
+      commitStarted,
+      message,
+    })
+
+    try {
+      await this._changes.mutate(changeName, (freshChange: Change) => {
+        freshChange.recordArchiveFailure(step, message, failureActor, commitStarted)
+        return freshChange
+      })
+    } catch {
+      // The active change may already have been moved or be otherwise unavailable.
+    }
+  }
+}
+
+/**
+ * Returns whether a tracked archive input filename is delta-backed.
+ *
+ * @param filename - Change-directory filename
+ * @returns `true` when the file lives under `deltas/`
+ */
+function isDeltaTrackedFilename(filename: string): boolean {
+  return filename.startsWith('deltas/')
+}
+
+/**
+ * Resolves the authoritative filename to archive for a tracked artifact.
+ *
+ * Preserves validated tracked filenames, while allowing legacy or unvalidated
+ * representation mismatches to fall back to the current expected path.
+ *
+ * @param trackedFile - Tracked artifact file from the change
+ * @param expectedFilename - Current expected filename for this artifact
+ * @returns Filename to consume during archive
+ */
+function resolveTrackedArchiveFilename(
+  trackedFile: TrackedArchiveFile,
+  expectedFilename: string,
+): string {
+  if (
+    trackedFile.validatedHash === undefined &&
+    isDeltaTrackedFilename(trackedFile.filename) !== isDeltaTrackedFilename(expectedFilename)
+  ) {
+    return expectedFilename
+  }
+  return trackedFile.filename
 }

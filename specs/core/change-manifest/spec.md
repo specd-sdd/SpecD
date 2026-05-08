@@ -145,6 +145,22 @@ The JSON serialization of each event type is:
 
 On read, the manifest loader MUST also accept legacy historical invalidation events that persisted `"cause": "artifact-change"`. That legacy value is a backward-compatible alias for `"artifact-drift"` and MUST be normalized to the current domain cause during deserialization instead of being treated as corruption.
 
+### Requirement: Archive outcome history events
+
+The active change manifest history MUST preserve explicit failed-archive traceability.
+
+The `archive-failed` event is appended when an archive attempt fails after archive execution begins but before a successful archive commit is completed.
+
+`archive-failed` MUST include:
+
+- `step` — the archive phase in which the failure occurred
+- `message` — a human-readable diagnostic summary
+- `commitStarted` — whether staged archive commit had already begun
+
+Successful archive completion MUST remain traceable through the archived manifest metadata (`archivedAt`, `archivedBy`, and archive location data) rather than by appending a new active-change history event after the change has ceased to be an active change.
+
+A failed pre-commit archive attempt MUST NOT by itself imply that archive completed or that permanent specs were partially accepted.
+
 ### Requirement: Artifact filenames use expected paths
 
 Every `ManifestArtifactFile.filename` MUST be the expected change-directory path for that artifact, as defined by `core:change-layout`.
@@ -154,6 +170,14 @@ When a change is created or its spec scope changes, persisted spec-scoped artifa
 The manifest MUST NOT initially persist a `specs/...` filename for an existing delta-capable spec and rely on a later read, validation, or delta creation pass to repair it. The manifest is a user- and agent-visible contract from creation time.
 
 When loading older manifests that contain a stale `specs/...` filename for an existing delta-capable spec, the repository MAY normalize the filename to the expected `deltas/...` path while preserving the file state and validation hash semantics.
+
+### Requirement: Filename normalization preserves tracked intent
+
+Manifest filename normalization MUST preserve the tracked artifact representation already validated for the change.
+
+Loading or syncing a manifest MUST NOT reinterpret a tracked direct `specs/...` filename as a delta-backed `deltas/...` filename merely because the repository now contains a partially materialized spec directory or some other partial side effect from a failed archive attempt.
+
+Any normalization that changes the representation class of a tracked artifact file MUST be rejected unless it is explicitly proven to preserve the same artifact semantics for that exact artifact file.
 
 ### Requirement: Schema version
 

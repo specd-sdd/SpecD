@@ -13,7 +13,9 @@ import {
   type SpecSearchResult,
   type SpecSearchMatch,
 } from '../../application/ports/spec-repository.js'
+import { Logger } from '../../application/logger.js'
 import { isEnoent } from './is-enoent.js'
+import { normalizeRelativePath, resolveConfinedPath } from './path-confinement.js'
 import { writeFileAtomic } from './write-atomic.js'
 import { sha256 } from './hash.js'
 
@@ -138,7 +140,11 @@ export class FsSpecRepository extends SpecRepository {
    * @returns The artifact with its content and `originalHash`, or `null` if the file does not exist
    */
   override async artifact(spec: Spec, filename: string): Promise<SpecArtifact | null> {
-    const filePath = path.join(this._specDir(spec.name), filename)
+    const filePath = resolveConfinedPath(
+      this._specDir(spec.name),
+      filename,
+      allowedSpecArtifactFilenames(spec),
+    )
 
     let content: string
     try {
@@ -148,6 +154,11 @@ export class FsSpecRepository extends SpecRepository {
       throw err
     }
 
+    Logger.debug('FsSpecRepository resolved expected artifact file', {
+      workspace: this.workspace(),
+      spec: spec.name.toString(),
+      filename: normalizeRelativePath(filename),
+    })
     return new SpecArtifact(filename, content, sha256(content))
   }
 
@@ -179,7 +190,7 @@ export class FsSpecRepository extends SpecRepository {
     const dir = this._specDir(spec.name)
     await fs.mkdir(dir, { recursive: true })
 
-    const filePath = path.join(dir, artifact.filename)
+    const filePath = resolveConfinedPath(dir, artifact.filename, allowedSpecArtifactFilenames(spec))
 
     if (artifact.originalHash !== undefined && options?.force !== true) {
       let currentContent: string
@@ -572,4 +583,18 @@ async function filterFiles(dir: string, entries: string[]): Promise<string[]> {
     }),
   )
   return checks.filter((c) => c.isFile).map((c) => c.entry)
+}
+
+/**
+ * Returns the allowed normal artifact filenames for a spec.
+ *
+ * @param spec - Spec whose artifact API surface is being constrained
+ * @returns Allowed normalized basenames for `artifact()` and `save()`
+ */
+function allowedSpecArtifactFilenames(spec: Spec): ReadonlySet<string> {
+  const allowed = new Set<string>(['spec.md', 'verify.md'])
+  for (const filename of spec.filenames) {
+    allowed.add(normalizeRelativePath(filename))
+  }
+  return allowed
 }
