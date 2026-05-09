@@ -192,11 +192,19 @@ artifacts:
         type: section
         matches: '^Requirements$'
         required: true
+        count:
+          exactly: 1
         children:
           - id: has-requirement-block
             type: section
             matches: '^Requirement:'
             required: true
+            count:
+              min: 1
+              unique:
+                by:
+                  from: label
+                  strip: '^Requirement:\s*'
   # ── verify ─────────────────────────────────────────────────────────────────
   - id: verify
     scope: spec
@@ -293,16 +301,30 @@ artifacts:
         type: section
         matches: '^Requirements$'
         required: true
+        count:
+          exactly: 1
         children:
           - id: has-requirement-block
             type: section
             matches: '^Requirement:'
             required: true
+            count:
+              min: 1
+              unique:
+                by:
+                  from: label
+                  strip: '^Requirement:\s*'
             children:
               - id: has-scenario
                 type: section
                 matches: '^Scenario:'
                 required: true
+                count:
+                  min: 1
+                  unique:
+                    by:
+                      from: label
+                      strip: '^Scenario:\s*'
 
   # ── design ─────────────────────────────────────────────────────────────────
   - id: design
@@ -463,6 +485,25 @@ artifacts:
     taskCompletionCheck:
       incompletePattern: '^\s*-\s+\[ \]'
       completePattern: '^\s*-\s+\[x\]'
+
+# ── crossArtifactValidations ──────────────────────────────────────────────────────────────────
+
+crossArtifactValidations:
+  - id: specs-verify-requirement-parity
+    scope: spec
+    participants:
+      - artifact: specs
+        as: specRequirements
+        selector: { type: section, matches: '^Requirement:' }
+        key: { from: label, strip: '^Requirement:\\s*' }
+      - artifact: verify
+        as: verifyRequirements
+        selector: { type: section, matches: '^Requirement:' }
+        key: { from: label, strip: '^Requirement:\\s*' }
+    relation:
+      kind: all-equal
+      between: [specRequirements, verifyRequirements]
+      options: { ordering: ignore }
 
 # ── metadataExtraction ──────────────────────────────────────────────────────────────────
 
