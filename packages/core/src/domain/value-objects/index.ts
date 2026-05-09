@@ -10,6 +10,17 @@ export { type ChangeState, VALID_TRANSITIONS, isValidTransition } from './change
 export { type ArtifactStatus } from './artifact-status.js'
 export { type Selector, type DeltaPosition } from './selector.js'
 export {
+  type ValidationCount,
+  type CrossArtifactScope,
+  type CrossArtifactKeySource,
+  type CrossArtifactRelationKind,
+  type CrossArtifactOrdering,
+  type CrossArtifactKeySpec,
+  type CrossArtifactParticipant,
+  type CrossArtifactRelation,
+  type CrossArtifactValidationRule,
+} from './cross-artifact-validation.js'
+export {
   type Extractor,
   type ExtractorTransformDeclaration,
   type FieldMapping,

@@ -14,6 +14,12 @@
 - **WHEN** a schema file is missing `name` or `version`
 - **THEN** `SchemaRegistry.resolve()` must throw a validation error
 
+#### Scenario: crossArtifactValidations accepted at schema root
+
+- **GIVEN** a schema file declares a `crossArtifactValidations` array alongside `artifacts`
+- **WHEN** the relational rule entries are otherwise valid
+- **THEN** `SchemaRegistry.resolve()` must load the schema without rejecting the root field
+
 ### Requirement: Schema kind field
 
 #### Scenario: Missing kind field
@@ -96,6 +102,11 @@
 
 - **WHEN** an artifact has `preHashCleanup: [{ id: "checkboxes", ... }, { id: "checkboxes", ... }]`
 - **THEN** `SchemaRegistry.resolve()` must throw a `SchemaValidationError` mentioning the duplicate preHashCleanup ID
+
+#### Scenario: Duplicate crossArtifactValidations IDs rejected
+
+- **WHEN** a schema has `crossArtifactValidations: [{ id: "mirrored-reqs", ... }, { id: "mirrored-reqs", ... }]`
+- **THEN** `SchemaRegistry.resolve()` must throw a `SchemaValidationError` mentioning the duplicate crossArtifactValidations ID
 
 #### Scenario: Duplicate metadataExtraction.context IDs rejected
 
@@ -240,17 +251,18 @@
 - **WHEN** `ValidateArtifacts` evaluates the rule
 - **THEN** the rule fails — zero nodes matched — and `ValidateArtifacts` reports a validation failure
 
-#### Scenario: Rule passes vacuously when no nodes match
-
-- **GIVEN** a `deltaValidations` rule that matches no nodes in the delta YAML AST
-- **WHEN** `ValidateArtifacts` evaluates the rule
-- **THEN** the rule passes without error regardless of `required`
-
 #### Scenario: Warning on required false with no match
 
 - **GIVEN** a `deltaValidations` rule with `required: false` that matches zero nodes in the delta YAML AST
 - **WHEN** `ValidateArtifacts` evaluates the rule
 - **THEN** `ValidateArtifacts` records a warning, not a failure
+
+#### Scenario: count min rejects too few matching delta entries
+
+- **GIVEN** a `deltaValidations` rule with `count: { min: 2 }`
+- **AND** only one delta entry matches its selector
+- **WHEN** `ValidateArtifacts` evaluates the rule
+- **THEN** `ValidateArtifacts` records a validation failure for the count mismatch
 
 #### Scenario: Children constraint checked for each matched node
 
@@ -272,6 +284,46 @@
 
 - **WHEN** an artifact omits `format` and its derived output filename has an extension not in `.md`, `.json`, `.yaml`, `.yml`
 - **THEN** the resolved artifact uses `format: plaintext`
+
+### Requirement: Cross-artifact validation rules
+
+#### Scenario: Same-spec same-scope relational rule is accepted
+
+- **GIVEN** a schema declares `crossArtifactValidations` with participants `specs` and `verify`, both under `scope: spec`
+- **WHEN** `SchemaRegistry.resolve()` loads the schema
+- **THEN** the relational rule is accepted
+
+#### Scenario: Participant aliases must be unique within one relational rule
+
+- **GIVEN** a cross-artifact rule whose `participants` array declares the same `as` alias twice
+- **WHEN** `SchemaRegistry.resolve()` loads the schema
+- **THEN** it must throw a `SchemaValidationError`
+
+#### Scenario: relation.between alias must resolve to a participant
+
+- **GIVEN** a cross-artifact rule whose `relation.between` references an alias not declared in `participants`
+- **WHEN** `SchemaRegistry.resolve()` loads the schema
+- **THEN** it must throw a `SchemaValidationError`
+
+#### Scenario: Mixed-scope relational rule is rejected
+
+- **GIVEN** a cross-artifact rule with one participant from a `scope: spec` artifact and another from a `scope: change` artifact
+- **WHEN** `SchemaRegistry.resolve()` loads the schema
+- **THEN** it must throw a `SchemaValidationError`
+
+#### Scenario: keySelector extracts nested values before comparison
+
+- **GIVEN** a participant selects a YAML `sequence-item`
+- **AND** its `keySelector` targets the nested `pair` labeled `id`
+- **WHEN** the cross-artifact rule is evaluated
+- **THEN** the comparable key is extracted from the nested `id` value rather than from the outer item node
+
+#### Scenario: all-equal strict ordering distinguishes reordering
+
+- **GIVEN** two participants expose the same keys in different orders
+- **AND** their relation uses `kind: all-equal` with `options.ordering: strict`
+- **WHEN** the rule is evaluated
+- **THEN** the rule fails because the write order does not match
 
 ### Requirement: Template resolution
 
@@ -305,6 +357,27 @@
 - **WHEN** `ValidateArtifacts` evaluates the rule
 - **THEN** `ValidateArtifacts` reports a warning, not an error
 
+#### Scenario: count exactly rejects duplicate matches
+
+- **GIVEN** a `validations` rule `{ type: section, matches: '^Requirement: Login$', count: { exactly: 1 } }`
+- **AND** the artifact contains two matching `Requirement: Login` sections
+- **WHEN** `ValidateArtifacts` evaluates the rule
+- **THEN** `ValidateArtifacts` reports a validation failure for the count mismatch
+
+#### Scenario: count.unique.by rejects duplicate normalized keys
+
+- **GIVEN** a `validations` rule `{ type: section, matches: '^Requirement:', count: { unique: { by: { from: label, strip: '^Requirement:\\s*' } } } }`
+- **AND** the artifact contains `Requirement: Login` twice
+- **WHEN** `ValidateArtifacts` evaluates the rule
+- **THEN** `ValidateArtifacts` reports a validation failure for duplicate unique keys
+
+#### Scenario: count.unique.minUnique enforces minimum distinct keys
+
+- **GIVEN** a `validations` rule with `count.unique.by` and `count.unique.minUnique: 3`
+- **AND** the artifact contains three matching sections but only two distinct normalized keys
+- **WHEN** `ValidateArtifacts` evaluates the rule
+- **THEN** `ValidateArtifacts` reports a validation failure for unique cardinality mismatch
+
 #### Scenario: children narrows scope to matched node
 
 - **GIVEN** a `validations` rule `{ type: section, matches: '^Requirements$', children: [{ type: section, matches: '^Requirement:' }] }`
@@ -314,7 +387,7 @@
 
 #### Scenario: Children constraint fails on one node
 
-- **GIVEN** a `validations` rule `{ type: section, matches: '^Requirement:' }` with a `children` constraint `{ type: section, matches: '^Scenario:', required: true }`
+- **GIVEN** a `validations` rule `{ type: section, matches: '^Requirement:' }` with a `children` constraint `{ type: section, matches: '^Scenario:', count: { min: 1 } }`
 - **AND** one `Requirement:` section has no `Scenario:` child
 - **WHEN** `ValidateArtifacts` evaluates the rule
 - **THEN** `ValidateArtifacts` reports an error identifying the offending Requirement
@@ -325,12 +398,6 @@
 - **AND** one `Requirement:` section whose serialized markdown body contains no `SHALL` or `MUST`
 - **WHEN** `ValidateArtifacts` evaluates the rule
 - **THEN** `ValidateArtifacts` records a warning for that section
-
-#### Scenario: Rule passes vacuously when no nodes match
-
-- **GIVEN** a `validations` rule with a `children` constraint, whose top-level identification matches zero nodes in the artifact AST
-- **WHEN** `ValidateArtifacts` evaluates the rule
-- **THEN** the rule passes without error — the children constraint is never evaluated
 
 ### Requirement: Per-spec approval
 

@@ -358,6 +358,110 @@ metadataExtraction:
   })
 })
 
+describe('parseSchemaYaml — count and crossArtifactValidations', () => {
+  it('parses count semantics on validation rules', () => {
+    const yaml = `
+kind: schema
+name: test
+version: 1
+artifacts:
+  - id: spec
+    scope: spec
+    output: spec.md
+    validations:
+      - id: unique-req
+        type: section
+        matches: '^Requirement:'
+        count:
+          exactly: 1
+`
+    const data = parseSchemaYaml('#test', yaml)
+    expect(data.artifacts?.[0]?.validations?.[0]?.count).toEqual({ exactly: 1 })
+  })
+
+  it('parses crossArtifactValidations at schema root', () => {
+    const yaml = `
+kind: schema
+name: test
+version: 1
+artifacts:
+  - id: specs
+    scope: spec
+    output: spec.md
+  - id: verify
+    scope: spec
+    output: verify.md
+crossArtifactValidations:
+  - id: mirrored
+    scope: spec
+    participants:
+      - artifact: specs
+        as: specRequirements
+        selector: { type: section, matches: '^Requirement:' }
+        key: { from: label }
+      - artifact: verify
+        as: verifyRequirements
+        selector: { type: section, matches: '^Requirement:' }
+        key: { from: label }
+    relation:
+      kind: all-equal
+      between: [specRequirements, verifyRequirements]
+      options: { ordering: ignore }
+`
+    const data = parseSchemaYaml('#test', yaml)
+    expect(data.crossArtifactValidations?.[0]?.id).toBe('mirrored')
+  })
+
+  it('parses count.unique shape on validation rules', () => {
+    const yaml = `
+kind: schema
+name: test
+version: 1
+artifacts:
+  - id: spec
+    scope: spec
+    output: spec.md
+    validations:
+      - id: unique-req
+        type: section
+        matches: '^Requirement:'
+        count:
+          unique:
+            by:
+              from: label
+              strip: '^Requirement:\\\\s*'
+            minUnique: 1
+            maxUnique: 5
+`
+    const data = parseSchemaYaml('#test', yaml)
+    expect(data.artifacts?.[0]?.validations?.[0]?.count?.unique).toMatchObject({
+      by: { from: 'label', strip: '^Requirement:\\\\s*' },
+      minUnique: 1,
+      maxUnique: 5,
+    })
+  })
+
+  it('rejects count.unique without by', () => {
+    const yaml = `
+kind: schema
+name: test
+version: 1
+artifacts:
+  - id: spec
+    scope: spec
+    output: spec.md
+    validations:
+      - id: unique-req
+        type: section
+        matches: '^Requirement:'
+        count:
+          unique:
+            minUnique: 1
+`
+    expect(() => parseSchemaYaml('#test', yaml)).toThrow(SchemaValidationError)
+  })
+})
+
 // ---------------------------------------------------------------------------
 // Requirement: rules on artifacts
 // ---------------------------------------------------------------------------

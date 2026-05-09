@@ -170,11 +170,13 @@
 - **WHEN** `ValidateArtifacts.execute` is called
 - **THEN** the artifact proceeds to application preview and `result.warnings` includes the unsatisfied rule
 
-#### Scenario: Delta validation passes vacuously when no nodes match
+#### Scenario: Delta validation count mismatch blocks application
 
-- **GIVEN** a `deltaValidations` rule whose selector matches zero nodes in the delta YAML AST
+- **GIVEN** a `deltaValidations` rule with `count: { min: 2 }`
+- **AND** only one delta entry matches the rule selector
 - **WHEN** `ValidateArtifacts.execute` is called
-- **THEN** the rule passes without error regardless of `required`
+- **THEN** `result.passed` is `false`
+- **AND** the artifact is not advanced to application preview
 
 #### Scenario: no-op delta bypasses deltaValidations entirely
 
@@ -262,6 +264,13 @@
 - **WHEN** `ValidateArtifacts.execute` is called
 - **THEN** `result.warnings` includes the absent section and validation still passes
 
+#### Scenario: count exactly rejects duplicate local matches
+
+- **GIVEN** a `validations` rule with `count: { exactly: 1 }`
+- **AND** the merged artifact content contains two matching nodes
+- **WHEN** `ValidateArtifacts.execute` is called
+- **THEN** `result.failures` includes the count mismatch and `markComplete` is not called
+
 #### Scenario: All validation failures collected before returning
 
 - **GIVEN** two `required: true` validation rules both fail for the same artifact
@@ -274,6 +283,40 @@
 - **WHEN** `ValidateArtifacts.execute` is called
 - **THEN** `validations[]` rules are not evaluated against the base content
 - **AND** `markComplete` is called with the hash of the raw delta file content
+
+### Requirement: Cross-artifact structural validation
+
+#### Scenario: Spec-scoped relation compares merged outputs
+
+- **GIVEN** `specs` and `verify` are delta-capable `scope: spec` artifacts for the same spec
+- **AND** both local validations pass
+- **WHEN** `ValidateArtifacts.execute` evaluates a matching cross-artifact rule
+- **THEN** it compares the merged/materialized outputs, not the raw delta YAML files
+
+#### Scenario: Single-artifact validation still runs relevant cross-artifact rules
+
+- **GIVEN** validation is invoked with `artifactId: verify`
+- **AND** a cross-artifact rule references `verify` and `specs`
+- **AND** both participants are locally valid and available
+- **WHEN** `ValidateArtifacts.execute` runs
+- **THEN** the relational rule is evaluated during that invocation
+
+#### Scenario: Missing ready participant defers cross-artifact validation
+
+- **GIVEN** a cross-artifact rule references `specs` and `verify`
+- **AND** `verify` is locally valid
+- **AND** `specs` is missing or still locally invalid
+- **WHEN** `ValidateArtifacts.execute` runs
+- **THEN** the relational rule is deferred
+- **AND** the result includes a non-failing warning explaining why it was deferred
+
+#### Scenario: Ordered subset preserves relative order
+
+- **GIVEN** a cross-artifact rule with `kind: subset` and `options.ordering: strict`
+- **AND** participant `A` yields keys `[a, c]`
+- **AND** participant `B` yields keys `[a, b, c]`
+- **WHEN** `ValidateArtifacts.execute` evaluates the rule
+- **THEN** the rule passes because `A` appears as an order-preserving subsequence of `B`
 
 ### Requirement: MetadataExtraction validation
 
@@ -318,6 +361,12 @@
 
 - **WHEN** all non-optional artifacts are present and all validations pass
 - **THEN** `result.passed` is `true` and `result.failures` is empty
+
+#### Scenario: deferred cross-artifact rule is reported as warning
+
+- **GIVEN** a cross-artifact rule cannot run because one participant is not yet locally valid
+- **WHEN** `ValidateArtifacts.execute` returns
+- **THEN** `result.warnings` includes a non-failing deferred validation notice
 
 #### Scenario: files list reports the expected validated filename
 

@@ -299,3 +299,135 @@ artifacts:
 ```
 
 This keeps the validation constraint and the metadata extraction declaration aligned — if you add a new section to validate, you can decide whether it also belongs in extracted metadata. The `id` field on each extractor entry is optional but recommended: it allows `schemaOverrides` in `specd.yaml` to target the entry by name.
+
+## Cardinality and cross-artifact examples
+
+### Enforce uniqueness with `count.exactly`
+
+```yaml
+validations:
+  - id: unique-login-requirement
+    type: section
+    matches: '^Requirement: Login$'
+    count:
+      exactly: 1
+```
+
+### Enforce min/max child counts
+
+```yaml
+validations:
+  - id: requirement-scenarios
+    type: section
+    matches: '^Requirement:'
+    children:
+      - id: scenarios
+        type: section
+        matches: '^Scenario:'
+        count:
+          min: 1
+          max: 3
+```
+
+### Reject duplicate keys with `count.unique`
+
+```yaml
+validations:
+  - id: unique-requirement-ids
+    type: section
+    matches: '^Requirement:'
+    count:
+      min: 1
+      unique:
+        by:
+          from: label
+          strip: '^Requirement:\s*'
+```
+
+This selects all `Requirement:` sections and rejects any whose label (after stripping the prefix) is not unique.
+
+### Enforce mirrored keys across `specs` and `verify`
+
+```yaml
+crossArtifactValidations:
+  - id: mirrored-requirements
+    scope: spec
+    participants:
+      - artifact: specs
+        as: specRequirements
+        selector: { type: section, matches: '^Requirement:' }
+        key: { from: label, strip: '^Requirement:\\s*' }
+      - artifact: verify
+        as: verifyRequirements
+        selector: { type: section, matches: '^Requirement:' }
+        key: { from: label, strip: '^Requirement:\\s*' }
+    relation:
+      kind: all-equal
+      between: [specRequirements, verifyRequirements]
+      options: { ordering: ignore }
+```
+
+### Use `keySelector` for nested key extraction
+
+When keys live inside a parent section, use `keySelector` to select the key-producing nodes within each match:
+
+```yaml
+crossArtifactValidations:
+  - id: mirrored-requirement-ids
+    scope: spec
+    participants:
+      - artifact: specs
+        as: specRequirements
+        selector:
+          type: section
+          matches: '^Requirements$'
+        keySelector:
+          type: section
+          matches: '^Requirement:'
+        key:
+          from: label
+          capture: '\\[([^\\]]+)\\]$'
+      - artifact: verify
+        as: verifyRequirements
+        selector:
+          type: section
+          matches: '^Requirements$'
+        keySelector:
+          type: section
+          matches: '^Requirement:'
+        key:
+          from: label
+          capture: '\\[([^\\]]+)\\]$'
+    relation:
+      kind: all-equal
+      between: [specRequirements, verifyRequirements]
+```
+
+### Check that specs are covered by a YAML model
+
+```yaml
+crossArtifactValidations:
+  - id: spec-ids-in-model
+    scope: spec
+    participants:
+      - artifact: specs
+        as: specRequirements
+        selector:
+          type: section
+          matches: '^Requirement:'
+        key:
+          from: label
+          strip: '^Requirement:\s*'
+      - artifact: model
+        as: yamlRequirements
+        selector:
+          type: sequence-item
+          parent:
+            type: pair
+            matches: '^requirements$'
+        key:
+          from: value
+    relation:
+      kind: subset
+      between: [specRequirements, yamlRequirements]
+```

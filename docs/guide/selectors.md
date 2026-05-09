@@ -432,14 +432,15 @@ Validation rules assert structural constraints on artifact content. They appear 
 
 ### Validation rule fields
 
-| Field            | Type     | Description                                                                                                                                          |
-| ---------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `id`             | string   | Optional identifier for this rule. Useful for error messages and for targeting with overrides.                                                       |
-| `selector`       | selector | Identifies the node(s) to validate.                                                                                                                  |
-| `path`           | string   | JSONPath expression for targeting a value in JSON or YAML artifacts. Alternative to `selector`.                                                      |
-| `required`       | boolean  | Whether the matched node must exist. Defaults to `true`. When `false`, the rule produces a warning rather than a hard failure if the node is absent. |
-| `contentMatches` | string   | Regex the rendered node content must match.                                                                                                          |
-| `children`       | array    | Nested validation rules evaluated against the matched node's children.                                                                               |
+| Field            | Type     | Description                                                                                                                                               |
+| ---------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`             | string   | Optional identifier for this rule. Useful for error messages and for targeting with overrides.                                                            |
+| `selector`       | selector | Identifies the node(s) to validate.                                                                                                                       |
+| `path`           | string   | JSONPath expression for targeting a value in JSON or YAML artifacts. Alternative to `selector`.                                                           |
+| `required`       | boolean  | Whether the matched node must exist. Defaults to `true`. When `false`, the rule produces a warning rather than a hard failure if the node is absent.      |
+| `count`          | object   | Cardinality and uniqueness constraints over the matched nodes. See [Cardinality](#cardinality-with-count) and [Uniqueness](#uniqueness-with-countunique). |
+| `contentMatches` | string   | Regex the rendered node content must match.                                                                                                               |
+| `children`       | array    | Nested validation rules evaluated against the matched node's children.                                                                                    |
 
 ### Cross-field validation in structured artifacts
 
@@ -526,6 +527,83 @@ validations:
 ```
 
 Use this for recommended but not mandatory structure.
+
+### Cardinality with `count`
+
+`required` only handles the zero-match case. Use `count` when you need non-zero cardinality constraints — for example, "exactly one login requirement" or "each requirement must have 1–3 scenarios":
+
+```yaml
+validations:
+  - id: unique-login-requirement
+    selector:
+      type: section
+      matches: '^Requirement: Login$'
+    count:
+      exactly: 1
+
+  - id: requirement-scenarios
+    selector:
+      type: section
+      matches: '^Requirement:'
+    children:
+      - id: scenarios
+        selector:
+          type: section
+          matches: '^Scenario:'
+        count:
+          min: 1
+          max: 3
+```
+
+`exactly` is mutually exclusive with `min`/`max`. `children` rules can also declare their own `count`.
+
+### Uniqueness with `count.unique`
+
+Inside `count`, an optional `unique` block rejects selected nodes whose derived keys collide. Keys are extracted via a `by` sub-object using the same `from`/`capture`/`strip` model as cross-artifact participant keys:
+
+```yaml
+validations:
+  - id: unique-requirement-ids
+    selector:
+      type: section
+      matches: '^Requirement:'
+    count:
+      min: 1
+      unique:
+        by:
+          from: label
+          strip: '^Requirement:\s*'
+```
+
+This selects all `Requirement:` sections and rejects any whose label (after stripping the prefix) is not unique. The validation failure message lists the duplicate keys found.
+
+Optional bounds constrain the number of **unique** keys independently of total count: `exactlyUnique`, `minUnique`, `maxUnique`.
+
+### Cross-artifact validation
+
+Beyond per-artifact rules, schemas can declare **relational** checks across multiple artifacts using the top-level `crossArtifactValidations` array. Each rule extracts comparable key collections from two or more artifacts and compares them with a relation operator (`all-equal`, `subset`, `superset`).
+
+```yaml
+crossArtifactValidations:
+  - id: mirrored-requirements
+    scope: spec
+    participants:
+      - artifact: specs
+        as: specRequirements
+        selector: { type: section, matches: '^Requirement:' }
+        key: { from: label, strip: '^Requirement:\\s*' }
+      - artifact: verify
+        as: verifyRequirements
+        selector: { type: section, matches: '^Requirement:' }
+        key: { from: label, strip: '^Requirement:\\s*' }
+    relation:
+      kind: all-equal
+      between: [specRequirements, verifyRequirements]
+```
+
+This rule ensures `specs` and `verify` expose the same requirement IDs. Rules are evaluated only after all participating artifacts pass their local structural validation. When a participant is not yet ready, the rule is deferred with a warning rather than failing.
+
+For the full syntax including `keySelector`, ordering options, and relation kinds, see the [schema format reference](../schemas/schema-format.md#crossartifactvalidations).
 
 ---
 

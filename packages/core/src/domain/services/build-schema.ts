@@ -12,6 +12,11 @@ import {
   type PreHashCleanup,
   type TaskCompletionCheck,
 } from '../value-objects/validation-rule.js'
+import {
+  type CrossArtifactValidationRule,
+  type CrossArtifactParticipant,
+  type CrossArtifactRelation,
+} from '../value-objects/cross-artifact-validation.js'
 import { type Selector } from '../value-objects/selector.js'
 import {
   type Extractor,
@@ -45,6 +50,25 @@ export interface ValidationRuleRaw {
   selector?: SelectorRaw | undefined
   path?: string | undefined
   required?: boolean | undefined
+  count?:
+    | {
+        exactly?: number | undefined
+        min?: number | undefined
+        max?: number | undefined
+        unique?:
+          | {
+              by: {
+                from: 'label' | 'value' | 'content'
+                capture?: string | undefined
+                strip?: string | undefined
+              }
+              minUnique?: number | undefined
+              maxUnique?: number | undefined
+              exactlyUnique?: number | undefined
+            }
+          | undefined
+      }
+    | undefined
   contentMatches?: string | undefined
   children?: ValidationRuleRaw[] | undefined
   type?: string | undefined
@@ -53,6 +77,41 @@ export interface ValidationRuleRaw {
   parent?: SelectorRaw | undefined
   index?: number | undefined
   where?: Record<string, string> | undefined
+}
+
+/** Raw cross-artifact key extraction shape. */
+export interface CrossArtifactKeySpecRaw {
+  from: 'label' | 'value' | 'content'
+  capture?: string | undefined
+  strip?: string | undefined
+}
+
+/** Raw cross-artifact participant shape. */
+export interface CrossArtifactParticipantRaw {
+  artifact: string
+  as: string
+  selector: SelectorRaw
+  keySelector?: SelectorRaw | undefined
+  key: CrossArtifactKeySpecRaw
+}
+
+/** Raw cross-artifact relation shape. */
+export interface CrossArtifactRelationRaw {
+  kind: 'all-equal' | 'subset' | 'superset'
+  between: readonly string[]
+  options?:
+    | {
+        ordering?: 'ignore' | 'strict' | undefined
+      }
+    | undefined
+}
+
+/** Raw schema-level cross-artifact validation rule shape. */
+export interface CrossArtifactValidationRuleRaw {
+  id: string
+  scope: 'spec' | 'change'
+  participants: readonly CrossArtifactParticipantRaw[]
+  relation: CrossArtifactRelationRaw
 }
 
 /** Raw field mapping shape. */
@@ -158,6 +217,7 @@ export interface SchemaYamlData {
   readonly description?: string | undefined
   readonly extends?: string | undefined
   readonly artifacts?: readonly ArtifactYamlData[] | undefined
+  readonly crossArtifactValidations?: readonly CrossArtifactValidationRuleRaw[] | undefined
   readonly workflow?: readonly WorkflowStep[] | undefined
   readonly metadataExtraction?: MetadataExtractionRaw | undefined
   readonly operations?: SchemaOperationsRaw | undefined
@@ -207,13 +267,141 @@ function buildValidationRule(raw: ValidationRuleRaw): ValidationRule {
     })
   }
 
+  validateCountSemantics(raw.count)
+
+  const count =
+    raw.count !== undefined
+      ? {
+          ...(raw.count.exactly !== undefined ? { exactly: raw.count.exactly } : {}),
+          ...(raw.count.min !== undefined ? { min: raw.count.min } : {}),
+          ...(raw.count.max !== undefined ? { max: raw.count.max } : {}),
+          ...(raw.count.unique !== undefined
+            ? {
+                unique: {
+                  by: {
+                    from: raw.count.unique.by.from,
+                    ...(raw.count.unique.by.capture !== undefined
+                      ? { capture: raw.count.unique.by.capture }
+                      : {}),
+                    ...(raw.count.unique.by.strip !== undefined
+                      ? { strip: raw.count.unique.by.strip }
+                      : {}),
+                  },
+                  ...(raw.count.unique.minUnique !== undefined
+                    ? { minUnique: raw.count.unique.minUnique }
+                    : {}),
+                  ...(raw.count.unique.maxUnique !== undefined
+                    ? { maxUnique: raw.count.unique.maxUnique }
+                    : {}),
+                  ...(raw.count.unique.exactlyUnique !== undefined
+                    ? { exactlyUnique: raw.count.unique.exactlyUnique }
+                    : {}),
+                },
+              }
+            : {}),
+        }
+      : undefined
+
   return {
     ...(raw.id !== undefined ? { id: raw.id } : {}),
     ...(selector !== undefined ? { selector } : {}),
     ...(raw.path !== undefined ? { path: raw.path } : {}),
     ...(raw.required !== undefined ? { required: raw.required } : {}),
+    ...(count !== undefined ? { count } : {}),
     ...(raw.contentMatches !== undefined ? { contentMatches: raw.contentMatches } : {}),
     ...(raw.children !== undefined ? { children: raw.children.map(buildValidationRule) } : {}),
+  }
+}
+
+/**
+ * Validates semantic constraints for the `count` block in a validation rule.
+ *
+ * @param count - Optional raw count block
+ * @throws {SchemaValidationError} When mutually exclusive or invalid cardinality combinations are declared
+ */
+function validateCountSemantics(count: ValidationRuleRaw['count']): void {
+  if (count === undefined) return
+
+  if (count.exactly !== undefined && (count.min !== undefined || count.max !== undefined)) {
+    throw new SchemaValidationError(
+      '#schema',
+      'validation rule count.exactly is mutually exclusive with count.min/count.max',
+    )
+  }
+  if (count.min !== undefined && count.max !== undefined && count.min > count.max) {
+    throw new SchemaValidationError('#schema', 'validation rule count.min must be <= count.max')
+  }
+  if (count.unique === undefined) return
+
+  const { exactlyUnique, minUnique, maxUnique } = count.unique
+  if (exactlyUnique !== undefined && (minUnique !== undefined || maxUnique !== undefined)) {
+    throw new SchemaValidationError(
+      '#schema',
+      'validation rule count.unique.exactlyUnique is mutually exclusive with count.unique.minUnique/count.unique.maxUnique',
+    )
+  }
+  if (minUnique !== undefined && maxUnique !== undefined && minUnique > maxUnique) {
+    throw new SchemaValidationError(
+      '#schema',
+      'validation rule count.unique.minUnique must be <= count.unique.maxUnique',
+    )
+  }
+}
+
+/**
+ * Converts a raw cross-artifact participant into the domain type.
+ *
+ * @param raw - The raw participant
+ * @returns The domain participant
+ */
+function buildCrossArtifactParticipant(raw: CrossArtifactParticipantRaw): CrossArtifactParticipant {
+  return {
+    artifact: raw.artifact,
+    as: raw.as,
+    selector: buildSelector(raw.selector),
+    ...(raw.keySelector !== undefined ? { keySelector: buildSelector(raw.keySelector) } : {}),
+    key: {
+      from: raw.key.from,
+      ...(raw.key.capture !== undefined ? { capture: raw.key.capture } : {}),
+      ...(raw.key.strip !== undefined ? { strip: raw.key.strip } : {}),
+    },
+  }
+}
+
+/**
+ * Converts a raw cross-artifact relation into the domain type.
+ *
+ * @param raw - The raw relation
+ * @returns The domain relation
+ */
+function buildCrossArtifactRelation(raw: CrossArtifactRelationRaw): CrossArtifactRelation {
+  return {
+    kind: raw.kind,
+    between: raw.between,
+    ...(raw.options !== undefined
+      ? {
+          options: {
+            ...(raw.options.ordering !== undefined ? { ordering: raw.options.ordering } : {}),
+          },
+        }
+      : {}),
+  }
+}
+
+/**
+ * Converts a raw cross-artifact validation rule into the domain type.
+ *
+ * @param raw - The raw cross-artifact rule
+ * @returns The domain cross-artifact rule
+ */
+function buildCrossArtifactValidationRule(
+  raw: CrossArtifactValidationRuleRaw,
+): CrossArtifactValidationRule {
+  return {
+    id: raw.id,
+    scope: raw.scope,
+    participants: raw.participants.map(buildCrossArtifactParticipant),
+    relation: buildCrossArtifactRelation(raw.relation),
   }
 }
 
@@ -607,6 +795,52 @@ export function buildSchema(
     }
   }
 
+  const crossArtifactValidations = (data.crossArtifactValidations ?? []).map(
+    buildCrossArtifactValidationRule,
+  )
+  if (crossArtifactValidations.length > 0) {
+    validateArrayIds(ref, crossArtifactValidations, 'crossArtifactValidations', 'schema')
+  }
+  for (const rule of crossArtifactValidations) {
+    if (rule.participants.length === 0) {
+      throw new SchemaValidationError(
+        ref,
+        `crossArtifactValidations rule '${rule.id}' must declare at least one participant`,
+      )
+    }
+    const aliasSet = new Set<string>()
+    for (const participant of rule.participants) {
+      if (aliasSet.has(participant.as)) {
+        throw new SchemaValidationError(
+          ref,
+          `crossArtifactValidations rule '${rule.id}' has duplicate participant alias '${participant.as}'`,
+        )
+      }
+      aliasSet.add(participant.as)
+      const artifactType = artifactIndex.get(participant.artifact)
+      if (artifactType === undefined) {
+        throw new SchemaValidationError(
+          ref,
+          `crossArtifactValidations rule '${rule.id}' references unknown artifact '${participant.artifact}'`,
+        )
+      }
+      if (artifactType.scope !== rule.scope) {
+        throw new SchemaValidationError(
+          ref,
+          `crossArtifactValidations rule '${rule.id}' mixes scopes: rule '${rule.scope}', artifact '${participant.artifact}' is '${artifactType.scope}'`,
+        )
+      }
+    }
+    for (const alias of rule.relation.between) {
+      if (!aliasSet.has(alias)) {
+        throw new SchemaValidationError(
+          ref,
+          `crossArtifactValidations rule '${rule.id}' relation.between references unknown alias '${alias}'`,
+        )
+      }
+    }
+  }
+
   validateArtifactGraph(ref, artifacts)
 
   const metadataExtraction =
@@ -640,6 +874,7 @@ export function buildSchema(
     artifacts,
     workflow,
     metadataExtraction,
+    crossArtifactValidations,
     data.extends,
   )
 }

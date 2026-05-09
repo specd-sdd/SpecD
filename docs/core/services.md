@@ -393,7 +393,9 @@ function evaluateRules(
 ): RuleEvaluationResult
 ```
 
-Evaluates a list of validation rules against an AST root. Returns all failures (required rules not satisfied) and warnings (optional rules not satisfied).
+Evaluates a list of validation rules against an AST root. Returns all failures (required rules not satisfied, cardinality violations, uniqueness violations, content mismatches) and warnings (optional rules not satisfied).
+
+For each rule, evaluation proceeds in order: select nodes via `selector` or `path` → handle zero-match (`required`) → evaluate `count` cardinality (`exactly`/`min`/`max` and `unique.by` with `minUnique`/`maxUnique`/`exactlyUnique`) → check `contentMatches` per matched node → evaluate `children` rules recursively.
 
 | Parameter    | Type                        | Description                                                |
 | ------------ | --------------------------- | ---------------------------------------------------------- |
@@ -403,6 +405,30 @@ Evaluates a list of validation rules against an AST root. Returns all failures (
 | `parser`     | `RuleEvaluatorParser`       | Provides `renderSubtree()` for `contentMatches` checks.    |
 
 **Returns:** `RuleEvaluationResult` — `{ failures: RuleEvaluationFailure[], warnings: RuleEvaluationWarning[] }`.
+
+---
+
+### evaluateCrossArtifactRule
+
+```typescript
+import { evaluateCrossArtifactRule } from '@specd/core'
+
+function evaluateCrossArtifactRule(
+  context: CrossArtifactEvaluationContext,
+): CrossArtifactEvaluationResult
+```
+
+Evaluates a single cross-artifact relational rule against already-parsed participant ASTs. Pure function — no I/O, no side effects. Used by both `ValidateArtifacts` (change-time) and `ValidateSpecs` (archived specs).
+
+For each participant, the evaluator resolves its `selector` (and optional `keySelector`), extracts keys via `key.from` (`label`/`value`/`content`) with optional `capture`/`strip`, then compares the resulting key collections using the declared relation (`all-equal`, `subset`, `superset`) with `ordering` (`ignore` or `strict`).
+
+| Parameter | Type                             | Description                                                                                        |
+| --------- | -------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `context` | `CrossArtifactEvaluationContext` | Contains the `rule` definition and a `participants` map of alias → `{ artifactId, root, parser }`. |
+
+**Returns:** `CrossArtifactEvaluationResult` — `{ failures: CrossArtifactEvaluationFailure[], warnings: CrossArtifactEvaluationWarning[] }`.
+
+When a participant is missing from the map, the rule is deferred with a warning rather than failing. Failure messages include the specific keys that differ or are missing.
 
 ---
 

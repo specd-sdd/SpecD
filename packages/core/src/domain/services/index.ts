@@ -32,6 +32,9 @@ export {
   type ArtifactYamlData,
   type SelectorRaw,
   type ValidationRuleRaw,
+  type CrossArtifactValidationRuleRaw,
+  type CrossArtifactParticipantRaw,
+  type CrossArtifactRelationRaw,
   type MetadataExtractionRaw,
   type RuleEntryRaw,
   type ArtifactRulesRaw,
@@ -50,6 +53,14 @@ export {
   selectBySelector,
   collectAllNodes,
 } from './selector-matching.js'
+export {
+  evaluateCrossArtifactRule,
+  type CrossArtifactEvaluationFailure,
+  type CrossArtifactEvaluationWarning,
+  type CrossArtifactParticipantInput,
+  type CrossArtifactEvaluationContext,
+  type CrossArtifactEvaluationResult,
+} from './cross-artifact-rule-evaluator.js'
 export {
   evaluateRules,
   selectNodes,

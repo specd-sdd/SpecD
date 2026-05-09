@@ -150,6 +150,28 @@ Artifacts that contain trackable tasks (markdown checkboxes) must explicitly dec
 
 This decision moves task tracking from a "magic" derivation to a declarative capability, improving schema readability and providing early failure for invalid workflows.
 
+### 16. Cardinality and uniqueness via `count`
+
+The existing `required` field handles only the zero-match case (no nodes selected). Non-zero cardinality constraints — "exactly N matches", "at most N", "at least N" — are expressed through a `count` block on each validation rule. `exactly` is mutually exclusive with `min`/`max`.
+
+Uniqueness constraints (no duplicate keys among selected nodes) are expressed through `count.unique.by`, using the same `from`/`capture`/`strip` key extraction model as cross-artifact participant keys. Optional `minUnique`/`maxUnique`/`exactlyUnique` bounds constrain the number of distinct keys independently of total count.
+
+This keeps cardinality as one reusable vocabulary covering top-level rules and nested `children` rules, instead of fragmenting it into separate boolean flags.
+
+### 17. Cross-artifact relational validation (`crossArtifactValidations`)
+
+The existing validation model is artifact-local: each rule evaluates against one AST root. Important consistency rules that span multiple artifacts — for example, requirement IDs in `specs` and `verify` must mirror each other — had no schema-driven enforcement.
+
+`crossArtifactValidations` is an optional top-level schema array declaring relational rules across multiple artifacts. Each rule declares `scope` (spec or change), `participants` (artifact + selector + key extraction), and a `relation` (all-equal, subset, superset with optional ordering).
+
+Key design decisions:
+
+- Rules relate only artifacts of the **same spec and scope**. Cross-spec and mixed-scope relations are out of scope for v1.
+- Rules are evaluated **after** all participating artifacts pass local structural validation. Missing participants produce a deferred warning, not a failure.
+- For `scope: spec`, evaluation operates on **merged/materialized** artifact previews, not raw delta ASTs.
+- The same evaluator is shared by both `ValidateArtifacts` (change-time) and `ValidateSpecs` (archived specs).
+- Key extraction reuses the selector model (`selector` for scope, optional `keySelector` for nested extraction) plus a `key` object (`from`/`capture`/`strip`).
+
 ### Consequences
 
 - Good, because `mergeSpecs` and `ValidateSpec` are fully schema-driven with no hardcoded section names, patterns, or keywords
@@ -163,6 +185,10 @@ This decision moves task tracking from a "magic" derivation to a declarative cap
 - Good, because mandatory `id` on array entries enables stable identity matching across schema layers
 - Good, because `rules.pre`/`rules.post` on artifacts provide expressive control over constraint injection (before/after instruction, all five operations)
 - Good, because `schemaOverrides` consolidates all project-level customisation into a single mechanism, reducing config surface
+- Good, because `count` provides a single reusable cardinality vocabulary instead of fragmenting into separate flags
+- Good, because `count.unique.by` reuses the same key extraction model as cross-artifact participant keys, keeping the mental model small
+- Good, because `crossArtifactValidations` makes requirement mirroring and other relational checks schema-driven rather than hardcoded conventions
+- Good, because cross-artifact rules reuse the same evaluator for both change-time and archived-spec validation, avoiding duplication
 - Bad, because `mergeSpecs` must be updated — the current implementation hardcodes defaults and applies operations without conflict checks; both must be changed
 - Bad, because `ApproveChange` must become per-spec rather than per-change, requiring a manifest format update
 - Bad, because `SchemaRegistry` load-time validation adds startup cost proportional to the number of referenced template files
@@ -170,7 +196,7 @@ This decision moves task tracking from a "magic" derivation to a declarative cap
 
 ### Confirmation
 
-`specs/core/schema-format/verify.md` scenarios serve as acceptance tests for the format, including `kind`, `extends`, `id` uniqueness, and `rules.pre`/`rules.post` semantics. `specs/core/schema-merge/verify.md` scenarios cover the five merge operations, layer ordering, identity matching, and post-merge validation. `mergeSpecs` unit tests verify schema-driven section resolution, configurable operation keywords, fixed apply order (RENAMED → REMOVED → MODIFIED → ADDED), and conflict detection before any mutation. `ValidateSpec` unit tests verify `validations[]`, `deltaValidations[]` (all three modes: file-level, `scope`, `eachBlock`), and that `deltaValidations[]` section names use the schema's resolved `deltaOperations` keywords.
+`specs/core/schema-format/verify.md` scenarios serve as acceptance tests for the format, including `kind`, `extends`, `id` uniqueness, `count` semantics, `crossArtifactValidations`, and `rules.pre`/`rules.post` semantics. `specs/core/schema-merge/verify.md` scenarios cover the five merge operations, layer ordering, identity matching, and post-merge validation. `mergeSpecs` unit tests verify schema-driven section resolution, configurable operation keywords, fixed apply order (RENAMED → REMOVED → MODIFIED → ADDED), and conflict detection before any mutation. `ValidateSpec` unit tests verify `validations[]`, `deltaValidations[]` (all three modes: file-level, `scope`, `eachBlock`), and that `deltaValidations[]` section names use the schema's resolved `deltaOperations` keywords.
 
 ## More Information
 

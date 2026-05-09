@@ -525,6 +525,13 @@ Also enforces approval invalidation: if any artifact's content has changed since
 
 Dependency-blocked validation failures are status-aware: `ValidationFailure.description` includes the blocking dependency ID plus its effective status. Review states (`pending-review`, `drifted-pending-review`) are reported as review blockers, and recursive review propagation (`pending-parent-artifact-review`) includes upstream parent blocker context when available.
 
+Validation executes in two passes:
+
+1. **Local structural validation** — each artifact is parsed and evaluated against its `validations[]` and `deltaValidations[]` rules independently. Artifacts that pass are retained as parsed ASTs for the second pass.
+2. **Cross-artifact relational validation** — after all artifacts have been locally validated, applicable `crossArtifactValidations` rules are evaluated over the retained parsed outputs. For `scope: spec` artifacts, the parsed output is the merged/materialized preview (delta-applied), not the raw delta AST. If one or more participants in a rule are not yet locally valid, the rule is deferred and a warning is recorded rather than a failure.
+
+Cross-artifact failures and deferred warnings are folded into the existing `failures` and `warnings` arrays in the result.
+
 Validation and file reads happen outside the lock; the final persisted invalidation, `markComplete(...)`, and `setSpecDependsOn(...)` updates are applied through `ChangeRepository.mutate(...)` on a fresh reload.
 
 **Constructor:**
@@ -593,6 +600,11 @@ interface ValidationFileResult {
 ### ValidateSpecs
 
 Validates existing spec artifacts (not change artifacts) against the active schema's structural rules. Supports validating a single spec, all specs in a workspace, or all specs across all workspaces.
+
+Each spec's artifacts are validated in two passes:
+
+1. **Local structural validation** — each spec-scoped artifact file is parsed and evaluated against its `validations[]` rules. Artifacts with no local rules are still parsed when they participate in a `crossArtifactValidations` rule. Parsed ASTs are retained after local validation passes.
+2. **Cross-artifact relational validation** — applicable `crossArtifactValidations` rules with `scope: spec` are evaluated over the retained ASTs, reusing the same `evaluateCrossArtifactRule` engine as `ValidateArtifacts`. Failures and deferred warnings are folded into each `SpecValidationEntry`'s existing `failures` and `warnings` arrays.
 
 **Constructor:**
 

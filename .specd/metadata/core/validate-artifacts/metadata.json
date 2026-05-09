@@ -80,7 +80,7 @@
     {
       "requirement": "Delta validation",
       "rules": [
-        "If the schema artifact declares `deltaValidations[]` and a delta file exists for the artifact at `deltas/<workspace>/<capability-path>/<filename>.delta.yaml`, `ValidateArtifacts` must validate the delta file before attempting application.\n\n**No-op delta bypass:** If the parsed delta entries consist exclusively of `no-op` operations, `ValidateArtifacts` MUST skip `deltaValidations`, delta application preview, and structural validation entirely. Instead, it proceeds directly to hash computation and `markComplete` using the raw delta file content. This is because `no-op` declares that the existing artifact content is already valid — there are no operations to validate or apply.\n\nFor non-no-op deltas, the delta file is parsed by the YAML adapter to produce a normalized YAML AST. Each `deltaValidations` rule is then evaluated against this AST using the same algorithm as structural validation (see Requirement: Structural validation), with the delta AST as the document root.\n\nFor each rule in `deltaValidations[]`, apply the rule evaluation algorithm (identical for both `validations` and `deltaValidations`; only the document root differs):\n\n1. Select candidate nodes from the document root using one of:\n   - **Selector fields** (`type`, `matches`, `contains`, `parent`, `index`, `where`): apply the selector model defined in [`core:selector-model`](../selector-model/spec.md) against the AST.\n   - **`path`** (JSONPath string): evaluate the JSONPath expression against the document root.\n2. If zero nodes are selected: if `required: true`, record a failure; if `required: false`, record a warning. Skip `children` and `contentMatches` evaluation.\n3. If one or more nodes are selected: for each matched node:\n   - If `contentMatches` is present: call `parser.renderSubtree(node)` to serialize the subtree to its native format, then test the regex against the result. A non-matching node records a failure.\n   - Evaluate any `children` rules recursively, using the matched node as the document root.\n\nA rule passes vacuously when zero nodes are selected. If any `required: true` delta validation rule fails, the artifact is not advanced to the delta application preview step — the failure is reported immediately."
+        "If the schema artifact declares `deltaValidations[]` and a delta file exists for the artifact at `deltas/<workspace>/<capability-path>/<filename>.delta.yaml`, `ValidateArtifacts` must validate the delta file before attempting application.\n\n**No-op delta bypass:** If the parsed delta entries consist exclusively of `no-op` operations, `ValidateArtifacts` MUST skip `deltaValidations`, delta application preview, and structural validation entirely. Instead, it proceeds directly to hash computation and `markComplete` using the raw delta file content. This is because `no-op` declares that the existing artifact content is already valid — there are no operations to validate or apply.\n\nFor non-no-op deltas, the delta file is parsed by the YAML adapter to produce a normalized YAML AST. Each `deltaValidations` rule is then evaluated against this AST using the same algorithm as structural validation (see Requirement: Structural validation), with the delta AST as the document root.\n\nFor each rule in `deltaValidations[]`, apply the rule evaluation algorithm (identical for both `validations` and `deltaValidations`; only the document root differs):\n\n1. Select candidate nodes from the document root using one of:\n   - **Selector fields** (`type`, `matches`, `contains`, `parent`, `index`, `where`): apply the selector model defined in [`core:selector-model`](../selector-model/spec.md) against the AST.\n   - **`path`** (JSONPath string): evaluate the JSONPath expression against the document root.\n2. If zero nodes are selected: if `required: true`, record a failure; if `required: false`, record a warning. Skip `children` and `contentMatches` evaluation.\n3. If one or more nodes are selected:\n   - If the rule declares `count`, evaluate total cardinality (`exactly` or `min`/`max`) and, when declared, unique cardinality (`unique.by` with optional `minUnique`/`maxUnique`/`exactlyUnique`), recording failures for any mismatch.\n   - For each matched node:\n     - If `contentMatches` is present: call `parser.renderSubtree(node)` to serialize the subtree to its native format, then test the regex against the result. A non-matching node records a failure.\n     - Evaluate any `children` rules recursively, using the matched node as the document root.\n\nIf any `required: true` delta validation rule fails, the artifact is not advanced to the delta application preview step — the failure is reported immediately."
       ]
     },
     {
@@ -92,7 +92,13 @@
     {
       "requirement": "Structural validation",
       "rules": [
-        "After a successful delta application preview (or for non-delta artifacts), `ValidateArtifacts` runs all rules in the artifact's `validations[]` against the merged (or direct) content:\n\n1. Parse the content via `ArtifactParser.parse()` to produce a normalized AST (if not already parsed during delta application preview).\n2. For each rule in `validations[]`, apply the rule evaluation algorithm: select nodes using selector fields or `path`; if zero nodes matched, record failure or warning per `required` and skip `children`/`contentMatches`; for each matched node, evaluate `contentMatches` against the serialized subtree (`parser.renderSubtree(node)`), then evaluate `children` rules recursively with that node as root.\n\n`ValidateArtifacts` collects all failures and warnings for the artifact before moving on — it does not stop at the first failure.\n\n**No-op bypass:** When the delta contains only `no-op` entries, structural validation is skipped. The `no-op` operation declares that the existing artifact content is already valid, so re-validating the base content against `validations[]` is not required."
+        "After a successful delta application preview (or for non-delta artifacts), `ValidateArtifacts` runs all rules in the artifact's `validations[]` against the merged (or direct) content:\n\n1. Parse the content via `ArtifactParser.parse()` to produce a normalized AST (if not already parsed during delta application preview).\n2. For each rule in `validations[]`, apply the rule evaluation algorithm: select nodes using selector fields or `path`; if zero nodes matched, record failure or warning per `required` and skip `children`/`contentMatches`; if the rule declares `count`, evaluate total and unique cardinality constraints; for each matched node, evaluate `contentMatches` against the serialized subtree (`parser.renderSubtree(node)`), then evaluate `children` rules recursively with that node as root.\n\n`ValidateArtifacts` collects all failures and warnings for the artifact before moving on — it does not stop at the first failure.\n\nA locally valid parsed artifact output is the prerequisite input for Requirement: Cross-artifact structural validation.\n\n**No-op bypass:** When the delta contains only `no-op` entries, structural validation is skipped. The `no-op` operation declares that the existing artifact content is already valid, so re-validating the base content against `validations[]` is not required."
+      ]
+    },
+    {
+      "requirement": "Cross-artifact structural validation",
+      "rules": [
+        "After local artifact validation succeeds, `ValidateArtifacts` MUST evaluate any applicable `crossArtifactValidations` declared by the schema.\n\nApplicability rules:\n\n- only rules whose `scope` matches the artifact scope being validated are eligible\n- only rules whose participants all belong to the same target spec and the same scope are eligible\n- when `artifactId` is provided, only cross-artifact rules that reference that artifact are eligible for evaluation in that invocation\n\nParticipant readiness rules:\n\n- a participant is ready only when its expected file exists, its local structural validation has already passed, and its parsed artifact output is available\n- for `scope: spec`, the parsed artifact output MUST be the merged/materialized artifact preview produced by delta application or direct-file validation\n- for `scope: change`, the parsed artifact output MUST come from the direct change artifact file\n\nEvaluation rules:\n\n1. Resolve each participant's `selector` against its artifact AST.\n2. If the participant declares `keySelector`, resolve it relative to each node matched by the main `selector`; otherwise use the main selector matches directly as key-producing nodes.\n3. Extract comparable keys using `key.from`, then apply any `capture` and `strip` normalization declared by the schema.\n4. Evaluate the participant key collections using `relation.kind`, `relation.between`, and any operator-specific `relation.options`.\n\nRelation semantics:\n\n- `all-equal` compares all aliases named in `between`\n- `subset` is directional: `between: [A, B]` means all keys from `A` MUST appear in `B`\n- `superset` is directional: `between: [A, B]` means all keys from `B` MUST appear in `A`\n- `relation.options.ordering: ignore` performs unordered comparison\n- `relation.options.ordering: strict` performs ordered comparison; for `subset` and `superset`, strict ordering means relative-order preservation rather than exact positional alignment\n\nIf every participant required by a rule is ready, `ValidateArtifacts` MUST evaluate the rule and record any mismatch as a validation failure for the participating artifact set.\n\nIf one or more required participants are not ready yet, `ValidateArtifacts` MUST defer that cross-artifact rule for the current invocation and MUST surface a non-failing validation output entry explaining that the rule was not evaluated because all participants were not yet available as locally valid parsed outputs."
       ]
     },
     {
@@ -110,7 +116,7 @@
     {
       "requirement": "Result shape",
       "rules": [
-        "`ValidateArtifacts.execute` must return a result object — it must not throw for validation failures. The result must include:\n\n- `passed: boolean` — `true` only if all required artifacts are present and all validations pass with no errors\n- `failures: ValidationFailure[]` — one entry per failed rule, missing artifact, or `DeltaApplicationError`\n- `warnings: ValidationWarning[]` — one entry per `required: false` rule that was absent\n- `files: ValidationFileResult[]` — one entry per artifact file considered by validation, including `artifactId`, `key`, `filename`, and whether the file was validated, skipped, or missing\n\nEach `ValidationFailure` must include the artifact ID, the rule or error description, and enough context for the CLI to produce a useful error message. Missing-file failures MUST include the expected `filename`.\n\n`ValidationFileResult.filename` MUST be the expected path used by validation. It MUST NOT report an alternate file path that was present but intentionally ignored."
+        "`ValidateArtifacts.execute` must return a result object — it must not throw for validation failures. The result must include:\n\n- `passed: boolean` — `true` only if all required artifacts are present and all validations pass with no errors\n- `failures: ValidationFailure[]` — one entry per failed local rule, failed cross-artifact rule, missing artifact, or `DeltaApplicationError`\n- `warnings: ValidationWarning[]` — one entry per `required: false` local rule that was absent and any non-failing deferred cross-artifact validation notice\n- `files: ValidationFileResult[]` — one entry per artifact file considered by validation, including `artifactId`, `key`, `filename`, and whether the file was validated, skipped, or missing\n\nEach `ValidationFailure` must include the artifact ID, the rule or error description, and enough context for the CLI to produce a useful error message. Missing-file failures MUST include the expected `filename`.\n\n`ValidationFileResult.filename` MUST be the expected path used by validation. It MUST NOT report an alternate file path that was present but intentionally ignored."
       ]
     },
     {
@@ -374,10 +380,13 @@
     },
     {
       "requirement": "Delta validation",
-      "name": "Delta validation passes vacuously when no nodes match",
-      "given": ["a deltaValidations rule whose selector matches zero nodes in the delta YAML AST"],
+      "name": "Delta validation count mismatch blocks application",
+      "given": [
+        "a deltaValidations rule with count: { min: 2 }",
+        "AND only one delta entry matches the rule selector"
+      ],
       "when": ["ValidateArtifacts.execute is called"],
-      "then": ["the rule passes without error regardless of required"]
+      "then": ["result.passed is false", "AND the artifact is not advanced to application preview"]
     },
     {
       "requirement": "Delta validation",
@@ -506,6 +515,16 @@
     },
     {
       "requirement": "Structural validation",
+      "name": "count exactly rejects duplicate local matches",
+      "given": [
+        "a validations rule with count: { exactly: 1 }",
+        "AND the merged artifact content contains two matching nodes"
+      ],
+      "when": ["ValidateArtifacts.execute is called"],
+      "then": ["result.failures includes the count mismatch and markComplete is not called"]
+    },
+    {
+      "requirement": "Structural validation",
       "name": "All validation failures collected before returning",
       "given": ["two required: true validation rules both fail for the same artifact"],
       "when": ["ValidateArtifacts.execute is called"],
@@ -522,6 +541,52 @@
         "validations[] rules are not evaluated against the base content",
         "AND markComplete is called with the hash of the raw delta file content"
       ]
+    },
+    {
+      "requirement": "Cross-artifact structural validation",
+      "name": "Spec-scoped relation compares merged outputs",
+      "given": [
+        "specs and verify are delta-capable scope: spec artifacts for the same spec",
+        "AND both local validations pass"
+      ],
+      "when": ["ValidateArtifacts.execute evaluates a matching cross-artifact rule"],
+      "then": ["it compares the merged/materialized outputs, not the raw delta YAML files"]
+    },
+    {
+      "requirement": "Cross-artifact structural validation",
+      "name": "Single-artifact validation still runs relevant cross-artifact rules",
+      "given": [
+        "validation is invoked with artifactId: verify",
+        "AND a cross-artifact rule references verify and specs",
+        "AND both participants are locally valid and available"
+      ],
+      "when": ["ValidateArtifacts.execute runs"],
+      "then": ["the relational rule is evaluated during that invocation"]
+    },
+    {
+      "requirement": "Cross-artifact structural validation",
+      "name": "Missing ready participant defers cross-artifact validation",
+      "given": [
+        "a cross-artifact rule references specs and verify",
+        "AND verify is locally valid",
+        "AND specs is missing or still locally invalid"
+      ],
+      "when": ["ValidateArtifacts.execute runs"],
+      "then": [
+        "the relational rule is deferred",
+        "AND the result includes a non-failing warning explaining why it was deferred"
+      ]
+    },
+    {
+      "requirement": "Cross-artifact structural validation",
+      "name": "Ordered subset preserves relative order",
+      "given": [
+        "a cross-artifact rule with kind: subset and options.ordering: strict",
+        "AND participant A yields keys [a, c]",
+        "AND participant B yields keys [a, b, c]"
+      ],
+      "when": ["ValidateArtifacts.execute evaluates the rule"],
+      "then": ["the rule passes because A appears as an order-preserving subsequence of B"]
     },
     {
       "requirement": "MetadataExtraction validation",
@@ -570,6 +635,15 @@
       "name": "passed is true when all pass",
       "when": ["all non-optional artifacts are present and all validations pass"],
       "then": ["result.passed is true and result.failures is empty"]
+    },
+    {
+      "requirement": "Result shape",
+      "name": "deferred cross-artifact rule is reported as warning",
+      "given": [
+        "a cross-artifact rule cannot run because one participant is not yet locally valid"
+      ],
+      "when": ["ValidateArtifacts.execute returns"],
+      "then": ["result.warnings includes a non-failing deferred validation notice"]
     },
     {
       "requirement": "Result shape",
@@ -770,8 +844,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:aa39a7bfc0e9389c52e4ebf27be21efea5b6c7ef197d90e755ba295302d0d77f",
-    "verify.md": "sha256:103683af019031cf76363132493005b846c821b69d0afd2b62334069a6e27827"
+    "spec.md": "sha256:b377ec3b5b645da4d1d3c7c599d188677f695982c22e19ca71c184a49fe5bcbb",
+    "verify.md": "sha256:cbd4084c4024e3bf565b6b974a52eacd4bd7db558d81cd62e62e3c413ad0f16e"
   },
   "generatedBy": "core"
 }

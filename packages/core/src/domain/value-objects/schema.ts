@@ -1,4 +1,5 @@
 import { ArtifactType } from './artifact-type.js'
+import { type CrossArtifactValidationRule } from './cross-artifact-validation.js'
 import { type MetadataExtraction } from './metadata-extraction.js'
 import { type WorkflowStep } from './workflow-step.js'
 
@@ -22,6 +23,7 @@ export class Schema {
   private readonly _artifacts: readonly ArtifactType[]
   private readonly _artifactIndex: ReadonlyMap<string, ArtifactType>
   private readonly _metadataExtraction: MetadataExtraction | undefined
+  private readonly _crossArtifactValidations: readonly CrossArtifactValidationRule[]
   private readonly _workflow: readonly WorkflowStep[]
   private readonly _workflowIndex: ReadonlyMap<string, WorkflowStep>
 
@@ -34,6 +36,7 @@ export class Schema {
    * @param artifacts - Artifact type definitions in schema-declared order
    * @param workflow - Workflow step configurations in schema-declared order
    * @param metadataExtraction - Optional metadata extraction declarations
+   * @param crossArtifactValidations - Optional cross-artifact structural rules
    * @param extendsRef - Optional parent schema reference
    */
   constructor(
@@ -43,6 +46,7 @@ export class Schema {
     artifacts: readonly ArtifactType[],
     workflow: readonly WorkflowStep[],
     metadataExtraction?: MetadataExtraction,
+    crossArtifactValidations: readonly CrossArtifactValidationRule[] = [],
     extendsRef?: string,
   ) {
     this._kind = kind
@@ -52,6 +56,7 @@ export class Schema {
     this._artifacts = artifacts
     this._artifactIndex = new Map(artifacts.map((a) => [a.id, a]))
     this._metadataExtraction = metadataExtraction
+    this._crossArtifactValidations = crossArtifactValidations
     this._workflow = workflow
     this._workflowIndex = new Map(workflow.map((s) => [s.step, s]))
   }
@@ -101,6 +106,15 @@ export class Schema {
    */
   metadataExtraction(): MetadataExtraction | undefined {
     return this._metadataExtraction
+  }
+
+  /**
+   * All declared cross-artifact structural validation rules.
+   *
+   * @returns Cross-artifact rules in declaration order
+   */
+  crossArtifactValidations(): readonly CrossArtifactValidationRule[] {
+    return this._crossArtifactValidations
   }
 
   /**

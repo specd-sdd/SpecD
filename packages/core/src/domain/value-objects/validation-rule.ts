@@ -1,4 +1,5 @@
 import { type Selector } from './selector.js'
+import { type ValidationCount } from './cross-artifact-validation.js'
 
 /** A structural validation constraint applied to an artifact's content. */
 export interface ValidationRule {
@@ -10,6 +11,8 @@ export interface ValidationRule {
   readonly path?: string
   /** Whether the matched node must exist. Defaults to `true` when omitted. */
   readonly required?: boolean
+  /** Cardinality checks applied to the selected node set. */
+  readonly count?: ValidationCount
   /** Regex pattern the rendered node content must match. */
   readonly contentMatches?: string
   /** Nested rules evaluated against the matched node's children. */

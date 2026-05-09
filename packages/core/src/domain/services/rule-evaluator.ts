@@ -1,4 +1,5 @@
 import { type ValidationRule } from '../value-objects/validation-rule.js'
+import { type ValidationCount } from '../value-objects/cross-artifact-validation.js'
 import { safeRegex } from './safe-regex.js'
 import {
   type SelectorNode,
@@ -242,6 +243,11 @@ function evaluateRule(
     }
     return
   }
+
+  if (rule.count !== undefined) {
+    evaluateCount(rule.count, nodes, artifactId, parser, failures)
+  }
+
   for (const node of nodes) {
     if (rule.contentMatches !== undefined) {
       const re = safeRegex(rule.contentMatches)
@@ -266,4 +272,150 @@ function evaluateRule(
       }
     }
   }
+}
+
+/**
+ * Evaluates total and unique cardinality constraints for one selected node set.
+ *
+ * @param count - Count constraints from the validation rule
+ * @param nodes - Selected nodes for this rule
+ * @param artifactId - Artifact identifier for failure attribution
+ * @param parser - Parser used for `unique.by.from: content`
+ * @param failures - Mutable failure collection
+ */
+function evaluateCount(
+  count: ValidationCount,
+  nodes: readonly SelectorNode[],
+  artifactId: string,
+  parser: RuleEvaluatorParser,
+  failures: RuleEvaluationFailure[],
+): void {
+  const { exactly, min, max } = count
+  const size = nodes.length
+  if (exactly !== undefined && size !== exactly) {
+    failures.push({
+      artifactId,
+      description: `Selected node count ${size} does not match exactly ${exactly}`,
+    })
+  }
+  if (min !== undefined && size < min) {
+    failures.push({
+      artifactId,
+      description: `Selected node count ${size} is below min ${min}`,
+    })
+  }
+  if (max !== undefined && size > max) {
+    failures.push({
+      artifactId,
+      description: `Selected node count ${size} is above max ${max}`,
+    })
+  }
+
+  if (count.unique === undefined) return
+  const normalized = nodes.map((node) =>
+    normalizeCountKey(readCountKey(node, count, parser), count),
+  )
+  const uniqueSize = new Set(normalized).size
+  if (uniqueSize !== normalized.length) {
+    const dups = findDuplicateKeys(normalized)
+    failures.push({
+      artifactId,
+      description: `Duplicate keys found (${uniqueSize} unique of ${normalized.length} total): ${formatKeyPreview(dups)}`,
+    })
+  }
+
+  const { exactlyUnique, minUnique, maxUnique } = count.unique
+  if (exactlyUnique !== undefined && uniqueSize !== exactlyUnique) {
+    failures.push({
+      artifactId,
+      description: `Selected unique key count ${uniqueSize} does not match exactlyUnique ${exactlyUnique}`,
+    })
+  }
+  if (minUnique !== undefined && uniqueSize < minUnique) {
+    failures.push({
+      artifactId,
+      description: `Selected unique key count ${uniqueSize} is below minUnique ${minUnique}`,
+    })
+  }
+  if (maxUnique !== undefined && uniqueSize > maxUnique) {
+    failures.push({
+      artifactId,
+      description: `Selected unique key count ${uniqueSize} is above maxUnique ${maxUnique}`,
+    })
+  }
+}
+
+/**
+ * Reads the raw unique key for one selected node according to `count.unique.by`.
+ *
+ * @param node - Selected node
+ * @param count - Count block with unique key extraction settings
+ * @param parser - Parser for content-based extraction
+ * @returns Raw key value before capture/strip normalization
+ */
+function readCountKey(
+  node: SelectorNode,
+  count: ValidationCount,
+  parser: RuleEvaluatorParser,
+): string {
+  const by = count.unique?.by
+  if (by === undefined || by.from === 'label') return node.label ?? ''
+  if (by.from === 'value') return node.value === undefined ? '' : String(node.value)
+  return parser.renderSubtree(node)
+}
+
+/**
+ * Applies optional capture/strip normalization to one raw unique key.
+ *
+ * @param raw - Raw key value
+ * @param count - Count block with unique key extraction settings
+ * @returns Normalized key
+ */
+function normalizeCountKey(raw: string, count: ValidationCount): string {
+  const by = count.unique?.by
+  if (by === undefined) return raw
+  let result = raw
+  if (by.capture !== undefined) {
+    const re = safeRegex(by.capture)
+    if (re !== null) {
+      const match = re.exec(result)
+      if (match?.[1] !== undefined) result = match[1]
+    }
+  }
+  if (by.strip !== undefined) {
+    const re = safeRegex(by.strip)
+    if (re !== null) result = result.replace(re, '')
+  }
+  return result
+}
+
+/**
+ * Returns the keys that appear more than once in the input array.
+ *
+ * @param keys - Normalized keys to check for duplicates
+ * @returns Keys that appear two or more times
+ */
+function findDuplicateKeys(keys: readonly string[]): string[] {
+  const seen = new Map<string, number>()
+  for (const key of keys) {
+    seen.set(key, (seen.get(key) ?? 0) + 1)
+  }
+  return [...seen.entries()].filter(([, c]) => c > 1).map(([k]) => k)
+}
+
+/**
+ * Formats a list of keys for inclusion in a validation failure description.
+ * Truncates after `max` entries with an "and N more" suffix.
+ *
+ * @param keys - Keys to format
+ * @param max - Maximum number of keys to show before truncating
+ * @returns A human-readable key preview string
+ */
+function formatKeyPreview(keys: readonly string[], max = 10): string {
+  const shown = keys
+    .slice(0, max)
+    .map((k) => `'${k}'`)
+    .join(', ')
+  if (keys.length <= max) return shown
+  return `${shown} and ${keys.length - max} more`
 }

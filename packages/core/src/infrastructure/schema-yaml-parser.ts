@@ -14,6 +14,25 @@ export interface ValidationRuleRaw {
   selector?: SelectorRaw | undefined
   path?: string | undefined
   required?: boolean | undefined
+  count?:
+    | {
+        exactly?: number | undefined
+        min?: number | undefined
+        max?: number | undefined
+        unique?:
+          | {
+              by: {
+                from: 'label' | 'value' | 'content'
+                capture?: string | undefined
+                strip?: string | undefined
+              }
+              minUnique?: number | undefined
+              maxUnique?: number | undefined
+              exactlyUnique?: number | undefined
+            }
+          | undefined
+      }
+    | undefined
   contentMatches?: string | undefined
   children?: ValidationRuleRaw[] | undefined
   type?: string | undefined
@@ -24,9 +43,47 @@ export interface ValidationRuleRaw {
   where?: Record<string, string> | undefined
 }
 
+/** Zod-inferred intermediate shape for a cross-artifact rule participant. */
+export interface CrossArtifactParticipantRaw {
+  artifact: string
+  as: string
+  selector: SelectorRaw
+  keySelector?: SelectorRaw | undefined
+  key: {
+    from: 'label' | 'value' | 'content'
+    capture?: string | undefined
+    strip?: string | undefined
+  }
+}
+
+/** Zod-inferred intermediate shape for a cross-artifact rule relation. */
+export interface CrossArtifactRelationRaw {
+  kind: 'all-equal' | 'subset' | 'superset'
+  between: readonly string[]
+  options?:
+    | {
+        ordering?: 'ignore' | 'strict' | undefined
+      }
+    | undefined
+}
+
+/** Zod-inferred intermediate shape for a cross-artifact schema rule. */
+export interface CrossArtifactValidationRuleRaw {
+  id: string
+  scope: 'spec' | 'change'
+  participants: readonly CrossArtifactParticipantRaw[]
+  relation: CrossArtifactRelationRaw
+}
+
 // ---------------------------------------------------------------------------
 // Zod schemas for schema.yaml validation
 // ---------------------------------------------------------------------------
+
+const ValidationUniqueByZodSchema = z.object({
+  from: z.enum(['label', 'value', 'content']),
+  capture: z.string().optional(),
+  strip: z.string().optional(),
+})
 
 const ValidationRuleZodSchema: z.ZodType<ValidationRuleRaw> = z.lazy(() =>
   z.object({
@@ -34,6 +91,21 @@ const ValidationRuleZodSchema: z.ZodType<ValidationRuleRaw> = z.lazy(() =>
     selector: SelectorZodSchema.optional(),
     path: z.string().optional(),
     required: z.boolean().optional(),
+    count: z
+      .object({
+        exactly: z.number().int().nonnegative().optional(),
+        min: z.number().int().nonnegative().optional(),
+        max: z.number().int().nonnegative().optional(),
+        unique: z
+          .object({
+            by: ValidationUniqueByZodSchema,
+            minUnique: z.number().int().nonnegative().optional(),
+            maxUnique: z.number().int().nonnegative().optional(),
+            exactlyUnique: z.number().int().nonnegative().optional(),
+          })
+          .optional(),
+      })
+      .optional(),
     contentMatches: z.string().optional(),
     children: z.array(ValidationRuleZodSchema).optional(),
     type: z.string().optional(),
@@ -44,6 +116,37 @@ const ValidationRuleZodSchema: z.ZodType<ValidationRuleRaw> = z.lazy(() =>
     where: z.record(z.string()).optional(),
   }),
 )
+
+const CrossArtifactKeySpecZodSchema = z.object({
+  from: z.enum(['label', 'value', 'content']),
+  capture: z.string().optional(),
+  strip: z.string().optional(),
+})
+
+const CrossArtifactParticipantZodSchema: z.ZodType<CrossArtifactParticipantRaw> = z.object({
+  artifact: z.string(),
+  as: z.string(),
+  selector: SelectorZodSchema,
+  keySelector: SelectorZodSchema.optional(),
+  key: CrossArtifactKeySpecZodSchema,
+})
+
+const CrossArtifactRelationZodSchema: z.ZodType<CrossArtifactRelationRaw> = z.object({
+  kind: z.enum(['all-equal', 'subset', 'superset']),
+  between: z.array(z.string()),
+  options: z
+    .object({
+      ordering: z.enum(['ignore', 'strict']).optional(),
+    })
+    .optional(),
+})
+
+const CrossArtifactValidationRuleZodSchema: z.ZodType<CrossArtifactValidationRuleRaw> = z.object({
+  id: z.string(),
+  scope: z.enum(['spec', 'change']),
+  participants: z.array(CrossArtifactParticipantZodSchema),
+  relation: CrossArtifactRelationZodSchema,
+})
 
 const ExtractorTransformDeclarationZodSchema = z.union([
   z
@@ -213,6 +316,7 @@ const SchemaYamlZodSchema = z
     description: z.string().optional(),
     extends: z.string().optional(),
     artifacts: z.array(ArtifactZodSchema).optional(),
+    crossArtifactValidations: z.array(CrossArtifactValidationRuleZodSchema).optional(),
     metadataExtraction: MetadataExtractionZodSchema.optional(),
     workflow: z.array(WorkflowStepZodSchema).optional(),
     operations: OperationsZodSchema.optional(),
@@ -282,6 +386,7 @@ export interface SchemaYamlData {
   readonly description?: string | undefined
   readonly extends?: string | undefined
   readonly artifacts?: readonly ArtifactYaml[] | undefined
+  readonly crossArtifactValidations?: readonly CrossArtifactValidationRuleRaw[] | undefined
   readonly workflow?: readonly WorkflowStepRaw[] | undefined
   readonly metadataExtraction?: MetadataExtractionRaw | undefined
   readonly operations?: OperationsRaw | undefined

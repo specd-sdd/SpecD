@@ -3,13 +3,16 @@ import { type SpecRepository } from '../ports/spec-repository.js'
 import { type SchemaProvider } from '../ports/schema-provider.js'
 import { type ArtifactParserRegistry } from '../ports/artifact-parser.js'
 import { type ArtifactType } from '../../domain/value-objects/artifact-type.js'
+import { type CrossArtifactValidationRule } from '../../domain/value-objects/cross-artifact-validation.js'
 import { type ValidationFailure, type ValidationWarning } from './validate-artifacts.js'
 import { WorkspaceNotFoundError } from '../errors/workspace-not-found-error.js'
 import { SpecNotFoundError } from '../errors/spec-not-found-error.js'
 import { SpecPath } from '../../domain/value-objects/spec-path.js'
 import { parseSpecId } from '../../domain/services/parse-spec-id.js'
 import { evaluateRules } from '../../domain/services/rule-evaluator.js'
+import { evaluateCrossArtifactRule } from '../../domain/services/cross-artifact-rule-evaluator.js'
 import { inferFormat } from '../../domain/services/format-inference.js'
+import { type ReadyArtifactParticipant } from './_shared/cross-artifact-participant-state.js'
 
 /** Input for the {@link ValidateSpecs} use case. */
 export interface ValidateSpecsInput {
@@ -81,6 +84,7 @@ export class ValidateSpecs {
    */
   async execute(input: ValidateSpecsInput): Promise<ValidateSpecsResult> {
     const schema = await this._schemaProvider.get()
+    const crossRules = schema.crossArtifactValidations().filter((rule) => rule.scope === 'spec')
 
     const specArtifactTypes = schema.artifacts().filter((a) => a.scope === 'spec')
     const entries: SpecValidationEntry[] = []
@@ -102,6 +106,7 @@ export class ValidateSpecs {
         capabilityPath,
         spec.filenames,
         specArtifactTypes,
+        crossRules,
       )
       entries.push(entry)
     } else if (input.workspace !== undefined) {
@@ -117,6 +122,7 @@ export class ValidateSpecs {
           spec.name.toFsPath('/'),
           spec.filenames,
           specArtifactTypes,
+          crossRules,
         )
         entries.push(entry)
       }
@@ -130,6 +136,7 @@ export class ValidateSpecs {
             spec.name.toFsPath('/'),
             spec.filenames,
             specArtifactTypes,
+            crossRules,
           )
           entries.push(entry)
         }
@@ -153,6 +160,7 @@ export class ValidateSpecs {
    * @param capabilityPath - Capability path within the workspace
    * @param filenames - Filenames present in the spec directory
    * @param specArtifactTypes - Spec-scoped artifact types from the active schema
+   * @param crossRules - Cross-artifact validation rules scoped to spec artifacts
    * @returns Validation entry with failures and warnings
    */
   private async _validateSpec(
@@ -161,12 +169,14 @@ export class ValidateSpecs {
     capabilityPath: string,
     filenames: readonly string[],
     specArtifactTypes: readonly ArtifactType[],
+    crossRules: readonly CrossArtifactValidationRule[],
   ): Promise<SpecValidationEntry> {
     const label = `${workspace}:${capabilityPath}`
     const failures: ValidationFailure[] = []
     const warnings: ValidationWarning[] = []
     const specPath = SpecPath.parse(capabilityPath)
     const spec = await specRepo.get(specPath)
+    const readyParticipants = new Map<string, ReadyArtifactParticipant>()
 
     for (const artifactType of specArtifactTypes) {
       const filename = path.basename(artifactType.output)
@@ -181,8 +191,6 @@ export class ValidateSpecs {
         }
         continue
       }
-
-      if (artifactType.validations.length === 0) continue
       if (spec === null) continue
 
       const artifact = await specRepo.artifact(spec, filename)
@@ -191,11 +199,63 @@ export class ValidateSpecs {
       const format = artifactType.format ?? inferFormat(filename)
       const parser = format !== undefined ? this._parsers.get(format) : undefined
       if (parser === undefined) continue
+      const hasCrossRuleForArtifact = crossRules.some((rule) =>
+        rule.participants.some((participant) => participant.artifact === artifactType.id),
+      )
+      if (artifactType.validations.length === 0 && !hasCrossRuleForArtifact) continue
 
       const ast = parser.parse(artifact.content)
-      const result = evaluateRules(artifactType.validations, ast.root, artifactType.id, parser)
-      failures.push(...result.failures)
-      warnings.push(...result.warnings)
+      let artifactFailed = false
+      if (artifactType.validations.length > 0) {
+        const result = evaluateRules(artifactType.validations, ast.root, artifactType.id, parser)
+        failures.push(...result.failures)
+        warnings.push(...result.warnings)
+        artifactFailed = result.failures.length > 0
+      }
+      if (!artifactFailed) {
+        readyParticipants.set(artifactType.id, {
+          artifactId: artifactType.id,
+          key: label,
+          scope: artifactType.scope,
+          root: ast.root,
+          parser,
+          filename,
+        })
+      }
+    }
+
+    for (const rule of crossRules) {
+      const participantInputs = new Map()
+      let deferred = false
+      for (const participant of rule.participants) {
+        const ready = readyParticipants.get(participant.artifact)
+        if (ready === undefined) {
+          deferred = true
+          break
+        }
+        participantInputs.set(participant.as, {
+          artifactId: ready.artifactId,
+          root: ready.root,
+          parser: ready.parser,
+        })
+      }
+      if (deferred) {
+        warnings.push({
+          artifactId: rule.participants[0]?.artifact ?? 'unknown',
+          description: `Deferred cross-artifact rule '${rule.id}': participants not ready`,
+        })
+        continue
+      }
+      const result = evaluateCrossArtifactRule({
+        rule,
+        participants: participantInputs,
+      })
+      failures.push(
+        ...result.failures.map((f) => ({ artifactId: f.artifactId, description: f.description })),
+      )
+      warnings.push(
+        ...result.warnings.map((w) => ({ artifactId: w.artifactId, description: w.description })),
+      )
     }
 
     return {

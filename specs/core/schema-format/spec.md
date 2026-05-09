@@ -16,6 +16,7 @@ A schema file must be a valid YAML document with the following top-level fields:
 - `description` (string, optional) — human-readable summary
 - `extends` (string, optional) — reference to a parent schema; see Requirement: Schema extends
 - `artifacts` (array, required for `kind: schema`) — one entry per artifact type
+- `crossArtifactValidations` (array, optional, only valid for `kind: schema`) — relational structural rules evaluated across multiple artifacts of the same spec and scope; see Requirement: Cross-artifact validation rules
 - `workflow` (array, optional, only valid for `kind: schema`) — named phases of the change lifecycle, each with optional artifact prerequisites and hooks; see Requirement: Workflow
 
 ### Requirement: Schema kind field
@@ -46,6 +47,7 @@ Every entry in the following schema arrays must carry an `id` field:
 - `artifacts[].deltaValidations[]`
 - `artifacts[].rules.pre[]` and `artifacts[].rules.post[]`
 - `artifacts[].preHashCleanup[]`
+- `crossArtifactValidations[]`
 - `metadataExtraction` array entries (entries in `rules[]`, `constraints[]`, `scenarios[]`, `context[]`)
 
 Format: `^[a-z][a-z0-9]*(-[a-z0-9]+)*$`, 1–64 characters.
@@ -56,7 +58,7 @@ Format: `^[a-z][a-z0-9]*(-[a-z0-9]+)*$`, 1–64 characters.
 
 Duplicate IDs within the same array (or for hooks, duplicate IDs across any workflow step) produce a `SchemaValidationError`.
 
-Workflow steps use `step` as their identity field instead of `id`. Artifact entries use their existing `id` field.
+Workflow steps use `step` as their identity field instead of `id`. Artifact entries use their existing `id` field. Cross-artifact participant aliases use `as` as their local identity within one rule and are governed by Requirement: Cross-artifact validation rules rather than by this array-entry rule.
 
 Single-entry metadata fields (`title`, `description`, `dependsOn`, `keywords`) do not have `id` — they are scalars, not array entries.
 
@@ -122,11 +124,17 @@ A validation rule is an object with:
 
 **Additional fields** — compatible with both identification styles:
 
-- `required` (boolean, optional, default `true`) — whether absence of a matching node is an error (`true`) or a warning (`false`)
+- `required` (boolean, optional, default `true`) — controls only the zero-match case. When a rule selects zero nodes, `required: true` records a failure and `required: false` records a warning.
+- `count` (object, optional) — cardinality constraint over the nodes selected by this rule.
+  - Total-match fields: `exactly`, `min`, `max` (`exactly` is mutually exclusive with `min`/`max`)
+  - Unique-key fields: `unique.by`, optional `minUnique`, `maxUnique`, `exactlyUnique` (`exactlyUnique` is mutually exclusive with `minUnique`/`maxUnique`)
+  - `unique.by` defines how a key is derived from each selected node (`from: label|value|content` plus optional `capture`/`strip` normalization).
+  - When `unique.by` is present, duplicate derived keys are not allowed.
+  - When `count` is omitted, any non-zero number of matches satisfies the rule once the zero-match handling has been applied.
 - `contentMatches` (string, optional) — a regex matched case-insensitively against the serialized text of the matched node's subtree; `ArtifactParser` serializes the subtree to its native format before matching; useful for asserting that a node's full rendered content contains expected text regardless of its internal AST structure
-- `children` (array, optional) — sub-rules evaluated with each matched node as root; each entry is a full validation rule
+- `children` (array, optional) — sub-rules evaluated with each matched node as root; each entry is a full validation rule and MAY declare its own `count`
 
-A rule passes vacuously when it matches zero nodes — no error or warning is produced.
+`required` is not a general cardinality feature. Uniqueness and minimum/maximum match counts MUST be expressed through `count`.
 
 ```yaml
 validations:
@@ -134,6 +142,8 @@ validations:
   - type: section
     matches: '^Requirements$'
     required: true
+    count:
+      exactly: 1
     children:
       - type: section
         matches: '^Requirement:'
@@ -141,7 +151,20 @@ validations:
         children:
           - type: section
             matches: '^Scenario:'
-            required: true
+            count:
+              min: 1
+              max: 3
+
+  # unique.by: duplicate Requirement headings are rejected
+  - type: section
+    matches: '^Requirement:'
+    count:
+      min: 1
+      unique:
+        by:
+          from: label
+          strip: '^Requirement:\s*'
+        minUnique: 1
 
   # contentMatches: assert the section body contains normative language
   - type: section
@@ -151,7 +174,8 @@ validations:
 
   # path: JSONPath for queries that need more expressive power
   - path: '$..children[?(@.type=="section" && @.level==2)]'
-    required: true
+    count:
+      min: 1
 ```
 
 ### Requirement: Delta validation rules
@@ -160,9 +184,9 @@ validations:
 
 The delta file is a YAML sequence of operation entries. When parsed by the YAML adapter, each entry becomes a `sequence-item` containing a `mapping` with `pair` nodes for `op`, `selector`, `content`, `position`, etc. The `where` field on `sequence-item` rules is particularly useful here for correlated checks — asserting that the same entry satisfies multiple field conditions simultaneously.
 
-Each rule uses the same structure as `validations` rules: selector fields or `path` for node identification, plus `required`, `contentMatches`, and `children`.
+Each rule uses the same structure as `validations` rules: selector fields or `path` for node identification, plus `required`, `count`, `contentMatches`, and `children`.
 
-A rule passes vacuously when it matches zero nodes.
+`required` still controls only the zero-match case. Any non-zero cardinality requirement beyond that MUST be expressed through `count`, including uniqueness constraints expressed through `count.unique`.
 
 ```yaml
 deltaValidations:
@@ -173,13 +197,100 @@ deltaValidations:
     where:
       op: 'added|modified'
     contentMatches: '#### Scenario:'
-    required: true
+    count:
+      min: 1
 
   # Warning if nothing is being removed (may indicate a delta that only adds)
   - type: sequence-item
     where:
       op: 'removed'
     required: false
+```
+
+### Requirement: Cross-artifact validation rules
+
+`crossArtifactValidations` is an optional top-level schema field that defines relational structural rules across multiple artifacts. These rules are evaluated only between artifacts of the same spec and the same scope.
+
+Each entry in `crossArtifactValidations` MUST include:
+
+- `id` (string, required) — unique within the `crossArtifactValidations` array
+- `scope` (`spec` | `change`, required) — the artifact scope the rule applies to
+- `participants` (array, required) — the artifact-derived key sets compared by the relation
+- `relation` (object, required) — defines how the participant key collections are compared
+
+Each participant MUST include:
+
+- `artifact` (string, required) — artifact ID from `artifacts[]`
+- `as` (string, required) — local alias used by `relation.between`; must be unique within the rule's `participants[]`
+- `selector` (selector, required) — selects the node set or root scope for this participant
+- `keySelector` (selector, optional) — when present, runs relative to each node matched by `selector` and selects the node set that actually produces keys
+- `key` (object, required) — extracts comparable values from either `keySelector` matches (when `keySelector` is present) or directly from `selector` matches
+
+Every participant's referenced artifact MUST exist in `artifacts[]`, and every referenced artifact MUST have the same `scope` as the enclosing cross-artifact rule. Mixed-scope relations are invalid.
+
+`key` MUST include:
+
+- `from` (`label` | `value` | `content`, required) — source value used to derive each key
+
+`key` MAY also include:
+
+- `capture` (string, optional) — regex whose first capture group becomes the key
+- `strip` (string, optional) — regex removed from the extracted value before comparison
+
+`relation` MUST include:
+
+- `kind` (`all-equal` | `subset` | `superset`, required)
+- `between` (array of participant aliases, required)
+- `options` (object, optional) — operator-specific options
+
+Every alias named in `relation.between` MUST match a participant `as` value from the same rule.
+
+Supported `relation.options` for v1:
+
+- `ordering` (`ignore` | `strict`, optional, default `ignore`)
+
+Relation semantics:
+
+- `all-equal` compares every alias in `between` and requires them to expose the same keys. With `ordering: ignore`, comparison is set-based and ignores write order. With `ordering: strict`, comparison is sequence-based and requires the same key order.
+- `subset` is directional. `between: [A, B]` means every key selected for `A` MUST appear in `B`. With `ordering: strict`, `A` MUST appear as an order-preserving subsequence of `B`.
+- `superset` is directional. `between: [A, B]` means every key selected for `B` MUST appear in `A`. With `ordering: strict`, `B` MUST appear as an order-preserving subsequence of `A`.
+
+Cross-artifact relations operate on derived key collections, not on raw AST nodes. Duplicate prevention remains an artifact-local concern handled by `validations[].count.unique`.
+
+```yaml
+crossArtifactValidations:
+  - id: mirrored-requirements
+    scope: spec
+    participants:
+      - artifact: specs
+        as: specRequirements
+        selector:
+          type: section
+          matches: '^Requirements$'
+        keySelector:
+          type: section
+          matches: '^Requirement:'
+        key:
+          from: label
+          capture: '\\[([^\\]]+)\\]$'
+      - artifact: verify
+        as: verifyRequirements
+        selector:
+          type: section
+          matches: '^Requirements$'
+        keySelector:
+          type: section
+          matches: '^Requirement:'
+        key:
+          from: label
+          capture: '\\[([^\\]]+)\\]$'
+    relation:
+      kind: all-equal
+      between:
+        - specRequirements
+        - verifyRequirements
+      options:
+        ordering: ignore
 ```
 
 ### Requirement: Per-spec approval

@@ -11,6 +11,7 @@ import {
 } from '../../../src/domain/value-objects/artifact-type.js'
 import { Schema } from '../../../src/domain/value-objects/schema.js'
 import { type MetadataExtraction } from '../../../src/domain/value-objects/metadata-extraction.js'
+import { type CrossArtifactValidationRule } from '../../../src/domain/value-objects/cross-artifact-validation.js'
 import { type WorkflowStep } from '../../../src/domain/value-objects/workflow-step.js'
 import { ChangeRepository } from '../../../src/application/ports/change-repository.js'
 import {
@@ -587,6 +588,7 @@ export function makeSchema(
         workflow?: WorkflowStep[]
         name?: string
         metadataExtraction?: MetadataExtraction
+        crossArtifactValidations?: readonly CrossArtifactValidationRule[]
       }
     | ArtifactType[] = {},
   workflow: WorkflowStep[] = [],
@@ -601,6 +603,7 @@ export function makeSchema(
     optsOrArtifacts.artifacts ?? [],
     optsOrArtifacts.workflow ?? [],
     optsOrArtifacts.metadataExtraction,
+    optsOrArtifacts.crossArtifactValidations ?? [],
   )
 }
 

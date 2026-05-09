@@ -296,7 +296,9 @@ describe('ValidateArtifacts', () => {
         result.failures.some((f) => f.artifactId === 'specs' && f.description.includes('blocked')),
       ).toBe(true)
       expect(
-        result.failures.some((f) => f.artifactId === 'specs' && f.description.includes('status: in-progress')),
+        result.failures.some(
+          (f) => f.artifactId === 'specs' && f.description.includes('status: in-progress'),
+        ),
       ).toBe(true)
     })
 
@@ -1700,7 +1702,9 @@ describe('ValidateArtifacts', () => {
         result.failures.some((f) => f.artifactId === 'specs' && f.description.includes('blocked')),
       ).toBe(true)
       expect(
-        result.failures.some((f) => f.artifactId === 'specs' && f.description.includes('status: missing')),
+        result.failures.some(
+          (f) => f.artifactId === 'specs' && f.description.includes('status: missing'),
+        ),
       ).toBe(true)
     })
 
@@ -1714,7 +1718,11 @@ describe('ValidateArtifacts', () => {
         files: new Map([
           [
             'proposal',
-            new ArtifactFile({ key: 'proposal', filename: 'proposal.md', status: 'pending-review' }),
+            new ArtifactFile({
+              key: 'proposal',
+              filename: 'proposal.md',
+              status: 'pending-review',
+            }),
           ],
         ]),
       })
@@ -1722,7 +1730,10 @@ describe('ValidateArtifacts', () => {
         type: 'verify',
         requires: ['specs'],
         files: new Map([
-          ['verify', new ArtifactFile({ key: 'verify', filename: 'verify.md', status: 'in-progress' })],
+          [
+            'verify',
+            new ArtifactFile({ key: 'verify', filename: 'verify.md', status: 'in-progress' }),
+          ],
         ]),
       })
       const change = makeChangeWithArtifacts('c', [proposalArtifact, verifyArtifact])
@@ -1775,7 +1786,10 @@ describe('ValidateArtifacts', () => {
         type: 'verify',
         requires: ['specs'],
         files: new Map([
-          ['verify', new ArtifactFile({ key: 'verify', filename: 'verify.md', status: 'in-progress' })],
+          [
+            'verify',
+            new ArtifactFile({ key: 'verify', filename: 'verify.md', status: 'in-progress' }),
+          ],
         ]),
       })
       const change = makeChangeWithArtifacts('c', [proposalArtifact, verifyArtifact])
@@ -2339,6 +2353,281 @@ describe('ValidateArtifacts', () => {
         ]),
       )
       expect(repo.store.get('c')?.specDependsOn.get('default:auth/login')).toBeUndefined()
+    })
+  })
+
+  describe('Cross-artifact structural validation', () => {
+    it('runs cross-artifact rule when all participants are locally ready in the same invocation', async () => {
+      const specsType = makeArtifactType('specs', { scope: 'spec', output: 'spec.md' })
+      const verifyType = makeArtifactType('verify', { scope: 'spec', output: 'verify.md' })
+      const schema = makeSchema({
+        artifacts: [specsType, verifyType],
+        crossArtifactValidations: [
+          {
+            id: 'mirrored-requirements',
+            scope: 'spec',
+            participants: [
+              {
+                artifact: 'specs',
+                as: 'specRequirements',
+                selector: { type: 'section', matches: '^Requirement:' },
+                key: { from: 'label', strip: '^Requirement:\\s*' },
+              },
+              {
+                artifact: 'verify',
+                as: 'verifyRequirements',
+                selector: { type: 'section', matches: '^Requirement:' },
+                key: { from: 'label', strip: '^Requirement:\\s*' },
+              },
+            ],
+            relation: {
+              kind: 'all-equal',
+              between: ['specRequirements', 'verifyRequirements'],
+              options: { ordering: 'ignore' },
+            },
+          },
+        ],
+      })
+
+      const key = 'default:auth'
+      const specsFilename = 'specs/default/auth/spec.md'
+      const verifyFilename = 'specs/default/auth/verify.md'
+      const specsArtifact = new ChangeArtifact({
+        type: 'specs',
+        files: new Map([
+          [key, new ArtifactFile({ key, filename: specsFilename, status: 'in-progress' })],
+        ]),
+      })
+      const verifyArtifact = new ChangeArtifact({
+        type: 'verify',
+        files: new Map([
+          [key, new ArtifactFile({ key, filename: verifyFilename, status: 'in-progress' })],
+        ]),
+      })
+      const change = makeChangeWithArtifacts('c', [specsArtifact, verifyArtifact], {
+        specIds: [key],
+      })
+      const repo = makeChangeRepository([change])
+      const files = new Map<string, string>([
+        [specsFilename, 'Requirement: A\nRequirement: B'],
+        [verifyFilename, 'Requirement: B\nRequirement: A'],
+      ])
+      Object.assign(repo, {
+        async artifact(_change: Change, filename: string): Promise<SpecArtifact | null> {
+          const c = files.get(filename)
+          return c !== undefined ? new SpecArtifact(filename, c) : null
+        },
+      })
+
+      const parser = makeParser({
+        parse(content: string): ArtifactAST {
+          const children = content
+            .split('\n')
+            .map((line) => line.trim())
+            .filter((line) => line.startsWith('Requirement:'))
+            .map((line) => ({ type: 'section', label: line }) satisfies ArtifactNode)
+          return { root: { type: 'document', children } }
+        },
+      })
+
+      const uc = new ValidateArtifacts(
+        repo,
+        new Map([['default', makeSpecRepository()]]),
+        makeSchemaProvider(schema),
+        makeParsers(parser, makeParser()),
+        makeActorResolver(),
+        makeContentHasher(),
+      )
+
+      const result = await uc.execute({
+        name: 'c',
+        specPath: key,
+      })
+
+      expect(
+        result.failures.some((failure) => failure.description.includes('Cross-artifact rule')),
+      ).toBe(false)
+      expect(
+        result.warnings.some((warning) => warning.description.includes('Deferred cross-artifact')),
+      ).toBe(false)
+    })
+
+    it('adds deferred warning when at least one cross-artifact participant is not ready', async () => {
+      const specsType = makeArtifactType('specs', { scope: 'spec', output: 'spec.md' })
+      const verifyType = makeArtifactType('verify', { scope: 'spec', output: 'verify.md' })
+      const schema = makeSchema({
+        artifacts: [specsType, verifyType],
+        crossArtifactValidations: [
+          {
+            id: 'mirrored-requirements',
+            scope: 'spec',
+            participants: [
+              {
+                artifact: 'specs',
+                as: 'specRequirements',
+                selector: { type: 'section', matches: '^Requirement:' },
+                key: { from: 'label' },
+              },
+              {
+                artifact: 'verify',
+                as: 'verifyRequirements',
+                selector: { type: 'section', matches: '^Requirement:' },
+                key: { from: 'label' },
+              },
+            ],
+            relation: {
+              kind: 'all-equal',
+              between: ['specRequirements', 'verifyRequirements'],
+            },
+          },
+        ],
+      })
+
+      const key = 'default:auth'
+      const verifyFilename = 'specs/default/auth/verify.md'
+      const verifyArtifact = new ChangeArtifact({
+        type: 'verify',
+        files: new Map([
+          [key, new ArtifactFile({ key, filename: verifyFilename, status: 'in-progress' })],
+        ]),
+      })
+      const change = makeChangeWithArtifacts('c', [verifyArtifact], { specIds: [key] })
+      const repo = makeChangeRepository([change])
+      Object.assign(repo, {
+        async artifact(_change: Change, filename: string): Promise<SpecArtifact | null> {
+          return filename === verifyFilename ? new SpecArtifact(filename, 'Requirement: A') : null
+        },
+      })
+
+      const uc = new ValidateArtifacts(
+        repo,
+        new Map([['default', makeSpecRepository()]]),
+        makeSchemaProvider(schema),
+        makeParsers(
+          makeParser({
+            parse(content: string): ArtifactAST {
+              return {
+                root: {
+                  type: 'document',
+                  children: [{ type: 'section', label: content }],
+                },
+              }
+            },
+          }),
+          makeParser(),
+        ),
+        makeActorResolver(),
+        makeContentHasher(),
+      )
+
+      const result = await uc.execute({
+        name: 'c',
+        specPath: key,
+        artifactId: 'verify',
+      })
+
+      expect(
+        result.warnings.some((warning) =>
+          warning.description.includes("Deferred cross-artifact rule 'mirrored-requirements'"),
+        ),
+      ).toBe(true)
+    })
+
+    it('records failure when cross-artifact rule finds mismatch', async () => {
+      const specsType = makeArtifactType('specs', { scope: 'spec', output: 'spec.md' })
+      const verifyType = makeArtifactType('verify', { scope: 'spec', output: 'verify.md' })
+      const schema = makeSchema({
+        artifacts: [specsType, verifyType],
+        crossArtifactValidations: [
+          {
+            id: 'mirrored-requirements',
+            scope: 'spec',
+            participants: [
+              {
+                artifact: 'specs',
+                as: 'specRequirements',
+                selector: { type: 'section', matches: '^Requirement:' },
+                key: { from: 'label', strip: '^Requirement:\\s*' },
+              },
+              {
+                artifact: 'verify',
+                as: 'verifyRequirements',
+                selector: { type: 'section', matches: '^Requirement:' },
+                key: { from: 'label', strip: '^Requirement:\\s*' },
+              },
+            ],
+            relation: {
+              kind: 'all-equal',
+              between: ['specRequirements', 'verifyRequirements'],
+              options: { ordering: 'ignore' },
+            },
+          },
+        ],
+      })
+
+      const key = 'default:auth'
+      const specsFilename = 'specs/default/auth/spec.md'
+      const verifyFilename = 'specs/default/auth/verify.md'
+      const specsArtifact = new ChangeArtifact({
+        type: 'specs',
+        files: new Map([
+          [key, new ArtifactFile({ key, filename: specsFilename, status: 'in-progress' })],
+        ]),
+      })
+      const verifyArtifact = new ChangeArtifact({
+        type: 'verify',
+        files: new Map([
+          [key, new ArtifactFile({ key, filename: verifyFilename, status: 'in-progress' })],
+        ]),
+      })
+      const change = makeChangeWithArtifacts('c', [specsArtifact, verifyArtifact], {
+        specIds: [key],
+      })
+      const repo = makeChangeRepository([change])
+      const files = new Map<string, string>([
+        [specsFilename, 'Requirement: A\nRequirement: B'],
+        [verifyFilename, 'Requirement: B\nRequirement: C'],
+      ])
+      Object.assign(repo, {
+        async artifact(_change: Change, filename: string): Promise<SpecArtifact | null> {
+          const c = files.get(filename)
+          return c !== undefined ? new SpecArtifact(filename, c) : null
+        },
+      })
+
+      const parser = makeParser({
+        parse(content: string): ArtifactAST {
+          const children = content
+            .split('\n')
+            .map((line) => line.trim())
+            .filter((line) => line.startsWith('Requirement:'))
+            .map((line) => ({ type: 'section', label: line }) satisfies ArtifactNode)
+          return { root: { type: 'document', children } }
+        },
+      })
+
+      const uc = new ValidateArtifacts(
+        repo,
+        new Map([['default', makeSpecRepository()]]),
+        makeSchemaProvider(schema),
+        makeParsers(parser, makeParser()),
+        makeActorResolver(),
+        makeContentHasher(),
+      )
+
+      const result = await uc.execute({
+        name: 'c',
+        specPath: key,
+      })
+
+      expect(result.passed).toBe(false)
+      expect(
+        result.failures.some(
+          (f) =>
+            f.description.includes('Cross-artifact rule') &&
+            f.description.includes('mirrored-requirements'),
+        ),
+      ).toBe(true)
     })
   })
 })

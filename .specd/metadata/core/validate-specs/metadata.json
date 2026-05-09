@@ -45,13 +45,19 @@
     {
       "requirement": "Per-spec artifact validation",
       "rules": [
-        "For each spec, the use case SHALL check every spec-scoped artifact type from the schema:\n\n1. Determine the expected filename from `path.basename(artifactType.output)`.\n2. If the file is missing and the artifact type is not optional, record a `ValidationFailure` with description indicating the required artifact is missing.\n3. If the file is missing and the artifact type is optional, skip silently.\n4. If the file exists and the artifact type has no validation rules, skip.\n5. If the file exists and has rules: infer the format (from `artifactType.format` or filename), obtain the parser from `ArtifactParserRegistry`, parse the content into an AST, and evaluate the schema's validation rules via `evaluateRules`."
+        "For each spec, the use case SHALL check every spec-scoped artifact type from the schema:\n\n1. Determine the expected filename from `path.basename(artifactType.output)`.\n2. If the file is missing and the artifact type is not optional, record a `ValidationFailure` with description indicating the required artifact is missing.\n3. If the file is missing and the artifact type is optional, skip silently.\n4. If the file exists and the artifact type has no validation rules, parse it when a matching `crossArtifactValidations` rule may need it; otherwise skip.\n5. If the file exists and has local rules: infer the format (from `artifactType.format` or filename), obtain the parser from `ArtifactParserRegistry`, parse the content into an AST, and evaluate the schema's validation rules via `evaluateRules`.\n6. Any artifact whose local validation passes and whose AST is available becomes an eligible participant input for Requirement: Per-spec cross-artifact validation."
+      ]
+    },
+    {
+      "requirement": "Per-spec cross-artifact validation",
+      "rules": [
+        "After local per-artifact validation for one spec, `ValidateSpecs` SHALL evaluate the same schema `crossArtifactValidations` engine used by `ValidateArtifacts` for all rules whose `scope` is `spec`.\n\nEvaluation rules:\n\n- rules are evaluated independently for each spec being validated\n- only participants belonging to the current spec are considered\n- participant key extraction and relation semantics MUST match `ValidateArtifacts`\n- `ValidateSpecs` MUST reuse the same underlying cross-artifact evaluation machinery as `ValidateArtifacts` rather than redefining a separate comparison model\n\nParticipant readiness rules:\n\n- a participant is ready only when its artifact file exists, its artifact has passed local structural validation for this spec, and its parsed AST is available\n- if every participant for a rule is ready, the rule MUST be evaluated and any mismatch recorded as a `ValidationFailure`\n- if one or more participants are not ready, the rule MUST be deferred for that spec and surfaced as a non-failing validation output entry"
       ]
     },
     {
       "requirement": "Aggregated result",
       "rules": [
-        "The use case SHALL return a `ValidateSpecsResult` containing:\n\n- `entries` — array of `SpecValidationEntry` objects, one per validated spec.\n- `totalSpecs` — total number of specs validated.\n- `passed` — number of specs with zero failures.\n- `failed` — number of specs with one or more failures.\n\nEach `SpecValidationEntry` MUST include:\n\n- `spec` — qualified label in `workspace:capabilityPath` format.\n- `passed` — `true` if `failures` is empty.\n- `failures` — array of `ValidationFailure` objects.\n- `warnings` — array of `ValidationWarning` objects."
+        "The use case SHALL return a `ValidateSpecsResult` containing:\n\n- `entries` — array of `SpecValidationEntry` objects, one per validated spec.\n- `totalSpecs` — total number of specs validated.\n- `passed` — number of specs with zero failures.\n- `failed` — number of specs with one or more failures.\n\nEach `SpecValidationEntry` MUST include:\n\n- `spec` — qualified label in `workspace:capabilityPath` format.\n- `passed` — `true` if `failures` is empty.\n- `failures` — array of `ValidationFailure` objects from both local artifact validation and per-spec cross-artifact validation.\n- `warnings` — array of `ValidationWarning` objects, including deferred cross-artifact validation notices."
       ]
     },
     {
@@ -148,6 +154,16 @@
     },
     {
       "requirement": "Per-spec artifact validation",
+      "name": "Artifact with no local rules is still parsed for cross-artifact validation",
+      "given": [
+        "a spec-scoped artifact file has no local validations",
+        "AND a schema crossArtifactValidations rule references that artifact"
+      ],
+      "when": ["ValidateSpecs validates the spec"],
+      "then": ["the artifact is parsed so it can participate in the cross-artifact rule"]
+    },
+    {
+      "requirement": "Per-spec artifact validation",
       "name": "Validation rules evaluated against parsed AST",
       "given": [
         "a spec-scoped artifact type with validation rules, and the file exists and parses successfully"
@@ -156,11 +172,51 @@
       "then": ["evaluateRules results are included in the entry's failures and warnings"]
     },
     {
+      "requirement": "Per-spec cross-artifact validation",
+      "name": "Cross-artifact mismatch becomes a spec failure",
+      "given": [
+        "spec.md and verify.md for one spec both parse successfully",
+        "AND a schema crossArtifactValidations rule requires all-equal requirement IDs between them"
+      ],
+      "when": ["ValidateSpecs evaluates that spec"],
+      "then": ["any key mismatch is recorded as a ValidationFailure on that spec entry"]
+    },
+    {
+      "requirement": "Per-spec cross-artifact validation",
+      "name": "Deferred rule is surfaced when a participant is not locally valid",
+      "given": ["one participant artifact for the spec failed local validation"],
+      "when": ["ValidateSpecs evaluates a cross-artifact rule that needs that participant"],
+      "then": [
+        "the rule is deferred",
+        "AND the spec entry includes a non-failing warning explaining the deferral"
+      ]
+    },
+    {
+      "requirement": "Per-spec cross-artifact validation",
+      "name": "ValidateSpecs reuses ValidateArtifacts cross-artifact semantics",
+      "given": ["a cross-artifact rule using keySelector, subset, and options.ordering: strict"],
+      "when": ["the same spec content is evaluated through ValidateArtifacts and ValidateSpecs"],
+      "then": ["both use cases apply the same participant key extraction and relation semantics"]
+    },
+    {
       "requirement": "Aggregated result",
       "name": "Counts reflect validation outcomes",
       "given": ["three specs validated where two pass and one fails"],
       "when": ["the result is returned"],
       "then": ["totalSpecs is 3, passed is 2, failed is 1"]
+    },
+    {
+      "requirement": "Aggregated result",
+      "name": "Cross-artifact failures and deferred warnings are aggregated per spec",
+      "given": [
+        "one spec has a cross-artifact mismatch",
+        "AND another spec has a deferred cross-artifact rule because one participant is invalid"
+      ],
+      "when": ["ValidateSpecs returns its result"],
+      "then": [
+        "the first spec entry includes the relational failure",
+        "AND the second spec entry includes the deferred warning"
+      ]
     },
     {
       "requirement": "Format inference and parser resolution",
@@ -178,8 +234,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:3b44f9aad91cc30e9455dc1f6b1f256bedfb2913a08ec452c6597ed4d9c2d643",
-    "verify.md": "sha256:748ab9f5b82ef32a9c11a9f76ed0dbc9f6ae3f0fdb1daa997c9ca6d2895868ba"
+    "spec.md": "sha256:6c0c665d69d9940b43e529f596909a2f4b596e4b102e6cd15d5ec59ecad66297",
+    "verify.md": "sha256:1b7e7baba1b390edf6f059d5a8ca47b5cacbbadf7ff757d0d1dbb20991b6cd3b"
   },
   "generatedBy": "core"
 }

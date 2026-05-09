@@ -459,4 +459,290 @@ describe('buildSchema', () => {
     expect(artifact.taskCompletionCheck!.incompletePattern).toBe('^\\s*-\\s+\\[ \\]')
     expect(artifact.taskCompletionCheck!.completePattern).toBe('^\\s*-\\s+\\[x\\]')
   })
+
+  it('rejects crossArtifactValidations relation alias that is not declared by participants', () => {
+    const data = {
+      kind: 'schema' as const,
+      name: 'test',
+      version: 1,
+      artifacts: [
+        { id: 'specs', scope: 'spec' as const, output: 'spec.md' },
+        { id: 'verify', scope: 'spec' as const, output: 'verify.md' },
+      ],
+      crossArtifactValidations: [
+        {
+          id: 'mirrored',
+          scope: 'spec' as const,
+          participants: [
+            {
+              artifact: 'specs',
+              as: 'left',
+              selector: { type: 'section' },
+              key: { from: 'label' as const },
+            },
+            {
+              artifact: 'verify',
+              as: 'right',
+              selector: { type: 'section' },
+              key: { from: 'label' as const },
+            },
+          ],
+          relation: { kind: 'all-equal' as const, between: ['left', 'missing'] },
+        },
+      ],
+    }
+    expect(() => buildSchema('#test', data, new Map())).toThrow(SchemaValidationError)
+  })
+
+  it('rejects crossArtifactValidations participant alias duplicates', () => {
+    const data = {
+      kind: 'schema' as const,
+      name: 'test',
+      version: 1,
+      artifacts: [
+        { id: 'specs', scope: 'spec' as const, output: 'spec.md' },
+        { id: 'verify', scope: 'spec' as const, output: 'verify.md' },
+      ],
+      crossArtifactValidations: [
+        {
+          id: 'mirrored',
+          scope: 'spec' as const,
+          participants: [
+            {
+              artifact: 'specs',
+              as: 'dup',
+              selector: { type: 'section' },
+              key: { from: 'label' as const },
+            },
+            {
+              artifact: 'verify',
+              as: 'dup',
+              selector: { type: 'section' },
+              key: { from: 'label' as const },
+            },
+          ],
+          relation: { kind: 'all-equal' as const, between: ['dup', 'dup'] },
+        },
+      ],
+    }
+    expect(() => buildSchema('#test', data, new Map())).toThrow(SchemaValidationError)
+  })
+
+  it('rejects duplicate crossArtifactValidations ids', () => {
+    const data = {
+      kind: 'schema' as const,
+      name: 'test',
+      version: 1,
+      artifacts: [
+        { id: 'specs', scope: 'spec' as const, output: 'spec.md' },
+        { id: 'verify', scope: 'spec' as const, output: 'verify.md' },
+      ],
+      crossArtifactValidations: [
+        {
+          id: 'mirrored',
+          scope: 'spec' as const,
+          participants: [
+            {
+              artifact: 'specs',
+              as: 'a',
+              selector: { type: 'section' },
+              key: { from: 'label' as const },
+            },
+            {
+              artifact: 'verify',
+              as: 'b',
+              selector: { type: 'section' },
+              key: { from: 'label' as const },
+            },
+          ],
+          relation: { kind: 'all-equal' as const, between: ['a', 'b'] },
+        },
+        {
+          id: 'mirrored',
+          scope: 'spec' as const,
+          participants: [
+            {
+              artifact: 'specs',
+              as: 'c',
+              selector: { type: 'section' },
+              key: { from: 'label' as const },
+            },
+            {
+              artifact: 'verify',
+              as: 'd',
+              selector: { type: 'section' },
+              key: { from: 'label' as const },
+            },
+          ],
+          relation: { kind: 'all-equal' as const, between: ['c', 'd'] },
+        },
+      ],
+    }
+    expect(() => buildSchema('#test', data, new Map())).toThrow(SchemaValidationError)
+  })
+
+  it('rejects crossArtifactValidations with unknown artifact reference', () => {
+    const data = {
+      kind: 'schema' as const,
+      name: 'test',
+      version: 1,
+      artifacts: [
+        { id: 'specs', scope: 'spec' as const, output: 'spec.md' },
+        { id: 'verify', scope: 'spec' as const, output: 'verify.md' },
+      ],
+      crossArtifactValidations: [
+        {
+          id: 'mirrored',
+          scope: 'spec' as const,
+          participants: [
+            {
+              artifact: 'specs',
+              as: 'a',
+              selector: { type: 'section' },
+              key: { from: 'label' as const },
+            },
+            {
+              artifact: 'nonexistent',
+              as: 'b',
+              selector: { type: 'section' },
+              key: { from: 'label' as const },
+            },
+          ],
+          relation: { kind: 'all-equal' as const, between: ['a', 'b'] },
+        },
+      ],
+    }
+    expect(() => buildSchema('#test', data, new Map())).toThrow(SchemaValidationError)
+  })
+
+  it('rejects crossArtifactValidations with mixed scopes', () => {
+    const data = {
+      kind: 'schema' as const,
+      name: 'test',
+      version: 1,
+      artifacts: [
+        { id: 'specs', scope: 'spec' as const, output: 'spec.md' },
+        { id: 'design', scope: 'change' as const, output: 'design.md' },
+      ],
+      crossArtifactValidations: [
+        {
+          id: 'mirrored',
+          scope: 'spec' as const,
+          participants: [
+            {
+              artifact: 'specs',
+              as: 'a',
+              selector: { type: 'section' },
+              key: { from: 'label' as const },
+            },
+            {
+              artifact: 'design',
+              as: 'b',
+              selector: { type: 'section' },
+              key: { from: 'label' as const },
+            },
+          ],
+          relation: { kind: 'all-equal' as const, between: ['a', 'b'] },
+        },
+      ],
+    }
+    expect(() => buildSchema('#test', data, new Map())).toThrow(SchemaValidationError)
+  })
+
+  it('stores crossArtifactValidations on schema when valid', () => {
+    const data = {
+      kind: 'schema' as const,
+      name: 'test',
+      version: 1,
+      artifacts: [
+        { id: 'specs', scope: 'spec' as const, output: 'spec.md' },
+        { id: 'verify', scope: 'spec' as const, output: 'verify.md' },
+      ],
+      crossArtifactValidations: [
+        {
+          id: 'mirrored',
+          scope: 'spec' as const,
+          participants: [
+            {
+              artifact: 'specs',
+              as: 'a',
+              selector: { type: 'section' },
+              key: { from: 'label' as const },
+            },
+            {
+              artifact: 'verify',
+              as: 'b',
+              selector: { type: 'section' },
+              key: { from: 'label' as const },
+            },
+          ],
+          relation: { kind: 'all-equal' as const, between: ['a', 'b'] },
+        },
+      ],
+    }
+    const schema = buildSchema('#test', data, new Map())
+    expect(schema.crossArtifactValidations()).toHaveLength(1)
+    expect(schema.crossArtifactValidations()[0]!.id).toBe('mirrored')
+  })
+
+  it('rejects count.exactly combined with min/max', () => {
+    const data = {
+      ...minimalData(),
+      artifacts: [
+        {
+          id: 'spec',
+          scope: 'spec' as const,
+          output: 'spec.md',
+          validations: [{ id: 'v1', type: 'section', count: { exactly: 1, min: 1 } }],
+        },
+      ],
+    }
+    expect(() => buildSchema('#test', data, new Map())).toThrow(SchemaValidationError)
+  })
+
+  it('rejects count.unique.exactlyUnique combined with minUnique/maxUnique', () => {
+    const data = {
+      ...minimalData(),
+      artifacts: [
+        {
+          id: 'spec',
+          scope: 'spec' as const,
+          output: 'spec.md',
+          validations: [
+            {
+              id: 'v1',
+              type: 'section',
+              count: {
+                unique: { by: { from: 'label' as const }, exactlyUnique: 2, minUnique: 1 },
+              },
+            },
+          ],
+        },
+      ],
+    }
+    expect(() => buildSchema('#test', data, new Map())).toThrow(SchemaValidationError)
+  })
+
+  it('rejects count.unique minUnique > maxUnique', () => {
+    const data = {
+      ...minimalData(),
+      artifacts: [
+        {
+          id: 'spec',
+          scope: 'spec' as const,
+          output: 'spec.md',
+          validations: [
+            {
+              id: 'v1',
+              type: 'section',
+              count: {
+                unique: { by: { from: 'label' as const }, minUnique: 3, maxUnique: 2 },
+              },
+            },
+          ],
+        },
+      ],
+    }
+    expect(() => buildSchema('#test', data, new Map())).toThrow(SchemaValidationError)
+  })
 })

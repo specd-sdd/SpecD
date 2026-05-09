@@ -14,7 +14,7 @@
     {
       "requirement": "Schema file structure",
       "rules": [
-        "A schema file must be a valid YAML document with the following top-level fields:\n\n- `kind` (`schema` | `schema-plugin`, required) — discriminates full schemas from plugins; see Requirement: Schema kind field\n- `name` (string, required) — machine identifier, e.g. `spec-driven`\n- `version` (integer, required) — schema version, monotonically increasing\n- `description` (string, optional) — human-readable summary\n- `extends` (string, optional) — reference to a parent schema; see Requirement: Schema extends\n- `artifacts` (array, required for `kind: schema`) — one entry per artifact type\n- `workflow` (array, optional, only valid for `kind: schema`) — named phases of the change lifecycle, each with optional artifact prerequisites and hooks; see Requirement: Workflow"
+        "A schema file must be a valid YAML document with the following top-level fields:\n\n- `kind` (`schema` | `schema-plugin`, required) — discriminates full schemas from plugins; see Requirement: Schema kind field\n- `name` (string, required) — machine identifier, e.g. `spec-driven`\n- `version` (integer, required) — schema version, monotonically increasing\n- `description` (string, optional) — human-readable summary\n- `extends` (string, optional) — reference to a parent schema; see Requirement: Schema extends\n- `artifacts` (array, required for `kind: schema`) — one entry per artifact type\n- `crossArtifactValidations` (array, optional, only valid for `kind: schema`) — relational structural rules evaluated across multiple artifacts of the same spec and scope; see Requirement: Cross-artifact validation rules\n- `workflow` (array, optional, only valid for `kind: schema`) — named phases of the change lifecycle, each with optional artifact prerequisites and hooks; see Requirement: Workflow"
       ]
     },
     {
@@ -32,7 +32,7 @@
     {
       "requirement": "Array entry identity",
       "rules": [
-        "Every entry in the following schema arrays must carry an `id` field:\n\n- `workflow[].hooks.pre[]` and `workflow[].hooks.post[]`\n- `artifacts[].validations[]`\n- `artifacts[].deltaValidations[]`\n- `artifacts[].rules.pre[]` and `artifacts[].rules.post[]`\n- `artifacts[].preHashCleanup[]`\n- `metadataExtraction` array entries (entries in `rules[]`, `constraints[]`, `scenarios[]`, `context[]`)\n\nFormat: `^[a-z][a-z0-9]*(-[a-z0-9]+)*$`, 1–64 characters.\n\n**For hooks:** IDs must be globally unique across ALL workflow steps. No two hooks in any workflow step may share the same ID, regardless of whether they are in pre or post arrays.\n\n**For all other array entries:** IDs must be unique within their immediate array.\n\nDuplicate IDs within the same array (or for hooks, duplicate IDs across any workflow step) produce a `SchemaValidationError`.\n\nWorkflow steps use `step` as their identity field instead of `id`. Artifact entries use their existing `id` field.\n\nSingle-entry metadata fields (`title`, `description`, `dependsOn`, `keywords`) do not have `id` — they are scalars, not array entries."
+        "Every entry in the following schema arrays must carry an `id` field:\n\n- `workflow[].hooks.pre[]` and `workflow[].hooks.post[]`\n- `artifacts[].validations[]`\n- `artifacts[].deltaValidations[]`\n- `artifacts[].rules.pre[]` and `artifacts[].rules.post[]`\n- `artifacts[].preHashCleanup[]`\n- `crossArtifactValidations[]`\n- `metadataExtraction` array entries (entries in `rules[]`, `constraints[]`, `scenarios[]`, `context[]`)\n\nFormat: `^[a-z][a-z0-9]*(-[a-z0-9]+)*$`, 1–64 characters.\n\n**For hooks:** IDs must be globally unique across ALL workflow steps. No two hooks in any workflow step may share the same ID, regardless of whether they are in pre or post arrays.\n\n**For all other array entries:** IDs must be unique within their immediate array.\n\nDuplicate IDs within the same array (or for hooks, duplicate IDs across any workflow step) produce a `SchemaValidationError`.\n\nWorkflow steps use `step` as their identity field instead of `id`. Artifact entries use their existing `id` field. Cross-artifact participant aliases use `as` as their local identity within one rule and are governed by Requirement: Cross-artifact validation rules rather than by this array-entry rule.\n\nSingle-entry metadata fields (`title`, `description`, `dependsOn`, `keywords`) do not have `id` — they are scalars, not array entries."
       ]
     },
     {
@@ -56,13 +56,19 @@
     {
       "requirement": "Validation rules",
       "rules": [
-        "`validations` on an artifact defines structural constraints checked by `ValidateArtifacts` against the artifact content (after delta application for `scope: spec` artifacts). Each rule identifies nodes in the normalized artifact AST and asserts that they exist and optionally satisfy further constraints.\n\nA validation rule is an object with:\n\n**Node identification** — one of two mutually exclusive approaches:\n\n- **Selector fields** — the selector fields defined in [`core:selector-model`](../selector-model/spec.md): `type`, `matches`, `contains`, `parent`, `index`, `where`. Identifies nodes by type, label pattern, value pattern, ancestry, or position.\n- **`path`** (string) — a JSONPath expression (RFC 9535) evaluated against the normalized AST. Use when the structural query requires more expressive power than the selector fields provide.\n\n**Additional fields** — compatible with both identification styles:\n\n- `required` (boolean, optional, default `true`) — whether absence of a matching node is an error (`true`) or a warning (`false`)\n- `contentMatches` (string, optional) — a regex matched case-insensitively against the serialized text of the matched node's subtree; `ArtifactParser` serializes the subtree to its native format before matching; useful for asserting that a node's full rendered content contains expected text regardless of its internal AST structure\n- `children` (array, optional) — sub-rules evaluated with each matched node as root; each entry is a full validation rule\n\nA rule passes vacuously when it matches zero nodes — no error or warning is produced.\n\n```yaml\nvalidations:\n  # Selector fields: structural checks with readable syntax\n  - type: section\n    matches: '^Requirements$'\n    required: true\n    children:\n      - type: section\n        matches: '^Requirement:'\n        required: true\n        children:\n          - type: section\n            matches: '^Scenario:'\n            required: true\n\n  # contentMatches: assert the section body contains normative language\n  - type: section\n    matches: '^Requirement:'\n    contentMatches: 'SHALL|MUST'\n    required: false\n\n  # path: JSONPath for queries that need more expressive power\n  - path: '$..children[?(@.type==\"section\" && @.level==2)]'\n    required: true\n```"
+        "`validations` on an artifact defines structural constraints checked by `ValidateArtifacts` against the artifact content (after delta application for `scope: spec` artifacts). Each rule identifies nodes in the normalized artifact AST and asserts that they exist and optionally satisfy further constraints.\n\nA validation rule is an object with:\n\n**Node identification** — one of two mutually exclusive approaches:\n\n- **Selector fields** — the selector fields defined in [`core:selector-model`](../selector-model/spec.md): `type`, `matches`, `contains`, `parent`, `index`, `where`. Identifies nodes by type, label pattern, value pattern, ancestry, or position.\n- **`path`** (string) — a JSONPath expression (RFC 9535) evaluated against the normalized AST. Use when the structural query requires more expressive power than the selector fields provide.\n\n**Additional fields** — compatible with both identification styles:\n\n- `required` (boolean, optional, default `true`) — controls only the zero-match case. When a rule selects zero nodes, `required: true` records a failure and `required: false` records a warning.\n- `count` (object, optional) — cardinality constraint over the nodes selected by this rule.\n  - Total-match fields: `exactly`, `min`, `max` (`exactly` is mutually exclusive with `min`/`max`)\n  - Unique-key fields: `unique.by`, optional `minUnique`, `maxUnique`, `exactlyUnique` (`exactlyUnique` is mutually exclusive with `minUnique`/`maxUnique`)\n  - `unique.by` defines how a key is derived from each selected node (`from: label|value|content` plus optional `capture`/`strip` normalization).\n  - When `unique.by` is present, duplicate derived keys are not allowed.\n  - When `count` is omitted, any non-zero number of matches satisfies the rule once the zero-match handling has been applied.\n- `contentMatches` (string, optional) — a regex matched case-insensitively against the serialized text of the matched node's subtree; `ArtifactParser` serializes the subtree to its native format before matching; useful for asserting that a node's full rendered content contains expected text regardless of its internal AST structure\n- `children` (array, optional) — sub-rules evaluated with each matched node as root; each entry is a full validation rule and MAY declare its own `count`\n\n`required` is not a general cardinality feature. Uniqueness and minimum/maximum match counts MUST be expressed through `count`.\n\n```yaml\nvalidations:\n  # Selector fields: structural checks with readable syntax\n  - type: section\n    matches: '^Requirements$'\n    required: true\n    count:\n      exactly: 1\n    children:\n      - type: section\n        matches: '^Requirement:'\n        required: true\n        children:\n          - type: section\n            matches: '^Scenario:'\n            count:\n              min: 1\n              max: 3\n\n  # unique.by: duplicate Requirement headings are rejected\n  - type: section\n    matches: '^Requirement:'\n    count:\n      min: 1\n      unique:\n        by:\n          from: label\n          strip: '^Requirement:\\s*'\n        minUnique: 1\n\n  # contentMatches: assert the section body contains normative language\n  - type: section\n    matches: '^Requirement:'\n    contentMatches: 'SHALL|MUST'\n    required: false\n\n  # path: JSONPath for queries that need more expressive power\n  - path: '$..children[?(@.type==\"section\" && @.level==2)]'\n    count:\n      min: 1\n```"
       ]
     },
     {
       "requirement": "Delta validation rules",
       "rules": [
-        "`deltaValidations` on a schema artifact defines rules that `ValidateArtifacts` checks against the delta file before application. It works identically to `validations` — each rule uses the same structure and evaluation semantics — but the document is the **normalized YAML AST of the delta file** rather than the artifact content. Only valid when `delta: true`.\n\nThe delta file is a YAML sequence of operation entries. When parsed by the YAML adapter, each entry becomes a `sequence-item` containing a `mapping` with `pair` nodes for `op`, `selector`, `content`, `position`, etc. The `where` field on `sequence-item` rules is particularly useful here for correlated checks — asserting that the same entry satisfies multiple field conditions simultaneously.\n\nEach rule uses the same structure as `validations` rules: selector fields or `path` for node identification, plus `required`, `contentMatches`, and `children`.\n\nA rule passes vacuously when it matches zero nodes.\n\n```yaml\ndeltaValidations:\n  # At least one added/modified entry must contribute content containing a Scenario.\n  # where: checks multiple fields on the same sequence-item (correlated condition).\n  # contentMatches: checks the rendered text of the entry's content field subtree.\n  - type: sequence-item\n    where:\n      op: 'added|modified'\n    contentMatches: '#### Scenario:'\n    required: true\n\n  # Warning if nothing is being removed (may indicate a delta that only adds)\n  - type: sequence-item\n    where:\n      op: 'removed'\n    required: false\n```"
+        "`deltaValidations` on a schema artifact defines rules that `ValidateArtifacts` checks against the delta file before application. It works identically to `validations` — each rule uses the same structure and evaluation semantics — but the document is the **normalized YAML AST of the delta file** rather than the artifact content. Only valid when `delta: true`.\n\nThe delta file is a YAML sequence of operation entries. When parsed by the YAML adapter, each entry becomes a `sequence-item` containing a `mapping` with `pair` nodes for `op`, `selector`, `content`, `position`, etc. The `where` field on `sequence-item` rules is particularly useful here for correlated checks — asserting that the same entry satisfies multiple field conditions simultaneously.\n\nEach rule uses the same structure as `validations` rules: selector fields or `path` for node identification, plus `required`, `count`, `contentMatches`, and `children`.\n\n`required` still controls only the zero-match case. Any non-zero cardinality requirement beyond that MUST be expressed through `count`, including uniqueness constraints expressed through `count.unique`.\n\n```yaml\ndeltaValidations:\n  # At least one added/modified entry must contribute content containing a Scenario.\n  # where: checks multiple fields on the same sequence-item (correlated condition).\n  # contentMatches: checks the rendered text of the entry's content field subtree.\n  - type: sequence-item\n    where:\n      op: 'added|modified'\n    contentMatches: '#### Scenario:'\n    count:\n      min: 1\n\n  # Warning if nothing is being removed (may indicate a delta that only adds)\n  - type: sequence-item\n    where:\n      op: 'removed'\n    required: false\n```"
+      ]
+    },
+    {
+      "requirement": "Cross-artifact validation rules",
+      "rules": [
+        "`crossArtifactValidations` is an optional top-level schema field that defines relational structural rules across multiple artifacts. These rules are evaluated only between artifacts of the same spec and the same scope.\n\nEach entry in `crossArtifactValidations` MUST include:\n\n- `id` (string, required) — unique within the `crossArtifactValidations` array\n- `scope` (`spec` | `change`, required) — the artifact scope the rule applies to\n- `participants` (array, required) — the artifact-derived key sets compared by the relation\n- `relation` (object, required) — defines how the participant key collections are compared\n\nEach participant MUST include:\n\n- `artifact` (string, required) — artifact ID from `artifacts[]`\n- `as` (string, required) — local alias used by `relation.between`; must be unique within the rule's `participants[]`\n- `selector` (selector, required) — selects the node set or root scope for this participant\n- `keySelector` (selector, optional) — when present, runs relative to each node matched by `selector` and selects the node set that actually produces keys\n- `key` (object, required) — extracts comparable values from either `keySelector` matches (when `keySelector` is present) or directly from `selector` matches\n\nEvery participant's referenced artifact MUST exist in `artifacts[]`, and every referenced artifact MUST have the same `scope` as the enclosing cross-artifact rule. Mixed-scope relations are invalid.\n\n`key` MUST include:\n\n- `from` (`label` | `value` | `content`, required) — source value used to derive each key\n\n`key` MAY also include:\n\n- `capture` (string, optional) — regex whose first capture group becomes the key\n- `strip` (string, optional) — regex removed from the extracted value before comparison\n\n`relation` MUST include:\n\n- `kind` (`all-equal` | `subset` | `superset`, required)\n- `between` (array of participant aliases, required)\n- `options` (object, optional) — operator-specific options\n\nEvery alias named in `relation.between` MUST match a participant `as` value from the same rule.\n\nSupported `relation.options` for v1:\n\n- `ordering` (`ignore` | `strict`, optional, default `ignore`)\n\nRelation semantics:\n\n- `all-equal` compares every alias in `between` and requires them to expose the same keys. With `ordering: ignore`, comparison is set-based and ignores write order. With `ordering: strict`, comparison is sequence-based and requires the same key order.\n- `subset` is directional. `between: [A, B]` means every key selected for `A` MUST appear in `B`. With `ordering: strict`, `A` MUST appear as an order-preserving subsequence of `B`.\n- `superset` is directional. `between: [A, B]` means every key selected for `B` MUST appear in `A`. With `ordering: strict`, `B` MUST appear as an order-preserving subsequence of `A`.\n\nCross-artifact relations operate on derived key collections, not on raw AST nodes. Duplicate prevention remains an artifact-local concern handled by `validations[].count.unique`.\n\n```yaml\ncrossArtifactValidations:\n  - id: mirrored-requirements\n    scope: spec\n    participants:\n      - artifact: specs\n        as: specRequirements\n        selector:\n          type: section\n          matches: '^Requirements$'\n        keySelector:\n          type: section\n          matches: '^Requirement:'\n        key:\n          from: label\n          capture: '\\\\[([^\\\\]]+)\\\\]$'\n      - artifact: verify\n        as: verifyRequirements\n        selector:\n          type: section\n          matches: '^Requirements$'\n        keySelector:\n          type: section\n          matches: '^Requirement:'\n        key:\n          from: label\n          capture: '\\\\[([^\\\\]]+)\\\\]$'\n    relation:\n      kind: all-equal\n      between:\n        - specRequirements\n        - verifyRequirements\n      options:\n        ordering: ignore\n```"
       ]
     },
     {
@@ -151,6 +157,13 @@
       "name": "Missing required field",
       "when": ["a schema file is missing name or version"],
       "then": ["SchemaRegistry.resolve() must throw a validation error"]
+    },
+    {
+      "requirement": "Schema file structure",
+      "name": "crossArtifactValidations accepted at schema root",
+      "given": ["a schema file declares a crossArtifactValidations array alongside artifacts"],
+      "when": ["the relational rule entries are otherwise valid"],
+      "then": ["SchemaRegistry.resolve() must load the schema without rejecting the root field"]
     },
     {
       "requirement": "Schema kind field",
@@ -268,6 +281,16 @@
       ],
       "then": [
         "SchemaRegistry.resolve() must throw a SchemaValidationError mentioning the duplicate preHashCleanup ID"
+      ]
+    },
+    {
+      "requirement": "Array entry identity",
+      "name": "Duplicate crossArtifactValidations IDs rejected",
+      "when": [
+        "a schema has crossArtifactValidations: [{ id: \"mirrored-reqs\", ... }, { id: \"mirrored-reqs\", ... }]"
+      ],
+      "then": [
+        "SchemaRegistry.resolve() must throw a SchemaValidationError mentioning the duplicate crossArtifactValidations ID"
       ]
     },
     {
@@ -471,19 +494,22 @@
     },
     {
       "requirement": "Delta validation rules",
-      "name": "Rule passes vacuously when no nodes match",
-      "given": ["a deltaValidations rule that matches no nodes in the delta YAML AST"],
-      "when": ["ValidateArtifacts evaluates the rule"],
-      "then": ["the rule passes without error regardless of required"]
-    },
-    {
-      "requirement": "Delta validation rules",
       "name": "Warning on required false with no match",
       "given": [
         "a deltaValidations rule with required: false that matches zero nodes in the delta YAML AST"
       ],
       "when": ["ValidateArtifacts evaluates the rule"],
       "then": ["ValidateArtifacts records a warning, not a failure"]
+    },
+    {
+      "requirement": "Delta validation rules",
+      "name": "count min rejects too few matching delta entries",
+      "given": [
+        "a deltaValidations rule with count: { min: 2 }",
+        "AND only one delta entry matches its selector"
+      ],
+      "when": ["ValidateArtifacts evaluates the rule"],
+      "then": ["ValidateArtifacts records a validation failure for the count mismatch"]
     },
     {
       "requirement": "Delta validation rules",
@@ -513,6 +539,62 @@
         "an artifact omits format and its derived output filename has an extension not in .md, .json, .yaml, .yml"
       ],
       "then": ["the resolved artifact uses format: plaintext"]
+    },
+    {
+      "requirement": "Cross-artifact validation rules",
+      "name": "Same-spec same-scope relational rule is accepted",
+      "given": [
+        "a schema declares crossArtifactValidations with participants specs and verify, both under scope: spec"
+      ],
+      "when": ["SchemaRegistry.resolve() loads the schema"],
+      "then": ["the relational rule is accepted"]
+    },
+    {
+      "requirement": "Cross-artifact validation rules",
+      "name": "Participant aliases must be unique within one relational rule",
+      "given": ["a cross-artifact rule whose participants array declares the same as alias twice"],
+      "when": ["SchemaRegistry.resolve() loads the schema"],
+      "then": ["it must throw a SchemaValidationError"]
+    },
+    {
+      "requirement": "Cross-artifact validation rules",
+      "name": "relation.between alias must resolve to a participant",
+      "given": [
+        "a cross-artifact rule whose relation.between references an alias not declared in participants"
+      ],
+      "when": ["SchemaRegistry.resolve() loads the schema"],
+      "then": ["it must throw a SchemaValidationError"]
+    },
+    {
+      "requirement": "Cross-artifact validation rules",
+      "name": "Mixed-scope relational rule is rejected",
+      "given": [
+        "a cross-artifact rule with one participant from a scope: spec artifact and another from a scope: change artifact"
+      ],
+      "when": ["SchemaRegistry.resolve() loads the schema"],
+      "then": ["it must throw a SchemaValidationError"]
+    },
+    {
+      "requirement": "Cross-artifact validation rules",
+      "name": "keySelector extracts nested values before comparison",
+      "given": [
+        "a participant selects a YAML sequence-item",
+        "AND its keySelector targets the nested pair labeled id"
+      ],
+      "when": ["the cross-artifact rule is evaluated"],
+      "then": [
+        "the comparable key is extracted from the nested id value rather than from the outer item node"
+      ]
+    },
+    {
+      "requirement": "Cross-artifact validation rules",
+      "name": "all-equal strict ordering distinguishes reordering",
+      "given": [
+        "two participants expose the same keys in different orders",
+        "AND their relation uses kind: all-equal with options.ordering: strict"
+      ],
+      "when": ["the rule is evaluated"],
+      "then": ["the rule fails because the write order does not match"]
     },
     {
       "requirement": "Template resolution",
@@ -557,6 +639,36 @@
     },
     {
       "requirement": "Validation rules",
+      "name": "count exactly rejects duplicate matches",
+      "given": [
+        "a validations rule { type: section, matches: '^Requirement: Login$', count: { exactly: 1 } }",
+        "AND the artifact contains two matching Requirement: Login sections"
+      ],
+      "when": ["ValidateArtifacts evaluates the rule"],
+      "then": ["ValidateArtifacts reports a validation failure for the count mismatch"]
+    },
+    {
+      "requirement": "Validation rules",
+      "name": "count.unique.by rejects duplicate normalized keys",
+      "given": [
+        "a validations rule { type: section, matches: '^Requirement:', count: { unique: { by: { from: label, strip: '^Requirement:\\\\s*' } } } }",
+        "AND the artifact contains Requirement: Login twice"
+      ],
+      "when": ["ValidateArtifacts evaluates the rule"],
+      "then": ["ValidateArtifacts reports a validation failure for duplicate unique keys"]
+    },
+    {
+      "requirement": "Validation rules",
+      "name": "count.unique.minUnique enforces minimum distinct keys",
+      "given": [
+        "a validations rule with count.unique.by and count.unique.minUnique: 3",
+        "AND the artifact contains three matching sections but only two distinct normalized keys"
+      ],
+      "when": ["ValidateArtifacts evaluates the rule"],
+      "then": ["ValidateArtifacts reports a validation failure for unique cardinality mismatch"]
+    },
+    {
+      "requirement": "Validation rules",
       "name": "children narrows scope to matched node",
       "given": [
         "a validations rule { type: section, matches: '^Requirements$', children: [{ type: section, matches: '^Requirement:' }] }",
@@ -571,7 +683,7 @@
       "requirement": "Validation rules",
       "name": "Children constraint fails on one node",
       "given": [
-        "a validations rule { type: section, matches: '^Requirement:' } with a children constraint { type: section, matches: '^Scenario:', required: true }",
+        "a validations rule { type: section, matches: '^Requirement:' } with a children constraint { type: section, matches: '^Scenario:', count: { min: 1 } }",
         "AND one Requirement: section has no Scenario: child"
       ],
       "when": ["ValidateArtifacts evaluates the rule"],
@@ -586,15 +698,6 @@
       ],
       "when": ["ValidateArtifacts evaluates the rule"],
       "then": ["ValidateArtifacts records a warning for that section"]
-    },
-    {
-      "requirement": "Validation rules",
-      "name": "Rule passes vacuously when no nodes match",
-      "given": [
-        "a validations rule with a children constraint, whose top-level identification matches zero nodes in the artifact AST"
-      ],
-      "when": ["ValidateArtifacts evaluates the rule"],
-      "then": ["the rule passes without error — the children constraint is never evaluated"]
     },
     {
       "requirement": "Per-spec approval",
@@ -924,8 +1027,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:cc1dbbefac0752d7b54bc6274f9e3bde1bfbd7b5e8e8206f42a83eb65ef5cbaa",
-    "verify.md": "sha256:28ebaed2d96296a7cd8c4f438801edeea4fc8d575d9282b7bfcd8e852677e9f4"
+    "spec.md": "sha256:a42752d11142ac0444dfb3c79e250f2de32c24830ecde7dbaeedf1adb15b3aa1",
+    "verify.md": "sha256:e66f7f9c67acdedba5ed6d5bc8e791b04ea6cd97e5389b43e35aaba757a11a7e"
   },
   "generatedBy": "core"
 }

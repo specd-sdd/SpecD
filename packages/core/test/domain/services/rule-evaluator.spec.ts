@@ -92,6 +92,160 @@ describe('evaluateRules', () => {
     const result = evaluateRules(rules, root, 'specs', mockParser)
     expect(result.failures).toHaveLength(0)
   })
+
+  it('fails when count.exactly does not match selected node count', () => {
+    const root: RuleEvaluatorNode = {
+      type: 'document',
+      children: [
+        { type: 'section', label: 'Requirement: A' },
+        { type: 'section', label: 'Requirement: A' },
+      ],
+    }
+    const rules: ValidationRule[] = [
+      {
+        selector: { type: 'section', matches: '^Requirement: A$' },
+        count: { exactly: 1 },
+      },
+    ]
+
+    const result = evaluateRules(rules, root, 'specs', mockParser)
+    expect(result.failures).toHaveLength(1)
+    expect(result.failures[0]?.description).toContain('exactly 1')
+  })
+
+  it('fails when count.min is not satisfied', () => {
+    const root: RuleEvaluatorNode = {
+      type: 'document',
+      children: [{ type: 'section', label: 'Scenario: A' }],
+    }
+    const rules: ValidationRule[] = [
+      {
+        selector: { type: 'section', matches: '^Scenario:' },
+        count: { min: 2 },
+      },
+    ]
+
+    const result = evaluateRules(rules, root, 'verify', mockParser)
+    expect(result.failures).toHaveLength(1)
+    expect(result.failures[0]?.description).toContain('below min 2')
+  })
+
+  it('fails when count.max is exceeded', () => {
+    const root: RuleEvaluatorNode = {
+      type: 'document',
+      children: [
+        { type: 'section', label: 'Scenario: A' },
+        { type: 'section', label: 'Scenario: B' },
+      ],
+    }
+    const rules: ValidationRule[] = [
+      {
+        selector: { type: 'section', matches: '^Scenario:' },
+        count: { max: 1 },
+      },
+    ]
+
+    const result = evaluateRules(rules, root, 'verify', mockParser)
+    expect(result.failures).toHaveLength(1)
+    expect(result.failures[0]?.description).toContain('above max 1')
+  })
+
+  it('fails when count.unique.by produces duplicate normalized keys', () => {
+    const root: RuleEvaluatorNode = {
+      type: 'document',
+      children: [
+        { type: 'section', label: 'Requirement: Login' },
+        { type: 'section', label: 'Requirement: Login' },
+      ],
+    }
+    const rules: ValidationRule[] = [
+      {
+        selector: { type: 'section', matches: '^Requirement:' },
+        count: { unique: { by: { from: 'label', strip: '^Requirement:\\s*' } } },
+      },
+    ]
+
+    const result = evaluateRules(rules, root, 'specs', mockParser)
+    expect(result.failures).toHaveLength(1)
+    expect(result.failures[0]?.description).toContain('Duplicate keys')
+    expect(result.failures[0]?.description).toContain("'Login'")
+  })
+
+  it('fails when count.unique.minUnique is not satisfied', () => {
+    const root: RuleEvaluatorNode = {
+      type: 'document',
+      children: [
+        { type: 'section', label: 'Requirement: A' },
+        { type: 'section', label: 'Requirement: A' },
+        { type: 'section', label: 'Requirement: B' },
+      ],
+    }
+    const rules: ValidationRule[] = [
+      {
+        selector: { type: 'section', matches: '^Requirement:' },
+        count: {
+          unique: {
+            by: { from: 'label', strip: '^Requirement:\\s*' },
+            minUnique: 3,
+          },
+        },
+      },
+    ]
+
+    const result = evaluateRules(rules, root, 'specs', mockParser)
+    expect(result.failures).toHaveLength(2)
+    expect(result.failures.map((f) => f.description).join(' | ')).toContain('below minUnique 3')
+  })
+
+  it('fails when count.unique.maxUnique is exceeded', () => {
+    const root: RuleEvaluatorNode = {
+      type: 'document',
+      children: [
+        { type: 'section', label: 'Requirement: A' },
+        { type: 'section', label: 'Requirement: B' },
+      ],
+    }
+    const rules: ValidationRule[] = [
+      {
+        selector: { type: 'section', matches: '^Requirement:' },
+        count: {
+          unique: {
+            by: { from: 'label', strip: '^Requirement:\\s*' },
+            maxUnique: 1,
+          },
+        },
+      },
+    ]
+
+    const result = evaluateRules(rules, root, 'specs', mockParser)
+    expect(result.failures).toHaveLength(1)
+    expect(result.failures[0]?.description).toContain('above maxUnique 1')
+  })
+
+  it('fails when count.unique.exactlyUnique does not match', () => {
+    const root: RuleEvaluatorNode = {
+      type: 'document',
+      children: [
+        { type: 'section', label: 'Requirement: A' },
+        { type: 'section', label: 'Requirement: B' },
+      ],
+    }
+    const rules: ValidationRule[] = [
+      {
+        selector: { type: 'section', matches: '^Requirement:' },
+        count: {
+          unique: {
+            by: { from: 'label', strip: '^Requirement:\\s*' },
+            exactlyUnique: 3,
+          },
+        },
+      },
+    ]
+
+    const result = evaluateRules(rules, root, 'specs', mockParser)
+    expect(result.failures).toHaveLength(1)
+    expect(result.failures[0]?.description).toContain('exactlyUnique 3')
+  })
 })
 
 describe('selectNodes', () => {

@@ -21,6 +21,7 @@ import { SpecPath } from '../../domain/value-objects/spec-path.js'
 import { parseSpecId } from '../../domain/services/parse-spec-id.js'
 import { expectedArtifactFilename } from '../../domain/services/artifact-filename.js'
 import { evaluateRules } from '../../domain/services/rule-evaluator.js'
+import { evaluateCrossArtifactRule } from '../../domain/services/cross-artifact-rule-evaluator.js'
 import { inferFormat } from '../../domain/services/format-inference.js'
 import { LifecycleEngine } from '../../domain/services/lifecycle-engine.js'
 import { type ContentHasher } from '../ports/content-hasher.js'
@@ -37,6 +38,7 @@ import {
   type SpecWorkspaceRoute,
 } from './_shared/spec-reference-resolver.js'
 import { Logger } from '../logger.js'
+import { type ReadyArtifactParticipant } from './_shared/cross-artifact-participant-state.js'
 
 /** Input for the {@link ValidateArtifacts} use case. */
 export interface ValidateArtifactsInput {
@@ -206,6 +208,7 @@ export class ValidateArtifacts {
       readonly fileKey: string
       readonly validatedHash: string
     }> = []
+    const readyParticipants = new Map<string, ReadyArtifactParticipant>()
     const specDependsOnUpdates = new Map<string, readonly string[]>()
     const lifecycle = this._lifecycle.evaluate(change, schema)
     const artifactVerdicts = new Map(
@@ -237,6 +240,7 @@ export class ValidateArtifacts {
     } catch {
       resolveSpecReference = undefined
     }
+    const crossRules = schema.crossArtifactValidations()
 
     // --- Required artifacts check (skipped when artifactId is provided) ---
     if (input.artifactId === undefined) {
@@ -377,6 +381,11 @@ export class ValidateArtifacts {
       const format = artifactType.format ?? inferFormat(outputBasename)
       const parser = format !== undefined ? this._parsers.get(format) : undefined
       const yamlParser = this._parsers.get('yaml')
+      const hasCrossRuleForArtifact = crossRules.some(
+        (rule) =>
+          rule.participants.some((p) => p.artifact === artifactType.id) &&
+          rule.scope === artifactType.scope,
+      )
       const shouldApplyDelta =
         artifactType.delta &&
         artifactType.scope === 'spec' &&
@@ -463,14 +472,25 @@ export class ValidateArtifacts {
       if (validationContent === null) {
         continue
       }
+      let localAstRoot: SelectorNode | undefined
 
       // --- Structural validation ---
       if (!artifactFailed && artifactType.validations.length > 0 && parser !== undefined) {
         const ast = parser.parse(validationContent)
+        localAstRoot = ast.root
         const result = evaluateRules(artifactType.validations, ast.root, artifactType.id, parser)
         failures.push(...result.failures)
         warnings.push(...result.warnings)
         if (result.failures.length > 0) artifactFailed = true
+      }
+
+      if (
+        !artifactFailed &&
+        parser !== undefined &&
+        localAstRoot === undefined &&
+        hasCrossRuleForArtifact
+      ) {
+        localAstRoot = parser.parse(validationContent).root
       }
 
       // --- MetadataExtraction validation ---
@@ -544,6 +564,17 @@ export class ValidateArtifacts {
         }
       }
 
+      if (!artifactFailed && parser !== undefined && localAstRoot !== undefined) {
+        readyParticipants.set(artifactType.id, {
+          artifactId: artifactType.id,
+          key: fileKey,
+          scope: artifactType.scope,
+          root: localAstRoot,
+          parser,
+          filename: validationFilename,
+        })
+      }
+
       // --- Mark complete ---
       if (!artifactFailed) {
         const contentToHash = shouldApplyDelta ? effectiveFile.content : validationContent
@@ -559,6 +590,46 @@ export class ValidateArtifacts {
           specDependsOnUpdates.set(input.specPath, deps)
         }
       }
+    }
+
+    for (const rule of crossRules) {
+      if (
+        input.artifactId !== undefined &&
+        !rule.participants.some((p) => p.artifact === input.artifactId)
+      ) {
+        continue
+      }
+      const participantInputs = new Map()
+      let deferred = false
+      for (const participant of rule.participants) {
+        const ready = readyParticipants.get(participant.artifact)
+        if (ready === undefined || ready.scope !== rule.scope) {
+          deferred = true
+          break
+        }
+        participantInputs.set(participant.as, {
+          artifactId: ready.artifactId,
+          root: ready.root,
+          parser: ready.parser,
+        })
+      }
+      if (deferred) {
+        warnings.push({
+          artifactId: rule.participants[0]?.artifact ?? 'unknown',
+          description: `Deferred cross-artifact rule '${rule.id}': participants not ready`,
+        })
+        continue
+      }
+      const result = evaluateCrossArtifactRule({
+        rule,
+        participants: participantInputs,
+      })
+      failures.push(
+        ...result.failures.map((f) => ({ artifactId: f.artifactId, description: f.description })),
+      )
+      warnings.push(
+        ...result.warnings.map((w) => ({ artifactId: w.artifactId, description: w.description })),
+      )
     }
 
     if (

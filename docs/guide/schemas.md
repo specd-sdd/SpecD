@@ -291,7 +291,17 @@ Schemas can declare structural validation rules for artifact content. Validation
 
 The standard schema ships validations for `spec.md` and `verify.md` out of the box, so malformed artifacts fail before they can be archived.
 
+Rules can also enforce **cardinality** (exactly N matches, min/max bounds) and **uniqueness** (no duplicate keys among selected nodes) via the `count` field.
+
 For the full validation rule syntax and selector system, see [selectors.md](selectors.md).
+
+## Cross-artifact validation
+
+Schemas can also declare **relational** rules that compare multiple artifacts of the same spec. For example, that requirement IDs in `spec.md` and `verify.md` are always mirrored, or that every spec requirement is covered by a YAML model artifact.
+
+These rules are declared in the top-level `crossArtifactValidations` array and are evaluated only after all participating artifacts pass their local structural validation.
+
+For the full syntax, see the [schema format reference](../schemas/schema-format.md#crossartifactvalidations).
 
 ## Metadata extraction
 
