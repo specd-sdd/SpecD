@@ -62,6 +62,12 @@ Any advisory conditions (missing `file:` entries, stale metadata, unknown worksp
 - If the config cannot be loaded (discovery failure or parse error), exits per the entrypoint exit code rules.
 - If the schema cannot be resolved, exits with code 3.
 
+### Requirement: Full mode defaults and section overrides
+
+In `full` mode (default when no section flags are passed), the output includes Description, Rules, and Constraints for each spec.
+
+When one or more section flags (`--rules`, `--constraints`, `--scenarios`) are passed, only those sections appear (header fields persist).
+
 ## Constraints
 
 - This command is read-only

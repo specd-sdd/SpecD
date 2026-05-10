@@ -107,3 +107,11 @@
 
 - **WHEN** the graph has 100 symbols but only 10 pass filters
 - **THEN** `totalSymbols` is 100 and `entries` has length 10
+
+### Requirement: Pure function
+
+#### Scenario: computeHotspots does not mutate the store
+
+- **GIVEN** a store with known state
+- **WHEN** `computeHotspots(store, options)` is called
+- **THEN** subsequent `getStatistics()` returns the same values as before the call

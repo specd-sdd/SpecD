@@ -148,7 +148,7 @@
 - **WHEN** validation fails
 - **THEN** result has `valid: false`, `errors` (non-empty string array), and `warnings` (string array)
 
-### Requirement: Extends chain warnings in file mode
+### Requirement: Extends chain warnings in file and ref modes
 
 #### Scenario: File with extends emits resolution warning
 

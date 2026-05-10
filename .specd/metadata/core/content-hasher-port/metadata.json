@@ -104,11 +104,23 @@
         "no observable state changes occur between calls",
         "AND the return value is identical each time"
       ]
+    },
+    {
+      "requirement": "Hash input",
+      "name": "Hash accepts string content",
+      "when": ["hash is called with a string argument"],
+      "then": ["it returns a valid hash result without throwing"]
+    },
+    {
+      "requirement": "Hash input",
+      "name": "Hash treats input as UTF-8",
+      "when": ["hash is called with a string containing unicode characters"],
+      "then": ["it produces a deterministic hash based on UTF-8 encoding of the input"]
     }
   ],
   "contentHashes": {
     "spec.md": "sha256:b0d078c574fba9c652ca45cb2180d03e426c6145c5e90c2b1e871c3f20e979a1",
-    "verify.md": "sha256:b713fdfb1a91cedd0f484d8dda1981991e8612c754307603b40c37a79aae7284"
+    "verify.md": "sha256:0e07dc6c9004a04272c082253ad4b70622122fca077ce42854e74a1057b2156d"
   },
   "generatedBy": "core"
 }

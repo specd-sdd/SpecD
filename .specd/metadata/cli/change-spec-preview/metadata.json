@@ -72,7 +72,7 @@
       "then": ["the command outputs a unified diff instead of the full merged content"]
     },
     {
-      "requirement": "Text output — merged mode",
+      "requirement": "Text output — merged mode (no --diff)",
       "name": "Files separated by header lines with status labels",
       "given": ["a change with merged, no-op, and missing artifacts"],
       "when": ["the command is invoked without --diff"],
@@ -85,49 +85,49 @@
       ]
     },
     {
-      "requirement": "Text output — merged mode",
+      "requirement": "Text output — merged mode (no --diff)",
       "name": "Filtered artifact shows status label",
       "given": ["a change where specs artifact is no-op"],
       "when": ["specd change spec-preview my-change my-spec --artifact specs is run"],
       "then": ["stdout contains --- spec.md --- (no-op delta, showing original)"]
     },
     {
-      "requirement": "Text output — diff mode",
+      "requirement": "Text output — diff mode (--diff)",
       "name": "Additions colored green",
       "given": ["a delta that adds lines to a spec"],
       "when": ["the command is invoked with --diff --format text"],
       "then": ["lines starting with + are rendered in green"]
     },
     {
-      "requirement": "Text output — diff mode",
+      "requirement": "Text output — diff mode (--diff)",
       "name": "Removals colored red",
       "given": ["a delta that removes lines from a spec"],
       "when": ["the command is invoked with --diff --format text"],
       "then": ["lines starting with - are rendered in red"]
     },
     {
-      "requirement": "Text output — diff mode",
+      "requirement": "Text output — diff mode (--diff)",
       "name": "Hunk headers colored cyan",
       "given": ["a delta producing a diff"],
       "when": ["the command is invoked with --diff --format text"],
       "then": ["lines starting with @@ are rendered in cyan"]
     },
     {
-      "requirement": "Text output — diff mode",
+      "requirement": "Text output — diff mode (--diff)",
       "name": "Context lines dimmed",
       "given": ["a delta producing a diff with context lines"],
       "when": ["the command is invoked with --diff --format text"],
       "then": ["unchanged context lines are rendered in dim"]
     },
     {
-      "requirement": "Text output — diff mode",
+      "requirement": "Text output — diff mode (--diff)",
       "name": "No-change files omitted in diff mode",
       "given": ["a change with a no-op delta for one artifact and a real delta for another"],
       "when": ["the command is invoked with --diff"],
       "then": ["only the artifact with real changes appears in the output"]
     },
     {
-      "requirement": "Text output — diff mode",
+      "requirement": "Text output — diff mode (--diff)",
       "name": "Filtered artifact in diff mode",
       "given": ["a change with deltas in spec.md and verify.md"],
       "when": ["specd change spec-preview my-change my-spec --diff --artifact specs is run"],
@@ -244,7 +244,7 @@
   ],
   "contentHashes": {
     "spec.md": "sha256:abf18454b15617245698e4a6da133f86fbe7d399626a3f5221cee0640616ba16",
-    "verify.md": "sha256:9770b07258059490de539773422a35108e50c95da49875acb692d80c38371a01"
+    "verify.md": "sha256:b1afb239e5f26368a3d8d6f4eedaacc88681e31b2f2d7c096846c382c132e930"
   },
   "generatedBy": "core"
 }

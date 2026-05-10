@@ -18,6 +18,37 @@
 - **WHEN** `expand()` is called
 - **THEN** the result is `"add-auth in default"`
 
+### Requirement: Built-in namespace
+
+#### Scenario: project namespace is always present
+
+- **GIVEN** any expansion context
+- **WHEN** `expand()` is called
+- **THEN** the `project` namespace is available
+- **AND** `project.root` contains the absolute path to the project root
+
+#### Scenario: Built-in variables are injected at composition time
+
+- **WHEN** `TemplateExpander` is constructed
+- **THEN** it receives built-in variables (project namespace) from the composition layer
+- **AND** use cases do not need to build them per invocation
+
+### Requirement: Variable map shape
+
+#### Scenario: Variable map is a nested record structure
+
+- **GIVEN** a variable map `{ project: { root: '/home' }, change: { name: 'my-change' } }`
+- **WHEN** it is used for expansion
+- **THEN** it is a plain object where top-level keys are namespace names
+- **AND** each namespace value is a flat record of string keys to primitive values
+
+#### Scenario: Only primitive values are expanded
+
+- **GIVEN** a template `"{{change.complex}}"`
+- **AND** variables `{ change: { complex: { nested: 'value' } } }`
+- **WHEN** `expand()` is called
+- **THEN** the token is preserved unchanged because object values are not expanded
+
 ### Requirement: Expansion semantics
 
 #### Scenario: Unknown namespace preserved

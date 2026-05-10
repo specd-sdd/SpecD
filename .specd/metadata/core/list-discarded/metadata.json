@@ -33,6 +33,12 @@
   ],
   "scenarios": [
     {
+      "requirement": "Constructor accepts a ChangeRepository",
+      "name": "Constructor accepts ChangeRepository",
+      "when": ["ListDiscarded is instantiated"],
+      "then": ["it requires a ChangeRepository in its constructor"]
+    },
+    {
       "requirement": "Returns all discarded changes",
       "name": "Multiple discarded changes exist",
       "given": [
@@ -76,7 +82,7 @@
   ],
   "contentHashes": {
     "spec.md": "sha256:72a115c74d2aced6b77fb5edf026e8c6e3df0737773d0e587e281c556481d554",
-    "verify.md": "sha256:13bff06f9a2e6a18078569bfb4b3e172032f9fe4782b17d53bc72da5b2dfac09"
+    "verify.md": "sha256:4bfc57ef17273e7a69d8d83e05d2ddf2d10a89fab08e1faabf178804d05bf93e"
   },
   "generatedBy": "core"
 }

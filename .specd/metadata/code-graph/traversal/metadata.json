@@ -291,11 +291,23 @@
       "given": ["a store with known state"],
       "when": ["getUpstream, getDownstream, or analyzeImpact is called"],
       "then": ["getStatistics() returns the same counts before and after the call"]
+    },
+    {
+      "requirement": "TraversalOptions and TraversalResult",
+      "name": "TraversalOptions defaults",
+      "when": ["getUpstream is called without options"],
+      "then": ["default maxDepth is 3", "AND default includeFiles is true"]
+    },
+    {
+      "requirement": "TraversalOptions and TraversalResult",
+      "name": "TraversalResult structure",
+      "when": ["getUpstream(store, symbol.id) returns"],
+      "then": ["result contains root, levels (Map), totalCount, and truncated fields"]
     }
   ],
   "contentHashes": {
     "spec.md": "sha256:ef44fe17ebbfd8e1e4bfd6da6cc80829465942f1b8dc63994d8f1861de176e7a",
-    "verify.md": "sha256:cef498ff2d32f64610be4a5cb3e1b591011c38f648bf4dd0d47a6b11d06bc130"
+    "verify.md": "sha256:150d8eed78c71d2339e325fa22194be7d56c3e128281904d100b5b50b95dbc14"
   },
   "generatedBy": "core"
 }

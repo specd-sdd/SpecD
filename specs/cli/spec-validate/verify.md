@@ -74,3 +74,45 @@
 - **AND** the workspace does not exist in config
 - **THEN** stderr contains `error: unknown workspace`
 - **AND** exit code is 1
+
+### Requirement: Scope resolution
+
+#### Scenario: Only spec-scoped artifacts are validated
+
+- **WHEN** `specd spec validate default:auth/login --all` is run
+- **THEN** only `scope: 'spec'` artifacts are validated
+- **AND** change-scoped artifacts are ignored
+
+### Requirement: Artifact filename derivation
+
+#### Scenario: Artifact filename derived from artifactType.output()
+
+- **WHEN** the schema has `spec.md` artifact with output `specs/**/spec.md`
+- **THEN** the command loads `spec.md` from the spec directory
+
+### Requirement: Missing artifact handling
+
+#### Scenario: Missing required artifact counts as failure
+
+- **WHEN** a spec has a required artifact (`optional: false`) that is absent
+- **THEN** it counts as a validation failure
+
+### Requirement: Structural validation
+
+#### Scenario: Validation rules evaluated against AST
+
+- **GIVEN** a spec's schema has `validations` defined
+- **WHEN** `specd spec validate default:auth/login` is run
+- **THEN** validation rules are evaluated against the AST
+
+### Requirement: Exit code
+
+#### Scenario: All specs pass exits 0
+
+- **WHEN** all specs pass validation
+- **THEN** exit code is 0
+
+#### Scenario: Any failure exits 1
+
+- **WHEN** any spec has validation failures
+- **THEN** exit code is 1

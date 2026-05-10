@@ -70,6 +70,15 @@
       "then": ["the command exits with code 1", "AND a usage error is printed to stderr"]
     },
     {
+      "requirement": "Delegates to RunStepHooks",
+      "name": "Command delegates to use case",
+      "when": ["specd change run-hooks is invoked"],
+      "then": [
+        "it delegates all hook resolution and execution to RunStepHooks use case",
+        "AND it does not resolve schemas, collect hooks, or call HookRunner directly"
+      ]
+    },
+    {
       "requirement": "Exit code 0 on success",
       "name": "All hooks succeed",
       "given": [
@@ -185,7 +194,7 @@
   ],
   "contentHashes": {
     "spec.md": "sha256:3525d872ac348b718667441c8e08a4d062bc912c9d7d5bdfdf69d2976f0a6026",
-    "verify.md": "sha256:35241e7405ccd0e0cf17a8bc7da5f7d739f26418ebf838ed08ed71a2e6d84e24"
+    "verify.md": "sha256:7d982b2db6a54a5d8fec815383645f8659b8571a3ca0fd3629b76b07cd767927"
   },
   "generatedBy": "core"
 }

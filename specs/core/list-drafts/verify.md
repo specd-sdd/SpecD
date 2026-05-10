@@ -2,6 +2,13 @@
 
 ## Requirements
 
+### Requirement: Constructor accepts a ChangeRepository
+
+#### Scenario: Constructor accepts ChangeRepository
+
+- **WHEN** `ListDrafts` is instantiated
+- **THEN** it requires a `ChangeRepository` in its constructor
+
 ### Requirement: Returns all drafted changes
 
 #### Scenario: Multiple drafted changes exist

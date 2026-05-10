@@ -123,3 +123,15 @@
 - **GIVEN** `repo.artifact(spec, 'spec.md')` throws an I/O error during summary resolution
 - **WHEN** `execute({ includeSummary: true })` is called
 - **THEN** the entry still appears without a `summary` and no error is thrown
+
+### Requirement: SpecListEntry shape
+
+#### Scenario: Entry contains required fields
+
+- **WHEN** `execute()` is called
+- **THEN** each entry contains `workspace` (string), `path` (string), and `title` (string)
+
+#### Scenario: Entry may contain optional fields when requested
+
+- **WHEN** `execute({ includeSummary: true, includeMetadataStatus: true })` is called
+- **THEN** entries may contain `summary` and `metadataStatus` in addition to required fields

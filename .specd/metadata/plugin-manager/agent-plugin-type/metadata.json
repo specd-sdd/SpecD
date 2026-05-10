@@ -53,11 +53,26 @@
       "given": ["a SpecdPlugin with install and uninstall methods but type is not 'agent'"],
       "when": ["isAgentPlugin is called"],
       "then": ["it returns false"]
+    },
+    {
+      "requirement": "AgentInstallOptions",
+      "name": "Options include skills filter and variables",
+      "when": ["AgentInstallOptions is used"],
+      "then": ["it accepts optional skills array and variables record"]
+    },
+    {
+      "requirement": "AgentInstallResult",
+      "name": "Result tracks installed and skipped skills",
+      "when": ["AgentInstallResult is returned"],
+      "then": [
+        "it contains installed array with skill and path",
+        "AND skipped array with skill and reason"
+      ]
     }
   ],
   "contentHashes": {
     "spec.md": "sha256:6ef3e5ecf69176e24c90443613bd968fbbd87811312221b40905a6670f018f2f",
-    "verify.md": "sha256:9c69a8d95806f821535d36c0b7a2110c990e19155d6380665d0548f2de117672"
+    "verify.md": "sha256:3ee275fff7cf1c7d95d445875af052b9cbba6f875029b2d9e319c62ee016fe7f"
   },
   "generatedBy": "core"
 }

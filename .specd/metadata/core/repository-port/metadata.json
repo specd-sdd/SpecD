@@ -9,8 +9,7 @@
     {
       "requirement": "RepositoryConfig shape",
       "rules": [
-        "`Repository` is constructed from a `RepositoryConfig` object:\n\n```typescript\ninterface RepositoryConfig {\n  readonly workspace: string\n  readonly ownership: 'owned' | 'shared' | 'readOnly'\n  readonly isExternal: boolean\n}\n```\n\n- `workspace` — the workspace name this repository is bound to (e.g. `\"default\"`, `\"billing\"`)\n- `ownership` — the ownership level declared in `specd.yaml`:\n  - `owned` — full control, no restrictions\n  - `shared` — writes allowed but recorded in the change manifest as `touchedSharedSpecs`\n  - `readOnly` — no writes allowed; data may only be read\n- `isExternal` — whether this repository points to data outside the current git repository. External repositories may not be accessible to agents restricted to the git root.",
-        "`Repository` is constructed from a `RepositoryConfig` object:\n\n```typescript\ninterface RepositoryConfig {\n  readonly workspace: string\n  readonly ownership: 'owned' | 'shared' | 'readOnly'\n  readonly isExternal: boolean\n  readonly configPath: string\n}\n```\n\n- `workspace` — the workspace name this repository is bound to (e.g. `\"default\"`, `\"billing\"`)\n- `ownership` — the ownership level declared in `specd.yaml`:\n  - `owned` — full control, no restrictions\n  - `shared` — writes allowed but recorded in the change manifest as `touchedSharedSpecs`\n  - `readOnly` — no writes allowed; data may only be read\n- `isExternal` — whether this repository points to data outside the current git repository\n- `configPath` — absolute path to the config directory, used for derived paths (e.g. change locks)"
+        "`Repository` is constructed from a `RepositoryConfig` object:\n\n```typescript\ninterface RepositoryConfig {\n  readonly workspace: string\n  readonly ownership: 'owned' | 'shared' | 'readOnly'\n  readonly isExternal: boolean\n}\n```\n\n- `workspace` — the workspace name this repository is bound to (e.g. `\"default\"`, `\"billing\"`)\n- `ownership` — the ownership level declared in `specd.yaml`:\n  - `owned` — full control, no restrictions\n  - `shared` — writes allowed but recorded in the change manifest as `touchedSharedSpecs`\n  - `readOnly` — no writes allowed; data may only be read\n- `isExternal` — whether this repository points to data outside the current git repository. External repositories may not be accessible to agents restricted to the git root."
       ]
     },
     {
@@ -46,6 +45,19 @@
     "ReadOnlyWorkspaceError extends DomainError and is exported from the repository-port module"
   ],
   "scenarios": [
+    {
+      "requirement": "Abstract class, not interface",
+      "name": "Repository cannot be instantiated directly",
+      "when": ["code attempts to instantiate Repository directly"],
+      "then": ["it fails because Repository is abstract"]
+    },
+    {
+      "requirement": "Abstract class, not interface",
+      "name": "Subclasses extend Repository",
+      "given": ["a concrete class extending Repository"],
+      "when": ["the subclass is instantiated with RepositoryConfig"],
+      "then": ["it compiles and can be instantiated as a concrete repository"]
+    },
     {
       "requirement": "Immutable accessors",
       "name": "Accessors return construction-time values",
@@ -95,8 +107,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:8b5304bc2d4432301c0b6455bc7bd26d99f3417b99d6154fa98c97ef2e49ee3c",
-    "verify.md": "sha256:741a220ef0ecfe766a265a3ea59747b0dfc21a9f5f68a09f850fa0fb41ff06f7"
+    "spec.md": "sha256:d10763da75620b581e613d90a203eddfb907247f9b951c09a9ad756124243b3a",
+    "verify.md": "sha256:98cff78d753fccf29d500c282ad2a14974ca0504f298446f4e91ea7adb7a25ee"
   },
   "generatedBy": "core"
 }

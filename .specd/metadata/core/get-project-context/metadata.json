@@ -309,11 +309,19 @@
       "given": ["a spec has no metadata and the schema has no metadataExtraction declarations"],
       "when": ["execute is called"],
       "then": ["the spec's content contains only the spec heading with no body"]
+    },
+    {
+      "requirement": "Construction dependencies",
+      "name": "Constructor accepts all required ports",
+      "when": ["GetProjectContext is instantiated"],
+      "then": [
+        "it requires specs (ReadonlyMap<string, SpecRepository>), schemaProvider (SchemaProvider), files (FileReader), parsers (ArtifactParserRegistry), and hasher (ContentHasher) in its constructor"
+      ]
     }
   ],
   "contentHashes": {
     "spec.md": "sha256:1f0eb688dff0e160a5b05a96b2895273a3959c8bc09ee4671356bff778fef6ef",
-    "verify.md": "sha256:67c2a1afd37438e1d4728531c682ef478fbb7a0568776c9d84c75afb89169b32"
+    "verify.md": "sha256:33fb6dc4672c258aa86843831e3c93b4dbe0d4a15c198178868455438a06229f"
   },
   "generatedBy": "core"
 }

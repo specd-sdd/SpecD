@@ -2,6 +2,13 @@
 
 ## Requirements
 
+### Requirement: Constructor accepts a ChangeRepository
+
+#### Scenario: Constructor accepts ChangeRepository
+
+- **WHEN** `ListChanges` is instantiated
+- **THEN** it requires a `ChangeRepository` in its constructor
+
 ### Requirement: Returns all active changes
 
 #### Scenario: Multiple active changes exist

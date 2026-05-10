@@ -22,13 +22,22 @@
   "constraints": ["The port interface MUST NOT contain any I/O code."],
   "scenarios": [
     {
-      "requirement": "Port interface",
+      "requirement": "SkillRepositoryPort interface",
       "name": "Has required methods",
       "when": ["SkillRepositoryPort is inspected"],
       "then": ["it has list(), get(), getBundle(), and listSharedFiles() methods"]
     },
     {
-      "requirement": "Port interface",
+      "requirement": "SkillRepositoryPort interface",
+      "name": "Interface matches SkillRepository",
+      "when": ["SkillRepositoryPort is inspected"],
+      "then": [
+        "it defines list(), get(), getBundle(), and listSharedFiles() methods",
+        "AND getBundle accepts name, variables, and optional SpecdConfig"
+      ]
+    },
+    {
+      "requirement": "SkillRepositoryPort interface",
       "name": "getBundle preserves shared origin markers",
       "given": ["shared files are declared for a skill"],
       "when": ["getBundle resolves files for that skill"],
@@ -36,11 +45,20 @@
         "resolved files that come from shared declarations are marked as shared",
         "AND files from skill-local templates are not marked as shared"
       ]
+    },
+    {
+      "requirement": "Port abstraction",
+      "name": "Implementation lives in infrastructure layer",
+      "when": ["a concrete implementation of SkillRepositoryPort is created"],
+      "then": [
+        "it is defined in the infrastructure layer",
+        "AND no I/O code exists in the port interface"
+      ]
     }
   ],
   "contentHashes": {
     "spec.md": "sha256:f15f4aa3d875deebcb8255847c09c903b1359b075be2681d35d1217d77a68629",
-    "verify.md": "sha256:a467fded07534d06e91612fa68f8323950337cb87a8dd05c8baefaf4c6aaea90"
+    "verify.md": "sha256:d7812b57a78f408a8e1116092c0a62419b1beb74ed68f85a06787031cb0c6da2"
   },
   "generatedBy": "core"
 }

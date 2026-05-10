@@ -430,11 +430,44 @@
       ],
       "when": ["unscaffold(change, ['core:edit-change']) is called"],
       "then": ["the specs/core/core/edit-change/ directory and its contents are removed"]
+    },
+    {
+      "requirement": "Inheritance from Repository base",
+      "name": "Repository extends Repository base class",
+      "when": ["ChangeRepository is examined in the codebase"],
+      "then": ["it extends a base Repository class"]
+    },
+    {
+      "requirement": "delete removes the entire change directory",
+      "name": "Delete removes change directory",
+      "given": ["a change in the changes directory with manifest and artifact files"],
+      "when": ["delete(change) is called"],
+      "then": ["the entire change directory is removed"]
+    },
+    {
+      "requirement": "changePath returns the absolute path to a change directory",
+      "name": "changePath resolves to absolute path",
+      "given": ["a change with name \"my-change\""],
+      "when": ["changePath(change) is called"],
+      "then": ["it returns the absolute path to the change directory"]
+    },
+    {
+      "requirement": "scaffold creates artifact directories",
+      "name": "Scaffold creates spec directories",
+      "given": ["a change with specIds including core:edit-change"],
+      "when": ["scaffold(change) is called"],
+      "then": ["it creates the specs/core/core/edit-change/ directory"]
+    },
+    {
+      "requirement": "Abstract class with abstract methods",
+      "name": "ChangeRepository declares abstract methods",
+      "when": ["ChangeRepository is declared"],
+      "then": ["it is an abstract class with abstract methods for get, list, save, mutate"]
     }
   ],
   "contentHashes": {
     "spec.md": "sha256:39bf9751c8fa54d3c3166cae3bec9713794e32d6ad2eef91178240ed2f9e5c7b",
-    "verify.md": "sha256:c2ff063703df66861efba3cb40ac50f63e82b390a6eb49a9c8a483a64d618685"
+    "verify.md": "sha256:dc4917a952a109a256c858d1162fa88c62381a738a4be1922ea3398f471ce260"
   },
   "generatedBy": "core"
 }

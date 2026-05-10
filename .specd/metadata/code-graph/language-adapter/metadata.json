@@ -864,11 +864,32 @@
       "given": ["alias assignment in one method and method call in another"],
       "when": ["extractRelations() runs"],
       "then": ["no CALLS relation is emitted from cross-method alias propagation"]
+    },
+    {
+      "requirement": "PHP loader resolver extensibility",
+      "name": "Loader detection is registry-based",
+      "given": ["a PHP adapter with loader resolver registry"],
+      "when": ["a new loader API pattern is registered"],
+      "then": ["the adapter can detect it without changing the core extraction flow"]
+    },
+    {
+      "requirement": "PHP loader resolver extensibility",
+      "name": "Adding a new loader requires resolver definition",
+      "given": ["a framework-specific loader pattern"],
+      "when": ["the pattern is added as a resolver definition"],
+      "then": ["the adapter can detect it and no core extraction code changes"]
+    },
+    {
+      "requirement": "Tree-sitter query patterns",
+      "name": "Query patterns are internal implementation details",
+      "given": ["a language adapter uses Tree-sitter query patterns internally"],
+      "when": ["consumers call the adapter methods"],
+      "then": ["query patterns are not exposed through the public API"]
     }
   ],
   "contentHashes": {
     "spec.md": "sha256:d7d80f0edc953d1ad050c9c8c9fd064a88181379bfbf13a7917d660599ac738e",
-    "verify.md": "sha256:0dd3186bb7af0054210049f039860cb0f60bf995973eb7beb7f51f87695e78e5"
+    "verify.md": "sha256:a49256735fcb8cb3f04775f288cb5bd98b00d18d8436eae5074164e351330ff7"
   },
   "generatedBy": "core"
 }

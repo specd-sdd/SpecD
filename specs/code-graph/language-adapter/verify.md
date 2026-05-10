@@ -575,3 +575,25 @@
 - **GIVEN** alias assignment in one method and method call in another
 - **WHEN** `extractRelations()` runs
 - **THEN** no `CALLS` relation is emitted from cross-method alias propagation
+
+### Requirement: PHP loader resolver extensibility
+
+#### Scenario: Loader detection is registry-based
+
+- **GIVEN** a PHP adapter with loader resolver registry
+- **WHEN** a new loader API pattern is registered
+- **THEN** the adapter can detect it without changing the core extraction flow
+
+#### Scenario: Adding a new loader requires resolver definition
+
+- **GIVEN** a framework-specific loader pattern
+- **WHEN** the pattern is added as a resolver definition
+- **THEN** the adapter can detect it and no core extraction code changes
+
+### Requirement: Tree-sitter query patterns
+
+#### Scenario: Query patterns are internal implementation details
+
+- **GIVEN** a language adapter uses Tree-sitter query patterns internally
+- **WHEN** consumers call the adapter methods
+- **THEN** query patterns are not exposed through the public API

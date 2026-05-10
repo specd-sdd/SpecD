@@ -26,15 +26,35 @@
   "constraints": ["Read-only operation, no state modification."],
   "scenarios": [
     {
+      "requirement": "Input",
+      "name": "Input includes plugin names array",
+      "when": ["ListPlugins is executed"],
+      "then": ["the input includes pluginNames array"]
+    },
+    {
       "requirement": "Output",
       "name": "Returns plugin statuses",
       "when": ["ListPlugins is executed with plugin names"],
       "then": ["it returns array with name, status, and optional plugin/error"]
+    },
+    {
+      "requirement": "Behavior",
+      "name": "Not found status when package cannot be resolved",
+      "given": ["an npm package that cannot be resolved"],
+      "when": ["ListPlugins is executed with that plugin name"],
+      "then": ["status is 'not_found'"]
+    },
+    {
+      "requirement": "Behavior",
+      "name": "Error status when load fails",
+      "given": ["a plugin that exists but fails to load"],
+      "when": ["ListPlugins is executed with that plugin name"],
+      "then": ["status is 'error' with error message"]
     }
   ],
   "contentHashes": {
     "spec.md": "sha256:b55b58f01a7b3275b9b3a5a4d9f97c419cee96f9b8446451112b81c76b562e76",
-    "verify.md": "sha256:d723bf8dce80cb6cc5f17fd049f67d836cb4d7739f7cbb13330679dd813c0441"
+    "verify.md": "sha256:09a9bc952bb92f930a3d87552119ac9b0de4c19706eab0b140d3e4cac3963f73"
   },
   "generatedBy": "core"
 }

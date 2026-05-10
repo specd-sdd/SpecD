@@ -137,3 +137,34 @@
 - **GIVEN** a change with `specIds: ['core:edit-change']`
 - **WHEN** `execute` is called with `addSpecIds: ['core:change-repository-port']`
 - **THEN** `ChangeRepository.unscaffold` is NOT called
+
+### Requirement: Input contract
+
+#### Scenario: execute accepts EditChangeInput
+
+- **WHEN** `EditChange.execute` is called
+- **THEN** it accepts `EditChangeInput` with `name` (required), `addSpecIds` (optional), `removeSpecIds` (optional), `description` (optional)
+
+### Requirement: Output contract
+
+#### Scenario: execute returns EditChangeResult
+
+- **WHEN** `EditChange.execute` completes
+- **THEN** it returns `EditChangeResult` with `change` (the Change entity) and `invalidated` (boolean)
+
+### Requirement: Dependencies
+
+#### Scenario: Uses ChangeRepository port
+
+- **WHEN** `EditChange` is instantiated
+- **THEN** it requires a `ChangeRepository` port in its constructor
+
+#### Scenario: Uses ActorResolver port
+
+- **WHEN** `EditChange` is instantiated
+- **THEN** it requires an `ActorResolver` port in its constructor
+
+#### Scenario: Uses spec repositories map
+
+- **WHEN** `EditChange` is instantiated
+- **THEN** it requires a `ReadonlyMap<string, SpecRepository>` for spec existence checks

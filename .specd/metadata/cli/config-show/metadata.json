@@ -37,6 +37,12 @@
   ],
   "scenarios": [
     {
+      "requirement": "Command signature",
+      "name": "No positional arguments",
+      "when": ["specd config show is run"],
+      "then": ["the command proceeds without positional arguments"]
+    },
+    {
       "requirement": "Output format",
       "name": "artifactRules not shown in text output",
       "given": ["a config with artifactRules set"],
@@ -51,6 +57,15 @@
       "then": ["the output includes a plugins section listing the agent names"]
     },
     {
+      "requirement": "Sensitive fields",
+      "name": "No sensitive values in config output",
+      "when": ["specd config show is run"],
+      "then": [
+        "the output contains only filesystem paths, schema references, and boolean flags",
+        "AND no redaction is applied"
+      ]
+    },
+    {
       "requirement": "Error cases",
       "name": "Config not found",
       "given": ["CWD is not under any directory containing specd.yaml"],
@@ -63,7 +78,7 @@
   ],
   "contentHashes": {
     "spec.md": "sha256:536d4c36fedf7d951f3e80b4a0e7f7f150cd15afc0bcd611041fd9532a56a3ef",
-    "verify.md": "sha256:35317531613c0b226b9d467bd31b1619148585fef793880bb4c17a92f17efacc"
+    "verify.md": "sha256:986ee790b03314e3e60a275f3685c47fddefcfbd8230a485ff444b9ad96d1017"
   },
   "generatedBy": "core"
 }

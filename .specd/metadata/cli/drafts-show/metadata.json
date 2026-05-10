@@ -56,6 +56,12 @@
       "then": ["it is accepted as an alias of specd drafts show my-change"]
     },
     {
+      "requirement": "Output format — toon",
+      "name": "TOON format output",
+      "when": ["specd drafts show my-change --format toon is run"],
+      "then": ["output is encoded in Token-Oriented Object Notation (toon)"]
+    },
+    {
       "requirement": "Output format — text",
       "name": "Normal text output",
       "given": [
@@ -97,7 +103,7 @@
   ],
   "contentHashes": {
     "spec.md": "sha256:4e885713046bdcca5c975edbd239897da90c145b35ba16e5590822cfb59d7c3e",
-    "verify.md": "sha256:47ba6ae5cb776a7f81d1f35a34e795d6b9868947fa2eaa68879241d979f6a8c7"
+    "verify.md": "sha256:dd55568591b61302aeee4aff8bb15ae781e0faeae6c65df52098a2a8fab3d555"
   },
   "generatedBy": "core"
 }

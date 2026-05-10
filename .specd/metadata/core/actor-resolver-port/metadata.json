@@ -72,11 +72,23 @@
         "the promise MUST reject with an Error whose message indicates no VCS was detected",
         "AND no I/O or subprocess invocation SHALL occur"
       ]
+    },
+    {
+      "requirement": "Decoupled from VcsAdapter",
+      "name": "ActorResolver does not import VcsAdapter",
+      "when": ["examining the imports in ActorResolver port declaration"],
+      "then": ["no import of VcsAdapter or VCS-related types appears"]
+    },
+    {
+      "requirement": "Interface-only declaration",
+      "name": "ActorResolver is an interface",
+      "when": ["ActorResolver is declared in the codebase"],
+      "then": ["it is declared as a type or interface, not an abstract class"]
     }
   ],
   "contentHashes": {
     "spec.md": "sha256:b41f21590352f6a663f6c51377c13f9227fbb0514f120a6cb1d4ace546eddcfc",
-    "verify.md": "sha256:569797288dc300794dd66bd49cb84e1c0e191e3f4cd6e5ca71c7f317301b7395"
+    "verify.md": "sha256:c2b8b5b8a86f331763b6a33c6af364637cc5c40b6974d1ed759ff1d8c263e738"
   },
   "generatedBy": "core"
 }

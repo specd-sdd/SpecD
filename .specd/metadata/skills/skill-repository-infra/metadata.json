@@ -57,11 +57,31 @@
       "name": "Factory exists",
       "when": ["createSkillRepository() is called"],
       "then": ["it returns a SkillRepositoryPort implementation"]
+    },
+    {
+      "requirement": "TemplateReader",
+      "name": "TemplateReader loads .md files lazily",
+      "given": ["a skill with templates in packages/skills/templates/<skill-name>/"],
+      "when": ["getBundle is called"],
+      "then": [
+        "the TemplateReader loads .md files as SkillTemplate objects",
+        "AND content is loaded lazily via getContent()"
+      ]
+    },
+    {
+      "requirement": "Shared file scanning",
+      "name": "Scans templates/shared/ for .meta.json files",
+      "when": ["getBundle is called for a skill that uses shared files"],
+      "then": [
+        "the infrastructure scans templates/shared/ for .meta.json files",
+        "AND shared file content is loaded on demand",
+        "AND ResolvedFile entries are marked as shared"
+      ]
     }
   ],
   "contentHashes": {
     "spec.md": "sha256:f43745475b95e1c29b1ff6ded56e7af35d35f0b5e3a00b00f03d12af75b0f597",
-    "verify.md": "sha256:d7708e1e3e8d286c48de142eee628cce6439824562ad5accf35f756c4829d5b9"
+    "verify.md": "sha256:28338fff4bc1184f6fa4cc6fc02a412a04a55d7061731ee58638426b45cca09c"
   },
   "generatedBy": "core"
 }

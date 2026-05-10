@@ -37,3 +37,22 @@
 - **THEN** `ChangeRepository.mutate(input.name, fn)` is called
 - **AND** the callback records the restored event on the fresh persisted `Change`
 - **AND** the resulting change is relocated back to the active changes area by the repository
+
+### Requirement: Input contract
+
+#### Scenario: execute accepts RestoreChangeInput
+
+- **WHEN** `RestoreChange.execute` is called
+- **THEN** it accepts `RestoreChangeInput` with `name` (required string)
+
+### Requirement: Dependencies
+
+#### Scenario: Uses ChangeRepository port
+
+- **WHEN** `RestoreChange` is instantiated
+- **THEN** it requires a `ChangeRepository` port in its constructor
+
+#### Scenario: Uses ActorResolver port
+
+- **WHEN** `RestoreChange` is instantiated
+- **THEN** it requires an `ActorResolver` port in its constructor

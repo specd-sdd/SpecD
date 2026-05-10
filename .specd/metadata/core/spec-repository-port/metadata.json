@@ -120,6 +120,54 @@
   ],
   "scenarios": [
     {
+      "requirement": "Inheritance from Repository base",
+      "name": "Extends Repository with immutable accessors",
+      "given": ["a concrete SpecRepository implementation"],
+      "when": ["it is instantiated with workspace, ownership, and isExternal values"],
+      "then": [
+        "it extends Repository",
+        "AND workspace(), ownership(), and isExternal() return the constructor-provided values",
+        "AND these values are immutable for the lifetime of the instance"
+      ]
+    },
+    {
+      "requirement": "saveMetadata persists metadata with conflict detection",
+      "name": "Read-only workspace throws error",
+      "given": ["a SpecRepository with ownership readOnly"],
+      "when": ["saveMetadata(spec, content) is called"],
+      "then": ["ReadOnlyWorkspaceError is thrown before any filesystem operation"]
+    },
+    {
+      "requirement": "saveMetadata persists metadata with conflict detection",
+      "name": "Write with conflict detection",
+      "given": [
+        "a SpecRepository with ownership owned",
+        "AND existing metadata file with a different hash than content.originalHash"
+      ],
+      "when": ["saveMetadata(spec, content) is called"],
+      "then": ["ArtifactConflictError is thrown"]
+    },
+    {
+      "requirement": "saveMetadata persists metadata with conflict detection",
+      "name": "Force write skips conflict detection",
+      "given": [
+        "a SpecRepository with ownership owned",
+        "AND existing metadata with different hash"
+      ],
+      "when": ["saveMetadata(spec, content, { force: true }) is called"],
+      "then": ["the file is written without error"]
+    },
+    {
+      "requirement": "Abstract class with abstract methods",
+      "name": "Port is an abstract class with abstract storage methods",
+      "when": ["SpecRepository is examined"],
+      "then": [
+        "it is declared as abstract class",
+        "AND get, list, artifact, save, delete, resolveFromPath, metadata, saveMetadata, and search are declared as abstract methods",
+        "AND a concrete implementation can extend it and implement these methods"
+      ]
+    },
+    {
       "requirement": "Workspace scoping",
       "name": "Operations are limited to the bound workspace",
       "given": ["a SpecRepository bound to workspace billing"],
@@ -355,7 +403,7 @@
   ],
   "contentHashes": {
     "spec.md": "sha256:fb1b4d0100cda117afdff3315158941a20addc57617da573b363b11b6a95dbb2",
-    "verify.md": "sha256:be29717815138b648788ebeeb0e1a8ddcd9d261ec0745e2bc7ffa47d25d4407d"
+    "verify.md": "sha256:d367a05087b2fde57e4509ffd6ef460759156cbf0a6978512be707bdfe70a0a0"
   },
   "generatedBy": "core"
 }

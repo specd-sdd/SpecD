@@ -294,11 +294,18 @@
       "given": ["specd.yaml has no workspaces configured"],
       "when": ["specd spec list is run"],
       "then": ["stdout contains no workspaces configured", "AND the process exits with code 0"]
+    },
+    {
+      "requirement": "Error cases",
+      "name": "Spec filesystem cannot be read exits code 3",
+      "given": ["the spec filesystem has an I/O error preventing reads"],
+      "when": ["specd spec list is run"],
+      "then": ["the command exits with code 3"]
     }
   ],
   "contentHashes": {
     "spec.md": "sha256:e0b7ed1ccc40fbe28cb03b05fe75af403a6165ceaf145893f4a6e7d07cbe480c",
-    "verify.md": "sha256:0261600723297469b4b047ef5fe72abed46d0a73e80a29d6575d967b6fa5a556"
+    "verify.md": "sha256:1622b03fb33da7c8d83e94d71745139baa86920e0368ffcef472aa208fb536b6"
   },
   "generatedBy": "core"
 }

@@ -2,6 +2,28 @@
 
 ## Requirements
 
+### Requirement: Ports and constructor
+
+#### Scenario: All dependencies injected via constructor
+
+- **WHEN** `ArchiveChange` is instantiated
+- **THEN** it must receive all required repository and service ports.
+
+### Requirement: Input
+
+#### Scenario: Default values for optional fields
+
+- **WHEN** execute is called with only a name
+- **THEN** hooks are not skipped and overlap is not allowed by default.
+
+### Requirement: Schema name guard
+
+#### Scenario: Mismatched schema throws error
+
+- **GIVEN** a change with schema A and project with schema B
+- **WHEN** archive is called
+- **THEN** the use case must throw `SchemaMismatchError`.
+
 ### Requirement: Archivable guard
 
 #### Scenario: Change not in archivable state
@@ -182,6 +204,26 @@
 - **GIVEN** a base markdown spec that mixes unordered list markers (`-` and `*`) or emphasis markers (`*` and `_`) for the same construct
 - **WHEN** `ArchiveChange.execute` merges and serializes the markdown artifact
 - **THEN** output style is deterministic and follows project markdown conventions
+
+### Requirement: Archive repository call
+
+#### Scenario: Calls archiveRepository.archive with actor
+
+- **GIVEN** `ActorResolver.identity()` returns a valid actor
+- **WHEN** `ArchiveChange.execute` completes the delta merge step
+- **THEN** it calls `archiveRepository.archive(change, { actor })` with the resolved actor
+
+#### Scenario: Calls archiveRepository.archive without actor when identity unavailable
+
+- **GIVEN** `ActorResolver.identity()` throws (no VCS config)
+- **WHEN** `ArchiveChange.execute` completes the delta merge step
+- **THEN** it calls `archiveRepository.archive(change, {})` without actor
+
+#### Scenario: ArchivedChange constructed by repository, not use case
+
+- **WHEN** `ArchiveChange.execute` succeeds
+- **THEN** the returned `archivedChange` is constructed by the repository
+- **AND** the use case does not directly construct the `ArchivedChange` record
 
 ### Requirement: ArchivedChange construction
 

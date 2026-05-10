@@ -23,12 +23,28 @@
 - **THEN** a warning containing "already installed" and "update" is emitted
 - **AND** the plugin is NOT re-installed
 
+### Requirement: Display name
+
+#### Scenario: Output displays appropriate header
+
+- **WHEN** `specd plugins install @specd/plugin-agent-claude` is invoked
+- **THEN** output displays a header `Installed plugins:` followed by plugin details
+
+### Requirement: Installation workflow
+
+#### Scenario: Calls InstallPlugin use case and records in config
+
+- **WHEN** `specd plugins install @specd/plugin-agent-claude` is invoked with plugin not installed
+- **THEN** `InstallPlugin` use case is called
+- **AND** `ConfigWriter.addPlugin()` is called to record the plugin in `specd.yaml`
+
 ### Requirement: Exit code
 
 #### Scenario: Installation failure
 
 - **WHEN** any plugin fails to install
 - **THEN** the command exits with code 1
+- **AND** continues processing the remaining plugins
 
 ### Requirement: Output format
 

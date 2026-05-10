@@ -48,6 +48,25 @@
       "then": ["it returns the template content as a Promise"]
     },
     {
+      "requirement": "SkillTemplate interface",
+      "name": "Content is loaded lazily, not eagerly",
+      "given": ["a Skill object with templates"],
+      "when": ["the Skill object is created"],
+      "then": [
+        "template content is not loaded into memory",
+        "AND content is only loaded when getContent() is called"
+      ]
+    },
+    {
+      "requirement": "Lazy content loading",
+      "name": "getContent returns content lazily",
+      "when": ["getContent() is called on a SkillTemplate"],
+      "then": [
+        "it returns the template content as a Promise",
+        "AND content is not loaded until the method is called"
+      ]
+    },
+    {
       "requirement": "No I/O in domain",
       "name": "Domain has no I/O imports",
       "when": ["the domain layer is inspected"],
@@ -56,7 +75,7 @@
   ],
   "contentHashes": {
     "spec.md": "sha256:b095b5d557038ee85896061dd5760073a0d73443ef4001408e370da4e4aec26e",
-    "verify.md": "sha256:f341c78a5a48ad60f420de50edaf538fbf05c4b2140478a4c84681f1dcecad6d"
+    "verify.md": "sha256:a04deee796ca8be0c0db7700769eb094e809126efeff0f95fe5253d5b0a45458"
   },
   "generatedBy": "core"
 }

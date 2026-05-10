@@ -40,6 +40,12 @@
       "rules": [
         "- If the config cannot be loaded (discovery failure or parse error), exits per the entrypoint exit code rules.\n- If the schema cannot be resolved, exits with code 3."
       ]
+    },
+    {
+      "requirement": "Full mode defaults and section overrides",
+      "rules": [
+        "In `full` mode (default when no section flags are passed), the output includes Description, Rules, and Constraints for each spec.\n\nWhen one or more section flags (`--rules`, `--constraints`, `--scenarios`) are passed, only those sections appear (header fields persist)."
+      ]
     }
   ],
   "constraints": [
@@ -152,14 +158,26 @@
       "then": ["the command prints no project context configured and exits with code 0"]
     },
     {
-      "requirement": "Output",
+      "requirement": "Error cases",
+      "name": "Config cannot be loaded",
+      "when": ["config discovery fails or parse error occurs"],
+      "then": ["the command exits per the entrypoint exit code rules"]
+    },
+    {
+      "requirement": "Error cases",
+      "name": "Schema cannot be resolved",
+      "when": ["the schema cannot be resolved"],
+      "then": ["the command exits with code 3"]
+    },
+    {
+      "requirement": "Full mode defaults and section overrides",
       "name": "Full mode defaults to Description + Rules + Constraints",
       "given": ["GetProjectContext returns specs in full mode"],
       "when": ["specd project context is run without section flags"],
       "then": ["output includes Description, Rules, and Constraints for each spec"]
     },
     {
-      "requirement": "Output",
+      "requirement": "Full mode defaults and section overrides",
       "name": "Section flags override full mode defaults",
       "given": ["GetProjectContext returns specs in full mode"],
       "when": ["specd project context --rules is run"],
@@ -191,8 +209,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:c90d6f5db992158a8e09f7d18e2d58be068dc3c2d659da1a5b5dd4a20571f7ed",
-    "verify.md": "sha256:41d388cee20ca8cc8b01df147a0b5a6e421d6cb53d2af24a679817b2cb00111d"
+    "spec.md": "sha256:69f625c2bda7ceea13a65c35cb76b527e45b1c4d93e3f719c61e987fccfc97f8",
+    "verify.md": "sha256:f17ff0193a629b340791ec158e440e420a076bfbbae355780f6802e08f6cee01"
   },
   "generatedBy": "core"
 }

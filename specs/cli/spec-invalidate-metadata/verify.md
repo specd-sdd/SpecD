@@ -2,6 +2,18 @@
 
 ## Requirements
 
+### Requirement: Command signature
+
+#### Scenario: Accepts specPath as argument
+
+- **WHEN** `specd spec invalidate-metadata auth/login` is invoked
+- **THEN** the command accepts `<specPath>` as the spec to invalidate
+
+#### Scenario: Supports --config option
+
+- **WHEN** `specd spec invalidate-metadata auth/login --config /tmp/specd.yaml` is run
+- **THEN** the command uses the specified config path
+
 ### Requirement: Text output
 
 #### Scenario: Successful invalidation in text format

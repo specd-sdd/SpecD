@@ -41,6 +41,12 @@
       ]
     },
     {
+      "requirement": "ArchivedChange construction",
+      "rules": [
+        "The use case MUST call `ArchiveRepository.archive(change, { actor })` to move the change to the permanent archive. The resulting `ArchivedChange` entity MUST be returned in the result."
+      ]
+    },
+    {
       "requirement": "Archivable guard",
       "rules": [
         "The first persisted-state mutation step of `ArchiveChange.execute` after the schema name guard MUST be a call to `ChangeRepository.mutate(name, fn)`.\n\nInside the mutation callback, the repository supplies the fresh persisted `Change` for `name`. The use case MUST call `change.assertArchivable()` on that instance. If the change is not in `archivable` state, the callback throws and the archive is aborted without running any hooks or modifying any files.\n\nAfter the guard passes, the callback MUST transition the change to `archiving` via `change.transition('archiving', actor)` when the fresh change is not already in `archiving`, then return the updated change. When the callback resolves, the repository persists the updated manifest before any hooks execute or files are modified.\n\nThe rest of the archive flow operates on the change returned by that serialized mutation step."
@@ -132,6 +138,25 @@
     "Hook execution is delegated to RunStepHooks — ArchiveChange does not call HookRunner directly"
   ],
   "scenarios": [
+    {
+      "requirement": "Ports and constructor",
+      "name": "All dependencies injected via constructor",
+      "when": ["ArchiveChange is instantiated"],
+      "then": ["it must receive all required repository and service ports."]
+    },
+    {
+      "requirement": "Input",
+      "name": "Default values for optional fields",
+      "when": ["execute is called with only a name"],
+      "then": ["hooks are not skipped and overlap is not allowed by default."]
+    },
+    {
+      "requirement": "Schema name guard",
+      "name": "Mismatched schema throws error",
+      "given": ["a change with schema A and project with schema B"],
+      "when": ["archive is called"],
+      "then": ["the use case must throw SchemaMismatchError."]
+    },
     {
       "requirement": "Archivable guard",
       "name": "Change not in archivable state",
@@ -372,6 +397,29 @@
       "then": ["output style is deterministic and follows project markdown conventions"]
     },
     {
+      "requirement": "Archive repository call",
+      "name": "Calls archiveRepository.archive with actor",
+      "given": ["ActorResolver.identity() returns a valid actor"],
+      "when": ["ArchiveChange.execute completes the delta merge step"],
+      "then": ["it calls archiveRepository.archive(change, { actor }) with the resolved actor"]
+    },
+    {
+      "requirement": "Archive repository call",
+      "name": "Calls archiveRepository.archive without actor when identity unavailable",
+      "given": ["ActorResolver.identity() throws (no VCS config)"],
+      "when": ["ArchiveChange.execute completes the delta merge step"],
+      "then": ["it calls archiveRepository.archive(change, {}) without actor"]
+    },
+    {
+      "requirement": "Archive repository call",
+      "name": "ArchivedChange constructed by repository, not use case",
+      "when": ["ArchiveChange.execute succeeds"],
+      "then": [
+        "the returned archivedChange is constructed by the repository",
+        "AND the use case does not directly construct the ArchivedChange record"
+      ]
+    },
+    {
       "requirement": "ArchivedChange construction",
       "name": "archivedName derived from createdAt",
       "given": ["a change with createdAt = 2024-01-15T12:00:00Z and name = 'add-auth-flow'"],
@@ -598,8 +646,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:e475533bb0db291c4ddc2e83e65fe0e9a0b62df63a6af0f42b1576b50735d590",
-    "verify.md": "sha256:80d7d9ae9d4de2ce05a05e2923098af6b256a7cce28eff9b77606473b4193541"
+    "spec.md": "sha256:78f9b8509fe213d1643d68720fa1a01371ff581e1495401cf1a9ea96840a601d",
+    "verify.md": "sha256:6ce4af3eb3b83bcda6c8e17b1809cb9c3b86ad63dfda43962b7dabc0c081f5ef"
   },
   "generatedBy": "core"
 }

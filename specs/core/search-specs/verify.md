@@ -60,3 +60,11 @@
 - **WHEN** `execute("test")` is called
 - **THEN** results from `beta` are returned
 - **AND** no error propagates to the caller
+
+### Requirement: Empty results
+
+#### Scenario: No matches returns empty array
+
+- **GIVEN** no spec in any workspace matches the query
+- **WHEN** `execute("zzzznonexistent")` is called
+- **THEN** the result is an empty array (not an error)

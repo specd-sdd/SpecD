@@ -70,7 +70,34 @@
 - **WHEN** `GetHookInstructions.execute` is called with `phase: "pre"`
 - **THEN** the result is `{ phase: "pre", instructions: [] }`
 
-### Requirement: Change lookup — archive fallback
+### Requirement: Ports and constructor
+
+#### Scenario: Constructor accepts all required ports
+
+- **WHEN** `GetHookInstructions` is instantiated
+- **THEN** it requires `ChangeRepository`, `ArchiveRepository`, `SchemaProvider`, and `TemplateExpander` in its constructor
+
+### Requirement: Input
+
+#### Scenario: execute accepts name, step, phase, and optional only
+
+- **WHEN** `GetHookInstructions.execute` is called
+- **THEN** it accepts `name` (string, required), `step` (string, required), `phase` ('pre' | 'post', required), `only` (string, optional)
+
+### Requirement: Change lookup
+
+#### Scenario: Change loaded from ChangeRepository by name
+
+- **GIVEN** a change named `my-change` exists in `ChangeRepository`
+- **WHEN** `GetHookInstructions.execute` is called with `name: "my-change"`
+- **THEN** `ChangeRepository.get("my-change")` is called
+
+#### Scenario: ChangeNotFoundError thrown when change not found
+
+- **GIVEN** `ChangeRepository.get("nonexistent")` returns `null`
+- **AND** the step is not `archiving` post phase
+- **WHEN** `GetHookInstructions.execute` is called with `name: "nonexistent"`
+- **THEN** `ChangeNotFoundError` is thrown
 
 #### Scenario: Post-archiving fallback — change found in archive
 

@@ -2,6 +2,24 @@
 
 ## Requirements
 
+### Requirement: Command signature
+
+#### Scenario: Basic fork from npm package
+
+- **WHEN** `specd schema fork @specd/schema-std my-schema` is run
+- **THEN** the command accepts `<ref>` and `<name>` arguments
+- **AND** creates the forked schema
+
+#### Scenario: Fork with --output option
+
+- **WHEN** `specd schema fork @specd/schema-std my-fork --output /tmp/my-schema` is run
+- **THEN** the command accepts `--output <path>` as alternative to `--workspace`
+
+#### Scenario: Fork with --workspace option
+
+- **WHEN** `specd schema fork @specd/schema-std my-fork --workspace billing` is run
+- **THEN** the command accepts `--workspace <workspace>` as alternative to `--output`
+
 ### Requirement: Fork behaviour
 
 #### Scenario: Fork from npm package

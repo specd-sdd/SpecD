@@ -168,6 +168,14 @@
 - **THEN** the command exits with code 0
 - **AND** `specd.yaml` is overwritten
 
+### Requirement: JSON/TOON output schema in help
+
+#### Scenario: JSON/TOON output schema documented in help text
+
+- **WHEN** any command that supports `--format json|toon` has its `--help` displayed
+- **THEN** the help text includes a `JSON/TOON output schema:` section
+- **AND** it shows the output shape as a TypeScript-style type annotation
+
 ### Requirement: Output format flag
 
 #### Scenario: Text format produces human-readable output

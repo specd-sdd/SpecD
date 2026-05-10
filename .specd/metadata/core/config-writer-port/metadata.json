@@ -95,23 +95,47 @@
       "then": ["the existing file is overwritten and no error is thrown"]
     },
     {
-      "requirement": "AddPlugin behaviour",
+      "requirement": "AddPlugin",
       "name": "Adds plugin to agents array",
       "given": ["specd.yaml with plugins: { agents: [] }"],
       "when": ["addPlugin(configPath, 'agents', '@specd/plugin-agent-claude') is called"],
       "then": ["the plugin is added to plugins.agents"]
     },
     {
-      "requirement": "AddPlugin behaviour",
+      "requirement": "AddPlugin",
       "name": "Duplicate plugin updates existing",
       "given": ["specd.yaml with plugins: { agents: [{ name: '@specd/plugin-agent-claude' }] }"],
       "when": ["addPlugin(configPath, 'agents', '@specd/plugin-agent-claude') is called"],
       "then": ["the existing entry is updated"]
+    },
+    {
+      "requirement": "InitProject method signature",
+      "name": "initProject accepts InitProjectOptions",
+      "when": ["initProject is called"],
+      "then": [
+        "it accepts a single argument of type InitProjectOptions",
+        "AND returns Promise<InitProjectResult>"
+      ]
+    },
+    {
+      "requirement": "InitProjectOptions shape",
+      "name": "InitProjectOptions contains required fields",
+      "when": ["InitProjectOptions interface is inspected"],
+      "then": [
+        "it contains projectRoot: string, schemaRef: string, workspaceId: string, specsPath: string",
+        "AND optional force?: boolean"
+      ]
+    },
+    {
+      "requirement": "InitProjectResult shape",
+      "name": "InitProjectResult contains required fields",
+      "when": ["InitProjectResult interface is inspected"],
+      "then": ["it contains configPath: string, schemaRef: string, workspaces: readonly string[]"]
     }
   ],
   "contentHashes": {
     "spec.md": "sha256:b0bbe21d27c2967dd50bb954c9655463be2a9618059452670037ff26fe82a122",
-    "verify.md": "sha256:7279ec9fed6e624eb090150651ff088223a435a98d808b07f48910ee0b32aa97"
+    "verify.md": "sha256:944fcdec151daac9bd2f9ea25bd3f08c691f0644e90188285a469b0d61ddb45e"
   },
   "generatedBy": "core"
 }

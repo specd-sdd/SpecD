@@ -90,6 +90,13 @@
 - **THEN** the command exits with code 3 before opening the provider
 - **AND** it prints a short retry-later message explaining that the graph is currently being indexed
 
+### Requirement: Error cases
+
+#### Scenario: Provider cannot be opened exits with code 3
+
+- **WHEN** the provider fails to open
+- **THEN** the command exits with code 3
+
 ### Requirement: Output format
 
 #### Scenario: Text output groups by category

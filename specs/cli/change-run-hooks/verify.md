@@ -10,6 +10,14 @@
 - **THEN** the command exits with code 1
 - **AND** a usage error is printed to stderr
 
+### Requirement: Delegates to RunStepHooks
+
+#### Scenario: Command delegates to use case
+
+- **WHEN** `specd change run-hooks` is invoked
+- **THEN** it delegates all hook resolution and execution to `RunStepHooks` use case
+- **AND** it does not resolve schemas, collect hooks, or call `HookRunner` directly
+
 ### Requirement: Exit code 0 on success
 
 #### Scenario: All hooks succeed

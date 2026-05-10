@@ -77,3 +77,23 @@
 
 - **WHEN** running with `--file non-existent.md`
 - **THEN** it fails with a clear error message: "file 'non-existent.md' not found"
+
+### Requirement: Outline detail modes
+
+#### Scenario: Default mode returns compact subset
+
+- **WHEN** running `specd specs outline core:config` without `--full`
+- **THEN** output returns compact subset per parser type
+
+#### Scenario: Full mode returns all node families
+
+- **WHEN** running `specd specs outline core:config --full`
+- **THEN** output includes all selector-addressable node families
+
+### Requirement: Root-level selector hint metadata
+
+#### Scenario: --hints includes selectorHints
+
+- **WHEN** running `specd specs outline core:config --hints`
+- **THEN** response includes root-level `selectorHints` object
+- **AND** hint values are placeholder-oriented (not per-node concrete values)

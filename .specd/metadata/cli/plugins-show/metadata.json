@@ -38,11 +38,19 @@
       "name": "Plugin not found",
       "when": ["specd plugins show nonexistent-plugin is invoked"],
       "then": ["an error message is emitted", "AND exit code is 1"]
+    },
+    {
+      "requirement": "Output",
+      "name": "Machine-parseable JSON output",
+      "when": ["specd plugins show @specd/plugin-agent-claude --format json is invoked"],
+      "then": [
+        "output is machine-parseable JSON with plugin name, type, version, configSchema, and capabilities"
+      ]
     }
   ],
   "contentHashes": {
     "spec.md": "sha256:4dcc29ac21c5396e04ada00ddb4e0436ab9f5b06f1ebc49d1d9345afeb69b46c",
-    "verify.md": "sha256:2058dc158192844a90f75255a139e4b4c24c72866da00bb3f60e7f2f4102920f"
+    "verify.md": "sha256:ca36cf309b5b724823237a4e32cab1cb9d1258733e404ff8bb669233f20a5023"
   },
   "generatedBy": "core"
 }

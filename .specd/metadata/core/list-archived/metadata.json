@@ -49,6 +49,12 @@
   ],
   "scenarios": [
     {
+      "requirement": "Ports and constructor",
+      "name": "Constructor accepts ArchiveRepository",
+      "when": ["ListArchived is instantiated"],
+      "then": ["it requires an ArchiveRepository in its constructor"]
+    },
+    {
       "requirement": "No input",
       "name": "Execute called with no arguments",
       "when": ["listArchived.execute() is called"],
@@ -88,7 +94,7 @@
   ],
   "contentHashes": {
     "spec.md": "sha256:228d039aba4430d824b6735da23a7962182bfd1ff2be5833c68e5667d7d1ce34",
-    "verify.md": "sha256:e412860467e5540bc0c5576b4e0bea9646649b6b268757d59920752a632fda09"
+    "verify.md": "sha256:e394ab6f163b33b3860c234f497da9040df4ed47426ae9162a7d3c1564719cb8"
   },
   "generatedBy": "core"
 }

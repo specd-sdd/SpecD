@@ -34,11 +34,17 @@
       "name": "Returns skills array",
       "when": ["ListSkills use case is executed"],
       "then": ["it returns { skills: readonly Skill[] }"]
+    },
+    {
+      "requirement": "Behavior",
+      "name": "Returns all skills from repository",
+      "when": ["ListSkills is executed"],
+      "then": ["it returns the full array from SkillRepository.list()."]
     }
   ],
   "contentHashes": {
     "spec.md": "sha256:b68fd50da81618e87dd32d3b8b72d31bf1f398c7f554398ac5343b64bcad3dda",
-    "verify.md": "sha256:a9e4ce8c9a8e0b7267aba06208c27272217547eb611fc4a89ce0303d18447f3b"
+    "verify.md": "sha256:83f0cc0863d42356f9649cfef57f9090d340069d1d7096c4390a1620f35fad26"
   },
   "generatedBy": "core"
 }

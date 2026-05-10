@@ -18,6 +18,22 @@
 - **WHEN** `specd project status` is executed
 - **THEN** each workspace shows name, prefix, ownership, isExternal status, and codeRoot path
 
+### Requirement: includes spec counts
+
+#### Scenario: Output includes spec counts per workspace
+
+- **GIVEN** a project with multiple workspaces containing specs
+- **WHEN** `specd project status` is run
+- **THEN** output includes total spec count and per-workspace counts
+
+### Requirement: includes change counts
+
+#### Scenario: Output includes active changes, drafts, and discarded counts
+
+- **GIVEN** a project with changes, drafts, and discarded changes
+- **WHEN** `specd project status` is run
+- **THEN** output includes counts for each category
+
 ### Requirement: includes approval gates
 
 #### Scenario: Output shows approval gate status

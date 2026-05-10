@@ -55,3 +55,15 @@
 - **WHEN** `hash` is called multiple times with the same input
 - **THEN** no observable state changes occur between calls
 - **AND** the return value is identical each time
+
+### Requirement: Hash input
+
+#### Scenario: Hash accepts string content
+
+- **WHEN** `hash` is called with a string argument
+- **THEN** it returns a valid hash result without throwing
+
+#### Scenario: Hash treats input as UTF-8
+
+- **WHEN** `hash` is called with a string containing unicode characters
+- **THEN** it produces a deterministic hash based on UTF-8 encoding of the input

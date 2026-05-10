@@ -364,11 +364,52 @@
       "given": ["an OutlineEntry object"],
       "when": ["it is validated against the interface"],
       "then": ["type, label, and depth remain required", "AND children remains optional"]
+    },
+    {
+      "requirement": "NodeTypes contract",
+      "name": "nodeTypes returns complete type descriptors",
+      "when": ["nodeTypes() is called on an adapter"],
+      "then": [
+        "it returns a complete map of all node type names to their NodeTypeDescriptor",
+        "AND each descriptor includes nature flags (isCollection, isSequence, etc.)"
+      ]
+    },
+    {
+      "requirement": "Selector hint contract",
+      "name": "Selector hints guide delta application",
+      "given": ["an AST with a section having label \"Requirements\""],
+      "when": ["delta application uses a selector hint matching that label"],
+      "then": ["the selector resolves to that specific node"]
+    },
+    {
+      "requirement": "DeltaInstructions contract",
+      "name": "DeltaInstructions guide selection",
+      "given": ["a delta entry with instructions field"],
+      "when": ["parsing the delta entry"],
+      "then": ["the returned DeltaEntry includes the instructions for human review"]
+    },
+    {
+      "requirement": "ArtifactAST shape",
+      "name": "ArtifactAST has root and metadata",
+      "when": ["parse is called"],
+      "then": [
+        "the returned ArtifactAST has a root property (non-null ArtifactNode)",
+        "AND includes metadata about the original content"
+      ]
+    },
+    {
+      "requirement": "Supporting type shapes",
+      "name": "Supporting types are exported",
+      "when": ["examining the parser module exports"],
+      "then": [
+        "types like ArtifactNode, ArtifactAST, OutlineEntry, DeltaEntry are exported",
+        "AND can be imported by consumers"
+      ]
     }
   ],
   "contentHashes": {
     "spec.md": "sha256:2a86a157f7979f71b123609050e00b44de8c330071e6b7451508a54522300147",
-    "verify.md": "sha256:aceb28b5419ab51d206aa1bbd947bc8385c20793ca92ef689b929a76fdb0caa9"
+    "verify.md": "sha256:416e355d6dfbe7c3a0e3c3ba156e8d91999c5c1103fe4ffcabd51a16f7a941ed"
   },
   "generatedBy": "core"
 }

@@ -32,6 +32,24 @@
   ],
   "scenarios": [
     {
+      "requirement": "Command signature",
+      "name": "Basic extend from npm package",
+      "when": ["specd schema extend @specd/schema-std my-custom is run"],
+      "then": ["the command accepts <ref> and <name> arguments", "AND creates the extended schema"]
+    },
+    {
+      "requirement": "Command signature",
+      "name": "Extend with --output option",
+      "when": ["specd schema extend @specd/schema-std my-ext --output /tmp/my-ext is run"],
+      "then": ["the command accepts --output <path> as alternative to --workspace"]
+    },
+    {
+      "requirement": "Command signature",
+      "name": "Extend with --workspace option",
+      "when": ["specd schema extend @specd/schema-std my-ext --workspace billing is run"],
+      "then": ["the command accepts --workspace <workspace> as alternative to --output"]
+    },
+    {
       "requirement": "Extend behaviour",
       "name": "Extend from npm package",
       "given": ["@specd/schema-std is installed with kind: schema"],
@@ -113,7 +131,7 @@
   ],
   "contentHashes": {
     "spec.md": "sha256:da257b966ce7382c53017204172960d35e111f140090a4a2e8e6599231328df6",
-    "verify.md": "sha256:5573bcbb9b8dad26a9c4a9d0072da97991b0c68e53de1a1f04caa73c9c13ae27"
+    "verify.md": "sha256:098281f0e150dc688b04ea7479a715aaa3210a95e9aab90bf4c1b6ba41cc2c5e"
   },
   "generatedBy": "core"
 }

@@ -39,6 +39,18 @@
   ],
   "scenarios": [
     {
+      "requirement": "Command signature",
+      "name": "Accepts specPath as argument",
+      "when": ["specd spec invalidate-metadata auth/login is invoked"],
+      "then": ["the command accepts <specPath> as the spec to invalidate"]
+    },
+    {
+      "requirement": "Command signature",
+      "name": "Supports --config option",
+      "when": ["specd spec invalidate-metadata auth/login --config /tmp/specd.yaml is run"],
+      "then": ["the command uses the specified config path"]
+    },
+    {
       "requirement": "Text output",
       "name": "Successful invalidation in text format",
       "when": ["the invalidation succeeds and format is text"],
@@ -70,7 +82,7 @@
   ],
   "contentHashes": {
     "spec.md": "sha256:85418a33f3288436f90bc3a0424bfcea9fe9a0f714fe32a23dd361d4ea554a37",
-    "verify.md": "sha256:d4f845d03485a832ab1a354954ad38baf27a5a6d51c02bf198e1ccaa148d9f4d"
+    "verify.md": "sha256:ec055f5f61037c1b1f6a0dafa1f8827e0e1036ee9b1a5097cd2f6328fb96b677"
   },
   "generatedBy": "core"
 }

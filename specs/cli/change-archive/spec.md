@@ -56,6 +56,22 @@ On success, output depends on `--format`:
   - If changes were invalidated due to overlap, a summary listing each invalidated change and the overlapping specs:
 - `json` or `toon`: outputs the following to stdout (encoded in the respective format): where `<archive-path>` is the path to the archived change directory relative to the project root, and `invalidatedChanges` is the array from the `ArchiveChange` result (empty when no changes were invalidated).
 
+### Requirement: Output on success (extended)
+
+When archiving with `--allow-overlap`:
+
+- Text mode includes an "invalidated N overlapping changes:" section listing each change and its overlapping specs
+- JSON mode includes `invalidatedChanges` array with each entry's `name` and `specIds`
+
+When no changes are invalidated, this section is omitted in text mode.
+
+### Requirement: JSON output on success
+
+When `--format json` is specified:
+
+- stdout is valid JSON with `result: "ok"`, `name: "<change-name>"`, and `archivePath: "<archive-path>"`
+- the process exits with code 0
+
 ### Requirement: Error cases
 
 - If the change does not exist, exits with code 1.

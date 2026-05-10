@@ -56,3 +56,15 @@
 
 - **WHEN** a function or method has JSDoc but is missing a `@param` tag for one of its parameters
 - **THEN** the linter must report an error
+
+### Requirement: Layer boundary enforcement
+
+#### Scenario: Domain imports application
+
+- **WHEN** a file in `domain/` imports from `application/`
+- **THEN** the linter must report an error via `no-restricted-imports`
+
+#### Scenario: Domain imports infrastructure
+
+- **WHEN** a file in `domain/` imports from `infrastructure/`
+- **THEN** the linter must report an error

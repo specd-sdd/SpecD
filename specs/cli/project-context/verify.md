@@ -90,7 +90,19 @@
 - **WHEN** `specd project context` is called
 - **THEN** the command prints `no project context configured` and exits with code 0
 
-### Requirement: Output
+### Requirement: Error cases
+
+#### Scenario: Config cannot be loaded
+
+- **WHEN** config discovery fails or parse error occurs
+- **THEN** the command exits per the entrypoint exit code rules
+
+#### Scenario: Schema cannot be resolved
+
+- **WHEN** the schema cannot be resolved
+- **THEN** the command exits with code 3
+
+### Requirement: Full mode defaults and section overrides
 
 #### Scenario: Full mode defaults to Description + Rules + Constraints
 

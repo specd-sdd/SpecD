@@ -2,6 +2,14 @@
 
 ## Requirements
 
+### Requirement: Module location and layer
+
+#### Scenario: Module resides at infrastructure/schema-yaml-parser.ts
+
+- **WHEN** the `@specd/core` package is examined
+- **THEN** the file `infrastructure/schema-yaml-parser.ts` exists
+- **AND** it exports `parseSchemaYaml`, `SchemaYamlData`, `ArtifactYaml`, `WorkflowStepRaw`, and `formatZodPath`
+
 ### Requirement: Function signature
 
 #### Scenario: Valid minimal schema YAML

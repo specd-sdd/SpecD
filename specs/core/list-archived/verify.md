@@ -2,6 +2,13 @@
 
 ## Requirements
 
+### Requirement: Ports and constructor
+
+#### Scenario: Constructor accepts ArchiveRepository
+
+- **WHEN** `ListArchived` is instantiated
+- **THEN** it requires an `ArchiveRepository` in its constructor
+
 ### Requirement: No input
 
 #### Scenario: Execute called with no arguments

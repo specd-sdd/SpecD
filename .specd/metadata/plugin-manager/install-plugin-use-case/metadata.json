@@ -37,6 +37,18 @@
   ],
   "scenarios": [
     {
+      "requirement": "Input",
+      "name": "Input includes pluginName and config",
+      "when": ["InstallPlugin.execute() is called"],
+      "then": ["the input includes pluginName and config", "AND optional plugin-specific options"]
+    },
+    {
+      "requirement": "Output",
+      "name": "Output indicates success or failure",
+      "when": ["InstallPlugin.execute() completes"],
+      "then": ["output includes success: boolean, message: string, and optional data"]
+    },
+    {
       "requirement": "Behavior",
       "name": "Plugin not found",
       "when": ["InstallPlugin is executed with non-existent plugin"],
@@ -50,6 +62,12 @@
       "then": ["it returns success with message"]
     },
     {
+      "requirement": "Behavior",
+      "name": "Loads plugin via PluginLoader",
+      "when": ["InstallPlugin is executed"],
+      "then": ["it loads the plugin via PluginLoader", "AND validates it is an AgentPlugin"]
+    },
+    {
       "requirement": "Error handling",
       "name": "Non-agent plugin rejected",
       "given": ["a loaded plugin that is a valid SpecdPlugin but not an AgentPlugin"],
@@ -59,7 +77,7 @@
   ],
   "contentHashes": {
     "spec.md": "sha256:9a3fe57820058ab38f19ad1a637a36822fead9af16291d44d37ff4bda54ba778",
-    "verify.md": "sha256:bbeb01caf1e3cf8bd87fe1f29eaf8ec417ac0db2173243b1bb321a0307e14220"
+    "verify.md": "sha256:67377f0136c3fa3915abea1480927b698e7054a7c2f61ece1b46610829b16a9e"
   },
   "generatedBy": "core"
 }

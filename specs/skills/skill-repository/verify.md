@@ -27,3 +27,11 @@
 
 - **WHEN** `repository.getBundle('skill-name', { key: 'value' })` is called
 - **THEN** placeholders `{{key}}` are replaced with 'value'
+
+### Requirement: listSharedFiles() method
+
+#### Scenario: Lists shared files from templates/shared/
+
+- **WHEN** `repository.listSharedFiles()` is called
+- **THEN** it scans `templates/shared/` for `.meta.json` files
+- **AND** returns `SharedFile[]` with filename, content, and skills properties

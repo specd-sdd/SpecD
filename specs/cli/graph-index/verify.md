@@ -2,6 +2,14 @@
 
 ## Requirements
 
+### Requirement: Command signature
+
+#### Scenario: Minimal invocation with defaults
+
+- **WHEN** `specd graph index` is run
+- **THEN** it accepts no positional arguments
+- **AND** output format defaults to text
+
 ### Requirement: Indexing behaviour
 
 #### Scenario: Successful indexing with autodetected config

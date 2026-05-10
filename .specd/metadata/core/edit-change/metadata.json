@@ -75,7 +75,6 @@
     {
       "requirement": "Dependencies",
       "rules": [
-        "### Requirement: Dependencies",
         "`EditChange` depends on the following ports injected via constructor:\n\n- `ChangeRepository` — for loading, persisting, scaffolding, and unscaffolding changes\n- `ActorResolver` — for resolving the current actor identity\n- `specs: ReadonlyMap<string, SpecRepository>` — spec repositories keyed by workspace name, used for the `specExists` check during scaffolding"
       ]
     }
@@ -242,11 +241,45 @@
       "given": ["a change with specIds: ['core:edit-change']"],
       "when": ["execute is called with addSpecIds: ['core:change-repository-port']"],
       "then": ["ChangeRepository.unscaffold is NOT called"]
+    },
+    {
+      "requirement": "Input contract",
+      "name": "execute accepts EditChangeInput",
+      "when": ["EditChange.execute is called"],
+      "then": [
+        "it accepts EditChangeInput with name (required), addSpecIds (optional), removeSpecIds (optional), description (optional)"
+      ]
+    },
+    {
+      "requirement": "Output contract",
+      "name": "execute returns EditChangeResult",
+      "when": ["EditChange.execute completes"],
+      "then": [
+        "it returns EditChangeResult with change (the Change entity) and invalidated (boolean)"
+      ]
+    },
+    {
+      "requirement": "Dependencies",
+      "name": "Uses ChangeRepository port",
+      "when": ["EditChange is instantiated"],
+      "then": ["it requires a ChangeRepository port in its constructor"]
+    },
+    {
+      "requirement": "Dependencies",
+      "name": "Uses ActorResolver port",
+      "when": ["EditChange is instantiated"],
+      "then": ["it requires an ActorResolver port in its constructor"]
+    },
+    {
+      "requirement": "Dependencies",
+      "name": "Uses spec repositories map",
+      "when": ["EditChange is instantiated"],
+      "then": ["it requires a ReadonlyMap<string, SpecRepository> for spec existence checks"]
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:b79e68b5915e47e2485a5f89a374a993825b99e5889c71bad413da1f58f2a190",
-    "verify.md": "sha256:28bd3aa84af7b28fea7082eee25a35ab8d0763598a0ebec56253efd2a5535693"
+    "spec.md": "sha256:ddc50de90dbea2c6a5e78eb21e34fdc9b52a62ccecddfc4e2629f3f9e6238c1f",
+    "verify.md": "sha256:29b3ae611f31825a49a50db6463a78ae3bc08e1dfdc524cb6b9d17923eddeb97"
   },
   "generatedBy": "core"
 }

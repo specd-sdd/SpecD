@@ -125,6 +125,44 @@
 - **WHEN** step availability is evaluated again
 - **THEN** the step is no longer available
 
+### Requirement: Step-to-state mapping
+
+#### Scenario: Step name is the target state name
+
+- **GIVEN** a workflow step with `step: "implementing"`
+- **WHEN** `TransitionChange` transitions to this step
+- **THEN** the Change entity transitions to the `implementing` lifecycle state
+- **AND** there is no indirection or mapping table between step and state
+
+### Requirement: Hook execution at step boundaries
+
+#### Scenario: Pre-hooks execute before state change
+
+- **GIVEN** a workflow step with `pre: [{ id: "setup", run: "echo setup" }]`
+- **WHEN** `TransitionChange` transitions to this step
+- **THEN** pre-hooks execute before the state change occurs
+
+#### Scenario: Post-hooks execute after state change
+
+- **GIVEN** a workflow step with `post: [{ id: "teardown", run: "echo teardown" }]`
+- **WHEN** `TransitionChange` transitions to this step
+- **THEN** post-hooks execute after the state change completes
+
+### Requirement: Step requires reference artifact IDs
+
+#### Scenario: Requires contains artifact IDs not step names
+
+- **GIVEN** a workflow step with `requires: ["specs", "verify"]`
+- **WHEN** the step's requires are evaluated
+- **THEN** they reference artifact IDs (`specs`, `verify`)
+- **AND** they do not reference other step names
+
+#### Scenario: Step-to-step circular dependencies are impossible
+
+- **GIVEN** a schema where step A requires step B
+- **WHEN** `buildSchema` validates the schema
+- **THEN** it throws `SchemaValidationError` because step gating only accepts artifact IDs
+
 ### Requirement: Workflow array order is display order
 
 #### Scenario: Later step available before earlier step

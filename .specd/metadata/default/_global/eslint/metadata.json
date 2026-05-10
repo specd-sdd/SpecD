@@ -103,11 +103,23 @@
         "a function or method has JSDoc but is missing a @param tag for one of its parameters"
       ],
       "then": ["the linter must report an error"]
+    },
+    {
+      "requirement": "Layer boundary enforcement",
+      "name": "Domain imports application",
+      "when": ["a file in domain/ imports from application/"],
+      "then": ["the linter must report an error via no-restricted-imports"]
+    },
+    {
+      "requirement": "Layer boundary enforcement",
+      "name": "Domain imports infrastructure",
+      "when": ["a file in domain/ imports from infrastructure/"],
+      "then": ["the linter must report an error"]
     }
   ],
   "contentHashes": {
     "spec.md": "sha256:cbf52148d3d70d89911d05a46cf3c51adb27fd6860b86e578800ec58fa8de5b1",
-    "verify.md": "sha256:158f656872560db796e95015fbc18ebd42510dc6944ce64052d8224244859ab6"
+    "verify.md": "sha256:e5a6830ee9ea6fa665c8cef868242888f1af151606625cecf0f254da7284a799"
   },
   "generatedBy": "core"
 }

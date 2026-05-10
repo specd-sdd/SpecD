@@ -270,6 +270,15 @@
       "then": ["the command exits with code 0", "AND specd.yaml is overwritten"]
     },
     {
+      "requirement": "JSON/TOON output schema in help",
+      "name": "JSON/TOON output schema documented in help text",
+      "when": ["any command that supports --format json|toon has its --help displayed"],
+      "then": [
+        "the help text includes a JSON/TOON output schema: section",
+        "AND it shows the output shape as a TypeScript-style type annotation"
+      ]
+    },
+    {
       "requirement": "Output format flag",
       "name": "Text format produces human-readable output",
       "when": ["a command is run with --format text (or without --format)"],
@@ -367,7 +376,7 @@
   ],
   "contentHashes": {
     "spec.md": "sha256:32cdd478e6eacdbef1c32b472ddaa14a19f80836b66152d0a47b0354331ab767",
-    "verify.md": "sha256:d65df229672bb4d87bbbf7820e45df845430ee3d9989657818ff18f89fb359aa"
+    "verify.md": "sha256:814a9fd8864edeca4c6a725ea70b3e8f1ecd1aaeb568fb444c87c93f0f48d304"
   },
   "generatedBy": "core"
 }

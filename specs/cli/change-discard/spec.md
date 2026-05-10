@@ -30,6 +30,13 @@ On success, output depends on `--format`:
 - `text` (default): prints a single line to stdout:
 - `json` or `toon`: outputs the following to stdout (encoded in the respective format):
 
+### Requirement: JSON output on success
+
+When `--format json` succeeds:
+
+- stdout is valid JSON with `result: "ok"` and `name: "<name>"`
+- the process exits with code 0
+
 ### Requirement: Error cases
 
 - If the change does not exist, the command exits with code 1 and prints an `error:` message.

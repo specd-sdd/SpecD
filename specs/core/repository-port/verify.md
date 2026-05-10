@@ -2,6 +2,19 @@
 
 ## Requirements
 
+### Requirement: Abstract class, not interface
+
+#### Scenario: Repository cannot be instantiated directly
+
+- **WHEN** code attempts to instantiate `Repository` directly
+- **THEN** it fails because `Repository` is abstract
+
+#### Scenario: Subclasses extend Repository
+
+- **GIVEN** a concrete class extending `Repository`
+- **WHEN** the subclass is instantiated with `RepositoryConfig`
+- **THEN** it compiles and can be instantiated as a concrete repository
+
 ### Requirement: Immutable accessors
 
 #### Scenario: Accessors return construction-time values

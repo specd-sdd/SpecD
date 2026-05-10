@@ -26,6 +26,18 @@
   "constraints": ["The name parameter MUST be validated as non-empty."],
   "scenarios": [
     {
+      "requirement": "Output",
+      "name": "Returns skill or not found error",
+      "when": ["a skill is requested"],
+      "then": ["the result is either the Skill object or a NOT_FOUND error."]
+    },
+    {
+      "requirement": "Behavior",
+      "name": "Delegates to repository",
+      "when": ["GetSkill is executed"],
+      "then": ["it calls SkillRepository.get() with the provided name."]
+    },
+    {
       "requirement": "Input",
       "name": "Valid skill name",
       "when": ["GetSkill use case is executed with { name: 'skill-name' }"],
@@ -40,7 +52,7 @@
   ],
   "contentHashes": {
     "spec.md": "sha256:b7b4a537f276ba2b0f062016589e1fb8436d64b41292e5c80096a75cc6bfbb72",
-    "verify.md": "sha256:793c6f119faffac0605dfdee341f525837908bb74bc81be788bf2cdda857da69"
+    "verify.md": "sha256:68114c46db5a8fee8f98dd955e7d88e727407c08a9b45f5f0ea4bd2d5992ee54"
   },
   "generatedBy": "core"
 }

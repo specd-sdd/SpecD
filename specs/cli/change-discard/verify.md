@@ -65,7 +65,7 @@
 - **THEN** the command exits with code 1
 - **AND** stderr explains that implementation may already exist and discarding the change could leave specs and code out of sync
 
-### Requirement: Output on success
+### Requirement: JSON output on success
 
 #### Scenario: JSON output on success
 

@@ -41,6 +41,10 @@ There is no slash-based workspace detection. The `/` character is never used as 
 
 Functions that accept spec IDs SHOULD normalize bare paths to fully-qualified form (`default:capPath`) at the system boundary. Domain-layer code MAY assume spec IDs are already qualified.
 
+### Requirement: specDependsOn format
+
+The `specDependsOn` map in the change manifest MUST use fully-qualified spec IDs (`workspace:capabilityPath`). Bare paths in metadata MUST be normalized to fully-qualified form before storage.
+
 ## Constraints
 
 - Workspace names MUST NOT contain `/` or `:` characters

@@ -2,6 +2,15 @@
 
 ## Requirements
 
+### Requirement: Interface-only declaration
+
+#### Scenario: VcsAdapter is a TypeScript interface
+
+- **WHEN** the `VcsAdapter` type is examined
+- **THEN** it is declared as a TypeScript `interface`
+- **AND** not as an abstract class
+- **AND** implementations can be provided by any concrete class
+
 ### Requirement: rootDir returns the repository root
 
 #### Scenario: rootDir outside a repository
@@ -9,6 +18,20 @@
 - **GIVEN** the working directory is not inside any VCS repository
 - **WHEN** `rootDir()` is called
 - **THEN** the promise MUST reject with an `Error`
+
+### Requirement: isClean reports working-tree cleanliness
+
+#### Scenario: Clean working tree
+
+- **GIVEN** a VCS repository with no uncommitted changes
+- **WHEN** `isClean()` is called
+- **THEN** the promise MUST resolve to `true`
+
+#### Scenario: Dirty working tree
+
+- **GIVEN** a VCS repository with uncommitted changes
+- **WHEN** `isClean()` is called
+- **THEN** the promise MUST resolve to `false`
 
 ### Requirement: branch returns the current branch name
 

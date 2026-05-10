@@ -159,11 +159,51 @@
         "AND the workspace does not exist in config"
       ],
       "then": ["stderr contains error: unknown workspace", "AND exit code is 1"]
+    },
+    {
+      "requirement": "Scope resolution",
+      "name": "Only spec-scoped artifacts are validated",
+      "when": ["specd spec validate default:auth/login --all is run"],
+      "then": [
+        "only scope: 'spec' artifacts are validated",
+        "AND change-scoped artifacts are ignored"
+      ]
+    },
+    {
+      "requirement": "Artifact filename derivation",
+      "name": "Artifact filename derived from artifactType.output()",
+      "when": ["the schema has spec.md artifact with output specs/**/spec.md"],
+      "then": ["the command loads spec.md from the spec directory"]
+    },
+    {
+      "requirement": "Missing artifact handling",
+      "name": "Missing required artifact counts as failure",
+      "when": ["a spec has a required artifact (optional: false) that is absent"],
+      "then": ["it counts as a validation failure"]
+    },
+    {
+      "requirement": "Structural validation",
+      "name": "Validation rules evaluated against AST",
+      "given": ["a spec's schema has validations defined"],
+      "when": ["specd spec validate default:auth/login is run"],
+      "then": ["validation rules are evaluated against the AST"]
+    },
+    {
+      "requirement": "Exit code",
+      "name": "All specs pass exits 0",
+      "when": ["all specs pass validation"],
+      "then": ["exit code is 0"]
+    },
+    {
+      "requirement": "Exit code",
+      "name": "Any failure exits 1",
+      "when": ["any spec has validation failures"],
+      "then": ["exit code is 1"]
     }
   ],
   "contentHashes": {
     "spec.md": "sha256:29c92c4a1920d0a2ff79a832743b3490ec76469cd68af28769557299c85f2dab",
-    "verify.md": "sha256:da52f6c42b913130352afd7082e766d4de70dc99ad0eb094da5459ef45e89989"
+    "verify.md": "sha256:294579dc74fd40dd6599627e35cbddef596812a3dbe826d8f091d81d8cf2681b"
   },
   "generatedBy": "core"
 }

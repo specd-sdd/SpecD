@@ -2,6 +2,30 @@
 
 ## Requirements
 
+### Requirement: List method signature
+
+#### Scenario: list returns SchemaEntry array without loading content
+
+- **WHEN** `SchemaRegistry.list()` is called
+- **THEN** it returns `Promise<SchemaEntry[]>`
+- **AND** it does not load or validate schema file contents
+- **AND** it discovers available schemas and returns their metadata
+
+#### Scenario: list delegates to workspace repositories
+
+- **GIVEN** a `SchemaRegistry` with `SchemaRepository` instances for workspaces "billing" and "default"
+- **WHEN** `list()` is called
+- **THEN** it calls `list()` on each workspace repository
+- **AND** combines the results
+
+### Requirement: Schema re-export
+
+#### Scenario: Port module re-exports Schema type
+
+- **WHEN** the `SchemaRegistry` port module is imported
+- **THEN** it exports the `Schema` type from `domain/value-objects/schema.ts`
+- **AND** consumers can import both the port interface and Schema type from a single location
+
 ### Requirement: Interface shape
 
 #### Scenario: Implementation satisfies the contract

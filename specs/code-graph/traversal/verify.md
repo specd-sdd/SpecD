@@ -194,3 +194,16 @@
 - **GIVEN** a store with known state
 - **WHEN** `getUpstream`, `getDownstream`, or `analyzeImpact` is called
 - **THEN** `getStatistics()` returns the same counts before and after the call
+
+### Requirement: TraversalOptions and TraversalResult
+
+#### Scenario: TraversalOptions defaults
+
+- **WHEN** `getUpstream` is called without options
+- **THEN** default maxDepth is 3
+- **AND** default includeFiles is true
+
+#### Scenario: TraversalResult structure
+
+- **WHEN** `getUpstream(store, symbol.id)` returns
+- **THEN** result contains root, levels (Map), totalCount, and truncated fields

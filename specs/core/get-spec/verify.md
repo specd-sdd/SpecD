@@ -40,3 +40,10 @@
 - **WHEN** `execute(input)` is called
 - **THEN** the result contains the `Spec` entity at `result.spec`
 - **AND** the result contains a `Map` at `result.artifacts` keyed by filename
+
+### Requirement: Input shape
+
+#### Scenario: Input contains workspace and specPath
+
+- **WHEN** `GetSpecInput` is used
+- **THEN** it contains `workspace` (string) and `specPath` (SpecPath value object)

@@ -70,6 +70,33 @@
   ],
   "scenarios": [
     {
+      "requirement": "Function signature",
+      "name": "Plain exported function with correct signature",
+      "when": ["mergeSchemaLayers is imported from the domain services module"],
+      "then": [
+        "it is a plain exported function with signature (base: SchemaYamlData, layers: readonly SchemaLayer[]) => SchemaYamlData",
+        "AND it is synchronous and pure"
+      ]
+    },
+    {
+      "requirement": "SchemaLayer type",
+      "name": "SchemaLayer contains source, ref, and operations",
+      "when": ["a SchemaLayer is constructed"],
+      "then": [
+        "it has source: 'extends' | 'plugin' | 'override', ref: string, and operations: SchemaOperations",
+        "AND SchemaOperations contains optional remove, create, prepend, append, and set operations"
+      ]
+    },
+    {
+      "requirement": "Operation target structure",
+      "name": "Operations mirror schema hierarchy",
+      "given": ["an operation that targets workflow[0].hooks.post"],
+      "when": ["the operation entry includes a parent identity (step) and nested arrays"],
+      "then": [
+        "the merge engine locates the parent entry first, then applies the nested operation to the sub-array"
+      ]
+    },
+    {
       "requirement": "Five operations with fixed intra-layer order",
       "name": "Remove before create — no collision",
       "given": [
@@ -228,7 +255,7 @@
   ],
   "contentHashes": {
     "spec.md": "sha256:c8d7fb7a2d6d4b2bd85d1b6bb0efedbc04065d165ef1042f24e4a106c2973793",
-    "verify.md": "sha256:efa7d4ce355d25b47f5c430b5f9efd8f85eb046f14de52708ad9085b0fc0e93c"
+    "verify.md": "sha256:0fa37a203b34f0e652fe721e5e14f3291c4f17b699fb13f5eeb73173a385e2fb"
   },
   "generatedBy": "core"
 }

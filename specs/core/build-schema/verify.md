@@ -269,3 +269,33 @@
 - **GIVEN** valid `SchemaYamlData` with name `"test"`, version `1`, two artifacts, a workflow, and metadata extraction
 - **WHEN** `buildSchema` is called
 - **THEN** the returned `Schema` has `name() === "test"`, `version() === 1`, two artifacts accessible via `artifact(id)`, workflow steps accessible via `workflowStep(name)`, and metadata extraction defined
+
+### Requirement: buildMetadataExtractorEntry sub-function
+
+#### Scenario: Convert raw metadata extractor entry
+
+- **GIVEN** a raw metadata extractor entry with nested extractor
+- **WHEN** `buildMetadataExtractorEntry` is called
+- **THEN** it returns a `MetadataExtractorEntry` with the nested extractor converted
+
+### Requirement: buildMetadataExtraction sub-function
+
+#### Scenario: Convert raw metadata extraction block
+
+- **GIVEN** a raw metadata extraction block with title, description, dependsOn, and context fields
+- **WHEN** `buildMetadataExtraction` is called
+- **THEN** it returns a `MetadataExtraction` with all fields converted
+
+### Requirement: detectCycle helper
+
+#### Scenario: Cycle detected in artifact dependencies
+
+- **GIVEN** an artifact dependency graph where A depends on B and B depends on A
+- **WHEN** `detectCycle` is called with artifact A
+- **THEN** it returns `true`
+
+#### Scenario: No cycle in acyclic graph
+
+- **GIVEN** an artifact dependency graph where A -> B -> C (no cycles)
+- **WHEN** `detectCycle` is called with artifact A
+- **THEN** it returns `false`

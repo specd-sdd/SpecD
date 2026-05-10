@@ -16,3 +16,10 @@
 - **WHEN** `specd plugins show nonexistent-plugin` is invoked
 - **THEN** an error message is emitted
 - **AND** exit code is 1
+
+### Requirement: Output
+
+#### Scenario: Machine-parseable JSON output
+
+- **WHEN** `specd plugins show @specd/plugin-agent-claude --format json` is invoked
+- **THEN** output is machine-parseable JSON with plugin name, type, version, configSchema, and capabilities

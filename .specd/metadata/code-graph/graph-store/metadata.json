@@ -93,6 +93,15 @@
   ],
   "scenarios": [
     {
+      "requirement": "GraphStore port",
+      "name": "GraphStore is an abstract class",
+      "when": ["a concrete implementation of GraphStore is instantiated"],
+      "then": [
+        "it receives storagePath as a constructor parameter",
+        "AND it is defined in domain/ports/ following hexagonal architecture"
+      ]
+    },
+    {
       "requirement": "Connection lifecycle",
       "name": "Operation before open throws",
       "when": ["getFile() is called on a GraphStore that has not been opened"],
@@ -361,7 +370,7 @@
   ],
   "contentHashes": {
     "spec.md": "sha256:60e0b001559f9c9d9e3b6d61762a7327b4ac59e66d309d190524193c330b651f",
-    "verify.md": "sha256:41a093b9ae8d81d3f78f520b9d9ac253ad417ebecb038405b3bce8a4620093fb"
+    "verify.md": "sha256:b9bb46799712b367484ec68a10fcb1519fb5ac206c45d99e36cf62b27c33999a"
   },
   "generatedBy": "core"
 }

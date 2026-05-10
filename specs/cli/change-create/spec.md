@@ -46,6 +46,20 @@ On success, output depends on `--format`:
 
 No further output is produced.
 
+### Requirement: JSON output includes changePath
+
+When `--format json` is specified:
+
+- stdout is valid JSON with `result: "ok"`, `name: "<name>"`, `state: "drafting"`, and `changePath: "<absolute-path>"`
+- `changePath` points to the change directory under `.specd/changes/`
+
+### Requirement: JSON output on success
+
+When `--format json` succeeds:
+
+- stdout is valid JSON with `result: "ok"`, `state: "drafting"`, and `name: "<name>"`
+- the process exits with code 0
+
 ### Requirement: Duplicate name error
 
 If a change with the given name already exists (`ChangeAlreadyExistsError`), the command exits with code 1 and prints an `error:` message to stderr.

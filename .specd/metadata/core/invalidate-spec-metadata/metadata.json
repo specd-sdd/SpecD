@@ -100,11 +100,21 @@
       "given": ["a spec with metadata containing a scalar value (e.g. \"hello\")"],
       "when": ["InvalidateSpecMetadata is executed"],
       "then": ["the result is null — the file is not modified"]
+    },
+    {
+      "requirement": "No strict validation on write",
+      "name": "Metadata written without strict validation",
+      "given": ["a spec with metadata containing contentHashes"],
+      "when": ["InvalidateSpecMetadata is executed"],
+      "then": [
+        "the metadata is written directly via SpecRepository.saveMetadata() without going through SaveSpecMetadata",
+        "AND the force: true option is used to bypass conflict detection"
+      ]
     }
   ],
   "contentHashes": {
     "spec.md": "sha256:e720c4f2225d09c2766b23bc3f66981f21316363384ec410d1a9963efcb0f2c3",
-    "verify.md": "sha256:0cfb07da4106005cab6a9b81e748d2394f36027ba9c533d57c62b4258eb8315c"
+    "verify.md": "sha256:5f0aba0a69dd47e41f7351899ce4ee5ffcb9bfcac584d7a34b7cc35356d91979"
   },
   "generatedBy": "core"
 }

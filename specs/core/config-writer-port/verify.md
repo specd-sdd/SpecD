@@ -37,7 +37,7 @@
 - **WHEN** `initProject` is called with `force: true`
 - **THEN** the existing file is overwritten and no error is thrown
 
-### Requirement: AddPlugin behaviour
+### Requirement: AddPlugin
 
 #### Scenario: Adds plugin to agents array
 
@@ -50,3 +50,26 @@
 - **GIVEN** `specd.yaml` with `plugins: { agents: [{ name: '@specd/plugin-agent-claude' }] }`
 - **WHEN** `addPlugin(configPath, 'agents', '@specd/plugin-agent-claude')` is called
 - **THEN** the existing entry is updated
+
+### Requirement: InitProject method signature
+
+#### Scenario: initProject accepts InitProjectOptions
+
+- **WHEN** `initProject` is called
+- **THEN** it accepts a single argument of type `InitProjectOptions`
+- **AND** returns `Promise<InitProjectResult>`
+
+### Requirement: InitProjectOptions shape
+
+#### Scenario: InitProjectOptions contains required fields
+
+- **WHEN** `InitProjectOptions` interface is inspected
+- **THEN** it contains `projectRoot: string`, `schemaRef: string`, `workspaceId: string`, `specsPath: string`
+- **AND** optional `force?: boolean`
+
+### Requirement: InitProjectResult shape
+
+#### Scenario: InitProjectResult contains required fields
+
+- **WHEN** `InitProjectResult` interface is inspected
+- **THEN** it contains `configPath: string`, `schemaRef: string`, `workspaces: readonly string[]`

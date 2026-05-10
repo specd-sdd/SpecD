@@ -74,6 +74,24 @@
   ],
   "scenarios": [
     {
+      "requirement": "Ports and constructor",
+      "name": "Constructor receives required dependencies",
+      "when": ["PreviewSpec is instantiated"],
+      "then": [
+        "it receives ChangeRepository, a ReadonlyMap<string, SpecRepository>, SchemaProvider, and ArtifactParserRegistry",
+        "AND they are stored as instance properties for use during execute"
+      ]
+    },
+    {
+      "requirement": "Input",
+      "name": "execute receives change name and specId",
+      "when": ["PreviewSpec.execute is invoked"],
+      "then": [
+        "it receives name: string (the change name) and specId: string (the fully-qualified spec ID)",
+        "AND specId must be one of the change's specIds"
+      ]
+    },
+    {
       "requirement": "Spec ID validation",
       "name": "specId not in change throws error",
       "given": ["a change with specIds: [\"core:config\"]"],
@@ -207,7 +225,7 @@
   ],
   "contentHashes": {
     "spec.md": "sha256:bed39941579ab222e23ff577980764e1b133fa64ac9576ff8afbd83cf4c37034",
-    "verify.md": "sha256:133e706cab8e105988e0ca73e7181dbc06372e0c66bed9624eaeb64e8eac75d3"
+    "verify.md": "sha256:12f6cfc982003c416f52559070a1734893f1379ebeca6036d10516c08e1558bd"
   },
   "generatedBy": "core"
 }

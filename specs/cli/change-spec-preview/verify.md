@@ -16,7 +16,7 @@
 - **WHEN** `specd change spec-preview my-change core:config --diff` is invoked
 - **THEN** the command outputs a unified diff instead of the full merged content
 
-### Requirement: Text output — merged mode
+### Requirement: Text output — merged mode (no --diff)
 
 #### Scenario: Files separated by header lines with status labels
 
@@ -34,7 +34,7 @@
 - **WHEN** `specd change spec-preview my-change my-spec --artifact specs` is run
 - **THEN** stdout contains `--- spec.md --- (no-op delta, showing original)`
 
-### Requirement: Text output — diff mode
+### Requirement: Text output — diff mode (--diff)
 
 #### Scenario: Additions colored green
 

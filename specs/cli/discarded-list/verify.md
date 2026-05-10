@@ -2,6 +2,22 @@
 
 ## Requirements
 
+### Requirement: Command signature
+
+#### Scenario: No positional arguments
+
+- **WHEN** `specd discarded list` is run
+- **THEN** the command proceeds without positional arguments
+- **AND** output format defaults to text
+
+### Requirement: Output format — toon
+
+#### Scenario: TOON format output
+
+- **GIVEN** `discarded/` contains changes
+- **WHEN** `specd discarded list --format toon` is run
+- **THEN** output is encoded in Token-Oriented Object Notation (toon)
+
 ### Requirement: Output format — text
 
 #### Scenario: Discarded changes listed with correct fields

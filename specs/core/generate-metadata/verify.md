@@ -123,3 +123,20 @@
 - **WHEN** `GenerateSpecMetadata` completes successfully
 - **THEN** the returned metadata contains both the `extractMetadata()` output fields and `contentHashes`
 - **AND** `hasExtraction` is `true`
+
+### Requirement: Input and output
+
+#### Scenario: execute accepts specId string
+
+- **WHEN** `GenerateSpecMetadata.execute` is called
+- **THEN** it accepts a `specId` string parameter (e.g. `'core/change'` or `'billing:invoices/create'`)
+
+#### Scenario: Returns metadata and hasExtraction flag
+
+- **WHEN** `GenerateSpecMetadata.execute` completes successfully
+- **THEN** it returns `{ metadata: SpecMetadata, hasExtraction: boolean }`
+
+#### Scenario: metadata contains extracted fields and hashes
+
+- **WHEN** `GenerateSpecMetadata.execute` completes with extraction
+- **THEN** the returned `metadata` contains fields from `extractMetadata()` plus `contentHashes` and `generatedBy: 'core'`

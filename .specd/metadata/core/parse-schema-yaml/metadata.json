@@ -78,6 +78,15 @@
   ],
   "scenarios": [
     {
+      "requirement": "Module location and layer",
+      "name": "Module resides at infrastructure/schema-yaml-parser.ts",
+      "when": ["the @specd/core package is examined"],
+      "then": [
+        "the file infrastructure/schema-yaml-parser.ts exists",
+        "AND it exports parseSchemaYaml, SchemaYamlData, ArtifactYaml, WorkflowStepRaw, and formatZodPath"
+      ]
+    },
+    {
       "requirement": "Function signature",
       "name": "Valid minimal schema YAML",
       "when": [
@@ -258,7 +267,7 @@
   ],
   "contentHashes": {
     "spec.md": "sha256:eaaf65cc361ff0f1589fb22ae9a7746a878926e4e700f6b4f053abb5266aa91a",
-    "verify.md": "sha256:a7f2fb7802466f2cb2c5cb6a0bb5d8d895aeae8e5f96df2554d40aca5c8d1234"
+    "verify.md": "sha256:f083318fe8ad8128576ef3dd657437e89131164d85782e79f20966ea18935c06"
   },
   "generatedBy": "core"
 }

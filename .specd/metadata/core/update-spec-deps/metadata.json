@@ -74,6 +74,14 @@
   ],
   "scenarios": [
     {
+      "requirement": "Input contract",
+      "name": "execute accepts UpdateSpecDepsInput",
+      "when": ["UpdateSpecDeps.execute is called"],
+      "then": [
+        "it accepts UpdateSpecDepsInput with name (required), specId (required), add (optional), remove (optional), set (optional)"
+      ]
+    },
+    {
       "requirement": "Change lookup",
       "name": "Change does not exist",
       "when": ["execute is called with a name that does not exist in the repository"],
@@ -162,7 +170,7 @@
   ],
   "contentHashes": {
     "spec.md": "sha256:24dce23967718bb6e9e70e13f73b833857cd513f4c479cb26b4bf8189a0c9b65",
-    "verify.md": "sha256:15bbba08c660285c413d097a255aa7ac304fd023d923639a95716a23a66f2b7e"
+    "verify.md": "sha256:0082ea4d0b73129c98eeb327fd8af0605104fd25fa84b36326bd2c6473fe817a"
   },
   "generatedBy": "core"
 }

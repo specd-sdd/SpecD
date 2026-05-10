@@ -187,3 +187,10 @@
 - **GIVEN** a spec has no metadata and the schema has no `metadataExtraction` declarations
 - **WHEN** `execute` is called
 - **THEN** the spec's `content` contains only the spec heading with no body
+
+### Requirement: Construction dependencies
+
+#### Scenario: Constructor accepts all required ports
+
+- **WHEN** `GetProjectContext` is instantiated
+- **THEN** it requires `specs` (ReadonlyMap<string, SpecRepository>), `schemaProvider` (SchemaProvider), `files` (FileReader), `parsers` (ArtifactParserRegistry), and `hasher` (ContentHasher) in its constructor

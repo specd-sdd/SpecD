@@ -50,18 +50,58 @@
 - **WHEN** `CreateChange.execute` returns a change
 - **THEN** `change.state === 'drafting'`
 
-### Requirement: Persistence
+### Requirement: Input contract
+
+#### Scenario: execute accepts CreateChangeInput
+
+- **WHEN** `CreateChange.execute` is called
+- **THEN** it accepts `CreateChangeInput` with `name`, `specIds`, `schemaName`, `schemaVersion` (required)
+- **AND** `description` (optional)
+
+#### Scenario: specIds are recorded in the created event
+
+- **WHEN** `CreateChange.execute` is called with `specIds: ['auth/login', 'auth/register']`
+- **THEN** the created event contains `specIds: ['auth/login', 'auth/register']`
+
+### Requirement: Persistence and scaffolding
 
 #### Scenario: Change is saved to repository
 
 - **WHEN** `CreateChange.execute` completes successfully
 - **THEN** `ChangeRepository.save` was called with the returned `Change` instance
 
-### Requirement: Result includes changePath
+#### Scenario: Change is saved then scaffolded
 
-#### Scenario: changePath returned after creation
+- **WHEN** `CreateChange.execute` completes successfully
+- **THEN** `ChangeRepository.save` is called before scaffolding
+- **AND** `ChangeRepository.scaffold` is called after saving
+
+#### Scenario: Scaffolding uses specExists callback
+
+- **GIVEN** a `specExists` callback that checks workspace spec maps
+- **WHEN** `CreateChange.execute` completes
+- **THEN** `ChangeRepository.scaffold` is called with the specExists callback
+
+#### Scenario: Result includes changePath
 
 - **GIVEN** no change named `'add-login'` exists
 - **WHEN** `CreateChange.execute` is called with `name: 'add-login'`
 - **THEN** the result includes `changePath` as an absolute path to the change directory
 - **AND** the result includes `change` as the `Change` entity
+
+### Requirement: Dependencies
+
+#### Scenario: Uses ChangeRepository port
+
+- **WHEN** `CreateChange` is instantiated
+- **THEN** it requires a `ChangeRepository` port in its constructor
+
+#### Scenario: Uses ActorResolver port
+
+- **WHEN** `CreateChange` is instantiated
+- **THEN** it requires an `ActorResolver` port in its constructor
+
+#### Scenario: Uses spec repositories map
+
+- **WHEN** `CreateChange` is instantiated
+- **THEN** it requires a `ReadonlyMap<string, SpecRepository>` for spec existence checks

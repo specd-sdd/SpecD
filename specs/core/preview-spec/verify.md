@@ -2,6 +2,22 @@
 
 ## Requirements
 
+### Requirement: Ports and constructor
+
+#### Scenario: Constructor receives required dependencies
+
+- **WHEN** `PreviewSpec` is instantiated
+- **THEN** it receives `ChangeRepository`, a `ReadonlyMap<string, SpecRepository>`, `SchemaProvider`, and `ArtifactParserRegistry`
+- **AND** they are stored as instance properties for use during `execute`
+
+### Requirement: Input
+
+#### Scenario: execute receives change name and specId
+
+- **WHEN** `PreviewSpec.execute` is invoked
+- **THEN** it receives `name: string` (the change name) and `specId: string` (the fully-qualified spec ID)
+- **AND** `specId` must be one of the change's `specIds`
+
 ### Requirement: Spec ID validation
 
 #### Scenario: specId not in change throws error

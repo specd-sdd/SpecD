@@ -23,3 +23,18 @@
 - **GIVEN** a SpecdPlugin with `install` and `uninstall` methods but `type` is not `'agent'`
 - **WHEN** `isAgentPlugin` is called
 - **THEN** it returns `false`
+
+### Requirement: AgentInstallOptions
+
+#### Scenario: Options include skills filter and variables
+
+- **WHEN** `AgentInstallOptions` is used
+- **THEN** it accepts optional `skills` array and `variables` record
+
+### Requirement: AgentInstallResult
+
+#### Scenario: Result tracks installed and skipped skills
+
+- **WHEN** `AgentInstallResult` is returned
+- **THEN** it contains `installed` array with skill and path
+- **AND** `skipped` array with skill and reason

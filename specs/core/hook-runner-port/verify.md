@@ -86,3 +86,45 @@
 - **WHEN** hook execution is wired for that step
 - **THEN** the entry is dispatched through the external hook runner abstraction
 - **AND** `HookRunner.run()` is used only for shell `run:` hooks
+
+### Requirement: Run method signature
+
+#### Scenario: run method accepts command and variables
+
+- **WHEN** `HookRunner.run` is called
+- **THEN** it accepts `command: string` and `variables: HookVariables`
+- **AND** returns `Promise<HookResult>`
+
+#### Scenario: run method always resolves
+
+- **GIVEN** a command that throws or exits with non-zero code
+- **WHEN** `HookRunner.run` is called
+- **THEN** the promise resolves with a `HookResult` (never rejects)
+
+### Requirement: Hook type distinction
+
+#### Scenario: HookRunner only executes run hooks
+
+- **WHEN** a `run:` hook entry is executed
+- **THEN** `HookRunner.run()` is called with the command and variables
+
+#### Scenario: instruction hooks are not executed by HookRunner
+
+- **GIVEN** a workflow step has `instruction:` hooks
+- **WHEN** hook execution runs `run:` hooks
+- **THEN** `HookRunner.run()` is not called for the instruction entries
+
+### Requirement: Lifecycle execution guarantees
+
+#### Scenario: Non-zero exit code signals abort for pre-hooks
+
+- **GIVEN** a pre-hook is executed and exits with non-zero code
+- **WHEN** `HookRunner.run` returns the result
+- **THEN** the caller uses the non-zero exit code to abort the operation
+
+#### Scenario: Post-hook exit codes are collected without rollback
+
+- **GIVEN** post-hooks execute with various exit codes
+- **WHEN** `HookRunner.run` returns for each post-hook
+- **THEN** all exit codes are collected by the caller
+- **AND** no rollback is performed regardless of individual failures

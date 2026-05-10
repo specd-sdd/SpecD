@@ -2,6 +2,14 @@
 
 ## Requirements
 
+### Requirement: GraphStore port
+
+#### Scenario: GraphStore is an abstract class
+
+- **WHEN** a concrete implementation of `GraphStore` is instantiated
+- **THEN** it receives `storagePath` as a constructor parameter
+- **AND** it is defined in `domain/ports/` following hexagonal architecture
+
 ### Requirement: Connection lifecycle
 
 #### Scenario: Operation before open throws

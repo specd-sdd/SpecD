@@ -186,11 +186,23 @@
       "given": ["repo.artifact(spec, 'spec.md') throws an I/O error during summary resolution"],
       "when": ["execute({ includeSummary: true }) is called"],
       "then": ["the entry still appears without a summary and no error is thrown"]
+    },
+    {
+      "requirement": "SpecListEntry shape",
+      "name": "Entry contains required fields",
+      "when": ["execute() is called"],
+      "then": ["each entry contains workspace (string), path (string), and title (string)"]
+    },
+    {
+      "requirement": "SpecListEntry shape",
+      "name": "Entry may contain optional fields when requested",
+      "when": ["execute({ includeSummary: true, includeMetadataStatus: true }) is called"],
+      "then": ["entries may contain summary and metadataStatus in addition to required fields"]
     }
   ],
   "contentHashes": {
     "spec.md": "sha256:9c918b01b56918de6b1ec5636aea7983d87a2ca60abd2108c9a2b634d694a80a",
-    "verify.md": "sha256:6290a15c5ffa9332c2419dc68962631b7aa1cc63788b6fe51d9e289c060b9ded"
+    "verify.md": "sha256:3cd734966ab1aff5b166aacea31cd6913a8261fcd84e894ce330780a7b00c47c"
   },
   "generatedBy": "core"
 }

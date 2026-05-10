@@ -38,6 +38,12 @@
   ],
   "scenarios": [
     {
+      "requirement": "Command signature",
+      "name": "Command accepts --format option",
+      "when": ["specd project update --format json is run"],
+      "then": ["the command accepts --format option", "AND output is in JSON format"]
+    },
+    {
       "requirement": "Skills update step",
       "name": "Declared plugins are updated",
       "given": ["specd.yaml has plugins.agents: [{ name: '@specd/plugin-agent-claude' }]"],
@@ -84,7 +90,7 @@
   ],
   "contentHashes": {
     "spec.md": "sha256:98eccf4b710208dbb3c9e7c5ae58f064dd93318c01fe920315179a680cfc6165",
-    "verify.md": "sha256:bc1beb07dd586de93f2af3c99e0fc2b56ba83f2e6b2b9c80e4c5e0fd0fb3f9a4"
+    "verify.md": "sha256:eff4660110fad65082a4b80728c38033c13901b18e2e1c992922376aeb138a2e"
   },
   "generatedBy": "core"
 }

@@ -22,3 +22,21 @@
 
 - **WHEN** `createSkillRepository()` is called
 - **THEN** it returns a SkillRepositoryPort implementation
+
+### Requirement: TemplateReader
+
+#### Scenario: TemplateReader loads .md files lazily
+
+- **GIVEN** a skill with templates in `packages/skills/templates/<skill-name>/`
+- **WHEN** `getBundle` is called
+- **THEN** the TemplateReader loads `.md` files as `SkillTemplate` objects
+- **AND** content is loaded lazily via `getContent()`
+
+### Requirement: Shared file scanning
+
+#### Scenario: Scans templates/shared/ for .meta.json files
+
+- **WHEN** `getBundle` is called for a skill that uses shared files
+- **THEN** the infrastructure scans `templates/shared/` for `.meta.json` files
+- **AND** shared file content is loaded on demand
+- **AND** ResolvedFile entries are marked as shared

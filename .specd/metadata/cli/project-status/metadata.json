@@ -92,6 +92,20 @@
       "then": ["each workspace shows name, prefix, ownership, isExternal status, and codeRoot path"]
     },
     {
+      "requirement": "includes spec counts",
+      "name": "Output includes spec counts per workspace",
+      "given": ["a project with multiple workspaces containing specs"],
+      "when": ["specd project status is run"],
+      "then": ["output includes total spec count and per-workspace counts"]
+    },
+    {
+      "requirement": "includes change counts",
+      "name": "Output includes active changes, drafts, and discarded counts",
+      "given": ["a project with changes, drafts, and discarded changes"],
+      "when": ["specd project status is run"],
+      "then": ["output includes counts for each category"]
+    },
+    {
       "requirement": "includes approval gates",
       "name": "Output shows approval gate status",
       "given": ["a project with approval gates enabled"],
@@ -151,7 +165,7 @@
   ],
   "contentHashes": {
     "spec.md": "sha256:2370896d5fd5bdd9615db40383bdad6b9e3c6d635fba4bd8b05507f310688974",
-    "verify.md": "sha256:ce426ed3bea313aacecd7cb39b05e56551231ac27b523b6c67acce7fc5ca3abb"
+    "verify.md": "sha256:b9d67e8edc58fbfe9e0bd14f48eea08c8b6750a3ec4d6ea894ed9fa60e91e1c0"
   },
   "generatedBy": "core"
 }

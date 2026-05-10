@@ -603,3 +603,51 @@
 - **GIVEN** a `specd.yaml` without a `logging` section
 - **WHEN** the config is loaded
 - **THEN** the logging configuration MUST use the default level `'info'`
+
+### Requirement: Approvals
+
+#### Scenario: Spec approval gate disabled by default
+
+- **GIVEN** `specd.yaml` does not declare `approvals.spec`
+- **WHEN** config is loaded
+- **THEN** `approvals.spec` defaults to `false`
+
+#### Scenario: Signoff gate disabled by default
+
+- **GIVEN** `specd.yaml` does not declare `approvals.signoff`
+- **WHEN** config is loaded
+- **THEN** `approvals.signoff` defaults to `false`
+
+#### Scenario: Spec approval gate enabled
+
+- **GIVEN** `specd.yaml` declares `approvals.spec: true`
+- **WHEN** config is loaded
+- **THEN** `approvals.spec` is `true`
+
+#### Scenario: Signoff approval gate enabled
+
+- **GIVEN** `specd.yaml` declares `approvals.signoff: true`
+- **WHEN** config is loaded
+- **THEN** `approvals.signoff` is `true`
+
+### Requirement: Config writer port
+
+#### Scenario: ConfigWriter port defines initProject method
+
+- **WHEN** `ConfigWriter` interface is inspected
+- **THEN** it declares `initProject(options: InitProjectOptions): Promise<InitProjectResult>`
+
+#### Scenario: ConfigWriter port defines addPlugin method
+
+- **WHEN** `ConfigWriter` interface is inspected
+- **THEN** it declares `addPlugin(configPath, type, name, config?): Promise<void>`
+
+#### Scenario: ConfigWriter port defines removePlugin method
+
+- **WHEN** `ConfigWriter` interface is inspected
+- **THEN** it declares `removePlugin(configPath, type, name): Promise<void>`
+
+#### Scenario: ConfigWriter port defines listPlugins method
+
+- **WHEN** `ConfigWriter` interface is inspected
+- **THEN** it declares `listPlugins(configPath, type): Promise<Array<{ name: string; config?: Record<string, unknown> }>>`

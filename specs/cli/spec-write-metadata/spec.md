@@ -21,7 +21,9 @@ The `<specPath>` argument uses the same `workspace:capability-path` syntax as ot
 
 Content is read from `--input <file>` when provided, otherwise from stdin. The content must be a valid JSON string representing a metadata object.
 
-### Requirement: YAML validation
+### Requirement: Error — invalid YAML
+
+If the input content fails YAML parsing, the command writes `error: invalid YAML: <parse error message>` to stderr and exits with code 1.
 
 ### Requirement: JSON validation
 
@@ -38,8 +40,6 @@ On success, JSON format outputs: `{ "result": "ok", "spec": "<workspace:path>" }
 ### Requirement: Error — spec not found
 
 If the spec does not exist in the given workspace, the command writes `error: spec '<specPath>' not found` to stderr and exits with code 1.
-
-### Requirement: Error — invalid YAML
 
 ### Requirement: Error — invalid JSON
 

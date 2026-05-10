@@ -421,29 +421,6 @@
 - **WHEN** at least one touched spec ID has not been approved
 - **THEN** `specd archive` must refuse and report which spec IDs are pending approval
 
-### Requirement: taskCompletionCheck
-
-#### Scenario: Default patterns detect markdown checkboxes
-
-- **GIVEN** an artifact with no `taskCompletionCheck` declared
-- **AND** its file contains `- [ ] pending` and `- [x] done`
-- **WHEN** the CLI checks task completion
-- **THEN** `incompletePattern` defaults to `^\s*-\s+\[ \]` and matches `- [ ] pending`
-- **AND** `completePattern` defaults to `^\s*-\s+\[x\]` (case-insensitive) and matches `- [x] done`
-
-#### Scenario: Custom patterns override defaults
-
-- **GIVEN** an artifact declares `taskCompletionCheck.incompletePattern: '^\s*TODO:'` and `taskCompletionCheck.completePattern: '^\s*DONE:'`
-- **AND** its file contains `TODO: implement login` and `DONE: implement logout`
-- **WHEN** the CLI checks task completion
-- **THEN** `incompletePattern` matches `TODO: implement login` and the transition is blocked
-
-#### Scenario: All tasks complete — no incomplete matches
-
-- **GIVEN** an artifact file where all checkboxes are checked and none are unchecked
-- **WHEN** the `implementing → verifying` transition is attempted
-- **THEN** `incompletePattern` matches zero lines and the transition is allowed
-
 ### Requirement: preHashCleanup
 
 #### Scenario: Substitution applied before hashing

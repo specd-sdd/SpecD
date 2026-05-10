@@ -70,6 +70,21 @@
   ],
   "scenarios": [
     {
+      "requirement": "Input contract",
+      "name": "execute accepts SaveSpecMetadataInput",
+      "when": ["SaveSpecMetadata.execute is called"],
+      "then": [
+        "it accepts SaveSpecMetadataInput with workspace (string, required), specPath (SpecPath, required), content (string, required), force (optional)"
+      ]
+    },
+    {
+      "requirement": "Output contract",
+      "name": "Successful write returns spec label",
+      "given": ["valid content, existing workspace, and existing spec"],
+      "when": ["execute() succeeds"],
+      "then": ["the result is SaveSpecMetadataResult containing spec (qualified spec label)"]
+    },
+    {
       "requirement": "Content validation before write",
       "name": "Non-object JSON is rejected",
       "given": ["a valid spec exists"],
@@ -203,15 +218,6 @@
     },
     {
       "requirement": "Artifact persistence",
-      "name": "Successful write returns spec label",
-      "given": [
-        "valid content, existing workspace, and existing spec with name auth/oauth in workspace default"
-      ],
-      "when": ["execute() is called"],
-      "then": ["the result is { spec: 'default:auth/oauth' }"]
-    },
-    {
-      "requirement": "Artifact persistence",
       "name": "Metadata is saved via saveMetadata",
       "when": ["execute() succeeds"],
       "then": ["SpecRepository.saveMetadata() is called with the raw YAML content"]
@@ -226,7 +232,7 @@
   ],
   "contentHashes": {
     "spec.md": "sha256:c6082a00730db3dc01eb71f260d956cb327051d6731a2d6199a851a64be6e7f6",
-    "verify.md": "sha256:aa06e497aaa57b044408b9e630d8e7a43dbf8292fb81e43bc57626e334af5d41"
+    "verify.md": "sha256:8478bf08bcdb2fe267e41857d9cf43bff0114d09d796dfc04c49cdd77c2ee1b4"
   },
   "generatedBy": "core"
 }

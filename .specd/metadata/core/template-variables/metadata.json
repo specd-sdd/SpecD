@@ -100,6 +100,45 @@
       "then": ["the result is \"add-auth in default\""]
     },
     {
+      "requirement": "Built-in namespace",
+      "name": "project namespace is always present",
+      "given": ["any expansion context"],
+      "when": ["expand() is called"],
+      "then": [
+        "the project namespace is available",
+        "AND project.root contains the absolute path to the project root"
+      ]
+    },
+    {
+      "requirement": "Built-in namespace",
+      "name": "Built-in variables are injected at composition time",
+      "when": ["TemplateExpander is constructed"],
+      "then": [
+        "it receives built-in variables (project namespace) from the composition layer",
+        "AND use cases do not need to build them per invocation"
+      ]
+    },
+    {
+      "requirement": "Variable map shape",
+      "name": "Variable map is a nested record structure",
+      "given": ["a variable map { project: { root: '/home' }, change: { name: 'my-change' } }"],
+      "when": ["it is used for expansion"],
+      "then": [
+        "it is a plain object where top-level keys are namespace names",
+        "AND each namespace value is a flat record of string keys to primitive values"
+      ]
+    },
+    {
+      "requirement": "Variable map shape",
+      "name": "Only primitive values are expanded",
+      "given": [
+        "a template \"{{change.complex}}\"",
+        "AND variables { change: { complex: { nested: 'value' } } }"
+      ],
+      "when": ["expand() is called"],
+      "then": ["the token is preserved unchanged because object values are not expanded"]
+    },
+    {
       "requirement": "Expansion semantics",
       "name": "Unknown namespace preserved",
       "given": [
@@ -265,7 +304,7 @@
   ],
   "contentHashes": {
     "spec.md": "sha256:3c6b2d7a4d700290199f4718f009b07f6de6d77bf64994a250e8db41694db1b2",
-    "verify.md": "sha256:800543b9cd542f37cc210d393a23d23dce7490dffe4b0863f502714d4996bf0d"
+    "verify.md": "sha256:84b5f672f9d27f00fb4938bb9f208fb820c99f3e92d824efd909766b6aef6fed"
   },
   "generatedBy": "core"
 }

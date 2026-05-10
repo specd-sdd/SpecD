@@ -161,3 +161,71 @@
 - **THEN** the transition succeeds
 - **AND** no hooks are executed
 - **AND** the change state is updated to `implementing`
+
+### Requirement: Default hook execution for transitions and archives
+
+#### Scenario: TransitionChange executes pre-hooks before state change
+
+- **GIVEN** a transition to `implementing` step with pre-hooks
+- **WHEN** `TransitionChange.execute` is called
+- **THEN** pre-hooks are executed before the state transition
+- **AND** pre-hook failure aborts the transition
+
+#### Scenario: TransitionChange executes post-hooks after state change
+
+- **GIVEN** a transition to `implementing` step with post-hooks
+- **WHEN** `TransitionChange.execute` is called
+- **THEN** post-hooks are executed after the state transition
+- **AND** post-hook failures are collected without rollback
+
+#### Scenario: ArchiveChange executes pre-hooks before archive
+
+- **GIVEN** archiving step with pre-hooks
+- **WHEN** `ArchiveChange.execute` is called
+- **THEN** pre-hooks are executed before any file modifications
+- **AND** pre-hook failure aborts the archive
+
+#### Scenario: ArchiveChange executes post-hooks after archive
+
+- **GIVEN** archiving step with post-hooks
+- **WHEN** `ArchiveChange.execute` is called
+- **THEN** post-hooks are executed after the archive completes
+- **AND** post-hook failures are collected without rollback
+
+#### Scenario: Hook execution delegated to RunStepHooks
+
+- **GIVEN** `TransitionChange` needs to execute hooks
+- **WHEN** hook execution is triggered
+- **THEN** `RunStepHooks` is used for collection, variable expansion, and execution
+
+### Requirement: Manual hook control with skipHooks
+
+#### Scenario: TransitionChange accepts skipHookPhases selector
+
+- **WHEN** `TransitionChange.execute` is called with `skipHookPhases: ['all']`
+- **THEN** all `run:` hooks are skipped for that transition
+
+#### Scenario: ArchiveChange accepts skipHookPhases selector
+
+- **WHEN** `ArchiveChange.execute` is called with `skipHookPhases: ['pre']`
+- **THEN** pre-hooks are skipped for that archive
+
+#### Scenario: Phase selector skips specific phases
+
+- **GIVEN** `TransitionChange` accepts phase selectors 'source.pre', 'source.post', 'target.pre', 'target.post'
+- **WHEN** `skipHookPhases: ['target.pre']` is provided
+- **THEN** only target pre-hooks are skipped
+
+### Requirement: Template variable expansion
+
+#### Scenario: HookRunner expands template variables in run commands
+
+- **GIVEN** a `run:` hook with command `"echo {{change.name}}"`
+- **WHEN** the hook is executed via `HookRunner`
+- **THEN** `{{change.name}}` is substituted with the change name value
+
+#### Scenario: Unknown template variables left unexpanded
+
+- **GIVEN** a `run:` hook with command `"echo {{unknown.variable}}"`
+- **WHEN** the hook is executed
+- **THEN** the literal `{{unknown.variable}}` token is preserved in the command

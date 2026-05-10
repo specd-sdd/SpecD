@@ -16,12 +16,40 @@
 - **WHEN** `specd spec write-metadata auth/login --input meta.json` is run
 - **THEN** the metadata is written successfully
 
-### Requirement: YAML validation
+### Requirement: Command signature
+
+#### Scenario: Command accepts specPath as argument
+
+- **WHEN** `specd spec write-metadata auth/login` is invoked
+- **THEN** `<specPath>` is accepted as argument
+
+#### Scenario: Command supports --format, --input, --force options
+
+- **WHEN** `specd spec write-metadata auth/login --format json --input meta.json --force` is run
+- **THEN** all options are accepted
+
+### Requirement: JSON validation
 
 #### Scenario: Rejects invalid JSON
 
 - **WHEN** `specd spec write-metadata auth/login --input bad.txt` is run with non-JSON content
 - **THEN** stderr contains `error: invalid JSON:` and exit code is 1
+
+### Requirement: Error — invalid JSON
+
+#### Scenario: Invalid JSON exits 1
+
+- **WHEN** input content is not valid JSON
+- **THEN** the command writes `error: invalid JSON: <message>` to stderr
+- **AND** exits with code 1
+
+### Requirement: Error — invalid YAML
+
+#### Scenario: Invalid YAML exits 1
+
+- **WHEN** input content is not valid YAML
+- **THEN** the command writes `error: invalid YAML: <message>` to stderr
+- **AND** exits with code 1
 
 ### Requirement: Text output
 

@@ -86,3 +86,25 @@
 
 - **WHEN** a new package declares a `workspace:*` dependency that creates a cycle
 - **THEN** pnpm must reject it
+
+### Requirement: Composition layer for use-case wiring
+
+#### Scenario: Dependency injection is manual and explicit
+
+- **WHEN** a package wires its use cases
+- **THEN** it must do so in a dedicated composition layer
+- **AND** every dependency must be passed explicitly via constructor without using a container
+
+#### Scenario: Composition is the only layer importing infrastructure
+
+- **WHEN** checking imports in the `composition/` directory
+- **THEN** it may import from `infrastructure/`
+- **AND** no other layer (`domain/`, `application/`) may contain such imports
+
+### Requirement: YAML inputs validated at the infrastructure boundary
+
+#### Scenario: External data is validated before use
+
+- **WHEN** a system component reads external YAML or structured data
+- **THEN** it must validate that data against a formal schema at the boundary
+- **AND** no unvalidated external structure may leak into domain or application logic

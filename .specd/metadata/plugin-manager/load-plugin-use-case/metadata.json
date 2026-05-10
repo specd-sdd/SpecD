@@ -29,6 +29,12 @@
   ],
   "scenarios": [
     {
+      "requirement": "Input",
+      "name": "Input includes plugin name",
+      "when": ["LoadPlugin is executed"],
+      "then": ["the input includes pluginName"]
+    },
+    {
       "requirement": "Output",
       "name": "Plugin loaded",
       "when": ["LoadPlugin is executed with valid plugin"],
@@ -39,11 +45,20 @@
       "name": "Plugin not found",
       "when": ["LoadPlugin is executed with non-existent plugin"],
       "then": ["it returns { error: PluginNotFoundError }"]
+    },
+    {
+      "requirement": "Behavior",
+      "name": "Loads plugin via PluginLoader",
+      "when": ["LoadPlugin is executed"],
+      "then": [
+        "it loads the plugin via PluginLoader",
+        "AND validates the plugin implements the expected interface"
+      ]
     }
   ],
   "contentHashes": {
     "spec.md": "sha256:8ccc0f8a7e6dba34e3cc42979e3936ccd8c45f29dfb39784183f75a7f3c08396",
-    "verify.md": "sha256:e068558a8972a286d7953b21070a3d3f4d77e8e500e3d8d5ef53477948def877"
+    "verify.md": "sha256:945bbe97932c4134b8d46ba357420b0bce237185832d6a777f11e641059a821b"
   },
   "generatedBy": "core"
 }

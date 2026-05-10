@@ -32,6 +32,24 @@
   ],
   "scenarios": [
     {
+      "requirement": "Command signature",
+      "name": "Basic fork from npm package",
+      "when": ["specd schema fork @specd/schema-std my-schema is run"],
+      "then": ["the command accepts <ref> and <name> arguments", "AND creates the forked schema"]
+    },
+    {
+      "requirement": "Command signature",
+      "name": "Fork with --output option",
+      "when": ["specd schema fork @specd/schema-std my-fork --output /tmp/my-schema is run"],
+      "then": ["the command accepts --output <path> as alternative to --workspace"]
+    },
+    {
+      "requirement": "Command signature",
+      "name": "Fork with --workspace option",
+      "when": ["specd schema fork @specd/schema-std my-fork --workspace billing is run"],
+      "then": ["the command accepts --workspace <workspace> as alternative to --output"]
+    },
+    {
       "requirement": "Fork behaviour",
       "name": "Fork from npm package",
       "given": ["@specd/schema-std is installed and the default workspace has a schemasPath"],
@@ -106,7 +124,7 @@
   ],
   "contentHashes": {
     "spec.md": "sha256:22f94739f7ae7a5abe5f65213f3d3998dc5f4d1e6892b4bb2d9cec2cbcde4d7b",
-    "verify.md": "sha256:498124cfe2c0b4f45057cdf5bdd164867acd2f5fc7a1185630fe042a7dd459d2"
+    "verify.md": "sha256:9277f0ad5290e9e7876133a430d105582f07e490862d61d52caa90a18cfc2496"
   },
   "generatedBy": "core"
 }

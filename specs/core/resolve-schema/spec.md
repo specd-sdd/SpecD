@@ -51,6 +51,10 @@ When resolving the extends chain, templates from each schema in the chain are ac
 
 This may require extending `SchemaRegistry.resolve()` to return a richer result type, or `ResolveSchema` may call a lower-level method that returns intermediate data before domain construction.
 
+### Requirement: Multiple executions are idempotent
+
+`ResolveSchema` is idempotent — multiple executions with the same construction config produce equivalent `Schema` objects. The resolution pipeline has no side effects that alter subsequent calls.
+
 ## Constraints
 
 - `ResolveSchema` is an application use case — it lives in `application/use-cases/`

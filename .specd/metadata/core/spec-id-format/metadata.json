@@ -41,6 +41,12 @@
       "rules": [
         "Functions that accept spec IDs SHOULD normalize bare paths to fully-qualified form (`default:capPath`) at the system boundary. Domain-layer code MAY assume spec IDs are already qualified."
       ]
+    },
+    {
+      "requirement": "specDependsOn format",
+      "rules": [
+        "The `specDependsOn` map in the change manifest MUST use fully-qualified spec IDs (`workspace:capabilityPath`). Bare paths in metadata MUST be normalized to fully-qualified form before storage."
+      ]
     }
   ],
   "constraints": [
@@ -128,7 +134,7 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:252025b89ff44d73b224548a3ce8abfc97427927696691d50c3f312f6fa13e0d",
+    "spec.md": "sha256:2d1cedb994fda0e4439c76a3aa860a17a85c3fbf790bf15616a6d8785734e34c",
     "verify.md": "sha256:f9023f0a7de7d50e232e3a5d07456bc5ad2a86f29167e5ec10017e490d9d989a"
   },
   "generatedBy": "core"

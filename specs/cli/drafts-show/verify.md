@@ -14,6 +14,13 @@
 - **WHEN** `specd draft show my-change` is run
 - **THEN** it is accepted as an alias of `specd drafts show my-change`
 
+### Requirement: Output format — toon
+
+#### Scenario: TOON format output
+
+- **WHEN** `specd drafts show my-change --format toon` is run
+- **THEN** output is encoded in Token-Oriented Object Notation (toon)
+
 ### Requirement: Output format — text
 
 #### Scenario: Normal text output

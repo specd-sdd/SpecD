@@ -49,6 +49,14 @@
   ],
   "scenarios": [
     {
+      "requirement": "Input contract",
+      "name": "execute accepts SkipArtifactInput",
+      "when": ["SkipArtifact.execute is called"],
+      "then": [
+        "it accepts SkipArtifactInput with name (required), artifactId (required), reason (optional)"
+      ]
+    },
+    {
       "requirement": "Change lookup",
       "name": "Change does not exist",
       "when": ["execute is called with a name that does not exist in the repository"],
@@ -102,7 +110,7 @@
   ],
   "contentHashes": {
     "spec.md": "sha256:955d62f23519f0ab2b3b187d3473dc222f2d2e62085d6c67ace21fdedd6fdb01",
-    "verify.md": "sha256:fe3de67e2e86a8a8bd82ccbd1d9e0963a2e9093ea9f98c039ef7d7ec18cbbff0"
+    "verify.md": "sha256:50595075ea1b08306e47b31152fa629485270468d6e3b6bac79e5128e7103b4c"
   },
   "generatedBy": "core"
 }

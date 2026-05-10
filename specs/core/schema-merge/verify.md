@@ -2,6 +2,30 @@
 
 ## Requirements
 
+### Requirement: Function signature
+
+#### Scenario: Plain exported function with correct signature
+
+- **WHEN** `mergeSchemaLayers` is imported from the domain services module
+- **THEN** it is a plain exported function with signature `(base: SchemaYamlData, layers: readonly SchemaLayer[]) => SchemaYamlData`
+- **AND** it is synchronous and pure
+
+### Requirement: SchemaLayer type
+
+#### Scenario: SchemaLayer contains source, ref, and operations
+
+- **WHEN** a `SchemaLayer` is constructed
+- **THEN** it has `source: 'extends' | 'plugin' | 'override'`, `ref: string`, and `operations: SchemaOperations`
+- **AND** `SchemaOperations` contains optional `remove`, `create`, `prepend`, `append`, and `set` operations
+
+### Requirement: Operation target structure
+
+#### Scenario: Operations mirror schema hierarchy
+
+- **GIVEN** an operation that targets `workflow[0].hooks.post`
+- **WHEN** the operation entry includes a parent identity (`step`) and nested arrays
+- **THEN** the merge engine locates the parent entry first, then applies the nested operation to the sub-array
+
 ### Requirement: Five operations with fixed intra-layer order
 
 #### Scenario: Remove before create — no collision

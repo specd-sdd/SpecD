@@ -2,6 +2,13 @@
 
 ## Requirements
 
+### Requirement: Input contract
+
+#### Scenario: execute accepts SkipArtifactInput
+
+- **WHEN** `SkipArtifact.execute` is called
+- **THEN** it accepts `SkipArtifactInput` with `name` (required), `artifactId` (required), `reason` (optional)
+
 ### Requirement: Change lookup
 
 #### Scenario: Change does not exist

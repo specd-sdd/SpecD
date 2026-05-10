@@ -153,6 +153,43 @@
 - **THEN** workspace `billing` is not active
 - **AND** its workspace-level patterns are not applied
 
+### Requirement: Primary workspace
+
+#### Scenario: Primary workspace is first spec's workspace
+
+- **GIVEN** a change with `specIds: ['billing:invoices', 'default:auth/login']`
+- **WHEN** the primary workspace is determined
+- **THEN** it is `billing`
+
+#### Scenario: Primary workspace used for archive path template
+
+- **GIVEN** a change with primary workspace `billing`
+- **WHEN** `ArchiveChange` resolves `{{change.workspace}}` in the archive path template
+- **THEN** it resolves to `billing`
+
+### Requirement: Port-per-workspace pattern
+
+#### Scenario: Repository map passed to cross-workspace use cases
+
+- **GIVEN** multiple workspaces `default` and `billing` are declared
+- **WHEN** a use case that operates across workspaces is invoked
+- **THEN** it receives a `ReadonlyMap<string, RepositoryInstance>` keyed by workspace name
+- **AND** it looks up the repository for a spec's workspace to resolve paths
+
+### Requirement: Cross-workspace references
+
+#### Scenario: Spec references another workspace's spec
+
+- **GIVEN** workspace `billing` and `default` are declared
+- **WHEN** a spec declares `dependsOn: ['billing:payments/invoices']`
+- **THEN** the reference is accepted
+
+#### Scenario: Unknown workspace reference at config validation time
+
+- **GIVEN** a workspace with `prefix: team` declares a schema reference `#unknown:name`
+- **WHEN** configuration is validated
+- **THEN** an error is thrown
+
 ### Requirement: Workspace-level context patterns
 
 #### Scenario: Unqualified pattern resolves to own workspace

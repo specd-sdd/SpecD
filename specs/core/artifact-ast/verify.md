@@ -122,3 +122,31 @@
 - **GIVEN** a JSON file with `"keywords": ["specd", "spec-driven"]`
 - **WHEN** the JSON adapter parses it
 - **THEN** the `keywords` property has `children` containing an `array` node with `array-item` children each having `value`
+
+### Requirement: Plaintext AST
+
+#### Scenario: Document node is root
+
+- **GIVEN** a plaintext file
+- **WHEN** the plaintext adapter parses it
+- **THEN** the root is a `document` node with `children` containing block nodes
+
+#### Scenario: Paragraph and line nodes
+
+- **GIVEN** a plaintext file with multiple paragraphs
+- **WHEN** the plaintext adapter parses it
+- **THEN** each paragraph becomes a `paragraph` node with `line` children
+
+### Requirement: Round-trip fidelity
+
+#### Scenario: Markdown round-trip preserves headings
+
+- **GIVEN** a markdown file with headings at multiple levels
+- **WHEN** it is parsed to AST, then serialized back to markdown
+- **THEN** heading levels and labels are preserved exactly
+
+#### Scenario: YAML round-trip preserves key order
+
+- **GIVEN** a YAML file with multiple keys
+- **WHEN** it is parsed to AST, then serialized back to YAML
+- **THEN** key order is preserved

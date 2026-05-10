@@ -64,6 +64,12 @@
       ]
     },
     {
+      "requirement": "Two execution modes",
+      "rules": [
+        "Workflow steps operate in two distinct execution modes:\n\n1. **Agent-driven mode** — steps like `implementing` require the agent to explicitly invoke `RunStepHooks`. Hooks are not automatically executed by the state transition; the agent must call `specd change run-hooks` to execute them.\n2. **Deterministic mode** — steps like `archiving` execute hooks internally. `ArchiveChange` calls `RunStepHooks` directly before performing the archive."
+      ]
+    },
+    {
       "requirement": "Step requires reference artifact IDs",
       "rules": [
         "A workflow step's `requires` array contains **artifact IDs** (e.g. `specs`, `tasks`, `verify`), not other step names. This means step-to-step circular dependencies are structurally impossible — a step cannot depend on another step, only on artifact completion status. The artifact dependency graph itself is validated as a directed acyclic graph (DAG) at schema build time by `buildSchema()`, which performs depth-first cycle detection and throws `SchemaValidationError` if a cycle is found. Since step gating delegates entirely to artifact status, and the artifact graph is guaranteed acyclic, the step availability evaluation is always well-defined and termination is guaranteed."
@@ -243,6 +249,47 @@
       "then": ["the step is no longer available"]
     },
     {
+      "requirement": "Step-to-state mapping",
+      "name": "Step name is the target state name",
+      "given": ["a workflow step with step: \"implementing\""],
+      "when": ["TransitionChange transitions to this step"],
+      "then": [
+        "the Change entity transitions to the implementing lifecycle state",
+        "AND there is no indirection or mapping table between step and state"
+      ]
+    },
+    {
+      "requirement": "Hook execution at step boundaries",
+      "name": "Pre-hooks execute before state change",
+      "given": ["a workflow step with pre: [{ id: \"setup\", run: \"echo setup\" }]"],
+      "when": ["TransitionChange transitions to this step"],
+      "then": ["pre-hooks execute before the state change occurs"]
+    },
+    {
+      "requirement": "Hook execution at step boundaries",
+      "name": "Post-hooks execute after state change",
+      "given": ["a workflow step with post: [{ id: \"teardown\", run: \"echo teardown\" }]"],
+      "when": ["TransitionChange transitions to this step"],
+      "then": ["post-hooks execute after the state change completes"]
+    },
+    {
+      "requirement": "Step requires reference artifact IDs",
+      "name": "Requires contains artifact IDs not step names",
+      "given": ["a workflow step with requires: [\"specs\", \"verify\"]"],
+      "when": ["the step's requires are evaluated"],
+      "then": [
+        "they reference artifact IDs (specs, verify)",
+        "AND they do not reference other step names"
+      ]
+    },
+    {
+      "requirement": "Step requires reference artifact IDs",
+      "name": "Step-to-step circular dependencies are impossible",
+      "given": ["a schema where step A requires step B"],
+      "when": ["buildSchema validates the schema"],
+      "then": ["it throws SchemaValidationError because step gating only accepts artifact IDs"]
+    },
+    {
       "requirement": "Workflow array order is display order",
       "name": "Later step available before earlier step",
       "given": [
@@ -275,8 +322,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:530edfcb9d895fb6fe1e4ae30681b8cc9ecb87c838b5c03bda69980bddb2a04e",
-    "verify.md": "sha256:0e3ee73db1e729b84cbc96731e49114422016519d41b39fbf679d5c2f7f39f2f"
+    "spec.md": "sha256:5865c596ff1ba22a31321bcd7e50b85d86547a611b595def6d71c0f88fb37864",
+    "verify.md": "sha256:ab90e870ac56a2accb79687d172b57bd9a69484b597848ed1411536ae8ac3e6e"
   },
   "generatedBy": "core"
 }

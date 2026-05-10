@@ -489,11 +489,41 @@
       "then": [
         "the returned Schema has name() === \"test\", version() === 1, two artifacts accessible via artifact(id), workflow steps accessible via workflowStep(name), and metadata extraction defined"
       ]
+    },
+    {
+      "requirement": "buildMetadataExtractorEntry sub-function",
+      "name": "Convert raw metadata extractor entry",
+      "given": ["a raw metadata extractor entry with nested extractor"],
+      "when": ["buildMetadataExtractorEntry is called"],
+      "then": ["it returns a MetadataExtractorEntry with the nested extractor converted"]
+    },
+    {
+      "requirement": "buildMetadataExtraction sub-function",
+      "name": "Convert raw metadata extraction block",
+      "given": [
+        "a raw metadata extraction block with title, description, dependsOn, and context fields"
+      ],
+      "when": ["buildMetadataExtraction is called"],
+      "then": ["it returns a MetadataExtraction with all fields converted"]
+    },
+    {
+      "requirement": "detectCycle helper",
+      "name": "Cycle detected in artifact dependencies",
+      "given": ["an artifact dependency graph where A depends on B and B depends on A"],
+      "when": ["detectCycle is called with artifact A"],
+      "then": ["it returns true"]
+    },
+    {
+      "requirement": "detectCycle helper",
+      "name": "No cycle in acyclic graph",
+      "given": ["an artifact dependency graph where A -> B -> C (no cycles)"],
+      "when": ["detectCycle is called with artifact A"],
+      "then": ["it returns false"]
     }
   ],
   "contentHashes": {
     "spec.md": "sha256:7091e2e7cb0eb7fd4a1e68d7c75a9fef48734bcf194d9ef1e35dc02fc76a0639",
-    "verify.md": "sha256:6516ccf054524044535a0b28ebfbfd646ed512ebbade77722c86337be8c0e593"
+    "verify.md": "sha256:62918b5d6ac173f0f363488ea6d3f5bf8b491fac541d27a6f4d7000398fda9a7"
   },
   "generatedBy": "core"
 }

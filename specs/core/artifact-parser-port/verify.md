@@ -212,3 +212,43 @@
 - **WHEN** it is validated against the interface
 - **THEN** `type`, `label`, and `depth` remain required
 - **AND** `children` remains optional
+
+### Requirement: NodeTypes contract
+
+#### Scenario: nodeTypes returns complete type descriptors
+
+- **WHEN** `nodeTypes()` is called on an adapter
+- **THEN** it returns a complete map of all node type names to their `NodeTypeDescriptor`
+- **AND** each descriptor includes nature flags (`isCollection`, `isSequence`, etc.)
+
+### Requirement: Selector hint contract
+
+#### Scenario: Selector hints guide delta application
+
+- **GIVEN** an AST with a section having label "Requirements"
+- **WHEN** delta application uses a selector hint matching that label
+- **THEN** the selector resolves to that specific node
+
+### Requirement: DeltaInstructions contract
+
+#### Scenario: DeltaInstructions guide selection
+
+- **GIVEN** a delta entry with `instructions` field
+- **WHEN** parsing the delta entry
+- **THEN** the returned `DeltaEntry` includes the instructions for human review
+
+### Requirement: ArtifactAST shape
+
+#### Scenario: ArtifactAST has root and metadata
+
+- **WHEN** `parse` is called
+- **THEN** the returned `ArtifactAST` has a `root` property (non-null `ArtifactNode`)
+- **AND** includes metadata about the original content
+
+### Requirement: Supporting type shapes
+
+#### Scenario: Supporting types are exported
+
+- **WHEN** examining the parser module exports
+- **THEN** types like `ArtifactNode`, `ArtifactAST`, `OutlineEntry`, `DeltaEntry` are exported
+- **AND** can be imported by consumers

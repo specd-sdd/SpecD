@@ -115,11 +115,37 @@
         "AND the callback records the discarded event on the fresh persisted Change",
         "AND the resulting change is relocated to the discarded area by the repository"
       ]
+    },
+    {
+      "requirement": "Input contract",
+      "name": "execute accepts DiscardChangeInput",
+      "when": ["DiscardChange.execute is called"],
+      "then": [
+        "it accepts DiscardChangeInput with name, reason (required), supersededBy (optional), force (optional)"
+      ]
+    },
+    {
+      "requirement": "Input contract",
+      "name": "reason field is mandatory",
+      "when": ["DiscardChange.execute is called without reason"],
+      "then": ["a type error is raised (reason is required in the input type)"]
+    },
+    {
+      "requirement": "Dependencies",
+      "name": "Uses ChangeRepository port",
+      "when": ["DiscardChange is instantiated"],
+      "then": ["it requires a ChangeRepository port in its constructor"]
+    },
+    {
+      "requirement": "Dependencies",
+      "name": "Uses ActorResolver port",
+      "when": ["DiscardChange is instantiated"],
+      "then": ["it requires an ActorResolver port in its constructor"]
     }
   ],
   "contentHashes": {
     "spec.md": "sha256:d355d176809ba4c86ce6519b2839745a76cd60407f3f96b94338d67cb28035a1",
-    "verify.md": "sha256:f3bfdd1a295f9abc7682d736d05f8a15b68715db5d71bf8a752f9cfbb5043c6c"
+    "verify.md": "sha256:89ecc36ab0b02974ba201ab4de73918139ef986ce4c6640561f861a5393eb307"
   },
   "generatedBy": "core"
 }

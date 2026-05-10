@@ -67,6 +67,34 @@
   ],
   "scenarios": [
     {
+      "requirement": "List method signature",
+      "name": "list returns SchemaEntry array without loading content",
+      "when": ["SchemaRegistry.list() is called"],
+      "then": [
+        "it returns Promise<SchemaEntry[]>",
+        "AND it does not load or validate schema file contents",
+        "AND it discovers available schemas and returns their metadata"
+      ]
+    },
+    {
+      "requirement": "List method signature",
+      "name": "list delegates to workspace repositories",
+      "given": [
+        "a SchemaRegistry with SchemaRepository instances for workspaces \"billing\" and \"default\""
+      ],
+      "when": ["list() is called"],
+      "then": ["it calls list() on each workspace repository", "AND combines the results"]
+    },
+    {
+      "requirement": "Schema re-export",
+      "name": "Port module re-exports Schema type",
+      "when": ["the SchemaRegistry port module is imported"],
+      "then": [
+        "it exports the Schema type from domain/value-objects/schema.ts",
+        "AND consumers can import both the port interface and Schema type from a single location"
+      ]
+    },
+    {
       "requirement": "Interface shape",
       "name": "Implementation satisfies the contract",
       "given": ["a concrete class implementing SchemaRegistry"],
@@ -193,7 +221,7 @@
   ],
   "contentHashes": {
     "spec.md": "sha256:a51f79669eb561c5ee906c1d85cd47c7fa61899885ca7e49f5d7dd0f14e14158",
-    "verify.md": "sha256:f214b2ace7fbb5cb517d7244ca3567e6175edb24f020cc7eb35ee9463b1ccf37"
+    "verify.md": "sha256:ed0e79a16f7db9745d13c16518987c9563adf1664b312210cfe8934561860903"
   },
   "generatedBy": "core"
 }

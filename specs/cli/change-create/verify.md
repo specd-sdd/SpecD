@@ -65,6 +65,14 @@
 - **WHEN** `specd change create my-change --spec default:auth/login` is run
 - **THEN** the change is created successfully
 
+### Requirement: Schema name and version
+
+#### Scenario: Schema resolved from active config
+
+- **GIVEN** the active `SpecdConfig` has `schema: "spec-driven"` and `schemaVersion: 1`
+- **WHEN** `specd change create my-change` is run
+- **THEN** the created change's manifest includes `schemaName: "spec-driven"` and `schemaVersion: 1`
+
 ### Requirement: Output on success
 
 #### Scenario: Successful creation
@@ -91,7 +99,7 @@
 - **THEN** the command exits with code 1
 - **AND** stderr contains an `error:` message mentioning the duplicate name
 
-### Requirement: Output on success
+### Requirement: JSON output on success
 
 #### Scenario: JSON output on success
 

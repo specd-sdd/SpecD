@@ -34,6 +34,12 @@
       "rules": [
         "If the provider cannot be opened, the command exits with code 3 (same as other graph commands). The `process.exit(0)` pattern applies — LadybugDB native threads require explicit exit."
       ]
+    },
+    {
+      "requirement": "Command signature (filters)",
+      "rules": [
+        "The command accepts the following filter options applied at the store level:\n\n- `--kind <kinds>` — filter symbols by kind (e.g., `class,method`)\n- `--file <path>` — filter symbols by file path pattern (supports `*` wildcards)\n- `--workspace <name>` — filter to a single workspace\n- `--exclude-path <pattern>` — exclude symbols/specs matching the glob pattern\n- `--exclude-workspace <name>` — exclude results from the given workspace"
+      ]
     }
   ],
   "constraints": [
@@ -151,6 +157,12 @@
       ]
     },
     {
+      "requirement": "Error cases",
+      "name": "Provider cannot be opened exits with code 3",
+      "when": ["the provider fails to open"],
+      "then": ["the command exits with code 3"]
+    },
+    {
       "requirement": "Output format",
       "name": "Text output groups by category",
       "when": ["results include both symbols and specs in text mode"],
@@ -217,8 +229,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:3984d6443bd0d998136cc02c3f435beacce10e44a8a77b99e6d729a8044b6ecb",
-    "verify.md": "sha256:6c7d7c85e4fb25ff0f38353e3aa41c5867b0b959d12c0da45368fc2caef477a2"
+    "spec.md": "sha256:4be5a23ad5d28ccde2c3343967577a7f32edc963418a8fc323d553f4056451b8",
+    "verify.md": "sha256:896eb337fee8a7dbadceccd51fa333cd1467e72b5262c7c3cc4e5fc332348d67"
   },
   "generatedBy": "core"
 }

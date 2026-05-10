@@ -110,6 +110,68 @@
   ],
   "scenarios": [
     {
+      "requirement": "Ports and constructor",
+      "name": "Constructor receives required dependencies",
+      "when": ["RunStepHooks is instantiated"],
+      "then": [
+        "it receives ChangeRepository, ArchiveRepository, HookRunner, and SchemaProvider",
+        "AND they are stored as instance properties for use during execute"
+      ]
+    },
+    {
+      "requirement": "Input",
+      "name": "execute receives name, step, phase, and optional only",
+      "when": ["RunStepHooks.execute is invoked"],
+      "then": [
+        "it receives name: string, step: string, phase: 'pre' | 'post', and optionally only: string",
+        "AND these parameters control which change, workflow step, and hooks are processed"
+      ]
+    },
+    {
+      "requirement": "Progress callback",
+      "name": "Progress callback receives hook start and done events",
+      "given": ["onProgress callback is provided to execute"],
+      "when": ["hooks are executed"],
+      "then": [
+        "the callback receives { type: 'hook-start', hookId, command } before each hook",
+        "AND receives { type: 'hook-done', hookId, success, exitCode } after each hook"
+      ]
+    },
+    {
+      "requirement": "Change lookup",
+      "name": "Change not found throws ChangeNotFoundError (non-archiving)",
+      "given": [
+        "ChangeRepository.get(name) returns null",
+        "AND the requested step is NOT 'archiving' with phase 'post'"
+      ],
+      "when": ["execute is called"],
+      "then": ["ChangeNotFoundError is thrown immediately"]
+    },
+    {
+      "requirement": "Change lookup",
+      "name": "Archiving post-phase falls back to archive",
+      "given": [
+        "ChangeRepository.get(name) returns null",
+        "AND the requested step is 'archiving' with phase 'post'"
+      ],
+      "when": ["execute is called"],
+      "then": [
+        "it falls back to ArchiveRepository.get(name)",
+        "AND if found, uses the archived change for template variables"
+      ]
+    },
+    {
+      "requirement": "Change lookup",
+      "name": "Change not found in archive throws error",
+      "given": [
+        "ChangeRepository.get(name) returns null",
+        "AND the requested step is 'archiving' with phase 'post'",
+        "AND ArchiveRepository.get(name) also returns null"
+      ],
+      "when": ["execute is called"],
+      "then": ["ChangeNotFoundError is thrown"]
+    },
+    {
       "requirement": "Schema name guard",
       "name": "Schema mismatch throws SchemaMismatchError",
       "given": [
@@ -287,65 +349,11 @@
       "given": ["the archiving step with pre-hooks [{ id: \"test\", run: \"pnpm test\" }]"],
       "when": ["RunStepHooks.execute is called with step: \"archiving\", phase: \"pre\""],
       "then": ["pnpm test is executed via HookRunner", "AND the result includes the hook outcome"]
-    },
-    {
-      "requirement": "Change lookup — archive fallback",
-      "name": "Post-archiving fallback — change found in archive",
-      "given": [
-        "a change named my-change does not exist in ChangeRepository",
-        "AND ArchiveRepository.get(\"my-change\") returns an ArchivedChange"
-      ],
-      "when": [
-        "RunStepHooks.execute is called with name: \"my-change\", step: \"archiving\", phase: \"post\""
-      ],
-      "then": [
-        "the use case proceeds normally using the archived change",
-        "AND change.path template variable resolves to ArchiveRepository.archivePath(archivedChange)"
-      ]
-    },
-    {
-      "requirement": "Change lookup — archive fallback",
-      "name": "Post-archiving fallback — change not in either repository",
-      "given": [
-        "a change named nonexistent does not exist in ChangeRepository",
-        "AND ArchiveRepository.get(\"nonexistent\") returns null"
-      ],
-      "when": [
-        "RunStepHooks.execute is called with name: \"nonexistent\", step: \"archiving\", phase: \"post\""
-      ],
-      "then": ["ChangeNotFoundError is thrown"]
-    },
-    {
-      "requirement": "Change lookup — archive fallback",
-      "name": "Active change takes precedence over archived",
-      "given": ["a change named my-change exists in both ChangeRepository and ArchiveRepository"],
-      "when": [
-        "RunStepHooks.execute is called with name: \"my-change\", step: \"archiving\", phase: \"post\""
-      ],
-      "then": [
-        "the active change from ChangeRepository is used",
-        "AND ArchiveRepository.get() is not called"
-      ]
-    },
-    {
-      "requirement": "Change lookup — archive fallback",
-      "name": "Non-archiving step does not fall back to archive",
-      "given": [
-        "a change named my-change does not exist in ChangeRepository",
-        "AND ArchiveRepository.get(\"my-change\") would return an ArchivedChange"
-      ],
-      "when": [
-        "RunStepHooks.execute is called with name: \"my-change\", step: \"implementing\", phase: \"post\""
-      ],
-      "then": [
-        "ChangeNotFoundError is thrown immediately",
-        "AND ArchiveRepository.get() is not called"
-      ]
     }
   ],
   "contentHashes": {
     "spec.md": "sha256:51bf125dfe3cad5a7b749c61326198d9cb29ca9d37bf498542001063075dbb62",
-    "verify.md": "sha256:3993b4a721fff1d2c0ddb2602c20ee430242d291353b0ef67d829c34398ba13c"
+    "verify.md": "sha256:7ed80595cbd202d45be94105c924b7636660ad6465eeb810f51d97914ba8ab34"
   },
   "generatedBy": "core"
 }

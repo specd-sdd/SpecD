@@ -271,6 +271,44 @@
       ]
     },
     {
+      "requirement": "Primary workspace",
+      "name": "Primary workspace is first spec's workspace",
+      "given": ["a change with specIds: ['billing:invoices', 'default:auth/login']"],
+      "when": ["the primary workspace is determined"],
+      "then": ["it is billing"]
+    },
+    {
+      "requirement": "Primary workspace",
+      "name": "Primary workspace used for archive path template",
+      "given": ["a change with primary workspace billing"],
+      "when": ["ArchiveChange resolves {{change.workspace}} in the archive path template"],
+      "then": ["it resolves to billing"]
+    },
+    {
+      "requirement": "Port-per-workspace pattern",
+      "name": "Repository map passed to cross-workspace use cases",
+      "given": ["multiple workspaces default and billing are declared"],
+      "when": ["a use case that operates across workspaces is invoked"],
+      "then": [
+        "it receives a ReadonlyMap<string, RepositoryInstance> keyed by workspace name",
+        "AND it looks up the repository for a spec's workspace to resolve paths"
+      ]
+    },
+    {
+      "requirement": "Cross-workspace references",
+      "name": "Spec references another workspace's spec",
+      "given": ["workspace billing and default are declared"],
+      "when": ["a spec declares dependsOn: ['billing:payments/invoices']"],
+      "then": ["the reference is accepted"]
+    },
+    {
+      "requirement": "Cross-workspace references",
+      "name": "Unknown workspace reference at config validation time",
+      "given": ["a workspace with prefix: team declares a schema reference #unknown:name"],
+      "when": ["configuration is validated"],
+      "then": ["an error is thrown"]
+    },
+    {
       "requirement": "Workspace-level context patterns",
       "name": "Unqualified pattern resolves to own workspace",
       "given": ["workspace billing declares contextIncludeSpecs: ['payments/*']"],
@@ -312,7 +350,7 @@
   ],
   "contentHashes": {
     "spec.md": "sha256:9f214485f383d509f573fbffe9cd1946620de176bc05dd7f1e6ebca501b3f0f4",
-    "verify.md": "sha256:a3ab7819cdeea3be3938cc8d070a7db3d90562a403af15dec25606f4a4abf4ab"
+    "verify.md": "sha256:dbc60f03bec668d2e9e70e5363d3191e03213a66f69bf172338e59648bda49e3"
   },
   "generatedBy": "core"
 }

@@ -2,6 +2,13 @@
 
 ## Requirements
 
+### Requirement: Command signature
+
+#### Scenario: No positional arguments
+
+- **WHEN** `specd config show` is run
+- **THEN** the command proceeds without positional arguments
+
 ### Requirement: Output format
 
 #### Scenario: artifactRules not shown in text output
@@ -15,6 +22,14 @@
 - **GIVEN** a config with `plugins.agents` containing one entry
 - **WHEN** `specd config show` runs in text mode
 - **THEN** the output includes a `plugins` section listing the agent names
+
+### Requirement: Sensitive fields
+
+#### Scenario: No sensitive values in config output
+
+- **WHEN** `specd config show` is run
+- **THEN** the output contains only filesystem paths, schema references, and boolean flags
+- **AND** no redaction is applied
 
 ### Requirement: Error cases
 

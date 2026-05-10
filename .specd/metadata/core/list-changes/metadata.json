@@ -33,6 +33,12 @@
   ],
   "scenarios": [
     {
+      "requirement": "Constructor accepts a ChangeRepository",
+      "name": "Constructor accepts ChangeRepository",
+      "when": ["ListChanges is instantiated"],
+      "then": ["it requires a ChangeRepository in its constructor"]
+    },
+    {
       "requirement": "Returns all active changes",
       "name": "Multiple active changes exist",
       "given": [
@@ -76,7 +82,7 @@
   ],
   "contentHashes": {
     "spec.md": "sha256:43ed668e45c05bd391f4d7efaf667cf04f8dca886adec285f93e437d527ffa13",
-    "verify.md": "sha256:f98ffd36e45ccf402d477f2929390f6ddb6dd3dc0c94bfdbbf56ec50cee9968d"
+    "verify.md": "sha256:a5704d239bb59c65987d8800695e25324f16ca91c8ac1311968d0b40a8e38f62"
   },
   "generatedBy": "core"
 }

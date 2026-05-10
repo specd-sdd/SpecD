@@ -80,6 +80,16 @@ In `json` or `toon` mode, outputs `{ symbols: [...], specs: [...] }`. Each entry
 
 If the provider cannot be opened, the command exits with code 3 (same as other graph commands). The `process.exit(0)` pattern applies — LadybugDB native threads require explicit exit.
 
+### Requirement: Command signature (filters)
+
+The command accepts the following filter options applied at the store level:
+
+- `--kind <kinds>` — filter symbols by kind (e.g., `class,method`)
+- `--file <path>` — filter symbols by file path pattern (supports `*` wildcards)
+- `--workspace <name>` — filter to a single workspace
+- `--exclude-path <pattern>` — exclude symbols/specs matching the glob pattern
+- `--exclude-workspace <name>` — exclude results from the given workspace
+
 ## Constraints
 
 - The CLI does not contain search logic — it delegates to `CodeGraphProvider.searchSymbols` and `CodeGraphProvider.searchSpecs`

@@ -15,3 +15,20 @@
 
 - **WHEN** any plugin fails to uninstall
 - **THEN** the command exits with code 1
+- **AND** continues processing the remaining plugins
+
+### Requirement: Uninstall workflow
+
+#### Scenario: Uninstall calls plugin hook and removes from config
+
+- **WHEN** `specd plugins uninstall @specd/plugin-agent-claude` is invoked
+- **THEN** the plugin is loaded via `LoadPlugin` use case
+- **AND** the plugin's `uninstall()` method is called
+- **AND** `ConfigWriter.removePlugin()` removes the plugin from `specd.yaml`
+
+### Requirement: Output
+
+#### Scenario: Machine-parseable JSON output
+
+- **WHEN** `specd plugins uninstall @specd/plugin-agent-claude --format json` is invoked
+- **THEN** output is machine-parseable JSON with plugin name and status

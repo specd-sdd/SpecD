@@ -55,11 +55,44 @@
       "given": ["SkillRepository.getBundle returns files including a shared-marked file"],
       "when": ["ResolveBundle applies variable substitution"],
       "then": ["the shared marker remains unchanged on that file in the output bundle"]
+    },
+    {
+      "requirement": "Output",
+      "name": "Returns resolved bundle with SkillBundle structure",
+      "when": ["ResolveBundle completes successfully"],
+      "then": ["the output contains a bundle field with the resolved SkillBundle"]
+    },
+    {
+      "requirement": "Behavior",
+      "name": "Built-in variables merged with user variables",
+      "given": [
+        "a SpecdConfig with projectRoot: '/path/to/project'",
+        "AND user-provided variables { customKey: 'customValue' }"
+      ],
+      "when": ["ResolveBundle is executed"],
+      "then": [
+        "built-in variables ({{projectRoot}}, {{configPath}}, {{schemaRef}}) are available",
+        "AND user-provided variables override built-ins"
+      ]
+    },
+    {
+      "requirement": "Behavior",
+      "name": "Variable substitution replaces placeholders",
+      "given": ["a resolved file with content containing {{outputPath}}"],
+      "when": ["ResolveBundle is called with variables: { outputPath: '/tmp/output' }"],
+      "then": ["all instances of {{outputPath}} are replaced with /tmp/output"]
+    },
+    {
+      "requirement": "Behavior",
+      "name": "Resolved file metadata preserved",
+      "given": ["a resolved file with shared: true metadata"],
+      "when": ["ResolveBundle applies variable substitution"],
+      "then": ["the shared metadata is preserved in the output"]
     }
   ],
   "contentHashes": {
     "spec.md": "sha256:a6895242c995850f8efefe77fbd8169b616f639ab503b57c50e06b998c9a570c",
-    "verify.md": "sha256:b48f33137290dc3bc532d427a91f539171493f746a64f693de207728514e2f8d"
+    "verify.md": "sha256:298cf791426891c3e37aac7f8a4156342b1e0d507b6a60d103c577c06231fd92"
   },
   "generatedBy": "core"
 }

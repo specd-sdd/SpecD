@@ -117,11 +117,31 @@
         "AND the callback records the drafted event on the fresh persisted Change",
         "AND the resulting change is relocated to the drafts area by the repository"
       ]
+    },
+    {
+      "requirement": "Input contract",
+      "name": "execute accepts DraftChangeInput",
+      "when": ["DraftChange.execute is called"],
+      "then": [
+        "it accepts DraftChangeInput with name (required), reason (optional), force (optional)"
+      ]
+    },
+    {
+      "requirement": "Dependencies",
+      "name": "Uses ChangeRepository port",
+      "when": ["DraftChange is instantiated"],
+      "then": ["it requires a ChangeRepository port in its constructor"]
+    },
+    {
+      "requirement": "Dependencies",
+      "name": "Uses ActorResolver port",
+      "when": ["DraftChange is instantiated"],
+      "then": ["it requires an ActorResolver port in its constructor"]
     }
   ],
   "contentHashes": {
     "spec.md": "sha256:29e32ee99723ccf9c74b4f2b4ab6369aa9bc6d503dd3aa908431b87745aba26a",
-    "verify.md": "sha256:8637787c28622baa3fb90f92888415b6a7ec3fa0efd1a4b37075c566cff5c582"
+    "verify.md": "sha256:e6c5509a8967db3ddb9cfb87cc3f9bd2e04833aa0e94a89e705313a734440ccd"
   },
   "generatedBy": "core"
 }

@@ -2,6 +2,24 @@
 
 ## Requirements
 
+### Requirement: Command signature
+
+#### Scenario: Basic extend from npm package
+
+- **WHEN** `specd schema extend @specd/schema-std my-custom` is run
+- **THEN** the command accepts `<ref>` and `<name>` arguments
+- **AND** creates the extended schema
+
+#### Scenario: Extend with --output option
+
+- **WHEN** `specd schema extend @specd/schema-std my-ext --output /tmp/my-ext` is run
+- **THEN** the command accepts `--output <path>` as alternative to `--workspace`
+
+#### Scenario: Extend with --workspace option
+
+- **WHEN** `specd schema extend @specd/schema-std my-ext --workspace billing` is run
+- **THEN** the command accepts `--workspace <workspace>` as alternative to `--output`
+
 ### Requirement: Extend behaviour
 
 #### Scenario: Extend from npm package

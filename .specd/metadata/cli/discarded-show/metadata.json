@@ -50,6 +50,12 @@
       "then": ["the command exits with code 1 and prints a usage error to stderr"]
     },
     {
+      "requirement": "Output format — toon",
+      "name": "TOON format output",
+      "when": ["specd discarded show my-change --format toon is run"],
+      "then": ["output is encoded in Token-Oriented Object Notation (toon)"]
+    },
+    {
       "requirement": "Output format — text",
       "name": "Normal text output includes reason",
       "given": [
@@ -85,7 +91,7 @@
   ],
   "contentHashes": {
     "spec.md": "sha256:055129745ad8006b0480ae4bb26e5d70511668b53593a15c10aacce934ab66e5",
-    "verify.md": "sha256:2d42761b06505560b718b40dfef27a470704bf4a6faa350b8548613592907a70"
+    "verify.md": "sha256:8208eca51a7e5c6edda55302bc0f87dd89395a74867f29369a610c03c5c8871d"
   },
   "generatedBy": "core"
 }

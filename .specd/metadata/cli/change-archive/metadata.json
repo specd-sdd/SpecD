@@ -49,6 +49,18 @@
       ]
     },
     {
+      "requirement": "Output on success (extended)",
+      "rules": [
+        "When archiving with `--allow-overlap`:\n\n- Text mode includes an \"invalidated N overlapping changes:\" section listing each change and its overlapping specs\n- JSON mode includes `invalidatedChanges` array with each entry's `name` and `specIds`\n\nWhen no changes are invalidated, this section is omitted in text mode."
+      ]
+    },
+    {
+      "requirement": "JSON output on success",
+      "rules": [
+        "When `--format json` is specified:\n\n- stdout is valid JSON with `result: \"ok\"`, `name: \"<change-name>\"`, and `archivePath: \"<archive-path>\"`\n- the process exits with code 0"
+      ]
+    },
+    {
       "requirement": "Error cases",
       "rules": [
         "- If the change does not exist, exits with code 1.\n- If the change is not in `archivable` state, exits with code 1.\n- If a delta merge fails (conflict or parse error), exits with code 1 and prints a descriptive error."
@@ -173,7 +185,7 @@
       "then": ["the JSON output includes invalidatedChanges with the entry's name and specIds"]
     },
     {
-      "requirement": "Output on success",
+      "requirement": "JSON output on success",
       "name": "JSON output on success",
       "when": ["specd change archive my-change --format json succeeds"],
       "then": [
@@ -183,8 +195,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:3a86bc9088d1599b948e220d2b28a6ec12c95f9a6525269ba798f2b22919e5e8",
-    "verify.md": "sha256:90461f6aef9d3309978f73aa9de6079880d2f98b6d0c46b10f8c9d7f1ea8cd82"
+    "spec.md": "sha256:5fa3b7ed3772608426b6ed9a2e69b28380dc1e71462d9c6019b770788c700d98",
+    "verify.md": "sha256:7cdd99751a68fb819648a4ed89d2b4ea8331aafe3b5063b7e8ad6859b10dfb5f"
   },
   "generatedBy": "core"
 }

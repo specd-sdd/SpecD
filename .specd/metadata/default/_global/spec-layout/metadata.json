@@ -106,6 +106,21 @@
       ]
     },
     {
+      "requirement": "spec.md structure",
+      "name": "Correct spec.md structure",
+      "when": ["a spec.md file is created"],
+      "then": [
+        "it contains # Title, ## Purpose, ## Requirements, and optionally ## Constraints and ## Spec Dependencies",
+        "AND it contains no #### Scenario: headings (those go in verify.md)"
+      ]
+    },
+    {
+      "requirement": "spec.md structure",
+      "name": "Sections marked optional may be omitted",
+      "when": ["a spec.md file has no constraints"],
+      "then": ["the ## Constraints section may be omitted"]
+    },
+    {
       "requirement": "Spec Dependencies section",
       "name": "Global spec with no dependencies",
       "when": ["a spec in specs/_global/ has no dependencies on other specs"],
@@ -137,7 +152,7 @@
   ],
   "contentHashes": {
     "spec.md": "sha256:64dee3830d5120520694ea893ebf64af031ebad2d87ac360b7dc26d5b633ea7c",
-    "verify.md": "sha256:704547f3ef837fdd8cb6bdde75c41fc0c1e9ca4700907cb5ad999fc644a7e160"
+    "verify.md": "sha256:1886469d30e4b6b4e813d3090fa9baf4a1abad7890fe99f3237f4655c9c284b4"
   },
   "generatedBy": "core"
 }

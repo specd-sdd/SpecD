@@ -2,6 +2,14 @@
 
 ## Requirements
 
+### Requirement: Command signature
+
+#### Scenario: Command accepts --format option
+
+- **WHEN** `specd project update --format json` is run
+- **THEN** the command accepts `--format` option
+- **AND** output is in JSON format
+
 ### Requirement: Skills update step
 
 #### Scenario: Declared plugins are updated

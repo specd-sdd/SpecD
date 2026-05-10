@@ -75,6 +75,14 @@ Entering a workflow step corresponds to transitioning the Change entity to the l
 
 All workflow steps can declare `run:` and `instruction:` hooks in their `pre` and `post` phases. When transitioning to a state, `TransitionChange` executes `run:` hooks automatically by default (pre-hooks before the state change, post-hooks after). When `skipHooks` is true, the caller manages hook execution separately via `RunStepHooks`. The archiving step's hooks are executed by `ArchiveChange` via delegation to `RunStepHooks`.
 
+### Requirement: Two execution modes
+
+Workflow steps operate in two distinct execution modes:
+
+1. **Agent-driven mode** — steps like `implementing` require the agent to explicitly invoke `RunStepHooks`. Hooks are not automatically executed by the state transition; the agent must call `specd change run-hooks` to execute them.
+
+2. **Deterministic mode** — steps like `archiving` execute hooks internally. `ArchiveChange` calls `RunStepHooks` directly before performing the archive.
+
 ### Requirement: Step requires reference artifact IDs
 
 A workflow step's `requires` array contains **artifact IDs** (e.g. `specs`, `tasks`, `verify`), not other step names. This means step-to-step circular dependencies are structurally impossible — a step cannot depend on another step, only on artifact completion status. The artifact dependency graph itself is validated as a directed acyclic graph (DAG) at schema build time by `buildSchema()`, which performs depth-first cycle detection and throws `SchemaValidationError` if a cycle is found. Since step gating delegates entirely to artifact status, and the artifact graph is guaranteed acyclic, the step availability evaluation is always well-defined and termination is guaranteed.

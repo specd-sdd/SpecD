@@ -2,6 +2,38 @@
 
 ## Requirements
 
+### Requirement: Construction dependencies
+
+#### Scenario: Constructor receives all required dependencies
+
+- **WHEN** `ResolveSchema` is instantiated
+- **THEN** it receives `SchemaRegistry`, `schemaRef: string`, `workspaceSchemasPaths: ReadonlyMap<string, string>`, `schemaPlugins: readonly string[]`, and optionally `schemaOverrides: SchemaOperations`
+- **AND** they are stored for use during `execute`
+
+### Requirement: Execute takes no arguments
+
+#### Scenario: execute is parameterless
+
+- **WHEN** `ResolveSchema.execute()` is called
+- **THEN** it takes no arguments
+- **AND** all configuration was provided at construction time
+
+### Requirement: Returns the resolved Schema
+
+#### Scenario: execute returns a Promise of Schema
+
+- **WHEN** `ResolveSchema.execute()` is called
+- **THEN** it returns `Promise<Schema>` — the fully-resolved, customized schema
+
+### Requirement: SchemaRegistry returns raw data
+
+#### Scenario: SchemaRegistry provides raw data for merge and templates
+
+- **GIVEN** a `SchemaRegistry` implementation
+- **WHEN** `SchemaRegistry.resolve(ref, workspaceSchemasPaths)` is called
+- **THEN** it returns data that includes the parsed `SchemaYamlData`, loaded templates, and the resolved file path
+- **AND** this data is sufficient for the merge engine and `buildSchema`
+
 ### Requirement: Resolution pipeline
 
 #### Scenario: Base schema with no extends, no plugins, no overrides
@@ -78,7 +110,7 @@
 - **WHEN** `execute()` is called
 - **THEN** the resolved schema includes `templates/proposal.md` from the parent
 
-### Requirement: Execute takes no arguments
+### Requirement: Multiple executions are idempotent
 
 #### Scenario: Multiple executions resolve the same schema
 

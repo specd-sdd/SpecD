@@ -56,11 +56,20 @@
       "name": "Get bundle with variables",
       "when": ["repository.getBundle('skill-name', { key: 'value' }) is called"],
       "then": ["placeholders {{key}} are replaced with 'value'"]
+    },
+    {
+      "requirement": "listSharedFiles() method",
+      "name": "Lists shared files from templates/shared/",
+      "when": ["repository.listSharedFiles() is called"],
+      "then": [
+        "it scans templates/shared/ for .meta.json files",
+        "AND returns SharedFile[] with filename, content, and skills properties"
+      ]
     }
   ],
   "contentHashes": {
     "spec.md": "sha256:e214cba5b4b441c00661737fb628d7432b62c04f5bf9f6739b17a34df4d53baf",
-    "verify.md": "sha256:7693448baa76db98be81de97a9f24c7ae9f2821be77a32a0d362a55d5e1e8db6"
+    "verify.md": "sha256:32b7fdc5a9d492b97102b21fad02186d101eba6f02f7cd182c2c726a4daaaf13"
   },
   "generatedBy": "core"
 }

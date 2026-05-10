@@ -108,11 +108,18 @@
       "given": ["workspace alpha search throws an I/O error and workspace beta returns results"],
       "when": ["execute(\"test\") is called"],
       "then": ["results from beta are returned", "AND no error propagates to the caller"]
+    },
+    {
+      "requirement": "Empty results",
+      "name": "No matches returns empty array",
+      "given": ["no spec in any workspace matches the query"],
+      "when": ["execute(\"zzzznonexistent\") is called"],
+      "then": ["the result is an empty array (not an error)"]
     }
   ],
   "contentHashes": {
     "spec.md": "sha256:0f40d528e06e7222067eb499c1f2db4d8634260f0a2efd7ab85f4bd27cdc821d",
-    "verify.md": "sha256:eb2ce47616f93dd5a7beec0956dafec9e7241c59390cc4acebaf13baee48b1d2"
+    "verify.md": "sha256:d0b29dd0b549e50bc7d75e9d6f5d7b3a9e872a914ceb2f3ea97bc02cdc19e746"
   },
   "generatedBy": "core"
 }

@@ -49,6 +49,10 @@ Hook execution is delegated to `RunStepHooks` — `ArchiveChange` does not recei
 
 After obtaining the schema from `SchemaProvider`, `ArchiveChange` must compare `schema.name()` with `change.schemaName`. If they differ, it must throw `SchemaMismatchError`. This must happen before the archivable guard, any hooks, or file modifications.
 
+### Requirement: ArchivedChange construction
+
+The use case MUST call `ArchiveRepository.archive(change, { actor })` to move the change to the permanent archive. The resulting `ArchivedChange` entity MUST be returned in the result.
+
 ### Requirement: Archivable guard
 
 The first persisted-state mutation step of `ArchiveChange.execute` after the schema name guard MUST be a call to `ChangeRepository.mutate(name, fn)`.

@@ -186,11 +186,18 @@
       "name": "totalSymbols reflects full graph",
       "when": ["the graph has 100 symbols but only 10 pass filters"],
       "then": ["totalSymbols is 100 and entries has length 10"]
+    },
+    {
+      "requirement": "Pure function",
+      "name": "computeHotspots does not mutate the store",
+      "given": ["a store with known state"],
+      "when": ["computeHotspots(store, options) is called"],
+      "then": ["subsequent getStatistics() returns the same values as before the call"]
     }
   ],
   "contentHashes": {
     "spec.md": "sha256:f06c773990ab5e240ee25cc68aa9ff08383d7bb3758df3046c9ea19b20016233",
-    "verify.md": "sha256:fa49e4ecbc48721383e27cf2fbfc634d97bd05c7da27419de8e634ffbd877231"
+    "verify.md": "sha256:aea75ba65c3ebd47cca43716572910a8d3a7cc3f2ef8fe6e245e42ae3ac28e0b"
   },
   "generatedBy": "core"
 }

@@ -52,6 +52,12 @@
   ],
   "scenarios": [
     {
+      "requirement": "Command signature",
+      "name": "Minimal invocation with defaults",
+      "when": ["specd graph index is run"],
+      "then": ["it accepts no positional arguments", "AND output format defaults to text"]
+    },
+    {
       "requirement": "Indexing behaviour",
       "name": "Successful indexing with autodetected config",
       "given": ["the current working directory resolves to a project with specd.yaml"],
@@ -230,7 +236,7 @@
   ],
   "contentHashes": {
     "spec.md": "sha256:cfba60f4d9c1562e80eb570762979ebe4991a0f9fc8874aec12ebf445193556f",
-    "verify.md": "sha256:70c783563ffb4a0ae1f7e95f99f1f07dee0fd454446b5d60452b6448edfecc25"
+    "verify.md": "sha256:195ecebee987b2e1cdb677b3a2fdbb2f66a5dee3d25fb4179cf8c2ca4ba3e8b2"
   },
   "generatedBy": "core"
 }

@@ -10,6 +10,22 @@
 - **THEN** the command exits with code 1
 - **AND** a usage error is printed to stderr
 
+### Requirement: Delegates to GetHookInstructions
+
+#### Scenario: Command delegates to use case
+
+- **WHEN** `specd change hook-instruction` is invoked
+- **THEN** it delegates to `GetHookInstructions` use case
+- **AND** it does not resolve schemas or collect hooks directly
+
+### Requirement: Works for any step
+
+#### Scenario: Any step name accepted regardless of state
+
+- **GIVEN** the schema defines steps `designing`, `implementing`, and `verifying`
+- **WHEN** `specd change hook-instruction add-auth designing --phase pre` is run
+- **THEN** instruction text is returned without validating whether the step is currently available
+
 ### Requirement: Exit code 0 on success
 
 #### Scenario: Instructions returned

@@ -105,7 +105,7 @@
 - **WHEN** `specd change archive <name> --allow-overlap --format json` succeeds
 - **THEN** the JSON output includes `invalidatedChanges` with the entry's `name` and `specIds`
 
-### Requirement: Output on success
+### Requirement: JSON output on success
 
 #### Scenario: JSON output on success
 

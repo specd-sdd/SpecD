@@ -52,12 +52,28 @@
       "requirement": "Exit code",
       "name": "Uninstall failure",
       "when": ["any plugin fails to uninstall"],
-      "then": ["the command exits with code 1"]
+      "then": ["the command exits with code 1", "AND continues processing the remaining plugins"]
+    },
+    {
+      "requirement": "Uninstall workflow",
+      "name": "Uninstall calls plugin hook and removes from config",
+      "when": ["specd plugins uninstall @specd/plugin-agent-claude is invoked"],
+      "then": [
+        "the plugin is loaded via LoadPlugin use case",
+        "AND the plugin's uninstall() method is called",
+        "AND ConfigWriter.removePlugin() removes the plugin from specd.yaml"
+      ]
+    },
+    {
+      "requirement": "Output",
+      "name": "Machine-parseable JSON output",
+      "when": ["specd plugins uninstall @specd/plugin-agent-claude --format json is invoked"],
+      "then": ["output is machine-parseable JSON with plugin name and status"]
     }
   ],
   "contentHashes": {
     "spec.md": "sha256:80b90772f4f078bfa29be2e3f86467636555710c4176ee84e6b6a4510a08a7fb",
-    "verify.md": "sha256:3f8d2d80b7ff2d27a8867cc643bb130c35a83678a255db4391be73f4ec973d1d"
+    "verify.md": "sha256:af358d33d9cb4d61fbea684f23c8dd1887954b4f08be5f60d9eb47c1b97d5e75"
   },
   "generatedBy": "core"
 }

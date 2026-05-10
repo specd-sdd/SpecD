@@ -57,3 +57,27 @@
 - **THEN** `ChangeRepository.mutate(input.name, fn)` is called
 - **AND** the callback records the discarded event on the fresh persisted `Change`
 - **AND** the resulting change is relocated to the discarded area by the repository
+
+### Requirement: Input contract
+
+#### Scenario: execute accepts DiscardChangeInput
+
+- **WHEN** `DiscardChange.execute` is called
+- **THEN** it accepts `DiscardChangeInput` with `name`, `reason` (required), `supersededBy` (optional), `force` (optional)
+
+#### Scenario: reason field is mandatory
+
+- **WHEN** `DiscardChange.execute` is called without `reason`
+- **THEN** a type error is raised (reason is required in the input type)
+
+### Requirement: Dependencies
+
+#### Scenario: Uses ChangeRepository port
+
+- **WHEN** `DiscardChange` is instantiated
+- **THEN** it requires a `ChangeRepository` port in its constructor
+
+#### Scenario: Uses ActorResolver port
+
+- **WHEN** `DiscardChange` is instantiated
+- **THEN** it requires an `ActorResolver` port in its constructor

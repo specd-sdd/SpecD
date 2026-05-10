@@ -62,6 +62,24 @@
       "then": ["the command exits with code 1", "AND a usage error is printed to stderr"]
     },
     {
+      "requirement": "Delegates to GetHookInstructions",
+      "name": "Command delegates to use case",
+      "when": ["specd change hook-instruction is invoked"],
+      "then": [
+        "it delegates to GetHookInstructions use case",
+        "AND it does not resolve schemas or collect hooks directly"
+      ]
+    },
+    {
+      "requirement": "Works for any step",
+      "name": "Any step name accepted regardless of state",
+      "given": ["the schema defines steps designing, implementing, and verifying"],
+      "when": ["specd change hook-instruction add-auth designing --phase pre is run"],
+      "then": [
+        "instruction text is returned without validating whether the step is currently available"
+      ]
+    },
+    {
       "requirement": "Exit code 0 on success",
       "name": "Instructions returned",
       "given": [
@@ -127,7 +145,7 @@
   ],
   "contentHashes": {
     "spec.md": "sha256:fcf58c5b8dff9d821660b5a9949dcad764f41b8575463460f10f3aa6603ac1ec",
-    "verify.md": "sha256:5c8e24a710c1763b1a0f9b567bc416a2666276d8fb0ed7f6def30ec65d6cc688"
+    "verify.md": "sha256:5df0a312554c93c6295ae509ceade9a150abcb6bfdff0273ce9c6ca395d93e6f"
   },
   "generatedBy": "core"
 }

@@ -85,11 +85,17 @@
         "the result contains the Spec entity at result.spec",
         "AND the result contains a Map at result.artifacts keyed by filename"
       ]
+    },
+    {
+      "requirement": "Input shape",
+      "name": "Input contains workspace and specPath",
+      "when": ["GetSpecInput is used"],
+      "then": ["it contains workspace (string) and specPath (SpecPath value object)"]
     }
   ],
   "contentHashes": {
     "spec.md": "sha256:f54065da18bba350c9374e4708468ede307681dda65b5193e2398d564ef23586",
-    "verify.md": "sha256:d08df2b0cca89147ab83a9588b0102e91f5a959734ac69a9e55998ad1d60c597"
+    "verify.md": "sha256:45c72c83076653bd8dc62abf4ebd7715266e8afcae4889321f7dbdfdf53d269c"
   },
   "generatedBy": "core"
 }

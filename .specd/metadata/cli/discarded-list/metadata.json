@@ -49,6 +49,22 @@
   ],
   "scenarios": [
     {
+      "requirement": "Command signature",
+      "name": "No positional arguments",
+      "when": ["specd discarded list is run"],
+      "then": [
+        "the command proceeds without positional arguments",
+        "AND output format defaults to text"
+      ]
+    },
+    {
+      "requirement": "Output format — toon",
+      "name": "TOON format output",
+      "given": ["discarded/ contains changes"],
+      "when": ["specd discarded list --format toon is run"],
+      "then": ["output is encoded in Token-Oriented Object Notation (toon)"]
+    },
+    {
       "requirement": "Output format — text",
       "name": "Discarded changes listed with correct fields",
       "given": [
@@ -118,7 +134,7 @@
   ],
   "contentHashes": {
     "spec.md": "sha256:c8d653553e5613f445aa52b7131e2124f8e23ea2983888087e93402d50286e46",
-    "verify.md": "sha256:fc0a23133bc8229fb6a8af3020c7b1ac37a8986623562d8e98100d0fefe7701f"
+    "verify.md": "sha256:0479913613fd8ee8ba60cca95f0d8ce842bd73a5d6ca99dfee2d63fc631d4524"
   },
   "generatedBy": "core"
 }

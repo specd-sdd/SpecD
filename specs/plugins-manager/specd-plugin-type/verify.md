@@ -42,3 +42,17 @@
 - **GIVEN** a value with all SpecdPlugin properties and `type` is `'agent'`
 - **WHEN** `isSpecdPlugin` is called
 - **THEN** it returns `true`
+
+### Requirement: PluginType
+
+#### Scenario: PluginType derived from PLUGIN_TYPES array
+
+- **WHEN** PluginType is referenced
+- **THEN** it is derived from `(typeof PLUGIN_TYPES)[number]`
+
+### Requirement: ConfigSchemaEntry
+
+#### Scenario: ConfigSchemaEntry defines type, description, and optional fields
+
+- **WHEN** ConfigSchemaEntry is used
+- **THEN** it includes `type`, `description`, and optional `default` and `required`

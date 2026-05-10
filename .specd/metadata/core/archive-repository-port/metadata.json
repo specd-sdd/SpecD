@@ -272,11 +272,26 @@
       "given": ["an archived change record"],
       "when": ["any operation is performed on the repository"],
       "then": ["the archived change's directory contents and manifest remain unchanged"]
+    },
+    {
+      "requirement": "Inheritance from Repository base",
+      "name": "Repository extends Repository base class",
+      "when": ["ArchiveRepository is examined in the codebase"],
+      "then": ["it extends a base Repository class that provides common repository infrastructure"]
+    },
+    {
+      "requirement": "Abstract class with abstract methods",
+      "name": "ArchiveRepository declares abstract methods",
+      "when": ["ArchiveRepository is declared"],
+      "then": [
+        "it is an abstract class with abstract methods for archive, list, get, and archivePath",
+        "AND concrete implementations must implement all abstract methods"
+      ]
     }
   ],
   "contentHashes": {
     "spec.md": "sha256:9ff2e8c500e197aafbf171132edca53a9a89dd29422d3c68fde8ad1d9b5169eb",
-    "verify.md": "sha256:d92b8f672333313bdd78efbf923df7fbe35275feb421a316a6b06d93bb381e89"
+    "verify.md": "sha256:488a27a975553b19b4105827c09a9047c92eecc1ac2105f5d7bb05029e2d9b08"
   },
   "generatedBy": "core"
 }

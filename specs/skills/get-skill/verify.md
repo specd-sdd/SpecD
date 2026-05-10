@@ -2,6 +2,20 @@
 
 ## Requirements
 
+### Requirement: Output
+
+#### Scenario: Returns skill or not found error
+
+- **WHEN** a skill is requested
+- **THEN** the result is either the `Skill` object or a `NOT_FOUND` error.
+
+### Requirement: Behavior
+
+#### Scenario: Delegates to repository
+
+- **WHEN** `GetSkill` is executed
+- **THEN** it calls `SkillRepository.get()` with the provided name.
+
 ### Requirement: Input
 
 #### Scenario: Valid skill name

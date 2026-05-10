@@ -23,8 +23,10 @@
       ]
     },
     {
-      "requirement": "YAML validation",
-      "rules": ["### Requirement: YAML validation"]
+      "requirement": "Error — invalid YAML",
+      "rules": [
+        "If the input content fails YAML parsing, the command writes `error: invalid YAML: <parse error message>` to stderr and exits with code 1."
+      ]
     },
     {
       "requirement": "JSON validation",
@@ -47,10 +49,6 @@
       "rules": [
         "If the spec does not exist in the given workspace, the command writes `error: spec '<specPath>' not found` to stderr and exits with code 1."
       ]
-    },
-    {
-      "requirement": "Error — invalid YAML",
-      "rules": ["### Requirement: Error — invalid YAML"]
     },
     {
       "requirement": "Error — invalid JSON",
@@ -98,10 +96,42 @@
       "then": ["the metadata is written successfully"]
     },
     {
-      "requirement": "YAML validation",
+      "requirement": "Command signature",
+      "name": "Command accepts specPath as argument",
+      "when": ["specd spec write-metadata auth/login is invoked"],
+      "then": ["<specPath> is accepted as argument"]
+    },
+    {
+      "requirement": "Command signature",
+      "name": "Command supports --format, --input, --force options",
+      "when": [
+        "specd spec write-metadata auth/login --format json --input meta.json --force is run"
+      ],
+      "then": ["all options are accepted"]
+    },
+    {
+      "requirement": "JSON validation",
       "name": "Rejects invalid JSON",
       "when": ["specd spec write-metadata auth/login --input bad.txt is run with non-JSON content"],
       "then": ["stderr contains error: invalid JSON: and exit code is 1"]
+    },
+    {
+      "requirement": "Error — invalid JSON",
+      "name": "Invalid JSON exits 1",
+      "when": ["input content is not valid JSON"],
+      "then": [
+        "the command writes error: invalid JSON: <message> to stderr",
+        "AND exits with code 1"
+      ]
+    },
+    {
+      "requirement": "Error — invalid YAML",
+      "name": "Invalid YAML exits 1",
+      "when": ["input content is not valid YAML"],
+      "then": [
+        "the command writes error: invalid YAML: <message> to stderr",
+        "AND exits with code 1"
+      ]
     },
     {
       "requirement": "Text output",
@@ -176,8 +206,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:34b2d292df69c6e6f2f1743cbab7d758d84b70f2948399065c7f008295648ba9",
-    "verify.md": "sha256:56e205aa0d342bc5b6e0e0f6006a318feca9c43d6c3d11862e3d8e5f8ea9cc14"
+    "spec.md": "sha256:66a52fc8e5bc750a2d7c8d0e1e86b2767ce46d2838f84606cb5d3cf251c89678",
+    "verify.md": "sha256:23fe3643b7ea683a06bf7564bb8755bd5f9554a424a3baa71cdf6899f0710070"
   },
   "generatedBy": "core"
 }

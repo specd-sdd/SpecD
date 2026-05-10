@@ -984,11 +984,65 @@
       "given": ["a specd.yaml without a logging section"],
       "when": ["the config is loaded"],
       "then": ["the logging configuration MUST use the default level 'info'"]
+    },
+    {
+      "requirement": "Approvals",
+      "name": "Spec approval gate disabled by default",
+      "given": ["specd.yaml does not declare approvals.spec"],
+      "when": ["config is loaded"],
+      "then": ["approvals.spec defaults to false"]
+    },
+    {
+      "requirement": "Approvals",
+      "name": "Signoff gate disabled by default",
+      "given": ["specd.yaml does not declare approvals.signoff"],
+      "when": ["config is loaded"],
+      "then": ["approvals.signoff defaults to false"]
+    },
+    {
+      "requirement": "Approvals",
+      "name": "Spec approval gate enabled",
+      "given": ["specd.yaml declares approvals.spec: true"],
+      "when": ["config is loaded"],
+      "then": ["approvals.spec is true"]
+    },
+    {
+      "requirement": "Approvals",
+      "name": "Signoff approval gate enabled",
+      "given": ["specd.yaml declares approvals.signoff: true"],
+      "when": ["config is loaded"],
+      "then": ["approvals.signoff is true"]
+    },
+    {
+      "requirement": "Config writer port",
+      "name": "ConfigWriter port defines initProject method",
+      "when": ["ConfigWriter interface is inspected"],
+      "then": ["it declares initProject(options: InitProjectOptions): Promise<InitProjectResult>"]
+    },
+    {
+      "requirement": "Config writer port",
+      "name": "ConfigWriter port defines addPlugin method",
+      "when": ["ConfigWriter interface is inspected"],
+      "then": ["it declares addPlugin(configPath, type, name, config?): Promise<void>"]
+    },
+    {
+      "requirement": "Config writer port",
+      "name": "ConfigWriter port defines removePlugin method",
+      "when": ["ConfigWriter interface is inspected"],
+      "then": ["it declares removePlugin(configPath, type, name): Promise<void>"]
+    },
+    {
+      "requirement": "Config writer port",
+      "name": "ConfigWriter port defines listPlugins method",
+      "when": ["ConfigWriter interface is inspected"],
+      "then": [
+        "it declares listPlugins(configPath, type): Promise<Array<{ name: string; config?: Record<string, unknown> }>>"
+      ]
     }
   ],
   "contentHashes": {
     "spec.md": "sha256:8a7ec457ff2901ccfcfe665bb01fc487f1971480ff2f88dc344f156333ee7762",
-    "verify.md": "sha256:a5358f9fa3a3870b74ff4aa0a48810d47eb5197ba70fc4159e56f583715004a8"
+    "verify.md": "sha256:57699a53c06768b8420278791f46c1171c3e7966e6507457dd5e54f9e38ebf13"
   },
   "generatedBy": "core"
 }

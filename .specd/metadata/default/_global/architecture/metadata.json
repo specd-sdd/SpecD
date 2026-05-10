@@ -182,11 +182,38 @@
       "name": "Cycle introduced by new package",
       "when": ["a new package declares a workspace:* dependency that creates a cycle"],
       "then": ["pnpm must reject it"]
+    },
+    {
+      "requirement": "Composition layer for use-case wiring",
+      "name": "Dependency injection is manual and explicit",
+      "when": ["a package wires its use cases"],
+      "then": [
+        "it must do so in a dedicated composition layer",
+        "AND every dependency must be passed explicitly via constructor without using a container"
+      ]
+    },
+    {
+      "requirement": "Composition layer for use-case wiring",
+      "name": "Composition is the only layer importing infrastructure",
+      "when": ["checking imports in the composition/ directory"],
+      "then": [
+        "it may import from infrastructure/",
+        "AND no other layer (domain/, application/) may contain such imports"
+      ]
+    },
+    {
+      "requirement": "YAML inputs validated at the infrastructure boundary",
+      "name": "External data is validated before use",
+      "when": ["a system component reads external YAML or structured data"],
+      "then": [
+        "it must validate that data against a formal schema at the boundary",
+        "AND no unvalidated external structure may leak into domain or application logic"
+      ]
     }
   ],
   "contentHashes": {
     "spec.md": "sha256:e4b6d93d9ad5dec95baa9994ed0c6c8824868b8ca0d8fc0dbae69830cad64e50",
-    "verify.md": "sha256:dbbf29057514a748003772a3670aa33c62a8fb2a7e859ec9d9a49d49367cbbff"
+    "verify.md": "sha256:bbb109d7836e60284481b7d0eef37bff5b3969ee0323078c0b5314fe36a762dd"
   },
   "generatedBy": "core"
 }

@@ -55,6 +55,14 @@ By default, `TransitionChange` and `ArchiveChange` auto-execute `run:` hooks at 
 
 Both use cases delegate hook execution to `RunStepHooks`, which handles hook collection, variable expansion, and execution semantics.
 
+### Requirement: Two execution modes for run hooks
+
+`RunStepHooks` supports **fail-fast** for pre-hooks and **fail-soft** for post-hooks.
+
+### Requirement: change transition does not execute hooks
+
+The `Change` entity itself MUST NOT execute hooks. Hook execution is an application-layer responsibility managed by use cases (like `TransitionChange`).
+
 ### Requirement: Manual hook control with skipHooks
 
 Manual hook control uses phase selectors rather than a separate boolean flag.

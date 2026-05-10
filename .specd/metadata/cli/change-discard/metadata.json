@@ -25,6 +25,12 @@
       ]
     },
     {
+      "requirement": "JSON output on success",
+      "rules": [
+        "When `--format json` succeeds:\n\n- stdout is valid JSON with `result: \"ok\"` and `name: \"<name>\"`\n- the process exits with code 0"
+      ]
+    },
+    {
       "requirement": "Error cases",
       "rules": [
         "- If the change does not exist, the command exits with code 1 and prints an `error:` message.\n- `--reason` is mandatory; omitting it is a CLI usage error (exit code 1).\n- If the change has ever reached `implementing` and `--force` is not provided, the command exits with code 1 and prints an `error:` message explaining that implementation may already exist and discarding the change could leave specs and code out of sync."
@@ -109,7 +115,7 @@
       ]
     },
     {
-      "requirement": "Output on success",
+      "requirement": "JSON output on success",
       "name": "JSON output on success",
       "when": ["specd change discard old-experiment --reason \"done\" --format json succeeds"],
       "then": [
@@ -119,8 +125,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:36826ebfea3ff078461a99fe66a00cee9c9e1fb734037fb74c62ce7f390c3fc7",
-    "verify.md": "sha256:4cfa631cac38cb1685d1f313fd9d5deb64075da660c5a512080e978d7708e557"
+    "spec.md": "sha256:0ef28098ae206805477d9fdebf4543c2039cdaf41ccc3e052f7c97fa0e990d65",
+    "verify.md": "sha256:59f1116a9cb7e3109b366627f76c00bb299b9e4598f1e7125866feaec4c62b41"
   },
   "generatedBy": "core"
 }

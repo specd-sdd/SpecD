@@ -49,6 +49,22 @@
   ],
   "scenarios": [
     {
+      "requirement": "Command signature",
+      "name": "No positional arguments",
+      "when": ["specd drafts list is run"],
+      "then": [
+        "the command proceeds without positional arguments",
+        "AND output format defaults to text"
+      ]
+    },
+    {
+      "requirement": "Output format — toon",
+      "name": "TOON format output",
+      "given": ["drafts/ contains changes"],
+      "when": ["specd drafts list --format toon is run"],
+      "then": ["output is encoded in Token-Oriented Object Notation (toon)"]
+    },
+    {
       "requirement": "Output format — text",
       "name": "Drafts listed with correct fields",
       "given": [
@@ -129,7 +145,7 @@
   ],
   "contentHashes": {
     "spec.md": "sha256:be61effca3973b6468bfdfaff679a4bdb2049e3f8b94d553d253676ec53ea0a9",
-    "verify.md": "sha256:fe431168ead20d477cb41f34273a5f338102b0dbb9eb53986c791c05c3ba5668"
+    "verify.md": "sha256:8d97f8721e4121700f073edce05079e7a93462e4e210283cdfde0584fa9de951"
   },
   "generatedBy": "core"
 }

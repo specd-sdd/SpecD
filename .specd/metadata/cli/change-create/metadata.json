@@ -37,6 +37,18 @@
       ]
     },
     {
+      "requirement": "JSON output includes changePath",
+      "rules": [
+        "When `--format json` is specified:\n\n- stdout is valid JSON with `result: \"ok\"`, `name: \"<name>\"`, `state: \"drafting\"`, and `changePath: \"<absolute-path>\"`\n- `changePath` points to the change directory under `.specd/changes/`"
+      ]
+    },
+    {
+      "requirement": "JSON output on success",
+      "rules": [
+        "When `--format json` succeeds:\n\n- stdout is valid JSON with `result: \"ok\"`, `state: \"drafting\"`, and `name: \"<name>\"`\n- the process exits with code 0"
+      ]
+    },
+    {
       "requirement": "Duplicate name error",
       "rules": [
         "If a change with the given name already exists (`ChangeAlreadyExistsError`), the command exits with code 1 and prints an `error:` message to stderr."
@@ -125,6 +137,15 @@
       "then": ["the change is created successfully"]
     },
     {
+      "requirement": "Schema name and version",
+      "name": "Schema resolved from active config",
+      "given": ["the active SpecdConfig has schema: \"spec-driven\" and schemaVersion: 1"],
+      "when": ["specd change create my-change is run"],
+      "then": [
+        "the created change's manifest includes schemaName: \"spec-driven\" and schemaVersion: 1"
+      ]
+    },
+    {
       "requirement": "Output on success",
       "name": "Successful creation",
       "when": ["specd change create add-login --spec auth/login succeeds"],
@@ -154,7 +175,7 @@
       ]
     },
     {
-      "requirement": "Output on success",
+      "requirement": "JSON output on success",
       "name": "JSON output on success",
       "when": ["specd change create add-login --spec auth/login --format json succeeds"],
       "then": [
@@ -165,8 +186,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:ade32ecc8ebcae7adc16126637350429cb5e0bb6d886db853f92a0f8b4418c66",
-    "verify.md": "sha256:4a2dcd0a78e27d0d3879fa474766e0d968f99090dad85fb4b232a0d66057f5fa"
+    "spec.md": "sha256:4153e90cab5cc231f4bf086bf34401b30a649ccd2f42ea2a94cfbd5a749bdafa",
+    "verify.md": "sha256:65090a3b7942dd5bb66866698f1b517c3518508f95a0b762a34d455b824d7060"
   },
   "generatedBy": "core"
 }

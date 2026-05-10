@@ -63,3 +63,29 @@
 - **THEN** all specd-managed skill directories are removed
 - **AND** `.claude/skills/_specd-shared/` is removed
 - **AND** unrelated user skill directories remain
+
+### Requirement: Domain layer
+
+#### Scenario: Domain layer contains claude-plugin.ts
+
+- **WHEN** the domain layer is inspected
+- **THEN** `claude-plugin.ts` exists implementing the `AgentPlugin` interface
+
+#### Scenario: Domain layer contains frontmatter.ts
+
+- **WHEN** the domain layer is inspected
+- **THEN** `frontmatter.ts` exists with Frontmatter type definitions
+
+### Requirement: Frontmatter type
+
+#### Scenario: Frontmatter defines required and optional fields
+
+- **WHEN** Frontmatter is used
+- **THEN** it includes `description` (required), and optional fields like `name`, `when_to_use`, `argument_hint`, etc.
+
+### Requirement: Application layer
+
+#### Scenario: Application layer contains InstallSkills use case
+
+- **WHEN** the application layer is inspected
+- **THEN** `InstallSkills` use case exists that orchestrates skill installation

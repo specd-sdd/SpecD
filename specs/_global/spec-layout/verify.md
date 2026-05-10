@@ -50,6 +50,19 @@
 - **WHEN** a `verify.md` file contains scenarios not grouped under a `### Requirement:` heading
 - **THEN** it does not conform to this layout and AST-based delta selectors will fail to locate those scenarios by heading
 
+### Requirement: spec.md structure
+
+#### Scenario: Correct spec.md structure
+
+- **WHEN** a `spec.md` file is created
+- **THEN** it contains `# Title`, `## Purpose`, `## Requirements`, and optionally `## Constraints` and `## Spec Dependencies`
+- **AND** it contains no `#### Scenario:` headings (those go in verify.md)
+
+#### Scenario: Sections marked optional may be omitted
+
+- **WHEN** a `spec.md` file has no constraints
+- **THEN** the `## Constraints` section may be omitted
+
 ### Requirement: Spec Dependencies section
 
 #### Scenario: Global spec with no dependencies

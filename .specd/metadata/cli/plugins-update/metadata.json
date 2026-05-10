@@ -50,12 +50,34 @@
       "requirement": "Exit code",
       "name": "Update failure",
       "when": ["any plugin fails to update"],
-      "then": ["the command exits with code 1"]
+      "then": ["the command exits with code 1", "AND continues processing the remaining plugins"]
+    },
+    {
+      "requirement": "Update behavior",
+      "name": "Update all plugins when no arguments provided",
+      "when": ["specd plugins update is invoked with no arguments"],
+      "then": ["all declared plugins in specd.yaml are updated"]
+    },
+    {
+      "requirement": "Update behavior",
+      "name": "Update behavior is idempotent",
+      "given": ["specd plugins update @specd/plugin-agent-claude has been run successfully"],
+      "when": ["specd plugins update @specd/plugin-agent-claude is run again"],
+      "then": [
+        "the command succeeds and does not produce an error",
+        "AND specd.yaml is not modified"
+      ]
+    },
+    {
+      "requirement": "Output",
+      "name": "Machine-parseable JSON output",
+      "when": ["specd plugins update --format json is invoked"],
+      "then": ["output is machine-parseable JSON with plugin names and status"]
     }
   ],
   "contentHashes": {
     "spec.md": "sha256:1ac372c8f7c79d790bdf7fb1c84a80ba9a3082f3557d2326f9c1944837ea1179",
-    "verify.md": "sha256:b3da793c1adf0c24587c7146db6afe24397563303df812ce70aa7191645ef51d"
+    "verify.md": "sha256:8b424d9aa8856ee1600dd235137d2b141a6c71a12c04d421e18c67e5e3eafb6c"
   },
   "generatedBy": "core"
 }

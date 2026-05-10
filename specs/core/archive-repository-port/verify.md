@@ -146,3 +146,18 @@
 - **GIVEN** an archived change record
 - **WHEN** any operation is performed on the repository
 - **THEN** the archived change's directory contents and manifest remain unchanged
+
+### Requirement: Inheritance from Repository base
+
+#### Scenario: Repository extends Repository base class
+
+- **WHEN** `ArchiveRepository` is examined in the codebase
+- **THEN** it extends a base `Repository` class that provides common repository infrastructure
+
+### Requirement: Abstract class with abstract methods
+
+#### Scenario: ArchiveRepository declares abstract methods
+
+- **WHEN** `ArchiveRepository` is declared
+- **THEN** it is an abstract class with abstract methods for `archive`, `list`, `get`, and `archivePath`
+- **AND** concrete implementations must implement all abstract methods

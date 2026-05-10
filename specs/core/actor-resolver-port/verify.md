@@ -31,3 +31,17 @@
 - **WHEN** `identity()` is called on a `NullActorResolver`
 - **THEN** the promise MUST reject with an `Error` whose message indicates no VCS was detected
 - **AND** no I/O or subprocess invocation SHALL occur
+
+### Requirement: Decoupled from VcsAdapter
+
+#### Scenario: ActorResolver does not import VcsAdapter
+
+- **WHEN** examining the imports in `ActorResolver` port declaration
+- **THEN** no import of `VcsAdapter` or VCS-related types appears
+
+### Requirement: Interface-only declaration
+
+#### Scenario: ActorResolver is an interface
+
+- **WHEN** `ActorResolver` is declared in the codebase
+- **THEN** it is declared as a `type` or `interface`, not an `abstract class`

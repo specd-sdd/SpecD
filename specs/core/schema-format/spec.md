@@ -88,6 +88,16 @@ Each entry in `artifacts` must include:
 - `preHashCleanup` (array, optional) — list of regex substitutions applied to the artifact content before computing any hash (both `validatedHash` for `ArtifactStatus` and the approval hash). Each entry has `id` (string, required — standard array entry identity format), `pattern` (regex string), and `replacement` (string, may be empty). Substitutions are applied in declaration order. Use this to normalize progress markers or other volatile content that should not affect hash comparisons.
 - `taskCompletionCheck` (object, optional) — declares patterns for detecting checkboxes; see Requirement: taskCompletionCheck.
 
+### Requirement: preHashCleanup
+
+`preHashCleanup` is a list of regex substitutions applied to the artifact content before computing any hash (both `validatedHash` for `ArtifactStatus` and the approval hash). Each entry must have:
+
+- `id` (string, required) — follows the standard array entry identity format
+- `pattern` (regex string, required) — the regex pattern to match
+- `replacement` (string, required) — the replacement string (may be empty)
+
+Substitutions are applied in declaration order. The result of each substitution becomes the input for the next. Checking a task off does not invalidate approval because `preHashCleanup` normalises checked boxes to unchecked before the hash is computed.
+
 ### Requirement: taskCompletionCheck
 
 `taskCompletionCheck` defines how the system identifies incomplete tasks within an artifact's file. This requirement is only active when `hasTasks: true` is set for the artifact.

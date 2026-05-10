@@ -50,6 +50,22 @@
   ],
   "scenarios": [
     {
+      "requirement": "Command signature",
+      "name": "No positional arguments",
+      "when": ["specd archive list is run"],
+      "then": [
+        "the command proceeds without positional arguments",
+        "AND output format defaults to text"
+      ]
+    },
+    {
+      "requirement": "Output format — toon",
+      "name": "TOON format output",
+      "given": ["the archive directory contains changes"],
+      "when": ["specd archive list --format toon is run"],
+      "then": ["output is encoded in Token-Oriented Object Notation (toon)"]
+    },
+    {
       "requirement": "Output format — text",
       "name": "Archived changes listed with correct fields",
       "given": [
@@ -119,7 +135,7 @@
   ],
   "contentHashes": {
     "spec.md": "sha256:18e2c4c2cd252a75eff414b01229829c8e6d296cec36f20e916869e9f9f648cc",
-    "verify.md": "sha256:0b197577883bb58d311f7289890b48abf2a50eb1bc1d90263d5f6933519e72b7"
+    "verify.md": "sha256:27d4e999cc40c003c756d73a85b143542b83b2b09a620537581a24cb1a6d430f"
   },
   "generatedBy": "core"
 }

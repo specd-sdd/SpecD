@@ -44,21 +44,21 @@
       "then": ["it returns the plugin instance"]
     },
     {
-      "requirement": "Zod validation",
-      "name": "Invalid manifest",
+      "requirement": "Manifest schema",
+      "name": "Manifest schema validates required fields",
       "given": ["specd-plugin.json has invalid schema"],
       "when": ["PluginLoader loads it"],
       "then": ["PluginValidationError is thrown"]
     },
     {
-      "requirement": "Zod validation",
+      "requirement": "Manifest schema",
       "name": "Manifest missing version",
       "given": ["specd-plugin.json has no version field"],
       "when": ["PluginLoader loads it"],
       "then": ["PluginValidationError is thrown"]
     },
     {
-      "requirement": "Zod validation",
+      "requirement": "Manifest schema",
       "name": "Unknown plugin type rejected at runtime",
       "given": [
         "a plugin whose manifest declares pluginType: 'agent' but the runtime object's type is not in PLUGIN_TYPES"
@@ -67,18 +67,42 @@
       "then": ["isSpecdPlugin returns false and PluginValidationError is thrown"]
     },
     {
-      "requirement": "Zod validation",
+      "requirement": "Manifest schema",
       "name": "Agent plugin missing install method",
       "given": [
         "a plugin whose manifest declares pluginType: 'agent' but the runtime object lacks install or uninstall"
       ],
       "when": ["PluginLoader validates the interface"],
       "then": ["isAgentPlugin returns false and PluginValidationError is thrown"]
+    },
+    {
+      "requirement": "Manifest schema",
+      "name": "Valid manifest passes Zod validation",
+      "given": ["a valid specd-plugin.json with all required fields"],
+      "when": ["PluginLoader validates it with Zod schema"],
+      "then": ["the manifest passes validation"]
+    },
+    {
+      "requirement": "Error handling",
+      "name": "Base contract violation throws PluginValidationError",
+      "given": ["a plugin missing required base fields"],
+      "when": ["PluginLoader validates it"],
+      "then": ["PluginValidationError is thrown"]
+    },
+    {
+      "requirement": "Factory function",
+      "name": "Plugin exports create factory",
+      "given": ["a plugin npm package"],
+      "when": ["PluginLoader loads it"],
+      "then": [
+        "it calls create(options: PluginLoaderOptions) factory function",
+        "AND passes the fully-resolved SpecdConfig"
+      ]
     }
   ],
   "contentHashes": {
     "spec.md": "sha256:2328912874ad2f87da058dba84d2a11849886b61449b40848c91690cb109224b",
-    "verify.md": "sha256:0a5ae4933041d3300cb8794382ff7a1275cc56ed92823c4b615b9193d25cd632"
+    "verify.md": "sha256:6895a5b6e5ee426eb7c79dffcb11e1675b6938caa1349257bc3176598edc22f0"
   },
   "generatedBy": "core"
 }

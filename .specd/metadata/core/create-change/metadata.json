@@ -106,25 +106,74 @@
       "then": ["change.state === 'drafting'"]
     },
     {
-      "requirement": "Persistence",
+      "requirement": "Input contract",
+      "name": "execute accepts CreateChangeInput",
+      "when": ["CreateChange.execute is called"],
+      "then": [
+        "it accepts CreateChangeInput with name, specIds, schemaName, schemaVersion (required)",
+        "AND description (optional)"
+      ]
+    },
+    {
+      "requirement": "Input contract",
+      "name": "specIds are recorded in the created event",
+      "when": ["CreateChange.execute is called with specIds: ['auth/login', 'auth/register']"],
+      "then": ["the created event contains specIds: ['auth/login', 'auth/register']"]
+    },
+    {
+      "requirement": "Persistence and scaffolding",
       "name": "Change is saved to repository",
       "when": ["CreateChange.execute completes successfully"],
       "then": ["ChangeRepository.save was called with the returned Change instance"]
     },
     {
-      "requirement": "Result includes changePath",
-      "name": "changePath returned after creation",
+      "requirement": "Persistence and scaffolding",
+      "name": "Change is saved then scaffolded",
+      "when": ["CreateChange.execute completes successfully"],
+      "then": [
+        "ChangeRepository.save is called before scaffolding",
+        "AND ChangeRepository.scaffold is called after saving"
+      ]
+    },
+    {
+      "requirement": "Persistence and scaffolding",
+      "name": "Scaffolding uses specExists callback",
+      "given": ["a specExists callback that checks workspace spec maps"],
+      "when": ["CreateChange.execute completes"],
+      "then": ["ChangeRepository.scaffold is called with the specExists callback"]
+    },
+    {
+      "requirement": "Persistence and scaffolding",
+      "name": "Result includes changePath",
       "given": ["no change named 'add-login' exists"],
       "when": ["CreateChange.execute is called with name: 'add-login'"],
       "then": [
         "the result includes changePath as an absolute path to the change directory",
         "AND the result includes change as the Change entity"
       ]
+    },
+    {
+      "requirement": "Dependencies",
+      "name": "Uses ChangeRepository port",
+      "when": ["CreateChange is instantiated"],
+      "then": ["it requires a ChangeRepository port in its constructor"]
+    },
+    {
+      "requirement": "Dependencies",
+      "name": "Uses ActorResolver port",
+      "when": ["CreateChange is instantiated"],
+      "then": ["it requires an ActorResolver port in its constructor"]
+    },
+    {
+      "requirement": "Dependencies",
+      "name": "Uses spec repositories map",
+      "when": ["CreateChange is instantiated"],
+      "then": ["it requires a ReadonlyMap<string, SpecRepository> for spec existence checks"]
     }
   ],
   "contentHashes": {
     "spec.md": "sha256:d094b46e0c39a1a840cd8f4582a0c467df0815ccfdcc18a26989c4b59f25ced9",
-    "verify.md": "sha256:5ec3b8881aa9c3b43364102f48ecc47795926f6a4e8bf07bdff6c59571647d6a"
+    "verify.md": "sha256:395de648169d9681ff3f0b58c1cb250c88790c053b8101182e8f60deb38efa55"
   },
   "generatedBy": "core"
 }

@@ -221,14 +221,14 @@
       ]
     },
     {
-      "requirement": "Extends chain warnings in file mode",
+      "requirement": "Extends chain warnings in file and ref modes",
       "name": "File with extends emits resolution warning",
       "given": ["a schema file that extends @specd/schema-std resolved from /path/to/schema.yaml"],
       "when": ["execute is called with mode: 'file'"],
       "then": ["warnings contains extends '@specd/schema-std' resolved from /path/to/schema.yaml"]
     },
     {
-      "requirement": "Extends chain warnings in file mode",
+      "requirement": "Extends chain warnings in file and ref modes",
       "name": "Ref with extends emits resolution warning",
       "given": ["a schema ref that extends @specd/schema-std resolved from /path/to/schema.yaml"],
       "when": ["execute is called with { mode: 'ref', ref: '#default:child' }"],
@@ -237,7 +237,7 @@
   ],
   "contentHashes": {
     "spec.md": "sha256:e053e7696e1ebf41b9da38a772f041a197244529a11230a601698345c9c0f143",
-    "verify.md": "sha256:1334f9fc3a06f6e35cd07c46ef07d1ffe0f1b3ed99f2d40fa39c80eba15349d6"
+    "verify.md": "sha256:a6daab20b95e04dffca746e44f6dae67504236524e59efc42c641c605e375e22"
   },
   "generatedBy": "core"
 }

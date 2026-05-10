@@ -113,11 +113,17 @@
         "a ChangeNotFoundError is thrown",
         "AND no repository write methods are invoked by the use case itself"
       ]
+    },
+    {
+      "requirement": "Ports and constructor",
+      "name": "Constructor accepts ArchiveRepository",
+      "when": ["GetArchivedChange is instantiated"],
+      "then": ["it requires an ArchiveRepository in its constructor"]
     }
   ],
   "contentHashes": {
     "spec.md": "sha256:283edeff069fd927a222144bf4a5fa5c5d28dffa6d3649dac270aa4a2eb5fd29",
-    "verify.md": "sha256:d24b912b459fbd70bab7081e92225935d4c8c1391277fa419c6818b5e4d6f537"
+    "verify.md": "sha256:33ca0b318a30c0cda940eb57756a2a61b4d6a88570996820e68e7382deb1bdfa"
   },
   "generatedBy": "core"
 }

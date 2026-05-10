@@ -194,3 +194,11 @@
 - **WHEN** `specd spec list` is run
 - **THEN** stdout contains `no workspaces configured`
 - **AND** the process exits with code 0
+
+### Requirement: Error cases
+
+#### Scenario: Spec filesystem cannot be read exits code 3
+
+- **GIVEN** the spec filesystem has an I/O error preventing reads
+- **WHEN** `specd spec list` is run
+- **THEN** the command exits with code 3

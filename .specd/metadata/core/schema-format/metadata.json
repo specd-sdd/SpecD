@@ -42,6 +42,12 @@
       ]
     },
     {
+      "requirement": "preHashCleanup",
+      "rules": [
+        "`preHashCleanup` is a list of regex substitutions applied to the artifact content before computing any hash (both `validatedHash` for `ArtifactStatus` and the approval hash). Each entry must have:\n\n- `id` (string, required) — follows the standard array entry identity format\n- `pattern` (regex string, required) — the regex pattern to match\n- `replacement` (string, required) — the replacement string (may be empty)\n\nSubstitutions are applied in declaration order. The result of each substitution becomes the input for the next. Checking a task off does not invalidate approval because `preHashCleanup` normalises checked boxes to unchecked before the hash is computed."
+      ]
+    },
+    {
       "requirement": "taskCompletionCheck",
       "rules": [
         "`taskCompletionCheck` defines how the system identifies incomplete tasks within an artifact's file. This requirement is only active when `hasTasks: true` is set for the artifact.\n\nThe fields are optional and default to standard markdown checkbox syntax:\n\n- `incompletePattern` (string, regex, default `^\\s*-\\s+\\[ \\]`) — matches an incomplete task item\n- `completePattern` (string, regex, default `^\\s*-\\s+\\[x\\]`, case-insensitive) — matches a complete task item"
@@ -724,36 +730,6 @@
       "then": ["specd archive must refuse and report which spec IDs are pending approval"]
     },
     {
-      "requirement": "taskCompletionCheck",
-      "name": "Default patterns detect markdown checkboxes",
-      "given": [
-        "an artifact with no taskCompletionCheck declared",
-        "AND its file contains - [ ] pending and - [x] done"
-      ],
-      "when": ["the CLI checks task completion"],
-      "then": [
-        "incompletePattern defaults to ^\\s*-\\s+\\[ \\] and matches - [ ] pending",
-        "AND completePattern defaults to ^\\s*-\\s+\\[x\\] (case-insensitive) and matches - [x] done"
-      ]
-    },
-    {
-      "requirement": "taskCompletionCheck",
-      "name": "Custom patterns override defaults",
-      "given": [
-        "an artifact declares taskCompletionCheck.incompletePattern: '^\\s*TODO:' and taskCompletionCheck.completePattern: '^\\s*DONE:'",
-        "AND its file contains TODO: implement login and DONE: implement logout"
-      ],
-      "when": ["the CLI checks task completion"],
-      "then": ["incompletePattern matches TODO: implement login and the transition is blocked"]
-    },
-    {
-      "requirement": "taskCompletionCheck",
-      "name": "All tasks complete — no incomplete matches",
-      "given": ["an artifact file where all checkboxes are checked and none are unchecked"],
-      "when": ["the implementing → verifying transition is attempted"],
-      "then": ["incompletePattern matches zero lines and the transition is allowed"]
-    },
-    {
       "requirement": "preHashCleanup",
       "name": "Substitution applied before hashing",
       "given": [
@@ -1027,8 +1003,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:a42752d11142ac0444dfb3c79e250f2de32c24830ecde7dbaeedf1adb15b3aa1",
-    "verify.md": "sha256:e66f7f9c67acdedba5ed6d5bc8e791b04ea6cd97e5389b43e35aaba757a11a7e"
+    "spec.md": "sha256:60d1cc3dcaa04eddc6ae249d82cdb635538f6ab3c3dd0f1cd6996451e374eb4f",
+    "verify.md": "sha256:13189dd8c842e83a42b9c28a20035f9cacc00fddbc89914bd66be860d1599d47"
   },
   "generatedBy": "core"
 }

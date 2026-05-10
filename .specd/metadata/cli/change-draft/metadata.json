@@ -25,6 +25,12 @@
       ]
     },
     {
+      "requirement": "JSON output on success",
+      "rules": [
+        "When `--format json` succeeds:\n\n- stdout is valid JSON with `result: \"ok\"` and `name: \"<name>\"`\n- the process exits with code 0"
+      ]
+    },
+    {
       "requirement": "Error cases",
       "rules": [
         "- If the change does not exist, the command exits with code 1 and prints an `error:` message to stderr.\n- If the change is already in `drafts/`, the command exits with code 1 and prints an `error:` message to stderr.\n- If the change has ever reached `implementing` and `--force` is not provided, the command exits with code 1 and prints an `error:` message explaining that implementation may already exist and shelving the change could leave specs and code out of sync."
@@ -110,7 +116,7 @@
       ]
     },
     {
-      "requirement": "Output on success",
+      "requirement": "JSON output on success",
       "name": "JSON output on success",
       "when": ["specd change draft my-change --format json succeeds"],
       "then": [
@@ -120,8 +126,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:157d012c403c6277362f0b1172da6f91f681a2eac5465b5afce8d9ed92f83493",
-    "verify.md": "sha256:2d8c12c53cd7309b285cf11eec7ba0072833653421ac8dd82d1a599fe063d64e"
+    "spec.md": "sha256:c129b1cbee961842ad4787b82877749b7832aa85bf33e5489159b4dabbc4ec3f",
+    "verify.md": "sha256:30d316377358fde405f2a872dac9a8f8d74e0663deec76a7d6905a105649145e"
   },
   "generatedBy": "core"
 }

@@ -2,6 +2,13 @@
 
 ## Requirements
 
+### Requirement: Constructor accepts a ChangeRepository
+
+#### Scenario: Constructor accepts ChangeRepository
+
+- **WHEN** `ListDiscarded` is instantiated
+- **THEN** it requires a `ChangeRepository` in its constructor
+
 ### Requirement: Returns all discarded changes
 
 #### Scenario: Multiple discarded changes exist

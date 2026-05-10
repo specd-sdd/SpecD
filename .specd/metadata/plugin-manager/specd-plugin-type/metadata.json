@@ -87,11 +87,23 @@
       "given": ["a value with all SpecdPlugin properties and type is 'agent'"],
       "when": ["isSpecdPlugin is called"],
       "then": ["it returns true"]
+    },
+    {
+      "requirement": "PluginType",
+      "name": "PluginType derived from PLUGIN_TYPES array",
+      "when": ["PluginType is referenced"],
+      "then": ["it is derived from (typeof PLUGIN_TYPES)[number]"]
+    },
+    {
+      "requirement": "ConfigSchemaEntry",
+      "name": "ConfigSchemaEntry defines type, description, and optional fields",
+      "when": ["ConfigSchemaEntry is used"],
+      "then": ["it includes type, description, and optional default and required"]
     }
   ],
   "contentHashes": {
     "spec.md": "sha256:4bcf43c289de774e4e0486400bab8c1c97927ab226899d6786ae87529371af84",
-    "verify.md": "sha256:9a8c42abc2354d044d3efd96517465ebf448c533ac9a736d5989dfe6e5ad6e04"
+    "verify.md": "sha256:f181eac7a678b0ce8e7289c8ae1e73c839a2e6980070d2ac05111e09fa2ad549"
   },
   "generatedBy": "core"
 }

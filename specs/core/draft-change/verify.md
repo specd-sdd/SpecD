@@ -57,3 +57,22 @@
 - **THEN** `ChangeRepository.mutate(input.name, fn)` is called
 - **AND** the callback records the drafted event on the fresh persisted `Change`
 - **AND** the resulting change is relocated to the drafts area by the repository
+
+### Requirement: Input contract
+
+#### Scenario: execute accepts DraftChangeInput
+
+- **WHEN** `DraftChange.execute` is called
+- **THEN** it accepts `DraftChangeInput` with `name` (required), `reason` (optional), `force` (optional)
+
+### Requirement: Dependencies
+
+#### Scenario: Uses ChangeRepository port
+
+- **WHEN** `DraftChange` is instantiated
+- **THEN** it requires a `ChangeRepository` port in its constructor
+
+#### Scenario: Uses ActorResolver port
+
+- **WHEN** `DraftChange` is instantiated
+- **THEN** it requires an `ActorResolver` port in its constructor

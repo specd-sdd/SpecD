@@ -48,6 +48,18 @@
       ]
     },
     {
+      "requirement": "Two execution modes for run hooks",
+      "rules": [
+        "`RunStepHooks` supports **fail-fast** for pre-hooks and **fail-soft** for post-hooks."
+      ]
+    },
+    {
+      "requirement": "change transition does not execute hooks",
+      "rules": [
+        "The `Change` entity itself MUST NOT execute hooks. Hook execution is an application-layer responsibility managed by use cases (like `TransitionChange`)."
+      ]
+    },
+    {
       "requirement": "Manual hook control with skipHooks",
       "rules": [
         "Manual hook control uses phase selectors rather than a separate boolean flag.\n\n- `TransitionChange` accepts `skipHookPhases` values `'source.pre'`, `'source.post'`, `'target.pre'`, `'target.post'`, and `'all'`.\n- `ArchiveChange` accepts `skipHookPhases` values `'pre'`, `'post'`, and `'all'`.\n\nWhen the selector set contains all phases for the current use case, `TransitionChange` or `ArchiveChange` skips every `run:` hook. This gives the caller (typically an LLM agent) manual control over hook timing:\n\n1. Call `specd change hook-instruction <name> <step> --phase pre` to read `instruction:` hooks\n2. Call `specd change run-hooks <name> <step> --phase pre` to execute `run:` pre-hooks\n3. Call the lifecycle command with `--skip-hooks ...` to perform the transition or archive without the skipped auto-hooks\n4. Call `specd change run-hooks <name> <step> --phase post` to execute `run:` post-hooks\n5. Call `specd change hook-instruction <name> <step> --phase post` to read post-step instructions\n\nThe `--skip-hooks` CLI flag maps to the `skipHookPhases` selector set in the corresponding use case input. The agent is responsible for invoking hooks at the appropriate time."
@@ -291,11 +303,93 @@
         "AND no hooks are executed",
         "AND the change state is updated to implementing"
       ]
+    },
+    {
+      "requirement": "Default hook execution for transitions and archives",
+      "name": "TransitionChange executes pre-hooks before state change",
+      "given": ["a transition to implementing step with pre-hooks"],
+      "when": ["TransitionChange.execute is called"],
+      "then": [
+        "pre-hooks are executed before the state transition",
+        "AND pre-hook failure aborts the transition"
+      ]
+    },
+    {
+      "requirement": "Default hook execution for transitions and archives",
+      "name": "TransitionChange executes post-hooks after state change",
+      "given": ["a transition to implementing step with post-hooks"],
+      "when": ["TransitionChange.execute is called"],
+      "then": [
+        "post-hooks are executed after the state transition",
+        "AND post-hook failures are collected without rollback"
+      ]
+    },
+    {
+      "requirement": "Default hook execution for transitions and archives",
+      "name": "ArchiveChange executes pre-hooks before archive",
+      "given": ["archiving step with pre-hooks"],
+      "when": ["ArchiveChange.execute is called"],
+      "then": [
+        "pre-hooks are executed before any file modifications",
+        "AND pre-hook failure aborts the archive"
+      ]
+    },
+    {
+      "requirement": "Default hook execution for transitions and archives",
+      "name": "ArchiveChange executes post-hooks after archive",
+      "given": ["archiving step with post-hooks"],
+      "when": ["ArchiveChange.execute is called"],
+      "then": [
+        "post-hooks are executed after the archive completes",
+        "AND post-hook failures are collected without rollback"
+      ]
+    },
+    {
+      "requirement": "Default hook execution for transitions and archives",
+      "name": "Hook execution delegated to RunStepHooks",
+      "given": ["TransitionChange needs to execute hooks"],
+      "when": ["hook execution is triggered"],
+      "then": ["RunStepHooks is used for collection, variable expansion, and execution"]
+    },
+    {
+      "requirement": "Manual hook control with skipHooks",
+      "name": "TransitionChange accepts skipHookPhases selector",
+      "when": ["TransitionChange.execute is called with skipHookPhases: ['all']"],
+      "then": ["all run: hooks are skipped for that transition"]
+    },
+    {
+      "requirement": "Manual hook control with skipHooks",
+      "name": "ArchiveChange accepts skipHookPhases selector",
+      "when": ["ArchiveChange.execute is called with skipHookPhases: ['pre']"],
+      "then": ["pre-hooks are skipped for that archive"]
+    },
+    {
+      "requirement": "Manual hook control with skipHooks",
+      "name": "Phase selector skips specific phases",
+      "given": [
+        "TransitionChange accepts phase selectors 'source.pre', 'source.post', 'target.pre', 'target.post'"
+      ],
+      "when": ["skipHookPhases: ['target.pre'] is provided"],
+      "then": ["only target pre-hooks are skipped"]
+    },
+    {
+      "requirement": "Template variable expansion",
+      "name": "HookRunner expands template variables in run commands",
+      "given": ["a run: hook with command \"echo {{change.name}}\""],
+      "when": ["the hook is executed via HookRunner"],
+      "then": ["{{change.name}} is substituted with the change name value"]
+    },
+    {
+      "requirement": "Template variable expansion",
+      "name": "Unknown template variables left unexpanded",
+      "given": ["a run: hook with command \"echo {{unknown.variable}}\""],
+      "when": ["the hook is executed"],
+      "then": ["the literal {{unknown.variable}} token is preserved in the command"]
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:ebc2c6343454c2e370a0cf0e8ed2b78f5677bd0408049b7dee5437d732a04676",
-    "verify.md": "sha256:9a0b785ff33a80696701758328988d8889fb98312efa41ce9ce15ed36e8a88ce"
+    "spec.md": "sha256:70a36036b7fe87acb54c95fcecb3d9e7845c1b15284cec14d7ff5e2f16ad4b96",
+    "verify.md": "sha256:351f4e7ea9e422c71e9869e306f340a153eecb5dc0727bc42652388bd2dd7dd3"
   },
   "generatedBy": "core"
 }

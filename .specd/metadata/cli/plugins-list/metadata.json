@@ -59,11 +59,23 @@
       "given": ["a plugin is in config but fails to load"],
       "when": ["specd plugins list is invoked"],
       "then": ["status shows \"error\" with error message"]
+    },
+    {
+      "requirement": "Output format",
+      "name": "Text output includes plugin details",
+      "when": ["specd plugins list is invoked"],
+      "then": ["output includes plugin name, type, version, and status"]
+    },
+    {
+      "requirement": "Output format",
+      "name": "JSON output is machine-parseable",
+      "when": ["specd plugins list --format json is invoked"],
+      "then": ["output is machine-parseable JSON"]
     }
   ],
   "contentHashes": {
     "spec.md": "sha256:882b871e3a31f0e37668c82866a2d941c9aac800822724374d95e65441fb1b7c",
-    "verify.md": "sha256:be9233df9073e5217aae41b8d5f463ddb18d415245026da2fed9545b3fb5e8d9"
+    "verify.md": "sha256:2346a17c554a2e317412db63c1f7785e78e411bfeb52b662c9708d0bfba82a1d"
   },
   "generatedBy": "core"
 }

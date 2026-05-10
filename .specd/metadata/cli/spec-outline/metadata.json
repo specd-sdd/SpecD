@@ -131,11 +131,32 @@
       "name": "File not found",
       "when": ["running with --file non-existent.md"],
       "then": ["it fails with a clear error message: \"file 'non-existent.md' not found\""]
+    },
+    {
+      "requirement": "Outline detail modes",
+      "name": "Default mode returns compact subset",
+      "when": ["running specd specs outline core:config without --full"],
+      "then": ["output returns compact subset per parser type"]
+    },
+    {
+      "requirement": "Outline detail modes",
+      "name": "Full mode returns all node families",
+      "when": ["running specd specs outline core:config --full"],
+      "then": ["output includes all selector-addressable node families"]
+    },
+    {
+      "requirement": "Root-level selector hint metadata",
+      "name": "--hints includes selectorHints",
+      "when": ["running specd specs outline core:config --hints"],
+      "then": [
+        "response includes root-level selectorHints object",
+        "AND hint values are placeholder-oriented (not per-node concrete values)"
+      ]
     }
   ],
   "contentHashes": {
     "spec.md": "sha256:59aa6d3f6ffe13335a971ab33ec14463233ca0e712038eb017d84ddab8adb66e",
-    "verify.md": "sha256:49445d78e901e48b0397f9b271f9855ef71b8cb75611602067297089a6e7f3ed"
+    "verify.md": "sha256:3db3ff0ee4ddf9724dc8007094294d71061c01c4d1d112035b01c3bbc42d9899"
   },
   "generatedBy": "core"
 }

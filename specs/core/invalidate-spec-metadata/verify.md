@@ -51,3 +51,12 @@
 - **GIVEN** a spec with metadata containing a scalar value (e.g. `"hello"`)
 - **WHEN** `InvalidateSpecMetadata` is executed
 - **THEN** the result is `null` — the file is not modified
+
+### Requirement: No strict validation on write
+
+#### Scenario: Metadata written without strict validation
+
+- **GIVEN** a spec with metadata containing `contentHashes`
+- **WHEN** `InvalidateSpecMetadata` is executed
+- **THEN** the metadata is written directly via `SpecRepository.saveMetadata()` without going through `SaveSpecMetadata`
+- **AND** the `force: true` option is used to bypass conflict detection

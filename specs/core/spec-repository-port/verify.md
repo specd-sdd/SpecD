@@ -2,6 +2,47 @@
 
 ## Requirements
 
+### Requirement: Inheritance from Repository base
+
+#### Scenario: Extends Repository with immutable accessors
+
+- **GIVEN** a concrete `SpecRepository` implementation
+- **WHEN** it is instantiated with workspace, ownership, and isExternal values
+- **THEN** it extends `Repository`
+- **AND** `workspace()`, `ownership()`, and `isExternal()` return the constructor-provided values
+- **AND** these values are immutable for the lifetime of the instance
+
+### Requirement: saveMetadata persists metadata with conflict detection
+
+#### Scenario: Read-only workspace throws error
+
+- **GIVEN** a `SpecRepository` with ownership `readOnly`
+- **WHEN** `saveMetadata(spec, content)` is called
+- **THEN** `ReadOnlyWorkspaceError` is thrown before any filesystem operation
+
+#### Scenario: Write with conflict detection
+
+- **GIVEN** a `SpecRepository` with ownership `owned`
+- **AND** existing metadata file with a different hash than `content.originalHash`
+- **WHEN** `saveMetadata(spec, content)` is called
+- **THEN** `ArtifactConflictError` is thrown
+
+#### Scenario: Force write skips conflict detection
+
+- **GIVEN** a `SpecRepository` with ownership `owned`
+- **AND** existing metadata with different hash
+- **WHEN** `saveMetadata(spec, content, { force: true })` is called
+- **THEN** the file is written without error
+
+### Requirement: Abstract class with abstract methods
+
+#### Scenario: Port is an abstract class with abstract storage methods
+
+- **WHEN** `SpecRepository` is examined
+- **THEN** it is declared as `abstract class`
+- **AND** `get`, `list`, `artifact`, `save`, `delete`, `resolveFromPath`, `metadata`, `saveMetadata`, and `search` are declared as `abstract` methods
+- **AND** a concrete implementation can extend it and implement these methods
+
 ### Requirement: Workspace scoping
 
 #### Scenario: Operations are limited to the bound workspace

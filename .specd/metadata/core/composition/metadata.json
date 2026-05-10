@@ -192,11 +192,31 @@
       "name": "SpecdConfig has no methods",
       "when": ["the SpecdConfig type is inspected"],
       "then": ["it contains only readonly properties — no methods, no class instances"]
+    },
+    {
+      "requirement": "FsChangeRepository options include artifact type resolution",
+      "name": "artifactTypes option passed to FsChangeRepository",
+      "given": ["FsChangeRepositoryOptions with artifactTypes populated"],
+      "when": ["FsChangeRepository is constructed with these options"],
+      "then": ["it uses the provided artifact types for syncArtifacts"]
+    },
+    {
+      "requirement": "FsChangeRepository options include artifact type resolution",
+      "name": "resolveArtifactTypes lazy resolution",
+      "given": ["FsChangeRepositoryOptions with resolveArtifactTypes function"],
+      "when": ["FsChangeRepository performs first artifact sync"],
+      "then": ["the artifact types are resolved lazily and cached"]
+    },
+    {
+      "requirement": "ResolveSchema factory wiring",
+      "name": "ResolveSchema factory is wired in kernel",
+      "when": ["createKernel is called"],
+      "then": ["ResolveSchema use case is available via kernel.specs.resolve"]
     }
   ],
   "contentHashes": {
     "spec.md": "sha256:a08538d73e04b5051e768553b4232e360e10667e182b6df84d00938d7b3a6d71",
-    "verify.md": "sha256:99fc9c6e3dac335d05ab97153d325eeff63f093367c2cc37716e7d5414856029"
+    "verify.md": "sha256:1fd93d86c8943fb332e102b8df71b91402fa6af68c765b75ac3ff9ac43f375ac"
   },
   "generatedBy": "core"
 }

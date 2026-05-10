@@ -205,11 +205,39 @@
       "then": [
         "the keywords property has children containing an array node with array-item children each having value"
       ]
+    },
+    {
+      "requirement": "Plaintext AST",
+      "name": "Document node is root",
+      "given": ["a plaintext file"],
+      "when": ["the plaintext adapter parses it"],
+      "then": ["the root is a document node with children containing block nodes"]
+    },
+    {
+      "requirement": "Plaintext AST",
+      "name": "Paragraph and line nodes",
+      "given": ["a plaintext file with multiple paragraphs"],
+      "when": ["the plaintext adapter parses it"],
+      "then": ["each paragraph becomes a paragraph node with line children"]
+    },
+    {
+      "requirement": "Round-trip fidelity",
+      "name": "Markdown round-trip preserves headings",
+      "given": ["a markdown file with headings at multiple levels"],
+      "when": ["it is parsed to AST, then serialized back to markdown"],
+      "then": ["heading levels and labels are preserved exactly"]
+    },
+    {
+      "requirement": "Round-trip fidelity",
+      "name": "YAML round-trip preserves key order",
+      "given": ["a YAML file with multiple keys"],
+      "when": ["it is parsed to AST, then serialized back to YAML"],
+      "then": ["key order is preserved"]
     }
   ],
   "contentHashes": {
     "spec.md": "sha256:2a02f64e98a4187863106180d2057b68ec5d514361c8c883a7c9a2a627ec438c",
-    "verify.md": "sha256:0348685e5c899f40e53dbf01abb71fdcc9cab5f66aec5cbb5a03c384e4440185"
+    "verify.md": "sha256:0999b3b7fa2795411473ab84c98ab3296b2d3804d7b994b7a496ce280816d09d"
   },
   "generatedBy": "core"
 }

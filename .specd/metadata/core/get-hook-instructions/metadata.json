@@ -146,7 +146,40 @@
       "then": ["the result is { phase: \"pre\", instructions: [] }"]
     },
     {
-      "requirement": "Change lookup — archive fallback",
+      "requirement": "Ports and constructor",
+      "name": "Constructor accepts all required ports",
+      "when": ["GetHookInstructions is instantiated"],
+      "then": [
+        "it requires ChangeRepository, ArchiveRepository, SchemaProvider, and TemplateExpander in its constructor"
+      ]
+    },
+    {
+      "requirement": "Input",
+      "name": "execute accepts name, step, phase, and optional only",
+      "when": ["GetHookInstructions.execute is called"],
+      "then": [
+        "it accepts name (string, required), step (string, required), phase ('pre' | 'post', required), only (string, optional)"
+      ]
+    },
+    {
+      "requirement": "Change lookup",
+      "name": "Change loaded from ChangeRepository by name",
+      "given": ["a change named my-change exists in ChangeRepository"],
+      "when": ["GetHookInstructions.execute is called with name: \"my-change\""],
+      "then": ["ChangeRepository.get(\"my-change\") is called"]
+    },
+    {
+      "requirement": "Change lookup",
+      "name": "ChangeNotFoundError thrown when change not found",
+      "given": [
+        "ChangeRepository.get(\"nonexistent\") returns null",
+        "AND the step is not archiving post phase"
+      ],
+      "when": ["GetHookInstructions.execute is called with name: \"nonexistent\""],
+      "then": ["ChangeNotFoundError is thrown"]
+    },
+    {
+      "requirement": "Change lookup",
       "name": "Post-archiving fallback — change found in archive",
       "given": [
         "a change named my-change does not exist in ChangeRepository",
@@ -161,7 +194,7 @@
       ]
     },
     {
-      "requirement": "Change lookup — archive fallback",
+      "requirement": "Change lookup",
       "name": "Post-archiving fallback — change not in either repository",
       "given": [
         "a change named nonexistent does not exist in ChangeRepository",
@@ -173,7 +206,7 @@
       "then": ["ChangeNotFoundError is thrown"]
     },
     {
-      "requirement": "Change lookup — archive fallback",
+      "requirement": "Change lookup",
       "name": "Active change takes precedence over archived",
       "given": ["a change named my-change exists in both ChangeRepository and ArchiveRepository"],
       "when": [
@@ -185,7 +218,7 @@
       ]
     },
     {
-      "requirement": "Change lookup — archive fallback",
+      "requirement": "Change lookup",
       "name": "Non-archiving step does not fall back to archive",
       "given": [
         "a change named my-change does not exist in ChangeRepository",
@@ -202,7 +235,7 @@
   ],
   "contentHashes": {
     "spec.md": "sha256:a0d8cf408deb5b63dbabfad3b5ea3720216f07727c7c13159872ccfae23602cd",
-    "verify.md": "sha256:94d38d4120f19dfea9d042ff955236ff126556d5fc0d046e77ddeba91e8cde72"
+    "verify.md": "sha256:19f96d8a65ee7ca7d45cd4332efec692c61d506a4b535c3c2645704d4b48d4aa"
   },
   "generatedBy": "core"
 }

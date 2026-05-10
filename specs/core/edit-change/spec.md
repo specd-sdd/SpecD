@@ -80,8 +80,6 @@ is silently skipped.
 
 ### Requirement: Dependencies
 
-### Requirement: Dependencies
-
 `EditChange` depends on the following ports injected via constructor:
 
 - `ChangeRepository` — for loading, persisting, scaffolding, and unscaffolding changes

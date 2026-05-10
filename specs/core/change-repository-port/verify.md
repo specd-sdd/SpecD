@@ -244,3 +244,41 @@
 - **GIVEN** a change directory with `specs/core/core/edit-change/spec.md` (a file inside the directory)
 - **WHEN** `unscaffold(change, ['core:edit-change'])` is called
 - **THEN** the `specs/core/core/edit-change/` directory and its contents are removed
+
+### Requirement: Inheritance from Repository base
+
+#### Scenario: Repository extends Repository base class
+
+- **WHEN** `ChangeRepository` is examined in the codebase
+- **THEN** it extends a base `Repository` class
+
+### Requirement: delete removes the entire change directory
+
+#### Scenario: Delete removes change directory
+
+- **GIVEN** a change in the changes directory with manifest and artifact files
+- **WHEN** `delete(change)` is called
+- **THEN** the entire change directory is removed
+
+### Requirement: changePath returns the absolute path to a change directory
+
+#### Scenario: changePath resolves to absolute path
+
+- **GIVEN** a change with name "my-change"
+- **WHEN** `changePath(change)` is called
+- **THEN** it returns the absolute path to the change directory
+
+### Requirement: scaffold creates artifact directories
+
+#### Scenario: Scaffold creates spec directories
+
+- **GIVEN** a change with specIds including `core:edit-change`
+- **WHEN** `scaffold(change)` is called
+- **THEN** it creates the `specs/core/core/edit-change/` directory
+
+### Requirement: Abstract class with abstract methods
+
+#### Scenario: ChangeRepository declares abstract methods
+
+- **WHEN** `ChangeRepository` is declared
+- **THEN** it is an abstract class with abstract methods for get, list, save, mutate

@@ -98,3 +98,24 @@
 
 - **WHEN** the `SpecdConfig` type is inspected
 - **THEN** it contains only readonly properties — no methods, no class instances
+
+### Requirement: FsChangeRepository options include artifact type resolution
+
+#### Scenario: artifactTypes option passed to FsChangeRepository
+
+- **GIVEN** `FsChangeRepositoryOptions` with `artifactTypes` populated
+- **WHEN** `FsChangeRepository` is constructed with these options
+- **THEN** it uses the provided artifact types for syncArtifacts
+
+#### Scenario: resolveArtifactTypes lazy resolution
+
+- **GIVEN** `FsChangeRepositoryOptions` with `resolveArtifactTypes` function
+- **WHEN** `FsChangeRepository` performs first artifact sync
+- **THEN** the artifact types are resolved lazily and cached
+
+### Requirement: ResolveSchema factory wiring
+
+#### Scenario: ResolveSchema factory is wired in kernel
+
+- **WHEN** `createKernel` is called
+- **THEN** `ResolveSchema` use case is available via `kernel.specs.resolve`

@@ -77,10 +77,27 @@
       ]
     },
     {
+      "requirement": "Display name",
+      "name": "Output displays appropriate header",
+      "when": ["specd plugins install @specd/plugin-agent-claude is invoked"],
+      "then": ["output displays a header Installed plugins: followed by plugin details"]
+    },
+    {
+      "requirement": "Installation workflow",
+      "name": "Calls InstallPlugin use case and records in config",
+      "when": [
+        "specd plugins install @specd/plugin-agent-claude is invoked with plugin not installed"
+      ],
+      "then": [
+        "InstallPlugin use case is called",
+        "AND ConfigWriter.addPlugin() is called to record the plugin in specd.yaml"
+      ]
+    },
+    {
       "requirement": "Exit code",
       "name": "Installation failure",
       "when": ["any plugin fails to install"],
-      "then": ["the command exits with code 1"]
+      "then": ["the command exits with code 1", "AND continues processing the remaining plugins"]
     },
     {
       "requirement": "Output format",
@@ -91,7 +108,7 @@
   ],
   "contentHashes": {
     "spec.md": "sha256:e5dc613b8411f6e8a8c7df79607e6418a8a3973f777a4a395401462e097a1d9e",
-    "verify.md": "sha256:479f0610d8af081a8c34d1af1458471d298eedfca4e40a0dc13261e35aff9498"
+    "verify.md": "sha256:5643ac903233885c39beddd1db73c349a8f17a3e94bbc5a3ca7fae3b8f7711e4"
   },
   "generatedBy": "core"
 }

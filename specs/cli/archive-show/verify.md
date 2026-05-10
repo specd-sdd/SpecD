@@ -9,6 +9,13 @@
 - **WHEN** `specd archive show` is run without a name
 - **THEN** the command exits with code 1 and prints a usage error to stderr
 
+### Requirement: Output format — toon
+
+#### Scenario: TOON format output
+
+- **WHEN** `specd archive show my-change --format toon` is run
+- **THEN** output is encoded in Token-Oriented Object Notation (toon)
+
 ### Requirement: Output format — text
 
 #### Scenario: Normal text output

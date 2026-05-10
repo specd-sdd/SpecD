@@ -58,11 +58,35 @@
   ],
   "scenarios": [
     {
+      "requirement": "Interface-only declaration",
+      "name": "VcsAdapter is a TypeScript interface",
+      "when": ["the VcsAdapter type is examined"],
+      "then": [
+        "it is declared as a TypeScript interface",
+        "AND not as an abstract class",
+        "AND implementations can be provided by any concrete class"
+      ]
+    },
+    {
       "requirement": "rootDir returns the repository root",
       "name": "rootDir outside a repository",
       "given": ["the working directory is not inside any VCS repository"],
       "when": ["rootDir() is called"],
       "then": ["the promise MUST reject with an Error"]
+    },
+    {
+      "requirement": "isClean reports working-tree cleanliness",
+      "name": "Clean working tree",
+      "given": ["a VCS repository with no uncommitted changes"],
+      "when": ["isClean() is called"],
+      "then": ["the promise MUST resolve to true"]
+    },
+    {
+      "requirement": "isClean reports working-tree cleanliness",
+      "name": "Dirty working tree",
+      "given": ["a VCS repository with uncommitted changes"],
+      "when": ["isClean() is called"],
+      "then": ["the promise MUST resolve to false"]
     },
     {
       "requirement": "branch returns the current branch name",
@@ -124,7 +148,7 @@
   ],
   "contentHashes": {
     "spec.md": "sha256:a6e6f852969e7b5b25ba40a257aed2630c4c14ed32ca5f4251e95dca71139eca",
-    "verify.md": "sha256:a0107d8fe62875c687eea4184be9505f2b7609735f985c52ddacbabbb69dcc88"
+    "verify.md": "sha256:ed89a1681f523cd5326c997ead1377bf1132789a384cb196ec89354a91003bd7"
   },
   "generatedBy": "core"
 }

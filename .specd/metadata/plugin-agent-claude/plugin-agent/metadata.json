@@ -131,11 +131,37 @@
         "AND .claude/skills/_specd-shared/ is removed",
         "AND unrelated user skill directories remain"
       ]
+    },
+    {
+      "requirement": "Domain layer",
+      "name": "Domain layer contains claude-plugin.ts",
+      "when": ["the domain layer is inspected"],
+      "then": ["claude-plugin.ts exists implementing the AgentPlugin interface"]
+    },
+    {
+      "requirement": "Domain layer",
+      "name": "Domain layer contains frontmatter.ts",
+      "when": ["the domain layer is inspected"],
+      "then": ["frontmatter.ts exists with Frontmatter type definitions"]
+    },
+    {
+      "requirement": "Frontmatter type",
+      "name": "Frontmatter defines required and optional fields",
+      "when": ["Frontmatter is used"],
+      "then": [
+        "it includes description (required), and optional fields like name, when_to_use, argument_hint, etc."
+      ]
+    },
+    {
+      "requirement": "Application layer",
+      "name": "Application layer contains InstallSkills use case",
+      "when": ["the application layer is inspected"],
+      "then": ["InstallSkills use case exists that orchestrates skill installation"]
     }
   ],
   "contentHashes": {
     "spec.md": "sha256:46ac164143ac4928616a53c15abeca3b9f45d1cd741300c7627d095299da1385",
-    "verify.md": "sha256:d2ee9a396ebf75a1293ae059e3f47a491a7064b6a07e12bf219b90bc9d874bdc"
+    "verify.md": "sha256:e85673bb85e37fc374586193b0ec8e10c896d55c524a306fb6396c10dc30efbb"
   },
   "generatedBy": "core"
 }

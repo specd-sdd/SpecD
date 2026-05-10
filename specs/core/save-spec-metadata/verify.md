@@ -2,6 +2,21 @@
 
 ## Requirements
 
+### Requirement: Input contract
+
+#### Scenario: execute accepts SaveSpecMetadataInput
+
+- **WHEN** `SaveSpecMetadata.execute` is called
+- **THEN** it accepts `SaveSpecMetadataInput` with `workspace` (string, required), `specPath` (SpecPath, required), `content` (string, required), `force` (optional)
+
+### Requirement: Output contract
+
+#### Scenario: Successful write returns spec label
+
+- **GIVEN** valid content, existing workspace, and existing spec
+- **WHEN** `execute()` succeeds
+- **THEN** the result is `SaveSpecMetadataResult` containing `spec` (qualified spec label)
+
 ### Requirement: Content validation before write
 
 #### Scenario: Non-object JSON is rejected
@@ -109,12 +124,6 @@
 - **THEN** the write succeeds
 
 ### Requirement: Artifact persistence
-
-#### Scenario: Successful write returns spec label
-
-- **GIVEN** valid content, existing workspace, and existing spec with name `auth/oauth` in workspace `default`
-- **WHEN** `execute()` is called
-- **THEN** the result is `{ spec: 'default:auth/oauth' }`
 
 #### Scenario: Metadata is saved via saveMetadata
 

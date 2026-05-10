@@ -2,6 +2,13 @@
 
 ## Requirements
 
+### Requirement: Input contract
+
+#### Scenario: execute accepts UpdateSpecDepsInput
+
+- **WHEN** `UpdateSpecDeps.execute` is called
+- **THEN** it accepts `UpdateSpecDepsInput` with `name` (required), `specId` (required), `add` (optional), `remove` (optional), `set` (optional)
+
 ### Requirement: Change lookup
 
 #### Scenario: Change does not exist

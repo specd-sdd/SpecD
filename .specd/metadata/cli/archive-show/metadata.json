@@ -50,6 +50,12 @@
       "then": ["the command exits with code 1 and prints a usage error to stderr"]
     },
     {
+      "requirement": "Output format — toon",
+      "name": "TOON format output",
+      "when": ["specd archive show my-change --format toon is run"],
+      "then": ["output is encoded in Token-Oriented Object Notation (toon)"]
+    },
+    {
       "requirement": "Output format — text",
       "name": "Normal text output",
       "given": [
@@ -86,7 +92,7 @@
   ],
   "contentHashes": {
     "spec.md": "sha256:bbfd3e9361b21f33cfc6ef169c067e5dad878b34757a969c651253d231d10974",
-    "verify.md": "sha256:7ee898ee3d0f81de254abfd876574acff2495e7f7906bbe91afd4d41d0a8782f"
+    "verify.md": "sha256:374c08eabff8b85d8bf5132014a9da3d38ca65295b3b282345e3404fd46d29ea"
   },
   "generatedBy": "core"
 }

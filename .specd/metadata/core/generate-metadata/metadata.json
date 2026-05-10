@@ -220,11 +220,33 @@
         "the returned metadata contains both the extractMetadata() output fields and contentHashes",
         "AND hasExtraction is true"
       ]
+    },
+    {
+      "requirement": "Input and output",
+      "name": "execute accepts specId string",
+      "when": ["GenerateSpecMetadata.execute is called"],
+      "then": [
+        "it accepts a specId string parameter (e.g. 'core/change' or 'billing:invoices/create')"
+      ]
+    },
+    {
+      "requirement": "Input and output",
+      "name": "Returns metadata and hasExtraction flag",
+      "when": ["GenerateSpecMetadata.execute completes successfully"],
+      "then": ["it returns { metadata: SpecMetadata, hasExtraction: boolean }"]
+    },
+    {
+      "requirement": "Input and output",
+      "name": "metadata contains extracted fields and hashes",
+      "when": ["GenerateSpecMetadata.execute completes with extraction"],
+      "then": [
+        "the returned metadata contains fields from extractMetadata() plus contentHashes and generatedBy: 'core'"
+      ]
     }
   ],
   "contentHashes": {
     "spec.md": "sha256:eb0a45ef5f1cc3b1ee9753f9e3e9e2ef848fa5aef1599916a14456f956c24766",
-    "verify.md": "sha256:e5655076892353660a7915231022b0b7e182c5fa17f69dffbd04bd507a468afa"
+    "verify.md": "sha256:1ece538051244dbc0871ebe83ed5671fb6dda3bbd0ca88fc35398382dda0dac0"
   },
   "generatedBy": "core"
 }

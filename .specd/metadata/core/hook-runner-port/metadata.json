@@ -162,11 +162,57 @@
         "the entry is dispatched through the external hook runner abstraction",
         "AND HookRunner.run() is used only for shell run: hooks"
       ]
+    },
+    {
+      "requirement": "Run method signature",
+      "name": "run method accepts command and variables",
+      "when": ["HookRunner.run is called"],
+      "then": [
+        "it accepts command: string and variables: HookVariables",
+        "AND returns Promise<HookResult>"
+      ]
+    },
+    {
+      "requirement": "Run method signature",
+      "name": "run method always resolves",
+      "given": ["a command that throws or exits with non-zero code"],
+      "when": ["HookRunner.run is called"],
+      "then": ["the promise resolves with a HookResult (never rejects)"]
+    },
+    {
+      "requirement": "Hook type distinction",
+      "name": "HookRunner only executes run hooks",
+      "when": ["a run: hook entry is executed"],
+      "then": ["HookRunner.run() is called with the command and variables"]
+    },
+    {
+      "requirement": "Hook type distinction",
+      "name": "instruction hooks are not executed by HookRunner",
+      "given": ["a workflow step has instruction: hooks"],
+      "when": ["hook execution runs run: hooks"],
+      "then": ["HookRunner.run() is not called for the instruction entries"]
+    },
+    {
+      "requirement": "Lifecycle execution guarantees",
+      "name": "Non-zero exit code signals abort for pre-hooks",
+      "given": ["a pre-hook is executed and exits with non-zero code"],
+      "when": ["HookRunner.run returns the result"],
+      "then": ["the caller uses the non-zero exit code to abort the operation"]
+    },
+    {
+      "requirement": "Lifecycle execution guarantees",
+      "name": "Post-hook exit codes are collected without rollback",
+      "given": ["post-hooks execute with various exit codes"],
+      "when": ["HookRunner.run returns for each post-hook"],
+      "then": [
+        "all exit codes are collected by the caller",
+        "AND no rollback is performed regardless of individual failures"
+      ]
     }
   ],
   "contentHashes": {
     "spec.md": "sha256:5a414ac884589d9841584b6945172c5d9b28faf9fe0465786da323a7f325e1e9",
-    "verify.md": "sha256:8160cfa1fcc65cd5d9789e1bc5fe478cff5cda3fc2eda920741fe6a87cc42b30"
+    "verify.md": "sha256:904df32d49283c13ffb42eb0e9b922d094b67c15f66df0f120f63b872ceeef41"
   },
   "generatedBy": "core"
 }

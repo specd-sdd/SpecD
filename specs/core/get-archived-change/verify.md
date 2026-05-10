@@ -55,3 +55,10 @@
 - **WHEN** `getArchivedChange.execute({ name: 'nonexistent' })` is called
 - **THEN** a `ChangeNotFoundError` is thrown
 - **AND** no repository write methods are invoked by the use case itself
+
+### Requirement: Ports and constructor
+
+#### Scenario: Constructor accepts ArchiveRepository
+
+- **WHEN** `GetArchivedChange` is instantiated
+- **THEN** it requires an `ArchiveRepository` in its constructor
