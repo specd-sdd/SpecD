@@ -115,17 +115,17 @@ export class PrivacyActorResolver implements ActorResolver {
     if (!local || !domain) return '***@***'
 
     let maskedLocal: string
-    if (local.length <= 2) {
+    if (local.length <= 1) {
+      maskedLocal = local[0] + '***' + local[0]
+    } else if (local.length <= 2) {
       maskedLocal = '***'
     } else {
       maskedLocal = local[0] + '***' + local[local.length - 1]
     }
 
     const domainParts = domain.split('.')
-    const tld = domainParts.length > 1 ? '.' + domainParts.slice(1).join('.') : ''
     const domainName = domainParts[0] ?? ''
-
-    const maskedDomain = (domainName[0] ?? '') + '***' + tld
+    const maskedDomain = domainName[0] + '***.' + (domainParts[domainParts.length - 1] ?? 'com')
 
     return `${maskedLocal}@${maskedDomain}`
   }

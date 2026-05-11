@@ -24,9 +24,16 @@
 #### Scenario: Masking applied to email and name
 
 - **GIVEN** `privacy.mode` is `mask`
-- **AND** real identity is `{ name: "John Doe", email: "john@example.com" }`
+- **AND** real identity is `{ name: "John Doe", email: "jhon@subdomain.example.com" }`
 - **WHEN** `identity()` is called
-- **THEN** it returns `{ name: "J***n", email: "j***n@e***.com" }`
+- **THEN** it returns `{ name: "J***e", email: "j***n@s***.com" }`
+
+#### Scenario: Single-char local part repeats itself
+
+- **GIVEN** `privacy.mode` is `mask`
+- **AND** real identity is `{ name: "John", email: "j@example.com" }`
+- **WHEN** `identity()` is called
+- **THEN** it returns `{ name: "J***n", email: "j***j@e***.com" }`
 
 ### Requirement: Metadata privacy
 

@@ -47,7 +47,7 @@ describe('PrivacyActorResolver', () => {
       const identity = await decorator.identity()
 
       expect(identity.name).toBe('***')
-      expect(identity.email).toBe('***@b***.c')
+      expect(identity.email).toBe('a***a@b***.c')
     })
 
     it('masks short local parts fully', async () => {
@@ -58,6 +58,28 @@ describe('PrivacyActorResolver', () => {
       const identity = await decorator.identity()
 
       expect(identity.email).toBe('***@e***.com')
+    })
+
+    it('masks deeply nested subdomains to TLD only', async () => {
+      const nestedResolver: ActorResolver = {
+        identity: vi
+          .fn()
+          .mockResolvedValue({ name: 'John', email: 'jhon@subdomain1.subdomain2.example.com' }),
+      }
+      const decorator = new PrivacyActorResolver(nestedResolver, { mode: 'mask' })
+      const identity = await decorator.identity()
+
+      expect(identity.email).toBe('j***n@s***.com')
+    })
+
+    it('repeats single-char local part on both sides', async () => {
+      const singleCharResolver: ActorResolver = {
+        identity: vi.fn().mockResolvedValue({ name: 'John', email: 'j@example.com' }),
+      }
+      const decorator = new PrivacyActorResolver(singleCharResolver, { mode: 'mask' })
+      const identity = await decorator.identity()
+
+      expect(identity.email).toBe('j***j@e***.com')
     })
   })
 

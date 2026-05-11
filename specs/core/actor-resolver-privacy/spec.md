@@ -25,9 +25,9 @@ In `hash` mode, the decorator MUST use HMAC with SHA-256 and the configured `sal
 
 In `mask` mode, the decorator MUST apply the following rules:
 
-- **Name**: Keep first character, mask the rest (e.g. `J***n`).
-- **Email Local Part**: Keep first and last characters, replace middle with `***`. If 2 chars or fewer, mask entire part.
-- **Email Domain Part**: Keep first character and full extension (e.g. `e***.com`).
+- **Name**: Keep first character, mask the rest (e.g. `J***n`). If only 1 character, mask entirely to `***`.
+- **Email Local Part**: Keep first and last characters, replace middle with `***`. If 1 character, repeat it on both sides (e.g. `j***j`). If 2 characters or fewer, mask entire part.
+- **Email Domain Part**: Keep first character and TLD (e.g. `e***.com`). Subdomains beyond the root domain are discarded.
 
 ### Requirement: Metadata privacy
 

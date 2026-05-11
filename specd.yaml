@@ -1,5 +1,8 @@
 schema: '@specd/schema-std'
 
+privacy:
+  mode: mask
+
 # Agent instructions prepended before spec content
 context:
   - instruction: |
