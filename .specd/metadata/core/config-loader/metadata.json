@@ -36,9 +36,15 @@
       ]
     },
     {
+      "requirement": "Native environment file support",
+      "rules": [
+        "The loader MUST attempt to load environment variables from `.env` and `.env.local` files in the project root using Node.js native `process.loadEnvFile()` (or equivalent).\n\n- `.env.local` SHALL have higher priority than `.env`.\n- Files absence MUST NOT be treated as an error."
+      ]
+    },
+    {
       "requirement": "YAML parsing and structural validation",
       "rules": [
-        "The loader MUST parse the config file as YAML. If the file contains invalid YAML syntax, `load()` MUST throw `ConfigValidationError` with a message describing the parse error.\n\nAfter parsing, the loader MUST validate the resulting object against a Zod schema that enforces the structural shape defined in `specs/core/config/spec.md`. Any structural mismatch — missing required fields, wrong types, unknown adapter values — MUST produce a `ConfigValidationError` with the Zod issue path and message. Validation MUST occur before any path resolution or domain object construction.\n\nThe Zod schema MUST additionally enforce:\n\n- `schemaPlugins` is an optional array of strings\n- `schemaOverrides` is an optional object with five optional keys: `create`, `remove`, `set`, `append`, `prepend`\n\nThe loader MUST NOT accept `artifactRules` or `workflow` at the top level of `specd.yaml` — these fields have been removed. If either field is present, the loader SHOULD emit a warning suggesting migration to `schemaOverrides`."
+        "The loader MUST parse the config file as YAML. After parsing, the loader MUST validate the resulting object against a Zod schema.\n\nBefore validation, the loader MUST merge supported environment variables into the configuration object. Environment variables MUST take precedence over file-based configuration."
       ]
     },
     {
@@ -224,6 +230,13 @@
       "given": ["the file at configPath does not exist"],
       "when": ["load() is called"],
       "then": ["load() throws ConfigValidationError with a message about the file not being found"]
+    },
+    {
+      "requirement": "Native environment file support",
+      "name": ".env.local takes precedence over .env",
+      "given": [".env has FOO=bar", "AND .env.local has FOO=baz"],
+      "when": ["loader runs"],
+      "then": ["process.env.FOO is baz (or mapped accordingly)"]
     },
     {
       "requirement": "YAML parsing and structural validation",
@@ -481,8 +494,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:2c28de10220712ec604118a24d8bae128a75e64cd7338b03200a8a7bc047a7ab",
-    "verify.md": "sha256:955e6dfb8d2c7520973acdc3dc8b202bcf2b957e84c263d1fc1756f9bc466b8c"
+    "spec.md": "sha256:bbe3002761dd994d56b80c6022f10ae70548737d8cf6628377e1cb4254e6a03b",
+    "verify.md": "sha256:442fc620e5cbdf8ee4e230d53905ac52a606e0d32ec7e4bf85c9cdb4ca4c2892"
   },
   "generatedBy": "core"
 }

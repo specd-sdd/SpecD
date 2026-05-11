@@ -20,6 +20,21 @@ export interface SpecdLoggingConfig {
   readonly level: SpecdLogLevel
 }
 
+/** Identity privacy configuration. */
+export interface PrivacyConfig {
+  /** Obfuscation mode. */
+  readonly mode: 'hash' | 'mask' | 'anonymous'
+  /** Optional salt for HMAC hashing. */
+  readonly salt?: string | undefined
+  /**
+   * Actors to exclude from obfuscation (case-insensitive name or email).
+   * Defaults to `['specd', 'system@getspecd.dev']`.
+   */
+  readonly excludeActors?: readonly string[] | undefined
+  /** Whitelisted metadata keys to preserve under privacy modes. */
+  readonly allowedMetadataKeys?: readonly string[] | undefined
+}
+
 /** Per-workspace code graph configuration from `specd.yaml`. */
 export interface SpecdWorkspaceGraphConfig {
   /**
@@ -175,18 +190,24 @@ export interface SpecdConfig {
    */
   readonly contextMode?: SpecdContextMode
   /** When `true`, specd may invoke an LLM for enriched output (default: `false`). */
-  readonly llmOptimizedContext?: boolean
+  readonly llmOptimizedContext?: boolean | undefined
+  /** Forced actor provider name. When set, bypasses auto-detection. */
+  readonly actorProvider?: string | undefined
+  /** Identity privacy configuration. */
+  readonly privacy?: PrivacyConfig | undefined
   /** Schema plugin references from `specd.yaml`, in declaration order. */
-  readonly schemaPlugins?: readonly string[]
+  readonly schemaPlugins?: readonly string[] | undefined
   /** Inline schema override operations from `specd.yaml`. */
-  readonly schemaOverrides?: SchemaOperations
+  readonly schemaOverrides?: SchemaOperations | undefined
   /** Declared plugins grouped by type (currently `agents`). */
-  readonly plugins?: Readonly<{
-    agents?: ReadonlyArray<{
-      readonly name: string
-      readonly config?: Readonly<Record<string, unknown>>
-    }>
-  }>
+  readonly plugins?:
+    | {
+        readonly agents?: readonly {
+          readonly name: string
+          readonly config?: Readonly<Record<string, unknown>>
+        }[]
+      }
+    | undefined
 }
 
 /** Minimal shape check for {@link isSpecdConfig} — validates the structural signature. */
@@ -199,6 +220,15 @@ const specdConfigShape = z.object({
   approvals: z.object({ spec: z.boolean(), signoff: z.boolean() }),
   logging: z
     .object({ level: z.enum(['trace', 'debug', 'info', 'warn', 'error', 'silent']) })
+    .optional(),
+  actorProvider: z.string().optional(),
+  privacy: z
+    .object({
+      mode: z.enum(['hash', 'mask', 'anonymous']),
+      salt: z.string().optional(),
+      excludeActors: z.array(z.string()).optional(),
+      allowedMetadataKeys: z.array(z.string()).optional(),
+    })
     .optional(),
 })
 

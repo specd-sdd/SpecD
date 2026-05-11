@@ -21,6 +21,24 @@
       ]
     },
     {
+      "requirement": "Privacy settings",
+      "rules": [
+        "`specd.yaml` MAY include a `privacy` section to control identity obfuscation.\n\n- **`mode`** — MUST be one of: `hash`, `mask`, `anonymous`.\n- **`salt`** — optional string for HMAC hashing (recommended via environment).\n- **`excludeActors`** — optional array of names or emails to skip obfuscation. Defaults to `[\"specd\", \"system@getspecd.dev\"]`.\n- **`allowedMetadataKeys`** — optional whitelist of metadata keys to preserve under privacy modes."
+      ]
+    },
+    {
+      "requirement": "Environment variable overrides",
+      "rules": [
+        "Root-level non-hierarchical configuration values SHALL be overridable by environment variables. The following mappings apply:\n\n- `SPECD_ACTOR_PROVIDER` → `actorProvider`\n- `SPECD_PRIVACY_SALT` → `privacy.salt`\n- `SPECD_PRIVACY_MODE` → `privacy.mode`\n\nEnvironment variables (including those from `.env` and `.env.local`) SHALL take precedence over values defined in `specd.yaml` and `specd.local.yaml`."
+      ]
+    },
+    {
+      "requirement": "Forced actor provider",
+      "rules": [
+        "`specd.yaml` MAY include an `actorProvider` root field (string). When present, it MUST force the selection of the named provider from the kernel registry, bypassing auto-detection."
+      ]
+    },
+    {
       "requirement": "Local config override",
       "rules": [
         "Alongside `specd.yaml`, developers may place a `specd.local.yaml` file in the same directory to use a fully independent local configuration. When `specd.local.yaml` is present, specd uses it exclusively — `specd.yaml` is not read and no merging takes place. The local file is a complete, self-contained config that must be valid on its own.\n\nThe file is optional — its absence is normal. `specd init` must add `specd.local.yaml` to the project's `.gitignore` so it is never committed.\n\nThe typical workflow for local customisation is: copy `specd.yaml` to `specd.local.yaml`, then edit the copy. This keeps the mental model simple — there is always exactly one active config file.\n\nWhen the CLI is invoked with `--config path/to/specd.yaml`, that file is used exactly as specified — no `specd.local.yaml` lookup takes place. This allows testing with the shared config without the local override interfering."
@@ -137,12 +155,8 @@
   ],
   "constraints": [
     "Every field in specd.yaml is validated at load time by the Zod schema",
-    "artifactRules is not a valid config field — use schemaOverrides instead",
-    "skills is not a valid config field — skills are managed via the plugin system",
-    "contextMode is project-level only — rejected inside workspace entries",
-    "Unknown fields at the top level are rejected by the strict Zod schema",
-    "configPath MUST resolve inside the repository root",
-    "Storage paths MUST resolve inside the repository root"
+    "When privacy.mode is set to hash, a salt MUST be provided (via config or environment) or validation SHALL fail",
+    "Unknown fields at the top level are rejected by the strict Zod schema"
   ],
   "scenarios": [
     {
@@ -198,6 +212,37 @@
         "--config still means an explicit config file path override",
         "AND bootstrap mode is not selected by reinterpreting --config as a repository root"
       ]
+    },
+    {
+      "requirement": "Privacy settings",
+      "name": "Mode hash requires salt",
+      "given": ["privacy.mode is hash", "AND no salt is provided in config or environment"],
+      "when": ["config is loaded"],
+      "then": ["validation fails with a ConfigValidationError"]
+    },
+    {
+      "requirement": "Privacy settings",
+      "name": "excludeActors defaults applied",
+      "given": ["a privacy section is present", "AND excludeActors is omitted"],
+      "when": ["config is loaded"],
+      "then": ["excludeActors contains [\"specd\", \"system@getspecd.dev\"]"]
+    },
+    {
+      "requirement": "Environment variable overrides",
+      "name": "Variable takes precedence over specd.yaml",
+      "given": [
+        "specd.yaml defines privacy.mode: mask",
+        "AND environment has SPECD_PRIVACY_MODE=hash"
+      ],
+      "when": ["config is loaded"],
+      "then": ["the effective mode is hash"]
+    },
+    {
+      "requirement": "Forced actor provider",
+      "name": "Selection by name",
+      "given": ["actorProvider: \"ldap\" is configured"],
+      "when": ["actor resolution is requested"],
+      "then": ["the system bypasses auto-detection and attempts to use the ldap provider"]
     },
     {
       "requirement": "Local config override",
@@ -1041,8 +1086,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:8a7ec457ff2901ccfcfe665bb01fc487f1971480ff2f88dc344f156333ee7762",
-    "verify.md": "sha256:57699a53c06768b8420278791f46c1171c3e7966e6507457dd5e54f9e38ebf13"
+    "spec.md": "sha256:3c6ed9dd1d1d0009e70a49170a8fdc29f1f33bb84f2e8cd94211deb218c695b5",
+    "verify.md": "sha256:c017871d61b1ad0044fd6904cd619615ca8269c08c0793f258776050cc685755"
   },
   "generatedBy": "core"
 }

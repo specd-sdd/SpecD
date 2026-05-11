@@ -1,0 +1,92 @@
+{
+  "title": "Actor Resolver Privacy",
+  "description": "To protect user privacy in public repositories, specd provides a `PrivacyActorResolver` decorator. It ensures that sensitive identity data (like real emails) is obfuscated or removed before being stored in change manifests or archives.",
+  "dependsOn": ["core:actor-resolver-port", "core:config"],
+  "context": [
+    "To protect user privacy in public repositories, specd provides a `PrivacyActorResolver` decorator. It ensures that sensitive identity data (like real emails) is obfuscated or removed before being stored in change manifests or archives."
+  ],
+  "rules": [
+    {
+      "requirement": "Privacy modes",
+      "rules": [
+        "The decorator MUST support three obfuscation modes:\n\n- **`hash`**: Obfuscates the email using HMAC with a project-specific salt.\n- **`mask`**: Partially masks the name and email parts (e.g. `j***z@e***.com`).\n- **`anonymous`**: Replaces the identity with a static \"Anonymous\" placeholder."
+      ]
+    },
+    {
+      "requirement": "HMAC hashing with salt",
+      "rules": [
+        "In `hash` mode, the decorator MUST use HMAC with SHA-256 and the configured `salt`.\n\n- The salt MUST be treated as a secret.\n- Hashing SHALL be deterministic: the same email and salt MUST always produce the same hash."
+      ]
+    },
+    {
+      "requirement": "Masking strategy",
+      "rules": [
+        "In `mask` mode, the decorator MUST apply the following rules:\n\n- **Name**: Keep first character, mask the rest (e.g. `J***n`).\n- **Email Local Part**: Keep first and last characters, replace middle with `***`. If 2 chars or fewer, mask entire part.\n- **Email Domain Part**: Keep first character and full extension (e.g. `e***.com`)."
+      ]
+    },
+    {
+      "requirement": "Metadata privacy",
+      "rules": [
+        "When any privacy mode is active, the decorator MUST:\n\n- Remove `providerId`.\n- Remove all `metadata` fields except those explicitly whitelisted in `allowedMetadataKeys`."
+      ]
+    },
+    {
+      "requirement": "Excluded actors",
+      "rules": [
+        "The decorator MUST NOT apply any obfuscation or metadata removal to actors listed in `excludeActors`.\n\n- Comparison MUST be case-insensitive against both `name` and `email`.\n- When an actor is excluded, the raw identity is returned verbatim — including `providerId` and all `metadata` fields. This takes precedence over the \"Metadata privacy\" requirement."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "Privacy modes",
+      "name": "Anonymous mode replaces all data",
+      "given": ["privacy.mode is anonymous"],
+      "when": ["identity() is called"],
+      "then": ["it returns { name: \"Anonymous\", email: \"anonymous@getspecd.dev\" }"]
+    },
+    {
+      "requirement": "HMAC hashing with salt",
+      "name": "Deterministic hashing",
+      "given": ["privacy.mode is hash", "AND a fixed salt"],
+      "when": ["identity() is called twice for the same email"],
+      "then": ["both hashes are identical"]
+    },
+    {
+      "requirement": "Masking strategy",
+      "name": "Masking applied to email and name",
+      "given": [
+        "privacy.mode is mask",
+        "AND real identity is { name: \"John Doe\", email: \"john@example.com\" }"
+      ],
+      "when": ["identity() is called"],
+      "then": ["it returns { name: \"J***n\", email: \"j***n@e***.com\" }"]
+    },
+    {
+      "requirement": "Metadata privacy",
+      "name": "providerId and metadata removed by default",
+      "given": ["privacy mode is active", "AND no whitelist is provided"],
+      "when": ["identity() returns identity with providerId and metadata"],
+      "then": ["the decorator returns an object without those fields"]
+    },
+    {
+      "requirement": "Metadata privacy",
+      "name": "Whitelisted metadata preserved",
+      "given": ["privacy mode is active", "AND allowedMetadataKeys contains [\"dept\"]"],
+      "when": ["identity has metadata { dept: \"IT\", ssn: \"...\" }"],
+      "then": ["only dept is preserved"]
+    },
+    {
+      "requirement": "Excluded actors",
+      "name": "Excluded actor keeps real data",
+      "given": ["privacy is hash", "AND excludeActors contains [\"specd\"]"],
+      "when": ["current actor name is specd"],
+      "then": ["no hashing is applied"]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:5ca5694df5dee5c14907a4160141c8b7107397d685f7968e1f05d20caf7184ab",
+    "verify.md": "sha256:7575d35927d88acd47aea10292564da4f01f70fccdc04b218657fcd600a0aca9"
+  },
+  "generatedBy": "core"
+}

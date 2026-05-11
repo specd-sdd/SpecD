@@ -103,6 +103,8 @@ Field definitions:
 - **`validatedHash`** remains persisted for drift detection and approval signatures. It is `null` when not validated, a SHA-256 string when validated, or `"__skipped__"` when explicitly skipped.
 - **`history`** — append-only array of typed events. The event types, their semantics, and the derivation rules (current state, active approval, draft status) are defined in [`specs/core/change/spec.md` — Requirement: History and event sourcing](../change/spec.md). This section defines only the JSON serialization of those events. The current lifecycle state is derived from the most recent `transitioned` event's `to` field.
 
+  history — append-only array of typed events. Each event contains common fields: `type`, `at`, and `by`. The `by` field is an `ActorIdentity` object (defined in `core:change`) which includes `name`, `email`, and optional `provider`, `providerId`, and `metadata`.
+
 The JSON serialization of each event type is:
 
 ```jsonc
@@ -201,9 +203,9 @@ The manifest must be written atomically — by writing to a temporary file and t
 
 ## Spec Dependencies
 
-- [`core:change`](../change/spec.md) — change event model and lifecycle derivation
-- [`core:change-layout`](../change-layout/spec.md) — expected artifact paths for new spec files and delta files
-- [`core:storage`](../storage/spec.md) — repository writes and atomic manifest handling
-- [`core:spec-metadata`](../spec-metadata/spec.md) — metadata files referenced by the manifest model
-- [`core:spec-id-format`](../spec-id-format/spec.md) — canonical `workspace:capabilityPath` identifiers
-- [`core:workspace`](../workspace/spec.md) — workspace semantics referenced by persisted spec IDs
+- [core:change](../change/spec.md) — change event model and lifecycle derivation
+- [core:change-layout](../change-layout/spec.md) — expected artifact paths
+- [core:storage](../storage/spec.md) — repository writes
+- [core:spec-metadata](../spec-metadata/spec.md) — metadata files
+- [core:spec-id-format](../spec-id-format/spec.md) — identifiers
+- [core:workspace](../workspace/spec.md) — workspace semantics

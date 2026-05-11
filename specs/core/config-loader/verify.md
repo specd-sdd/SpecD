@@ -111,6 +111,15 @@
 - **WHEN** `load()` is called
 - **THEN** `load()` throws `ConfigValidationError` with a message about the file not being found
 
+### Requirement: Native environment file support
+
+#### Scenario: .env.local takes precedence over .env
+
+- **GIVEN** `.env` has `FOO=bar`
+- **AND** `.env.local` has `FOO=baz`
+- **WHEN** loader runs
+- **THEN** `process.env.FOO` is `baz` (or mapped accordingly)
+
 ### Requirement: YAML parsing and structural validation
 
 #### Scenario: Invalid YAML syntax

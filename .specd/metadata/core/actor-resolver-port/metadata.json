@@ -1,7 +1,7 @@
 {
   "title": "Actor Resolver Port",
   "description": "Change history events must record who performed an operation, but the identity source varies across environments (git config, SSO, environment variables), so use cases cannot depend on any single provider. `ActorResolver` is the application-layer port interface that resolves the current actor's name and email, letting identity providers be swapped without affecting consumers.",
-  "dependsOn": ["default:_global/architecture", "core:actor-resolver"],
+  "dependsOn": ["core:actor-resolver", "core:change"],
   "context": [
     "Change history events must record who performed an operation, but the identity source varies across environments (git config, SSO, environment variables), so use cases cannot depend on any single provider. `ActorResolver` is the application-layer port interface that resolves the current actor's name and email, letting identity providers be swapped without affecting consumers."
   ],
@@ -9,7 +9,7 @@
     {
       "requirement": "identity returns the current actor",
       "rules": [
-        "`identity()` MUST return a `Promise<ActorIdentity>`, where `ActorIdentity` is defined as:\n\n```typescript\ninterface ActorIdentity {\n  readonly name: string\n  readonly email: string\n}\n```\n\nBoth `name` and `email` MUST be non-empty strings when the promise resolves successfully."
+        "identity() MUST return a `Promise<ActorIdentity>`, where `ActorIdentity` is defined in the Change domain entity.\n\n```typescript\nexport interface ActorIdentity {\n  readonly name: string\n  readonly email: string\n  readonly provider?: string\n  readonly providerId?: string\n  readonly metadata?: Record<string, string>\n}\n```\n\n`name` MUST be a non-empty string when the promise resolves successfully. `email` MUST be a non-empty string for providers that have an email source (e.g. git, hg with `Name <email>` format); it MAY be an empty string for providers that do not store email natively (e.g. SVN, LDAP without email attribute). All other fields are optional and their presence depends on the active provider and privacy settings."
       ]
     },
     {
@@ -47,8 +47,12 @@
       "requirement": "identity returns the current actor",
       "name": "Successful identity resolution",
       "given": ["an identity source with configured name and email"],
-      "when": ["identity() is called"],
-      "then": ["the promise MUST resolve to an ActorIdentity with non-empty name and email strings"]
+      "when": ["identity() resolves"],
+      "then": [
+        "it returns an object with non-empty name",
+        "AND the email is non-empty for providers with email sources, or empty for providers without",
+        "AND it MAY include provider, providerId, and metadata"
+      ]
     },
     {
       "requirement": "identity throws when identity is unavailable",
@@ -87,8 +91,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:b41f21590352f6a663f6c51377c13f9227fbb0514f120a6cb1d4ace546eddcfc",
-    "verify.md": "sha256:c2b8b5b8a86f331763b6a33c6af364637cc5c40b6974d1ed759ff1d8c263e738"
+    "spec.md": "sha256:d8bdb1334030c0b239c8241d3c43a98a20393d6874dac64736c58abd58e90a60",
+    "verify.md": "sha256:c5951ffda1caac3e6324eb76cd6ce23baf9b9373295cfc0b651ec606c76a21c6"
   },
   "generatedBy": "core"
 }

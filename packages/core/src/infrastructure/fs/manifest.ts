@@ -15,6 +15,12 @@ export interface ManifestActorIdentity {
   readonly name: string
   /** Email address of the actor. */
   readonly email: string
+  /** Optional provider identifier (e.g. 'git', 'ldap', 'sso'). */
+  readonly provider?: string
+  /** Optional unique identifier within the provider (e.g. LDAP DN, employee ID). */
+  readonly providerId?: string
+  /** Optional bag of additional identity metadata. */
+  readonly metadata?: Record<string, string>
 }
 
 /** A single file within a manifest artifact. */
@@ -248,6 +254,9 @@ export type RawChangeEvent =
 export const actorIdentitySchema = z.object({
   name: z.string(),
   email: z.string(),
+  provider: z.string().optional(),
+  providerId: z.string().optional(),
+  metadata: z.record(z.string()).optional(),
 })
 
 const artifactStatusSchema = z.enum([

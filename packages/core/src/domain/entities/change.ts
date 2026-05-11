@@ -16,6 +16,12 @@ const CHANGE_NAME_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 export interface ActorIdentity {
   readonly name: string
   readonly email: string
+  /** Optional provider identifier (e.g. 'git', 'ldap', 'sso'). */
+  readonly provider?: string
+  /** Optional unique identifier within the provider (e.g. LDAP DN, employee ID). */
+  readonly providerId?: string
+  /** Optional bag of additional identity metadata. */
+  readonly metadata?: Record<string, string>
 }
 
 /** Appended once when the change is first created. */
@@ -122,7 +128,11 @@ export interface ArtifactSkippedEvent {
 }
 
 /** System actor identity used for automated operations like artifact sync. */
-export const SYSTEM_ACTOR: ActorIdentity = { name: 'specd', email: 'system@getspecd.dev' }
+export const SYSTEM_ACTOR: ActorIdentity = {
+  name: 'specd',
+  email: 'system@getspecd.dev',
+  provider: 'system',
+} as const
 
 /** Appended when artifact sync reconciles the artifact map against the schema. */
 export interface ArtifactsSyncedEvent {

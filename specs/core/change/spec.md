@@ -8,7 +8,15 @@ Without a single entity that owns spec work end-to-end, lifecycle state, approva
 
 ### Requirement: Identity
 
-A Change has a unique, user-defined slug name (e.g. `add-auth-flow`) and a `createdAt` timestamp recorded at creation time. Both are immutable. The name is the primary handle used in all CLI commands and port interfaces. The `createdAt` timestamp is the source of truth for ordering — the storage layer derives its directory name prefix from it (see storage spec), but that prefix is an infrastructure concern and does not appear in the domain model.
+A Change has a unique, user-defined slug name (e.g. `add-auth-flow`) and a `createdAt` timestamp recorded at creation time. Both are immutable.
+
+Identities in specd are represented by the `ActorIdentity` interface:
+
+- **`name`** — human-readable name of the actor
+- **`email`** — unique identifier (often a real email, but may be a hash or masked value)
+- **`provider`** — optional identifier of the identity source (e.g. 'git', 'ldap')
+- **`providerId`** — optional unique ID within that provider (e.g. LDAP DN)
+- **`metadata`** — optional bag of arbitrary string-valued metadata (`Record<string, string>`)
 
 ### Requirement: Workspaces and specs
 
@@ -160,7 +168,7 @@ A Change can reconcile its artifact map against the current schema's artifact ty
 5. Returns `true` if any changes were made, `false` if the artifact map was already in sync.
 6. When changes are made, appends an `ArtifactsSyncedEvent` to history with the `SYSTEM_ACTOR` identity.
 
-`SYSTEM_ACTOR` is a constant `{ name: 'specd', email: 'system@getspecd.dev' }` used for automated operations like artifact sync. It is not a user actor and does not require VCS resolution.
+`SYSTEM_ACTOR` is a constant `{ name: 'specd', email: 'system@getspecd.dev', provider: 'system' }` used for automated operations.
 
 ### Requirement: History and event sourcing
 
@@ -177,6 +185,8 @@ All events share common fields:
 - **`type`** — identifies the event kind
 - **`at`** — ISO 8601 timestamp
 - **`by`** — git identity (`name` + `email`) of the actor, mandatory on all events
+
+  by — the `ActorIdentity` of the person or system performing the operation, mandatory on all events
 
 Event types:
 
@@ -247,14 +257,14 @@ A **`schemaVersion` mismatch** within the same schema name is advisory. A warnin
 
 A change may be moved between storage locations without affecting its lifecycle state. All operations are recorded as events in history.
 
-- **Draft** (`changes/` → `drafts/`) — shelves the change. Appends a `drafted` event with: Drafting remains orthogonal to the current lifecycle state, but it is guarded by historical implementation detection. If the change has ever reached `implementing`, drafting SHALL fail by default because implementation may already exist and shelving the change would risk leaving permanent specs and code out of sync. The operation MAY proceed only when the caller explicitly forces it.
-  - **`by`** — mandatory git identity (name + email) of the person shelving
+- **Draft** (changes/ → drafts/) — shelves the change. Appends a `drafted` event. If the change has ever reached `implementing`, drafting SHALL fail by default.
+  - **`by`** — mandatory `ActorIdentity` of the person shelving
   - **`at`** — timestamp
   - **`reason`** — optional explanation
-- **Restore** (`drafts/` → `changes/`) — recovers a drafted change. Appends a `restored` event. The change resumes from its preserved state.
-- **Discard** (`changes/` or `drafts/` → `discarded/`) — permanently abandons the change. Appends a `discarded` event with: Discarding is irreversible. A change may be drafted and restored multiple times before being discarded; the full cycle is preserved in history. If the change has ever reached `implementing`, discarding SHALL fail by default because implementation may already exist and abandoning the workflow would risk leaving permanent specs and code out of sync. The operation MAY proceed only when the caller explicitly forces it.
+- **Restore** (drafts/ → changes/) — recovers a drafted change. Appends a `restored` event.
+- **Discard** (changes/ or drafts/ → discarded/) — permanently abandons the change. Appends a `discarded` event. If the change has ever reached `implementing`, discarding SHALL fail by default.
   - **`reason`** — mandatory human-provided explanation
-  - **`by`** — mandatory git identity (name + email) of the person discarding
+  - **`by`** — mandatory `ActorIdentity` of the person discarding
   - **`at`** — timestamp
   - **`supersededBy`** — optional list of change names that replace this one
 

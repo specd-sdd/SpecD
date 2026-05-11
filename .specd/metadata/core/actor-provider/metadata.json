@@ -1,0 +1,46 @@
+{
+  "title": "Actor Provider",
+  "description": "To support extensible and configurable identity resolution, specd uses a registry of actor providers. This spec defines the factory interfaces that allow different technologies (VCS, LDAP, SSO) to contribute actor resolvers to the system.",
+  "dependsOn": ["core:actor-resolver-port"],
+  "context": [
+    "To support extensible and configurable identity resolution, specd uses a registry of actor providers. This spec defines the factory interfaces that allow different technologies (VCS, LDAP, SSO) to contribute actor resolvers to the system."
+  ],
+  "rules": [
+    {
+      "requirement": "Base ActorProvider interface",
+      "rules": [
+        "The `ActorProvider` interface SHALL represent a factory capable of producing an `ActorResolver` when explicitly selected.\n\n- It MUST have a `readonly name: string` property used for configuration-based selection.\n- It MUST have a `create(options: Record<string, unknown>): Promise<ActorResolver>` method."
+      ]
+    },
+    {
+      "requirement": "AutoDetectActorProvider interface",
+      "rules": [
+        "The `AutoDetectActorProvider` interface SHALL extend `ActorProvider` with environmental detection capabilities.\n\n- It MUST implement `detect(cwd: string): Promise<ActorResolver | null>`.\n- It SHALL return an instance when the environment (e.g. a .git folder) matches its technology, otherwise `null`."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "Base ActorProvider interface",
+      "name": "Selection by name",
+      "given": ["a provider named \"custom\" is registered"],
+      "when": ["actorProvider: \"custom\" is configured"],
+      "then": ["the kernel calls custom.create()"]
+    },
+    {
+      "requirement": "AutoDetectActorProvider interface",
+      "name": "Automatic detection",
+      "given": [
+        "a provider named \"test\" implements AutoDetectActorProvider",
+        "AND it detects the environment"
+      ],
+      "when": ["detect() is called"],
+      "then": ["it returns a resolver"]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:c3ee4dde91d692a63d1ca651f8089d4214dfa8d41a195c6d9cbe74f8eab5e5bc",
+    "verify.md": "sha256:58ea6cb9255b86c5307ac06eeb4da86d115bdec1828ccea61caea965e3a8faf1"
+  },
+  "generatedBy": "core"
+}

@@ -1,0 +1,52 @@
+{
+  "title": "Actor Resolver Svn",
+  "description": "Provides actor identity resolution for Subversion working copies.",
+  "dependsOn": ["core:actor-provider"],
+  "context": ["Provides actor identity resolution for Subversion working copies."],
+  "rules": [
+    {
+      "requirement": "Implementation of AutoDetectActorProvider",
+      "rules": [
+        "The Svn actor provider MUST implement the `AutoDetectActorProvider` interface.\n\n- **`name`**: MUST be `\"svn\"`."
+      ]
+    },
+    {
+      "requirement": "Detection logic",
+      "rules": [
+        "The provider MUST detect SVN presence by looking for a `.svn` directory in the `cwd` or its parents."
+      ]
+    },
+    {
+      "requirement": "Identity resolution",
+      "rules": [
+        "The resulting resolver MUST retrieve identity from SVN environment.\n\n- `provider`: MUST be set to `\"svn\"`."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "Implementation of AutoDetectActorProvider",
+      "name": "Interface satisfaction",
+      "given": ["an SvnActorProvider instance"],
+      "then": ["it satisfies the AutoDetectActorProvider interface"]
+    },
+    {
+      "requirement": "Detection logic",
+      "name": "Repo detected",
+      "given": ["the directory has a .svn folder"],
+      "when": ["detect() is called"],
+      "then": ["it returns an SvnActorResolver"]
+    },
+    {
+      "requirement": "Identity resolution",
+      "name": "Provider field present",
+      "when": ["identity() resolves"],
+      "then": ["the provider field is \"svn\""]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:99d7c77f9c09045ffd374d4ab3f65231916f4eb655f7f38bb5c7d6cd3aedffe8",
+    "verify.md": "sha256:c605caf235a317429c68515c060644b13262ce09f6d8733f87bd039b35cdde36"
+  },
+  "generatedBy": "core"
+}

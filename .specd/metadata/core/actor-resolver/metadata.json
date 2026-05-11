@@ -1,7 +1,7 @@
 {
   "title": "Actor Resolver Factory",
   "description": "specd needs to identify the current user (for approvals, sign-offs, and audit trails) using whichever VCS is active, without callers coupling to a specific VCS implementation. `createVcsActorResolver` is a composition factory that auto-detects the active version-control system in a directory and returns the corresponding `ActorResolver` implementation, serving as the single entry point so that callers never construct concrete resolvers directly.",
-  "dependsOn": ["core:vcs-adapter", "core:composition", "default:_global/architecture"],
+  "dependsOn": ["core:actor-provider", "core:actor-resolver-privacy", "core:composition"],
   "context": [
     "specd needs to identify the current user (for approvals, sign-offs, and audit trails) using whichever VCS is active, without callers coupling to a specific VCS implementation. `createVcsActorResolver` is a composition factory that auto-detects the active version-control system in a directory and returns the corresponding `ActorResolver` implementation, serving as the single entry point so that callers never construct concrete resolvers directly."
   ],
@@ -9,7 +9,7 @@
     {
       "requirement": "Detection probes in priority order",
       "rules": [
-        "`createVcsActorResolver` MUST probe for VCS presence in the following order: git, hg, svn. The first probe that succeeds determines the returned resolver. Subsequent probes MUST NOT execute once a match is found."
+        "`createVcsActorResolver` MUST determine the provider to use based on the following precedence:\n\n1. **Forced Provider**: If `actorProvider` is configured, the factory MUST attempt to load that specific provider by name. If not found, it SHALL throw. If found, it MUST call `create()` on that provider, bypassing all other probes.\n2. **Auto-Detection**: If no forced provider is set, the factory MUST iterate through all registered `AutoDetectActorProvider` instances (e.g. git, hg, svn) in priority order and call `detect()`.\n\nThe first successful provider (manual or auto) determines the base resolver."
       ]
     },
     {
@@ -35,6 +35,12 @@
       "rules": [
         "`createVcsActorResolver` MUST return a `Promise<ActorResolver>` — the application port interface defined in `application/ports/actor-resolver.ts`. The concrete resolver type is an implementation detail not exposed to callers."
       ]
+    },
+    {
+      "requirement": "Privacy wrapping",
+      "rules": [
+        "Privacy wrapping is NOT the responsibility of `createVcsActorResolver`. The factory returns the raw base resolver (VCS-detected or custom). Privacy wrapping is applied at the **kernel composition level**, where `config.privacy` is available.\n\nThe kernel wires the actor resolver as:\n\n```typescript\nconst baseActor = await resolveActorResolver(...)\ni.actor = config.privacy\n  ? new PrivacyActorResolver(baseActor, config.privacy)\n  : baseActor\n```\n\nThis approach ensures privacy is applied uniformly to ALL actor sources — VCS-backed (git, hg, svn), custom providers registered via the registry, and the null fallback — without coupling `createVcsActorResolver` to the privacy config shape."
+      ]
     }
   ],
   "constraints": [
@@ -46,9 +52,9 @@
     {
       "requirement": "Detection probes in priority order",
       "name": "Git repository detected",
-      "given": ["the target directory is inside a git repository"],
-      "when": ["createVcsActorResolver(cwd) is called"],
-      "then": ["it returns a GitActorResolver", "AND hg and svn probes are never executed"]
+      "given": ["actorProvider: \"git\" is configured", "AND the environment has an hg repository"],
+      "when": ["createVcsActorResolver() is called"],
+      "then": ["it returns the git resolver without probing for hg"]
     },
     {
       "requirement": "Detection probes in priority order",
@@ -123,11 +129,20 @@
       "name": "Return type satisfies ActorResolver",
       "when": ["createVcsActorResolver(cwd) resolves"],
       "then": ["the returned object satisfies the ActorResolver interface"]
+    },
+    {
+      "requirement": "Privacy wrapping",
+      "name": "Privacy wrapping applied at kernel level",
+      "given": ["privacy.mode is mask"],
+      "when": ["the kernel is constructed with a privacy config"],
+      "then": [
+        "the actor resolver exposed by kernel-internals is a PrivacyActorResolver wrapping the detected base resolver"
+      ]
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:d9ad1cf01d2a2838a0b4e3501adf2bd5151f3887c56cb6cbfa40bf25cb091341",
-    "verify.md": "sha256:5a3aa7873df41c85c28ade06325adc7a5305f0c8e2aeb11a04f31e7aed56b91b"
+    "spec.md": "sha256:eae7a3dc3f0791d8c5834debe5b4049ee5d9efea5a8661006b858beeff33572f",
+    "verify.md": "sha256:be643fc5fa42d95c7cbdadcbf45332ab455a29ba0300e3bf71916029997703f2"
   },
   "generatedBy": "core"
 }

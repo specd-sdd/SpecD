@@ -11,6 +11,7 @@ import {
   type SpecdStorageConfig,
   type SpecdContextEntry,
 } from '../../application/specd-config.js'
+import { type SchemaOperations } from '../../domain/services/merge-schema-layers.js'
 import { ConfigValidationError } from '../../domain/errors/config-validation-error.js'
 import { git } from '../git/exec.js'
 
@@ -237,6 +238,26 @@ const SpecdYamlZodSchema = z
     schema: z.string(),
     configPath: z.string().optional(),
     workspaces: z.record(WorkspaceRawZodSchema),
+    actorProvider: z.string().optional(),
+    privacy: z
+      .object({
+        mode: z.enum(['hash', 'mask', 'anonymous']),
+        salt: z.string().optional(),
+        excludeActors: z.array(z.string()).optional(),
+        allowedMetadataKeys: z.array(z.string()).optional(),
+      })
+      .strict()
+      .superRefine((privacy, ctx) => {
+        if (privacy.mode === 'hash' && !privacy.salt) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['salt'],
+            message:
+              'When privacy.mode is set to hash, a salt MUST be provided (via config or environment)',
+          })
+        }
+      })
+      .optional(),
     storage: z.object({
       changes: AdapterBindingRawZodSchema,
       drafts: AdapterBindingRawZodSchema,
@@ -345,6 +366,68 @@ async function findConfigFile(startDir: string): Promise<string | null> {
   }
 
   return null
+}
+
+/**
+ * Attempts to load environment variables from `.env` and `.env.local` files
+ * in the configuration directory.
+ *
+ * @param configDir - Absolute directory containing the config file
+ */
+function tryLoadEnvFiles(configDir: string): void {
+  // process.loadEnvFile does NOT override existing variables.
+  // To ensure .env.local has higher priority, we must load it FIRST.
+  const files = [path.join(configDir, '.env.local'), path.join(configDir, '.env')]
+
+  for (const file of files) {
+    try {
+      if (typeof process.loadEnvFile === 'function') {
+        process.loadEnvFile(file)
+      }
+    } catch {
+      // Ignore missing files or permission errors
+    }
+  }
+}
+
+/**
+ * Merges environment variable overrides into the raw configuration object.
+ *
+ * @param raw - The raw configuration object parsed from YAML
+ */
+function applyEnvOverrides(raw: Record<string, unknown>): void {
+  if (process.env['SPECD_ACTOR_PROVIDER']) {
+    raw.actorProvider = process.env['SPECD_ACTOR_PROVIDER']
+  }
+
+  if (process.env['SPECD_PRIVACY_MODE'] || process.env['SPECD_PRIVACY_SALT']) {
+    const privacy = (raw.privacy as Record<string, unknown> | undefined) ?? {}
+    if (process.env['SPECD_PRIVACY_MODE']) {
+      privacy.mode = process.env['SPECD_PRIVACY_MODE']
+    }
+    if (process.env['SPECD_PRIVACY_SALT']) {
+      privacy.salt = process.env['SPECD_PRIVACY_SALT']
+    }
+    raw.privacy = privacy
+  }
+
+  if (process.env['SPECD_LOG_LEVEL']) {
+    const logging = (raw.logging as Record<string, unknown> | undefined) ?? {}
+    logging.level = process.env['SPECD_LOG_LEVEL']
+    raw.logging = logging
+  }
+
+  if (process.env['SPECD_CONTEXT_MODE']) {
+    raw.contextMode = process.env['SPECD_CONTEXT_MODE']
+  }
+
+  if (process.env['SPECD_LLM_OPTIMIZED']) {
+    raw.llmOptimizedContext = process.env['SPECD_LLM_OPTIMIZED'] === 'true'
+  }
+
+  if (process.env['SPECD_SCHEMA']) {
+    raw.schema = process.env['SPECD_SCHEMA']
+  }
 }
 
 /**
@@ -499,8 +582,12 @@ export class FsConfigLoader implements ConfigLoader {
       throw new ConfigValidationError(configPath, `invalid YAML: ${(err as Error).message}`)
     }
 
+    tryLoadEnvFiles(configDir)
+
     if (typeof raw === 'object' && raw !== null) {
       const parsed = raw as Record<string, unknown>
+      applyEnvOverrides(parsed)
+
       if ('artifactRules' in parsed) {
         throw new ConfigValidationError(
           configPath,
@@ -700,6 +787,8 @@ export class FsConfigLoader implements ConfigLoader {
       logging: {
         level: data.logging?.level ?? 'info',
       },
+      ...(data.actorProvider !== undefined ? { actorProvider: data.actorProvider } : {}),
+      ...(data.privacy !== undefined ? { privacy: data.privacy } : {}),
       ...(context !== undefined ? { context } : {}),
       ...(data.contextIncludeSpecs !== undefined
         ? { contextIncludeSpecs: data.contextIncludeSpecs }
@@ -714,8 +803,7 @@ export class FsConfigLoader implements ConfigLoader {
       ...(data.schemaPlugins !== undefined ? { schemaPlugins: data.schemaPlugins } : {}),
       ...(data.schemaOverrides !== undefined
         ? {
-            schemaOverrides:
-              data.schemaOverrides as import('../../domain/services/merge-schema-layers.js').SchemaOperations,
+            schemaOverrides: data.schemaOverrides as SchemaOperations,
           }
         : {}),
       ...(data.plugins !== undefined

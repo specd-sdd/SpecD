@@ -31,6 +31,6 @@ export class GitActorResolver implements ActorResolver {
       git(this._cwd, 'config', 'user.name'),
       git(this._cwd, 'config', 'user.email'),
     ])
-    return { name, email }
+    return { name, email, provider: 'git' }
   }
 }

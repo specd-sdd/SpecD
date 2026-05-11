@@ -20,6 +20,29 @@ Some command families may explicitly define a bootstrap mode that intentionally 
 
 Bootstrap mode, when defined by a command spec, is for setup and early repository exploration rather than the intended steady-state mode for configured projects. Such command specs MUST document when bootstrap mode is entered, how repository root is resolved, and how it differs from configured operation.
 
+### Requirement: Privacy settings
+
+`specd.yaml` MAY include a `privacy` section to control identity obfuscation.
+
+- **`mode`** — MUST be one of: `hash`, `mask`, `anonymous`.
+- **`salt`** — optional string for HMAC hashing (recommended via environment).
+- **`excludeActors`** — optional array of names or emails to skip obfuscation. Defaults to `["specd", "system@getspecd.dev"]`.
+- **`allowedMetadataKeys`** — optional whitelist of metadata keys to preserve under privacy modes.
+
+### Requirement: Environment variable overrides
+
+Root-level non-hierarchical configuration values SHALL be overridable by environment variables. The following mappings apply:
+
+- `SPECD_ACTOR_PROVIDER` → `actorProvider`
+- `SPECD_PRIVACY_SALT` → `privacy.salt`
+- `SPECD_PRIVACY_MODE` → `privacy.mode`
+
+Environment variables (including those from `.env` and `.env.local`) SHALL take precedence over values defined in `specd.yaml` and `specd.local.yaml`.
+
+### Requirement: Forced actor provider
+
+`specd.yaml` MAY include an `actorProvider` root field (string). When present, it MUST force the selection of the named provider from the kernel registry, bypassing auto-detection.
+
 ### Requirement: Local config override
 
 Alongside `specd.yaml`, developers may place a `specd.local.yaml` file in the same directory to use a fully independent local configuration. When `specd.local.yaml` is present, specd uses it exclusively — `specd.yaml` is not read and no merging takes place. The local file is a complete, self-contained config that must be valid on its own.
@@ -490,13 +513,9 @@ Before constructing any use case, the config loader MUST validate the loaded con
 
 ## Constraints
 
-- Every field in `specd.yaml` is validated at load time by the Zod schema
-- `artifactRules` is not a valid config field — use `schemaOverrides` instead
-- `skills` is not a valid config field — skills are managed via the plugin system
-- `contextMode` is project-level only — rejected inside workspace entries
+- Every field in specd.yaml is validated at load time by the Zod schema
+- When `privacy.mode` is set to `hash`, a `salt` MUST be provided (via config or environment) or validation SHALL fail
 - Unknown fields at the top level are rejected by the strict Zod schema
-- `configPath` MUST resolve inside the repository root
-- Storage paths MUST resolve inside the repository root
 
 ## Examples
 

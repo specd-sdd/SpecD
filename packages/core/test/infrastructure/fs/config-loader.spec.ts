@@ -20,6 +20,13 @@ beforeEach(async () => {
 
 afterEach(async () => {
   await fs.rm(tmpDir, { recursive: true, force: true })
+
+  // Clean up environment variables
+  for (const key of Object.keys(process.env)) {
+    if (key.startsWith('SPECD_')) {
+      delete process.env[key]
+    }
+  }
 })
 
 /** Writes a specd.yaml to tmpDir with the given content and returns the path. */
@@ -1404,5 +1411,57 @@ storage:
       const loader = new FsConfigLoader({ configPath })
       await expect(loader.load()).rejects.toThrow(/workspaces\.default\.graph/)
     })
+  })
+})
+
+describe('Requirement: Privacy settings and Environment support', () => {
+  it('loads environment variables from .env', async () => {
+    await fs.writeFile(path.join(tmpDir, '.env'), 'SPECD_PRIVACY_MODE=mask\n')
+    const configPath = await writeConfig(minimalYaml())
+    const loader = new FsConfigLoader({ configPath })
+    const config = await loader.load()
+
+    expect(config.privacy?.mode).toBe('mask')
+  })
+
+  it('.env.local takes precedence over .env', async () => {
+    await fs.writeFile(path.join(tmpDir, '.env'), 'SPECD_PRIVACY_MODE=mask\n')
+    await fs.writeFile(
+      path.join(tmpDir, '.env.local'),
+      'SPECD_PRIVACY_MODE=hash\nSPECD_PRIVACY_SALT=secret\n',
+    )
+    const configPath = await writeConfig(minimalYaml())
+    const loader = new FsConfigLoader({ configPath })
+    const config = await loader.load()
+
+    expect(config.privacy?.mode).toBe('hash')
+    expect(config.privacy?.salt).toBe('secret')
+  })
+
+  it('overrides specd.yaml with environment variables', async () => {
+    const configPath = await writeConfig(minimalYaml('privacy:\n  mode: anonymous'))
+    process.env['SPECD_PRIVACY_MODE'] = 'mask'
+    try {
+      const loader = new FsConfigLoader({ configPath })
+      const config = await loader.load()
+      expect(config.privacy?.mode).toBe('mask')
+    } finally {
+      delete process.env['SPECD_PRIVACY_MODE']
+    }
+  })
+
+  it('validates that hash mode requires a salt', async () => {
+    const configPath = await writeConfig(minimalYaml('privacy:\n  mode: hash'))
+    const loader = new FsConfigLoader({ configPath })
+    await expect(loader.load()).rejects.toThrow(
+      /privacy\.salt: When privacy\.mode is set to hash, a salt MUST be provided/,
+    )
+  })
+
+  it('accepts actorProvider selection', async () => {
+    const configPath = await writeConfig(minimalYaml('actorProvider: ldap'))
+    const loader = new FsConfigLoader({ configPath })
+    const config = await loader.load()
+    expect(config.actorProvider).toBe('ldap')
   })
 })

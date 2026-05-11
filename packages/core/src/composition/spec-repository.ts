@@ -1,22 +1,16 @@
+import { type RepositoryConfig } from '../application/ports/repository.js'
 import { type SpecRepository } from '../application/ports/spec-repository.js'
 import { FsSpecRepository } from '../infrastructure/fs/spec-repository.js'
 
+/* eslint-disable @typescript-eslint/no-empty-object-type */
 /**
- * Domain context shared by all `SpecRepository` adapter types.
+ * Repository configuration for spec repositories.
  *
- * These fields belong to the port contract and are independent of the
- * underlying storage technology.
+ * Extends {@link RepositoryConfig} to allow providers to add adapter-specific
+ * fields without coupling to the base type.
  */
-export interface SpecRepositoryContext {
-  /** The workspace name from `specd.yaml` (e.g. `"default"`, `"billing"`). */
-  readonly workspace: string
-  /** Ownership level of this repository instance. */
-  readonly ownership: 'owned' | 'shared' | 'readOnly'
-  /** Whether this repository points to data outside the current git root. */
-  readonly isExternal: boolean
-  /** Absolute path to the config directory. */
-  readonly configPath: string
-}
+export interface SpecRepositoryConfig extends RepositoryConfig {}
+/* eslint-enable @typescript-eslint/no-empty-object-type */
 
 /**
  * Filesystem adapter options for `createSpecRepository('fs', ...)`.
@@ -37,22 +31,22 @@ export interface FsSpecRepositoryOptions {
  * concrete class.
  *
  * @param type - Adapter type discriminant; determines which implementation is used
- * @param context - Domain context shared across all adapter types
+ * @param config - Repository configuration shared across all adapter types
  * @param options - Filesystem adapter options
  * @returns A fully constructed `SpecRepository` bound to the given workspace
  */
 export function createSpecRepository(
   type: 'fs',
-  context: SpecRepositoryContext,
+  config: SpecRepositoryConfig,
   options: FsSpecRepositoryOptions,
 ): SpecRepository {
   switch (type) {
     case 'fs':
       return new FsSpecRepository({
-        workspace: context.workspace,
-        ownership: context.ownership,
-        isExternal: context.isExternal,
-        configPath: context.configPath,
+        workspace: config.workspace,
+        ownership: config.ownership,
+        isExternal: config.isExternal,
+        configPath: config.configPath,
         specsPath: options.specsPath,
         metadataPath: options.metadataPath,
         ...(options.prefix !== undefined ? { prefix: options.prefix } : {}),

@@ -6,10 +6,10 @@
 
 #### Scenario: Git repository detected
 
-- **GIVEN** the target directory is inside a git repository
-- **WHEN** `createVcsActorResolver(cwd)` is called
-- **THEN** it returns a `GitActorResolver`
-- **AND** hg and svn probes are never executed
+- **GIVEN** `actorProvider: "git"` is configured
+- **AND** the environment has an `hg` repository
+- **WHEN** `createVcsActorResolver()` is called
+- **THEN** it returns the `git` resolver without probing for `hg`
 
 #### Scenario: Mercurial repository detected
 
@@ -75,3 +75,11 @@
 
 - **WHEN** `createVcsActorResolver(cwd)` resolves
 - **THEN** the returned object satisfies the `ActorResolver` interface
+
+### Requirement: Privacy wrapping
+
+#### Scenario: Privacy wrapping applied at kernel level
+
+- **GIVEN** `privacy.mode` is `mask`
+- **WHEN** the kernel is constructed with a privacy config
+- **THEN** the actor resolver exposed by `kernel-internals` is a `PrivacyActorResolver` wrapping the detected base resolver

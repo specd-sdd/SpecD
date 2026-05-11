@@ -33,22 +33,40 @@ Bootstrap mode is intended for initial indexing and exploratory graph queries. I
 
 ## Top-level fields
 
-| Field                 | Type    | Required | Default         | Description                                                                                                    |
-| --------------------- | ------- | -------- | --------------- | -------------------------------------------------------------------------------------------------------------- |
-| `configPath`          | string  | no       | `.specd/config` | Root directory for specd-owned runtime state such as graph backends and graph temp files.                      |
-| `schema`              | string  | yes      | —               | Schema reference. See [`schema`](#schema).                                                                     |
-| `workspaces`          | object  | yes      | —               | Workspace declarations. Must include `default`.                                                                |
-| `storage`             | object  | yes      | —               | Storage paths for changes, drafts, discarded, and archive.                                                     |
-| `context`             | array   | no       | `[]`            | Additional content injected into compiled context before spec content.                                         |
-| `contextIncludeSpecs` | array   | no       | —               | Spec patterns always included in compiled context. When absent, no project-level include patterns are applied. |
-| `contextExcludeSpecs` | array   | no       | —               | Spec patterns always excluded from compiled context.                                                           |
-| `contextMode`         | string  | no       | `'summary'`     | Context rendering mode: `'list'`, `'summary'`, `'full'`, or `'hybrid'`. See [`contextMode`](#contextmode).     |
-| `approvals`           | object  | no       | both `false`    | Approval gate configuration.                                                                                   |
-| `logging`             | object  | no       | `level: info`   | Project-level logging configuration.                                                                           |
-| `llmOptimizedContext` | boolean | no       | `false`         | Opt in to LLM-enriched context operations.                                                                     |
-| `plugins`             | object  | no       | —               | Installed plugins grouped by type.                                                                             |
-| `schemaPlugins`       | array   | no       | `[]`            | Schema plugin references loaded and merged into the active schema.                                             |
-| `schemaOverrides`     | object  | no       | —               | Inline schema override operations applied after plugins. See [`schemaOverrides`](#schemaoverrides).            |
+| Field                 | Type    | Required | Default         | Description                                                                                                          |
+| --------------------- | ------- | -------- | --------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `configPath`          | string  | no       | `.specd/config` | Root directory for specd-owned runtime state such as graph backends and graph temp files.                            |
+| `schema`              | string  | yes      | —               | Schema reference. See [`schema`](#schema).                                                                           |
+| `workspaces`          | object  | yes      | —               | Workspace declarations. Must include `default`.                                                                      |
+| `storage`             | object  | yes      | —               | Storage paths for changes, drafts, discarded, and archive.                                                           |
+| `actorProvider`       | string  | no       | —               | Forced actor provider name (e.g. `'git'`, `'ldap'`). Bypasses auto-detection. See [`actorProvider`](#actorprovider). |
+| `privacy`             | object  | no       | —               | Identity obfuscation settings. See [`privacy`](#privacy).                                                            |
+| `context`             | array   | no       | `[]`            | Additional content injected into compiled context before spec content.                                               |
+| `contextIncludeSpecs` | array   | no       | —               | Spec patterns always included in compiled context. When absent, no project-level include patterns are applied.       |
+| `contextExcludeSpecs` | array   | no       | —               | Spec patterns always excluded from compiled context.                                                                 |
+| `contextMode`         | string  | no       | `'summary'`     | Context rendering mode: `'list'`, `'summary'`, `'full'`, or `'hybrid'`. See [`contextMode`](#contextmode).           |
+| `approvals`           | object  | no       | both `false`    | Approval gate configuration.                                                                                         |
+| `logging`             | object  | no       | `level: info`   | Project-level logging configuration.                                                                                 |
+| `llmOptimizedContext` | boolean | no       | `false`         | Opt in to LLM-enriched context operations.                                                                           |
+| `plugins`             | object  | no       | —               | Installed plugins grouped by type.                                                                                   |
+| `schemaPlugins`       | array   | no       | `[]`            | Schema plugin references loaded and merged into the active schema.                                                   |
+| `schemaOverrides`     | object  | no       | —               | Inline schema override operations applied after plugins. See [`schemaOverrides`](#schemaoverrides).                  |
+
+## Environment overrides
+
+SpecD natively supports environment variables to override root-level configuration settings. These variables are loaded from the system environment and `.env` / `.env.local` files in the project root.
+
+| Variable               | Mapping               | Description                                 |
+| ---------------------- | --------------------- | ------------------------------------------- |
+| `SPECD_ACTOR_PROVIDER` | `actorProvider`       | Forced provider name.                       |
+| `SPECD_PRIVACY_MODE`   | `privacy.mode`        | Privacy mode (`hash`, `mask`, `anonymous`). |
+| `SPECD_PRIVACY_SALT`   | `privacy.salt`        | HMAC salt for hashing.                      |
+| `SPECD_LOG_LEVEL`      | `logging.level`       | Minimum log level.                          |
+| `SPECD_CONTEXT_MODE`   | `contextMode`         | Context rendering mode.                     |
+| `SPECD_LLM_OPTIMIZED`  | `llmOptimizedContext` | Boolean (`true`/`false`).                   |
+| `SPECD_SCHEMA`         | `schemaRef`           | Active schema reference.                    |
+
+Environment variables (including those from `.env.local`) always take precedence over values in `specd.yaml` and `specd.local.yaml`.
 
 ## schema
 
@@ -66,6 +84,7 @@ The value uses a prefix convention that determines exactly where SpecD looks:
 | `'/absolute/path/schema.yaml'`   | Absolute path                                                                    |
 
 Schema resolution happens at command dispatch time, immediately before the command body executes. Commands that do not require the schema — `--help`, `--version`, `specd project init`, `specd config validate`, and `specd plugin` subcommands — skip resolution entirely.
+schema resolution entirely.
 
 ```yaml
 # npm package (most common)
@@ -80,6 +99,40 @@ schema: '#billing:billing-schema'
 # direct path
 schema: './schemas/custom/schema.yaml'
 ```
+
+## actorProvider
+
+`actorProvider` forces SpecD to use a specific identity provider, bypassing the default auto-detection logic (which normally probes for VCS repositories like Git).
+
+```yaml
+actorProvider: git
+```
+
+This is useful when multiple providers might apply or when using a custom identity plugin. This field can be overridden by the `SPECD_ACTOR_PROVIDER` environment variable.
+
+## privacy
+
+`privacy` configures how actor identities are obfuscated before being stored in change manifests and archives. This is recommended for projects in public repositories.
+
+```yaml
+privacy:
+  mode: hash
+  salt: 'optional-salt'
+  excludeActors:
+    - 'specd'
+    - 'system@getspecd.dev'
+  allowedMetadataKeys:
+    - 'dept'
+```
+
+### Privacy fields
+
+| Field                 | Type   | Required | Default                            | Description                                                                                                  |
+| --------------------- | ------ | -------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `mode`                | string | yes      | —                                  | Obfuscation mode: `'hash'`, `'mask'`, or `'anonymous'`.                                                      |
+| `salt`                | string | no       | —                                  | Secret salt for `'hash'` mode. **Required** when `mode: hash`. Recommended via `SPECD_PRIVACY_SALT` env var. |
+| `excludeActors`       | array  | no       | `['specd', 'system@getspecd.dev']` | List of actor names or emails to keep verbatim. Case-insensitive.                                            |
+| `allowedMetadataKeys` | array  | no       | `[]`                               | Whitelist of metadata keys to preserve. All other metadata and `providerId` are removed under privacy modes. |
 
 ## configPath
 

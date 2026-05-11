@@ -8,16 +8,19 @@ Change history events must record who performed an operation, but the identity s
 
 ### Requirement: identity returns the current actor
 
-`identity()` MUST return a `Promise<ActorIdentity>`, where `ActorIdentity` is defined as:
+identity() MUST return a `Promise<ActorIdentity>`, where `ActorIdentity` is defined in the Change domain entity.
 
 ```typescript
-interface ActorIdentity {
+export interface ActorIdentity {
   readonly name: string
   readonly email: string
+  readonly provider?: string
+  readonly providerId?: string
+  readonly metadata?: Record<string, string>
 }
 ```
 
-Both `name` and `email` MUST be non-empty strings when the promise resolves successfully.
+`name` MUST be a non-empty string when the promise resolves successfully. `email` MUST be a non-empty string for providers that have an email source (e.g. git, hg with `Name <email>` format); it MAY be an empty string for providers that do not store email natively (e.g. SVN, LDAP without email attribute). All other fields are optional and their presence depends on the active provider and privacy settings.
 
 ### Requirement: identity throws when identity is unavailable
 
@@ -48,6 +51,6 @@ Unlike `NullVcsAdapter` (which returns safe defaults for most methods), `NullAct
 
 ## Spec Dependencies
 
-- [`default:_global/architecture`](../../_global/architecture/spec.md) -- hexagonal architecture, port/adapter separation
-
-- [`core:actor-resolver`](../actor-resolver/spec.md) -- factory that selects the concrete implementation
+- [default:\_global/architecture](../../_global/architecture/spec.md) -- hexagonal architecture, port/adapter separation
+- [core:actor-resolver](../actor-resolver/spec.md) -- factory that selects the concrete implementation
+- [core:change](../change/spec.md) -- defines the ActorIdentity domain type

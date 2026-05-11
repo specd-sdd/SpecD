@@ -3,6 +3,7 @@ import { type SpecdConfig } from '../application/specd-config.js'
 import { ConfigValidationError } from '../domain/errors/config-validation-error.js'
 import { type ChangeRepository } from '../application/ports/change-repository.js'
 import { type ArchiveRepository } from '../application/ports/archive-repository.js'
+import { type SchemaRepository } from '../application/ports/schema-repository.js'
 import { type SpecRepository } from '../application/ports/spec-repository.js'
 import { type SchemaRegistry } from '../application/ports/schema-registry.js'
 import { type ArtifactParserRegistry } from '../application/ports/artifact-parser.js'
@@ -25,8 +26,8 @@ import { createArchiveRepository } from './archive-repository.js'
 import { createSpecRepository } from './spec-repository.js'
 import { createSchemaRegistry } from './schema-registry.js'
 import { createSchemaRepository } from './schema-repository.js'
-import { type SchemaRepository } from '../application/ports/schema-repository.js'
-import { BUILTIN_ACTOR_PROVIDERS, createVcsActorResolver } from './actor-resolver.js'
+import { BUILTIN_ACTOR_PROVIDERS, resolveActorResolver } from './actor-resolver.js'
+import { PrivacyActorResolver } from './privacy-actor-resolver.js'
 import { BUILTIN_VCS_PROVIDERS, createVcsAdapter } from './vcs-adapter.js'
 import { getDefaultWorkspace } from './get-default-workspace.js'
 import { type KernelOptions } from './kernel.js'
@@ -471,6 +472,12 @@ export async function createKernelInternals(
 
   const expander = new TemplateExpander({ project: { root: config.projectRoot } })
 
+  const baseActor = await resolveActorResolver(
+    config.projectRoot,
+    registry.actorProviders,
+    config.actorProvider,
+  )
+
   return {
     registry,
     changes,
@@ -480,7 +487,7 @@ export async function createKernelInternals(
     parsers: registry.parsers,
     hasher: new NodeContentHasher(),
     files: new FsFileReader(),
-    actor: await createVcsActorResolver(config.projectRoot, registry.actorProviders),
+    actor: config.privacy ? new PrivacyActorResolver(baseActor, config.privacy) : baseActor,
     vcs: await createVcsAdapter(config.projectRoot, registry.vcsProviders),
     hooks: new NodeHookRunner(expander),
     configWriter: new FsConfigWriter(),

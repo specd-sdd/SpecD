@@ -1,137 +1,28 @@
 import { RegistryConflictError } from '../application/errors/registry-conflict-error.js'
-import { type ArchiveRepository } from '../application/ports/archive-repository.js'
 import {
   type ArtifactParser,
   type ArtifactParserRegistry,
 } from '../application/ports/artifact-parser.js'
-import { type ActorResolver } from '../application/ports/actor-resolver.js'
-import { type ChangeRepository } from '../application/ports/change-repository.js'
+import { type ActorProvider } from './actor-provider.js'
 import { type ExternalHookRunner } from '../application/ports/external-hook-runner.js'
-import { type SchemaRepository } from '../application/ports/schema-repository.js'
-import { type SpecRepository } from '../application/ports/spec-repository.js'
-import { type VcsAdapter } from '../application/ports/vcs-adapter.js'
+import { type VcsProvider } from './vcs-provider.js'
 import {
   type ExtractorTransform,
   type ExtractorTransformRegistry,
 } from '../domain/services/content-extraction.js'
-import { type ArchiveRepositoryContext } from './archive-repository.js'
-import { type ChangeRepositoryContext } from './change-repository.js'
-import { type SchemaRepositoryContext } from './schema-repository.js'
-import { type SpecRepositoryContext } from './spec-repository.js'
+import { type ArchiveStorageFactory } from './archive-storage-factory.js'
+import { type ChangeStorageFactory } from './change-storage-factory.js'
+import { type GraphStoreFactory } from './graph-store-factory.js'
+import { type SchemaStorageFactory } from './schema-storage-factory.js'
+import { type SpecStorageFactory } from './spec-storage-factory.js'
 
-/**
- * Factory for workspace spec repositories registered under a named adapter key.
- */
-export interface SpecStorageFactory {
-  /**
-   * Creates a spec repository for the given workspace context.
-   *
-   * @param context - Shared repository context for the target workspace
-   * @param options - Adapter-owned resolved options
-   * @returns A fully constructed spec repository implementation
-   */
-  create(context: SpecRepositoryContext, options: Readonly<Record<string, unknown>>): SpecRepository
-}
-
-/**
- * Factory for workspace schema repositories registered under a named adapter key.
- */
-export interface SchemaStorageFactory {
-  /**
-   * Creates a schema repository for the given workspace context.
-   *
-   * @param context - Shared repository context for the target workspace
-   * @param options - Adapter-owned resolved options
-   * @returns A fully constructed schema repository implementation
-   */
-  create(
-    context: SchemaRepositoryContext,
-    options: Readonly<Record<string, unknown>>,
-  ): SchemaRepository
-}
-
-/**
- * Factory for change repositories registered under a named adapter key.
- */
-export interface ChangeStorageFactory {
-  /**
-   * Creates a change repository for the default workspace context.
-   *
-   * @param context - Shared repository context for the default workspace
-   * @param options - Adapter-owned resolved options
-   * @returns A fully constructed change repository implementation
-   */
-  create(
-    context: ChangeRepositoryContext,
-    options: Readonly<Record<string, unknown>>,
-  ): ChangeRepository
-}
-
-/**
- * Factory for archive repositories registered under a named adapter key.
- */
-export interface ArchiveStorageFactory {
-  /**
-   * Creates an archive repository for the default workspace context.
-   *
-   * @param context - Shared repository context for the default workspace
-   * @param options - Adapter-owned resolved options
-   * @returns A fully constructed archive repository implementation
-   */
-  create(
-    context: ArchiveRepositoryContext,
-    options: Readonly<Record<string, unknown>>,
-  ): ArchiveRepository
-}
-
-/**
- * Opaque graph-store factory registration carried by the kernel registry.
- *
- * `@specd/core` does not construct code-graph backends directly, so the return type
- * remains intentionally opaque at this layer while preserving the same registry shape
- * used by other extension points.
- */
-export interface GraphStoreFactory {
-  /**
-   * Creates a concrete graph-store backend.
-   *
-   * @param options - Adapter-owned resolved options
-   * @returns The constructed backend instance
-   */
-  create(options: Readonly<Record<string, unknown>>): unknown
-}
-
-/**
- * Named VCS detection provider.
- */
-export interface VcsProvider {
-  /** Human-readable provider name for debugging and tests. */
-  readonly name: string
-
-  /**
-   * Attempts to detect and create a concrete VCS adapter for `cwd`.
-   *
-   * @param cwd - Directory to inspect
-   * @returns A concrete adapter when the provider applies, otherwise `null`
-   */
-  detect(cwd: string): Promise<VcsAdapter | null>
-}
-
-/**
- * Named actor-resolution provider.
- */
-export interface ActorProvider {
-  /** Human-readable provider name for debugging and tests. */
-  readonly name: string
-
-  /**
-   * Attempts to detect and create a concrete actor resolver for `cwd`.
-   *
-   * @param cwd - Directory to inspect
-   * @returns A concrete resolver when the provider applies, otherwise `null`
-   */
-  detect(cwd: string): Promise<ActorResolver | null>
-}
+export type { ActorProvider, AutoDetectActorProvider } from './actor-provider.js'
+export type { VcsProvider } from './vcs-provider.js'
+export type { SpecStorageFactory } from './spec-storage-factory.js'
+export type { SchemaStorageFactory } from './schema-storage-factory.js'
+export type { ChangeStorageFactory } from './change-storage-factory.js'
+export type { ArchiveStorageFactory } from './archive-storage-factory.js'
+export type { GraphStoreFactory } from './graph-store-factory.js'
 
 /**
  * Additive registry inputs accepted by the kernel and kernel builder.

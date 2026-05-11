@@ -23,6 +23,6 @@ export class SvnActorResolver implements ActorResolver {
   /** @inheritdoc */
   async identity(): Promise<ActorIdentity> {
     const username = await svn(this._cwd, 'info', '--show-item', 'last-changed-author')
-    return { name: username, email: '' }
+    return { name: username, email: '', provider: 'svn' }
   }
 }

@@ -8,6 +8,7 @@ import { type ArtifactParser } from '../../src/application/ports/artifact-parser
 import { type SpecdConfig } from '../../src/application/specd-config.js'
 import { createKernelBuilder } from '../../src/composition/kernel-builder.js'
 import { createKernel } from '../../src/composition/kernel.js'
+import { NullActorResolver } from '../../src/infrastructure/null/actor-resolver.js'
 
 let tmpDir: string | undefined
 
@@ -91,7 +92,11 @@ describe('createKernelBuilder', () => {
     const remoteChangeFactory = { create: vi.fn() }
     const remoteArchiveFactory = { create: vi.fn() }
     const vcsProvider = { name: 'custom-vcs', detect: vi.fn(async () => null) }
-    const actorProvider = { name: 'custom-actor', detect: vi.fn(async () => null) }
+    const actorProvider = {
+      name: 'custom-actor',
+      create: vi.fn(async () => new NullActorResolver()),
+      detect: vi.fn(async () => null),
+    }
     const trimTransform = vi.fn((value: string) => value.trim())
     const runner = {
       acceptedTypes: ['docker'],
@@ -117,7 +122,11 @@ describe('createKernelBuilder', () => {
     const remoteSpecFactory = { create: vi.fn() }
     const remoteGraphStoreFactory = { create: vi.fn() }
     const vcsProvider = { name: 'custom-vcs', detect: vi.fn(async () => null) }
-    const actorProvider = { name: 'custom-actor', detect: vi.fn(async () => null) }
+    const actorProvider = {
+      name: 'custom-actor',
+      create: vi.fn(async () => new NullActorResolver()),
+      detect: vi.fn(async () => null),
+    }
     const trimTransform = (value: string) => value.trim()
     const runner = {
       acceptedTypes: ['docker'],

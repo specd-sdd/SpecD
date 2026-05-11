@@ -1,0 +1,52 @@
+{
+  "title": "Actor Resolver Hg",
+  "description": "Provides actor identity resolution using the local Mercurial configuration.",
+  "dependsOn": ["core:actor-provider"],
+  "context": ["Provides actor identity resolution using the local Mercurial configuration."],
+  "rules": [
+    {
+      "requirement": "Implementation of AutoDetectActorProvider",
+      "rules": [
+        "The Hg actor provider MUST implement the `AutoDetectActorProvider` interface.\n\n- **`name`**: MUST be `\"hg\"`."
+      ]
+    },
+    {
+      "requirement": "Detection logic",
+      "rules": [
+        "The provider MUST detect Hg presence by looking for a `.hg` directory in the `cwd` or its parents."
+      ]
+    },
+    {
+      "requirement": "Identity resolution",
+      "rules": [
+        "The resulting resolver MUST retrieve identity from Hg config.\n\n- `provider`: MUST be set to `\"hg\"`."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "Implementation of AutoDetectActorProvider",
+      "name": "Interface satisfaction",
+      "given": ["an HgActorProvider instance"],
+      "then": ["it satisfies the AutoDetectActorProvider interface"]
+    },
+    {
+      "requirement": "Detection logic",
+      "name": "Repo detected",
+      "given": ["the directory has a .hg folder"],
+      "when": ["detect() is called"],
+      "then": ["it returns an HgActorResolver"]
+    },
+    {
+      "requirement": "Identity resolution",
+      "name": "Provider field present",
+      "when": ["identity() resolves"],
+      "then": ["the provider field is \"hg\""]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:74b454eb1e0af372fc0f77568a512228fc871d80c5505969b9f125607d2dbee4",
+    "verify.md": "sha256:881173dc3980ada8af2e000656c2dd5b6be8fb4f54d65743b74cf09807c72dfb"
+  },
+  "generatedBy": "core"
+}

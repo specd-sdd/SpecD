@@ -41,18 +41,18 @@ When `startDir` is not inside a git repository, the loader MUST check only the s
 
 When constructed with `{ configPath }`, the loader MUST resolve the path to an absolute path and use it directly. No `specd.local.yaml` lookup SHALL take place. If the file does not exist, `load()` MUST throw `ConfigValidationError`.
 
+### Requirement: Native environment file support
+
+The loader MUST attempt to load environment variables from `.env` and `.env.local` files in the project root using Node.js native `process.loadEnvFile()` (or equivalent).
+
+- `.env.local` SHALL have higher priority than `.env`.
+- Files absence MUST NOT be treated as an error.
+
 ### Requirement: YAML parsing and structural validation
 
-The loader MUST parse the config file as YAML. If the file contains invalid YAML syntax, `load()` MUST throw `ConfigValidationError` with a message describing the parse error.
+The loader MUST parse the config file as YAML. After parsing, the loader MUST validate the resulting object against a Zod schema.
 
-After parsing, the loader MUST validate the resulting object against a Zod schema that enforces the structural shape defined in `specs/core/config/spec.md`. Any structural mismatch — missing required fields, wrong types, unknown adapter values — MUST produce a `ConfigValidationError` with the Zod issue path and message. Validation MUST occur before any path resolution or domain object construction.
-
-The Zod schema MUST additionally enforce:
-
-- `schemaPlugins` is an optional array of strings
-- `schemaOverrides` is an optional object with five optional keys: `create`, `remove`, `set`, `append`, `prepend`
-
-The loader MUST NOT accept `artifactRules` or `workflow` at the top level of `specd.yaml` — these fields have been removed. If either field is present, the loader SHOULD emit a warning suggesting migration to `schemaOverrides`.
+Before validation, the loader MUST merge supported environment variables into the configuration object. Environment variables MUST take precedence over file-based configuration.
 
 ### Requirement: Default workspace is required
 

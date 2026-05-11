@@ -11,7 +11,7 @@ export interface ActorResolver {
   /**
    * Returns the identity of the current actor.
    *
-   * @returns The actor's name and email
+   * @returns The actor's identity, including name, email, and optional metadata
    * @throws When the identity cannot be determined
    */
   identity(): Promise<ActorIdentity>

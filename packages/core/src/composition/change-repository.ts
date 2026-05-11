@@ -1,23 +1,17 @@
+import { type RepositoryConfig } from '../application/ports/repository.js'
 import { type ChangeRepository } from '../application/ports/change-repository.js'
 import { type ArtifactType } from '../domain/value-objects/artifact-type.js'
 import { FsChangeRepository } from '../infrastructure/fs/change-repository.js'
 
+/* eslint-disable @typescript-eslint/no-empty-object-type */
 /**
- * Domain context shared by all `ChangeRepository` adapter types.
+ * Repository configuration for change repositories.
  *
- * These fields belong to the port contract and are independent of the
- * underlying storage technology.
+ * Extends {@link RepositoryConfig} to allow providers to add adapter-specific
+ * fields without coupling to the base type.
  */
-export interface ChangeRepositoryContext {
-  /** The workspace name from `specd.yaml` (e.g. `"default"`, `"billing"`). */
-  readonly workspace: string
-  /** Ownership level of this repository instance. */
-  readonly ownership: 'owned' | 'shared' | 'readOnly'
-  /** Whether this repository points to data outside the current git root. */
-  readonly isExternal: boolean
-  /** Absolute path to the config directory. */
-  readonly configPath: string
-}
+export interface ChangeRepositoryConfig extends RepositoryConfig {}
+/* eslint-enable @typescript-eslint/no-empty-object-type */
 
 /**
  * Filesystem adapter options for `createChangeRepository('fs', ...)`.
@@ -60,7 +54,7 @@ export interface FsChangeRepositoryOptions {
  * concrete class.
  *
  * @param type - Adapter type discriminant; determines which implementation is used
- * @param context - Domain context shared across all adapter types
+ * @param config - Repository configuration shared across all adapter types
  * @param options - Filesystem adapter options
  * @returns A fully constructed `ChangeRepository` bound to the given workspace
  *
@@ -70,16 +64,16 @@ export interface FsChangeRepositoryOptions {
  */
 export function createChangeRepository(
   type: 'fs',
-  context: ChangeRepositoryContext,
+  config: ChangeRepositoryConfig,
   options: FsChangeRepositoryOptions,
 ): ChangeRepository {
   switch (type) {
     case 'fs':
       return new FsChangeRepository({
-        workspace: context.workspace,
-        ownership: context.ownership,
-        isExternal: context.isExternal,
-        configPath: context.configPath,
+        workspace: config.workspace,
+        ownership: config.ownership,
+        isExternal: config.isExternal,
+        configPath: config.configPath,
         changesPath: options.changesPath,
         draftsPath: options.draftsPath,
         discardedPath: options.discardedPath,

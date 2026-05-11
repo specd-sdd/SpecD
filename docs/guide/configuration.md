@@ -67,6 +67,70 @@ logging:
 
 ---
 
+## Environment variables and .env support
+
+SpecD natively supports loading environment variables from `.env` and `.env.local` files in your project root. `.env.local` has higher priority and should be used for secrets that must never be committed (like privacy salts).
+
+The following variables map directly to root-level configuration settings and **override** values in `specd.yaml` or `specd.local.yaml`:
+
+| Variable               | Configuration Field   |
+| ---------------------- | --------------------- |
+| `SPECD_ACTOR_PROVIDER` | `actorProvider`       |
+| `SPECD_PRIVACY_MODE`   | `privacy.mode`        |
+| `SPECD_PRIVACY_SALT`   | `privacy.salt`        |
+| `SPECD_LOG_LEVEL`      | `logging.level`       |
+| `SPECD_CONTEXT_MODE`   | `contextMode`         |
+| `SPECD_LLM_OPTIMIZED`  | `llmOptimizedContext` |
+| `SPECD_SCHEMA`         | `schemaRef`           |
+
+---
+
+## Identity resolution
+
+SpecD automatically identifies the user performing an operation by probing the environment. By default, it prioritizes Version Control Systems (Git, Mercurial, Subversion) to resolve the actor's name and email.
+
+### Manual provider selection
+
+If you need to bypass auto-detection and force a specific identity provider, use the `actorProvider` field:
+
+```yaml
+actorProvider: git # forces git even if other systems are detected
+```
+
+This is useful in environments where multiple systems might be present or when using a custom identity plugin.
+
+---
+
+## Privacy
+
+For projects in public repositories, you might want to avoid exposing real names or emails in change manifests and archives. SpecD provides built-in privacy modes to obfuscate identity data:
+
+```yaml
+privacy:
+  mode: mask # hash | mask | anonymous
+  excludeActors: # optional: skip obfuscation for these actors
+    - 'specd'
+    - 'system@getspecd.dev'
+  allowedMetadataKeys: # optional: preserve specific metadata keys
+    - 'department'
+```
+
+### Privacy modes
+
+| Mode        | Effect                                                                    |
+| ----------- | ------------------------------------------------------------------------- |
+| `hash`      | Obfuscates email using HMAC-SHA256 with a salt. Requires a `salt`.        |
+| `mask`      | Partially masks name and email (e.g., `j***z@e***.com`).                  |
+| `anonymous` | Replaces all identity data with "Anonymous" and `anonymous@getspecd.dev`. |
+
+When using `hash` mode, you **must** provide a salt, preferably via the `SPECD_PRIVACY_SALT` environment variable.
+
+### Metadata privacy
+
+By default, any active privacy mode removes the internal `providerId` and all `metadata` fields to prevent accidental PII leakage. Use `allowedMetadataKeys` to whitelist specific non-sensitive keys you wish to preserve.
+
+---
+
 ## Runtime-owned config root
 
 Beyond `storage`, SpecD also keeps backend-owned runtime files under `configPath`. This root is for project-local operational state rather than workflow artifacts.

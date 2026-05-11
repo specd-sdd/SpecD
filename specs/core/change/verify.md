@@ -208,8 +208,8 @@
 
 - **GIVEN** a change returns to `designing` because verification requires artifact review
 - **WHEN** the invalidation event is appended
-- **THEN** its `cause` is `artifact-review-required`
-- **AND** it is distinct from `artifact-drift`
+- `THEN` its `cause` is `artifact-review-required`
+- `AND` it is distinct from `artifact-drift`
 
 #### Scenario: Description update appends description-updated event
 
@@ -217,7 +217,7 @@
 - **WHEN** `updateDescription("New description", actor)` is called
 - **THEN** a `description-updated` event is appended to history
 - **AND** the event contains `description: "New description"`
-- **AND** the event contains `by` with the actor identity
+- **AND** the event contains `by` with the full `ActorIdentity`
 
 #### Scenario: Description update does not append invalidated event
 

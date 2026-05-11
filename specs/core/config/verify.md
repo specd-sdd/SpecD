@@ -36,6 +36,39 @@
 - **THEN** `--config` still means an explicit config file path override
 - **AND** bootstrap mode is not selected by reinterpreting `--config` as a repository root
 
+### Requirement: Privacy settings
+
+#### Scenario: Mode hash requires salt
+
+- **GIVEN** `privacy.mode` is `hash`
+- **AND** no `salt` is provided in config or environment
+- **WHEN** config is loaded
+- **THEN** validation fails with a `ConfigValidationError`
+
+#### Scenario: excludeActors defaults applied
+
+- **GIVEN** a `privacy` section is present
+- **AND** `excludeActors` is omitted
+- `WHEN` config is loaded
+- `THEN` `excludeActors` contains `["specd", "system@getspecd.dev"]`
+
+### Requirement: Environment variable overrides
+
+#### Scenario: Variable takes precedence over specd.yaml
+
+- **GIVEN** `specd.yaml` defines `privacy.mode: mask`
+- **AND** environment has `SPECD_PRIVACY_MODE=hash`
+- **WHEN** config is loaded
+- **THEN** the effective mode is `hash`
+
+### Requirement: Forced actor provider
+
+#### Scenario: Selection by name
+
+- **GIVEN** `actorProvider: "ldap"` is configured
+- **WHEN** actor resolution is requested
+- **THEN** the system bypasses auto-detection and attempts to use the `ldap` provider
+
 ### Requirement: Local config override
 
 #### Scenario: Local file takes full precedence

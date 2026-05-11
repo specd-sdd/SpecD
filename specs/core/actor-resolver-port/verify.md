@@ -7,8 +7,10 @@
 #### Scenario: Successful identity resolution
 
 - **GIVEN** an identity source with configured name and email
-- **WHEN** `identity()` is called
-- **THEN** the promise MUST resolve to an `ActorIdentity` with non-empty `name` and `email` strings
+- **WHEN** `identity()` resolves
+- **THEN** it returns an object with non-empty `name`
+- **AND** the `email` is non-empty for providers with email sources, or empty for providers without
+- **AND** it MAY include `provider`, `providerId`, and `metadata`
 
 ### Requirement: identity throws when identity is unavailable
 

@@ -1,0 +1,53 @@
+{
+  "title": "Actor Resolver Null",
+  "description": "Fallback identity provider when no other provider is detected or selected.",
+  "dependsOn": ["core:actor-provider"],
+  "context": ["Fallback identity provider when no other provider is detected or selected."],
+  "rules": [
+    {
+      "requirement": "Identity resolution",
+      "rules": [
+        "The resulting resolver MUST reject `identity()` calls with an error indicating that no identity source is available."
+      ]
+    },
+    {
+      "requirement": "NullAutoDetectActorProvider",
+      "rules": [
+        "A `NullAutoDetectActorProvider` MUST be registered in the actor provider registry with `name: \"null\"`. Its `detect()` method MUST always return `null` — there is no environment to detect for the null provider. The `create()` method MUST return a `NullActorResolver`.\n\nThis provider is distinct from the `NullActorResolver` fallback: the resolver is the concrete implementation returned when all detection fails; the provider is the registered factory that produces it."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "Identity resolution",
+      "name": "Rejection",
+      "when": ["identity() is called on a NullActorResolver"],
+      "then": ["it rejects with an error"]
+    },
+    {
+      "requirement": "NullAutoDetectActorProvider",
+      "name": "Provider registered with correct name",
+      "when": ["the actor provider registry is inspected"],
+      "then": ["a provider named \"null\" exists and implements AutoDetectActorProvider"]
+    },
+    {
+      "requirement": "NullAutoDetectActorProvider",
+      "name": "Provider create() returns NullActorResolver",
+      "when": ["create() is called on the null provider"],
+      "then": [
+        "it returns an instance of NullActorResolver (or something satisfying ActorResolver)"
+      ]
+    },
+    {
+      "requirement": "NullAutoDetectActorProvider",
+      "name": "Provider detect() always returns null",
+      "when": ["detect(cwd) is called on the null provider"],
+      "then": ["it returns null for any cwd"]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:86010337927407b7eb43434d71aa741613c98877bd30c43430c3cada360740ec",
+    "verify.md": "sha256:1249888dab7d77df618d1ee4f093c4e7fd5f33800f3b90164002bbc2496e96d2"
+  },
+  "generatedBy": "core"
+}

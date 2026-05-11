@@ -8,7 +8,12 @@ specd needs to identify the current user (for approvals, sign-offs, and audit tr
 
 ### Requirement: Detection probes in priority order
 
-`createVcsActorResolver` MUST probe for VCS presence in the following order: git, hg, svn. The first probe that succeeds determines the returned resolver. Subsequent probes MUST NOT execute once a match is found.
+`createVcsActorResolver` MUST determine the provider to use based on the following precedence:
+
+1. **Forced Provider**: If `actorProvider` is configured, the factory MUST attempt to load that specific provider by name. If not found, it SHALL throw. If found, it MUST call `create()` on that provider, bypassing all other probes.
+2. **Auto-Detection**: If no forced provider is set, the factory MUST iterate through all registered `AutoDetectActorProvider` instances (e.g. git, hg, svn) in priority order and call `detect()`.
+
+The first successful provider (manual or auto) determines the base resolver.
 
 ### Requirement: External providers run before built-in probes
 
@@ -28,6 +33,21 @@ When no VCS is detected (all probes fail), `createVcsActorResolver` MUST return 
 
 `createVcsActorResolver` MUST return a `Promise<ActorResolver>` — the application port interface defined in `application/ports/actor-resolver.ts`. The concrete resolver type is an implementation detail not exposed to callers.
 
+### Requirement: Privacy wrapping
+
+Privacy wrapping is NOT the responsibility of `createVcsActorResolver`. The factory returns the raw base resolver (VCS-detected or custom). Privacy wrapping is applied at the **kernel composition level**, where `config.privacy` is available.
+
+The kernel wires the actor resolver as:
+
+```typescript
+const baseActor = await resolveActorResolver(...)
+i.actor = config.privacy
+  ? new PrivacyActorResolver(baseActor, config.privacy)
+  : baseActor
+```
+
+This approach ensures privacy is applied uniformly to ALL actor sources — VCS-backed (git, hg, svn), custom providers registered via the registry, and the null fallback — without coupling `createVcsActorResolver` to the privacy config shape.
+
 ## Constraints
 
 - The factory is async — VCS detection requires spawning external processes
@@ -36,6 +56,6 @@ When no VCS is detected (all probes fail), `createVcsActorResolver` MUST return 
 
 ## Spec Dependencies
 
-- [`core:vcs-adapter`](../vcs-adapter/spec.md)
-- [`core:composition`](../composition/spec.md)
-- [`default:_global/architecture`](../../_global/architecture/spec.md)
+- [core:actor-provider](../actor-provider/spec.md) -- factory interfaces
+- [core:actor-resolver-privacy](../actor-resolver-privacy/spec.md) -- privacy decorator
+- [core:composition](../composition/spec.md) -- kernel wiring of privacy decorator

@@ -203,6 +203,30 @@ The archive operation is in progress or has completed. This is the terminal stat
 
 ---
 
+## Identity and audit trails
+
+specd records the identity of the person or system performing every significant operation — creating a change, transitioning states, approving specs, and signing off on completed work. These records create a tamper-evident audit trail persisted in the change manifest and history.
+
+### How identity is resolved
+
+SpecD uses a pluggable identity resolution system. By default, it auto-detects the active Version Control System (Git, Mercurial, or Subversion) and retrieves the user's name and email from its configuration.
+
+In specific environments, you can force a provider or use custom identity plugins. See the [Configuration Guide](configuration.md#identity-resolution) for details.
+
+### Privacy in public repositories
+
+For projects hosted in public repositories, you can enable **privacy modes** to obfuscate real names and emails before they are persisted in the repository.
+
+Supported modes include:
+
+- **Hashing**: deterministic HMAC-SHA256 obfuscation of emails.
+- **Masking**: partial obfuscation (e.g., `j***z@e***.com`).
+- **Anonymization**: replacement with generic placeholders.
+
+Privacy settings also automatically filter out sensitive metadata. For more details on configuring privacy, see the [Privacy section](configuration.md#privacy) in the Configuration Guide.
+
+---
+
 ## Redesign: going back to designing
 
 Almost every state can transition back to `designing`. This is the **redesign path** — it is how you handle requirement changes, new information, or mistakes discovered mid-lifecycle.

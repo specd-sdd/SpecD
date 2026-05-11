@@ -1,22 +1,16 @@
+import { type RepositoryConfig } from '../application/ports/repository.js'
 import { type SchemaRepository } from '../application/ports/schema-repository.js'
 import { FsSchemaRepository } from '../infrastructure/fs/schema-repository.js'
 
+/* eslint-disable @typescript-eslint/no-empty-object-type */
 /**
- * Domain context shared by all `SchemaRepository` adapter types.
+ * Repository configuration for schema repositories.
  *
- * These fields belong to the port contract and are independent of the
- * underlying storage technology.
+ * Extends {@link RepositoryConfig} to allow providers to add adapter-specific
+ * fields without coupling to the base type.
  */
-export interface SchemaRepositoryContext {
-  /** The workspace name from `specd.yaml` (e.g. `"default"`, `"billing"`). */
-  readonly workspace: string
-  /** Ownership level of this repository instance. */
-  readonly ownership: 'owned' | 'shared' | 'readOnly'
-  /** Whether this repository points to data outside the current git root. */
-  readonly isExternal: boolean
-  /** Absolute path to the config directory. */
-  readonly configPath: string
-}
+export interface SchemaRepositoryConfig extends RepositoryConfig {}
+/* eslint-enable @typescript-eslint/no-empty-object-type */
 
 /**
  * Filesystem adapter options for `createSchemaRepository('fs', ...)`.
@@ -33,22 +27,22 @@ export interface FsSchemaRepositoryOptions {
  * concrete class.
  *
  * @param type - Adapter type discriminant; determines which implementation is used
- * @param context - Domain context shared across all adapter types
+ * @param config - Repository configuration shared across all adapter types
  * @param options - Filesystem adapter options
  * @returns A fully constructed `SchemaRepository` bound to the given workspace
  */
 export function createSchemaRepository(
   type: 'fs',
-  context: SchemaRepositoryContext,
+  config: SchemaRepositoryConfig,
   options: FsSchemaRepositoryOptions,
 ): SchemaRepository {
   switch (type) {
     case 'fs':
       return new FsSchemaRepository({
-        workspace: context.workspace,
-        ownership: context.ownership,
-        isExternal: context.isExternal,
-        configPath: context.configPath,
+        workspace: config.workspace,
+        ownership: config.ownership,
+        isExternal: config.isExternal,
+        configPath: config.configPath,
         schemasPath: options.schemasPath,
       })
   }
