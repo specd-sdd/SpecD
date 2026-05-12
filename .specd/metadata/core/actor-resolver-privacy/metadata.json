@@ -21,7 +21,7 @@
     {
       "requirement": "Masking strategy",
       "rules": [
-        "In `mask` mode, the decorator MUST apply the following rules:\n\n- **Name**: Keep first character, mask the rest (e.g. `J***n`).\n- **Email Local Part**: Keep first and last characters, replace middle with `***`. If 2 chars or fewer, mask entire part.\n- **Email Domain Part**: Keep first character and full extension (e.g. `e***.com`)."
+        "In `mask` mode, the decorator MUST apply the following rules:\n\n- **Name**: Keep first character, mask the rest (e.g. `J***n`). If only 1 character, mask entirely to `***`.\n- **Email Local Part**: Keep first and last characters, replace middle with `***`. If 1 character, repeat it on both sides (e.g. `j***j`). If 2 characters or fewer, mask entire part.\n- **Email Domain Part**: Keep first character and TLD (e.g. `e***.com`). Subdomains beyond the root domain are discarded."
       ]
     },
     {
@@ -57,10 +57,20 @@
       "name": "Masking applied to email and name",
       "given": [
         "privacy.mode is mask",
-        "AND real identity is { name: \"John Doe\", email: \"john@example.com\" }"
+        "AND real identity is { name: \"John Doe\", email: \"jhon@subdomain.example.com\" }"
       ],
       "when": ["identity() is called"],
-      "then": ["it returns { name: \"J***n\", email: \"j***n@e***.com\" }"]
+      "then": ["it returns { name: \"J***e\", email: \"j***n@s***.com\" }"]
+    },
+    {
+      "requirement": "Masking strategy",
+      "name": "Single-char local part repeats itself",
+      "given": [
+        "privacy.mode is mask",
+        "AND real identity is { name: \"John\", email: \"j@example.com\" }"
+      ],
+      "when": ["identity() is called"],
+      "then": ["it returns { name: \"J***n\", email: \"j***j@e***.com\" }"]
     },
     {
       "requirement": "Metadata privacy",
@@ -85,8 +95,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:5ca5694df5dee5c14907a4160141c8b7107397d685f7968e1f05d20caf7184ab",
-    "verify.md": "sha256:7575d35927d88acd47aea10292564da4f01f70fccdc04b218657fcd600a0aca9"
+    "spec.md": "sha256:e5299306eb7606261450683ba28637d03be7ac55dba86d3455da0b3e5caf9c96",
+    "verify.md": "sha256:d1dfb11cf8fd659665ea22e791adee2f594bb1b56b0e346f2b1ae7a004b3bf79"
   },
   "generatedBy": "core"
 }

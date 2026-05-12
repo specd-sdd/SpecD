@@ -52,6 +52,16 @@ When a change is not in `archivable` state and `options.force` is not `true`, `a
 
 `get(name)` MUST accept a change name string and return the `ArchivedChange` with that name, or `null` if not found. The implementation MUST search `index.jsonl` from the end (most recent entries first) for efficient lookup. If the entry is not found in the index, the implementation MUST fall back to a filesystem scan (e.g. glob `**/*-<name>`) and append the recovered entry to `index.jsonl` for future lookups.
 
+### Requirement: fs implementation maintains archive runtime ignore rules
+
+When the filesystem implementation creates or maintains runtime archive artifacts, it MUST also maintain archive-local ignore rules for those artifacts.
+
+`FsArchiveRepository` MUST ensure that the archive root `.gitignore` contains entries for `.specd-index.jsonl` and `.staging`.
+
+This guarantee MUST be provided by runtime archive behavior, not only by project initialization.
+
+The guarantee MUST cover archive creation, `reindex()`, and runtime index recovery or append paths that recreate or maintain `.specd-index.jsonl`.
+
 ### Requirement: archivePath returns the absolute path for an archived change
 
 `archivePath(archivedChange)` MUST accept an `ArchivedChange` and return the absolute filesystem path to its archived directory. This mirrors `ChangeRepository.changePath(change)` for active changes. The path MUST be resolved from the archive pattern and root directory configured at construction time — the caller does not need to know the archive directory structure.

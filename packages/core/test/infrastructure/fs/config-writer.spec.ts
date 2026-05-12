@@ -69,6 +69,12 @@ describe('FsConfigWriter', () => {
       expect(gitignore).toContain('specd.local.yaml')
     })
 
+    it('does not create archive-local .gitignore during init', async () => {
+      await writer.initProject(defaultOptions())
+
+      await expect(fs.stat(path.join(tmpDir, '.specd', 'archive', '.gitignore'))).rejects.toThrow()
+    })
+
     it('throws AlreadyInitialisedError when config exists and force is not set', async () => {
       await writer.initProject(defaultOptions())
 

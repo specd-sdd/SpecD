@@ -51,4 +51,3 @@
 
 - **WHEN** `execute` completes successfully
 - **THEN** `specd.local.yaml` is listed in the project's `.gitignore`
-- **AND** a `.gitignore` inside the archive directory excludes `.specd-index.jsonl`

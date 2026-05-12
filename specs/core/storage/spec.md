@@ -45,6 +45,16 @@ The `fs` archive adapter must support a configurable `pattern` field in `specd.y
 
 `FsArchiveRepository` must maintain an `index.jsonl` at the archive root. Each line must be a JSON object with `name` and `path` fields. The file must be kept in chronological order (oldest first, newest last) so that git diffs only show lines added at the bottom or lines removed — never reorderings. `archive(change)` must append one line at the end (O(1)). `get(name)` must scan the file from the end without loading it fully into memory; if not found, it must fall back to a recursive glob `**/*-<name>` and append the recovered entry. `reindex()` must be declared on the `ArchiveRepository` port. The `fs` adapter implements it by globbing all `manifest.json` files under the archive root, sorting entries by `archivedAt`, and writing a clean `index.jsonl` in chronological order. Other adapters implement it according to their storage mechanism. `specd storage reindex` calls the port method — it has no knowledge of the underlying implementation.
 
+### Requirement: Archive runtime ignore hygiene
+
+Fs-backed archive storage MUST maintain an archive-local `.gitignore` for runtime archive artifacts.
+
+`FsArchiveRepository` MUST ensure that the archive root ignores both `.specd-index.jsonl` and `.staging`.
+
+This guarantee MUST be exercised by runtime archive behavior rather than relying on project bootstrap state alone, so archive ignore hygiene remains correct after archive directory relocation, recreation, or index recovery.
+
+`FsArchiveRepository` MAY centralize this behavior in a shared internal archive-directory preparation helper, but the runtime guarantee MUST cover archive creation, index rebuild, and runtime index recovery or append paths.
+
 ### Requirement: Named storage factories
 
 Kernel composition SHALL support named storage factories for repository-backed capabilities. A storage factory SHALL be selected by adapter name and SHALL be responsible for creating the repository implementation needed for that storage mode.

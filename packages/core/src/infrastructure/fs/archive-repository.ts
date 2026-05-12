@@ -19,6 +19,8 @@ import { type ChangeManifest, changeManifestSchema } from './manifest.js'
 
 /** Filename of the append-only archive index at the archive root. */
 const INDEX_FILE = '.specd-index.jsonl'
+const ARCHIVE_GITIGNORE_FILE = '.gitignore'
+const ARCHIVE_RUNTIME_GITIGNORE_ENTRIES = ['.specd-index.jsonl', '.staging'] as const
 
 /** Default archive pattern when none is configured. */
 const DEFAULT_PATTERN = '{{change.archivedName}}'
@@ -188,6 +190,7 @@ export class FsArchiveRepository extends ArchiveRepository {
 
       await fs.mkdir(path.dirname(archiveDir), { recursive: true })
       await moveDir(stageDir, archiveDir)
+      await this._ensureArchiveRuntimeGitignore()
       await this._appendIndex(this._buildIndexEntry(archivedManifest, relPath))
 
       Logger.debug('FsArchiveRepository completed staged archive commit', {
@@ -308,6 +311,7 @@ export class FsArchiveRepository extends ArchiveRepository {
     const lines = entries.map((e) => JSON.stringify(this._buildIndexEntry(e.manifest, e.relPath)))
     const indexPath = path.join(this._archivePath, INDEX_FILE)
     const content = lines.length > 0 ? lines.join('\n') + '\n' : ''
+    await this._ensureArchiveRuntimeGitignore()
     await fs.mkdir(this._archivePath, { recursive: true })
     await writeFileAtomic(indexPath, content)
   }
@@ -560,9 +564,46 @@ export class FsArchiveRepository extends ArchiveRepository {
    * @param entry - The index entry to append
    */
   private async _appendIndex(entry: IndexEntry): Promise<void> {
+    await this._ensureArchiveRuntimeGitignore()
     const indexPath = path.join(this._archivePath, INDEX_FILE)
     await fs.mkdir(this._archivePath, { recursive: true })
     await fs.appendFile(indexPath, JSON.stringify(entry) + '\n', 'utf8')
+  }
+
+  /**
+   * Ensures archive-local runtime artifacts are ignored by git.
+   *
+   * @returns A promise that resolves once `.gitignore` contains runtime entries
+   */
+  private async _ensureArchiveRuntimeGitignore(): Promise<void> {
+    const gitignorePath = path.join(this._archivePath, ARCHIVE_GITIGNORE_FILE)
+    await fs.mkdir(this._archivePath, { recursive: true })
+    for (const entry of ARCHIVE_RUNTIME_GITIGNORE_ENTRIES) {
+      await this._appendArchiveGitignoreEntry(gitignorePath, entry)
+    }
+  }
+
+  /**
+   * Appends a gitignore entry exactly once while preserving existing content.
+   *
+   * @param gitignorePath - Absolute path to the archive-local `.gitignore`
+   * @param entry - The ignore entry to ensure
+   * @returns A promise that resolves after entry synchronization
+   */
+  private async _appendArchiveGitignoreEntry(gitignorePath: string, entry: string): Promise<void> {
+    let existing = ''
+    try {
+      existing = await fs.readFile(gitignorePath, 'utf8')
+    } catch (err) {
+      if (!isEnoent(err)) throw err
+    }
+    const lines = existing
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0)
+    if (lines.includes(entry)) return
+    const newContent = existing.length > 0 ? `${existing}${entry}\n` : `${entry}\n`
+    await writeFileAtomic(gitignorePath, newContent)
   }
 
   /**

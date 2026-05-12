@@ -115,6 +115,26 @@
 - **WHEN** `get("nonexistent")` is called and no matching change exists anywhere
 - **THEN** `null` is returned
 
+### Requirement: fs implementation maintains archive runtime ignore rules
+
+#### Scenario: Archive creation ensures runtime ignore rules
+
+- **GIVEN** the archive root `.gitignore` is missing or incomplete
+- **WHEN** `FsArchiveRepository.archive(change)` commits a successful archive
+- **THEN** the archive root `.gitignore` contains entries for `.specd-index.jsonl` and `.staging`
+
+#### Scenario: Runtime index recovery restores ignore rules
+
+- **GIVEN** runtime lookup recovers or appends an archive index entry
+- **WHEN** `FsArchiveRepository` maintains `.specd-index.jsonl` through recovery or append behavior
+- **THEN** the archive root `.gitignore` contains entries for `.specd-index.jsonl` and `.staging`
+
+#### Scenario: Reindex restores ignore rules
+
+- **GIVEN** the archive root `.gitignore` is missing or incomplete
+- **WHEN** `FsArchiveRepository.reindex()` rebuilds the archive index
+- **THEN** the archive root `.gitignore` contains entries for `.specd-index.jsonl` and `.staging`
+
 ### Requirement: archivePath returns the absolute path for an archived change
 
 #### Scenario: Path resolved from archive pattern

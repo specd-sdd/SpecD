@@ -136,6 +136,20 @@
 - **WHEN** `specd storage reindex` is run after manual filesystem changes
 - **THEN** `index.jsonl` is rewritten in chronological order based on each manifest's `archivedAt`
 
+### Requirement: Archive runtime ignore hygiene
+
+#### Scenario: Runtime archive behavior recreates ignore file when missing
+
+- **GIVEN** the archive root exists without an archive-local `.gitignore`
+- **WHEN** `FsArchiveRepository` recreates or rebuilds `.specd-index.jsonl`
+- **THEN** the archive root `.gitignore` is created or updated
+- **AND** it contains entries for `.specd-index.jsonl` and `.staging`
+
+#### Scenario: Shared helper coverage includes all runtime index-maintenance paths
+
+- **WHEN** archive creation, `reindex()`, or runtime index recovery or append behavior maintains the archive index
+- **THEN** each path preserves the archive-local ignore entries for `.specd-index.jsonl` and `.staging`
+
 ### Requirement: Named storage factories
 
 #### Scenario: Repository capability selects a factory by adapter name

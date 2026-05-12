@@ -33,7 +33,7 @@
     {
       "requirement": "Side effects performed by the port",
       "rules": [
-        "The `ConfigWriter.initProject` implementation MUST:\n\n- Write `specd.yaml` with the provided schema reference, workspace, and specs path.\n- Create standard storage directories (`changes/`, `drafts/`, `discarded/`, `archive/`).\n- Append `specd.local.yaml` to `.gitignore`.\n- Create a `.gitignore` inside the archive directory to exclude `.specd-index.jsonl`."
+        "The `ConfigWriter.initProject` implementation MUST:\n\n- Write `specd.yaml` with the provided schema reference, workspace, and specs path.\n- Create standard storage directories (`changes/`, `drafts/`, `discarded/`, `archive/`).\n- Append `specd.local.yaml` to `.gitignore`."
       ]
     }
   ],
@@ -94,15 +94,12 @@
       "requirement": "Side effects performed by the port",
       "name": "Gitignore entries added",
       "when": ["execute completes successfully"],
-      "then": [
-        "specd.local.yaml is listed in the project's .gitignore",
-        "AND a .gitignore inside the archive directory excludes .specd-index.jsonl"
-      ]
+      "then": ["specd.local.yaml is listed in the project's .gitignore"]
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:c579874b868212051fcd6977b8f6242a26442227152114ec204217d9391c9b26",
-    "verify.md": "sha256:d9597a9d6fbb5ee9c7162e60d978c85ed9c1e213a61f1c859cc1cd5003c05248"
+    "spec.md": "sha256:499583bfd4d1205e78322ee42a694d2fcb5685249f8a5b5554659f536d77d350",
+    "verify.md": "sha256:3e4ddf7acb2bb3c7c17ac231f4ce373c0296e19e9c805c3974dba2d250e9e770"
   },
   "generatedBy": "core"
 }

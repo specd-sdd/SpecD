@@ -61,6 +61,14 @@ async function cleanupRepo(ctx: RepoContext): Promise<void> {
   await fs.rm(ctx.tmpDir, { recursive: true, force: true })
 }
 
+async function readArchiveGitignoreEntries(archivePath: string): Promise<string[]> {
+  const content = await fs.readFile(path.join(archivePath, '.gitignore'), 'utf8')
+  return content
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+}
+
 /**
  * Creates a `Change` in `archivable` state and saves it via `FsChangeRepository`.
  *
@@ -188,6 +196,16 @@ describe('FsArchiveRepository', () => {
       const entry = JSON.parse(lines[0]!) as Record<string, unknown>
       expect(entry['name']).toBe('add-auth')
       expect(typeof entry['path']).toBe('string')
+    })
+
+    it('ensures archive runtime ignore entries after archive()', async () => {
+      const change = await makeArchivableChange(ctx, 'add-auth')
+
+      await ctx.archive.archive(change)
+
+      const entries = await readArchiveGitignoreEntries(ctx.archivePath)
+      expect(entries).toContain('.specd-index.jsonl')
+      expect(entries).toContain('.staging')
     })
 
     it('throws InvalidStateTransitionError when change is not archivable', async () => {
@@ -460,6 +478,31 @@ describe('FsArchiveRepository', () => {
       const entry = JSON.parse(indexContent.trim()) as Record<string, unknown>
       expect(entry['name']).toBe('recovered')
     })
+
+    it('ensures archive runtime ignore entries during recovery append path', async () => {
+      const change = await makeArchivableChange(ctx, 'recovered-ignore')
+      const archivedName = changeDirName('recovered-ignore', change.createdAt)
+      const archiveDir = path.join(ctx.archivePath, archivedName)
+
+      const sourceDir = path.join(ctx.changesPath, (await fs.readdir(ctx.changesPath))[0]!)
+      await fs.rename(sourceDir, archiveDir)
+
+      const manifestPath = path.join(archiveDir, 'manifest.json')
+      const manifest = JSON.parse(await fs.readFile(manifestPath, 'utf8')) as Record<
+        string,
+        unknown
+      >
+      manifest['archivedAt'] = new Date().toISOString()
+      await fs.writeFile(manifestPath, JSON.stringify(manifest), 'utf8')
+
+      await fs.writeFile(path.join(ctx.archivePath, '.gitignore'), '.staging\n', 'utf8')
+      await ctx.archive.get('recovered-ignore')
+
+      const entries = await readArchiveGitignoreEntries(ctx.archivePath)
+      expect(entries).toContain('.specd-index.jsonl')
+      expect(entries).toContain('.staging')
+      expect(entries.filter((entry) => entry === '.staging')).toHaveLength(1)
+    })
   })
 
   // ---- reindex ----
@@ -519,6 +562,16 @@ describe('FsArchiveRepository', () => {
       // After reindex, order is by archivedAt — older was archived first so it comes first
       expect(lines[0]!['name']).toBe('older')
       expect(lines[1]!['name']).toBe('newer')
+    })
+
+    it('ensures archive runtime ignore entries during reindex()', async () => {
+      await fs.writeFile(path.join(ctx.archivePath, '.gitignore'), '.specd-index.jsonl\n', 'utf8')
+
+      await ctx.archive.reindex()
+
+      const entries = await readArchiveGitignoreEntries(ctx.archivePath)
+      expect(entries).toContain('.specd-index.jsonl')
+      expect(entries).toContain('.staging')
     })
   })
 })

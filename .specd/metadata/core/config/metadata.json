@@ -1086,7 +1086,7 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:3c6ed9dd1d1d0009e70a49170a8fdc29f1f33bb84f2e8cd94211deb218c695b5",
+    "spec.md": "sha256:b6dfc1faa9104b3f09c65de3bb70524c8a63671b3f37f13729226f7339ec8363",
     "verify.md": "sha256:c017871d61b1ad0044fd6904cd619615ca8269c08c0793f258776050cc685755"
   },
   "generatedBy": "core"

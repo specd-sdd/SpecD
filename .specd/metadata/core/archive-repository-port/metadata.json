@@ -62,6 +62,12 @@
       ]
     },
     {
+      "requirement": "fs implementation maintains archive runtime ignore rules",
+      "rules": [
+        "When the filesystem implementation creates or maintains runtime archive artifacts, it MUST also maintain archive-local ignore rules for those artifacts.\n\n`FsArchiveRepository` MUST ensure that the archive root `.gitignore` contains entries for `.specd-index.jsonl` and `.staging`.\n\nThis guarantee MUST be provided by runtime archive behavior, not only by project initialization.\n\nThe guarantee MUST cover archive creation, `reindex()`, and runtime index recovery or append paths that recreate or maintain `.specd-index.jsonl`."
+      ]
+    },
+    {
       "requirement": "archivePath returns the absolute path for an archived change",
       "rules": [
         "`archivePath(archivedChange)` MUST accept an `ArchivedChange` and return the absolute filesystem path to its archived directory. This mirrors `ChangeRepository.changePath(change)` for active changes. The path MUST be resolved from the archive pattern and root directory configured at construction time — the caller does not need to know the archive directory structure.\n\nThis method is used by `RunStepHooks` and `GetHookInstructions` to build the `change.path` template variable when operating on archived changes."
@@ -238,6 +244,29 @@
       "then": ["null is returned"]
     },
     {
+      "requirement": "fs implementation maintains archive runtime ignore rules",
+      "name": "Archive creation ensures runtime ignore rules",
+      "given": ["the archive root .gitignore is missing or incomplete"],
+      "when": ["FsArchiveRepository.archive(change) commits a successful archive"],
+      "then": ["the archive root .gitignore contains entries for .specd-index.jsonl and .staging"]
+    },
+    {
+      "requirement": "fs implementation maintains archive runtime ignore rules",
+      "name": "Runtime index recovery restores ignore rules",
+      "given": ["runtime lookup recovers or appends an archive index entry"],
+      "when": [
+        "FsArchiveRepository maintains .specd-index.jsonl through recovery or append behavior"
+      ],
+      "then": ["the archive root .gitignore contains entries for .specd-index.jsonl and .staging"]
+    },
+    {
+      "requirement": "fs implementation maintains archive runtime ignore rules",
+      "name": "Reindex restores ignore rules",
+      "given": ["the archive root .gitignore is missing or incomplete"],
+      "when": ["FsArchiveRepository.reindex() rebuilds the archive index"],
+      "then": ["the archive root .gitignore contains entries for .specd-index.jsonl and .staging"]
+    },
+    {
       "requirement": "archivePath returns the absolute path for an archived change",
       "name": "Path resolved from archive pattern",
       "given": [
@@ -290,8 +319,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:9ff2e8c500e197aafbf171132edca53a9a89dd29422d3c68fde8ad1d9b5169eb",
-    "verify.md": "sha256:488a27a975553b19b4105827c09a9047c92eecc1ac2105f5d7bb05029e2d9b08"
+    "spec.md": "sha256:6dac87da6f0101211693a3cb46b3aa011ae07819f9081dcaae85581edc01cb84",
+    "verify.md": "sha256:0659cc138cdf61aa961a16c35c34f7c1e56599dcf1655426acc095c038f06f46"
   },
   "generatedBy": "core"
 }

@@ -60,6 +60,12 @@
       ]
     },
     {
+      "requirement": "Archive runtime ignore hygiene",
+      "rules": [
+        "Fs-backed archive storage MUST maintain an archive-local `.gitignore` for runtime archive artifacts.\n\n`FsArchiveRepository` MUST ensure that the archive root ignores both `.specd-index.jsonl` and `.staging`.\n\nThis guarantee MUST be exercised by runtime archive behavior rather than relying on project bootstrap state alone, so archive ignore hygiene remains correct after archive directory relocation, recreation, or index recovery.\n\n`FsArchiveRepository` MAY centralize this behavior in a shared internal archive-directory preparation helper, but the runtime guarantee MUST cover archive creation, index rebuild, and runtime index recovery or append paths."
+      ]
+    },
+    {
       "requirement": "Named storage factories",
       "rules": [
         "Kernel composition SHALL support named storage factories for repository-backed capabilities. A storage factory SHALL be selected by adapter name and SHALL be responsible for creating the repository implementation needed for that storage mode.\n\nWhen storage selection requires workspace-specific VCS or null-VCS handling, that responsibility SHALL remain within the selected storage factory rather than leaking into unrelated composition paths."
@@ -265,6 +271,26 @@
       ]
     },
     {
+      "requirement": "Archive runtime ignore hygiene",
+      "name": "Runtime archive behavior recreates ignore file when missing",
+      "given": ["the archive root exists without an archive-local .gitignore"],
+      "when": ["FsArchiveRepository recreates or rebuilds .specd-index.jsonl"],
+      "then": [
+        "the archive root .gitignore is created or updated",
+        "AND it contains entries for .specd-index.jsonl and .staging"
+      ]
+    },
+    {
+      "requirement": "Archive runtime ignore hygiene",
+      "name": "Shared helper coverage includes all runtime index-maintenance paths",
+      "when": [
+        "archive creation, reindex(), or runtime index recovery or append behavior maintains the archive index"
+      ],
+      "then": [
+        "each path preserves the archive-local ignore entries for .specd-index.jsonl and .staging"
+      ]
+    },
+    {
       "requirement": "Named storage factories",
       "name": "Repository capability selects a factory by adapter name",
       "given": ["registered storage factories for fs and git"],
@@ -374,8 +400,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:5782bc8ba5af26f7edc1a713b79b6fba5b863b70ae8ef2e3072b55ba9415f7fd",
-    "verify.md": "sha256:adeced1c264f947e6f2900eeec114fa71d8427b26727563bf8a3273d51ee60f2"
+    "spec.md": "sha256:b8ea05b48223ef8336b9cea4569927f1025fb922838b49fb3d834ca068fb4eee",
+    "verify.md": "sha256:5bcc1fcf64ec36ca5dbaa222645fe644c0a57b3d158e74020c3797c6658678e3"
   },
   "generatedBy": "core"
 }
