@@ -1,0 +1,303 @@
+{
+  "name": "fix-markdown-archive-merge-formatting",
+  "createdAt": "2026-03-17T20:58:21.857Z",
+  "description": "Fix markdown delta merge so archive preserves inline formatting and list markers",
+  "archivedAt": "2026-03-17T21:29:00.183Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "m***a@g***.com"
+  },
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "core:core/archive-change",
+    "core:core/artifact-parser-port",
+    "core:core/artifact-ast",
+    "core:core/delta-format"
+  ],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "validatedHash": "sha256:84a7eaa33c65028e973bd39f625511b9bfeacd6ad605f40f35fe8c9f26a5400a"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "files": [
+        {
+          "key": "core:core/archive-change",
+          "filename": "deltas/core/core/archive-change/spec.md.delta.yaml",
+          "validatedHash": "sha256:d352a1e516fdbea5f9a94a91fcb5b2214cd2d3831ebe3ee90cadf6667a793a80"
+        },
+        {
+          "key": "core:core/artifact-parser-port",
+          "filename": "deltas/core/core/artifact-parser-port/spec.md.delta.yaml",
+          "validatedHash": "sha256:f11e4024638e82765f51973cff239328a7c9e81fd9f56ca9ecf3cea0a774ddc7"
+        },
+        {
+          "key": "core:core/artifact-ast",
+          "filename": "deltas/core/core/artifact-ast/spec.md.delta.yaml",
+          "validatedHash": "sha256:6a36a5ef7853027721dd9e652ffb48118f42d17d438b9a6a50a24d6a58ed0925"
+        },
+        {
+          "key": "core:core/delta-format",
+          "filename": "deltas/core/core/delta-format/spec.md.delta.yaml",
+          "validatedHash": "sha256:bb3d98c29a927ef72bea23fa4bd1f60c9b8b1878f661116f70b3525c60852b46"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "files": [
+        {
+          "key": "core:core/archive-change",
+          "filename": "deltas/core/core/archive-change/verify.md.delta.yaml",
+          "validatedHash": "sha256:81f33cd00219d1d75613ad70489af7b85bf69fdbcdb6bfdc7030360d0744540d"
+        },
+        {
+          "key": "core:core/artifact-parser-port",
+          "filename": "deltas/core/core/artifact-parser-port/verify.md.delta.yaml",
+          "validatedHash": "sha256:96f59ea7c2cb16aa205a12c3c54323164ac6c404ff54c811ef011fa5555f38a4"
+        },
+        {
+          "key": "core:core/artifact-ast",
+          "filename": "deltas/core/core/artifact-ast/verify.md.delta.yaml",
+          "validatedHash": "sha256:ea5de3c65dc774ca60b9f2ef9c18f3428c52682c0fa04d8d015e914c853ac652"
+        },
+        {
+          "key": "core:core/delta-format",
+          "filename": "deltas/core/core/delta-format/verify.md.delta.yaml",
+          "validatedHash": "sha256:90364eed4d4d915101b7c35f8f452646e9ab2ae7d374fea7006e45c44791eb0f"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal"],
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "validatedHash": "sha256:6d9e73c0178e387036a0f8178387709493ab0f2ffb1d3de0b65c20860e190e09"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "validatedHash": "sha256:5c5a5a8f9953f654874f1974b60c9aae259a40d48f753b8744c54aa0c929bb72"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-03-17T20:58:21.857Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "specIds": ["core:core/archive-change", "core:core/artifact-parser-port"],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-03-17T20:58:21.867Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/archive-change"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/artifact-parser-port"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/archive-change"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/artifact-parser-port"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-17T20:58:27.108Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-03-17T21:06:33.122Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change"
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-03-17T21:06:33.122Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:core/artifact-ast"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/delta-format"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/artifact-ast"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/delta-format"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-17T21:15:28.227Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-17T21:16:38.915Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-03-17T21:20:47.077Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-change"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-17T21:20:47.077Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-17T21:22:34.427Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-17T21:22:34.711Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-17T21:22:34.989Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-17T21:22:48.481Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-17T21:22:49.081Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "done",
+      "to": "archivable"
+    }
+  ]
+}

@@ -1,0 +1,42 @@
+- op: modified
+  description: 'Add a force flag to the DraftChange input contract'
+  selector:
+    type: section
+    matches: 'Requirement: Input contract'
+  content: |
+    `DraftChange.execute` SHALL accept a `DraftChangeInput` with the following fields:
+
+    - `name` (string, required) — the change to shelve
+    - `reason` (string, optional) — explanation for shelving the change
+    - `force` (boolean, optional) — explicit override for the historical implementation guard
+
+- op: added
+  description: 'Require DraftChange to reject historically implemented changes unless forced'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Actor resolution'
+  content: |
+    ### Requirement: Historical implementation guard
+
+    `DraftChange` SHALL respect the `Change` entity's historical implementation guard.
+
+    If the loaded change has ever reached `implementing`, `DraftChange.execute` SHALL fail by default instead of shelving it, because implementation may already exist and moving the change to `drafts/` would risk leaving permanent specs and code out of sync.
+
+    The use case MAY proceed only when `input.force === true`, in which case the guard is bypassed intentionally.
+
+- op: modified
+  description: 'Pass the force flag through when appending the drafted event'
+  selector:
+    type: section
+    matches: 'Requirement: Drafted event appended to history'
+  content: |
+    The use case MUST call `change.draft(actor, reason, force)` to append a `drafted` event to the change's history after the historical implementation guard has been satisfied or explicitly bypassed. The event records:
+
+    - `type`: `'drafted'`
+    - `at`: the current timestamp
+    - `by`: the resolved actor identity
+    - `reason`: included only when provided in the input

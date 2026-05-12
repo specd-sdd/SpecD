@@ -1,0 +1,24 @@
+- op: modified
+  description: 'Add FTS query sanitization requirement to prevent FTS5 syntax errors'
+  selector:
+    type: section
+    matches: 'Requirement: SQLite full-text search'
+  content: |
+    `SQLiteGraphStore` SHALL implement symbol and spec search using SQLite full-text search
+    capabilities.
+
+    The adapter MUST:
+
+    - provide full-text search over symbol search text and symbol comments for
+      `GraphStore.searchSymbols()`
+    - provide full-text search over spec title, description, and searchable content for
+      `GraphStore.searchSpecs()`
+    - sanitize the FTS query string before passing it to the FTS5 MATCH clause so that
+      user input is treated as literal text and not interpreted as FTS5 query syntax
+      (boolean operators, column filters, prefix wildcards, etc.)
+    - return results ordered by descending relevance score
+    - rebuild or refresh backend-specific FTS structures when required after bulk data
+      changes
+
+    The implementation MAY use SQLite FTS5 virtual tables or another SQLite-native full-text
+    search mechanism, provided the abstract graph-store search contract remains satisfied.

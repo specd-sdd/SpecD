@@ -1,0 +1,14 @@
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: get returns an archived change or null'
+  content: |
+    ### Requirement: archivePath returns the absolute path for an archived change
+
+    `archivePath(archivedChange)` MUST accept an `ArchivedChange` and return the absolute filesystem path to its archived directory. This mirrors `ChangeRepository.changePath(change)` for active changes. The path MUST be resolved from the archive pattern and root directory configured at construction time — the caller does not need to know the archive directory structure.
+
+    This method is used by `RunStepHooks` and `GetHookInstructions` to build the `change.path` template variable when operating on archived changes.

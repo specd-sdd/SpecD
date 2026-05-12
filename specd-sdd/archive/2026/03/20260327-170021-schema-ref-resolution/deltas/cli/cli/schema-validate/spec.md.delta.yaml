@@ -1,0 +1,101 @@
+- op: modified
+  description: 'Add [ref] positional argument to command signature'
+  selector:
+    type: section
+    matches: 'Requirement: Command signature'
+  content: |
+    `specd schema validate [ref] [--file <path>] [--raw] [--format text|json|toon] [--config <path>]`
+
+    - `[ref]` — optional positional argument; a schema reference in the same format as `specd.yaml`'s `schema` field (e.g. `@specd/schema-std`, `#workspace:name`, `#name`, bare name). Resolved through `SchemaRegistry`.
+    - When neither `[ref]`, `--file`, nor `--raw` is provided, the command validates the project's fully-resolved schema (merged).
+    - When `--raw` is provided (without `[ref]` or `--file`), the command validates the project's base schema without plugins or overrides.
+    - When `--file` is provided, the command validates the specified external file (resolving its extends chain).
+    - When `[ref]` is provided, the command validates the referenced schema (resolving its extends chain, without project plugins or overrides).
+    - `[ref]`, `--file`, and `--raw` are mutually exclusive. If any combination is provided, the command SHALL fail with an error.
+
+- op: added
+  description: 'Add ref mode requirement'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: File mode'
+  content: |
+    ### Requirement: Ref mode
+
+    When invoked with `[ref]` (without `--file` or `--raw`), the command SHALL call `ValidateSchema.execute` with `mode: 'ref'` and the provided reference string. The use case handles resolution through `SchemaRegistry`, extends chain resolution, and validation. No project plugins or overrides are applied.
+
+- op: modified
+  description: 'Add ref mode to text output success'
+  selector:
+    type: section
+    matches: 'Requirement: Text output — success'
+  content: |
+    When validation succeeds and `--format` is `text`, the command SHALL write:
+
+    - Project resolved mode: `schema valid: <name> v<version> (<N> artifacts, <M> workflow steps)`
+    - Project raw mode: `schema valid: <name> v<version> (<N> artifacts, <M> workflow steps) [raw]`
+    - File mode: `schema valid: <name> v<version> (<N> artifacts, <M> workflow steps) [file]`
+    - Ref mode: `schema valid: <name> v<version> (<N> artifacts, <M> workflow steps) [ref]`
+
+    Warning lines, if any, are appended as `  warning: <text>`.
+
+- op: modified
+  description: 'Add ref mode to JSON output'
+  selector:
+    type: section
+    matches: 'Requirement: JSON output'
+  content: |
+    When `--format` is `json` or `toon`, the command SHALL write a structured result object:
+
+    Success:
+
+    ```json
+    {
+      "result": "ok",
+      "schema": { "name": "...", "version": 1 },
+      "artifacts": 5,
+      "workflowSteps": 4,
+      "mode": "project" | "project-raw" | "file" | "ref",
+      "warnings": []
+    }
+    ```
+
+    Failure:
+
+    ```json
+    {
+      "result": "error",
+      "errors": [{ "message": "..." }],
+      "warnings": [],
+      "mode": "project" | "project-raw" | "file" | "ref"
+    }
+    ```
+
+- op: added
+  description: 'Add error case for ref not found'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Error — file not found'
+  content: |
+    ### Requirement: Error — ref not found
+
+    When `[ref]` references a schema that cannot be resolved (e.g. npm package not installed, workspace schema does not exist), the validation result SHALL contain the error and exit with code 1.
+
+- op: modified
+  description: 'Expand mutual exclusivity to cover [ref]'
+  selector:
+    type: section
+    matches: 'Requirement: Mutually exclusive flags'
+  content: |
+    `[ref]`, `--file`, and `--raw` are mutually exclusive. If any combination of two or more is provided, the command SHALL write a descriptive error and exit with code 1:
+
+    - `[ref]` + `--file`: `[ref] and --file are mutually exclusive`
+    - `[ref]` + `--raw`: `[ref] and --raw are mutually exclusive`
+    - `--file` + `--raw`: `--file and --raw are mutually exclusive`

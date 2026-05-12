@@ -1,0 +1,12 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Scenario: Schema not found'
+    parent:
+      type: section
+      matches: 'Requirement: Schema resolution'
+  content: |
+    #### Scenario: Schema not found
+
+    - **WHEN** `SchemaProvider.get()` returns `null` for the configured schema reference
+    - **THEN** it throws `SchemaNotFoundError`

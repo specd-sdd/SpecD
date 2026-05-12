@@ -1,0 +1,35 @@
+- op: added
+  description: 'Dispatch explicit external hooks through external runners'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Hook collection$'
+  content: |
+    ### Requirement: External hook dispatch
+
+    `RunStepHooks` SHALL support explicit external hook entries in addition to shell `run:` hooks.
+
+    For an external hook entry, `RunStepHooks` MUST:
+
+    - read the hook's `external.type` and `external.config`
+    - resolve a registered external hook runner whose accepted-type declaration includes that type
+    - dispatch execution through that external runner
+
+    If no registered external runner accepts the hook's `external.type`, `RunStepHooks` MUST fail with a clear error.
+- op: modified
+  description: 'Record the new dependency on the external hook runner port'
+  selector:
+    type: section
+    matches: '^Spec Dependencies$'
+  content: |
+    - [`specs/core/hook-execution-model/spec.md`](../hook-execution-model/spec.md) — hook types, execution modes, failure semantics, ordering
+    - [`specs/core/hook-runner-port/spec.md`](../hook-runner-port/spec.md) — `HookRunner` interface, `HookResult`, `HookVariables`
+    - [`specs/core/external-hook-runner-port/spec.md`](../external-hook-runner-port/spec.md) — external hook runner contract and accepted-type dispatch
+    - [`specs/core/schema-format/spec.md`](../schema-format/spec.md) — `workflow[].hooks` structure, `run:`, `instruction:`, and explicit external entries
+    - [`specs/core/config/spec.md`](../config/spec.md) — project-level workflow hooks from `specd.yaml`
+    - [`specs/core/change/spec.md`](../change/spec.md) — Change entity, `schemaName`, `workspaces`
+    - [`specs/core/template-variables/spec.md`](../template-variables/spec.md) — `TemplateVariables` map, variable namespaces
+    - [`specs/core/archive-repository-port/spec.md`](../archive-repository-port/spec.md) — `ArchiveRepository` port, `get()`, `archivePath()`, `ArchivedChange`

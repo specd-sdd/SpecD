@@ -1,0 +1,22 @@
+- op: modified
+  selector:
+    type: section
+    matches: '^Scenario: Stack trace gated on SPECD_DEBUG$'
+  content: |
+    #### Scenario: Stack trace gated on logger debug level
+
+    - **GIVEN** logger debug level is not enabled
+    - **WHEN** a system error occurs
+    - **THEN** no stack trace is printed to stderr
+
+- op: added
+  position:
+    after:
+      type: section
+      matches: '^Scenario: Stack trace gated on logger debug level$'
+  content: |
+    #### Scenario: Stack trace shown when logger debug level is enabled
+
+    - **GIVEN** logger debug level is enabled
+    - **WHEN** a system error occurs
+    - **THEN** a stack trace is printed to stderr

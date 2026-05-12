@@ -1,0 +1,56 @@
+- op: modified
+  description: Make specPath optional for change-scoped artifacts
+  selector:
+    type: section
+    matches: 'Requirement: Input'
+  content: |
+
+    `ValidateArtifactsInput.specPath` is optional when validating `scope: change` artifacts. For `scope: change` artifacts (like `design`, `tasks`), the artifact is uniquely identified by its artifact ID alone — there is no ambiguity about which spec it belongs to.
+
+    For `scope: spec` artifacts, `specPath` is still required because the same artifact type (e.g., `specs`) exists for multiple specs.
+
+    When `specPath` is provided and the artifact is `scope: change`, the specPath is ignored — the artifact ID is sufficient.
+
+- op: modified
+  description: Add missing non-optional artifact detection
+  selector:
+    type: section
+    matches: 'Requirement: Per-file validation'
+  content: |
+
+    If the artifact file does not exist in the change directory and the artifact is not optional, validation MUST record a failure before skipping. Only optional artifacts may be silently skipped when their file is missing.
+
+- op: added
+  description: Add MetadataExtraction validation requirement
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Structural validation'
+  content: |
+    ### Requirement: MetadataExtraction validation
+
+    After building the merged preview, `ValidateArtifacts` MUST also validate the extracted metadata:
+
+    1. Get `schema.metadataExtraction()`
+    2. If defined, call `extractMetadata(extraction, astsByArtifact, renderers, transforms, artifactType.id)`
+    3. Validate result against `strictSpecMetadataSchema`
+    4. If validation fails, record as validation failure
+
+    The extracted metadata is validated ONLY for the artifact being validated — not all artifacts.
+
+- op: added
+  description: Add MetadataExtraction validation failures requirement
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Save after validation'
+  content: |
+    ### Requirement: MetadataExtraction validation failures are validation failures
+
+    If metadataExtraction validation fails, `ValidateArtifacts` MUST record the failure in `result.failures` with the artifact ID. The artifact is NOT marked complete.

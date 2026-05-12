@@ -1,0 +1,13 @@
+- op: modified
+  description: Verify that artifact skips persist through mutate.
+  selector:
+    type: section
+    matches: 'Requirement: Persistence and output'
+  content: |
+    #### Scenario: Change is persisted and returned through serialized mutation
+
+    - **GIVEN** a successful skip operation
+    - **WHEN** `execute` completes
+    - **THEN** `ChangeRepository.mutate(input.name, fn)` is called with the target change name
+    - **AND** the callback records the skip and marks the artifact skipped on the fresh persisted `Change`
+    - **AND** the returned value is the `Change` entity

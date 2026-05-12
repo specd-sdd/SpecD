@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'Structure is verified by Change entity scenarios; no manifest-specific scenarios needed for new fields.'

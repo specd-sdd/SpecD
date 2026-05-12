@@ -1,0 +1,3 @@
+releases:
+  cli:cli/change-spec-preview: patch
+  core:core/preview-spec: patch

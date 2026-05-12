@@ -1,0 +1,75 @@
+- op: modified
+  description: 'Add force coverage to the change discard command signature'
+  selector:
+    type: section
+    matches: 'Requirement: Command signature'
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    #### Scenario: Missing reason flag
+
+    - **WHEN** `specd change discard my-change` is run without `--reason`
+    - **THEN** the command exits with code 1 and prints a usage error to stderr
+
+    #### Scenario: Empty reason rejected
+
+    - **WHEN** `specd change discard my-change --reason ""` is run
+    - **THEN** the command exits with code 1 and prints a usage error to stderr
+
+    #### Scenario: Force flag is accepted
+
+    - **WHEN** `specd change discard my-change --reason "cleanup" --force` is run with a valid change name
+    - **THEN** the command accepts the flag as part of its input contract
+
+- op: modified
+  description: 'Add forced discard coverage to command behaviour'
+  selector:
+    type: section
+    matches: 'Requirement: Behaviour'
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    #### Scenario: Active change discarded
+
+    - **GIVEN** an active change `old-experiment` in `changes/`
+    - **WHEN** `specd change discard old-experiment --reason "superseded"` is run
+    - **THEN** the change is moved to `discarded/`
+    - **AND** a `discarded` event with the given reason is appended to history
+
+    #### Scenario: Drafted change discarded
+
+    - **GIVEN** a drafted change `old-experiment` in `drafts/`
+    - **WHEN** `specd change discard old-experiment --reason "abandoned"` is run
+    - **THEN** the change is moved to `discarded/`
+    - **AND** a `discarded` event is appended to history
+
+    #### Scenario: Historically implemented change can still be discarded when forced
+
+    - **GIVEN** `old-experiment` has previously reached `implementing`
+    - **WHEN** `specd change discard old-experiment --reason "workflow cleanup" --force` is run
+    - **THEN** the change is moved to `discarded/`
+    - **AND** a `discarded` event is appended to history
+
+- op: modified
+  description: 'Add guarded failure coverage to change discard error cases'
+  selector:
+    type: section
+    matches: 'Requirement: Error cases'
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    #### Scenario: Change not found
+
+    - **WHEN** `specd change discard nonexistent --reason "done"` is run
+    - **THEN** the command exits with code 1
+    - **AND** stderr contains an `error:` message
+
+    #### Scenario: Historically implemented change requires force
+
+    - **GIVEN** `old-experiment` has previously reached `implementing`
+    - **WHEN** `specd change discard old-experiment --reason "done"` is run without `--force`
+    - **THEN** the command exits with code 1
+    - **AND** stderr explains that implementation may already exist and discarding the change could leave specs and code out of sync

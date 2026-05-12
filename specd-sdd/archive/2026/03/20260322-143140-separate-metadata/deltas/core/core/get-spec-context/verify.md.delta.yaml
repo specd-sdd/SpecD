@@ -1,0 +1,61 @@
+- op: modified
+  description: 'Update build context entry scenarios to reference metadata()'
+  selector:
+    type: section
+    matches: 'Requirement: Build context entry from metadata'
+  content: |
+    #### Scenario: Fresh metadata produces full entry
+
+    - **GIVEN** a spec with fresh metadata containing title, description, rules, constraints, and scenarios
+    - **WHEN** `execute(input)` is called without section filters
+    - **THEN** the entry has `stale: false` and includes `title`, `description`, `rules`, `constraints`, and `scenarios`
+
+    #### Scenario: Empty rules/constraints/scenarios omitted from entry
+
+    - **GIVEN** a spec with fresh metadata where `rules` is an empty array
+    - **WHEN** `execute(input)` is called
+    - **THEN** the entry does not include a `rules` field
+
+- op: modified
+  description: 'Update stale or absent metadata scenarios'
+  selector:
+    type: section
+    matches: 'Requirement: Stale or absent metadata produces minimal entry'
+  content: |
+    #### Scenario: No metadata yields stale entry
+
+    - **GIVEN** a spec with no metadata
+    - **WHEN** `execute(input)` is called
+    - **THEN** the entry has `stale: true` and only `spec` and `stale` fields
+
+    #### Scenario: Stale hashes yield stale entry
+
+    - **GIVEN** a spec with metadata whose content hashes do not match current files
+    - **WHEN** `execute(input)` is called
+    - **THEN** the entry has `stale: true`
+    - **AND** a warning of type `'stale-metadata'` is emitted
+
+- op: modified
+  description: 'Update warnings scenarios to reference metadata'
+  selector:
+    type: section
+    matches: 'Requirement: Warnings for unresolvable dependencies'
+  content: |
+    #### Scenario: Unknown workspace in dependency emits warning
+
+    - **GIVEN** a spec whose metadata references `dependsOn: ['unknown-ws:some/spec']`
+    - **WHEN** `execute({ ..., followDeps: true })` is called
+    - **THEN** `warnings` contains an entry with `type: 'unknown-workspace'`
+    - **AND** traversal continues for remaining dependencies
+
+    #### Scenario: Missing dependency spec emits warning
+
+    - **GIVEN** a spec whose metadata references a dependency that does not exist in the target workspace
+    - **WHEN** `execute({ ..., followDeps: true })` is called
+    - **THEN** `warnings` contains an entry with `type: 'missing-spec'`
+
+    #### Scenario: Missing metadata during traversal emits warning
+
+    - **GIVEN** a dependency spec with no metadata
+    - **WHEN** dependency traversal reaches that spec
+    - **THEN** `warnings` contains an entry with `type: 'missing-metadata'`

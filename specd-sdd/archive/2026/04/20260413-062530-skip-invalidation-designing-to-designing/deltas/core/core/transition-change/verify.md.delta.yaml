@@ -1,0 +1,49 @@
+- op: modified
+  description: 'Add scenarios for designing-to-designing no-op transition and clarify invalidation scope'
+  selector:
+    type: section
+    matches: 'Requirement: Transition to designing from any state'
+  content: |
+    #### Scenario: Transition from archivable to designing
+
+    - **GIVEN** a change in `archivable` state
+    - **WHEN** `execute` is called with `to: 'designing'`
+    - **THEN** the change transitions to `designing`
+
+    #### Scenario: Transition to designing downgrades files to pending-review
+
+    - **GIVEN** a change with validated artifacts
+    - **AND** one file is already `drifted-pending-review`
+    - **WHEN** `execute` is called with `to: 'designing'`
+    - **THEN** every other tracked file becomes `pending-review`
+    - **AND** the drifted file remains `drifted-pending-review`
+
+    #### Scenario: Transition to designing invalidates active approvals
+
+    - **GIVEN** a change in `implementing` state with an active spec approval
+    - **WHEN** `execute` is called with `to: 'designing'`
+    - **THEN** the approval is invalidated before the transition
+
+    #### Scenario: Transition from designing to designing does not invalidate
+
+    - **GIVEN** a change already in `designing` state
+    - **WHEN** `execute` is called with `to: 'designing'`
+    - **THEN** `change.invalidate()` is not called
+    - **AND** `change.transition('designing', actor)` is called directly
+    - **AND** no artifact files are downgraded
+    - **AND** no approvals are cleared
+
+    #### Scenario: Transition from drafting to designing does not invalidate
+
+    - **GIVEN** a change in `drafting` state
+    - **WHEN** `execute` is called with `to: 'designing'`
+    - **THEN** `change.invalidate()` is not called
+    - **AND** `change.transition('designing', actor)` is called directly
+
+    #### Scenario: Transition from implementing to designing invalidates
+
+    - **GIVEN** a change in `implementing` state with validated artifacts
+    - **WHEN** `execute` is called with `to: 'designing'`
+    - **THEN** `change.invalidate()` is called with cause `'artifact-review-required'`
+    - **AND** all artifact files are downgraded to `pending-review`
+    - **AND** any active spec approval is cleared

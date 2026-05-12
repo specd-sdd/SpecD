@@ -1,0 +1,111 @@
+- op: modified
+  description: Verify hierarchy-aware query accessors on the graph store.
+  selector:
+    type: section
+    matches: '^Requirement: Query methods$'
+  content: |-
+    #### Scenario: getSpecDependencies returns outgoing DEPENDS_ON
+
+    - **GIVEN** spec A depends on specs B and C
+    - **WHEN** `getSpecDependencies(A.specId)` is called
+    - **THEN** two `DEPENDS_ON` relations are returned with targets B and C
+
+    #### Scenario: getSpecDependents returns incoming DEPENDS_ON
+
+    - **GIVEN** specs A and B both depend on spec C
+    - **WHEN** `getSpecDependents(C.specId)` is called
+    - **THEN** two `DEPENDS_ON` relations are returned with sources A and B
+
+    #### Scenario: getCallers returns only incoming CALLS relations
+
+    - **GIVEN** symbol B has two callers (A and C) and one callee (D)
+    - **WHEN** `getCallers(B.id)` is called
+    - **THEN** two relations are returned with `source` being A and C
+
+    #### Scenario: findSymbols filters by kind
+
+    - **GIVEN** the store contains functions, classes, and methods
+    - **WHEN** `findSymbols({ kind: SymbolKind.Class })` is called
+    - **THEN** only class symbols are returned
+
+    #### Scenario: findSymbols with name pattern
+
+    - **GIVEN** symbols named `createUser`, `createOrder`, `deleteUser`
+    - **WHEN** `findSymbols({ name: 'create*' })` is called
+    - **THEN** `createUser` and `createOrder` are returned
+
+    #### Scenario: findSymbols filters by comment text
+
+    - **GIVEN** symbols with comments containing "validates user input" and "computes hash"
+    - **WHEN** `findSymbols({ comment: 'validates' })` is called
+    - **THEN** only the symbol with "validates user input" in its comment is returned
+
+    #### Scenario: getExtenders returns incoming EXTENDS relations
+
+    - **GIVEN** type B and type C both extend type A
+    - **WHEN** `getExtenders(A.id)` is called
+    - **THEN** `EXTENDS` relations are returned with sources B and C
+
+    #### Scenario: getImplementors returns incoming IMPLEMENTS relations
+
+    - **GIVEN** types B and C both implement contract A
+    - **WHEN** `getImplementors(A.id)` is called
+    - **THEN** `IMPLEMENTS` relations are returned with sources B and C
+
+    #### Scenario: getOverriders returns incoming OVERRIDES relations
+
+    - **GIVEN** methods B and C both override method A
+    - **WHEN** `getOverriders(A.id)` is called
+    - **THEN** `OVERRIDES` relations are returned with sources B and C
+
+- op: modified
+  description: Ensure graph statistics expose hierarchy relation counts.
+  selector:
+    type: section
+    matches: '^Requirement: Graph statistics$'
+  content: |-
+    #### Scenario: Statistics include all expected fields
+
+    - **WHEN** `getStatistics()` is called on a populated store
+    - **THEN** the result SHALL include `fileCount`, `symbolCount`, `specCount`, `relationCounts`, `languages`, `lastIndexedAt`, and `lastIndexedRef`
+
+    #### Scenario: lastIndexedRef defaults to null
+
+    - **GIVEN** no VCS ref has been stored
+    - **WHEN** `getStatistics()` is called
+    - **THEN** `lastIndexedRef` SHALL be `null`
+
+    #### Scenario: lastIndexedRef reflects stored value
+
+    - **GIVEN** the `lastIndexedRef` meta key has been set to `"abc1234"`
+    - **WHEN** `getStatistics()` is called
+    - **THEN** `lastIndexedRef` SHALL be `"abc1234"`
+
+    #### Scenario: Statistics include hierarchy relation counts
+
+    - **GIVEN** the store contains persisted `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES` relations
+    - **WHEN** `getStatistics()` is called
+    - **THEN** `relationCounts` includes counts for all three hierarchy relation types
+
+- op: modified
+  description: Require LadybugDB adapter verification to cover hierarchy tables.
+  selector:
+    type: section
+    matches: '^Requirement: LadybugDB adapter$'
+  content: |-
+    #### Scenario: Database created on first open
+
+    - **GIVEN** no `.specd/` directory exists at `storagePath`
+    - **WHEN** `open()` is called on `LadybugGraphStore`
+    - **THEN** the `.specd/` directory and `code-graph.lbug` file are created
+
+    #### Scenario: Parameterized queries prevent injection
+
+    - **WHEN** `findSymbols({ name: "'; DROP TABLE symbols; --" })` is called
+    - **THEN** the query executes safely and returns no results (no injection)
+
+    #### Scenario: LadybugDB adapter persists hierarchy relations
+
+    - **GIVEN** hierarchy relations are passed to the store
+    - **WHEN** they are bulk loaded or queried back
+    - **THEN** `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES` behave like first-class persisted edge types

@@ -1,0 +1,22 @@
+- op: added
+  description: 'Require static type and construct dependency relations to participate in impact traversal.'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Impact analysis$'
+  content: |
+    ### Requirement: Static type dependency impact
+
+    Impact traversal SHALL treat all persisted symbol dependency relations as first-class blast-radius inputs, not only ordinary call edges.
+
+    Specifically:
+
+    - changing a symbol MUST affect symbols connected through `CALLS`, `CONSTRUCTS`, and `USES_TYPE` according to traversal direction
+    - changing a type symbol MUST affect symbols connected through `EXTENDS` and `IMPLEMENTS` according to traversal direction
+    - changing a method symbol MUST affect symbols connected through `OVERRIDES` according to traversal direction
+    - hierarchy-derived and static-type-derived affected symbols participate in depth counts, risk calculation, and affected-file aggregation the same way as call-derived affected symbols
+
+    This requirement applies to symbol impact and any file-impact operation that aggregates symbol impact results.

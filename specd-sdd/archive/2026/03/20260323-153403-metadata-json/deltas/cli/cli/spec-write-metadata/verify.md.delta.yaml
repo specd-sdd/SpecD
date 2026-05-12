@@ -1,0 +1,34 @@
+- op: modified
+  description: 'Update stdin scenario from YAML to JSON'
+  selector:
+    type: section
+    matches: 'Scenario: Reads YAML from stdin'
+  content: |
+    #### Scenario: Reads JSON from stdin
+
+    - **GIVEN** valid JSON metadata is piped to stdin
+    - **WHEN** `specd spec write-metadata auth/login` is run
+    - **THEN** the metadata is written successfully
+
+- op: modified
+  description: 'Update file scenario from YAML to JSON'
+  selector:
+    type: section
+    matches: 'Scenario: Reads YAML from file'
+  content: |
+    #### Scenario: Reads JSON from file
+
+    - **GIVEN** a file `meta.json` with valid JSON metadata
+    - **WHEN** `specd spec write-metadata auth/login --input meta.json` is run
+    - **THEN** the metadata is written successfully
+
+- op: modified
+  description: 'Update invalid input scenario from YAML to JSON'
+  selector:
+    type: section
+    matches: 'Scenario: Rejects invalid YAML'
+  content: |
+    #### Scenario: Rejects invalid JSON
+
+    - **WHEN** `specd spec write-metadata auth/login --input bad.txt` is run with non-JSON content
+    - **THEN** stderr contains `error: invalid JSON:` and exit code is 1

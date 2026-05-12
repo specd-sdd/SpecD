@@ -1,0 +1,63 @@
+- op: modified
+  description: 'Replace path-only graph stats signature with the shared graph CLI context model'
+  selector:
+    type: section
+    matches: '^Requirement: Command signature$'
+    parent:
+      type: section
+      matches: '^Requirements$'
+  content: |
+    ```
+    specd graph stats [--config <path> | --path <path>] [--format text|json|toon]
+    ```
+
+    - `--config <path>` — optional; explicit path to `specd.yaml`, matching the standard CLI meaning
+    - `--path <path>` — optional; repo-root bootstrap mode
+    - `--format text|json|toon` — optional; output format, defaults to `text`
+
+    `--config` and `--path` are mutually exclusive.
+
+    `--path` and no-config fallback are bootstrap mechanisms for setup and repository exploration, not the intended steady-state mode for configured projects.
+- op: modified
+  description: 'Define statistics retrieval in configured mode and bootstrap mode'
+  selector:
+    type: section
+    matches: '^Requirement: Statistics retrieval$'
+    parent:
+      type: section
+      matches: '^Requirements$'
+  content: |
+    The command:
+
+    1. Validates that `--config` and `--path` are not both present
+    2. Resolves graph context using explicit config, autodetected config, or bootstrap mode according to the graph CLI precedence rules
+    3. Creates a `CodeGraphProvider` from the resolved graph context
+    4. Opens the provider
+    5. Calls `getStatistics()` to retrieve the `GraphStatistics` object
+    6. Resolves the current VCS ref via `createVcsAdapter(projectRoot)` and `vcs.ref()`. If VCS detection fails or `ref()` throws, `currentRef` is `null`.
+    7. Compares `currentRef` against `statistics.lastIndexedRef` to determine staleness
+    8. Outputs the statistics with staleness information
+    9. Closes the provider
+    10. Exits with `process.exit(0)` — required because the LadybugDB native addon keeps the Node process alive
+
+    In bootstrap mode, the command SHALL behave as if there were a single `default` workspace whose `codeRoot` is the resolved VCS root.
+- op: modified
+  description: 'Update constraints to reflect shared context resolution'
+  selector:
+    type: section
+    matches: '^Constraints$'
+  content: |
+    - The CLI does not compute statistics — it delegates entirely to `@specd/code-graph`
+    - `process.exit(0)` is called explicitly after closing the provider
+    - Zero-value relation counts are omitted from text output for readability
+    - Context resolution SHALL use the shared graph CLI model rather than command-local path semantics
+- op: modified
+  description: 'Add core config as an explicit dependency'
+  selector:
+    type: section
+    matches: '^Spec Dependencies$'
+  content: |
+    - [`specs/cli/entrypoint/spec.md`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
+    - [`specs/core/config/spec.md`](../../core/config/spec.md) — configured operation, explicit config path handling, and bootstrap-mode relationship
+    - [`specs/code-graph/composition/spec.md`](../../code-graph/composition/spec.md) — CodeGraphProvider, GraphStatistics
+    - [`specs/code-graph/staleness-detection/spec.md`](../../code-graph/staleness-detection/spec.md) — staleness semantics, warn-not-block policy

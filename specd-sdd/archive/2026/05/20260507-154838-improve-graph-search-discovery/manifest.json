@@ -1,0 +1,262 @@
+{
+  "name": "improve-graph-search-discovery",
+  "createdAt": "2026-05-07T15:48:38.624Z",
+  "description": "This improvement optimizes the discovery of symbols and specifications in the code graph by changing the Full-Text search logic from strict intersection (AND) to ranked union (OR). By joining search terms with the OR operator and relying on existing BM25 ranking, the system now enables finding related concepts spread across different files or symbols, while maintaining precision by prioritizing results that match more terms.",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": ["code-graph:sqlite-graph-store", "code-graph:ladybug-graph-store"],
+  "specDependsOn": {
+    "code-graph:sqlite-graph-store": [
+      "code-graph:graph-store",
+      "core:config",
+      "code-graph:symbol-model",
+      "code-graph:workspace-integration"
+    ],
+    "code-graph:ladybug-graph-store": [
+      "code-graph:graph-store",
+      "core:config",
+      "code-graph:symbol-model",
+      "code-graph:workspace-integration"
+    ]
+  },
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:d3bf334a80047449824129a029ed57d7dfc02cf6d2d916edfcdae4f029adeb7d"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "code-graph:sqlite-graph-store",
+          "filename": "deltas/code-graph/sqlite-graph-store/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:b8c82796b772245710605d0c7f17663ff086671e190a36f6905ea5e70331a464"
+        },
+        {
+          "key": "code-graph:ladybug-graph-store",
+          "filename": "deltas/code-graph/ladybug-graph-store/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:bfc72bf739abdd2cff51dd005f0e2d11418650a7cc02d48d90a458a1c2db679b"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "code-graph:sqlite-graph-store",
+          "filename": "deltas/code-graph/sqlite-graph-store/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:38b7a9f03f0ff762267b976687669d3d1e0cbc335d1c9e00426c7ce8195c21ab"
+        },
+        {
+          "key": "code-graph:ladybug-graph-store",
+          "filename": "deltas/code-graph/ladybug-graph-store/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:941af0725b13cf9d3ef67951390ab7410887205dbf0120a07a973f3353f8d134"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:b49249539351c838ceea0a49729e22f3af27cdf15d2a2168c868fa11623729cb"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:e68b37880c293b8d29727e141aa626bc4ecd6ed1e45cdf2e6b41dd66984a49a7"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-05-07T15:48:38.624Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "specIds": ["code-graph:sqlite-graph-store", "code-graph:ladybug-graph-store"],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-05-07T15:48:38.634Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:sqlite-graph-store"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:ladybug-graph-store"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:sqlite-graph-store"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:ladybug-graph-store"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-07T15:50:12.061Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-07T16:03:51.220Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-07T16:29:03.135Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-07T16:33:19.435Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-08T19:29:33.128Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-08T19:30:48.567Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-08T19:36:58.968Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "description-updated",
+      "at": "2026-05-08T20:02:30.315Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "description": "This improvement optimizes the discovery of symbols and specifications in the code graph by changing the Full-Text search logic from strict intersection (AND) to ranked union (OR). By joining search terms with the OR operator and relying on existing BM25 ranking, the system now enables finding related concepts spread across different files or symbols, while maintaining precision by prioritizing results that match more terms."
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-08T20:02:31.274Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-05-08T20:02:31.357Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "m***a@g***.com"
+  }
+}

@@ -1,0 +1,43 @@
+- op: modified
+  description: 'Verify manifest persists explicit state and structured invalidation.'
+  selector:
+    type: section
+    matches: '^Requirement: Manifest structure$'
+  content: |
+    #### Scenario: Manifest stores artifact and file state explicitly
+
+    - **WHEN** a change manifest is written
+    - **THEN** each persisted artifact entry includes `state`
+    - **AND** each persisted file entry includes `state`
+
+    #### Scenario: Missing state defaults to missing on load
+
+    - **GIVEN** a manifest entry without a `state` field
+    - **WHEN** the manifest is loaded
+    - **THEN** the missing state is treated as `missing`
+
+    #### Scenario: Invalidated event stores message and affectedArtifacts
+
+    - **WHEN** a change is invalidated because validated files drifted
+    - **THEN** the `invalidated` event includes `cause`
+    - **AND** it includes a human-readable `message`
+    - **AND** it includes `affectedArtifacts` with artifact types and file keys
+
+    #### Scenario: Legacy artifact-change invalidation cause remains readable
+
+    - **GIVEN** a historical manifest whose `invalidated` event persisted `cause: "artifact-change"`
+    - **WHEN** the manifest is loaded
+    - **THEN** loading succeeds without reporting corruption
+    - **AND** the event is normalized to the current artifact-drift semantics
+
+    #### Scenario: validatedHash and state coexist
+
+    - **WHEN** `ValidateArtifacts` marks a file complete with hash `sha256:abc`
+    - **THEN** the manifest stores `validatedHash: "sha256:abc"`
+    - **AND** the file state is `complete`
+
+    #### Scenario: Drifted and pending-review states round-trip
+
+    - **GIVEN** a manifest with one file in `drifted-pending-review` and one file in `pending-review`
+    - **WHEN** the manifest is loaded and saved again
+    - **THEN** both states are preserved

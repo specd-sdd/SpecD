@@ -1,0 +1,31 @@
+- op: added
+  description: 'Add scenarios for specDependsOn cleanup when specIds are updated'
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Workspaces and specs'
+    after:
+      type: section
+      matches: 'Scenario: Spec added after creation'
+  content: |
+    #### Scenario: Orphaned specDependsOn removed when spec removed from specIds
+
+    - **GIVEN** a Change with `specIds: ['auth/login', 'auth/session']`
+    - **AND** `specDependsOn` has entries for both `'auth/login'` and `'auth/session'`
+    - **WHEN** `updateSpecIds(['auth/login'], actor)` is called
+    - **THEN** `specDependsOn` no longer has an entry for `'auth/session'`
+    - **AND** `specDependsOn` still has the entry for `'auth/login'`
+
+    #### Scenario: specDependsOn fully cleared when all specs with deps removed
+
+    - **GIVEN** a Change with `specIds: ['auth/login']`
+    - **AND** `specDependsOn` has an entry for `'auth/login'`
+    - **WHEN** `updateSpecIds(['billing/core'], actor)` is called
+    - **THEN** `specDependsOn` is empty
+
+    #### Scenario: specDependsOn unchanged when no orphans exist
+
+    - **GIVEN** a Change with `specIds: ['auth/login', 'auth/session']`
+    - **AND** `specDependsOn` has an entry only for `'auth/login'`
+    - **WHEN** `updateSpecIds(['auth/login', 'auth/session'], actor)` is called
+    - **THEN** `specDependsOn` still has exactly the entry for `'auth/login'`

@@ -1,0 +1,35 @@
+- op: modified
+  description: 'Update YAML rejection scenario to JSON'
+  selector:
+    type: section
+    matches: 'Scenario: Non-mapping YAML is rejected'
+  content: |
+    #### Scenario: Non-object JSON is rejected
+
+    - **GIVEN** a valid spec exists
+    - **WHEN** `SaveSpecMetadata` is called with `content: '"just a string"'`
+    - **THEN** it throws `MetadataValidationError` with message containing `content must be a JSON object`
+
+- op: modified
+  description: 'Update null YAML scenario to JSON'
+  selector:
+    type: section
+    matches: 'Scenario: Null YAML content is rejected'
+  content: |
+    #### Scenario: Invalid JSON content is rejected
+
+    - **GIVEN** a valid spec exists
+    - **WHEN** `SaveSpecMetadata` is called with `content: "not json at all"`
+    - **THEN** it throws `MetadataValidationError` with message containing `content must be a JSON object`
+
+- op: modified
+  description: 'Update constructor scenario to reflect no YamlSerializer'
+  selector:
+    type: section
+    matches: 'Scenario: Use case receives dependencies via constructor'
+  content: |
+    #### Scenario: Use case receives dependencies via constructor
+
+    - **GIVEN** a `ReadonlyMap<string, SpecRepository>` of spec repositories
+    - **WHEN** `SaveSpecMetadata` is constructed
+    - **THEN** it accepts the spec repositories map as its only dependency

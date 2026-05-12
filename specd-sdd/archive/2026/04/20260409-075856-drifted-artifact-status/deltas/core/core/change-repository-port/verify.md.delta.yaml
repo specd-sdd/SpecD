@@ -1,0 +1,57 @@
+- op: modified
+  description: 'Verify repository loads persisted state rather than deriving everything from hashes.'
+  selector:
+    type: section
+    matches: '^Requirement: get returns a Change or null$'
+  content: |
+    #### Scenario: Change exists
+
+    - **WHEN** `get("add-oauth-login")` is called and a change with that name exists
+    - **THEN** a `Change` is returned with persisted artifact and file state loaded from the manifest
+
+    #### Scenario: Missing state defaults to missing on load
+
+    - **GIVEN** a manifest entry without a `state` field
+    - **WHEN** `get()` loads that change
+    - **THEN** the missing artifact or file state defaults to `missing`
+
+    #### Scenario: get returns a snapshot, not a serialized mutation context
+
+    - **GIVEN** two callers both loaded the same change via `get()`
+    - **AND** one caller later updates that change through `mutate()`
+    - **WHEN** the other caller keeps using the previously returned `Change`
+    - **THEN** that object remains a stale snapshot until the caller reloads it
+- op: modified
+  description: 'Verify drift collection and automatic invalidation at file level.'
+  selector:
+    type: section
+    matches: '^Requirement: Auto-invalidation on get when artifact files drift$'
+  content: |
+    #### Scenario: Repository collects all drifted files before invalidating
+
+    - **GIVEN** a change with two validated spec files under the same artifact
+    - **AND** both files have changed on disk
+    - **WHEN** `FsChangeRepository.get()` is called
+    - **THEN** the invalidation captures both file keys in a single grouped invalidation
+
+    #### Scenario: Drift invalidates even while already designing
+
+    - **GIVEN** a change already in `designing`
+    - **AND** a previously validated artifact file drifts on disk
+    - **WHEN** `FsChangeRepository.get()` is called
+    - **THEN** the change remains in `designing`
+    - **AND** the drifted file becomes `drifted-pending-review`
+
+    #### Scenario: Drift preserves drifted files and downgrades others to pending review
+
+    - **GIVEN** a change with validated artifacts
+    - **AND** one file drifts on disk
+    - **WHEN** `FsChangeRepository.get()` auto-invalidates the change
+    - **THEN** the drifted file is `drifted-pending-review`
+    - **AND** other previously validated files become `pending-review`
+
+    #### Scenario: No drift — no invalidation
+
+    - **GIVEN** a change whose validated files still match their stored hashes
+    - **WHEN** `FsChangeRepository.get()` is called
+    - **THEN** no invalidation occurs

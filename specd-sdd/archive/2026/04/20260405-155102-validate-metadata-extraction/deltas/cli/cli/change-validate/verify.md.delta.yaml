@@ -1,0 +1,20 @@
+- op: modified
+  description: Update missing arguments scenario to account for change-scoped artifacts
+  selector:
+    type: section
+    matches: 'Scenario: Missing arguments'
+  content: |
+
+    #### Scenario: Missing arguments — but artifact targets change-scoped
+
+    - **WHEN** `specd change validate my-change --artifact design` is run (no spec ID)
+    - **AND** `design` is a `scope: change` artifact in the schema
+    - **THEN** the command proceeds with validation using artifact ID only
+    - **AND** it does NOT require specPath because design is change-scoped
+    - **AND** the process exits with code 0 if design passes validation
+
+    #### Scenario: Missing arguments with scope: spec artifact
+
+    - **WHEN** `specd change validate my-change --artifact specs` is run (no spec ID)
+    - **AND** `specs` is a `scope: spec` artifact in the schema
+    - **THEN** the command exits with code 1 and prints a usage error to stderr

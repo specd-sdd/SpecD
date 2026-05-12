@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'This change broadens verification/tests across markdown, JSON, and YAML node types and operations, but does not alter normative delta-format requirements.'

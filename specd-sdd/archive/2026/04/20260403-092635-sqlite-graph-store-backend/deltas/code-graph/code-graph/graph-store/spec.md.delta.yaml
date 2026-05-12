@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'The abstract GraphStore contract already supports multiple concrete backends without additional spec changes'

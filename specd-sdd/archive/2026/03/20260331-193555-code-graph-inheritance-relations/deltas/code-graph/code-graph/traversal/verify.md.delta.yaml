@@ -1,0 +1,105 @@
+- op: modified
+  description: Cover hierarchy-derived blast radius in impact analysis.
+  selector:
+    type: section
+    matches: '^Requirement: Impact analysis$'
+  content: |-
+    #### Scenario: LOW risk — no dependents
+
+    - **GIVEN** a symbol with 0 callers
+    - **WHEN** `analyzeImpact(store, symbol.id, 'upstream')` is called
+    - **THEN** `riskLevel` is `LOW` and `directDependents` is 0
+
+    #### Scenario: MEDIUM risk — few direct dependents
+
+    - **GIVEN** a symbol with 4 direct callers and 0 indirect
+    - **WHEN** `analyzeImpact(store, symbol.id, 'upstream')` is called
+    - **THEN** `riskLevel` is `MEDIUM`
+
+    #### Scenario: HIGH risk — many direct dependents
+
+    - **GIVEN** a symbol with 8 direct callers
+    - **WHEN** `analyzeImpact(store, symbol.id, 'upstream')` is called
+    - **THEN** `riskLevel` is `HIGH`
+
+    #### Scenario: CRITICAL risk — widely used symbol
+
+    - **GIVEN** a symbol with 25 total dependents across all depths
+    - **WHEN** `analyzeImpact(store, symbol.id, 'upstream')` is called
+    - **THEN** `riskLevel` is `CRITICAL`
+
+    #### Scenario: affectedFiles deduplication
+
+    - **GIVEN** symbols A and B are both in `src/utils.ts` and both are callers of target
+    - **WHEN** `analyzeImpact` is called
+    - **THEN** `affectedFiles` contains `src/utils.ts` only once
+
+    #### Scenario: affectedSymbols include depth
+
+    - **GIVEN** a call chain: D calls C, C calls B, B calls target
+    - **WHEN** `analyzeImpact(store, target.id, 'upstream')` is called
+    - **THEN** `affectedSymbols` contains B with `depth: 1`, C with `depth: 2`, D with `depth: 3`
+
+    #### Scenario: custom maxDepth limits traversal
+
+    - **GIVEN** a call chain of depth 5
+    - **WHEN** `analyzeImpact(store, target.id, 'upstream', 5)` is called
+    - **THEN** symbols up to depth 5 are included in `affectedSymbols`
+    - **AND** `transitiveDependents` counts depths 3 through 5
+
+    #### Scenario: default maxDepth is 3
+
+    - **GIVEN** a call chain of depth 5
+    - **WHEN** `analyzeImpact(store, target.id, 'upstream')` is called without maxDepth
+    - **THEN** only symbols up to depth 3 are included
+
+    #### Scenario: maxDepth 1 returns only direct dependents
+
+    - **GIVEN** a symbol with direct and indirect callers
+    - **WHEN** `analyzeImpact(store, target.id, 'upstream', 1)` is called
+    - **THEN** only depth-1 symbols are returned
+    - **AND** `indirectDependents` and `transitiveDependents` are 0
+
+    #### Scenario: Base type change affects inheritors and implementors
+
+    - **GIVEN** a type symbol with persisted `EXTENDS` and `IMPLEMENTS` dependents
+    - **WHEN** `analyzeImpact(store, target.id, 'upstream')` is called
+    - **THEN** those hierarchy-dependent symbols are included in `affectedSymbols`
+    - **AND** their files contribute to `affectedFiles`
+
+    #### Scenario: Base method change affects overriding methods
+
+    - **GIVEN** a method symbol with persisted `OVERRIDES` dependents
+    - **WHEN** `analyzeImpact(store, target.id, 'upstream')` is called
+    - **THEN** overriding methods are included in `affectedSymbols`
+
+- op: modified
+  description: Ensure file-level impact includes hierarchy-derived dependents.
+  selector:
+    type: section
+    matches: '^Requirement: File impact$'
+  content: |-
+    #### Scenario: Aggregate risk is maximum across symbols
+
+    - **GIVEN** file `src/auth.ts` contains symbols X (LOW risk) and Y (HIGH risk)
+    - **WHEN** `analyzeFileImpact(store, 'src/auth.ts', 'upstream')` is called
+    - **THEN** `riskLevel` is `HIGH` (the maximum)
+
+    #### Scenario: Affected symbols deduplicated across file symbols
+
+    - **GIVEN** symbols X and Y in the file share a common upstream dependent Z
+    - **WHEN** `analyzeFileImpact` is called
+    - **THEN** Z appears once in the aggregate result with the shallowest depth
+
+    #### Scenario: maxDepth passed through to per-symbol analysis
+
+    - **GIVEN** file `src/auth.ts` with symbols that have deep call chains
+    - **WHEN** `analyzeFileImpact(store, 'src/auth.ts', 'upstream', 5)` is called
+    - **THEN** each per-symbol `analyzeImpact` call uses `maxDepth: 5`
+    - **AND** the file-level IMPORTS BFS also uses depth limit 5
+
+    #### Scenario: Hierarchy-derived impact is aggregated at file level
+
+    - **GIVEN** a file defines a base type or base method with hierarchy dependents
+    - **WHEN** `analyzeFileImpact(store, filePath, 'upstream')` is called
+    - **THEN** those hierarchy-derived affected symbols are included in the aggregate result

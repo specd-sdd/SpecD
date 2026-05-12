@@ -1,0 +1,40 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Ports and constructor'
+  content: |
+    `GetHookInstructions` receives at construction time: `ChangeRepository`, `ArchiveRepository`, `SchemaProvider`, and `TemplateExpander`.
+
+    ```typescript
+    class GetHookInstructions {
+      constructor(
+        changes: ChangeRepository,
+        archive: ArchiveRepository,
+        schemaProvider: SchemaProvider,
+        expander: TemplateExpander,
+      )
+    }
+    ```
+
+    `SchemaProvider` returns the fully-resolved schema with plugins and overrides applied — all workflow hooks (including those added via `schemaOverrides`) are already present in the schema's workflow steps. All dependencies are injected at kernel composition time.
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Change lookup'
+  content: |
+    `GetHookInstructions` loads the change by name via `ChangeRepository`. If no change exists with the given name **and** the requested step is `'archiving'` with phase `'post'`, it MUST fall back to `ArchiveRepository.get(name)`. If the change is found in the archive, it MUST be used for template variable construction (using `ArchivedChange.name`, `ArchivedChange.workspace`, and `ArchiveRepository.archivePath(archivedChange)` for the `change.path` variable). If the change is not found in the archive either, it MUST throw `ChangeNotFoundError`.
+
+    For all other step/phase combinations, if `ChangeRepository.get(name)` returns null, `GetHookInstructions` MUST throw `ChangeNotFoundError` immediately — the archive fallback does not apply.
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`specs/core/hook-execution-model/spec.md`](../hook-execution-model/spec.md) — hook types, instruction hooks as passive text, ordering
+    - [`specs/core/schema-format/spec.md`](../schema-format/spec.md) — `workflow[].hooks` structure, `instruction:` entries
+    - [`specs/core/config/spec.md`](../config/spec.md) — project-level hooks via `schemaOverrides`
+    - [`specs/core/change/spec.md`](../change/spec.md) — Change entity, `schemaName`
+    - [`specs/core/template-variables/spec.md`](../template-variables/spec.md) — `TemplateExpander`, `TemplateVariables`, expansion semantics
+    - [`specs/core/archive-repository-port/spec.md`](../archive-repository-port/spec.md) — `ArchiveRepository` port, `get()`, `archivePath()`, `ArchivedChange`

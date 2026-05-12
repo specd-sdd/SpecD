@@ -1,0 +1,721 @@
+{
+  "name": "context-display-mode-config",
+  "createdAt": "2026-04-17T08:23:19.260Z",
+  "description": "Add configurable context display modes (list, summary, full, hybrid) to replace lazy/full tier model",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "core:core/compile-context",
+    "core:core/config",
+    "cli:cli/change-context",
+    "core:core/get-project-context",
+    "core:core/get-spec-context",
+    "cli:cli/project-context",
+    "cli:cli/spec-context"
+  ],
+  "specDependsOn": {
+    "cli:cli/change-context": [
+      "cli:cli/entrypoint",
+      "cli:cli/change-spec-preview",
+      "core:core/compile-context",
+      "core:core/config",
+      "core:core/get-artifact-instruction",
+      "core:core/get-hook-instructions"
+    ],
+    "core:core/get-spec-context": [
+      "core:core/config",
+      "core:core/compile-context",
+      "core:core/spec-metadata",
+      "core:core/storage",
+      "core:core/workspace",
+      "core:core/spec-id-format"
+    ],
+    "cli:cli/spec-context": [
+      "cli:cli/entrypoint",
+      "core:core/config",
+      "core:core/get-spec-context"
+    ],
+    "core:core/compile-context": [
+      "core:core/change",
+      "core:core/config",
+      "core:core/spec-metadata",
+      "core:core/schema-format",
+      "core:core/delta-format",
+      "core:core/selector-model",
+      "core:core/spec-id-format",
+      "core:core/workspace",
+      "core:core/get-artifact-instruction",
+      "core:core/get-hook-instructions",
+      "core:core/preview-spec"
+    ],
+    "core:core/config": [
+      "core:core/schema-format",
+      "core:core/schema-merge",
+      "default:_global/architecture",
+      "core:core/storage",
+      "core:core/spec-metadata",
+      "core:core/workspace"
+    ],
+    "core:core/get-project-context": [
+      "core:core/config",
+      "core:core/compile-context",
+      "core:core/spec-metadata",
+      "core:core/schema-format",
+      "default:_global/architecture"
+    ],
+    "cli:cli/project-context": [
+      "cli:cli/entrypoint",
+      "core:core/get-project-context",
+      "core:core/compile-context",
+      "core:core/config"
+    ]
+  },
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:8dba61040ce92d37189d42f5f81e0c38534885ca23daddd6d9168973127c1426"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:core/compile-context",
+          "filename": "deltas/core/core/compile-context/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:59dd92770fa154996e041900d693c8fcb1135532d143b612f7b4aa33544dcf47"
+        },
+        {
+          "key": "core:core/config",
+          "filename": "deltas/core/core/config/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:91bad0974d81d36795e2ee2a77603fc4a2763c1f8e2c46635cd41f6ce9a4a56a"
+        },
+        {
+          "key": "cli:cli/change-context",
+          "filename": "deltas/cli/cli/change-context/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:7c7d025527882888d85801ca26be07533acf51079a77076ee6a5d923d27cb474"
+        },
+        {
+          "key": "core:core/get-project-context",
+          "filename": "deltas/core/core/get-project-context/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:61e50d24b5efde649b66f2da1a0cf246edc380cac96bff2de048f0bcda6a3d9d"
+        },
+        {
+          "key": "core:core/get-spec-context",
+          "filename": "deltas/core/core/get-spec-context/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:f11be0b14d4464edb49bf87b96fc8b0040cb2dff41f5307e4babcbcd4990829b"
+        },
+        {
+          "key": "cli:cli/project-context",
+          "filename": "deltas/cli/cli/project-context/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:43e27826edd82e5c1f355f4155baa46c000fca408f96d4eb065ff4e205cb4ff6"
+        },
+        {
+          "key": "cli:cli/spec-context",
+          "filename": "deltas/cli/cli/spec-context/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:cb9d87afa93e3eb6ccef61b7a6d81393383fd1029b15d0be12fe096fa0c7e498"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:core/compile-context",
+          "filename": "deltas/core/core/compile-context/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:05d4d411c3aa6898c5b4185c3197f947aaf9cd37e153ee2dbff809da5ca4403f"
+        },
+        {
+          "key": "core:core/config",
+          "filename": "deltas/core/core/config/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:3d65a7384ab64f271953d9ef8d400f322cce2008fd2dbdfa838273848146fb46"
+        },
+        {
+          "key": "cli:cli/change-context",
+          "filename": "deltas/cli/cli/change-context/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:497658f37e3e0ed39a59914f086f1d13d381ab3b35892e0247ddf5fc10383a0a"
+        },
+        {
+          "key": "core:core/get-project-context",
+          "filename": "deltas/core/core/get-project-context/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:302d3fc3ad8b3b22c6db2e2fcb73b025eaeb5afd425bcdd0920d808e81d2699f"
+        },
+        {
+          "key": "core:core/get-spec-context",
+          "filename": "deltas/core/core/get-spec-context/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:788667673f91e055ccb618f7f63e07b4415ea12e45fc14e653c5b9bbb808eb1d"
+        },
+        {
+          "key": "cli:cli/project-context",
+          "filename": "deltas/cli/cli/project-context/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:de200dd972b973bf5bf58a13b9e06031c723f169a072dfacdc079097647acb53"
+        },
+        {
+          "key": "cli:cli/spec-context",
+          "filename": "deltas/cli/cli/spec-context/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:e6b721d1c2d731814a4daabe4491d786fdb95d080df71a3bd85603e232aa29a5"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:9b0359fdf114e6758aacc02a7d2e1f03b874e83595e1d94a2db6804c23401f58"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:eaadd21e1302ecd35230eafdef9a1211944b16eb43a563b1d6354ef8951f0e59"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-04-17T08:23:19.260Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "specIds": ["core:core/compile-context", "core:core/config", "cli:cli/change-context"],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-17T08:23:19.272Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/compile-context"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/config"
+        },
+        {
+          "type": "specs",
+          "key": "cli:cli/change-context"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/compile-context"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/config"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/change-context"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-17T08:26:54.588Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-17T08:35:32.565Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-17T08:36:08.830Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-17T10:58:57.144Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-18T10:37:33.480Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'plugin-system-phase-1' was archived with overlapping specs: core:core/config",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:core/config"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:core/config"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-20T08:17:51.146Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["core:core/compile-context", "core:core/config", "cli:cli/change-context"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:core/compile-context", "core:core/config", "cli:cli/change-context"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-20T08:17:51.146Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:core/get-project-context"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/get-project-context"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-20T08:17:55.349Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:core/compile-context",
+            "core:core/config",
+            "cli:cli/change-context",
+            "core:core/get-project-context"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:core/compile-context",
+            "core:core/config",
+            "cli:cli/change-context",
+            "core:core/get-project-context"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-20T08:17:55.349Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:core/get-spec-context"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/get-spec-context"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-20T08:17:59.610Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:core/compile-context",
+            "core:core/config",
+            "cli:cli/change-context",
+            "core:core/get-project-context",
+            "core:core/get-spec-context"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:core/compile-context",
+            "core:core/config",
+            "cli:cli/change-context",
+            "core:core/get-project-context",
+            "core:core/get-spec-context"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-20T08:17:59.611Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "cli:cli/project-context"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/project-context"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-20T08:18:03.579Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:core/compile-context",
+            "core:core/config",
+            "cli:cli/change-context",
+            "core:core/get-project-context",
+            "core:core/get-spec-context",
+            "cli:cli/project-context"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:core/compile-context",
+            "core:core/config",
+            "cli:cli/change-context",
+            "core:core/get-project-context",
+            "core:core/get-spec-context",
+            "cli:cli/project-context"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-20T08:18:03.579Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "cli:cli/spec-context"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/spec-context"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-20T09:15:31.847Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [core:core/compile-context, core:core/config]; verify [core:core/compile-context]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:core/compile-context", "core:core/config"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:core/compile-context"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-20T13:30:30.326Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-20T13:38:39.300Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-20T13:56:40.435Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-20T14:01:52.004Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "description-updated",
+      "at": "2026-04-20T14:59:58.710Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "description": "Add configurable context display modes (list, summary, full, hybrid) to replace lazy/full tier model"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-20T15:18:41.337Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-20T15:29:15.632Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-20T15:29:45.536Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-20T15:32:55.219Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-04-20T15:33:47.007Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "m***a@g***.com"
+  }
+}

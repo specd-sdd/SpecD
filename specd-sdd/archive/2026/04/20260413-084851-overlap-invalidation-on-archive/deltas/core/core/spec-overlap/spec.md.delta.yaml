@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'No spec changes needed — the existing detectSpecOverlap domain service and OverlapReport are reused as-is by ArchiveChange'

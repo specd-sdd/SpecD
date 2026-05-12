@@ -1,0 +1,24 @@
+# Delta: cli:change-artifact-instruction
+
+- op: modified
+  description: 'Clarify that omitted artifact-id uses core engine-derived auto-resolution.'
+  selector:
+    type: section
+    matches: 'Requirement: Command signature'
+  content: |
+    ```
+    specd change artifact-instruction <name> [artifact-id] [--format text|json|toon]
+    ```
+
+    - `<name>` — required positional; the change name
+    - `[artifact-id]` — optional positional; the artifact ID from the schema (e.g. `specs`, `verify`, `tasks`). When omitted, the use case auto-resolves the next artifact to work on using core lifecycle interpretation — the first artifact whose dependencies are effectively satisfied but that is not yet effectively complete
+    - `--format text|json|toon` — optional; output format, defaults to `text`
+
+- op: added
+  description: 'Clarify that the CLI does not rederive artifact readiness.'
+  position:
+    parent:
+      type: section
+      matches: 'Constraints'
+  content: |
+    - Next-artifact auto-selection is delegated entirely to `GetArtifactInstruction`; the CLI must not walk artifact dependencies or effective statuses itself

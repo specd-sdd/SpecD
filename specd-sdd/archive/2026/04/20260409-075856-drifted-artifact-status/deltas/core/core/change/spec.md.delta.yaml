@@ -1,0 +1,174 @@
+- op: modified
+  description: 'Refine lifecycle routing so verification failures only return to implementing when artifacts remain valid.'
+  selector:
+    type: section
+    matches: '^Requirement: Lifecycle$'
+  content: |
+    A Change progresses through the following states. Two approval gates are configurable in `specd.yaml` (`approvals.spec` and `approvals.signoff`, both default `false`); the dashed paths are only active when the corresponding gate is enabled:
+
+    ```
+    drafting → designing → ready ──────────────────────────────────────── → implementing ⇄ verifying → done ──────────────────── → archivable
+                                 ╌→ pending-spec-approval → spec-approved ┘                            ╌→ pending-signoff → signed-off ┘
+                                   (if approvals.spec: true)                                              (if approvals.signoff: true)
+    ```
+
+    | State                   | Meaning                                                                                                                     |
+    | ----------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+    | `drafting`              | Initial state; the change has been created but no design work has started                                                   |
+    | `designing`             | The agent is elaborating or revising the change artifacts                                                                   |
+    | `ready`                 | The design artifact set is complete; awaiting implementation (or spec approval if gate is enabled)                         |
+    | `pending-spec-approval` | Waiting for human approval of the spec before implementation may begin                                                      |
+    | `spec-approved`         | Spec has been approved; implementation may begin                                                                            |
+    | `implementing`          | Code is being written against the current artifacts and task set                                                            |
+    | `verifying`             | The implementation is being verified against the current verify scenarios                                                   |
+    | `done`                  | Verification is complete; the change is ready to archive                                                                    |
+    | `pending-signoff`       | Waiting for human sign-off on the completed work before archiving                                                           |
+    | `signed-off`            | Work has been signed off; the change may be archived                                                                        |
+    | `archivable`            | Final archival checks have passed and the change may be moved to the archive                                                |
+
+    Only the transitions shown above are valid. Any attempt to transition to a state not reachable from the current state throws `InvalidStateTransitionError`.
+
+    The `implementing ↔ verifying` loop may repeat any number of times. The transition `implementing → verifying` is only valid when all tasks in the `tasks` artifact are complete. The transition `verifying → implementing` is valid only for implementation-only failures: the current artifacts still describe the intended behavior and the required fix fits within the already-defined tasks. If verification concludes that the artifacts themselves must be revised, or that new tasks are required before implementation can resume, the change returns to `designing` instead.
+
+    Every state except `drafting` may return to `designing`. Returning to `designing` does not imply that artifacts drifted; it means the artifact set must be reviewed again before work can proceed.
+- op: modified
+  description: 'Clarify implementation-only verification failures versus artifact review.'
+  selector:
+    type: section
+    matches: '^Requirement: Implementation and verification loop$'
+  content: |
+    The `implementing` and `verifying` states form a loop that repeats until verification passes.
+
+    The transition `implementing → verifying` is gated by the workflow model's task completion gating rule (see [`specs/core/workflow-model/spec.md` — Requirement: Task completion gating](../workflow-model/spec.md)). Because the `verifying` step's `requires` includes `tasks` (which declares `taskCompletionCheck`), the transition is automatically blocked when incomplete task items remain. This is a content-level check on the artifact files, not a check on approval state.
+
+    Verification has two distinct outcomes:
+
+    - **`implementation-failure`** — the code does not satisfy the current artifacts, but the artifacts still correctly describe the intended behavior and the required fix fits within the existing task set. This outcome returns the change to `implementing` without invalidating or downgrading unchanged artifacts.
+    - **`artifact-review-required`** — the desired behavior has changed, the current artifacts are no longer sufficient, or the required fix would introduce tasks not already defined. This outcome returns the change to `designing`, where the artifacts are reviewed and updated.
+
+    Actual artifact drift is handled separately from verification outcomes. If any validated artifact file changes on disk and enters `drifted-pending-review`, the change is invalidated back to `designing` regardless of the current lifecycle state.
+
+    The loop may repeat any number of times. History records each round in full.
+- op: modified
+  description: 'Persist file and artifact state explicitly and define the new review states.'
+  selector:
+    type: section
+    matches: '^Requirement: Artifacts$'
+  content: |
+    A Change holds a set of artifacts — typed files whose types and dependency graph are declared by the active schema. Each artifact is a `ChangeArtifact` that contains zero or more `ArtifactFile` entries — one per file the artifact produces.
+
+    A `ChangeArtifact` has:
+
+    - **`type`** — the artifact type ID from the schema (e.g. `proposal`, `specs`, `design`, `tasks`)
+    - **`optional`** — whether the artifact is required for archiving
+    - **`requires`** — ordered list of artifact type IDs that must be complete before this artifact can satisfy downstream dependencies
+    - **`state`** — the persisted aggregate state of the artifact
+    - **`files`** — a `Map<string, ArtifactFile>` of tracked files, keyed by file key
+
+    For `scope: change` artifacts there is typically one file keyed by the artifact type id. For `scope: spec` artifacts there is one file per spec ID in `change.specIds`.
+
+    Each `ArtifactFile` value object has:
+
+    - **`key`** — identifier for this file within the artifact (artifact type id for `scope: change`, spec ID for `scope: spec`)
+    - **`filename`** — the file path within the change directory
+    - **`state`** — the persisted file state; this is the source of truth at file level
+    - **`validatedHash`** — the hash recorded when the file was last validated, computed after applying `preHashCleanup` if declared in the schema. The sentinel value `"__skipped__"` is used when an optional artifact is explicitly marked as not produced.
+
+    Allowed `state` values for both artifacts and files are:
+
+    - `missing`
+    - `in-progress`
+    - `complete`
+    - `skipped`
+    - `pending-review`
+    - `drifted-pending-review`
+
+    State semantics are:
+
+    - `missing` — the expected file is absent or, for backward-compatible loads, no explicit state was persisted
+    - `in-progress` — the file exists and is being authored or revised, but has not yet been revalidated
+    - `complete` — the file has been validated and remains accepted as the current source of truth
+    - `skipped` — the optional file was explicitly marked as not produced
+    - `pending-review` — the file was previously validated, but the change returned to `designing` and the file must be reviewed again against the current change intent
+    - `drifted-pending-review` — the file was previously validated, later changed on disk, and now requires explicit review
+
+    `validatedHash` still participates in drift detection and approval signatures, but it is no longer the source of truth for artifact status. A file's current state is read from its persisted `state`, and hash comparison is one of the mechanisms that may change that state.
+
+    The aggregated `state` on `ChangeArtifact` is materialized from file states and is also persisted:
+
+    - `drifted-pending-review` — at least one file is `drifted-pending-review`
+    - `pending-review` — no file is `drifted-pending-review`, and at least one file is `pending-review`
+    - `complete` — all files are `complete` or `skipped`, and at least one file exists
+    - `skipped` — all files are `skipped`, and at least one file exists
+    - `missing` — all files are `missing`, or the artifact has no files
+    - `in-progress` — any remaining mixed or partially-authored state
+
+    `skipped` is only valid for `optional: true` artifacts. Attempting to skip a non-optional artifact throws an error.
+
+    The `skipped` state must be set explicitly by an actor — human or agent via a CLI command. The agent must be instructed (via the schema `instruction` or skill definition) to call that command when it decides not to produce an optional artifact. The specific CLI command is defined in the CLI spec.
+
+    `ChangeArtifact.markComplete(key, hash)` takes two arguments — the file key and the content hash — and delegates to the corresponding `ArtifactFile.markComplete(hash)`. A successful completion sets the file state to `complete`, updates `validatedHash`, and recomputes the parent artifact state. `ChangeArtifact.markSkipped()` marks ALL files in the artifact as `skipped`. These may only be called by the `ValidateArtifacts` and skip use cases respectively. No other code path may set these values.
+
+    Returning to `designing` changes review state at file level. Every file in every artifact moves to `pending-review`, except files already marked `drifted-pending-review`, which keep that more specific state. The same downgrade applies when scope changes while the change already remains in `designing`: previously validated files are no longer treated as complete until they are reviewed again.
+
+    Dependency satisfaction is driven by the persisted artifact `state`. Only artifacts in `complete` or `skipped` satisfy `requires`. Artifacts in `missing`, `in-progress`, `pending-review`, or `drifted-pending-review` block dependents.
+
+    **Rollback:** `invalidate()` accepts affected artifact/file detail for the files whose validated content actually drifted. When drift is reported, those files are set to `drifted-pending-review`, their parent artifacts are recomputed, and all other files are downgraded to `pending-review` as part of the return to `designing`. Upstream files are not marked drifted unless their own validated content changed.
+- op: modified
+  description: 'Make invalidation events explicit and include artifact/file detail.'
+  selector:
+    type: section
+    matches: '^Requirement: History and event sourcing$'
+  content: |
+    The change manifest contains an **append-only `history` array** of typed events. Every significant operation appends one or more events. Events are never modified or removed.
+
+    The **current lifecycle state** of a Change is derived entirely from its history: the `to` field of the most recent `transitioned` event. If no `transitioned` event exists, the state is `drafting`. No separate state snapshot is stored. The JSON serialization of these events in `manifest.json` is defined in [`specs/core/change-manifest/spec.md` — Requirement: Manifest structure](../change-manifest/spec.md).
+
+    The **current draft/active status** is derived from history: if the most recent `drafted` or `restored` event is of type `drafted`, the change is currently shelved in `drafts/`; otherwise it is active in `changes/`.
+
+    The **active approval** for each gate is the most recent `spec-approved` or `signed-off` event that has not been superseded by a subsequent `invalidated` event.
+
+    All events share common fields:
+
+    - **`type`** — identifies the event kind
+    - **`at`** — ISO 8601 timestamp
+    - **`by`** — git identity (`name` + `email`) of the actor, mandatory on all events
+
+    Event types:
+
+    | Type               | Additional fields                                                                 | When appended                                                  |
+    | ------------------ | --------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+    | `created`          | `specIds`, `schemaName`, `schemaVersion`                                          | Once, when the change is first created                         |
+    | `transitioned`     | `from: ChangeState`, `to: ChangeState`                                            | Each lifecycle state transition                                |
+    | `spec-approved`    | `reason: string`, `artifactHashes: Record<string, string>`                        | When the spec approval gate is passed                          |
+    | `signed-off`       | `reason: string`, `artifactHashes: Record<string, string>`                        | When the signoff gate is passed                                |
+    | `invalidated`      | `cause`, `message`, `affectedArtifacts`                                           | When scope or artifact review invalidates prior approvals      |
+    | `drafted`          | `reason?: string`                                                                 | When a change is shelved to `drafts/`                          |
+    | `restored`         | _(none beyond common fields)_                                                     | When a drafted change is moved back to `changes/`              |
+    | `artifact-skipped` | `artifactId: string`, `reason?: string`                                           | When an optional artifact is explicitly marked as not produced |
+    | `artifacts-synced` | `typesAdded`, `typesRemoved`, `filesAdded`, `filesRemoved`                        | When artifact sync reconciles the artifact map against schema  |
+    | `discarded`        | `reason: string`, `supersededBy?: string[]`                                       | When a change is permanently abandoned                         |
+
+    `invalidated.cause` is explicit and machine-readable:
+
+    - `spec-change` — the change scope changed (for example, `specIds` were edited)
+    - `artifact-drift` — one or more validated artifact files changed on disk
+    - `artifact-review-required` — the change returned to `designing` because the artifacts must be revised even though no drifted file was detected
+
+    `invalidated.message` is a clear human-readable explanation, not a one-word label. `invalidated.affectedArtifacts` is a structured list of the affected artifact types and file keys so callers can explain exactly what triggered the review:
+
+    - `type` — artifact type ID
+    - `files` — list of file keys, using the artifact file key for `scope: change` and the spec ID for `scope: spec`
+
+    Approval invalidation caused by artifact drift MUST capture the full set of affected files before the event is appended. If multiple files drift in the same invalidation pass, they are recorded in the same `invalidated` event.
+- op: modified
+  description: 'Keep spec dependencies explicit and link-based for metadata extraction.'
+  selector:
+    type: section
+    matches: '^Spec Dependencies$'
+  content: |
+    - [`core:core/change-manifest`](../change-manifest/spec.md) — manifest serialization of artifact and history state
+    - [`core:core/workflow-model`](../workflow-model/spec.md) — workflow step semantics and requires gating
+    - [`core:core/spec-metadata`](../spec-metadata/spec.md) — dependency metadata resolution used during context compilation
+    - [`core:core/spec-id-format`](../spec-id-format/spec.md) — canonical `workspace:capabilityPath` identifiers for spec-scoped files
+    - [`default:_global/architecture`](../../_global/architecture/spec.md) — domain ownership of lifecycle and artifact invariants

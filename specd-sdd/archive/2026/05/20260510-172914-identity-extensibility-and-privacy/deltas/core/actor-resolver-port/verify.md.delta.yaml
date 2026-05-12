@@ -1,0 +1,11 @@
+- op: modified
+  description: 'Update the specific scenario for identity resolution'
+  selector:
+    type: section
+    matches: 'Scenario: Successful identity resolution'
+  content: |
+    - **GIVEN** an identity source with configured name and email
+    - **WHEN** `identity()` resolves
+    - **THEN** it returns an object with non-empty `name`
+    - **AND** the `email` is non-empty for providers with email sources, or empty for providers without
+    - **AND** it MAY include `provider`, `providerId`, and `metadata`

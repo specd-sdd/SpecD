@@ -1,0 +1,32 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Approval invalidation on effective change'
+  content: |
+    ### Requirement: Directory cleanup on removal
+
+    When the resulting `specIds` differ from the current set due to removals, the use
+    case MUST call `ChangeRepository.unscaffold(change, removedSpecIds)` to remove the
+    scaffolded directories for each removed spec from the change directory. This call
+    MUST happen after the change is persisted and before returning the result. If any
+    directory contains files, they MUST be removed along with the directory.
+
+    Directories to remove follow the change directory layout:
+    - `specs/<workspace>/<capability-path>/` — new-spec artifact directories
+    - `deltas/<workspace>/<capability-path>/` — delta artifact directories
+
+    The `unscaffold` operation is idempotent — if a directory does not exist, it
+    is silently skipped.
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Dependencies'
+  content: |
+    ### Requirement: Dependencies
+
+    `EditChange` depends on the following ports injected via constructor:
+
+    - `ChangeRepository` — for loading, persisting, scaffolding, and unscaffolding changes
+    - `ActorResolver` — for resolving the current actor identity
+    - `specs: ReadonlyMap<string, SpecRepository>` — spec repositories keyed by workspace name, used for the `specExists` check during scaffolding

@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'No change to global documentation requirements; this spec is included to own the docs/cli/cli-reference.md update required by the existing CLI documentation rule.'

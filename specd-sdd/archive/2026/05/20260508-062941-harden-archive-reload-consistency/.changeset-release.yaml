@@ -1,0 +1,10 @@
+releases:
+  core:core/archive-change: patch
+  core:core/change-layout: patch
+  core:core/validate-artifacts: patch
+  core:core/change-manifest: patch
+  core:core/change-repository-port: patch
+  core:core/spec-repository-port: patch
+  core:core/archive-repository-port: patch
+  core:core/storage: patch
+  core:core/change: patch

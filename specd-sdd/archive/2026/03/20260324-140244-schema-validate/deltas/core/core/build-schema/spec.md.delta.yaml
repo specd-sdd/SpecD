@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'Standalone mode uses buildSchema as-is — no spec changes needed'

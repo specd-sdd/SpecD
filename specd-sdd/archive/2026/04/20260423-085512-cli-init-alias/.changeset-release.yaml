@@ -1,0 +1,3 @@
+releases:
+  cli:cli/project-init: patch
+  cli:cli/entrypoint: patch

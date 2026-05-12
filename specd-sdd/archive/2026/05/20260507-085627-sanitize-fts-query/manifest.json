@@ -1,0 +1,318 @@
+{
+  "name": "sanitize-fts-query",
+  "createdAt": "2026-05-07T08:56:27.710Z",
+  "description": "Add sanitizeFtsQuery() to SQLite searchSymbols and searchSpecs to prevent FTS5 syntax errors on hyphenated or special-character queries. Migrate LadybugGraphStore from manual string interpolation (this.escape()) to prepared statements (conn.prepare() + $param bindings) for all parameterized queries, removing the escape() method entirely. Both stores now handle user search input safely without requiring API changes.",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": ["code-graph:sqlite-graph-store", "code-graph:ladybug-graph-store"],
+  "specDependsOn": {
+    "code-graph:sqlite-graph-store": [
+      "code-graph:graph-store",
+      "core:config",
+      "code-graph:symbol-model",
+      "code-graph:workspace-integration"
+    ],
+    "code-graph:ladybug-graph-store": [
+      "code-graph:graph-store",
+      "core:config",
+      "code-graph:symbol-model",
+      "code-graph:workspace-integration"
+    ]
+  },
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:9ff681700b460b4235feb3831658c64294a0885ce745378e8f0bc54412d388b9"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "code-graph:sqlite-graph-store",
+          "filename": "deltas/code-graph/sqlite-graph-store/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:135b41eac6de5d064b590dc93d5fa05d54ce0e0235808fac0d7d9e0a664e83cc"
+        },
+        {
+          "key": "code-graph:ladybug-graph-store",
+          "filename": "deltas/code-graph/ladybug-graph-store/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:0bd2ef72b7708cf63cf8a5b77789f89ae29b358ad716b43fcec8160445f821ac"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "code-graph:sqlite-graph-store",
+          "filename": "deltas/code-graph/sqlite-graph-store/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:a00a96935c566440a0c057f3a16c683fa76cb4540d8cd1948b7490ef33f3aa76"
+        },
+        {
+          "key": "code-graph:ladybug-graph-store",
+          "filename": "deltas/code-graph/ladybug-graph-store/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:b9f14c4c892d92a40ba92135334802b009a9f4f87edf4b3c7a7e295aa2ce8107"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:1ec97f26e88e05c6929e232e4a7458a0d465faa7e0daaeb05150580eb21afea2"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:353c5973659e0c955b5b69eea3908643ecdd4af68e79d56aec4e23c46db2da73"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-05-07T08:56:27.710Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "specIds": ["code-graph:sqlite-graph-store", "code-graph:ladybug-graph-store"],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-05-07T08:56:27.722Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:sqlite-graph-store"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:ladybug-graph-store"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:sqlite-graph-store"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:ladybug-graph-store"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-07T09:00:32.331Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-07T09:13:11.627Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-07T09:22:36.524Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-07T09:24:56.463Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-07T11:11:53.741Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-07T11:11:53.741Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-07T11:11:53.785Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-07T11:14:57.301Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-07T11:14:59.244Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-07T11:39:59.793Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-07T11:41:45.520Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-07T11:42:22.185Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "description-updated",
+      "at": "2026-05-07T15:34:35.803Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "description": "Add sanitizeFtsQuery() to SQLite searchSymbols and searchSpecs to prevent FTS5 syntax errors on hyphenated or special-character queries. Migrate LadybugGraphStore from manual string interpolation (this.escape()) to prepared statements (conn.prepare() + $param bindings) for all parameterized queries, removing the escape() method entirely. Both stores now handle user search input safely without requiring API changes."
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-07T15:34:48.941Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-05-07T15:34:49.170Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "m***a@g***.com"
+  }
+}

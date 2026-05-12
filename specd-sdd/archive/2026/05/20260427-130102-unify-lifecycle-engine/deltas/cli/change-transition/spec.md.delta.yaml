@@ -1,0 +1,23 @@
+# Delta: cli:change-transition
+
+- op: modified
+  description: 'Clarify that approval routing is delegated through core lifecycle interpretation.'
+  selector:
+    type: section
+    matches: 'Requirement: Approval-gate routing'
+  content: |
+    The CLI passes the `approvalsSpec` and `approvalsSignoff` flags from the loaded `SpecdConfig` to the `TransitionChange` use case. The use case, via `LifecycleEngine`, applies smart routing:
+
+    - When the change is in `ready` and `approvalsSpec: true`, `implementing` is silently routed to `pending-spec-approval`
+    - When the change is in `done` and `approvalsSignoff: true`, `archivable` is silently routed to `pending-signoff`
+
+    The user always specifies the logical target state; routing is transparent, and the CLI must not duplicate routing logic beyond choosing the requested target or `--next` target.
+
+- op: added
+  description: 'Clarify that repair guidance projects core lifecycle diagnostics.'
+  position:
+    parent:
+      type: section
+      matches: 'Constraints'
+  content: |
+    - Repair-guide blockers and next-action data are projected from core lifecycle diagnostics (`TransitionChange` failure plus `GetStatus`), not recomputed in the CLI layer

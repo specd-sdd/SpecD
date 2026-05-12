@@ -1,0 +1,160 @@
+- op: modified
+  description: 'Cover includeChangeSpecs direct seeding semantics.'
+  selector:
+    type: section
+    matches: 'Requirement: Context spec collection'
+  content: |
+    #### Scenario: includeChangeSpecs false skips direct change spec seed
+
+    - **GIVEN** a change with `specIds: ["core:core/config"]`
+    - **AND** `core:core/config` is not matched by include patterns and not discovered via traversal
+    - **WHEN** `CompileContext.execute` is called with `includeChangeSpecs: false`
+    - **THEN** `core:core/config` is not included solely because it is in `change.specIds`
+
+    #### Scenario: includeChangeSpecs true keeps direct change spec even if excluded
+
+    - **GIVEN** a change with `specIds: ["core:core/config"]`
+    - **AND** an exclude pattern matches `core:core/config`
+    - **WHEN** `CompileContext.execute` is called with `includeChangeSpecs: true`
+    - **THEN** `core:core/config` remains in the collected set as a mandatory direct seed
+
+    #### Scenario: includeChangeSpecs false allows reinjection through include patterns
+
+    - **GIVEN** a change with `specIds: ["core:core/config"]`
+    - **AND** project include patterns match `core:core/config`
+    - **WHEN** `CompileContext.execute` is called with `includeChangeSpecs: false`
+    - **THEN** `core:core/config` is still included through include-pattern collection
+
+    #### Scenario: includeChangeSpecs false allows reinjection through traversal
+
+    - **GIVEN** a change with `specIds: ["core:core/config"]`
+    - **AND** another spec in traversal depends on `core:core/config`
+    - **WHEN** `CompileContext.execute` is called with `includeChangeSpecs: false` and `followDeps: true`
+    - **THEN** `core:core/config` is included through `dependsOn` traversal
+
+- op: modified
+  description: 'Rename tier classification to context display modes and verify all modes.'
+  selector:
+    type: section
+    matches: 'Requirement: Tier classification'
+  rename: 'Requirement: Context display modes'
+  content: |
+    #### Scenario: Summary mode is the default when contextMode is omitted
+
+    - **GIVEN** `contextMode` is not declared in config
+    - **WHEN** `CompileContext.execute` is called
+    - **THEN** collected specs are emitted in summary mode unless another mode is explicitly requested
+
+    #### Scenario: List mode emits list entries only
+
+    - **GIVEN** `contextMode: "list"`
+    - **WHEN** `CompileContext.execute` is called
+    - **THEN** every emitted spec entry has `mode: "list"`
+    - **AND** no emitted entry contains full content
+
+    #### Scenario: Summary mode emits summary entries only
+
+    - **GIVEN** `contextMode: "summary"`
+    - **WHEN** `CompileContext.execute` is called
+    - **THEN** every emitted spec entry has `mode: "summary"`
+    - **AND** no emitted entry contains full content
+
+    #### Scenario: Full mode emits full entries only
+
+    - **GIVEN** `contextMode: "full"`
+    - **WHEN** `CompileContext.execute` is called
+    - **THEN** every emitted spec entry has `mode: "full"`
+    - **AND** each emitted entry contains renderable content
+
+    #### Scenario: Hybrid mode renders direct change specs in full
+
+    - **GIVEN** `contextMode: "hybrid"`
+    - **AND** `includeChangeSpecs: true`
+    - **AND** a spec is in `change.specIds`
+    - **WHEN** `CompileContext.execute` is called
+    - **THEN** that spec is emitted in full mode
+
+    #### Scenario: Hybrid mode renders non-direct specs as summary
+
+    - **GIVEN** `contextMode: "hybrid"`
+    - **AND** a spec is collected from include patterns or traversal and is not a direct included change spec
+    - **WHEN** `CompileContext.execute` is called
+    - **THEN** that spec is emitted in summary mode
+
+    #### Scenario: Section flags do not affect list and summary entries
+
+    - **GIVEN** `contextMode: "list"` or `contextMode: "summary"`
+    - **WHEN** `CompileContext.execute` is called with section filters
+    - **THEN** emitted entries remain list/summary shaped without full content blocks
+
+- op: modified
+  description: 'Validate list mode in structured result shape.'
+  selector:
+    type: section
+    matches: 'Requirement: Structured result assembly'
+  content: |
+    #### Scenario: availableSteps includes all workflow steps
+
+    - **WHEN** `CompileContext.execute` is called
+    - **THEN** `availableSteps` includes all steps from the active schema workflow
+
+    #### Scenario: List-mode structured entry omits summary and content fields
+
+    - **GIVEN** `contextMode: "list"`
+    - **WHEN** `CompileContext.execute` is called
+    - **THEN** each list entry includes `specId`, `source`, and `mode`
+    - **AND** list entries omit full content
+
+    #### Scenario: Summary-mode structured entry omits content
+
+    - **GIVEN** `contextMode: "summary"`
+    - **WHEN** `CompileContext.execute` is called
+    - **THEN** each summary entry omits full content
+
+    #### Scenario: Full-mode structured entry includes content
+
+    - **GIVEN** `contextMode: "full"`
+    - **WHEN** `CompileContext.execute` is called
+    - **THEN** each full entry includes content
+
+- op: modified
+  description: 'Remove lazy terminology from preview behavior scenario.'
+  selector:
+    type: section
+    matches: 'Requirement: Materialized delta view'
+  content: |
+    #### Scenario: Spec with validated delta returns merged content
+
+    - **GIVEN** a change with `specIds: ["core:core/config"]` and a validated delta for `spec.md`
+    - **AND** `PreviewSpec` returns a `files` entry with `filename: "spec.md"` and `merged: "merged content"`
+    - **WHEN** `CompileContext.execute` renders content for `core:core/config` in full mode
+    - **THEN** the `ContextSpecEntry.content` equals `"merged content"`
+
+    #### Scenario: Spec with no delta falls back to base content
+
+    - **GIVEN** a change with `specIds: ["core:core/config"]` and no delta files
+    - **AND** `PreviewSpec` returns an empty `files` array
+    - **WHEN** `CompileContext.execute` renders content for `core:core/config` in full mode
+    - **THEN** the `ContextSpecEntry.content` is rendered from metadata or extraction fallback as before
+
+    #### Scenario: PreviewSpec failure falls back gracefully
+
+    - **GIVEN** a change with `specIds: ["core:core/config"]` and a delta file
+    - **AND** `PreviewSpec` throws an error during execution
+    - **WHEN** `CompileContext.execute` renders content for `core:core/config`
+    - **THEN** the `ContextSpecEntry.content` is rendered from metadata or extraction fallback
+    - **AND** a warning is added to the result
+
+    #### Scenario: Preview only applies to specIds specs
+
+    - **GIVEN** a change with `specIds: ["core:core/config"]`
+    - **AND** the context includes `default:_global/architecture` via include pattern
+    - **WHEN** `CompileContext.execute` is called
+    - **THEN** `PreviewSpec` is NOT called for `default:_global/architecture`
+    - **AND** `default:_global/architecture` content is rendered from its base (metadata or fallback)
+
+    #### Scenario: Non-full specs are not previewed
+
+    - **GIVEN** `contextMode: "summary"` and a spec matched only via include pattern
+    - **WHEN** `CompileContext.execute` is called
+    - **THEN** `PreviewSpec` is NOT called for that spec — non-full specs have no merged content to render

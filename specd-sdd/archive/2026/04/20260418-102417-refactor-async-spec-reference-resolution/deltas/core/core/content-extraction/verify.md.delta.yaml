@@ -1,0 +1,130 @@
+- op: modified
+  description: 'Add verification that simple extraction awaits async transforms'
+  selector:
+    type: section
+    matches: '^Requirement: Simple extraction$'
+  content: |
+    #### Scenario: Extract with capture group
+
+    - **GIVEN** a section containing `[dep1](../dep1/spec.md) and [dep2](../dep2/spec.md)`
+    - **WHEN** `extractContent` runs with `capture: '\[.*?\]\(([^)]+)\)'`
+    - **THEN** the result is `["../dep1/spec.md", "../dep2/spec.md"]`
+    - **AND** each emitted value corresponds to the first capture group for its regex match
+
+    #### Scenario: Extract with strip
+
+    - **GIVEN** a section with label `Requirement: User Login`
+    - **WHEN** `extractContent` runs with `extract: 'label'` and `strip: '^Requirement:\s*'`
+    - **THEN** the result is `["User Login"]`
+
+    #### Scenario: Extract with named transform and interpolated args
+
+    - **GIVEN** extracted text `v2026-04-09`
+    - **AND** `capture` groups expose `$0 = v2026-04-09`, `$1 = 2026`, `$2 = 04`, `$3 = 09`
+    - **AND** a transform `joinDate` is registered with args `["$3", "/", "$2", "/", "$1"]`
+    - **WHEN** `extractContent` runs with that transform declaration
+    - **THEN** the transform is called with `value = "2026"` when the first capture group is the semantic value for that match
+    - **AND** the interpolated args are `["09", "/", "04", "/", "2026"]`
+
+    #### Scenario: Async transform is awaited before the result is returned
+
+    - **GIVEN** an extractor emits a captured value
+    - **AND** the registered transform returns a promise that resolves to a normalized string
+    - **WHEN** `extractContent` runs with that transform
+    - **THEN** the extraction result includes the resolved string rather than a pending promise value
+
+    #### Scenario: No matches returns empty array
+
+    - **WHEN** the selector matches zero nodes
+    - **THEN** `extractContent` returns `[]`
+- op: modified
+  description: 'Clarify that structured field transforms are awaited'
+  selector:
+    type: section
+    matches: '^Requirement: Structured extraction$'
+  content: |
+    #### Scenario: Fields produce structured objects
+
+    - **GIVEN** a `Scenario: Token Valid` section with list-item children for GIVEN, WHEN, THEN
+    - **WHEN** `extractContent` runs with `fields` mapping `name` from label and `given`/`when`/`then` via `childSelector`
+    - **THEN** the result is one object with `name: "Token Valid"`, `given: [...]`, `when: [...]`, `then: [...]`
+
+    #### Scenario: parentLabel walks ancestor chain
+
+    - **GIVEN** a `Scenario: X` section nested under `Requirement: Auth`
+    - **WHEN** a field declares `from: 'parentLabel'` with `strip: '^Requirement:\s*'`
+    - **THEN** the field value is `Auth`
+
+    #### Scenario: Field transform runs per extracted field value
+
+    - **GIVEN** a field mapping extracts `../shared/spec.md`
+    - **AND** that field declares `transform: resolveSpecPath`
+    - **WHEN** structured extraction runs with a registry containing `resolveSpecPath`
+    - **THEN** the transform is applied to that field value before the structured result is returned
+
+    #### Scenario: Async field transform is awaited before the structured result is returned
+
+    - **GIVEN** a field mapping extracts a dependency candidate
+    - **AND** that field's registered transform returns a promise that resolves to a normalized value
+    - **WHEN** structured extraction runs
+    - **THEN** the structured result includes the resolved value after the promise settles
+- op: modified
+  description: 'Extend transform callback verification to cover async execution and rejection'
+  selector:
+    type: section
+    matches: '^Requirement: Transform callbacks$'
+  content: |
+    #### Scenario: Unknown transform fails with ExtractorTransformError
+
+    - **GIVEN** an extractor with `transform: 'unknownTransform'`
+    - **AND** no transform by that name exists in the registry
+    - **WHEN** `extractContent` runs
+    - **THEN** extraction fails with `ExtractorTransformError`
+    - **AND** the error identifies `unknownTransform` as the missing transform name
+
+    #### Scenario: Field transform failure identifies the field
+
+    - **GIVEN** a structured extractor with a field `dependsOn` that declares `transform: resolveSpecPath`
+    - **AND** the registered transform throws or rejects while processing that field
+    - **WHEN** `extractContent` runs
+    - **THEN** extraction fails with `ExtractorTransformError`
+    - **AND** the error identifies `resolveSpecPath` as the transform name
+    - **AND** the error identifies `dependsOn` as the failing field
+
+    #### Scenario: Transform may fail when required context is absent
+
+    - **GIVEN** a registered transform requires `originSpecPath` in the context bag
+    - **AND** the caller omits that key
+    - **WHEN** `extractContent` runs and invokes the transform
+    - **THEN** extraction fails with `ExtractorTransformError`
+    - **AND** that failure propagates to the caller without being ignored
+
+    #### Scenario: Transform may not silently drop an extracted value
+
+    - **GIVEN** an extractor emits a value and a registered transform receives it
+    - **WHEN** that transform attempts to return a null value instead of a normalized string
+    - **THEN** extraction fails with `ExtractorTransformError`
+    - **AND** the value is not silently omitted from the final result
+
+    #### Scenario: Async transform result is awaited
+
+    - **GIVEN** a registered transform returns a promise that resolves to a normalized string
+    - **WHEN** `extractContent` runs
+    - **THEN** extraction awaits the promise before returning the final extracted value
+
+    #### Scenario: resolveSpecPath accepts a canonical spec ID directly
+
+    - **GIVEN** an extractor captures the dependency label as `value`
+    - **AND** the extracted value is already the canonical spec ID `core:core/storage`
+    - **WHEN** `extractContent` runs with a registry containing `resolveSpecPath`
+    - **THEN** the transform returns `core:core/storage` as-is instead of failing or discarding the value
+
+    #### Scenario: resolveSpecPath falls back from value to captured href args
+
+    - **GIVEN** an extractor captures the dependency label as `value`
+    - **AND** the extracted value is the legacy label `specs/core/storage/spec.md`
+    - **AND** the transform args resolve to `["../storage/spec.md"]`
+    - **WHEN** `extractContent` runs with a registry containing `resolveSpecPath`
+    - **THEN** the transform first attempts to resolve `value`
+    - **AND** when `value` is not resolvable as a canonical spec ID it attempts the href args in order
+    - **AND** the transform returns `core:core/storage` from the first resolvable fallback candidate

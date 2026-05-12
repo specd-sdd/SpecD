@@ -1,0 +1,49 @@
+- op: modified
+  description: 'Update AgentPlugin to use SpecdConfig and renamed agent types'
+  selector:
+    type: section
+    matches: 'Requirement: AgentPlugin extends SpecdPlugin'
+  content: |
+    `AgentPlugin` MUST extend `SpecdPlugin` with `type: 'agent'` and add:
+
+    - `install(config: SpecdConfig, options?: AgentInstallOptions): Promise<AgentInstallResult>`
+    - `uninstall(config: SpecdConfig, options?: AgentInstallOptions): Promise<void>`
+
+    The `AgentPlugin` SHALL receive the full `SpecdConfig` object to ensure it has access to the project root and any necessary workspace or storage configuration.
+
+- op: modified
+  description: 'Rename InstallOptions to AgentInstallOptions'
+  selector:
+    type: section
+    matches: 'Requirement: InstallOptions'
+  rename: 'Requirement: AgentInstallOptions'
+  content: |
+    ```typescript
+    interface AgentInstallOptions {
+      skills?: string[] // specific skill names; omit = all
+      variables?: Record<string, string> // variable substitution
+    }
+    ```
+
+- op: modified
+  description: 'Rename InstallResult to AgentInstallResult'
+  selector:
+    type: section
+    matches: 'Requirement: InstallResult'
+  rename: 'Requirement: AgentInstallResult'
+  content: |
+    ```typescript
+    interface AgentInstallResult {
+      installed: Array<{ skill: string; path: string }>
+      skipped: Array<{ skill: string; reason: string }>
+    }
+    ```
+
+- op: modified
+  description: 'Add core:core/config dependency'
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`core:core/config`](../../core/core/config/spec.md) — defines SpecdConfig type
+    - [`plugin-manager:specd-plugin-type`](../specd-plugin-type/spec.md) — base plugin interface

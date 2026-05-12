@@ -1,0 +1,48 @@
+- op: modified
+  description: 'Update metadata file present scenario to reference JSON'
+  selector:
+    type: section
+    matches: 'Scenario: Metadata file present'
+  content: |
+    #### Scenario: Metadata file present
+
+    - **GIVEN** a spec at `core:core/config` with a `metadata.json` at `.specd/metadata/core/config/metadata.json`
+    - **WHEN** `metadata(spec)` is called
+    - **THEN** the result contains the parsed JSON fields
+
+- op: modified
+  description: 'Update metadata file absent scenario'
+  selector:
+    type: section
+    matches: 'Scenario: Metadata file absent'
+  content: |
+    #### Scenario: Metadata file absent
+
+    - **GIVEN** no `metadata.json` exists for the spec
+    - **WHEN** `metadata(spec)` is called
+    - **THEN** the result is `null`
+
+- op: modified
+  description: 'Update valid metadata scenario to use JSON example'
+  selector:
+    type: section
+    matches: 'Scenario: Valid metadata file with all fields'
+  content: |
+    #### Scenario: Valid metadata file with all fields
+
+    - **GIVEN** a `metadata.json` containing `{"title":"Config","description":"Project configuration","dependsOn":["core:core/storage"],"contentHashes":{"spec.md":"sha256:abc..."},"generatedBy":"core"}`
+    - **WHEN** it is parsed by the lenient schema
+    - **THEN** all fields are present in the result
+
+- op: modified
+  description: 'Update metadata committed scenario to reference JSON'
+  selector:
+    type: section
+    matches: 'Scenario: Metadata committed with project'
+  content: |
+    #### Scenario: Metadata committed with project
+
+    - **GIVEN** a project with `.specd/metadata/` tracked in version control
+    - **WHEN** metadata is generated (as `metadata.json`)
+    - **THEN** the `.json` files are committed alongside specs
+    - **AND** consumers read them without regeneration

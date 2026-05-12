@@ -1,0 +1,15 @@
+- op: added
+  description: 'Expose a kernel builder as part of the composition surface'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Kernel builds all use cases from SpecdConfig$'
+  content: |
+    ### Requirement: Composition layer exposes a kernel builder
+
+    The composition layer SHALL expose a fluent kernel builder entry point in addition to `createKernel(config, options)`. The builder SHALL accumulate the same additive registrations supported by `KernelOptions` and SHALL build kernels with behavior equivalent to the lower-level construction path.
+
+    The builder is part of the public composition surface. It MUST NOT introduce a second, incompatible extensibility model.

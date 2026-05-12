@@ -1,0 +1,7 @@
+- op: modified
+  description: 'Update removes contentHashes to use JSON serialization'
+  selector:
+    type: section
+    matches: 'Requirement: Removes contentHashes'
+  content: |
+    When executed, loads the existing metadata via `repo.metadata(spec)`. If metadata exists, removes the `contentHashes` and `originalHash` fields, serializes the rest with `JSON.stringify(withoutHashes, null, 2)`, and writes back via `repo.saveMetadata(spec, content, { force: true })`. The `YamlSerializer` dependency is no longer needed.

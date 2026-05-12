@@ -1,0 +1,107 @@
+- op: modified
+  description: 'Replace path-centric indexing verification with shared graph CLI context scenarios'
+  selector:
+    type: section
+    matches: '^Requirement: Indexing behaviour$'
+    parent:
+      type: section
+      matches: '^Requirements$'
+  content: |
+    #### Scenario: Successful indexing with autodetected config
+
+    - **GIVEN** the current working directory resolves to a project with `specd.yaml`
+    - **WHEN** `specd graph index` is run
+    - **THEN** the command uses the discovered config to build workspace index targets
+    - **AND** stdout shows `Indexed N file(s) in Xms` followed by the summary lines
+    - **AND** the process exits with code 0
+
+    #### Scenario: Explicit config path bypasses discovery
+
+    - **GIVEN** the current directory would autodiscover a different `specd.yaml`
+    - **WHEN** `specd graph index --config /tmp/other/specd.yaml` is run
+    - **THEN** the command uses `/tmp/other/specd.yaml` directly
+    - **AND** indexing targets come from that config rather than from autodiscovery
+
+    #### Scenario: Explicit path enters bootstrap mode
+
+    - **GIVEN** a `specd.yaml` exists under the current repository
+    - **WHEN** `specd graph index --path /tmp/repo` is run
+    - **THEN** config discovery is ignored
+    - **AND** indexing runs against a synthetic single workspace `default` rooted at `/tmp/repo`
+
+    #### Scenario: Missing config falls back to bootstrap mode
+
+    - **GIVEN** no `specd.yaml` is found by autodiscovery
+    - **WHEN** `specd graph index` is run inside a repository
+    - **THEN** the command indexes the resolved VCS root in bootstrap mode as workspace `default`
+
+    #### Scenario: Force flag clears existing data
+
+    - **GIVEN** the workspace has been previously indexed
+    - **WHEN** `specd graph index --force` is run
+    - **THEN** the `.lbug`, `.lbug.wal`, and `.lbug.lock` files are deleted before opening the provider
+    - **AND** `filesRemoved` in the output reflects the previously indexed files
+
+    #### Scenario: Process exits explicitly
+
+    - **GIVEN** indexing completes successfully
+    - **WHEN** the provider is closed
+    - **THEN** `process.exit(0)` is called to prevent the LadybugDB addon from keeping the process alive
+
+    #### Scenario: --exclude-path merges on top of config excludePaths
+
+    - **GIVEN** workspace config has `graph.excludePaths: ["dist/"]`
+    - **AND** the command is run with `--exclude-path "fixtures/"`
+    - **WHEN** indexing runs
+    - **THEN** the effective exclusion list is `["dist/", "fixtures/"]`
+    - **AND** `specd.yaml` is not modified
+- op: modified
+  description: 'Add mutually exclusive context flag failure'
+  selector:
+    type: section
+    matches: '^Requirement: Error cases$'
+    parent:
+      type: section
+      matches: '^Requirements$'
+  content: |
+    #### Scenario: Mutually exclusive context flags fail fast
+
+    - **WHEN** `specd graph index --config ./specd.yaml --path .` is run
+    - **THEN** stderr contains a CLI error about incompatible flags
+    - **AND** no graph provider is opened
+    - **AND** the process exits with code 1
+
+    #### Scenario: Infrastructure error exits with code 3
+
+    - **GIVEN** the provider cannot be opened (e.g. database I/O error)
+    - **WHEN** `specd graph index` is run
+    - **THEN** stderr contains a `fatal:` prefixed error message
+    - **AND** the process exits with code 3
+
+    #### Scenario: Per-file errors do not cause non-zero exit
+
+    - **GIVEN** indexing encounters parse failures in some files
+    - **WHEN** `specd graph index` is run
+    - **THEN** the errors are included in the `errors` array of the output
+    - **AND** the process exits with code 0
+- op: modified
+  description: 'Document bootstrap semantics in CLI reference verification'
+  selector:
+    type: section
+    matches: '^Requirement: CLI reference documentation$'
+    parent:
+      type: section
+      matches: '^Requirements$'
+  content: |
+    #### Scenario: graph section present in CLI reference
+
+    - **WHEN** `docs/cli/cli-reference.md` is inspected
+    - **THEN** a `## graph` section exists covering `index`, `search`, `hotspots`, `stats`, and `impact`
+
+    #### Scenario: graph index flags documented
+
+    - **WHEN** the `### graph index` subsection is read
+    - **THEN** `--exclude-path`, `--workspace`, `--force`, `--config`, `--path`, and `--format` are documented with descriptions
+    - **AND** the `graph.excludePaths` and `graph.respectGitignore` config fields are explained
+    - **AND** the bootstrap-only nature of `--path` and no-config fallback is stated
+    - **AND** an example shows negation syntax (e.g. `!.specd/metadata/`)

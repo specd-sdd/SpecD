@@ -1,0 +1,892 @@
+{
+  "name": "improve-specd-diagnostics-and-ux",
+  "createdAt": "2026-04-24T21:40:07.386Z",
+  "description": "Rename warnings to notes, provide clear blockers in status/transition, and optimize skill diagnostic output.",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "core:core/get-status",
+    "core:core/transition-change",
+    "cli:cli/change-status",
+    "cli:cli/change-transition",
+    "cli:cli/change-validate",
+    "skills:workflow-automation",
+    "core:core/change"
+  ],
+  "specDependsOn": {
+    "core:core/get-status": [
+      "core:core/change",
+      "core:core/kernel",
+      "core:core/transition-change",
+      "core:core/schema-format",
+      "core:core/config"
+    ],
+    "core:core/transition-change": [
+      "core:core/change",
+      "core:core/run-step-hooks",
+      "core:core/hook-execution-model",
+      "core:core/workflow-model",
+      "default:_global/architecture"
+    ],
+    "cli:cli/change-status": ["cli:cli/entrypoint", "core:core/change", "core:core/get-status"],
+    "cli:cli/change-transition": [
+      "cli:cli/entrypoint",
+      "core:core/change",
+      "core:core/transition-change",
+      "core:core/hook-execution-model"
+    ],
+    "cli:cli/change-validate": [
+      "cli:cli/entrypoint",
+      "core:core/change",
+      "core:core/validate-artifacts",
+      "core:core/spec-id-format"
+    ],
+    "core:core/change": [
+      "core:core/change-manifest",
+      "core:core/workflow-model",
+      "core:core/spec-metadata",
+      "core:core/spec-id-format",
+      "default:_global/architecture"
+    ]
+  },
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:c00a5a8f7a5f6c80500b5cd2a5e98c90650e7ed00e992e6f55771cdc6dabaf79"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:core/get-status",
+          "filename": "deltas/core/core/get-status/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:5ecec5cd66a35f50b05f6ed6ceec80dfc796a474b2d33cd35e30929b939e4865"
+        },
+        {
+          "key": "core:core/transition-change",
+          "filename": "deltas/core/core/transition-change/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:03415f1ee58bb78d9b48e0f421e779d414aa697882ad031f5e879164c579650b"
+        },
+        {
+          "key": "cli:cli/change-status",
+          "filename": "deltas/cli/cli/change-status/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:9afa9562c8ea0d50b06db829218cadb46e2a6923baf2fafde367f8f29f6e2632"
+        },
+        {
+          "key": "cli:cli/change-transition",
+          "filename": "deltas/cli/cli/change-transition/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:b6e9db97f809540e967123526e46f40e14a2ba6763461377e8e9e02e8bacfffc"
+        },
+        {
+          "key": "cli:cli/change-validate",
+          "filename": "deltas/cli/cli/change-validate/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:4464b1f71e0cb8c2516dff33ff7d4c1f2f0250b49daf6da49abd4d57efb2b1db"
+        },
+        {
+          "key": "skills:workflow-automation",
+          "filename": "specs/skills/workflow-automation/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:67801b77776c7d323676f910c6dad0208632d582e85989c5b8223e6b8a096ae6"
+        },
+        {
+          "key": "core:core/change",
+          "filename": "deltas/core/core/change/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:ba70a7034ae726b94571d4d5fb20bff4157be375b67f212ae4bdbc2c084d176c"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:core/get-status",
+          "filename": "deltas/core/core/get-status/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:75986f0a82dc93e66d6f0dccce03b26d0c10b761e49408b36885bb042bbe73ab"
+        },
+        {
+          "key": "core:core/transition-change",
+          "filename": "deltas/core/core/transition-change/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:be90eb226a215843f9b65b47052ff490f5138a5ede4252711a16c924645eec94"
+        },
+        {
+          "key": "cli:cli/change-status",
+          "filename": "deltas/cli/cli/change-status/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:99c682ae293e46402eead9c96ce57fffeba4da4546f711bc3b84a6e71ee255e8"
+        },
+        {
+          "key": "cli:cli/change-transition",
+          "filename": "deltas/cli/cli/change-transition/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:b11e85b1ca56547241bfda89f2a3bb34a5b1acc616a1af502c116ef5ef0df0de"
+        },
+        {
+          "key": "cli:cli/change-validate",
+          "filename": "deltas/cli/cli/change-validate/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:a110cd290df9ee04a34872c0bfeb4b339fff3390f79e0fe879c6fa46ef2e6948"
+        },
+        {
+          "key": "skills:workflow-automation",
+          "filename": "specs/skills/workflow-automation/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:2602a1f39d36d912c0de8098e73fe70f575fae98a99a7df7e9a77a95b74d6707"
+        },
+        {
+          "key": "core:core/change",
+          "filename": "deltas/core/core/change/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:f7b77a46e689020d036d09e533dd59c46ec23dfb091d6e8987a2f5327bb1202e"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:788b5a79b7af0e2926a5233727523180dafcda56f806f0472d93b47fd7a0b40a"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:f16aa87ef3ca92ed948f329a8af1df677f23d296c14677f72eeb3c3632fb571e"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-04-24T21:40:07.386Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "specIds": [
+        "core:core/get-status",
+        "core:core/transition-change",
+        "cli:cli/change-status",
+        "cli:cli/change-transition",
+        "cli:cli/change-validate"
+      ],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-24T21:40:07.398Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/get-status"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/transition-change"
+        },
+        {
+          "type": "specs",
+          "key": "cli:cli/change-status"
+        },
+        {
+          "type": "specs",
+          "key": "cli:cli/change-transition"
+        },
+        {
+          "type": "specs",
+          "key": "cli:cli/change-validate"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/get-status"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/transition-change"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/change-status"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/change-transition"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/change-validate"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-24T21:42:07.105Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-24T22:01:04.917Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-24T22:01:26.078Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:core/get-status",
+            "core:core/transition-change",
+            "cli:cli/change-status",
+            "cli:cli/change-transition",
+            "cli:cli/change-validate"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:core/get-status",
+            "core:core/transition-change",
+            "cli:cli/change-status",
+            "cli:cli/change-transition",
+            "cli:cli/change-validate"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-24T22:01:26.079Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "skills:workflow-automation"
+        },
+        {
+          "type": "verify",
+          "key": "skills:workflow-automation"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-24T22:04:23.578Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-24T22:05:23.843Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:cli/change-status, cli:cli/change-transition, cli:cli/change-validate, core:core/get-status]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "cli:cli/change-status",
+            "cli:cli/change-transition",
+            "cli:cli/change-validate",
+            "core:core/get-status"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-24T22:05:23.843Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-24T22:11:37.378Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:cli/change-status]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["cli:cli/change-status"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-24T22:13:01.205Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-24T22:13:29.978Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-25T07:28:26.888Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:core/get-status",
+            "core:core/transition-change",
+            "cli:cli/change-status",
+            "cli:cli/change-transition",
+            "cli:cli/change-validate",
+            "skills:workflow-automation"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:core/get-status",
+            "core:core/transition-change",
+            "cli:cli/change-status",
+            "cli:cli/change-transition",
+            "cli:cli/change-validate",
+            "skills:workflow-automation"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-25T07:28:26.888Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-25T07:30:28.095Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:cli/change-status, core:core/get-status]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["cli:cli/change-status", "core:core/get-status"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-25T07:32:32.734Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:cli/change-status, core:core/get-status]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["cli:cli/change-status", "core:core/get-status"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-25T07:36:18.572Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-25T07:56:32.876Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]; design [design]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-25T07:56:32.876Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-25T08:04:39.711Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]; specs [cli:cli/change-status]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["cli:cli/change-status"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-25T08:07:53.640Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-25T08:11:15.073Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-25T14:21:22.545Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-25T14:23:48.433Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-25T14:32:54.957Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-25T14:32:54.957Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-25T15:23:33.321Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-26T15:06:51.041Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]; specs [cli:cli/change-validate]; design [design]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["cli:cli/change-validate"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-26T15:06:51.041Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-26T15:08:19.533Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-26T15:53:50.013Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:cli/change-status, cli:cli/change-transition, core:core/get-status, core:core/transition-change, skills:workflow-automation]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "cli:cli/change-status",
+            "cli:cli/change-transition",
+            "core:core/get-status",
+            "core:core/transition-change",
+            "skills:workflow-automation"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-26T15:54:01.808Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:core/get-status",
+            "core:core/transition-change",
+            "cli:cli/change-status",
+            "cli:cli/change-transition",
+            "cli:cli/change-validate",
+            "skills:workflow-automation"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:core/get-status",
+            "core:core/transition-change",
+            "cli:cli/change-status",
+            "cli:cli/change-transition",
+            "cli:cli/change-validate",
+            "skills:workflow-automation"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-26T15:54:01.808Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:core/change"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/change"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-26T16:14:28.218Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-26T16:15:37.876Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-26T17:10:35.946Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-26T17:10:49.279Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-27T05:41:16.362Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-27T05:41:24.233Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-04-27T05:41:57.072Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "m***a@g***.com"
+  }
+}

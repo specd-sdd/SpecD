@@ -1,0 +1,43 @@
+- op: removed
+  selector: { type: section, matches: 'Scenario: Skills install into Open Code directory' }
+- op: added
+  position:
+    parent: { type: section, matches: 'Requirement: Install location' }
+  content: |
+    #### Scenario: Skills install into Open Code directory
+
+    - **GIVEN** a `SpecdConfig` with `projectRoot`
+    - **WHEN** install writes skill files
+    - **THEN** files are created under `.opencode/skills/` within the provided project root
+- op: removed
+  selector:
+    {
+      type: section,
+      matches: 'Scenario: Uninstall removes selected skills when filter is provided',
+    }
+- op: added
+  position:
+    parent: { type: section, matches: 'Requirement: Uninstall behavior' }
+  content: |
+    #### Scenario: Uninstall removes selected skills when filter is provided
+
+    - **GIVEN** a `SpecdConfig` and multiple skills installed under `.opencode/skills/`
+    - **WHEN** `uninstall(config, { skills: ['specd-design'] })` is executed
+    - **THEN** only the selected skill directories are removed
+- op: removed
+  selector:
+    { type: section, matches: 'Scenario: Uninstall removes all skills when no filter is provided' }
+- op: added
+  position:
+    parent: { type: section, matches: 'Requirement: Uninstall behavior' }
+    after:
+      {
+        type: section,
+        matches: 'Scenario: Uninstall removes selected skills when filter is provided',
+      }
+  content: |
+    #### Scenario: Uninstall removes all skills when no filter is provided
+
+    - **GIVEN** a `SpecdConfig` and skills installed under `.opencode/skills/`
+    - **WHEN** `uninstall(config, optionsWithoutSkills)` is executed
+    - **THEN** the full `.opencode/skills/` tree is removed

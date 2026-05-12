@@ -1,0 +1,22 @@
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Artifact validation clearing on verifying to implementing'
+  content: |
+    ### Requirement: Transition to designing from any state
+
+    Every state except `drafting` SHALL include `designing` as a valid transition target. This allows the user to return to the design phase at any point in the lifecycle when issues are discovered.
+
+    When the effective target is `designing`, the use case MUST:
+
+    1. Invalidate the active spec approval if one exists — call `change.invalidate('redesign', actor)`.
+    2. Invalidate the active signoff if one exists — the invalidation in step 1 already clears both.
+    3. Proceed with the transition via `change.transition('designing', actor)`.
+
+    If no active approvals exist, the transition proceeds directly without invalidation.
+
+    The `archivable` state is no longer terminal — it can transition to `designing` like any other state.

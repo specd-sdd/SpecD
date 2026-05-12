@@ -1,0 +1,88 @@
+# Delta: cli:cli/schema-show — add description, output, hasTaskCompletionCheck
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Output format'
+  content: |
+    In `text` mode (default), the command prints the schema metadata followed by two sections:
+
+    ```
+    schema: <name>  version: <N>  kind: <kind>
+    extends: <ref>  (only if present)
+    plugins: <count> applied  (only if schemaPlugins is non-empty)
+
+    artifacts:
+      <id>  <scope>  <optional>  requires=[<id>,...]  output=<pattern>  [<description>]
+      ...
+
+    workflow:
+      <step>  requires=[<id>,...]
+      ...
+    ```
+
+    where `<optional>` is `optional` or `required`, and `requires` lists the artifact IDs or step names that must be complete before this entry is available. The `requires` field is omitted when empty. `output` is always shown. `<description>` is shown in brackets when present.
+
+    In `json` or `toon` mode, the output is (encoded in the respective format):
+
+    ```json
+    {
+      "schema": {"name": "...", "version": N, "kind": "schema", "extends": "..."},
+      "plugins": ["@specd/plugin-rfc"],
+      "artifacts": [
+        {
+          "id": "...",
+          "scope": "change|spec",
+          "optional": false,
+          "requires": [],
+          "format": "...",
+          "delta": false,
+          "description": "..." | null,
+          "output": "...",
+          "hasTaskCompletionCheck": false
+        }
+      ],
+      "workflow": [
+        {
+          "step": "...",
+          "requires": []
+        }
+      ]
+    }
+    ```
+
+    - `description` (string | null) — human-readable summary of the artifact's purpose; `null` when the schema does not declare one
+    - `output` (string) — the filename or glob pattern for the artifact's output files (e.g. `"proposal.md"`, `"specs/**/spec.md"`)
+    - `hasTaskCompletionCheck` (boolean) — `true` when the artifact declares a `taskCompletionCheck` configuration; `false` otherwise
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Constraints'
+  content: |
+    - This command is read-only
+    - Artifact `instruction`, `deltaInstruction`, `validations`, and `template` are not included in the output — this command focuses on structure, not content
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Examples'
+  content: |
+    ```
+    $ specd schema show
+    schema: specd-std  version: 1
+
+    artifacts:
+      proposal   change  optional   output=proposal.md  [Initial proposal outlining why the change is needed]
+      spec       change  required   requires=[proposal]  output=specs/**/spec.md
+      tasks      change  required   requires=[spec]  output=tasks.md
+
+    workflow:
+      designing     requires=[]
+      ready         requires=[spec]
+      implementing  requires=[spec]
+      verifying     requires=[tasks]
+
+    $ specd schema show --format json
+    {"schema":{"name":"specd-std","version":1},"artifacts":[...],"workflow":[...]}
+    ```

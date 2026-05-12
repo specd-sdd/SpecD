@@ -1,0 +1,19 @@
+- op: added
+  description: 'Define runtime ignore maintenance for archive-local artifacts'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Archive index$'
+  content: |
+    ### Requirement: Archive runtime ignore hygiene
+
+    Fs-backed archive storage MUST maintain an archive-local `.gitignore` for runtime archive artifacts.
+
+    `FsArchiveRepository` MUST ensure that the archive root ignores both `.specd-index.jsonl` and `.staging`.
+
+    This guarantee MUST be exercised by runtime archive behavior rather than relying on project bootstrap state alone, so archive ignore hygiene remains correct after archive directory relocation, recreation, or index recovery.
+
+    `FsArchiveRepository` MAY centralize this behavior in a shared internal archive-directory preparation helper, but the runtime guarantee MUST cover archive creation, index rebuild, and runtime index recovery or append paths.

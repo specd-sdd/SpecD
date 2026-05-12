@@ -1,0 +1,583 @@
+{
+  "name": "spec-list-filters",
+  "createdAt": "2026-05-03T18:00:43.295Z",
+  "description": "Add workspace filters and graph-backed search to 'specd specs list'",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "cli:cli/spec-list",
+    "cli:cli/spec-search",
+    "core:core/list-specs",
+    "core:core/spec-repository-port",
+    "core:core/search-specs"
+  ],
+  "specDependsOn": {
+    "cli:cli/spec-list": [
+      "cli:cli/entrypoint",
+      "cli:cli/command-resource-naming",
+      "cli:cli/spec-search"
+    ],
+    "cli:cli/spec-search": [
+      "cli:cli/entrypoint",
+      "default:_global/spec-layout",
+      "core:core/search-specs"
+    ],
+    "core:core/list-specs": [
+      "core:core/spec-metadata",
+      "core:core/content-extraction",
+      "core:core/storage",
+      "core:core/workspace"
+    ],
+    "core:core/spec-repository-port": [
+      "core:core/repository-port",
+      "default:_global/architecture",
+      "core:core/change",
+      "core:core/storage",
+      "core:core/workspace",
+      "core:core/spec-id-format",
+      "core:core/spec-metadata",
+      "core:core/search-specs"
+    ],
+    "core:core/search-specs": [
+      "core:core/spec-repository-port",
+      "core:core/list-specs",
+      "core:core/workspace"
+    ]
+  },
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:4f66854d052f3a5b9e62aefce002b2a5980a3e83087cfe94ca684e6c1809ecf9"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "cli:cli/spec-list",
+          "filename": "deltas/cli/cli/spec-list/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:fe2dc74d57a26ba5e3d1402e9e178d071a034238e6a33a29e870bfb04d4ae9e1"
+        },
+        {
+          "key": "cli:cli/spec-search",
+          "filename": "specs/cli/cli/spec-search/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:dbf5bf924820f32fa8844d01d8b2d21e640bc779704a0cf32df56d0dc37120a2"
+        },
+        {
+          "key": "core:core/list-specs",
+          "filename": "deltas/core/core/list-specs/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:5a9c64ea8fcee25fa038581ab18586ba115fcb71c3cf2594ddb40cedaa26faeb"
+        },
+        {
+          "key": "core:core/spec-repository-port",
+          "filename": "deltas/core/core/spec-repository-port/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:18987f06cf4cc2396684e9df47c5179f36587966e96820b39f3124460c96046a"
+        },
+        {
+          "key": "core:core/search-specs",
+          "filename": "specs/core/core/search-specs/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:927dba4d2fe99ded77ddcefd10e2442d7c057a83f167d8b43d9ced0d9b249eb8"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "cli:cli/spec-list",
+          "filename": "deltas/cli/cli/spec-list/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:5ac3d36be9ac43b9d3d0a3f7f47babdbf0b6d6552ede5cc4175b8b759ae4482b"
+        },
+        {
+          "key": "cli:cli/spec-search",
+          "filename": "specs/cli/cli/spec-search/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:c1e08c6097c3f9bf1e8857542b7cedde7bad87225be9b4f1a4291c725df1b120"
+        },
+        {
+          "key": "core:core/list-specs",
+          "filename": "deltas/core/core/list-specs/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:3576ddccfd442df506d18239f07875c879a6e51a283c74f805ecf0fa1507d5f9"
+        },
+        {
+          "key": "core:core/spec-repository-port",
+          "filename": "deltas/core/core/spec-repository-port/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:a0e84c477336f7fe57d48f2b51da1744a762b4ff379832658a3667d18ba59e55"
+        },
+        {
+          "key": "core:core/search-specs",
+          "filename": "specs/core/core/search-specs/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:eb2ce47616f93dd5a7beec0956dafec9e7241c59390cc4acebaf13baee48b1d2"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:619a4fee980d7b7f8864b6afcaa4824864906ed88d4d627954da20565b0a617b"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:461d62736cc20cadedc313c2486a3db659b889fd653cf8027487023c1a7616cb"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-05-03T18:00:43.295Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "specIds": ["cli:cli/spec-list"],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-05-03T18:00:43.304Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "cli:cli/spec-list"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/spec-list"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-03T18:03:00.324Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-03T18:21:38.337Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-03T18:38:08.145Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]; specs [cli:cli/spec-list]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["cli:cli/spec-list"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-03T18:38:27.443Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["cli:cli/spec-list"]
+        },
+        {
+          "type": "verify",
+          "files": ["cli:cli/spec-list"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-05-03T18:38:27.443Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "cli:cli/spec-search"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/spec-search"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-03T18:49:47.083Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-04T06:34:07.770Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-04T07:30:57.021Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:cli/spec-list]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["cli:cli/spec-list"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-04T07:32:00.473Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-04T07:47:55.531Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["cli:cli/spec-list", "cli:cli/spec-search"]
+        },
+        {
+          "type": "verify",
+          "files": ["cli:cli/spec-list", "cli:cli/spec-search"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-05-04T07:47:55.532Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:core/list-specs"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/list-specs"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-04T07:56:44.807Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["cli:cli/spec-list", "cli:cli/spec-search", "core:core/list-specs"]
+        },
+        {
+          "type": "verify",
+          "files": ["cli:cli/spec-list", "cli:cli/spec-search", "core:core/list-specs"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-05-04T07:56:44.809Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:core/spec-repository-port"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/search-specs"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/spec-repository-port"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/search-specs"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-04T08:34:36.235Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: design [design]",
+      "affectedArtifacts": [
+        {
+          "type": "design",
+          "files": ["design"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-04T08:36:43.525Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: design [design]",
+      "affectedArtifacts": [
+        {
+          "type": "design",
+          "files": ["design"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-04T08:43:04.209Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-04T08:44:14.604Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-04T14:21:51.626Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-04T14:26:23.045Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-04T14:26:38.599Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-04T14:28:38.124Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-05-04T14:28:38.241Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "m***a@g***.com"
+  }
+}

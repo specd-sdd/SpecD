@@ -1,0 +1,25 @@
+- op: added
+  description: 'Add native .env support requirement'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Forced mode'
+  content: |
+    ### Requirement: Native environment file support
+
+    The loader MUST attempt to load environment variables from `.env` and `.env.local` files in the project root using Node.js native `process.loadEnvFile()` (or equivalent).
+    - `.env.local` SHALL have higher priority than `.env`.
+    - Files absence MUST NOT be treated as an error.
+
+- op: modified
+  description: 'Update validation requirement to include environment mapping'
+  selector:
+    type: section
+    matches: 'Requirement: YAML parsing and structural validation'
+  content: |
+    The loader MUST parse the config file as YAML. After parsing, the loader MUST validate the resulting object against a Zod schema.
+
+    Before validation, the loader MUST merge supported environment variables into the configuration object. Environment variables MUST take precedence over file-based configuration.

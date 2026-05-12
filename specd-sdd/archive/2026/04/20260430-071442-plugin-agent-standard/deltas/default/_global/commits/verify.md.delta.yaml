@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'Existing verify scenarios remain valid — the scope-enum list update does not change verification behaviour'

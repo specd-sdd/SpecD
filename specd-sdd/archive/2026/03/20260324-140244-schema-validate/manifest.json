@@ -1,0 +1,439 @@
+{
+  "name": "schema-validate",
+  "createdAt": "2026-03-24T14:02:44.024Z",
+  "description": "Add specd schema validate CLI command to validate schema YAML files (active or standalone)",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "cli:cli/spec-validate",
+    "core:core/resolve-schema",
+    "core:core/build-schema",
+    "cli:cli/entrypoint",
+    "cli:cli/schema-validate",
+    "core:core/validate-schema"
+  ],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "validatedHash": "sha256:5e575800e1dd80dec8d01f43a35829cfb68e57f155a0907d6aeaf65c26d6df6b"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "files": [
+        {
+          "key": "cli:cli/spec-validate",
+          "filename": "deltas/cli/cli/spec-validate/spec.md.delta.yaml",
+          "validatedHash": "sha256:b8d206ae5dfcd6b628543c9a156c995340193b7f4e3f0e9f85e00cfa5ad2be4c"
+        },
+        {
+          "key": "core:core/resolve-schema",
+          "filename": "deltas/core/core/resolve-schema/spec.md.delta.yaml",
+          "validatedHash": "sha256:bf757df82c275c38fe44ea461376c2f4c3d240f7585007ee8ffce5acf62a3b24"
+        },
+        {
+          "key": "core:core/build-schema",
+          "filename": "deltas/core/core/build-schema/spec.md.delta.yaml",
+          "validatedHash": "sha256:1a2a6b6654360b98945c7a37f7069efcbfc3305115e14027f7ffd34fcccd639e"
+        },
+        {
+          "key": "cli:cli/entrypoint",
+          "filename": "deltas/cli/cli/entrypoint/spec.md.delta.yaml",
+          "validatedHash": "sha256:43b187f1caa70f53bc53e2068d8682ed129c65d0c4410fce0f9f3a1309649a53"
+        },
+        {
+          "key": "cli:cli/schema-validate",
+          "filename": "specs/cli/cli/schema-validate/spec.md",
+          "validatedHash": "sha256:06935c59dbcac9988e78577a7b9ecd2f1e3e0371ad138358c7d5ece1d219974f"
+        },
+        {
+          "key": "core:core/validate-schema",
+          "filename": "specs/core/core/validate-schema/spec.md",
+          "validatedHash": "sha256:9c02e18b493b8985c5c1c5251bd13148df57efb1e5d2998de630e2cc4957b599"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "files": [
+        {
+          "key": "cli:cli/spec-validate",
+          "filename": "deltas/cli/cli/spec-validate/verify.md.delta.yaml",
+          "validatedHash": "sha256:3d818e0f859c7bfe90e88f85b8e8f37c20bf75081b63e4464fcc860df5a6b487"
+        },
+        {
+          "key": "core:core/resolve-schema",
+          "filename": "deltas/core/core/resolve-schema/verify.md.delta.yaml",
+          "validatedHash": "sha256:3d818e0f859c7bfe90e88f85b8e8f37c20bf75081b63e4464fcc860df5a6b487"
+        },
+        {
+          "key": "core:core/build-schema",
+          "filename": "deltas/core/core/build-schema/verify.md.delta.yaml",
+          "validatedHash": "sha256:3d818e0f859c7bfe90e88f85b8e8f37c20bf75081b63e4464fcc860df5a6b487"
+        },
+        {
+          "key": "cli:cli/entrypoint",
+          "filename": "deltas/cli/cli/entrypoint/verify.md.delta.yaml",
+          "validatedHash": "sha256:3d818e0f859c7bfe90e88f85b8e8f37c20bf75081b63e4464fcc860df5a6b487"
+        },
+        {
+          "key": "cli:cli/schema-validate",
+          "filename": "specs/cli/cli/schema-validate/verify.md",
+          "validatedHash": "sha256:b1e570ecc98e8d5b572aeea7a50038cfcd24e7032c62f6c9e87b3b73d2143818"
+        },
+        {
+          "key": "core:core/validate-schema",
+          "filename": "specs/core/core/validate-schema/verify.md",
+          "validatedHash": "sha256:6ce741faea4a2a8add5710d090d26d33c6b22bf954e9b35462b68b646cd42eae"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "validatedHash": "sha256:99c27bce04688833b45c41ccb578da75659975b05d4ede086c2c6aaf982c3f95"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "validatedHash": "sha256:467eb0b0b087cae16b6f8cfeebefe38964e9a82268ebf0f05f2bdbe952f279f3"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-03-24T14:02:44.024Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "specIds": [
+        "cli:cli/spec-validate",
+        "core:core/resolve-schema",
+        "core:core/build-schema",
+        "cli:cli/entrypoint"
+      ],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-03-24T14:02:44.034Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "cli:cli/spec-validate"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/resolve-schema"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/build-schema"
+        },
+        {
+          "type": "specs",
+          "key": "cli:cli/entrypoint"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/spec-validate"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/resolve-schema"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/build-schema"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/entrypoint"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-24T14:03:35.799Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-03-24T14:07:50.601Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change"
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-03-24T14:07:50.601Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "cli:cli/schema-validate"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/schema-validate"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-03-24T14:16:09.429Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change"
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-03-24T14:16:09.429Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [],
+      "filesRemoved": [
+        {
+          "type": "specs",
+          "key": "cli:cli/schema-validate"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/schema-validate"
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-03-24T14:16:16.676Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change"
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-03-24T14:16:16.676Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "cli:cli/schema-validate"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/schema-validate"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-24T14:54:00.848Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-24T14:54:45.514Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-24T15:05:36.952Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-24T15:13:30.610Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "verifying",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-03-24T15:19:35.331Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change"
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-03-24T15:19:35.331Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:core/validate-schema"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/validate-schema"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-24T15:28:34.215Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-24T15:32:22.226Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-24T15:43:40.914Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-24T15:45:44.585Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-24T15:47:23.248Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-24T15:48:24.200Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-03-24T15:48:37.906Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "m***a@g***.com"
+  }
+}

@@ -1,0 +1,658 @@
+{
+  "name": "separate-metadata",
+  "createdAt": "2026-03-22T14:31:40.936Z",
+  "description": "Separate metadata from spec artifacts in SpecRepository — add dedicated metadata()/saveMetadata() methods, move metadata to .specd/specs/, update all call sites",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "core:core/spec-repository-port",
+    "core:core/spec-metadata",
+    "default:_global/spec-layout",
+    "core:core/save-spec-metadata",
+    "core:core/invalidate-spec-metadata",
+    "core:core/compile-context",
+    "core:core/list-specs",
+    "core:core/get-spec-context",
+    "cli:cli/spec-metadata",
+    "cli:cli/spec-generate-metadata",
+    "cli:cli/spec-write-metadata",
+    "cli:cli/spec-invalidate-metadata",
+    "core:core/config",
+    "core:core/config-loader"
+  ],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "validatedHash": "sha256:cc2e976caedea526b9a94fc1e024dc0be22681fc6e645eaad77b0877167b5988"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "files": [
+        {
+          "key": "core:core/spec-repository-port",
+          "filename": "deltas/core/core/spec-repository-port/spec.md.delta.yaml",
+          "validatedHash": "sha256:43d895f693cdc73c61bbed21a3d766cf0dae71671d43ed36c8c56629d56e9867"
+        },
+        {
+          "key": "core:core/spec-metadata",
+          "filename": "deltas/core/core/spec-metadata/spec.md.delta.yaml",
+          "validatedHash": "sha256:43a4ad956db998f0b9aa833cf2a817b91dd5282ff128587eb44c05fda8b3f064"
+        },
+        {
+          "key": "default:_global/spec-layout",
+          "filename": "deltas/default/_global/spec-layout/spec.md.delta.yaml",
+          "validatedHash": "sha256:d48abfbe9d72c29d7b737c94e4c39406be5de15b5a1a0d3457109cabe0708193"
+        },
+        {
+          "key": "core:core/save-spec-metadata",
+          "filename": "deltas/core/core/save-spec-metadata/spec.md.delta.yaml",
+          "validatedHash": "sha256:723cf95b328aa9470691bb9d82da3c1943f69145336165848faebe02c00aa4b8"
+        },
+        {
+          "key": "core:core/invalidate-spec-metadata",
+          "filename": "deltas/core/core/invalidate-spec-metadata/spec.md.delta.yaml",
+          "validatedHash": "sha256:0c9521e03ba3dba754be2f2f027fa0b73f169baf2ab7f13aeb60f06c46a8d013"
+        },
+        {
+          "key": "core:core/compile-context",
+          "filename": "deltas/core/core/compile-context/spec.md.delta.yaml",
+          "validatedHash": "sha256:b318493595f3609927df54bc6ce53074922cba26de8d94e253bcb0baa9d479ef"
+        },
+        {
+          "key": "core:core/list-specs",
+          "filename": "deltas/core/core/list-specs/spec.md.delta.yaml",
+          "validatedHash": "sha256:355f5d3194ab76b32b4b2a4e541a68155c78b1fb714564e48553206f0f285ba8"
+        },
+        {
+          "key": "core:core/get-spec-context",
+          "filename": "deltas/core/core/get-spec-context/spec.md.delta.yaml",
+          "validatedHash": "sha256:50cf2ce6d60e2b72414efe5e4f3b67cb1e00d63671e70921b9ec7f1afa2b19dc"
+        },
+        {
+          "key": "cli:cli/spec-metadata",
+          "filename": "deltas/cli/cli/spec-metadata/spec.md.delta.yaml",
+          "validatedHash": "sha256:d834f363241229496e23295dbf9bf5cb6ab549c5dcd2ab13bff96e4b54af79a0"
+        },
+        {
+          "key": "cli:cli/spec-generate-metadata",
+          "filename": "deltas/cli/cli/spec-generate-metadata/spec.md.delta.yaml",
+          "validatedHash": "sha256:626016ad3cc621d381040c2bb3d43368ddd91a4c20c70f3e8792809fb97ab304"
+        },
+        {
+          "key": "cli:cli/spec-write-metadata",
+          "filename": "deltas/cli/cli/spec-write-metadata/spec.md.delta.yaml",
+          "validatedHash": "sha256:4cfeb91a41762d5d2ff3955a612523dddd226c0c0cbca133b5ed7cf1dacfd894"
+        },
+        {
+          "key": "cli:cli/spec-invalidate-metadata",
+          "filename": "deltas/cli/cli/spec-invalidate-metadata/spec.md.delta.yaml",
+          "validatedHash": "sha256:aeaa1b05312e5c1c255730be44463326c63e90bafa977cc2699b7e7e6b40f2bf"
+        },
+        {
+          "key": "core:core/config",
+          "filename": "deltas/core/core/config/spec.md.delta.yaml",
+          "validatedHash": "sha256:dfce51b8bfd38f9a923f2b4f6b87c6a56731c809f246e79a1e74237a0f3fef7d"
+        },
+        {
+          "key": "core:core/config-loader",
+          "filename": "deltas/core/core/config-loader/spec.md.delta.yaml",
+          "validatedHash": "sha256:9cf68b9eee39607723aacdf5428eca876616bb188493781a727595f5995f62dd"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "files": [
+        {
+          "key": "core:core/spec-repository-port",
+          "filename": "deltas/core/core/spec-repository-port/verify.md.delta.yaml",
+          "validatedHash": "sha256:6ba2a2019d7b3b2319cdd5ab92cc9f611bd078efaeb229a043f0530bbcda1024"
+        },
+        {
+          "key": "core:core/spec-metadata",
+          "filename": "deltas/core/core/spec-metadata/verify.md.delta.yaml",
+          "validatedHash": "sha256:61231dadd75536f1816bbddf166a6077a152673d3bc41b648fc6e35cc77e8e2f"
+        },
+        {
+          "key": "default:_global/spec-layout",
+          "filename": "deltas/default/_global/spec-layout/verify.md.delta.yaml",
+          "validatedHash": "sha256:5dc284d2473a5d81484c99500de3110eb5e611b994cc43f30a80b920323606b8"
+        },
+        {
+          "key": "core:core/save-spec-metadata",
+          "filename": "deltas/core/core/save-spec-metadata/verify.md.delta.yaml",
+          "validatedHash": "sha256:045813fc764dc9e367158aad99d076d57a8e0c3f80dac2f7c1f4d45abe438961"
+        },
+        {
+          "key": "core:core/invalidate-spec-metadata",
+          "filename": "deltas/core/core/invalidate-spec-metadata/verify.md.delta.yaml",
+          "validatedHash": "sha256:d52ae4077339cb468863295a34dc7656f2ff78ae6b5eb27c67f1c2967884daed"
+        },
+        {
+          "key": "core:core/compile-context",
+          "filename": "deltas/core/core/compile-context/verify.md.delta.yaml",
+          "validatedHash": "sha256:78cf4164550451a7874465b31af8877a94b817a12029841fb2e59eff0c41ddc7"
+        },
+        {
+          "key": "core:core/list-specs",
+          "filename": "deltas/core/core/list-specs/verify.md.delta.yaml",
+          "validatedHash": "sha256:7ca49ad55192ae22a865135058cf8cfebf5629aea458810146a720c147b4ea5b"
+        },
+        {
+          "key": "core:core/get-spec-context",
+          "filename": "deltas/core/core/get-spec-context/verify.md.delta.yaml",
+          "validatedHash": "sha256:6e4154968c2a01ccc2934da2d98fa1f495cc772913b02ea3cda80b895eba45be"
+        },
+        {
+          "key": "cli:cli/spec-metadata",
+          "filename": "deltas/cli/cli/spec-metadata/verify.md.delta.yaml",
+          "validatedHash": "sha256:02bab1e465e8bff26d65471f5cc52c0f41712af468e7f4f4d740d181285fe592"
+        },
+        {
+          "key": "cli:cli/spec-generate-metadata",
+          "filename": "deltas/cli/cli/spec-generate-metadata/verify.md.delta.yaml",
+          "validatedHash": "sha256:34119a62b9b93352ca787536cc36402aa7fde69e59bac67265abcf5e2d481bcc"
+        },
+        {
+          "key": "cli:cli/spec-write-metadata",
+          "filename": "deltas/cli/cli/spec-write-metadata/verify.md.delta.yaml",
+          "validatedHash": "sha256:cd9420d0109d6003615fc90de6d0ea2620295eefe89fb93efcf308dd44664a53"
+        },
+        {
+          "key": "cli:cli/spec-invalidate-metadata",
+          "filename": "deltas/cli/cli/spec-invalidate-metadata/verify.md.delta.yaml",
+          "validatedHash": "sha256:cf42630f409ee76b144fed7aa239ec6d1e366e3a6ab3db6ff4c3c71dc7222e2b"
+        },
+        {
+          "key": "core:core/config",
+          "filename": "deltas/core/core/config/verify.md.delta.yaml",
+          "validatedHash": "sha256:f84dba1662372cf331ca0daf4184d9a67b7141c7d4390e3cfcca1d77f5c63705"
+        },
+        {
+          "key": "core:core/config-loader",
+          "filename": "deltas/core/core/config-loader/verify.md.delta.yaml",
+          "validatedHash": "sha256:27dd7af121362766710c2c0d0d2ed21c0770e519007422e25fadd9cc73d1e514"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "validatedHash": "sha256:1608277aa6d8bed7e677d2f15d3dbd7f396a75b289a3ac6096c8ef9a6937aa0b"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "validatedHash": "sha256:88323fb84c83be31f4ad95bfafbf4e5c507302b0d7d00353eaed9ca5ffb0178a"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-03-22T14:31:40.936Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "specIds": ["core:core/spec-repository-port", "core:core/spec-metadata"],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-03-22T14:31:40.944Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/spec-repository-port"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/spec-metadata"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/spec-repository-port"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/spec-metadata"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-22T14:31:47.049Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-03-22T14:48:44.929Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change"
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-03-22T14:48:44.929Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "default:_global/spec-layout"
+        },
+        {
+          "type": "verify",
+          "key": "default:_global/spec-layout"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-03-22T14:49:40.597Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change"
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-03-22T14:49:40.597Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:core/save-spec-metadata"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/invalidate-spec-metadata"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/compile-context"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/list-specs"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/get-spec-context"
+        },
+        {
+          "type": "specs",
+          "key": "cli:cli/spec-metadata"
+        },
+        {
+          "type": "specs",
+          "key": "cli:cli/spec-generate-metadata"
+        },
+        {
+          "type": "specs",
+          "key": "cli:cli/spec-write-metadata"
+        },
+        {
+          "type": "specs",
+          "key": "cli:cli/spec-invalidate-metadata"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/save-spec-metadata"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/invalidate-spec-metadata"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/compile-context"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/list-specs"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/get-spec-context"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/spec-metadata"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/spec-generate-metadata"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/spec-write-metadata"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/spec-invalidate-metadata"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-22T15:11:52.482Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-03-22T15:20:17.268Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-change"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-22T15:20:17.268Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-22T15:21:51.601Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-03-22T15:23:55.185Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-22T15:23:55.185Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-03-22T15:23:55.185Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:core/config"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/config-loader"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/config"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/config-loader"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-22T15:33:16.549Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-22T15:52:19.493Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "pending-spec-approval"
+    },
+    {
+      "type": "spec-approved",
+      "at": "2026-03-22T15:54:11.536Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "reason": "Todo OK",
+      "artifactHashes": {
+        "proposal:proposal": "sha256:cc2e976caedea526b9a94fc1e024dc0be22681fc6e645eaad77b0877167b5988",
+        "specs:core:core/spec-repository-port": "sha256:43d895f693cdc73c61bbed21a3d766cf0dae71671d43ed36c8c56629d56e9867",
+        "specs:core:core/spec-metadata": "sha256:43a4ad956db998f0b9aa833cf2a817b91dd5282ff128587eb44c05fda8b3f064",
+        "specs:default:_global/spec-layout": "sha256:d48abfbe9d72c29d7b737c94e4c39406be5de15b5a1a0d3457109cabe0708193",
+        "specs:core:core/save-spec-metadata": "sha256:723cf95b328aa9470691bb9d82da3c1943f69145336165848faebe02c00aa4b8",
+        "specs:core:core/invalidate-spec-metadata": "sha256:0c9521e03ba3dba754be2f2f027fa0b73f169baf2ab7f13aeb60f06c46a8d013",
+        "specs:core:core/compile-context": "sha256:b318493595f3609927df54bc6ce53074922cba26de8d94e253bcb0baa9d479ef",
+        "specs:core:core/list-specs": "sha256:355f5d3194ab76b32b4b2a4e541a68155c78b1fb714564e48553206f0f285ba8",
+        "specs:core:core/get-spec-context": "sha256:50cf2ce6d60e2b72414efe5e4f3b67cb1e00d63671e70921b9ec7f1afa2b19dc",
+        "specs:cli:cli/spec-metadata": "sha256:d834f363241229496e23295dbf9bf5cb6ab549c5dcd2ab13bff96e4b54af79a0",
+        "specs:cli:cli/spec-generate-metadata": "sha256:626016ad3cc621d381040c2bb3d43368ddd91a4c20c70f3e8792809fb97ab304",
+        "specs:cli:cli/spec-write-metadata": "sha256:4cfeb91a41762d5d2ff3955a612523dddd226c0c0cbca133b5ed7cf1dacfd894",
+        "specs:cli:cli/spec-invalidate-metadata": "sha256:aeaa1b05312e5c1c255730be44463326c63e90bafa977cc2699b7e7e6b40f2bf",
+        "specs:core:core/config": "sha256:dfce51b8bfd38f9a923f2b4f6b87c6a56731c809f246e79a1e74237a0f3fef7d",
+        "specs:core:core/config-loader": "sha256:9cf68b9eee39607723aacdf5428eca876616bb188493781a727595f5995f62dd",
+        "verify:core:core/spec-repository-port": "sha256:6ba2a2019d7b3b2319cdd5ab92cc9f611bd078efaeb229a043f0530bbcda1024",
+        "verify:core:core/spec-metadata": "sha256:61231dadd75536f1816bbddf166a6077a152673d3bc41b648fc6e35cc77e8e2f",
+        "verify:default:_global/spec-layout": "sha256:5dc284d2473a5d81484c99500de3110eb5e611b994cc43f30a80b920323606b8",
+        "verify:core:core/save-spec-metadata": "sha256:045813fc764dc9e367158aad99d076d57a8e0c3f80dac2f7c1f4d45abe438961",
+        "verify:core:core/invalidate-spec-metadata": "sha256:d52ae4077339cb468863295a34dc7656f2ff78ae6b5eb27c67f1c2967884daed",
+        "verify:core:core/compile-context": "sha256:78cf4164550451a7874465b31af8877a94b817a12029841fb2e59eff0c41ddc7",
+        "verify:core:core/list-specs": "sha256:7ca49ad55192ae22a865135058cf8cfebf5629aea458810146a720c147b4ea5b",
+        "verify:core:core/get-spec-context": "sha256:6e4154968c2a01ccc2934da2d98fa1f495cc772913b02ea3cda80b895eba45be",
+        "verify:cli:cli/spec-metadata": "sha256:02bab1e465e8bff26d65471f5cc52c0f41712af468e7f4f4d740d181285fe592",
+        "verify:cli:cli/spec-generate-metadata": "sha256:34119a62b9b93352ca787536cc36402aa7fde69e59bac67265abcf5e2d481bcc",
+        "verify:cli:cli/spec-write-metadata": "sha256:cd9420d0109d6003615fc90de6d0ea2620295eefe89fb93efcf308dd44664a53",
+        "verify:cli:cli/spec-invalidate-metadata": "sha256:cf42630f409ee76b144fed7aa239ec6d1e366e3a6ab3db6ff4c3c71dc7222e2b",
+        "verify:core:core/config": "sha256:f84dba1662372cf331ca0daf4184d9a67b7141c7d4390e3cfcca1d77f5c63705",
+        "verify:core:core/config-loader": "sha256:27dd7af121362766710c2c0d0d2ed21c0770e519007422e25fadd9cc73d1e514",
+        "design:design": "sha256:1608277aa6d8bed7e677d2f15d3dbd7f396a75b289a3ac6096c8ef9a6937aa0b",
+        "tasks:tasks": "sha256:d0bdf3720db1bba09962814cfff2737c8b372d1f6536d2a565732e86db75df30"
+      }
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-22T15:54:11.536Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "pending-spec-approval",
+      "to": "spec-approved"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-22T15:54:25.357Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "spec-approved",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-03-22T16:33:18.952Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-change"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-22T16:33:18.952Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-22T16:34:09.630Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-22T16:34:10.147Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-22T16:34:30.631Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-22T16:34:53.882Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-22T16:35:10.360Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-22T16:35:48.432Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-03-22T16:36:00.877Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "m***a@g***.com"
+  }
+}

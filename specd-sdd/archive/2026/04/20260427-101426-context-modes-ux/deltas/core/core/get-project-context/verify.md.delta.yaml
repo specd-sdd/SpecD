@@ -1,0 +1,36 @@
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Renders spec content from metadata when fresh'
+  content: |
+    #### Scenario: Full mode defaults to Description + Rules + Constraints
+    - **GIVEN** a spec has fresh metadata
+    - **AND** effective display mode is `full`
+    - **WHEN** `GetProjectContext.execute` is called without section filters
+    - **THEN** the entry includes Title, Description, Rules, and Constraints
+    - **AND** Scenarios are omitted
+
+    #### Scenario: Header persistence in full mode
+    - **GIVEN** effective display mode is `full`
+    - **WHEN** `GetProjectContext.execute` is called with `sections: ['rules']`
+    - **THEN** the entry includes Title, Description, and Rules
+    - **AND** Constraints and Scenarios are omitted
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Renders spec content from metadata when fresh'
+  content: |
+    #### Scenario: Fresh metadata rendered with all sections in full mode
+    - **GIVEN** a spec has fresh `.specd-metadata.yaml`
+    - **AND** the effective display mode is full
+    - **WHEN** `execute` is called without `sections` filter
+    - **THEN** the spec entry includes Title, Description, Rules, and Constraints (default sections)
+
+    #### Scenario: Sections filter restricts full output
+    - **GIVEN** a spec has fresh metadata
+    - **AND** the effective display mode is full
+    - **WHEN** `execute` is called with `sections: ["rules"]`
+    - **THEN** the spec entry includes Title and Description (header persistence)
+    - **AND** the spec entry includes Rules but not scenarios or constraints

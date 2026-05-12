@@ -1,0 +1,138 @@
+- op: modified
+  description: 'Cover lifecycle routing between implementing and designing.'
+  selector:
+    type: section
+    matches: '^Requirement: Lifecycle$'
+  content: |
+    #### Scenario: Valid transition — drafting to designing
+
+    - **WHEN** a Change in `drafting` state is transitioned to `designing`
+    - **THEN** a `transitioned` event with `from: 'drafting'` and `to: 'designing'` is appended and deriving state returns `designing`
+
+    #### Scenario: Valid transition — verifying back to implementing for implementation-only failure
+
+    - **GIVEN** a Change in `verifying` state
+    - **AND** the current artifacts still describe the intended behavior
+    - **AND** the required fix fits within the already-defined tasks
+    - **WHEN** the change is transitioned back to `implementing`
+    - **THEN** a `transitioned` event with `from: 'verifying'` and `to: 'implementing'` is appended
+    - **AND** no approval invalidation is triggered
+
+    #### Scenario: Verification requiring new tasks returns to designing
+
+    - **GIVEN** a Change in `verifying` state
+    - **AND** the required fix would introduce tasks not already defined
+    - **WHEN** verification routes the change out of `verifying`
+    - **THEN** the change transitions to `designing`, not `implementing`
+
+    #### Scenario: archivable can return to designing
+
+    - **GIVEN** a Change in `archivable` state
+    - **WHEN** it is transitioned to `designing`
+    - **THEN** the transition succeeds
+- op: added
+  description: 'Add coverage for the implementation and verification loop semantics.'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Lifecycle$'
+  content: |
+    ### Requirement: Implementation and verification loop
+
+    #### Scenario: implementation-failure returns to implementing without downgrading unchanged artifacts
+
+    - **GIVEN** a Change in `verifying` state with validated artifacts
+    - **AND** verification concludes that only the implementation is wrong
+    - **WHEN** the change returns to `implementing`
+    - **THEN** unchanged validated artifacts remain `complete`
+    - **AND** no file is moved to `pending-review`
+
+    #### Scenario: artifact-review-required returns to designing
+
+    - **GIVEN** a Change in `verifying` state
+    - **AND** verification concludes that the desired behavior has changed
+    - **WHEN** the verification outcome is `artifact-review-required`
+    - **THEN** the change returns to `designing`
+
+    #### Scenario: drift during verification is not treated as implementation-only failure
+
+    - **GIVEN** a Change in `verifying` state
+    - **AND** a previously validated artifact file changes on disk
+    - **WHEN** drift is detected
+    - **THEN** the change is invalidated to `designing`
+    - **AND** the drifted file is marked `drifted-pending-review`
+- op: modified
+  description: 'Verify persisted artifact and file state semantics.'
+  selector:
+    type: section
+    matches: '^Requirement: Artifacts$'
+  content: |
+    #### Scenario: File state is persisted explicitly
+
+    - **GIVEN** an artifact file stored in the manifest with `state: 'pending-review'`
+    - **WHEN** the Change is loaded
+    - **THEN** the file state is `pending-review`
+    - **AND** it is not recomputed from `validatedHash` alone
+
+    #### Scenario: Artifact aggregates to drifted-pending-review when any file drifted
+
+    - **GIVEN** an artifact with two files
+    - **AND** one file is `complete`
+    - **AND** one file is `drifted-pending-review`
+    - **WHEN** the artifact aggregate state is computed
+    - **THEN** the artifact state is `drifted-pending-review`
+
+    #### Scenario: Returning to designing downgrades files to pending-review
+
+    - **GIVEN** a change with validated artifacts
+    - **AND** one file is already `drifted-pending-review`
+    - **WHEN** the change returns to `designing`
+    - **THEN** every other file becomes `pending-review`
+    - **AND** the drifted file remains `drifted-pending-review`
+
+    #### Scenario: Requires satisfied only by complete or skipped
+
+    - **GIVEN** artifact B requires artifact A
+    - **AND** artifact A is `pending-review`
+    - **WHEN** dependency satisfaction is evaluated
+    - **THEN** artifact A does not satisfy the requirement
+
+    #### Scenario: markComplete sets file and artifact state to complete
+
+    - **GIVEN** an artifact file in `in-progress`
+    - **WHEN** `markComplete(key, hash)` is called through validation
+    - **THEN** the file state becomes `complete`
+    - **AND** the parent artifact state is recomputed
+- op: modified
+  description: 'Verify structured invalidation history.'
+  selector:
+    type: section
+    matches: '^Requirement: History and event sourcing$'
+  content: |
+    #### Scenario: History is append-only
+
+    - **WHEN** any operation is performed on a Change
+    - **THEN** new events are appended to history; no existing event is modified or removed
+
+    #### Scenario: Invalidated event records artifact drift details
+
+    - **GIVEN** two validated spec files drift in the same invalidation pass
+    - **WHEN** the change is invalidated for artifact drift
+    - **THEN** the `invalidated` event contains `cause: 'artifact-drift'`
+    - **AND** it includes a human-readable `message`
+    - **AND** `affectedArtifacts` records the artifact type and both file keys
+
+    #### Scenario: Scope change invalidation records spec-change cause
+
+    - **WHEN** `specIds` are edited after prior validation
+    - **THEN** the appended `invalidated` event uses `cause: 'spec-change'`
+
+    #### Scenario: Review-required invalidation remains distinguishable from drift
+
+    - **GIVEN** a change returns to `designing` because verification requires artifact review
+    - **WHEN** the invalidation event is appended
+    - **THEN** its `cause` is `artifact-review-required`
+    - **AND** it is distinct from `artifact-drift`

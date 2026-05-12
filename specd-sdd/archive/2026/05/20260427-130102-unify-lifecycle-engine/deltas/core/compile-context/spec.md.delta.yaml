@@ -1,0 +1,114 @@
+# Delta: core:compile-context
+
+- op: modified
+  description: 'Update the constructor to include LifecycleEngine while preserving the existing constructor contract.'
+  selector:
+    type: section
+    matches: 'Requirement: Ports and constructor'
+  content: |
+    `CompileContext` receives at construction time: `ChangeRepository`, a map of `SpecRepository` instances (one per configured workspace), `SchemaProvider`, `FileReader`, `ArtifactParserRegistry`, `ContentHasher`, `PreviewSpec`, and `LifecycleEngine`.
+
+    ```typescript
+    class CompileContext {
+      constructor(
+        changes: ChangeRepository,
+        specs: ReadonlyMap<string, SpecRepository>,
+        schemaProvider: SchemaProvider,
+        files: FileReader,
+        parsers: ArtifactParserRegistry,
+        hasher: ContentHasher,
+        previewSpec: PreviewSpec,
+        lifecycle: LifecycleEngine,
+      )
+    }
+    ```
+
+    `SchemaProvider` is a lazy, caching port that returns the fully-resolved schema (with plugins and overrides applied). It replaces the previous `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths` triple. All are injected at kernel composition time, not passed per invocation.
+
+    `PreviewSpec` is the use case `CompileContext` delegates to when it needs a materialized merged view of a spec with validated deltas applied. `ContentHasher` is used for metadata freshness checks and context fingerprint inputs. `LifecycleEngine` provides the schema-aware lifecycle interpretation needed for step availability and available-step diagnostics.
+
+- op: modified
+  description: 'Delegate step availability evaluation to LifecycleEngine without dropping backward-compatible result fields.'
+  selector:
+    type: section
+    matches: 'Requirement: Step availability'
+  content: |
+    `CompileContext` must evaluate whether the requested step is available for the current change using `LifecycleEngine`.
+
+    A step is considered available when the engine determines that the step is both:
+
+    - **ready** — all required artifacts are effectively `complete` or `skipped`
+    - **permitted** — the lifecycle protocol allows entry into that step under the current transition and approval state
+
+    A skipped optional artifact satisfies the requirement in the same way a completed artifact does.
+
+    If the step is not available, `CompileContext` must include the availability status and the list of blocking artifacts in the result. It must not throw — unavailability is surfaced to the caller, not treated as an error.
+
+    For backward compatibility, the top-level `stepAvailable` and `blockingArtifacts` fields remain part of the result. The richer per-step blocker diagnostics are exposed through `availableSteps`.
+
+- op: modified
+  description: 'Preserve structured result assembly while enriching availableSteps with engine diagnostics.'
+  selector:
+    type: section
+    matches: 'Requirement: Structured result assembly'
+  content: |
+    `CompileContext` MUST assemble the result by producing three structured components rather than a single text string:
+
+    1. **Project context entries** (`projectContext: ProjectContextEntry[]`) — for each entry in `config.context` (in declaration order): resolve `instruction` values verbatim; resolve `file` values by reading the file at the given path relative to the `specd.yaml` directory. Missing files emit a warning and are skipped. Each entry is an object with:
+       - `source` (`'instruction' | 'file'`) — the type of context entry
+       - `path` (string, only for `file` entries) — the file path
+       - `content` (string) — the rendered text content
+    2. **Spec entries** (`specs: ContextSpecEntry[]`) — for each spec in the collected context set, produce an entry with: specs MUST appear in stable collection order: direct `change.specIds` seeds for the call (when `includeChangeSpecs: true`), then `change.specDependsOn` seeds, then include-pattern matches in declaration order, then `dependsOn` traversal discoveries.
+       - `specId` (string) — the fully-qualified spec ID (e.g. `core:compile-context`)
+       - `title` (string, summary/full modes) — the spec title from metadata or extracted from the artifact set
+       - `description` (string, summary/full modes) — the spec description from metadata (2–3 sentence summary)
+       - `source` (`'specIds' | 'specDependsOn' | 'includePattern' | 'dependsOnTraversal'`) — how this spec was collected. When a spec qualifies through multiple sources, the highest-priority source wins: `specIds` > `specDependsOn` > `dependsOnTraversal` > `includePattern`.
+       - `mode` (`'list' | 'summary' | 'full'`) — rendering shape for this entry according to `contextMode` and `includeChangeSpecs`
+       - `content` (string, present only when `mode` is `'full'`) — the rendered spec content.
+
+    Full-mode rendering follows these rules:
+
+    - When `sections` is absent, `CompileContext` renders all artifacts whose schema `scope` is `spec` for that spec. If a file named `spec.md` exists, it is rendered first. All remaining spec-scoped artifact files are rendered after it in alphabetical order by filename.
+    - The rendered full content concatenates those files in display order and labels each file with its filename so multi-file specs remain readable.
+    - For specs in `change.specIds`, `CompileContext` uses the merged artifact set returned by `PreviewSpec` when available, preserving the same ordering rule (`spec.md` first if present, then alphabetical). If merged preview files are unavailable, it falls back to the base spec artifact set.
+    - When `sections` is present, `CompileContext` does not render raw artifact files. Instead it renders only the selected metadata-derived sections. For specs in `change.specIds`, those selected sections are extracted from the merged preview artifact set when available so merged deltas affect `rules`, `constraints`, and `scenarios` output. For all other specs, the selected sections come from fresh metadata or fallback extraction against the base artifact set.
+
+    3. **Available steps** (`availableSteps: AvailableStep[]`) — list all steps declared in the schema's `workflow[]`, each with:
+       - `step` (string) — the step name
+       - `available` (boolean) — whether the step is currently available
+       - `blockingArtifacts` (string[]) — artifact IDs blocking the step (empty if available)
+       - `isReady` (boolean, optional enrichment) — whether all required artifacts are effectively complete or skipped
+       - `isPermitted` (boolean, optional enrichment) — whether the lifecycle protocol currently permits the step
+       - `blockers` (`Blocker[]`, optional enrichment) — detailed blocker diagnostics from `LifecycleEngine`
+
+- op: modified
+  description: 'Preserve result shape while clarifying backward-compatible top-level summaries and enriched step diagnostics.'
+  selector:
+    type: section
+    matches: 'Requirement: Result shape'
+  content: |
+    `CompileContextResult` MUST include:
+
+    - `contextFingerprint` — the calculated fingerprint for the emitted logical context
+    - `status` — `'changed'` or `'unchanged'`
+    - `stepAvailable` — whether the requested lifecycle step is available
+    - `blockingArtifacts` — artifact IDs blocking the requested step
+    - `projectContext` — rendered project context entries
+    - `specs` — ordered context spec entries
+    - `availableSteps` — all workflow steps with availability status
+    - `warnings` — stale metadata warnings and advisory conditions
+
+    Each spec entry MUST include `specId`, `source`, and `mode`. `mode` is one of `'list'`, `'summary'`, or `'full'`. Summary and full entries include `title` and `description`; list entries do not require them. Full entries include `content`; list and summary entries MUST NOT include `content`.
+
+    `contextMode`, `includeChangeSpecs`, `followDeps`, `depth`, `sections`, warnings, available steps, project context entries, and emitted specs are part of the logical context and MUST affect the fingerprint when they change. Presentation-only flags such as `--format` MUST NOT affect the fingerprint.
+
+    When `availableSteps` carries enriched `LifecycleEngine` diagnostics such as `isReady`, `isPermitted`, or detailed `blockers`, those fields are part of the logical context as well and therefore MUST affect the fingerprint when they change.
+
+- op: added
+  description: 'Add LifecycleEngine to spec dependencies.'
+  position:
+    parent:
+      type: section
+      matches: 'Spec Dependencies'
+  content: |
+    - [`core:lifecycle-engine`](../lifecycle-engine/spec.md) — shared schema-aware lifecycle interpretation for step availability and blocker diagnostics

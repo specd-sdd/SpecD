@@ -1,0 +1,89 @@
+- op: added
+  description: 'Add verification coverage for verification outcomes.'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Step names reference domain lifecycle states$'
+  content: |
+    ### Requirement: Step semantics
+
+    #### Scenario: implementation-failure returns to implementing
+
+    - **GIVEN** a verifying step where artifacts remain correct
+    - **AND** the required fix fits within the existing task set
+    - **WHEN** verification concludes with `implementation-failure`
+    - **THEN** the workflow routes back to `implementing`
+
+    #### Scenario: artifact-review-required returns to designing
+
+    - **GIVEN** a verifying step where artifacts must be revised
+    - **WHEN** verification concludes with `artifact-review-required`
+    - **THEN** the workflow routes back to `designing`
+
+    #### Scenario: drifted file forces redesign
+
+    - **GIVEN** at least one file is `drifted-pending-review`
+    - **WHEN** workflow routing is evaluated after verification
+    - **THEN** the change must return to `designing`
+- op: modified
+  description: 'Verify requires gating uses persisted review states.'
+  selector:
+    type: section
+    matches: '^Requirement: Requires-based gating$'
+  content: |
+    #### Scenario: Step with all requires complete is available
+
+    - **GIVEN** a workflow step with `requires: [specs, tasks]`
+    - **AND** both artifacts have persisted `state: 'complete'`
+    - **WHEN** step availability is evaluated
+    - **THEN** the step is available
+
+    #### Scenario: pending-review blocks requires
+
+    - **GIVEN** a workflow step with `requires: [specs]`
+    - **AND** `specs` has persisted `state: 'pending-review'`
+    - **WHEN** step availability is evaluated
+    - **THEN** the step is not available
+
+    #### Scenario: drifted-pending-review blocks requires
+
+    - **GIVEN** a workflow step with `requires: [specs]`
+    - **AND** `specs` has persisted `state: 'drifted-pending-review'`
+    - **WHEN** step availability is evaluated
+    - **THEN** the step is not available
+
+    #### Scenario: Skipped optional artifact satisfies requires
+
+    - **GIVEN** a workflow step with `requires: [design, tasks]`
+    - **AND** `design` is `skipped`
+    - **AND** `tasks` is `complete`
+    - **WHEN** step availability is evaluated
+    - **THEN** the step is available
+- op: added
+  description: 'Add verification coverage for step availability evaluation.'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Task completion gating$'
+  content: |
+    ### Requirement: Step availability evaluation
+
+    #### Scenario: Availability reads persisted artifact state
+
+    - **GIVEN** a workflow step with `requires: [specs]`
+    - **AND** the `specs` artifact has persisted `state: 'complete'`
+    - **WHEN** step availability is evaluated
+    - **THEN** the step is available
+
+    #### Scenario: Availability is recomputed on each invocation
+
+    - **GIVEN** a workflow step with `requires: [specs]`
+    - **AND** `specs` changes from `complete` to `pending-review`
+    - **WHEN** step availability is evaluated again
+    - **THEN** the step is no longer available

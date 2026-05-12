@@ -1,0 +1,3 @@
+releases:
+  plugin-agent-standard:plugin-agent: minor
+  default:_global/commits: patch

@@ -1,0 +1,18 @@
+- op: added
+  description: 'Add Repair Guide verification scenarios'
+  position:
+    parent: { type: section, matches: 'Requirement: Invalid transition error' }
+  content: |
+    #### Scenario: Transition failure renders Repair Guide
+
+    - **GIVEN** a transition to `ready` fails because an artifact is missing
+    - **WHEN** the command is run in text mode
+    - **THEN** it prints an error message to stderr
+    - **AND** it renders a `repair guide:` section to stdout
+    - **AND** the guide includes the blocker code (e.g., `! MISSING_ARTIFACT`) and the recommended command
+
+    #### Scenario: Transition failure JSON output includes nextAction
+
+    - **GIVEN** a transition fails
+    - **WHEN** the command is run with `--format json`
+    - **THEN** the JSON output includes the `nextAction` object and `blockers` array

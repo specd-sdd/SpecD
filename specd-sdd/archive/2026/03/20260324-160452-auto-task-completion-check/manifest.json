@@ -1,0 +1,251 @@
+{
+  "name": "auto-task-completion-check",
+  "createdAt": "2026-03-24T16:04:52.031Z",
+  "description": "Derive task completion checks from schema automatically during transitions",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": ["core:core/transition-change", "core:core/change", "core:core/workflow-model"],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "validatedHash": "sha256:198602cf760fba4e3d52be92695f8c5dc6ee0c34e6bc79e3a60162cfb1ed2f13"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "files": [
+        {
+          "key": "core:core/transition-change",
+          "filename": "deltas/core/core/transition-change/spec.md.delta.yaml",
+          "validatedHash": "sha256:9f347a39eceede85e7e80b7bdb1956a32262d7f16a755612e7a6175af3416192"
+        },
+        {
+          "key": "core:core/change",
+          "filename": "deltas/core/core/change/spec.md.delta.yaml",
+          "validatedHash": "sha256:a6a0736c3685b5b8cdea01a8064d6a8ebaa352234704ee26938854922a9b46a5"
+        },
+        {
+          "key": "core:core/workflow-model",
+          "filename": "deltas/core/core/workflow-model/spec.md.delta.yaml",
+          "validatedHash": "sha256:48d03042a84c59f72ad440e380a340249f9262876f975ede2d2fcce885a0ecb7"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "files": [
+        {
+          "key": "core:core/transition-change",
+          "filename": "deltas/core/core/transition-change/verify.md.delta.yaml",
+          "validatedHash": "sha256:193cd8d27817300b61d35908fa192c384d493787f0276a520ca485a8d1a1ebf9"
+        },
+        {
+          "key": "core:core/change",
+          "filename": "deltas/core/core/change/verify.md.delta.yaml",
+          "validatedHash": "sha256:6e8354180a0b28bfe39ec18177288fbdfcfc861ec2e6401fee2faca3182dbbc5"
+        },
+        {
+          "key": "core:core/workflow-model",
+          "filename": "deltas/core/core/workflow-model/verify.md.delta.yaml",
+          "validatedHash": "sha256:97078be02eedd42ac73666ca3d63a82175b1d3342395eaa722ef09c991455e1a"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "validatedHash": "sha256:979ba7f03c4cd3fb95ff9776a775717dedc702e8a1be4cc074a57630b2eb2694"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "validatedHash": "sha256:9e042e022d8ffd10dd292f3df666853e405e115b7b6feb3b7da5ce139a65ecd0"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-03-24T16:04:52.031Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "specIds": ["core:core/transition-change"],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-03-24T16:04:52.040Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/transition-change"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/transition-change"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-24T16:06:30.412Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-03-24T16:20:19.347Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change"
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-03-24T16:20:19.347Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:core/change"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/workflow-model"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/change"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/workflow-model"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-24T16:42:44.849Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-24T16:46:37.003Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-24T16:52:20.034Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-24T17:17:03.011Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-24T17:17:14.044Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-24T17:18:07.853Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-03-24T17:18:21.970Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "m***a@g***.com"
+  }
+}

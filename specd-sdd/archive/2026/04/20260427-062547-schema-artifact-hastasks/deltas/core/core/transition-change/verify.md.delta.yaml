@@ -1,0 +1,25 @@
+- op: added
+  description: 'Add verification scenarios for task capability defensive check and default patterns'
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Task completion check during requires enforcement'
+    after:
+      type: section
+      matches: 'Scenario: Transition blocked by requiresTaskCompletion artifact with incomplete items'
+  content: |
+    #### Scenario: Transition blocked by missing task capability (defensive check)
+
+    - **GIVEN** a workflow step declares `requiresTaskCompletion: [proposal]`
+    - **AND** artifact `proposal` has `hasTasks: false`
+    - **WHEN** `execute` is called
+    - **THEN** it throws `InvalidStateTransitionError` with reason `missing-task-capability`
+
+    #### Scenario: Task gating works with default patterns when omitted in schema
+
+    - **GIVEN** an artifact `tasks` has `hasTasks: true` but no `taskCompletionCheck` in schema
+    - **AND** the tasks file contains `- [ ] incomplete`
+    - **AND** a step declares `requiresTaskCompletion: [tasks]`
+    - **WHEN** `execute` is called
+    - **THEN** it throws `InvalidStateTransitionError` with reason `incomplete-tasks`
+    - **AND** the counts reflect the markdown checkbox matches

@@ -1,0 +1,237 @@
+{
+  "name": "noop-delta",
+  "createdAt": "2026-03-22T11:40:58.893Z",
+  "description": "Add no-op delta operation and description field to unblock scope:spec artifacts that don't need changes",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "core:core/delta-format",
+    "core:core/artifact-parser-port",
+    "core:core/validate-artifacts"
+  ],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "validatedHash": "sha256:1136a5889366b5d7e65f6c81a7ffa5d5e4688c7e5f98880377220a2cef073c7e"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "files": [
+        {
+          "key": "core:core/delta-format",
+          "filename": "deltas/core/core/delta-format/spec.md.delta.yaml",
+          "validatedHash": "sha256:5bbb080c14810a4dba9499bf5f3948e70d17f93304cb282e9429fdc705d73dd9"
+        },
+        {
+          "key": "core:core/artifact-parser-port",
+          "filename": "deltas/core/core/artifact-parser-port/spec.md.delta.yaml",
+          "validatedHash": "sha256:7a0f5a6319db064c11aa7485dbb7448894f94f8e43b09aa26aad9369f3a3d043"
+        },
+        {
+          "key": "core:core/validate-artifacts",
+          "filename": "deltas/core/core/validate-artifacts/spec.md.delta.yaml",
+          "validatedHash": "sha256:4dbdd455e7e2a9df2db1be0fd81628acba81b5c05c464e2921a70d677af854fb"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "files": [
+        {
+          "key": "core:core/delta-format",
+          "filename": "deltas/core/core/delta-format/verify.md.delta.yaml",
+          "validatedHash": "sha256:1d9cc132e96ec13653cc490f358caad514b7bb5615046b3dd112430bbde8b6ed"
+        },
+        {
+          "key": "core:core/artifact-parser-port",
+          "filename": "deltas/core/core/artifact-parser-port/verify.md.delta.yaml",
+          "validatedHash": "sha256:15d69b6ab46e9bbc45ad64982b40395b753e8f581081e7e3405a318b641c7a84"
+        },
+        {
+          "key": "core:core/validate-artifacts",
+          "filename": "deltas/core/core/validate-artifacts/verify.md.delta.yaml",
+          "validatedHash": "sha256:bf15b86ee04575d97710d1cc2e532f43bdc5336e45503cf6c2ebce51b57dbf70"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "validatedHash": "sha256:86ae9a1e62054d71a7a05b0925d3d47c9745a3dd63129baf7b62af1e44207e17"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "validatedHash": "sha256:01755b46fbecfe734b0a200ad8ca00c943061067fd8545cefae734a79ec5e88e"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-03-22T11:40:58.893Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "specIds": [
+        "core:core/delta-format",
+        "core:core/artifact-parser-port",
+        "core:core/validate-artifacts"
+      ],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-03-22T11:40:58.902Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/delta-format"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/artifact-parser-port"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/validate-artifacts"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/delta-format"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/artifact-parser-port"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/validate-artifacts"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-22T11:41:30.506Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-22T12:33:17.718Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-22T12:33:44.999Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-22T12:42:33.160Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-22T12:55:39.505Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-22T12:56:32.941Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-22T12:57:01.948Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-03-22T12:57:03.690Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "m***a@g***.com"
+  }
+}

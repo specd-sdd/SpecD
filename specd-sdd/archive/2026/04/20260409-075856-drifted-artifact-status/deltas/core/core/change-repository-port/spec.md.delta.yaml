@@ -1,0 +1,52 @@
+- op: modified
+  description: 'Load persisted artifact state rather than deriving status only from hashes.'
+  selector:
+    type: section
+    matches: '^Requirement: get returns a Change or null$'
+  content: |
+    `get(name)` MUST accept a change name string and return the `Change` with that name, or `null` if no change with that name exists. The returned `Change` MUST load artifact and file states from the persisted manifest. If an artifact or file entry omits `state`, the repository defaults that missing value to `missing` while loading.
+
+    `validatedHash` is still loaded with the artifact data, but hash comparison is not the sole source of truth for steady-state status. The repository MAY detect drift and persist updated file and artifact states before returning (see Requirement: Auto-invalidation on get when artifact files drift).
+
+    `get()` is a snapshot read for callers. It MAY auto-invalidate and persist drifted artifacts before returning, but it MUST NOT be the repository's serialized mutation primitive. Callers that need a coordinated read-modify-write section for an existing persisted change MUST use `mutate(name, fn)` instead of relying on a later `save()` against a stale snapshot.
+- op: modified
+  description: 'Detect and persist drift at file level before invalidating back to designing.'
+  selector:
+    type: section
+    matches: '^Requirement: Auto-invalidation on get when artifact files drift$'
+  content: |
+    The `FsChangeRepository` implementation of `get()` MUST detect artifact file drift and auto-invalidate the change when appropriate. After loading a change, the repository compares the current cleaned file hash against each file's stored `validatedHash` for files that were previously validated.
+
+    A file is drifted when:
+
+    - `validatedHash` is a SHA-256 value recorded by prior validation, and
+    - the current cleaned content hash no longer matches that `validatedHash`
+
+    When drift is detected, the repository MUST:
+
+    1. Scan the full affected artifact set first, collecting every drifted file key grouped by artifact type. It MUST NOT stop at the first mismatch.
+    2. Mark each drifted file as `drifted-pending-review`.
+    3. Recompute every affected artifact's aggregate `state`.
+    4. Invalidate the change back to `designing` using the domain invalidation mechanism, preserving `drifted-pending-review` on the drifted files and downgrading the remaining files to `pending-review`.
+    5. Persist the updated manifest before returning.
+
+    This invalidation is lifecycle-independent: if a validated file drifts, the change is invalidated back to `designing` regardless of whether the current lifecycle state is `designing`, `ready`, `implementing`, `verifying`, `done`, or `archivable`.
+
+    The invalidation history entry MUST record:
+
+    - `cause: "artifact-drift"`
+    - a clear `message`
+    - `affectedArtifacts`, including each affected artifact type and the full list of drifted file keys captured in step 1
+
+    The `SYSTEM_ACTOR` constant (`{ name: 'specd', email: 'system@getspecd.dev' }`) is used as the actor for these automated invalidations.
+- op: modified
+  description: 'Normalize dependencies for metadata extraction.'
+  selector:
+    type: section
+    matches: '^Spec Dependencies$'
+  content: |
+    - [`core:core/repository-port`](../repository-port/spec.md) — shared repository base contract
+    - [`default:_global/architecture`](../../_global/architecture/spec.md) — application ports and ownership boundaries
+    - [`core:core/change`](../change/spec.md) — change entity state, invalidation, and artifact semantics
+    - [`core:core/storage`](../storage/spec.md) — filesystem persistence and change directory layout
+    - [`core:core/change-manifest`](../change-manifest/spec.md) — manifest fields persisted by the repository

@@ -1,0 +1,16 @@
+- op: added
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+  content: |
+    ### Requirement: Change locks directory placement
+
+    The `FsChangeRepository` implementation derives its change lock directory path internally
+    from the `configPath` field: `{configPath}/tmp/change-locks`. This directory is distinct
+    from the changes storage root and allows per-change lock files to be co-located with
+    other config-scoped temporary artifacts.
+
+    The `configPath` field is part of the `ChangeRepositoryConfig` port contract, provided
+    at construction time. The repository derives the locks directory internally as
+    `path.join(configPath, 'tmp', 'change-locks')`.

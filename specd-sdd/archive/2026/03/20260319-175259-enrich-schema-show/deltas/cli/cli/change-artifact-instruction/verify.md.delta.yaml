@@ -1,0 +1,37 @@
+# Delta: cli:cli/change-artifact-instruction verify — add template scenarios
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: JSON output format'
+    after:
+      type: section
+      matches: 'Scenario: JSON output with instruction'
+  content: |
+    #### Scenario: JSON output includes template
+
+    - **GIVEN** an artifact with a declared template containing scaffolding content
+    - **WHEN** `specd change artifact-instruction add-auth specs --format json`
+    - **THEN** stdout contains JSON with a `"template"` field containing the resolved template content
+
+    #### Scenario: JSON output has null template when not declared
+
+    - **GIVEN** an artifact with no template
+    - **WHEN** `specd change artifact-instruction add-auth proposal --format json`
+    - **THEN** stdout contains JSON with `"template": null`
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Text output format'
+    after:
+      type: section
+      matches: 'Scenario: Labelled sections in text output'
+  content: |
+    #### Scenario: Template section in text output
+
+    - **GIVEN** an artifact with a declared template
+    - **WHEN** `specd change artifact-instruction add-auth specs`
+    - **THEN** stdout contains a `[template]` section with the template content

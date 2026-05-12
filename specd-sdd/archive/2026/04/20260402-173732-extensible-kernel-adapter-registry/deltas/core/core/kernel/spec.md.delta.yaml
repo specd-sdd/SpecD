@@ -1,0 +1,51 @@
+- op: added
+  description: 'Add additive registry support to KernelOptions'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: createKernel accepts optional KernelOptions$'
+  content: |
+    ### Requirement: KernelOptions supports additive registries
+
+    `KernelOptions` SHALL support additive registration of external capabilities before kernel construction. At minimum, it SHALL include extension points for:
+
+    - storage factories
+    - VCS providers
+    - actor providers
+    - artifact parsers
+    - external hook runners
+
+    These registrations SHALL extend the built-in capability set rather than replacing it.
+- op: added
+  description: 'Expose merged registries from the kernel'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: KernelOptions supports additive registries$'
+  content: |
+    ### Requirement: Kernel exposes merged registries
+
+    The `Kernel` interface SHALL expose the merged built-in plus external registries used during construction. The exposed registry view SHALL let consumers inspect which storages, parsers, providers, and external hook runners are available from the built kernel.
+
+    The exposed registries MUST reflect the final additive capability set actually used during construction — not just the raw external registrations supplied by the caller.
+- op: added
+  description: 'Reject conflicting or unknown registry references'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Kernel exposes merged registries$'
+  content: |
+    ### Requirement: Kernel rejects invalid registry references
+
+    Kernel composition MUST reject conflicting registrations and unknown registry references with clear errors.
+
+    Conflicting registrations include attempts to overwrite an existing built-in or already-registered external entry for the same registry category. Unknown references include configuration or workflow data that names an adapter, parser, provider, or external hook type that is not present in the merged registry set.

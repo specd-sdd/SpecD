@@ -1,0 +1,68 @@
+- op: modified
+  description: 'Update Verification for Output format with artifact filtering'
+  selector:
+    type: section
+    matches: 'Requirement: Output format'
+  content: |
+    #### Scenario: Multiple artifact files printed with headers
+
+    - **GIVEN** `default:auth/login` has `spec.md` and `verify.md`
+    - **WHEN** `specd spec show default:auth/login` is run
+    - **THEN** stdout contains `--- spec.md ---` followed by the spec content, then `--- verify.md ---` followed by the verify content
+    - **AND** the process exits with code 0
+
+    #### Scenario: Missing artifact file skipped silently
+
+    - **GIVEN** `default:auth/login` has `spec.md` but no `verify.md`
+    - **WHEN** `specd spec show default:auth/login` is run
+    - **THEN** only the `spec.md` section is printed; no error for the missing file
+    - **AND** the process exits with code 0
+
+    #### Scenario: JSON output structure
+
+    - **GIVEN** `default:auth/login` has `spec.md` with content `# Auth Login` and `verify.md` with content `# Verification: Auth Login`
+    - **WHEN** `specd spec show default:auth/login --format json` is run
+    - **THEN** stdout is a valid JSON array with two entries, each having `filename` and `content`
+    - **AND** the first entry has `filename` equal to `"spec.md"` and `content` equal to `"# Auth Login"`
+    - **AND** the process exits with code 0
+
+    #### Scenario: Single artifact printed with header
+
+    - **GIVEN** `default:auth/login` has `spec.md` and `verify.md`
+    - **WHEN** `specd spec show default:auth/login --artifact specs` is run
+    - **THEN** stdout contains `--- spec.md ---` and the spec content
+    - **AND** stdout DOES NOT contain `--- verify.md ---`
+    - **AND** the process exits with code 0
+
+    #### Scenario: JSON output structure with filtering
+
+    - **GIVEN** `default:auth/login` has `spec.md` with content `# Auth Login` and `verify.md` with content `# Verification: Auth Login`
+    - **WHEN** `specd spec show default:auth/login --artifact specs --format json` is run
+    - **THEN** stdout is a JSON array with exactly one entry
+    - **AND** the entry has `filename` equal to `"spec.md"` and `content` equal to `"# Auth Login"`
+    - **AND** the process exits with code 0
+
+- op: added
+  description: 'Add Requirement: Artifact filtering'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Error cases'
+  content: |
+    ### Requirement: Artifact filtering
+
+    #### Scenario: Unknown artifact ID
+
+    - **WHEN** `specd spec show default:auth/login --artifact nonexistent` is run
+    - **THEN** the command exits with code 1
+    - **AND** stderr contains an `error:` message about unknown artifact ID
+
+    #### Scenario: Artifact missing on disk
+
+    - **GIVEN** `default:auth/login` has `spec.md` but NO `verify.md`
+    - **WHEN** `specd spec show default:auth/login --artifact verify` is run
+    - **THEN** the command exits with code 1
+    - **AND** stderr contains an `error:` message about missing artifact file

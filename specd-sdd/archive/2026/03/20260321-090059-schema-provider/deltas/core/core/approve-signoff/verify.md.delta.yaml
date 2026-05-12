@@ -1,0 +1,13 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Scenario: Schema does not resolve'
+    parent:
+      type: section
+      matches: 'Requirement: Artifact hash computation'
+  content: |
+    #### Scenario: Schema does not resolve
+
+    - **GIVEN** `SchemaProvider.get()` returns `null` for the configured schema
+    - **WHEN** the use case computes artifact hashes
+    - **THEN** all artifacts are hashed without any pre-hash cleanup rules applied

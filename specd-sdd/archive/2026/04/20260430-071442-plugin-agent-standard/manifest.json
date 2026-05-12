@@ -1,0 +1,254 @@
+{
+  "name": "plugin-agent-standard",
+  "createdAt": "2026-04-30T07:14:42.261Z",
+  "description": "Add @specd/plugin-agent-standard, a vendor-neutral agent plugin that installs specd skills into .agents/skills/ using the Agent Skills open standard (agentskills.io) frontmatter format including allowed-tools support. Also integrates the new package into CLI init wizard, meta-package, and commitlint scopes.",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": ["plugin-agent-standard:plugin-agent", "default:_global/commits"],
+  "specDependsOn": {
+    "plugin-agent-standard:plugin-agent": [
+      "plugin-agent-opencode:plugin-agent",
+      "default:_global/commits"
+    ]
+  },
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:36c6fab801d700b925358146edb0cd5a0d6e97c2129ffe71daa4c7b105191cd3"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "plugin-agent-standard:plugin-agent",
+          "filename": "specs/plugin-agent-standard/plugin-agent/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:52e91bd0be2299292e344883e7e85d43641c464bb0565bc3693140a6c0204f86"
+        },
+        {
+          "key": "default:_global/commits",
+          "filename": "deltas/default/_global/commits/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:3cbef2f8fb05dd94726a7a2187d34e2e673fd566022f9666c8a9901177a30439"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "plugin-agent-standard:plugin-agent",
+          "filename": "specs/plugin-agent-standard/plugin-agent/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:9194a2411b745349db2c9cc7dc4c1a280b2b077dd0dcb7790cdc0ca2b43945a5"
+        },
+        {
+          "key": "default:_global/commits",
+          "filename": "deltas/default/_global/commits/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:7c16ecb1a5df39482117bb2c9abcc0aa4c70f9f3d8b618e4b44a8ea1f99dd9c4"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:14020e0e4208ead85673c224bb78b2775fb8f8c231c8a3e1896eb1a171fb3476"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:c6cc9d900b6635e4b0b9f02c19fc98577fb0f51a98ca06ad3603d82ad6b69a02"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-04-30T07:14:42.261Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "specIds": ["plugin-agent-standard:plugin-agent", "default:_global/commits"],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-30T07:14:42.271Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-agent-standard:plugin-agent"
+        },
+        {
+          "type": "specs",
+          "key": "default:_global/commits"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-agent-standard:plugin-agent"
+        },
+        {
+          "type": "verify",
+          "key": "default:_global/commits"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-30T07:18:11.741Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-30T07:24:16.564Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-30T07:31:17.381Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-30T07:41:32.953Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-30T11:16:14.112Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-30T11:18:03.625Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-30T11:18:43.481Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "description-updated",
+      "at": "2026-04-30T12:20:27.394Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "description": "Add @specd/plugin-agent-standard, a vendor-neutral agent plugin that installs specd skills into .agents/skills/ using the Agent Skills open standard (agentskills.io) frontmatter format including allowed-tools support. Also integrates the new package into CLI init wizard, meta-package, and commitlint scopes."
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-30T12:20:43.576Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-04-30T12:20:43.632Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "m***a@g***.com"
+  }
+}

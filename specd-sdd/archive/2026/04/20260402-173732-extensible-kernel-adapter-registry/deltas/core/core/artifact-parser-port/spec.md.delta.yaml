@@ -1,0 +1,15 @@
+- op: added
+  description: 'Allow additive parser registration through kernel composition'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: ArtifactParserRegistry type$'
+  content: |
+    ### Requirement: ArtifactParserRegistry is additively extensible
+
+    `ArtifactParserRegistry` SHALL support additive extension through kernel composition. Built-in parsers remain available, and external parser registrations extend the registry by format name.
+
+    Referencing a parser format that is not present in the merged registry MUST fail with a clear error.

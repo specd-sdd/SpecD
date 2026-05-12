@@ -1,0 +1,48 @@
+- op: removed
+  description: 'Remove old PluginContext requirement'
+  selector:
+    type: section
+    matches: 'Requirement: PluginContext'
+
+- op: added
+  description: 'Add new SpecdConfig-based PluginContext requirement'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: SpecdPlugin interface'
+  content: |
+    ### Requirement: PluginContext
+
+    The system SHALL pass the fully-resolved project configuration to plugins during initialization:
+
+    ```typescript
+    interface PluginContext {
+      /**
+       * Fully-resolved project configuration.
+       */
+      readonly config: SpecdConfig
+    }
+    ```
+
+    The `PluginContext` MUST NOT include `projectRoot`, `typeContext`, or a separate `config` record, as these are all available through the `SpecdConfig` object.
+
+- op: removed
+  description: 'Remove old Spec Dependencies'
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+
+- op: added
+  description: 'Add new Spec Dependencies'
+  position:
+    parent:
+      type: section
+      matches: 'plugin-manager:specd-plugin-type'
+  content: |
+    ## Spec Dependencies
+
+    - [`core:core/config`](../../core/core/config/spec.md) — defines SpecdConfig type
+    - [`default:_global/architecture`](../default/_global/architecture/spec.md) — architecture constraints

@@ -1,0 +1,49 @@
+- op: modified
+  description: 'Rename artifact rule entry shape in schema-merge example'
+  selector:
+    type: section
+    matches: 'Examples'
+  content: |
+    ```typescript
+    import { mergeSchemaLayers } from './domain/services/merge-schema-layers.js'
+
+    // Base schema from parseSchemaYaml
+    const base: SchemaYamlData = { kind: 'schema', name: 'std', version: 1, artifacts: [...], ... }
+
+    // Plugin adds a post-rule to the specs artifact
+    const pluginLayer: SchemaLayer = {
+      source: 'plugin',
+      ref: '@specd/plugin-rfc',
+      operations: {
+        append: {
+          artifacts: [
+            {
+              id: 'specs',
+              rules: {
+                post: [{ id: 'rfc-reference', instruction: 'All requirements must reference the relevant RFC' }],
+              },
+            },
+          ],
+        },
+      },
+    }
+
+    // Override removes a hook from the implementing step
+    const overrideLayer: SchemaLayer = {
+      source: 'override',
+      ref: 'specd.yaml overrides',
+      operations: {
+        remove: {
+          workflow: [
+            {
+              step: 'implementing',
+              hooks: { post: [{ id: 'run-tests' }] },
+            },
+          ],
+        },
+      },
+    }
+
+    const merged = mergeSchemaLayers(base, [pluginLayer, overrideLayer])
+    // merged is a new SchemaYamlData ready for buildSchema
+    ```

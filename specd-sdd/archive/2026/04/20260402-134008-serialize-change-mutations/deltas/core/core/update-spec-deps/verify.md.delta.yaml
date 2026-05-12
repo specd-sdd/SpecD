@@ -1,0 +1,19 @@
+- op: modified
+  description: Verify that dependency updates persist through mutate.
+  selector:
+    type: section
+    matches: 'Requirement: Persistence and output'
+  content: |
+    #### Scenario: Change is persisted and result returned through serialized mutation
+
+    - **GIVEN** a successful update operation
+    - **WHEN** `execute` completes
+    - **THEN** `change.setSpecDependsOn` is called with the spec ID and computed dependency list
+    - **AND** `ChangeRepository.mutate(input.name, fn)` is called
+    - **AND** the returned `UpdateSpecDepsResult` contains both `specId` and `dependsOn`
+
+    #### Scenario: Dependencies with no prior state
+
+    - **GIVEN** a change where spec `'auth/login'` has no existing `specDependsOn` entry
+    - **WHEN** `execute` is called with `add: ['core/session']`
+    - **THEN** the resulting `dependsOn` is `['core/session']`

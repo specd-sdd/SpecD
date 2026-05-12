@@ -1,0 +1,449 @@
+{
+  "name": "context-modes-ux",
+  "createdAt": "2026-04-27T10:14:26.193Z",
+  "description": "Adds an explicit --mode flag to context commands and aligns full/hybrid rendering behavior across project context, change context, and spec context. The implementation now defaults full-mode output to structured Description + Rules + Constraints, with section filters overriding defaults while preserving header context. Core and CLI context use cases/tests were updated to enforce consistent mode semantics and predictable context output for agents.",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "cli:cli/project-context",
+    "cli:cli/change-context",
+    "cli:cli/spec-context",
+    "core:core/compile-context",
+    "core:core/get-spec-context",
+    "core:core/get-project-context",
+    "core:core/config"
+  ],
+  "specDependsOn": {
+    "core:core/compile-context": [
+      "core:core/change",
+      "core:core/config",
+      "core:core/spec-metadata",
+      "core:core/schema-format",
+      "core:core/delta-format",
+      "core:core/selector-model",
+      "core:core/spec-id-format",
+      "core:core/workspace",
+      "core:core/get-artifact-instruction",
+      "core:core/get-hook-instructions",
+      "core:core/preview-spec"
+    ],
+    "cli:cli/project-context": [
+      "cli:cli/entrypoint",
+      "core:core/get-project-context",
+      "core:core/compile-context",
+      "core:core/config"
+    ],
+    "cli:cli/change-context": [
+      "cli:cli/entrypoint",
+      "cli:cli/change-spec-preview",
+      "core:core/compile-context",
+      "core:core/config",
+      "core:core/get-artifact-instruction",
+      "core:core/get-hook-instructions"
+    ],
+    "cli:cli/spec-context": [
+      "cli:cli/entrypoint",
+      "core:core/config",
+      "core:core/get-spec-context"
+    ],
+    "core:core/get-spec-context": [
+      "core:core/config",
+      "core:core/compile-context",
+      "core:core/spec-metadata",
+      "core:core/storage",
+      "core:core/workspace",
+      "core:core/spec-id-format"
+    ],
+    "core:core/get-project-context": [
+      "core:core/config",
+      "core:core/compile-context",
+      "core:core/spec-metadata",
+      "core:core/schema-format",
+      "default:_global/architecture"
+    ]
+  },
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:b1cade5767ed9c3f53fc07278ab9dc7991255741f36534411bdac05aeaf16829"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "cli:cli/project-context",
+          "filename": "deltas/cli/cli/project-context/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:21238650f7dedaf9fbfc4006f2f84217231620d55b038cd79ff1738658f60b1e"
+        },
+        {
+          "key": "cli:cli/change-context",
+          "filename": "deltas/cli/cli/change-context/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:8b14a32e122e0b4a29911aeacf26d2ded8623e2af6c6ac41c9bee19be3c17ae2"
+        },
+        {
+          "key": "cli:cli/spec-context",
+          "filename": "deltas/cli/cli/spec-context/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:0b931081be796aaf831d95d71f9a59fbdb6c47beb26f08d66e261e7b402efcd7"
+        },
+        {
+          "key": "core:core/compile-context",
+          "filename": "deltas/core/core/compile-context/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:de18815782230502f67be073d14cf6f90e1222f54347bc14f7d0392f2c0003fc"
+        },
+        {
+          "key": "core:core/get-spec-context",
+          "filename": "deltas/core/core/get-spec-context/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:f35e4fcb531e444fde0659c93189c2b2ebf3846fa23df80b733eff960009c729"
+        },
+        {
+          "key": "core:core/get-project-context",
+          "filename": "deltas/core/core/get-project-context/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:60177d1d1748f1f7b631e2377330bbce6077e487f8ed5f95d3f6224f985a3a4d"
+        },
+        {
+          "key": "core:core/config",
+          "filename": "deltas/core/core/config/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:c7790bab18c267a19c6120791f815d56af37c9fec674c1d198ff92da03514ff4"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "cli:cli/project-context",
+          "filename": "deltas/cli/cli/project-context/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:9f25a5020b83402bc1e0d71bf7a1a565a4822ac14e6a50d93f86cfb4717216e2"
+        },
+        {
+          "key": "cli:cli/change-context",
+          "filename": "deltas/cli/cli/change-context/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:2f59e5b0c60f0242d2def3eebebb9606dd0e728267228f679ca693d50dae5fed"
+        },
+        {
+          "key": "cli:cli/spec-context",
+          "filename": "deltas/cli/cli/spec-context/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:1968d1ec6fa56ec0fab5551fa08250780286d8f69fa7e0b3f462b42584a1a263"
+        },
+        {
+          "key": "core:core/compile-context",
+          "filename": "deltas/core/core/compile-context/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:7ea109c79525bda13c8cb023ae3f9bb1103f831edee898c643bbf045a9476635"
+        },
+        {
+          "key": "core:core/get-spec-context",
+          "filename": "deltas/core/core/get-spec-context/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:6e19bb0b3278764125308b89bda32d37a9834de2c80f2846004744beceea6154"
+        },
+        {
+          "key": "core:core/get-project-context",
+          "filename": "deltas/core/core/get-project-context/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:670f93907a86400a449249af3daba5ad4e050b630ec832e10aaefb7e964da855"
+        },
+        {
+          "key": "core:core/config",
+          "filename": "deltas/core/core/config/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:e595f5ddec9ddd95eb891688943e0e8d0e101382eb901ad4ced7f9f7683e5271"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:b03474d1c585ff9cea9466c43bf7ae811d5b3f88bfc205bc03cff693f55705b2"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:0c042b9115613bb34d4d2bc5fd13c9e2752a27c980d8ea1e1f36b63d93bf4cc6"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-04-27T10:14:26.193Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "specIds": [
+        "cli:cli/project-context",
+        "cli:cli/change-context",
+        "cli:cli/spec-context",
+        "core:core/compile-context",
+        "core:core/get-spec-context",
+        "core:core/get-project-context",
+        "core:core/config"
+      ],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-27T10:14:26.204Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "cli:cli/project-context"
+        },
+        {
+          "type": "specs",
+          "key": "cli:cli/change-context"
+        },
+        {
+          "type": "specs",
+          "key": "cli:cli/spec-context"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/compile-context"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/get-spec-context"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/get-project-context"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/config"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/project-context"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/change-context"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/spec-context"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/compile-context"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/get-spec-context"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/get-project-context"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/config"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-27T10:15:00.324Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-27T10:32:41.889Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-27T10:40:59.882Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-27T10:50:15.492Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]; specs [cli:cli/spec-context, core:core/get-spec-context]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["cli:cli/spec-context", "core:core/get-spec-context"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-27T11:09:47.701Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-27T11:11:27.772Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-28T08:51:34.420Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-28T08:51:52.970Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-28T08:52:06.930Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "description-updated",
+      "at": "2026-04-28T09:36:03.884Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "description": "Adds an explicit --mode flag to context commands and aligns full/hybrid rendering behavior across project context, change context, and spec context. The implementation now defaults full-mode output to structured Description + Rules + Constraints, with section filters overriding defaults while preserving header context. Core and CLI context use cases/tests were updated to enforce consistent mode semantics and predictable context output for agents."
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-28T09:36:10.757Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-04-28T09:37:26.282Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "m***a@g***.com"
+  }
+}

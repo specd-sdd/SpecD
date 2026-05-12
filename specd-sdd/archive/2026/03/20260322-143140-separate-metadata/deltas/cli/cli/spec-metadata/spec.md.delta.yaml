@@ -1,0 +1,26 @@
+- op: modified
+  description: 'Update purpose to reference metadata via port instead of .specd-metadata.yaml'
+  selector:
+    type: section
+    matches: 'Purpose'
+  content: |
+    When debugging context issues or verifying metadata freshness, users need to inspect what is actually recorded in a spec's metadata file. The `specd spec metadata <workspace:capability-path>` command displays the parsed contents of a spec's metadata in a structured form, including freshness status for each recorded content hash.
+
+- op: modified
+  description: 'Update behaviour to reference metadata via port'
+  selector:
+    type: section
+    matches: 'Requirement: Behaviour'
+  content: |
+    The command reads metadata for the given spec (via the core use case, which delegates to `SpecRepository.metadata()`) and renders its contents in a structured form. For each file listed in `contentHashes`, it computes the current SHA-256 hash of the file on disk and compares it against the recorded hash, reporting whether the metadata is fresh or stale per file.
+
+    If no metadata exists for the spec, the command exits with code 1.
+
+- op: modified
+  description: 'Update error cases to reference metadata instead of .specd-metadata.yaml'
+  selector:
+    type: section
+    matches: 'Requirement: Error cases'
+  content: |
+    - If the workspace is not configured, exits with code 1.
+    - If no metadata exists for the spec, exits with code 1 and prints an `error:` message to stderr.

@@ -1,0 +1,7 @@
+releases:
+  code-graph:code-graph/language-adapter: minor
+  code-graph:code-graph/indexer: minor
+  code-graph:code-graph/symbol-model: minor
+  cli:cli/graph-impact: minor
+  skills:skill-templates-source: patch
+  default:_global/docs: patch

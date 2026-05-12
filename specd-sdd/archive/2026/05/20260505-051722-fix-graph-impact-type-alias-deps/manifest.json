@@ -1,0 +1,790 @@
+{
+  "name": "fix-graph-impact-type-alias-deps",
+  "createdAt": "2026-05-05T05:17:22.047Z",
+  "description": "Fix missing impact edges when symbols are referenced through type aliases and registry indirection (e.g. ArtifactParserRegistry -> ArtifactParser). Adds graph-derivation fingerprint for staleness detection, config-relative file selector resolution, and removes the confusing --changes flag from graph impact. Updates 8 specs across code-graph, CLI, and skills packages.",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "code-graph:traversal",
+    "code-graph:symbol-model",
+    "code-graph:graph-store",
+    "code-graph:indexer",
+    "code-graph:staleness-detection",
+    "cli:graph-impact",
+    "code-graph:workspace-integration",
+    "skills:skill-templates-source"
+  ],
+  "specDependsOn": {
+    "code-graph:traversal": ["code-graph:symbol-model", "code-graph:graph-store"],
+    "code-graph:symbol-model": ["default:_global/conventions"],
+    "code-graph:graph-store": [
+      "code-graph:symbol-model",
+      "default:_global/architecture",
+      "code-graph:staleness-detection"
+    ],
+    "code-graph:indexer": [
+      "code-graph:graph-store",
+      "code-graph:language-adapter",
+      "code-graph:symbol-model",
+      "code-graph:workspace-integration",
+      "core:config"
+    ],
+    "code-graph:staleness-detection": [
+      "code-graph:graph-store",
+      "code-graph:indexer",
+      "cli:graph-stats"
+    ],
+    "cli:graph-impact": [
+      "cli:entrypoint",
+      "core:config",
+      "code-graph:composition",
+      "code-graph:traversal",
+      "code-graph:workspace-integration"
+    ],
+    "code-graph:workspace-integration": ["core:config"],
+    "skills:skill-templates-source": ["skills:skill"]
+  },
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:ad1ce15bcb35296a6c6eac9b3a889f1f1087cc3ba92769b1cdbfd7108d4a431e"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "code-graph:traversal",
+          "filename": "deltas/code-graph/traversal/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:fc2f34c230261b16b3a2f98834a0593d9cc01f1563b2d0952e80cbabefd50caf"
+        },
+        {
+          "key": "code-graph:symbol-model",
+          "filename": "deltas/code-graph/symbol-model/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:4d8f129d38514b5283025d6f3d6884c6db7be3e599ab69800819826834b4729b"
+        },
+        {
+          "key": "code-graph:graph-store",
+          "filename": "deltas/code-graph/graph-store/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:653c259cc550f78e2fc09f4e123833b77b2a307251ef94d267d2733b507fcd0a"
+        },
+        {
+          "key": "code-graph:indexer",
+          "filename": "deltas/code-graph/indexer/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:1d53350eddb98019f3d86a65a56327daf1f5a44b7de6706582d5546556193f84"
+        },
+        {
+          "key": "code-graph:staleness-detection",
+          "filename": "deltas/code-graph/staleness-detection/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:571d2aa3383b54d2793de2c9c526e5abcd9e0fd1267c1beea53ebab3ebf8bc3e"
+        },
+        {
+          "key": "cli:graph-impact",
+          "filename": "deltas/cli/graph-impact/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:0a530b21e5d9d420df6dc5ad963eee35d061dd62f08cc7b1bbf807d4ecb25ac7"
+        },
+        {
+          "key": "code-graph:workspace-integration",
+          "filename": "deltas/code-graph/workspace-integration/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:88026cbef1c990321872ce1a109de132ae643c09543960877d070350d486987a"
+        },
+        {
+          "key": "skills:skill-templates-source",
+          "filename": "deltas/skills/skill-templates-source/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:8769779110fe0e8405288155330e14105c3cdd05e845a552f8da284d6908baff"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "code-graph:traversal",
+          "filename": "deltas/code-graph/traversal/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:83d678ac71724e260e29adca4aca1d57a67536c10cca51c1485c1866fcf93c8a"
+        },
+        {
+          "key": "code-graph:symbol-model",
+          "filename": "deltas/code-graph/symbol-model/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:60c4738b49d8cde8cd5ec29da1490f6b23da0ca1ac2e844cce63278169a6bf3d"
+        },
+        {
+          "key": "code-graph:graph-store",
+          "filename": "deltas/code-graph/graph-store/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:60bd8ff7d94a3b2726bb554424d89d19ccbf2bb9a9da620ea71bbb38a1d5199e"
+        },
+        {
+          "key": "code-graph:indexer",
+          "filename": "deltas/code-graph/indexer/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:b99286d7b7e7e67fd4b6102bc60c4de0dc79820f1e3e8f1cce760c88369852ee"
+        },
+        {
+          "key": "code-graph:staleness-detection",
+          "filename": "deltas/code-graph/staleness-detection/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:473b08e0a52ccd62e0ecdf5aacf2c12b9b7e6a918afa9c6a3edde477fbb0b7f1"
+        },
+        {
+          "key": "cli:graph-impact",
+          "filename": "deltas/cli/graph-impact/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:941ea6f94bbf531b53465ccb33258fb96ed1e590d97400fc82cdaba734feab5f"
+        },
+        {
+          "key": "code-graph:workspace-integration",
+          "filename": "deltas/code-graph/workspace-integration/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:7db77d88cccfd4778decd4432beb0e4aece2fa8efcda98b6cefebe4788a17734"
+        },
+        {
+          "key": "skills:skill-templates-source",
+          "filename": "deltas/skills/skill-templates-source/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:d88133c30b12b004482e9336c9f0aa2da16bc1ac5ffa76e6f00675fa34d867f7"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:ff63f33e339164e28937874a800293a88e33311401ace224dfb67be38c2797bf"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:e54539a80b5f62834afb86e85f6c2ba4d144bc249bd3bb880cc40dc4de35f84d"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-05-05T05:17:22.047Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "specIds": ["code-graph:traversal", "code-graph:symbol-model"],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-05-05T05:17:22.058Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:traversal"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:symbol-model"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:traversal"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:symbol-model"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-05T05:19:22.909Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-05T05:20:38.772Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["code-graph:traversal", "code-graph:symbol-model"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:traversal", "code-graph:symbol-model"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-05-05T05:20:38.773Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "code-graph:graph-store"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:graph-store"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-05T05:27:37.235Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-05T05:32:39.226Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["code-graph:traversal", "code-graph:symbol-model", "code-graph:graph-store"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:traversal", "code-graph:symbol-model", "code-graph:graph-store"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-05-05T05:32:39.227Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "code-graph:indexer"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:staleness-detection"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:indexer"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:staleness-detection"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-05T05:38:46.774Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-05T05:56:07.946Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-05T06:08:05.296Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-05T06:15:59.662Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-05T07:23:26.813Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-05T08:02:39.626Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:traversal",
+            "code-graph:symbol-model",
+            "code-graph:graph-store",
+            "code-graph:indexer",
+            "code-graph:staleness-detection"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:traversal",
+            "code-graph:symbol-model",
+            "code-graph:graph-store",
+            "code-graph:indexer",
+            "code-graph:staleness-detection"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-05-05T08:02:39.627Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "cli:graph-impact"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:workspace-integration"
+        },
+        {
+          "type": "verify",
+          "key": "cli:graph-impact"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:workspace-integration"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-05T08:31:25.007Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:traversal",
+            "code-graph:symbol-model",
+            "code-graph:graph-store",
+            "code-graph:indexer",
+            "code-graph:staleness-detection",
+            "cli:graph-impact",
+            "code-graph:workspace-integration"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:traversal",
+            "code-graph:symbol-model",
+            "code-graph:graph-store",
+            "code-graph:indexer",
+            "code-graph:staleness-detection",
+            "cli:graph-impact",
+            "code-graph:workspace-integration"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-05-05T08:31:25.008Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "skills:skill-templates-source"
+        },
+        {
+          "type": "verify",
+          "key": "skills:skill-templates-source"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-05T09:16:30.682Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: design [design]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-05T09:25:02.065Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-05T09:28:35.920Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-06T08:53:05.354Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-06T09:04:31.701Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-06T09:45:47.130Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [code-graph:graph-store, code-graph:staleness-detection, code-graph:symbol-model, code-graph:workspace-integration]; verify [code-graph:symbol-model, code-graph:workspace-integration]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:graph-store",
+            "code-graph:staleness-detection",
+            "code-graph:symbol-model",
+            "code-graph:workspace-integration"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:symbol-model", "code-graph:workspace-integration"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-06T09:45:47.130Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "from": "done",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-06T17:11:09.405Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-06T17:11:15.516Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-06T17:12:17.157Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-06T17:12:24.266Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-06T17:12:39.896Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "description-updated",
+      "at": "2026-05-07T05:34:34.741Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "description": "Fix missing impact edges when symbols are referenced through type aliases and registry indirection (e.g. ArtifactParserRegistry -> ArtifactParser). Adds graph-derivation fingerprint for staleness detection, config-relative file selector resolution, and removes the confusing --changes flag from graph impact. Updates 8 specs across code-graph, CLI, and skills packages."
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-07T05:34:52.978Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-05-07T05:34:53.384Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "m***a@g***.com"
+  }
+}

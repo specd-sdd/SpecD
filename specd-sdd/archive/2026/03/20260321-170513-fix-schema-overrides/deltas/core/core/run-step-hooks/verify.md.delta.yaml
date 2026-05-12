@@ -1,0 +1,11 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Hook collection'
+  content: |
+    #### Scenario: instruction hooks are excluded from collection
+
+    - **GIVEN** a step with hooks `pre: [{ id: "guidance", type: "instruction", text: "Read tasks" }, { id: "lint", type: "run", command: "pnpm lint" }, { id: "test", type: "run", command: "pnpm test" }]`
+    - **WHEN** `RunStepHooks` collects hooks for the pre phase
+    - **THEN** the collection contains only `lint` and `test` in that order
+    - **AND** `guidance` is not in the collection

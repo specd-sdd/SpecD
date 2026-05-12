@@ -1,0 +1,262 @@
+{
+  "name": "change-validate-blocker-diagnostics",
+  "createdAt": "2026-04-28T07:53:54.907Z",
+  "description": "Align change validate dependency-blocked diagnostics with change transition by reporting effective blocker status and recursive parent review blockers.",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": ["cli:cli/change-validate", "core:core/validate-artifacts"],
+  "specDependsOn": {
+    "cli:cli/change-validate": [
+      "cli:cli/entrypoint",
+      "core:core/change",
+      "core:core/validate-artifacts",
+      "core:core/spec-id-format"
+    ],
+    "core:core/validate-artifacts": [
+      "core:core/change",
+      "core:core/change-layout",
+      "core:core/change-manifest",
+      "core:core/schema-format",
+      "core:core/delta-format",
+      "core:core/selector-model",
+      "core:core/storage",
+      "default:_global/architecture",
+      "core:core/spec-id-format"
+    ]
+  },
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:644b016d841a5d867b78977624184d3e57505f8d192ba112c01cde1e4059aec4"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "cli:cli/change-validate",
+          "filename": "deltas/cli/cli/change-validate/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:53ed8cb7d1924934d2202031668d53f18666bd09e5f679a0eb44521d7517d29c"
+        },
+        {
+          "key": "core:core/validate-artifacts",
+          "filename": "deltas/core/core/validate-artifacts/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:7b3d04ce5ec6b0308fa5607e673be84927224fe0b4ca49145188ae79567dd54f"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "cli:cli/change-validate",
+          "filename": "deltas/cli/cli/change-validate/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:d0d09db5930aeca56e426a27f6eeea7a308a903b2becbed1146a32e65e6dabee"
+        },
+        {
+          "key": "core:core/validate-artifacts",
+          "filename": "deltas/core/core/validate-artifacts/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:d9983d340f4ac671005d1f28ecc27f2edc3b2ec32dc12a4d6ee9f9a95f17c7ef"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:a37cfc4043f7081b87facca40619ca261d756fe9b38856b2d3b569988f4ce7ff"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:7b921b499073b3b9807cd1390515a96fc3e31adee7f6d7cae4de063de93e7a74"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-04-28T07:53:54.907Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "specIds": ["cli:cli/change-validate", "core:core/validate-artifacts"],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-28T07:53:54.917Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "cli:cli/change-validate"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/validate-artifacts"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/change-validate"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/validate-artifacts"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-28T07:55:22.348Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-28T08:00:56.110Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [core:core/validate-artifacts]; verify [core:core/validate-artifacts]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:core/validate-artifacts"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:core/validate-artifacts"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-28T08:04:36.316Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-28T08:05:16.626Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-28T08:14:57.862Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-28T08:16:23.452Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-28T08:16:31.119Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-28T08:17:32.559Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-04-28T08:17:32.911Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "m***a@g***.com"
+  }
+}

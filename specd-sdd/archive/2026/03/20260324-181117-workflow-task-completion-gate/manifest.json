@@ -1,0 +1,277 @@
+{
+  "name": "workflow-task-completion-gate",
+  "createdAt": "2026-03-24T18:11:17.389Z",
+  "description": "Move task completion gating from artifact config to workflow step config via requiresTaskCompletion",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "core:core/schema-format",
+    "core:core/workflow-model",
+    "core:core/build-schema",
+    "core:core/transition-change"
+  ],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "validatedHash": "sha256:65fa6c67936663cf0a65accc7a93311979ce85f1c964eb63c8c1f61dc1308265"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "files": [
+        {
+          "key": "core:core/schema-format",
+          "filename": "deltas/core/core/schema-format/spec.md.delta.yaml",
+          "validatedHash": "sha256:f17c664363129dcc86e1e846dde3c06f6d9124387319397129e5b44ac1aff9c9"
+        },
+        {
+          "key": "core:core/workflow-model",
+          "filename": "deltas/core/core/workflow-model/spec.md.delta.yaml",
+          "validatedHash": "sha256:5a0479c2f60c03a5aa071f61162a4f4d0f7b7a7d03c8956a216df6a1addac82a"
+        },
+        {
+          "key": "core:core/build-schema",
+          "filename": "deltas/core/core/build-schema/spec.md.delta.yaml",
+          "validatedHash": "sha256:041a83492bdc62dbf42bdc8ef4e20b04fa8de5959992a3b0ef2af73804c7f76a"
+        },
+        {
+          "key": "core:core/transition-change",
+          "filename": "deltas/core/core/transition-change/spec.md.delta.yaml",
+          "validatedHash": "sha256:af3db63f5ca74320cea275f194743ffc4899452221dd52b9531d2ebfa76cef70"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "files": [
+        {
+          "key": "core:core/schema-format",
+          "filename": "deltas/core/core/schema-format/verify.md.delta.yaml",
+          "validatedHash": "sha256:07639b2fbe20761dfab813fed0dbeda0114c8a2b5d269ec5c17f9abe1e83fd35"
+        },
+        {
+          "key": "core:core/workflow-model",
+          "filename": "deltas/core/core/workflow-model/verify.md.delta.yaml",
+          "validatedHash": "sha256:710ab8d35d3818a04eeaa3f1e82d8ac3cd8d26c0026bf2fad63e2975c53a1e98"
+        },
+        {
+          "key": "core:core/build-schema",
+          "filename": "deltas/core/core/build-schema/verify.md.delta.yaml",
+          "validatedHash": "sha256:c3aba65d6ec892719d64f96998ab65226d404546b50dfd2519d683475dd2626b"
+        },
+        {
+          "key": "core:core/transition-change",
+          "filename": "deltas/core/core/transition-change/verify.md.delta.yaml",
+          "validatedHash": "sha256:9484a978ae0dc0f1c2472fce6dfa721eff657cbc9302d765112fe1e9582542d2"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "validatedHash": "sha256:ccb4396785c779993d85560f9983c50469cb01fbfd0172da88238b2a83bf0412"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "validatedHash": "sha256:28c8ddef2bbd0df7890eb528873264c975727305dde3f92301ac62aa54bcc38b"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-03-24T18:11:17.389Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "specIds": [
+        "core:core/schema-format",
+        "core:core/workflow-model",
+        "core:core/build-schema",
+        "core:core/transition-change"
+      ],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-03-24T18:11:17.398Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/schema-format"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/workflow-model"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/build-schema"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/transition-change"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/schema-format"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/workflow-model"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/build-schema"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/transition-change"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-24T18:13:18.763Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-25T12:16:57.285Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-25T12:26:54.325Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-25T12:28:25.233Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-25T12:57:02.751Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-25T15:00:47.336Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-25T15:05:36.948Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-25T15:10:53.191Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-25T15:11:37.544Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-03-25T15:11:56.438Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "m***a@g***.com"
+  }
+}

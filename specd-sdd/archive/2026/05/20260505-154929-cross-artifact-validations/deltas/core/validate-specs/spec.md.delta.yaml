@@ -1,0 +1,61 @@
+- op: modified
+  description: 'Retain local parsed outputs for later cross-artifact evaluation'
+  selector:
+    type: section
+    matches: '^Requirement: Per-spec artifact validation$'
+  content: |
+    For each spec, the use case SHALL check every spec-scoped artifact type from the schema:
+
+    1. Determine the expected filename from `path.basename(artifactType.output)`.
+    2. If the file is missing and the artifact type is not optional, record a `ValidationFailure` with description indicating the required artifact is missing.
+    3. If the file is missing and the artifact type is optional, skip silently.
+    4. If the file exists and the artifact type has no validation rules, parse it when a matching `crossArtifactValidations` rule may need it; otherwise skip.
+    5. If the file exists and has local rules: infer the format (from `artifactType.format` or filename), obtain the parser from `ArtifactParserRegistry`, parse the content into an AST, and evaluate the schema's validation rules via `evaluateRules`.
+    6. Any artifact whose local validation passes and whose AST is available becomes an eligible participant input for Requirement: Per-spec cross-artifact validation.
+
+- op: added
+  description: 'Run schema crossArtifactValidations for archived spec artifacts'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Per-spec artifact validation$'
+  content: |
+    ### Requirement: Per-spec cross-artifact validation
+
+    After local per-artifact validation for one spec, `ValidateSpecs` SHALL evaluate the same schema `crossArtifactValidations` engine used by `ValidateArtifacts` for all rules whose `scope` is `spec`.
+
+    Evaluation rules:
+
+    - rules are evaluated independently for each spec being validated
+    - only participants belonging to the current spec are considered
+    - participant key extraction and relation semantics MUST match `ValidateArtifacts`
+    - `ValidateSpecs` MUST reuse the same underlying cross-artifact evaluation machinery as `ValidateArtifacts` rather than redefining a separate comparison model
+
+    Participant readiness rules:
+
+    - a participant is ready only when its artifact file exists, its artifact has passed local structural validation for this spec, and its parsed AST is available
+    - if every participant for a rule is ready, the rule MUST be evaluated and any mismatch recorded as a `ValidationFailure`
+    - if one or more participants are not ready, the rule MUST be deferred for that spec and surfaced as a non-failing validation output entry
+
+- op: modified
+  description: 'Clarify that aggregated results include cross-artifact outcomes'
+  selector:
+    type: section
+    matches: '^Requirement: Aggregated result$'
+  content: |
+    The use case SHALL return a `ValidateSpecsResult` containing:
+
+    - `entries` — array of `SpecValidationEntry` objects, one per validated spec.
+    - `totalSpecs` — total number of specs validated.
+    - `passed` — number of specs with zero failures.
+    - `failed` — number of specs with one or more failures.
+
+    Each `SpecValidationEntry` MUST include:
+
+    - `spec` — qualified label in `workspace:capabilityPath` format.
+    - `passed` — `true` if `failures` is empty.
+    - `failures` — array of `ValidationFailure` objects from both local artifact validation and per-spec cross-artifact validation.
+    - `warnings` — array of `ValidationWarning` objects, including deferred cross-artifact validation notices.

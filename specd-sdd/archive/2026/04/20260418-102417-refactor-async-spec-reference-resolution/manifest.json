@@ -1,0 +1,280 @@
+{
+  "name": "refactor-async-spec-reference-resolution",
+  "createdAt": "2026-04-18T10:24:17.482Z",
+  "description": "This change refactors spec-reference normalization so metadata extraction can use repository-backed resolution asynchronously without coupling to filesystem-specific path math. It updates the extraction pipeline to await transform callbacks end-to-end and injects a shared cross-workspace resolver runtime that normalizes escaped references like ../../_global/architecture/spec.md to default:_global/architecture. The same awaited resolver path is applied consistently across GenerateSpecMetadata and metadata-fallback flows used by compile-context, project-context, and artifact validation.",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "core:core/content-extraction",
+    "core:core/generate-metadata",
+    "core:core/spec-repository-port"
+  ],
+  "specDependsOn": {
+    "core:core/generate-metadata": [
+      "core:core/spec-metadata",
+      "core:core/content-extraction",
+      "core:core/schema-format",
+      "core:core/spec-id-format",
+      "core:core/spec-repository-port"
+    ],
+    "core:core/content-extraction": ["core:core/selector-model", "core:core/artifact-ast"]
+  },
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:d425f2c637888bb1d33a09bb9b602c5db012927ba12292e97c8f3b3998184042"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:core/content-extraction",
+          "filename": "deltas/core/core/content-extraction/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:f3bb17134d7318ce0a07dd141a949d815f36bdb42ce86a8aeb044742dbb46e58"
+        },
+        {
+          "key": "core:core/generate-metadata",
+          "filename": "deltas/core/core/generate-metadata/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:deb4df93f33ed02801d43911b87a0fd7ff038bc42c4ae41001a9ac2856cfcc0a"
+        },
+        {
+          "key": "core:core/spec-repository-port",
+          "filename": "deltas/core/core/spec-repository-port/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:803a8d925b0140a542262b076ec0c00ebcca3efa903f07f6e99959595f0d3533"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:core/content-extraction",
+          "filename": "deltas/core/core/content-extraction/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:f126177d9bd5835b305e98561033fd0f20fc8c17185783a8b7d39a95ee5a656a"
+        },
+        {
+          "key": "core:core/generate-metadata",
+          "filename": "deltas/core/core/generate-metadata/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:93d810b1ee647a40ba795464fb8096c500873ef3842e6a26854b9010649efae7"
+        },
+        {
+          "key": "core:core/spec-repository-port",
+          "filename": "deltas/core/core/spec-repository-port/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:c959dfcfea921339d574e3255f40d8cb0d183e2720177a6e8d5721b12f803c9f"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:91951ce72c82ed8789ba06ee6393f497fdd4d30921385f43b57d10d8c4ac6d11"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:51188a49faa87db91a7aaf50c75e3d513f7cf578a82b708ce1b9880ff9100045"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-04-18T10:24:17.482Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "specIds": [
+        "core:core/content-extraction",
+        "core:core/generate-metadata",
+        "core:core/spec-repository-port"
+      ],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-18T10:24:17.493Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/content-extraction"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/generate-metadata"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/spec-repository-port"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/content-extraction"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/generate-metadata"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/spec-repository-port"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-18T14:57:51.400Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-18T15:18:24.834Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-18T15:23:25.759Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-18T15:30:25.107Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-19T19:21:11.598Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-19T19:23:31.730Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-19T19:23:57.878Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "description-updated",
+      "at": "2026-04-19T19:51:37.748Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "description": "This change refactors spec-reference normalization so metadata extraction can use repository-backed resolution asynchronously without coupling to filesystem-specific path math. It updates the extraction pipeline to await transform callbacks end-to-end and injects a shared cross-workspace resolver runtime that normalizes escaped references like ../../_global/architecture/spec.md to default:_global/architecture. The same awaited resolver path is applied consistently across GenerateSpecMetadata and metadata-fallback flows used by compile-context, project-context, and artifact validation."
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-19T19:51:51.761Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-04-19T19:51:51.873Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "m***a@g***.com"
+  }
+}

@@ -1,0 +1,6 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Schema resolution'
+  content: |
+    The use case obtains the active schema via `SchemaProvider.get()`. If the schema cannot be resolved (returns `null`), it throws `SchemaNotFoundError`. If the resolved schema has no `metadataExtraction` declarations, the use case returns `{ metadata: {}, hasExtraction: false }` immediately — there is nothing to extract.

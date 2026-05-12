@@ -1,0 +1,280 @@
+{
+  "name": "archive-skip-hooks-parity",
+  "createdAt": "2026-03-31T12:10:58.506Z",
+  "description": "Unify change archive hook skipping with change transition",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "core:core/hook-execution-model",
+    "cli:cli/change-archive",
+    "core:core/archive-change"
+  ],
+  "specDependsOn": {
+    "core:core/hook-execution-model": ["cli:cli/change-archive"]
+  },
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "validatedHash": "sha256:9596140350b4147f2f0d2d8fcd03e6febf2373066c1cda931cb9c76d2dfdc72c"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "files": [
+        {
+          "key": "core:core/hook-execution-model",
+          "filename": "deltas/core/core/hook-execution-model/spec.md.delta.yaml",
+          "validatedHash": "sha256:4a23bf026c9231f57abbe4bcc0430b50eb339ab32ed043761359fe693aca783c"
+        },
+        {
+          "key": "cli:cli/change-archive",
+          "filename": "deltas/cli/cli/change-archive/spec.md.delta.yaml",
+          "validatedHash": "sha256:8f31e3b727bf5433bcfa93393ef2cfd668bc1e09329c8561c496ca502f8bb167"
+        },
+        {
+          "key": "core:core/archive-change",
+          "filename": "deltas/core/core/archive-change/spec.md.delta.yaml",
+          "validatedHash": "sha256:2e5c3d639516e8077ce48bb95a458d758ce1dba396d11c5d4336340e59e74b36"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "files": [
+        {
+          "key": "core:core/hook-execution-model",
+          "filename": "deltas/core/core/hook-execution-model/verify.md.delta.yaml",
+          "validatedHash": "sha256:582fa5f56f81be9192b777d9934e36f979cf24c11da72ee2523fe869cc5f56d0"
+        },
+        {
+          "key": "cli:cli/change-archive",
+          "filename": "deltas/cli/cli/change-archive/verify.md.delta.yaml",
+          "validatedHash": "sha256:56ef4a6b0a2eb7b24beb3bc0beb75b6f935c3e74d68ca7caf932fbd879c4af82"
+        },
+        {
+          "key": "core:core/archive-change",
+          "filename": "deltas/core/core/archive-change/verify.md.delta.yaml",
+          "validatedHash": "sha256:01dadef427d35bb538c1494f365e81c52a26563fb89afbe057eeca0b8bfdbc0a"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "validatedHash": "sha256:159a16a03e1fe1e07068fbe4b9c909c9de19788d0570cfabfa6f43d32c02322a"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "validatedHash": "sha256:808d7ef7d19c2daba2275875d91ef637d01b8db0b385d4051ed159122315ca20"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-03-31T12:10:58.506Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "specIds": [],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-03-31T12:10:58.515Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-03-31T12:11:16.570Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-31T12:11:16.570Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-03-31T12:11:16.571Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:core/hook-execution-model"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/hook-execution-model"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-03-31T12:11:47.025Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change"
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-03-31T12:11:47.026Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "cli:cli/change-archive"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/archive-change"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/change-archive"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/archive-change"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-31T12:18:49.607Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-31T19:30:20.833Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-31T19:48:01.760Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-31T19:49:07.724Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-31T19:49:41.198Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-31T20:10:34.957Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-03-31T20:10:35.154Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "m***a@g***.com"
+  }
+}

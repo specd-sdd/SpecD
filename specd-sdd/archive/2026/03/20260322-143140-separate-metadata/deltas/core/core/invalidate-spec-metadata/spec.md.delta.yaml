@@ -1,0 +1,47 @@
+- op: modified
+  description: 'Update purpose to reference new port methods'
+  selector:
+    type: section
+    matches: 'Purpose'
+  content: |
+    When a spec's content changes outside the normal archive flow, its metadata becomes untrustworthy but deleting the entire file would lose curated fields like `dependsOn` and `description`. The `InvalidateSpecMetadata` use case marks the metadata as stale by removing only the `contentHashes` field, which causes all downstream consumers (staleness detection, `spec list --metadata-status`) to treat it as stale and forces regeneration on the next metadata pass. All other fields (title, description, rules, scenarios, etc.) are preserved.
+
+- op: modified
+  description: 'Update Removes contentHashes to use new port methods'
+  selector:
+    type: section
+    matches: 'Requirement: Removes contentHashes'
+  content: |
+    When executed, the use case reads the existing metadata via `SpecRepository.metadata()`, removes the `contentHashes` key from the parsed YAML, and writes the result back via `SpecRepository.saveMetadata()`. The write uses `force: true` to skip conflict detection — invalidation is always unconditional.
+
+- op: modified
+  description: 'Update returns null to reference metadata instead of .specd-metadata.yaml'
+  selector:
+    type: section
+    matches: 'Requirement: Returns null when not applicable'
+  content: |
+    The use case returns `null` (no-op) when:
+
+    - The spec has no metadata file
+    - The file content is not a YAML mapping (e.g. scalar, null)
+
+    In all other cases it returns `{ spec: '<workspace>:<path>' }`.
+
+- op: modified
+  description: 'Update no strict validation to use saveMetadata()'
+  selector:
+    type: section
+    matches: 'Requirement: No strict validation on write'
+  content: |
+    Because the use case intentionally removes `contentHashes` (a required field in `strictSpecMetadataSchema`), it bypasses `SaveSpecMetadata` and writes directly through `SpecRepository.saveMetadata()`. This is the only use case that writes metadata without strict validation.
+
+- op: modified
+  description: 'Update constraints to reference new port methods'
+  selector:
+    type: section
+    matches: 'Constraints'
+  content: |
+    - The use case contains no CLI or delivery logic — it operates purely through the `SpecRepository` port
+    - The write is always forced (`force: true`) — there is no conflict detection for invalidation
+    - The use case never deletes the metadata file — it only strips `contentHashes`
+    - Metadata is read via `SpecRepository.metadata()` and written via `SpecRepository.saveMetadata()`

@@ -1,0 +1,251 @@
+# Delta: core:transition-change (Verification)
+
+- op: modified
+  description: 'Update approval routing scenarios to mention LifecycleEngine while preserving the behavioral assertions.'
+  selector:
+    type: section
+    matches: 'Requirement: Approval-gate routing for spec approval'
+  content: |
+    #### Scenario: Ready to implementing is rerouted when spec approval is active
+
+    - **GIVEN** a change in `ready` state
+    - **WHEN** `execute` is called with `to: 'implementing'` and `approvalsSpec: true`
+    - **THEN** the `LifecycleEngine` identifies `pending-spec-approval` as the effective target
+    - **AND** the change transitions to `pending-spec-approval`
+
+    #### Scenario: Ready to implementing is direct when spec approval is inactive
+
+    - **GIVEN** a change in `ready` state
+    - **WHEN** `execute` is called with `to: 'implementing'` and `approvalsSpec: false`
+    - **THEN** the `LifecycleEngine` identifies `implementing` as the effective target
+    - **AND** the change transitions to `implementing`
+
+- op: modified
+  description: 'Update signoff routing scenarios to mention LifecycleEngine while preserving the behavioral assertions.'
+  selector:
+    type: section
+    matches: 'Requirement: Approval-gate routing for signoff'
+  content: |
+    #### Scenario: Done to archivable is rerouted when signoff is active
+
+    - **GIVEN** a change in `done` state
+    - **WHEN** `execute` is called with `to: 'archivable'` and `approvalsSignoff: true`
+    - **THEN** the `LifecycleEngine` identifies `pending-signoff` as the effective target
+    - **AND** the change transitions to `pending-signoff`
+
+    #### Scenario: Done to archivable is direct when signoff is inactive
+
+    - **GIVEN** a change in `done` state
+    - **WHEN** `execute` is called with `to: 'archivable'` and `approvalsSignoff: false`
+    - **THEN** the `LifecycleEngine` identifies `archivable` as the effective target
+    - **AND** the change transitions to `archivable`
+
+- op: modified
+  description: 'Update approval-boundary failure scenarios to preserve structured failure expectations.'
+  selector:
+    type: section
+    matches: 'Requirement: Human-approval pending states produce explicit transition failures'
+  content: |
+    #### Scenario: Pending spec approval blocks normal forward transition
+
+    - **GIVEN** a change in `pending-spec-approval` state
+    - **WHEN** `execute` is called with `to: 'spec-approved'`
+    - **THEN** the `LifecycleEngine` identifies an approval-required blocker
+    - **AND** it throws `InvalidStateTransitionError`
+    - **AND** the error reason equals `{ type: 'approval-required', gate: 'spec' }`
+
+    #### Scenario: Pending signoff blocks normal forward transition
+
+    - **GIVEN** a change in `pending-signoff` state
+    - **WHEN** `execute` is called with `to: 'signed-off'`
+    - **THEN** the `LifecycleEngine` identifies an approval-required blocker
+    - **AND** it throws `InvalidStateTransitionError`
+    - **AND** the error reason equals `{ type: 'approval-required', gate: 'signoff' }`
+
+    #### Scenario: Pending approval still allows redesign
+
+    - **GIVEN** a change in `pending-spec-approval` state
+    - **WHEN** `execute` is called with `to: 'designing'`
+    - **THEN** the change transitions to `designing`
+
+- op: modified
+  description: 'Preserve task-completion coverage while clarifying engine ownership of lifecycle interpretation.'
+  selector:
+    type: section
+    matches: 'Requirement: Task completion check during requires enforcement'
+  content: |
+    #### Scenario: Transition blocked by requiresTaskCompletion artifact with incomplete items
+
+    - **GIVEN** a change in `implementing` state
+    - **AND** the `verifying` step declares `requiresTaskCompletion: [tasks]`
+    - **AND** the `LifecycleEngine` has already identified `verifying` as the effective target
+    - **AND** the `tasks` artifact file contains `- [ ] unfinished task`
+    - **WHEN** `execute` is called with `to: 'verifying'`
+    - **THEN** it throws `InvalidStateTransitionError` with reason `incomplete-tasks`
+
+    #### Scenario: Transition blocked by missing task capability (defensive check)
+
+    - **GIVEN** a workflow step declares `requiresTaskCompletion: [proposal]`
+    - **AND** artifact `proposal` has `hasTasks: false`
+    - **WHEN** `execute` is called
+    - **THEN** it throws `InvalidStateTransitionError` with reason `missing-task-capability`
+
+    #### Scenario: Transition allowed when all tasks complete
+
+    - **GIVEN** a change in `implementing` state
+    - **AND** the `verifying` step declares `requiresTaskCompletion: [tasks]`
+    - **AND** the `LifecycleEngine` has already identified `verifying` as the effective target
+    - **AND** the tasks file contains only `- [x] done task`
+    - **WHEN** `execute` is called with `to: 'verifying'`
+    - **THEN** the change transitions to `verifying`
+
+    #### Scenario: No gating when requiresTaskCompletion absent
+
+    - **GIVEN** a change in `implementing` state
+    - **AND** the `verifying` step has `requires: [tasks]` but no `requiresTaskCompletion`
+    - **AND** the tasks file contains incomplete items
+    - **WHEN** `execute` is called with `to: 'verifying'`
+    - **THEN** the change transitions to `verifying` — no content check
+
+    #### Scenario: Missing artifact file is skipped
+
+    - **GIVEN** a step with `requiresTaskCompletion: [tasks]`
+    - **AND** the tasks file does not exist
+    - **WHEN** `execute` is called
+    - **THEN** the check is skipped and the transition proceeds
+
+    #### Scenario: Error carries incomplete and complete counts
+
+    - **GIVEN** a step with `requiresTaskCompletion: [tasks]`
+    - **AND** the tasks file has 5 complete items and 3 incomplete items
+    - **WHEN** `execute` is called
+    - **THEN** the error reason includes `artifactId: 'tasks'`, `incomplete: 3`, `complete: 5`, `total: 8`
+
+    #### Scenario: task-completion-failed progress event emitted before throwing
+
+    - **GIVEN** a step with `requiresTaskCompletion: [tasks]` and incomplete items
+    - **WHEN** `execute` is called with an `onProgress` callback
+    - **THEN** a `task-completion-failed` event is emitted with counts before the error is thrown
+
+- op: modified
+  description: 'Update requires-enforcement scenarios to mention engine-derived interpretation while keeping detailed blocker expectations.'
+  selector:
+    type: section
+    matches: 'Requirement: Workflow requires enforcement'
+  content: |
+    #### Scenario: Unsatisfied requirement throws with structured reason
+
+    - **GIVEN** a workflow step with `requires: [specs, tasks]`
+    - **AND** `LifecycleEngine` reports `specs` with effective status `in-progress`
+    - **WHEN** `execute` is called
+    - **THEN** `InvalidStateTransitionError` is thrown with reason `incomplete-artifact` and blocking artifact `specs`
+
+    #### Scenario: Transition blocked by recursive parent review
+
+    - **GIVEN** a workflow step requires artifact `design`
+    - **AND** `LifecycleEngine` reports `design` as `pending-parent-artifact-review`
+    - **AND** the detailed blocker context includes `blockedBy: { artifactId: 'specs', status: 'pending-review' }`
+    - **WHEN** `execute` is called
+    - **THEN** it throws `InvalidStateTransitionError`
+    - **AND** the error reason includes `status: 'pending-parent-artifact-review'`
+    - **AND** it includes `blockedBy: { artifactId: 'specs', status: 'pending-review' }`
+
+- op: added
+  description: 'Add missing requirement headings required by the spec contract.'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: Input contract
+
+    #### Scenario: Input accepts approvals and hook-skipping controls
+
+    - **WHEN** `TransitionChange.execute` is called
+    - **THEN** its input accepts `name`, `to`, `approvalsSpec`, `approvalsSignoff`, and optional `skipHookPhases`
+
+- op: added
+  description: 'Add the verify requirement for direct transition when gates are inactive.'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: Direct transition when gates are inactive
+
+    #### Scenario: Requested target is used directly when no gate reroutes it
+
+    - **GIVEN** no approval gate applies to the requested target
+    - **WHEN** `execute` is called
+    - **THEN** the requested target state is used directly
+
+- op: added
+  description: 'Add the verify requirement for pre-hook execution.'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: Pre-hook execution
+
+    #### Scenario: Target pre-hooks run before the state mutation
+
+    - **GIVEN** the target workflow step defines pre-hooks
+    - **WHEN** `execute` is called and hooks are not skipped
+    - **THEN** those target pre-hooks execute before the lifecycle transition
+
+- op: added
+  description: 'Add the verify requirement for transition event.'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: Transition event
+
+    #### Scenario: Successful transition emits transitioned progress event
+
+    - **WHEN** a state transition succeeds
+    - **THEN** a `transitioned` progress event is emitted with the source and target states
+
+- op: added
+  description: 'Add the verify requirement for result type.'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: Result type
+
+    #### Scenario: Successful execution returns the updated change
+
+    - **WHEN** `TransitionChange.execute` succeeds
+    - **THEN** the returned result contains the updated `change`
+
+- op: added
+  description: 'Add the verify requirement for progress callback.'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: Progress callback
+
+    #### Scenario: Progress callback receives hook and requires events
+
+    - **WHEN** `TransitionChange.execute` is called with an `onProgress` callback
+    - **THEN** the callback receives lifecycle progress events such as `requires-check`, `hook-start`, `hook-done`, and `transitioned`
+
+- op: added
+  description: 'Add the verify requirement for dependencies.'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: Dependencies
+
+    #### Scenario: TransitionChange depends on LifecycleEngine and RunStepHooks
+
+    - **WHEN** `TransitionChange` is assembled
+    - **THEN** it receives `ChangeRepository`, `ActorResolver`, `SchemaProvider`, `LifecycleEngine`, and `RunStepHooks`

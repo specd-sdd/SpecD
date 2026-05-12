@@ -1,0 +1,35 @@
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Output'
+  content: |
+    ### Requirement: Output
+
+    #### Scenario: Full mode defaults to Description + Rules + Constraints
+    - **GIVEN** `GetProjectContext` returns specs in `full` mode
+    - **WHEN** `specd project context` is run without section flags
+    - **THEN** output includes Description, Rules, and Constraints for each spec
+
+    #### Scenario: Section flags override full mode defaults
+    - **GIVEN** `GetProjectContext` returns specs in `full` mode
+    - **WHEN** `specd project context --rules` is run
+    - **THEN** output includes Title and Description (header persistence)
+    - **AND** output includes only the Rules section
+    - **AND** Constraints and Scenarios are omitted
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Command signature'
+  content: |
+    #### Scenario: --mode flag accepted
+    - **WHEN** `specd project context --mode full` is run
+    - **THEN** the command proceeds normally and overrides the config mode
+
+    #### Scenario: --depth without --follow-deps
+    - **WHEN** `specd project context --depth 2` is run without `--follow-deps`
+    - **THEN** the command exits with code 1 and prints a usage error to stderr

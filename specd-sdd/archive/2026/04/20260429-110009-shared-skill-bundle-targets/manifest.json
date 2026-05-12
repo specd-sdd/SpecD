@@ -1,0 +1,538 @@
+{
+  "name": "shared-skill-bundle-targets",
+  "createdAt": "2026-04-29T11:00:09.785Z",
+  "description": "Adds first-class shared file support for skill bundles so plugin installers can route shared templates to a dedicated shared directory while preserving compatibility when no shared target is configured. Agent plugin installers now install and uninstall only specd-managed skills, keeping unrelated user skills untouched during full uninstall operations. The change also standardizes shared template references and verifies end-to-end behavior across codex, claude, copilot, and opencode plugin workflows.",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "skills:skill-bundle",
+    "skills:skill-repository-port",
+    "skills:skill-repository-infra",
+    "skills:resolve-bundle",
+    "plugin-manager:agent-plugin-type",
+    "plugin-agent-codex:plugin-agent",
+    "plugin-agent-claude:plugin-agent",
+    "plugin-agent-copilot:plugin-agent",
+    "plugin-agent-opencode:plugin-agent"
+  ],
+  "specDependsOn": {
+    "plugin-agent-codex:plugin-agent": [
+      "core:core/config",
+      "plugin-manager:agent-plugin-type",
+      "skills:skill-bundle",
+      "skills:skill-templates-source"
+    ],
+    "plugin-agent-claude:plugin-agent": [
+      "core:core/config",
+      "plugin-manager:agent-plugin-type",
+      "skills:skill-bundle",
+      "skills:skill-repository"
+    ],
+    "plugin-agent-copilot:plugin-agent": [
+      "core:core/config",
+      "plugin-manager:agent-plugin-type",
+      "skills:skill-bundle",
+      "skills:skill-templates-source"
+    ],
+    "plugin-agent-opencode:plugin-agent": [
+      "core:core/config",
+      "plugin-manager:agent-plugin-type",
+      "skills:skill-bundle",
+      "skills:skill-templates-source"
+    ],
+    "skills:skill-bundle": ["skills:skill"],
+    "skills:skill-repository-port": ["core:core/config", "skills:skill", "skills:skill-bundle"],
+    "skills:skill-repository-infra": ["skills:skill-repository-port"],
+    "skills:resolve-bundle": [
+      "core:core/config",
+      "skills:skill-bundle",
+      "skills:skill-repository-port"
+    ]
+  },
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:52e8fe476f5766c15285baf780be402922d4866351ed15c8acc82569e4e810c4"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "skills:skill-bundle",
+          "filename": "deltas/skills/skill-bundle/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:3fd1f88d119e099273a123e11c16ed847452355ae871d69213dc8d0f5e10bf4c"
+        },
+        {
+          "key": "skills:skill-repository-port",
+          "filename": "deltas/skills/skill-repository-port/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:3d57669a87ab22459a4639a67040369c626d7de1909b4c3a5eab7b15dc012ec7"
+        },
+        {
+          "key": "skills:skill-repository-infra",
+          "filename": "deltas/skills/skill-repository-infra/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:1bbf9e9c31053b13bbec3597f2dae7049cade7374d80fc60b65e841db545738f"
+        },
+        {
+          "key": "skills:resolve-bundle",
+          "filename": "deltas/skills/resolve-bundle/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:84b64442ec3daf899fd9d9ac8aa2e66b2bef9b4993ec1b1946addbc7bb5141e2"
+        },
+        {
+          "key": "plugin-manager:agent-plugin-type",
+          "filename": "deltas/plugin-manager/agent-plugin-type/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:cfe9feb22f3715a0447f0d5218844ad79868ab83f518212d7764855246672021"
+        },
+        {
+          "key": "plugin-agent-codex:plugin-agent",
+          "filename": "deltas/plugin-agent-codex/plugin-agent/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:bc8a2ced8186e070ae9f29bfd82a86a2967bb7425484cb9eade3931dab4dcb57"
+        },
+        {
+          "key": "plugin-agent-claude:plugin-agent",
+          "filename": "deltas/plugin-agent-claude/plugin-agent/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:7874922d3a22dbf05b3930ad7efc895307ec245d4d52bf34f33cca2e016e2359"
+        },
+        {
+          "key": "plugin-agent-copilot:plugin-agent",
+          "filename": "deltas/plugin-agent-copilot/plugin-agent/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:2824f1732b333508b3849df7a443f2658b823e0d290239d916ec003232fcb4d0"
+        },
+        {
+          "key": "plugin-agent-opencode:plugin-agent",
+          "filename": "deltas/plugin-agent-opencode/plugin-agent/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:693b017de522e163af023953d349efaf641b85e633c3ca1a72cb6d1347ba41d0"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "skills:skill-bundle",
+          "filename": "deltas/skills/skill-bundle/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:fd5e2c929ee47886139857812a6a4920416c37a75030311ef3d5c33042712077"
+        },
+        {
+          "key": "skills:skill-repository-port",
+          "filename": "deltas/skills/skill-repository-port/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:0d12c1e7b5a821dc3ac428389f828531003db27bbf8b4034d05162af55fc4710"
+        },
+        {
+          "key": "skills:skill-repository-infra",
+          "filename": "deltas/skills/skill-repository-infra/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:3295da55f772e6efef2bbdb0e4a0d156e709dc80db47dce939e1ac65c81702c2"
+        },
+        {
+          "key": "skills:resolve-bundle",
+          "filename": "deltas/skills/resolve-bundle/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:cdfc81b2167dc27036ef8c4f73a01899ab7aa05486f5f53550f1b3fe9849592b"
+        },
+        {
+          "key": "plugin-manager:agent-plugin-type",
+          "filename": "deltas/plugin-manager/agent-plugin-type/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:3939af3258835990f524e1a28144204d0649918aa2808e8255ce7d9d8c9c624e"
+        },
+        {
+          "key": "plugin-agent-codex:plugin-agent",
+          "filename": "deltas/plugin-agent-codex/plugin-agent/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:5843df99b13f8602e3cfdc4761355e343bb42918456cb348ce4fbfe9184dca79"
+        },
+        {
+          "key": "plugin-agent-claude:plugin-agent",
+          "filename": "deltas/plugin-agent-claude/plugin-agent/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:9b71379d8d5e8279c4e8e62ea65cd9063b2e0724aef5714acf2c2e493fd94da2"
+        },
+        {
+          "key": "plugin-agent-copilot:plugin-agent",
+          "filename": "deltas/plugin-agent-copilot/plugin-agent/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:6f2139739bad9bfa65f3a75af7d13d8fb579f595cc9c2dcdd03cf84022315cf1"
+        },
+        {
+          "key": "plugin-agent-opencode:plugin-agent",
+          "filename": "deltas/plugin-agent-opencode/plugin-agent/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:77d81fe992d0e492abf5d2cccb426f73f8c62f4900cb5290cf04dc382e6b9743"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:ddc39bd7535d5c707f463008cec11ca3a162ac9af12bcc5dbd41d58174b016aa"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:2494f430eedc6ceca086683c5f82b5879fe50c37ab228d9fe0c760487fb13749"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-04-29T11:00:09.785Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "specIds": [
+        "skills:skill-bundle",
+        "skills:skill-repository-port",
+        "skills:skill-repository-infra",
+        "skills:resolve-bundle",
+        "plugin-manager:agent-plugin-type",
+        "plugin-agent-codex:plugin-agent",
+        "plugin-agent-claude:plugin-agent",
+        "plugin-agent-copilot:plugin-agent",
+        "plugin-agent-opencode:plugin-agent"
+      ],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-29T11:00:09.795Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "skills:skill-bundle"
+        },
+        {
+          "type": "specs",
+          "key": "skills:skill-repository-port"
+        },
+        {
+          "type": "specs",
+          "key": "skills:skill-repository-infra"
+        },
+        {
+          "type": "specs",
+          "key": "skills:resolve-bundle"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-manager:agent-plugin-type"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-agent-codex:plugin-agent"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-agent-claude:plugin-agent"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-agent-copilot:plugin-agent"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-agent-opencode:plugin-agent"
+        },
+        {
+          "type": "verify",
+          "key": "skills:skill-bundle"
+        },
+        {
+          "type": "verify",
+          "key": "skills:skill-repository-port"
+        },
+        {
+          "type": "verify",
+          "key": "skills:skill-repository-infra"
+        },
+        {
+          "type": "verify",
+          "key": "skills:resolve-bundle"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:agent-plugin-type"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-agent-codex:plugin-agent"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-agent-claude:plugin-agent"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-agent-copilot:plugin-agent"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-agent-opencode:plugin-agent"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-29T11:02:27.139Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-29T11:10:18.837Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-29T11:52:25.881Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-29T11:53:05.658Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-29T15:19:02.559Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "skills:skill-bundle",
+            "skills:skill-repository-port",
+            "skills:skill-repository-infra",
+            "skills:resolve-bundle",
+            "plugin-manager:agent-plugin-type",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-opencode:plugin-agent"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "skills:skill-bundle",
+            "skills:skill-repository-port",
+            "skills:skill-repository-infra",
+            "skills:resolve-bundle",
+            "plugin-manager:agent-plugin-type",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-opencode:plugin-agent"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-29T15:19:02.559Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-29T15:25:12.953Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-29T15:27:54.791Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-29T15:36:25.960Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-29T15:36:55.012Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "verifying",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-29T15:44:14.935Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-29T15:45:18.348Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-29T15:45:28.569Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "description-updated",
+      "at": "2026-04-29T15:47:53.736Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "description": "Adds first-class shared file support for skill bundles so plugin installers can route shared templates to a dedicated shared directory while preserving compatibility when no shared target is configured. Agent plugin installers now install and uninstall only specd-managed skills, keeping unrelated user skills untouched during full uninstall operations. The change also standardizes shared template references and verifies end-to-end behavior across codex, claude, copilot, and opencode plugin workflows."
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-29T15:48:31.532Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-04-29T15:48:31.884Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "m***a@g***.com"
+  }
+}

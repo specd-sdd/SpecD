@@ -1,0 +1,4 @@
+releases:
+  core:core/artifact-parser-port: minor
+  core:core/delta-format: patch
+  core:core/artifact-ast: patch

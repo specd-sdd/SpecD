@@ -1,0 +1,59 @@
+- op: modified
+  description: 'Rename metadata file from YAML to JSON'
+  selector:
+    type: section
+    matches: 'Requirement: File location and naming'
+  content: |
+    `metadata.json` lives under the `.specd/metadata/` directory, mirroring the spec's capability path:
+
+    ```
+    .specd/metadata/core/config/
+    └── metadata.json
+
+    specs/core/config/
+    ├── spec.md          ← user content only
+    └── verify.md
+    ```
+
+    The metadata root path is configured per workspace via `specs.fs.metadataPath` in `specd.yaml`. When not set, the composition layer auto-derives it from the VCS root of the workspace's specs path: `createVcsAdapter(specs.path).rootDir()` + `/.specd/metadata/`. This works across heterogeneous VCS setups (git, hg, svn). When `NullVcsAdapter` is returned (specs path is not inside any VCS), the fallback is `.specd/metadata/` relative to the specs root parent directory. The `FsSpecRepository` adapter receives the resolved path as config — it does not perform VCS detection itself.
+
+    The file's absence is not an error — a spec with no `metadata.json` is treated as having no declared dependencies and no recorded content hash.
+
+- op: modified
+  description: 'Change file format from YAML to JSON'
+  selector:
+    type: section
+    matches: 'Requirement: File format'
+  content: |
+    `metadata.json` is a JSON file (per ADR-0019: machine-generated files use JSON). All fields are optional — an empty object or absent file is valid:
+
+    ```json
+    {
+      "title": "Change",
+      "description": "The central domain entity in specd.",
+      "dependsOn": ["core:core/storage", "core:core/delta-format"],
+      "contentHashes": {
+        "spec.md": "sha256:abc123..."
+      },
+      "rules": [
+        { "requirement": "Lifecycle states", "rules": ["..."] }
+      ],
+      "constraints": ["..."],
+      "scenarios": [
+        { "requirement": "...", "name": "...", "given": [], "when": [], "then": [] }
+      ],
+      "generatedBy": "core"
+    }
+    ```
+
+    Fields:
+    - `title` — human-readable display title
+    - `description` — short summary of the spec's purpose
+    - `keywords` — lowercase hyphen-separated discovery tokens
+    - `dependsOn` — array of spec IDs this spec depends on
+    - `contentHashes` — `{ filename: "sha256:<hex>" }` for staleness detection
+    - `rules` — extracted requirements grouped by heading
+    - `constraints` — extracted constraint bullets
+    - `scenarios` — extracted verification scenarios
+    - `context` — freeform context strings
+    - `generatedBy` — `"core"` for deterministic extraction, `"agent"` for LLM-optimized

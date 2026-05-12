@@ -1,0 +1,34 @@
+- op: modified
+  description: Clarify that dependency-block diagnostics are rendered from core status-aware failure messages.
+  selector:
+    type: section
+    matches: '^Requirement: Output on failure$'
+  content: |
+    In `text` mode, the command prints each failure to stdout, exits with code 1, and includes any expected file paths that could not be validated:
+
+    ```text
+    validation failed <name>/<workspace:capability-path>:
+      missing: <path>
+        error: <artifactId> — <description>
+        ...
+        note: <artifactId> — <description>
+        ...
+      note: inspect merged spec output with `specd change spec-preview <name> <workspace:capability-path>`
+    ```
+
+    Missing path lines MUST be derived from `ValidateArtifacts` result metadata. For an existing spec with a delta-capable artifact, this path is the expected `deltas/.../*.delta.yaml` file, even if a direct `specs/...` file exists.
+
+    For dependency-blocked failures, `<description>` MUST be rendered exactly from the core validation failure entry and therefore MUST preserve dependency status context. When core reports review-propagation context (for example, a blocker status of `pending-parent-artifact-review` and an upstream parent blocker), the CLI MUST surface that context verbatim instead of replacing it with generic "incomplete dependency" wording.
+
+    In `json` or `toon` mode:
+
+    ```json
+    {
+      "passed": false,
+      "failures": [{ "artifactId": "...", "description": "...", "filename": "..." }],
+      "notes": [],
+      "files": [{ "artifactId": "...", "key": "...", "filename": "...", "status": "missing" }]
+    }
+    ```
+
+    The process exits with code 1 when `passed` is `false`, regardless of format.

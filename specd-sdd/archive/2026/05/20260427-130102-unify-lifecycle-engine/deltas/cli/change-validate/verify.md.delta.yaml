@@ -1,0 +1,35 @@
+# Delta: cli:change-validate (Verification)
+
+- op: modified
+  description: 'Clarify that dependency-block wording is preserved verbatim from core.'
+  selector:
+    type: section
+    matches: 'Requirement: Output on failure'
+  content: |
+    #### Scenario: Validation failures with notes
+
+    - **GIVEN** a change where a required artifact fails validation and has optimization notes
+    - **AND** validation reports missing file `deltas/core/core/config/spec.md.delta.yaml`
+    - **WHEN** `specd change validate my-change core:config --artifact specs` is run
+    - **THEN** stdout contains `validation failed`
+    - **AND** stdout contains `missing: deltas/core/core/config/spec.md.delta.yaml`
+    - **AND** stdout contains `error:` lines for each failure
+    - **AND** stdout contains `note:` lines for each note
+    - **AND** the process exits with code 1
+
+    #### Scenario: JSON output on failure includes notes and files
+
+    - **GIVEN** a change where a required artifact fails validation and has notes
+    - **WHEN** `specd change validate my-change core:config --artifact specs --format json` is run
+    - **THEN** stdout is valid JSON with `passed` equal to `false`
+    - **AND** `failures` contains at least one entry
+    - **AND** `notes` contains the optimization suggestions
+    - **AND** the process exits with code 1
+
+    #### Scenario: Dependency-block failure preserves core blocker status context
+
+    - **GIVEN** validation reports a dependency-blocked failure from core including dependency status context
+    - **WHEN** `specd change validate my-change core:config --artifact specs` is run
+    - **THEN** stdout contains the failure description exactly as emitted by core validation
+    - **AND** the CLI does not replace it with generic "incomplete dependency" wording
+    - **AND** the CLI does not recompute blocker semantics locally

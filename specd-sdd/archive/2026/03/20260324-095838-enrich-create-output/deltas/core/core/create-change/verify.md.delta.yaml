@@ -1,0 +1,18 @@
+- op: added
+  description: 'Add scenario for changePath in result'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Persistence and scaffolding'
+  content: |
+    ### Requirement: Result includes changePath
+
+    #### Scenario: changePath returned after creation
+
+    - **GIVEN** no change named `'add-login'` exists
+    - **WHEN** `CreateChange.execute` is called with `name: 'add-login'`
+    - **THEN** the result includes `changePath` as an absolute path to the change directory
+    - **AND** the result includes `change` as the `Change` entity

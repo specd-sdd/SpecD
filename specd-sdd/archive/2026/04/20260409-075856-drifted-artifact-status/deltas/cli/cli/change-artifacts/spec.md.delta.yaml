@@ -1,0 +1,60 @@
+- op: modified
+  description: 'Expose file state explicitly in change artifacts output.'
+  selector:
+    type: section
+    matches: '^Requirement: Output format$'
+  content: |
+    Artifacts are listed per-file. Multi-file artifacts (e.g. `scope: spec` with multiple
+    specIds) produce one row per file. Single-file artifacts produce one row. 
+
+    In `text` mode (default), each file is listed on one line:
+
+    ```
+    <id>  <artifact-state>  <file-state>  <exists>  <absolute-path>
+    ```
+
+    For multi-file artifacts, `<id>` includes the file key: `<artifact-id> [<file-key>]`.
+    For single-file artifacts, `<id>` is just the artifact type id.
+
+    When an artifact has no files yet (not synced), a summary row is shown with the
+    artifact-level `state`.
+
+    In `json` or `toon` mode, the output is (encoded in the respective format):
+
+    ```json
+    {
+      "name": "<change-name>",
+      "changeDir": "<absolute-change-dir>",
+      "artifacts": [
+        {
+          "artifactType": "proposal",
+          "artifactState": "complete",
+          "fileKey": "proposal",
+          "filename": "proposal.md",
+          "path": "/abs/path/proposal.md",
+          "fileState": "complete",
+          "exists": true
+        },
+        {
+          "artifactType": "specs",
+          "artifactState": "drifted-pending-review",
+          "fileKey": "default:auth/login",
+          "filename": "specs/default/auth/login/spec.md",
+          "path": "/abs/path/specs/default/auth/login/spec.md",
+          "fileState": "drifted-pending-review",
+          "exists": true
+        }
+      ]
+    }
+    ```
+
+    Artifacts are listed in schema-declared order, with per-file entries within each
+    artifact.
+- op: modified
+  description: 'Normalize dependencies for metadata extraction.'
+  selector:
+    type: section
+    matches: '^Spec Dependencies$'
+  content: |
+    - [`cli:cli/entrypoint`](../entrypoint/spec.md) — CLI config discovery, exit codes, and output conventions
+    - [`core:core/change`](../../core/change/spec.md) — artifact and file state model used for listing

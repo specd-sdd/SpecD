@@ -1,0 +1,43 @@
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Output'
+  content: |
+    #### Scenario: Full mode defaults to Description + Rules + Constraints
+    - **GIVEN** a spec is rendered in `full` mode (due to `--mode full` or being a change spec in `hybrid` mode)
+    - **WHEN** `specd change context` is run without section flags
+    - **THEN** output includes Description, Rules, and Constraints for that spec
+
+    #### Scenario: Smart section filtering in hybrid mode
+    - **GIVEN** effective mode is `hybrid`
+    - **AND** the context contains both change specs and non-change specs
+    - **WHEN** `specd change context <name> <step> --rules` is run
+    - **THEN** change specs render with Title, Description, and Rules only
+    - **AND** non-change specs remain in `summary` mode
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Command signature'
+  content: |
+    #### Scenario: Missing step argument
+    - **WHEN** `specd change context my-change` is run
+    - **THEN** the command exits with code 1
+    - **AND** stderr contains a usage error
+
+    #### Scenario: --mode flag accepted
+    - **WHEN** `specd change context my-change designing --mode summary` is run
+    - **THEN** the command proceeds normally and overrides the config mode
+
+    #### Scenario: --depth without --follow-deps
+    - **WHEN** `specd change context my-change designing --depth 2` is run without `--follow-deps`
+    - **THEN** the command exits with code 1 and prints a usage error to stderr
+
+    #### Scenario: --fingerprint flag accepted
+    - **WHEN** `specd change context my-change designing --fingerprint sha256:abc123...` is run
+    - **THEN** the command proceeds normally
+
+    #### Scenario: --include-change-specs flag accepted
+    - **WHEN** `specd change context my-change designing --include-change-specs` is run
+    - **THEN** the command proceeds normally and requests direct change-spec seeding

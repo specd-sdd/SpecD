@@ -1,0 +1,362 @@
+{
+  "name": "sqlite-graph-store-backend",
+  "createdAt": "2026-04-03T09:26:35.301Z",
+  "description": "Add a SQLite-backed code graph store with internal backend selection and switch the default away from Ladybug once SQLite reaches parity.",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "code-graph:code-graph/graph-store",
+    "code-graph:code-graph/ladybug-graph-store",
+    "code-graph:code-graph/composition",
+    "core:core/kernel",
+    "core:core/kernel-builder",
+    "code-graph:code-graph/sqlite-graph-store"
+  ],
+  "specDependsOn": {
+    "core:core/kernel-builder": ["core:core/kernel"],
+    "code-graph:code-graph/ladybug-graph-store": ["code-graph:code-graph/graph-store"],
+    "code-graph:code-graph/composition": ["code-graph:code-graph/graph-store"]
+  },
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "validatedHash": "sha256:c4fb453e060a4941446e161c44891e8e2b3ef833a7f48d1cf5df32eb78ad97ab"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "files": [
+        {
+          "key": "code-graph:code-graph/graph-store",
+          "filename": "deltas/code-graph/code-graph/graph-store/spec.md.delta.yaml",
+          "validatedHash": "sha256:65a01aa5bd6c361cf48788d64227155bc8d200e9ce2d6f82973ebf96e43182a7"
+        },
+        {
+          "key": "code-graph:code-graph/ladybug-graph-store",
+          "filename": "deltas/code-graph/code-graph/ladybug-graph-store/spec.md.delta.yaml",
+          "validatedHash": "sha256:e712d23374ba9823769d84096ec38aa1f40775ef1d102252a44200fe9109f90b"
+        },
+        {
+          "key": "code-graph:code-graph/composition",
+          "filename": "deltas/code-graph/code-graph/composition/spec.md.delta.yaml",
+          "validatedHash": "sha256:b91c3ff96a3da90cbb72e8c7e5614ae52afacb2d3c38fe19dd4f845b53b2bae6"
+        },
+        {
+          "key": "core:core/kernel",
+          "filename": "deltas/core/core/kernel/spec.md.delta.yaml",
+          "validatedHash": "sha256:0df84cc22a14eb353f694c84f5e6dc80a92253641fb3a2eb708423813e7b5f1a"
+        },
+        {
+          "key": "core:core/kernel-builder",
+          "filename": "deltas/core/core/kernel-builder/spec.md.delta.yaml",
+          "validatedHash": "sha256:f08f5b816223e039eade737a15f744dea9507c415c56b95a376a8fc607fd2dab"
+        },
+        {
+          "key": "code-graph:code-graph/sqlite-graph-store",
+          "filename": "specs/code-graph/code-graph/sqlite-graph-store/spec.md",
+          "validatedHash": "sha256:06b0ff2002bf5656fb95a0f53b2111936f4b394a7b4f33564fcaa604d6018127"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "files": [
+        {
+          "key": "code-graph:code-graph/graph-store",
+          "filename": "deltas/code-graph/code-graph/graph-store/verify.md.delta.yaml",
+          "validatedHash": "sha256:96f20f58b2ce60a90fbeb61106aea561a80d3a462c05fd3e12672624bb620efd"
+        },
+        {
+          "key": "code-graph:code-graph/ladybug-graph-store",
+          "filename": "deltas/code-graph/code-graph/ladybug-graph-store/verify.md.delta.yaml",
+          "validatedHash": "sha256:b1058c88a9ee53e4d4519fda1c59a9fa599744e6c670961917972aa417675917"
+        },
+        {
+          "key": "code-graph:code-graph/composition",
+          "filename": "deltas/code-graph/code-graph/composition/verify.md.delta.yaml",
+          "validatedHash": "sha256:6e9d857c94ee48fc4c0bb4fce563984d78d2938c73f966e64436296ad9c4e060"
+        },
+        {
+          "key": "core:core/kernel",
+          "filename": "deltas/core/core/kernel/verify.md.delta.yaml",
+          "validatedHash": "sha256:fdef2f7b540536d14f27b95b93ce7abc89c720904b76f567030a089d88f362b6"
+        },
+        {
+          "key": "core:core/kernel-builder",
+          "filename": "deltas/core/core/kernel-builder/verify.md.delta.yaml",
+          "validatedHash": "sha256:649b1fcfe1cc873f5b73cb5e6b398de6092f8820844018d2bdba47de199355f2"
+        },
+        {
+          "key": "code-graph:code-graph/sqlite-graph-store",
+          "filename": "specs/code-graph/code-graph/sqlite-graph-store/verify.md",
+          "validatedHash": "sha256:65e4928ea29b2c0b2b39ad8c890198e16a80259c96b7a6d8d43cd83526142f50"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "validatedHash": "sha256:46edf0ee5efad826398aaac2c06b5b110a118b314f6a8737ea6c0def6c096727"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "validatedHash": "sha256:8ad112eaafc603980daa2eeae94c3a8b6ac0a5ec3588714e3ab4cb7cb8afeffe"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-04-03T09:26:35.301Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "specIds": [
+        "code-graph:code-graph/graph-store",
+        "code-graph:code-graph/ladybug-graph-store",
+        "code-graph:code-graph/composition",
+        "core:core/kernel",
+        "core:core/kernel-builder"
+      ],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-03T09:26:35.309Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:code-graph/graph-store"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:code-graph/ladybug-graph-store"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:code-graph/composition"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/kernel"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/kernel-builder"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:code-graph/graph-store"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:code-graph/ladybug-graph-store"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:code-graph/composition"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/kernel"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/kernel-builder"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-03T09:29:02.214Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-03T10:03:07.978Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change"
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-03T10:03:07.978Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "code-graph:code-graph/sqlite-graph-store"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:code-graph/sqlite-graph-store"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-03T10:11:35.898Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-03T10:22:32.589Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-change"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-03T10:22:32.589Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-03T10:25:59.519Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-03T10:27:36.510Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-03T10:28:16.825Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-08T10:32:22.594Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-08T10:34:15.015Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-08T10:34:43.497Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-08T10:40:07.380Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-04-08T10:40:07.907Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "m***a@g***.com"
+  }
+}

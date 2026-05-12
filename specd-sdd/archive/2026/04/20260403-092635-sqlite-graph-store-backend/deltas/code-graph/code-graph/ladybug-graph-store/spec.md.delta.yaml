@@ -1,0 +1,40 @@
+- op: modified
+  description: 'Clarify that Ladybug is one concrete backend implementation rather than the permanently default store'
+  selector:
+    type: section
+    matches: '^Purpose$'
+  content: |
+    `GraphStore` is the storage contract for the code graph, but the concrete Ladybug-backed implementation has backend-specific behavior that should not leak into the abstract port spec. This spec defines the requirements that are specific to `LadybugGraphStore`: its physical schema, persistence layout, full-text indexing behavior, and bulk-load mechanics, while allowing it to coexist with other concrete graph-store backends behind the same abstract contract.
+
+- op: modified
+  description: 'Position Ladybug as a selectable concrete backend in a multi-backend registry'
+  selector:
+    type: section
+    matches: '^Requirement: Ladybug-backed implementation$'
+    parent:
+      type: section
+      matches: '^Requirements$'
+  content: |
+    `LadybugGraphStore` SHALL implement the `GraphStore` contract using LadybugDB as the storage engine. It is an infrastructure adapter and owns all backend-specific concerns that are not part of the abstract `GraphStore` port.
+
+    Within a composition that supports multiple registered graph-store backends, the Ladybug adapter is identified by the backend id `ladybug`. It remains available as an explicitly selectable concrete backend even when another backend becomes the default.
+
+    The adapter MUST:
+
+    - open and close a Ladybug database connection safely
+    - execute the Ladybug-specific schema DDL on first use
+    - keep backend-specific schema version state
+    - translate the abstract graph-store operations into Ladybug queries and bulk-load operations
+
+- op: modified
+  description: 'Reflect that Ladybug is a concrete backend-specific schema, not the only graph-store schema'
+  selector:
+    type: section
+    matches: '^Constraints$'
+  content: |
+    - `LadybugGraphStore` is an infrastructure adapter, not part of the abstract graph-store contract
+    - `ladybug` is the stable backend id used to select this adapter from a multi-backend graph-store registry
+    - Ladybug-specific file layout, FTS behavior, schema shape, and schema-version handling are defined here, not in `code-graph:code-graph/graph-store`
+    - All Ladybug scratch files and persisted database artifacts are rooted under `configPath`
+    - Node table layout, relationship tables, and FTS index shape defined here are Ladybug-specific and MUST NOT be treated as a portable graph-store schema
+    - Storage-agnostic use cases and CLI commands MUST NOT depend on this spec unless they truly require Ladybug-specific behavior

@@ -1,0 +1,82 @@
+- op: modified
+  description: 'Remove artifactRules from text output and add plugins'
+  selector:
+    type: section
+    matches: 'Requirement: Output format'
+  content: |
+    In `text` mode (default), the command prints the resolved config as structured key-value output:
+
+    ```
+    projectRoot:  <absolute-path>
+    schemaRef:    <schema-ref>
+    approvals:    spec=<true|false>  signoff=<true|false>
+
+    workspaces:
+      <name>  <ownership>  <specsPath>
+      ...
+
+    storage:
+      changes:   <absolute-path>
+      drafts:    <absolute-path>
+      discarded: <absolute-path>
+      archive:   <absolute-path>
+    ```
+
+    Optional fields are shown only when present in the config:
+
+    ```
+    storage:
+      pattern: <archive-pattern>
+
+    context:
+      file: <path>
+      instruction: <text>
+      ...
+
+    contextIncludeSpecs: <pattern>, <pattern>, ...
+    contextExcludeSpecs: <pattern>, <pattern>, ...
+    llmOptimizedContext: <true|false>
+    schemaPlugins: <ref>, <ref>, ...
+
+    plugins:
+      agents:
+        <name>  (present)
+        ...
+
+    schemaOverrides: (present)
+    ```
+
+    The text view is intentionally summarized. It shows the resolved workspace and storage paths used by humans for diagnosis, but it does not expand the full adapter-binding structure.
+
+    In `json` or `toon` mode, the command MUST serialize the `SpecdConfig` object directly — no manual field selection. The output is the config as-is, encoded in the respective format. This ensures that new fields added to `SpecdConfig`, including named adapter bindings such as `specsAdapter`, `schemasAdapter`, `changesAdapter`, `draftsAdapter`, `discardedAdapter`, and `archiveAdapter`, appear automatically without CLI changes. Optional fields that are `undefined` are omitted by the serializer.
+
+- op: modified
+  description: 'Update example to remove artifactRules/workflow and add plugins'
+  selector:
+    type: section
+    matches: 'Examples'
+  content: |
+    ```
+    $ specd config show
+    projectRoot:  /home/user/project
+    schemaRef:    @specd/schema-std
+    approvals:    spec=false  signoff=false
+
+    workspaces:
+      default   owned   /home/user/project/specs
+
+    storage:
+      changes:   /home/user/project/.specd/changes
+      drafts:    /home/user/project/.specd/drafts
+      discarded: /home/user/project/.specd/discarded
+      archive:   /home/user/project/.specd/archive
+
+    contextIncludeSpecs: default:*
+    llmOptimizedContext: true
+
+    plugins:
+      agents:
+        @specd/plugin-agent-claude  (present)
+
+    schemaOverrides: (present)
+    ```

@@ -1,0 +1,61 @@
+- op: modified
+  description: 'Rename warnings to notes in change validate verification scenarios'
+  selector:
+    type: section
+    matches: 'Requirement: Output on success'
+  content: |
+    #### Scenario: All artifacts pass, no notes
+
+    - **GIVEN** a change where all artifacts pass validation
+    - **AND** validation reports file `deltas/core/core/config/spec.md.delta.yaml`
+    - **WHEN** `specd change validate my-change core:core/config --artifact specs` is run
+    - **THEN** stdout contains `validated my-change/core:core/config: all artifacts pass`
+    - **AND** stdout contains `file: deltas/core/core/config/spec.md.delta.yaml`
+    - **AND** stdout contains `specd change spec-preview my-change core:core/config`
+    - **AND** the process exits with code 0
+
+    #### Scenario: Pass with notes
+
+    - **GIVEN** a change where artifacts pass but there are optimization notes
+    - **AND** validation reports file `deltas/core/core/config/spec.md.delta.yaml`
+    - **WHEN** `specd change validate my-change core:core/config --artifact specs` is run
+    - **THEN** stdout contains a pass message with `pass (N note(s))`
+    - **AND** stdout contains `note:` lines for each note
+    - **AND** stdout contains `file: deltas/core/core/config/spec.md.delta.yaml`
+    - **AND** stdout contains `specd change spec-preview my-change core:core/config`
+    - **AND** the process exits with code 0
+
+    #### Scenario: JSON output on pass includes notes and files
+
+    - **GIVEN** a change where all artifacts pass validation with optimization notes
+    - **AND** validation reports file `deltas/core/core/config/spec.md.delta.yaml`
+    - **WHEN** `specd change validate my-change core:core/config --artifact specs --format json` is run
+    - **THEN** stdout is valid JSON with `passed` equal to `true`, `failures` equal to `[]`, and a `notes` array
+    - **AND** `files` contains an entry with `filename: \"deltas/core/core/config/spec.md.delta.yaml\"`
+    - **AND** the process exits with code 0
+
+- op: modified
+  description: 'Rename warnings to notes in change validate failure scenarios'
+  selector:
+    type: section
+    matches: 'Requirement: Output on failure'
+  content: |
+    #### Scenario: Validation failures with notes
+
+    - **GIVEN** a change where a required artifact fails validation and has optimization notes
+    - **AND** validation reports missing file `deltas/core/core/config/spec.md.delta.yaml`
+    - **WHEN** `specd change validate my-change core:core/config --artifact specs` is run
+    - **THEN** stdout contains `validation failed`
+    - **AND** stdout contains `missing: deltas/core/core/config/spec.md.delta.yaml`
+    - **AND** stdout contains `error:` lines for each failure
+    - **AND** stdout contains `note:` lines for each note
+    - **AND** the process exits with code 1
+
+    #### Scenario: JSON output on failure includes notes and files
+
+    - **GIVEN** a change where a required artifact fails validation and has notes
+    - **WHEN** `specd change validate my-change core:core/config --artifact specs --format json` is run
+    - **THEN** stdout is valid JSON with `passed` equal to `false`
+    - **AND** `failures` contains at least one entry
+    - **AND** `notes` contains the optimization suggestions
+    - **AND** the process exits with code 1

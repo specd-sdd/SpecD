@@ -1,0 +1,5044 @@
+{
+  "name": "plugin-system-phase-1",
+  "createdAt": "2026-04-09T07:57:57.610Z",
+  "description": "Phase 1 introduces the plugin-based agent architecture and migrates the CLI and core flows from skills-manifest management to plugin lifecycle management. It adds the plugin-manager package, agent plugin packages (Claude/Copilot/Codex), canonical skills template/repository infrastructure, and new plugins install/list/show/update/uninstall command flows, including project init/update integration. The change also updates documentation, hooks, tests, and config persistence so plugin declarations in specd.yaml become the authoritative installation source.",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "cli:cli/plugins-install",
+    "cli:cli/plugins-list",
+    "cli:cli/plugins-show",
+    "cli:cli/plugins-update",
+    "core:core/config",
+    "core:core/config-writer-port",
+    "cli:cli/project-init",
+    "cli:cli/project-update",
+    "cli:cli/plugins-uninstall",
+    "plugin-agent-claude:plugin-agent",
+    "plugin-agent-copilot:plugin-agent",
+    "plugin-agent-codex:plugin-agent",
+    "plugin-manager:install-plugin-use-case",
+    "plugin-manager:uninstall-plugin-use-case",
+    "plugin-manager:update-plugin-use-case",
+    "plugin-manager:list-plugins-use-case",
+    "plugin-manager:load-plugin-use-case",
+    "plugin-manager:plugin-repository-port",
+    "plugin-manager:specd-plugin-type",
+    "plugin-manager:agent-plugin-type",
+    "plugin-manager:plugin-errors",
+    "plugin-manager:plugin-loader",
+    "skills:skill",
+    "skills:skill-bundle",
+    "skills:skill-repository",
+    "skills:list-skills",
+    "skills:get-skill",
+    "skills:resolve-bundle",
+    "skills:skill-repository-port",
+    "skills:skill-repository-infra",
+    "skills:skill-templates-source"
+  ],
+  "specDependsOn": {
+    "cli:cli/plugins-install": [
+      "plugin-manager:install-plugin-use-case",
+      "plugin-manager:load-plugin-use-case",
+      "core:core/config-writer-port"
+    ],
+    "cli:cli/plugins-list": ["plugin-manager:load-plugin-use-case", "core:core/config-writer-port"],
+    "cli:cli/plugins-show": ["plugin-manager:load-plugin-use-case"],
+    "cli:cli/plugins-update": [
+      "plugin-manager:update-plugin-use-case",
+      "core:core/config-writer-port"
+    ],
+    "core:core/config": [
+      "core:core/schema-format",
+      "core:core/schema-merge",
+      "default:_global/architecture",
+      "core:core/storage",
+      "core:core/spec-metadata",
+      "core:core/workspace"
+    ],
+    "core:core/config-writer-port": ["default:_global/architecture", "core:core/config"],
+    "cli:cli/project-init": ["cli:cli/entrypoint", "cli:cli/skills-install", "core:core/config"],
+    "cli:cli/project-update": ["cli:cli/entrypoint", "cli:cli/skills-update", "core:core/config"],
+    "cli:cli/plugins-uninstall": [
+      "plugin-manager:uninstall-plugin-use-case",
+      "plugin-manager:load-plugin-use-case",
+      "core:core/config-writer-port"
+    ],
+    "skills:skill-bundle": ["skills:skill"],
+    "skills:skill-repository": ["skills:skill", "skills:skill-bundle"],
+    "skills:skill-templates-source": ["skills:skill"],
+    "skills:list-skills": ["skills:skill", "skills:skill-repository-port"],
+    "skills:get-skill": ["skills:skill", "skills:skill-repository-port"],
+    "skills:resolve-bundle": ["skills:skill-bundle", "skills:skill-repository-port"],
+    "skills:skill-repository-port": ["skills:skill", "skills:skill-bundle"],
+    "skills:skill-repository-infra": ["skills:skill-repository-port"],
+    "plugin-manager:specd-plugin-type": ["default:_global/architecture"],
+    "plugin-manager:agent-plugin-type": ["plugin-manager:specd-plugin-type"],
+    "plugin-manager:plugin-errors": ["default:_global/architecture"],
+    "plugin-manager:install-plugin-use-case": [
+      "plugin-manager:agent-plugin-type",
+      "plugin-manager:plugin-loader"
+    ],
+    "plugin-manager:uninstall-plugin-use-case": [
+      "plugin-manager:agent-plugin-type",
+      "plugin-manager:plugin-loader"
+    ],
+    "plugin-manager:update-plugin-use-case": [
+      "plugin-manager:agent-plugin-type",
+      "plugin-manager:plugin-loader"
+    ],
+    "plugin-manager:list-plugins-use-case": ["plugin-manager:plugin-loader"],
+    "plugin-manager:load-plugin-use-case": ["plugin-manager:plugin-loader"],
+    "plugin-manager:plugin-repository-port": ["plugin-manager:specd-plugin-type"],
+    "plugin-manager:plugin-loader": [
+      "plugin-manager:specd-plugin-type",
+      "plugin-manager:plugin-errors"
+    ],
+    "plugin-agent-claude:plugin-agent": [
+      "plugin-manager:agent-plugin-type",
+      "skills:skill-repository"
+    ],
+    "plugin-agent-copilot:plugin-agent": ["plugin-manager:agent-plugin-type"],
+    "plugin-agent-codex:plugin-agent": ["plugin-manager:agent-plugin-type"]
+  },
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:15642aa095a92a057a2743da928cd9dc30c94613f8684804da1e5519f06d4113"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "cli:cli/plugins-install",
+          "filename": "specs/cli/cli/plugins-install/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:0c3932242b64a359037ec3ef0f44cf997ffd5b44a6e08529049d44cfb968cef3"
+        },
+        {
+          "key": "cli:cli/plugins-list",
+          "filename": "specs/cli/cli/plugins-list/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:3349b567450e167896a29009fe040ec0213c73e7072b6cacf30642b906188f74"
+        },
+        {
+          "key": "cli:cli/plugins-show",
+          "filename": "specs/cli/cli/plugins-show/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:d0797dd46cf855b9078753513a21dd4d09b6f02cf61b6603c2e3e50a829f2ee7"
+        },
+        {
+          "key": "cli:cli/plugins-update",
+          "filename": "specs/cli/cli/plugins-update/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:5596f48aa2e67e54ff7229b474b2b58a1ee77d77c6788ce4e30d85dd6769cb6a"
+        },
+        {
+          "key": "core:core/config",
+          "filename": "deltas/core/core/config/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:ce560e0795412f5d423d1279ca359d7bce18069d426918944f00b4efcb59a8de"
+        },
+        {
+          "key": "core:core/config-writer-port",
+          "filename": "deltas/core/core/config-writer-port/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:4249224b03f2ff45af294c8b8e2bc870c8e35a48ed3e300cf7cfba188383d8f9"
+        },
+        {
+          "key": "cli:cli/project-init",
+          "filename": "deltas/cli/cli/project-init/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:91b76f0d4a1cf2cc1abc407c0919ea4667064349a5f40bf07fbba9e2f0ec8d54"
+        },
+        {
+          "key": "cli:cli/project-update",
+          "filename": "deltas/cli/cli/project-update/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:c737bc14ca60456205d77ad78ed2ee63685a7e95a6daf71256ec416fbb45b180"
+        },
+        {
+          "key": "cli:cli/plugins-uninstall",
+          "filename": "specs/cli/cli/plugins-uninstall/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:aa5c70cd56bf6bba87b7c587baba242068af365957f4f2cc681b289c541e2136"
+        },
+        {
+          "key": "plugin-agent-claude:plugin-agent",
+          "filename": "specs/plugin-agent-claude/plugin-agent/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:90f7e767467c2879d022d797af617b290d895b8d2c3e3b26308d2f8db57b3850"
+        },
+        {
+          "key": "plugin-agent-copilot:plugin-agent",
+          "filename": "specs/plugin-agent-copilot/plugin-agent/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:24b4778a1a52760d12722782ec58beccffcb029f8f5c0a66cfdc6a30c1ff51d5"
+        },
+        {
+          "key": "plugin-agent-codex:plugin-agent",
+          "filename": "specs/plugin-agent-codex/plugin-agent/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:d4b0cc19c16db399ea6ebd2992de6673dbe35c67df89a14685c40089b2c76440"
+        },
+        {
+          "key": "plugin-manager:install-plugin-use-case",
+          "filename": "specs/plugin-manager/install-plugin-use-case/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:e427113e5fcddf72258948290114212aef4a8d0385015a3296d6717ee99f0851"
+        },
+        {
+          "key": "plugin-manager:uninstall-plugin-use-case",
+          "filename": "specs/plugin-manager/uninstall-plugin-use-case/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:ce54462a8cf5f7b752f01634f4125727967ba6a41d7dd8cde0bd49c8b79c87fb"
+        },
+        {
+          "key": "plugin-manager:update-plugin-use-case",
+          "filename": "specs/plugin-manager/update-plugin-use-case/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:8a613745cb52a226b75388190629727a1f16a2d8082a8482a743ffd17835beea"
+        },
+        {
+          "key": "plugin-manager:list-plugins-use-case",
+          "filename": "specs/plugin-manager/list-plugins-use-case/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:01c8741ee02e6b426114ebe9615ff33c5a180f5a44889ded0e50114c65c7883d"
+        },
+        {
+          "key": "plugin-manager:load-plugin-use-case",
+          "filename": "specs/plugin-manager/load-plugin-use-case/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:8686f32c3cccdc1b454fdd27286688a06ad396120ee1ce9e718768765a77d13b"
+        },
+        {
+          "key": "plugin-manager:plugin-repository-port",
+          "filename": "specs/plugin-manager/plugin-repository-port/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:5d4a3d6ff5f47b0c93abd5c2661040044f4bdfe0a013dd3adf35e32ec40b8227"
+        },
+        {
+          "key": "plugin-manager:specd-plugin-type",
+          "filename": "specs/plugin-manager/specd-plugin-type/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:a553e74684a4bdde019ef9428d959507c1af28d266d9602a4839d8ad4cc6e599"
+        },
+        {
+          "key": "plugin-manager:agent-plugin-type",
+          "filename": "specs/plugin-manager/agent-plugin-type/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:f4265dbae02fdfe01d52e804f1eea4cec94f33a6b97567ab32affc86f2f5933e"
+        },
+        {
+          "key": "plugin-manager:plugin-errors",
+          "filename": "specs/plugin-manager/plugin-errors/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:e1471688736aac1e0a98e49171d8d07d731e2b2a872299c7d599e9b7c66a14ff"
+        },
+        {
+          "key": "plugin-manager:plugin-loader",
+          "filename": "specs/plugin-manager/plugin-loader/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:43e097cf4946713fb29d7a24badbd9b11a79d513455873b8c04037e29229842b"
+        },
+        {
+          "key": "skills:skill",
+          "filename": "specs/skills/skill/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:b7fdf36d7c254d0f457eeb910aaa8af13bf7396c25c692bfbd9abf76fc661ac1"
+        },
+        {
+          "key": "skills:skill-bundle",
+          "filename": "specs/skills/skill-bundle/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:4208f553bfb2663f39d7fce69ba7dd7f955c76d9990f747297dc9e5a6f5e44c4"
+        },
+        {
+          "key": "skills:skill-repository",
+          "filename": "specs/skills/skill-repository/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:cbf21ae312d1629d0251a46e76293e336308a69a34201fccec855b484d788c67"
+        },
+        {
+          "key": "skills:list-skills",
+          "filename": "specs/skills/list-skills/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:2c3f7ff1e88c15bfeece12b03e9f483499b155ea98f4c204455e02d99642a7b0"
+        },
+        {
+          "key": "skills:get-skill",
+          "filename": "specs/skills/get-skill/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:b96394e5539252b5941395a3763bc33ff7bfd635456f2f3e885b866304b9c8f9"
+        },
+        {
+          "key": "skills:resolve-bundle",
+          "filename": "specs/skills/resolve-bundle/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:1486bd4878c9098ca4209c2e2830785636163906de0c93c21d2835efd77c89ef"
+        },
+        {
+          "key": "skills:skill-repository-port",
+          "filename": "specs/skills/skill-repository-port/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:c4eed838edebf26ac4c33944f81528ca5ea39a2d602f051455834b6364b6d4f1"
+        },
+        {
+          "key": "skills:skill-repository-infra",
+          "filename": "specs/skills/skill-repository-infra/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:3b4edc5bd95e6e932bdd8d9709c65f7021c7ca8e58cd71c4c8cd36c597e3b835"
+        },
+        {
+          "key": "skills:skill-templates-source",
+          "filename": "specs/skills/skill-templates-source/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:c9d4b8499317ccbd428e32f0f9d6aad148418cc3e86e6ce7816e5a4e23e992da"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "cli:cli/plugins-install",
+          "filename": "specs/cli/cli/plugins-install/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:f4a5cf966c3f7768e401bc824d9807535d8fcae09361450afd7905da4864e16d"
+        },
+        {
+          "key": "cli:cli/plugins-list",
+          "filename": "specs/cli/cli/plugins-list/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:c7e7f5f7a4c27c2e9733db5a3ff1c52b124fab916515fcab312200e8d56b3f08"
+        },
+        {
+          "key": "cli:cli/plugins-show",
+          "filename": "specs/cli/cli/plugins-show/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:c3f39387490a70bcb617109dd8bebb2e3b6e0b2537521a01a5306fe4ca569240"
+        },
+        {
+          "key": "cli:cli/plugins-update",
+          "filename": "specs/cli/cli/plugins-update/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:f54ce5b8fb23759c5bfdcaf800fc70a2e45e54eb03eda72243b930b48a3d935b"
+        },
+        {
+          "key": "core:core/config",
+          "filename": "deltas/core/core/config/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:e73af619c114799f78ab5d5b9ceef9bdb8a0cb639f07ff174dd70d4074e0bce9"
+        },
+        {
+          "key": "core:core/config-writer-port",
+          "filename": "deltas/core/core/config-writer-port/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:19ae2543ef924f7e88cc0e8b19e2fc64b794145a6b5606c7cc5b0b5a3c1a425c"
+        },
+        {
+          "key": "cli:cli/project-init",
+          "filename": "deltas/cli/cli/project-init/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:c6d0b737554783c62c4b57ee9ede639e725c4b8f532eaa6acf7803bfceb32f46"
+        },
+        {
+          "key": "cli:cli/project-update",
+          "filename": "deltas/cli/cli/project-update/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:590d17350903d07a37c393a84621ae407cd17fe3e659da4812c7ba9f813603d8"
+        },
+        {
+          "key": "cli:cli/plugins-uninstall",
+          "filename": "specs/cli/cli/plugins-uninstall/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:1f71feb2c962ebf523ab419fade927e1cc7cd16d08ed77549c094bd52a85b528"
+        },
+        {
+          "key": "plugin-agent-claude:plugin-agent",
+          "filename": "specs/plugin-agent-claude/plugin-agent/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:a9fffb98f76553be7b2736397e2bca8359209df4043ada5435301f98a07eacfd"
+        },
+        {
+          "key": "plugin-agent-copilot:plugin-agent",
+          "filename": "specs/plugin-agent-copilot/plugin-agent/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:a61756d3b3f6b3fe72dd33365a5f82fe55f13b754b2574af0366fd1558632aca"
+        },
+        {
+          "key": "plugin-agent-codex:plugin-agent",
+          "filename": "specs/plugin-agent-codex/plugin-agent/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:08788ca0ed8bbcadac3dddf2ccc3aaba02a883777cd2e549902b2d3222956e7c"
+        },
+        {
+          "key": "plugin-manager:install-plugin-use-case",
+          "filename": "specs/plugin-manager/install-plugin-use-case/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:91677bbf507957d83b33e5cf4b596a44199f48c4e3f13b9a3331438761e9192c"
+        },
+        {
+          "key": "plugin-manager:uninstall-plugin-use-case",
+          "filename": "specs/plugin-manager/uninstall-plugin-use-case/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:9da4996ec236ae172f86d68a736a3582fe76ed639c0af9b6b7589931e59dc681"
+        },
+        {
+          "key": "plugin-manager:update-plugin-use-case",
+          "filename": "specs/plugin-manager/update-plugin-use-case/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:0aa31131ba359517c26bb5c9268319ff523db901c12c409829b454fd7c078891"
+        },
+        {
+          "key": "plugin-manager:list-plugins-use-case",
+          "filename": "specs/plugin-manager/list-plugins-use-case/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:0087425adb8916cf070c72c94b3a1728c0de0c8d940ec1fc37e22301583767a1"
+        },
+        {
+          "key": "plugin-manager:load-plugin-use-case",
+          "filename": "specs/plugin-manager/load-plugin-use-case/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:b8868f43d86ab0ad157296493a949288241926a6da8d23182b540e6641886431"
+        },
+        {
+          "key": "plugin-manager:plugin-repository-port",
+          "filename": "specs/plugin-manager/plugin-repository-port/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:fb40fda494e8da3aa058f491a8045a80ad1edf8bb5c8a39b138129e165c7736b"
+        },
+        {
+          "key": "plugin-manager:specd-plugin-type",
+          "filename": "specs/plugin-manager/specd-plugin-type/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:652276a6c519c0a294f1d97f7d6d237f988989ebe51e86fda721d51e28f45242"
+        },
+        {
+          "key": "plugin-manager:agent-plugin-type",
+          "filename": "specs/plugin-manager/agent-plugin-type/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:a0fb6c9df3f2a47a719b27f5dfbab16b27363cccfd980afc9d53ab70f78ef81d"
+        },
+        {
+          "key": "plugin-manager:plugin-errors",
+          "filename": "specs/plugin-manager/plugin-errors/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:2178c297cea502896cce8744eadd2bdd4d95f22d9911f9e4282f7407cd774e47"
+        },
+        {
+          "key": "plugin-manager:plugin-loader",
+          "filename": "specs/plugin-manager/plugin-loader/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:60980282109431f2f4a29f5390456b6828d4271ce99838b1c514de0c657a96ec"
+        },
+        {
+          "key": "skills:skill",
+          "filename": "specs/skills/skill/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:5e0968ac5105daf9f9b81322688d54f9ef280c3427040dd1836e10c3755d5618"
+        },
+        {
+          "key": "skills:skill-bundle",
+          "filename": "specs/skills/skill-bundle/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:6ecb40310a8146f882899620fc9c644a6b2e13d55d9230253ca3cd702c2a4a40"
+        },
+        {
+          "key": "skills:skill-repository",
+          "filename": "specs/skills/skill-repository/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:58cf7c8d5e6a08c81d5c9d4c6639db5d3b3f73532334e925c1ef4fb4dcd109ba"
+        },
+        {
+          "key": "skills:list-skills",
+          "filename": "specs/skills/list-skills/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:3c3ed9ed5a744e195c226b1fa2b69ff2e90c9cb429683b590cbfa47c67285d3f"
+        },
+        {
+          "key": "skills:get-skill",
+          "filename": "specs/skills/get-skill/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:9cf924394377a01d754bd341b58e636f394a751a8ce2cbeac8bed790b6b2d9b2"
+        },
+        {
+          "key": "skills:resolve-bundle",
+          "filename": "specs/skills/resolve-bundle/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:c8260766bde230e30fc1e51322278ea243e8d21cbe55944e3b8706f410c5214b"
+        },
+        {
+          "key": "skills:skill-repository-port",
+          "filename": "specs/skills/skill-repository-port/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:17255947b926437a1d45c7daf28f2692fec7ca94dc92099a47f2a070fc6ae9a8"
+        },
+        {
+          "key": "skills:skill-repository-infra",
+          "filename": "specs/skills/skill-repository-infra/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:b0b338f235611862d169d1e6ba2ba72c60360102106e95a1017d868916f90e88"
+        },
+        {
+          "key": "skills:skill-templates-source",
+          "filename": "specs/skills/skill-templates-source/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:cf433cbacef1225e610a255cfc1e5431c9a4db74ac41c40807dc6ad2421b075d"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:442107ab6fedb2ae8ab84102d218efeade342da62ede804187cf711e94bbf344"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:e535523ec3abb58c8b5a2d12e7bf504b211b05d45cf94ced4f1177d5477f1e30"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-04-09T07:57:57.610Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "specIds": [],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-09T07:57:57.618Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-09T08:01:52.064Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-09T10:49:54.048Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change",
+      "affectedArtifacts": []
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-09T10:49:54.048Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:core/plugins"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/plugin-loader"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/skills"
+        },
+        {
+          "type": "specs",
+          "key": "cli:cli/plugins-install"
+        },
+        {
+          "type": "specs",
+          "key": "cli:cli/plugins-list"
+        },
+        {
+          "type": "specs",
+          "key": "cli:cli/plugins-show"
+        },
+        {
+          "type": "specs",
+          "key": "cli:cli/plugins-update"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/config"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/config-writer-port"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/get-skills-manifest"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/record-skill-install"
+        },
+        {
+          "type": "specs",
+          "key": "cli:cli/project-init"
+        },
+        {
+          "type": "specs",
+          "key": "cli:cli/project-update"
+        },
+        {
+          "type": "specs",
+          "key": "cli:cli/skills-install"
+        },
+        {
+          "type": "specs",
+          "key": "cli:cli/skills-list"
+        },
+        {
+          "type": "specs",
+          "key": "cli:cli/skills-show"
+        },
+        {
+          "type": "specs",
+          "key": "cli:cli/skills-update"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/plugins"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/plugin-loader"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/skills"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/plugins-install"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/plugins-list"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/plugins-show"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/plugins-update"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/config"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/config-writer-port"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/get-skills-manifest"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/record-skill-install"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/project-init"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/project-update"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/skills-install"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/skills-list"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/skills-show"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/skills-update"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-14T11:24:50.750Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-14T13:47:58.107Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-14T14:19:13.397Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:core/plugins",
+            "core:core/plugin-loader",
+            "core:core/skills",
+            "cli:cli/plugins-install",
+            "cli:cli/plugins-list",
+            "cli:cli/plugins-show",
+            "cli:cli/plugins-update",
+            "core:core/config",
+            "core:core/config-writer-port",
+            "core:core/get-skills-manifest",
+            "core:core/record-skill-install",
+            "cli:cli/project-init",
+            "cli:cli/project-update",
+            "cli:cli/skills-install",
+            "cli:cli/skills-list",
+            "cli:cli/skills-show",
+            "cli:cli/skills-update"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:core/plugins",
+            "core:core/plugin-loader",
+            "core:core/skills",
+            "cli:cli/plugins-install",
+            "cli:cli/plugins-list",
+            "cli:cli/plugins-show",
+            "cli:cli/plugins-update",
+            "core:core/config",
+            "core:core/config-writer-port",
+            "core:core/get-skills-manifest",
+            "core:core/record-skill-install",
+            "cli:cli/project-init",
+            "cli:cli/project-update",
+            "cli:cli/skills-install",
+            "cli:cli/skills-list",
+            "cli:cli/skills-show",
+            "cli:cli/skills-update"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-14T14:19:13.398Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [],
+      "filesRemoved": [
+        {
+          "type": "specs",
+          "key": "core:core/skills"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/skills"
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-14T14:19:31.682Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:core/plugins",
+            "core:core/plugin-loader",
+            "cli:cli/plugins-install",
+            "cli:cli/plugins-list",
+            "cli:cli/plugins-show",
+            "cli:cli/plugins-update",
+            "core:core/config",
+            "core:core/config-writer-port",
+            "core:core/get-skills-manifest",
+            "core:core/record-skill-install",
+            "cli:cli/project-init",
+            "cli:cli/project-update",
+            "cli:cli/skills-install",
+            "cli:cli/skills-list",
+            "cli:cli/skills-show",
+            "cli:cli/skills-update"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:core/plugins",
+            "core:core/plugin-loader",
+            "cli:cli/plugins-install",
+            "cli:cli/plugins-list",
+            "cli:cli/plugins-show",
+            "cli:cli/plugins-update",
+            "core:core/config",
+            "core:core/config-writer-port",
+            "core:core/get-skills-manifest",
+            "core:core/record-skill-install",
+            "cli:cli/project-init",
+            "cli:cli/project-update",
+            "cli:cli/skills-install",
+            "cli:cli/skills-list",
+            "cli:cli/skills-show",
+            "cli:cli/skills-update"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-14T14:19:31.682Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "skills:skills/skill"
+        },
+        {
+          "type": "specs",
+          "key": "skills:skills/skill-bundle"
+        },
+        {
+          "type": "specs",
+          "key": "skills:skills/template-reader-port"
+        },
+        {
+          "type": "specs",
+          "key": "skills:skills/skill-repository"
+        },
+        {
+          "type": "specs",
+          "key": "skills:skills/predefined-variables"
+        },
+        {
+          "type": "specs",
+          "key": "skills:skills/utils"
+        },
+        {
+          "type": "verify",
+          "key": "skills:skills/skill"
+        },
+        {
+          "type": "verify",
+          "key": "skills:skills/skill-bundle"
+        },
+        {
+          "type": "verify",
+          "key": "skills:skills/template-reader-port"
+        },
+        {
+          "type": "verify",
+          "key": "skills:skills/skill-repository"
+        },
+        {
+          "type": "verify",
+          "key": "skills:skills/predefined-variables"
+        },
+        {
+          "type": "verify",
+          "key": "skills:skills/utils"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-14T14:33:36.901Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: verify [core:core/get-skills-manifest, core:core/record-skill-install]",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": ["core:core/get-skills-manifest", "core:core/record-skill-install"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-14T15:59:24.834Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: verify [cli:cli/skills-install]",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": ["cli:cli/skills-install"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-14T16:42:33.710Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: verify [cli:cli/skills-list, cli:cli/skills-show, cli:cli/skills-update]",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": ["cli:cli/skills-list", "cli:cli/skills-show", "cli:cli/skills-update"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-15T07:18:32.867Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-15T07:20:15.557Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-16T08:16:29.918Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]; specs [skills:skills/skill-repository]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["skills:skills/skill-repository"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-16T08:27:24.760Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:core/plugins",
+            "core:core/plugin-loader",
+            "cli:cli/plugins-install",
+            "cli:cli/plugins-list",
+            "cli:cli/plugins-show",
+            "cli:cli/plugins-update",
+            "core:core/config",
+            "core:core/config-writer-port",
+            "core:core/get-skills-manifest",
+            "core:core/record-skill-install",
+            "cli:cli/project-init",
+            "cli:cli/project-update",
+            "cli:cli/skills-install",
+            "cli:cli/skills-list",
+            "cli:cli/skills-show",
+            "cli:cli/skills-update",
+            "skills:skills/skill",
+            "skills:skills/skill-bundle",
+            "skills:skills/template-reader-port",
+            "skills:skills/skill-repository",
+            "skills:skills/predefined-variables",
+            "skills:skills/utils"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:core/plugins",
+            "core:core/plugin-loader",
+            "cli:cli/plugins-install",
+            "cli:cli/plugins-list",
+            "cli:cli/plugins-show",
+            "cli:cli/plugins-update",
+            "core:core/config",
+            "core:core/config-writer-port",
+            "core:core/get-skills-manifest",
+            "core:core/record-skill-install",
+            "cli:cli/project-init",
+            "cli:cli/project-update",
+            "cli:cli/skills-install",
+            "cli:cli/skills-list",
+            "cli:cli/skills-show",
+            "cli:cli/skills-update",
+            "skills:skills/skill",
+            "skills:skills/skill-bundle",
+            "skills:skills/template-reader-port",
+            "skills:skills/skill-repository",
+            "skills:skills/predefined-variables",
+            "skills:skills/utils"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-16T08:27:24.761Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [],
+      "filesRemoved": [
+        {
+          "type": "specs",
+          "key": "core:core/plugin-loader"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/plugin-loader"
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-16T08:27:24.787Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:core/plugins",
+            "cli:cli/plugins-install",
+            "cli:cli/plugins-list",
+            "cli:cli/plugins-show",
+            "cli:cli/plugins-update",
+            "core:core/config",
+            "core:core/config-writer-port",
+            "core:core/get-skills-manifest",
+            "core:core/record-skill-install",
+            "cli:cli/project-init",
+            "cli:cli/project-update",
+            "cli:cli/skills-install",
+            "cli:cli/skills-list",
+            "cli:cli/skills-show",
+            "cli:cli/skills-update",
+            "skills:skills/skill",
+            "skills:skills/skill-bundle",
+            "skills:skills/template-reader-port",
+            "skills:skills/skill-repository",
+            "skills:skills/predefined-variables",
+            "skills:skills/utils"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:core/plugins",
+            "cli:cli/plugins-install",
+            "cli:cli/plugins-list",
+            "cli:cli/plugins-show",
+            "cli:cli/plugins-update",
+            "core:core/config",
+            "core:core/config-writer-port",
+            "core:core/get-skills-manifest",
+            "core:core/record-skill-install",
+            "cli:cli/project-init",
+            "cli:cli/project-update",
+            "cli:cli/skills-install",
+            "cli:cli/skills-list",
+            "cli:cli/skills-show",
+            "cli:cli/skills-update",
+            "skills:skills/skill",
+            "skills:skills/skill-bundle",
+            "skills:skills/template-reader-port",
+            "skills:skills/skill-repository",
+            "skills:skills/predefined-variables",
+            "skills:skills/utils"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-16T08:27:24.788Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [],
+      "filesRemoved": [
+        {
+          "type": "specs",
+          "key": "skills:skills/utils"
+        },
+        {
+          "type": "verify",
+          "key": "skills:skills/utils"
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-16T08:27:24.816Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:core/plugins",
+            "cli:cli/plugins-install",
+            "cli:cli/plugins-list",
+            "cli:cli/plugins-show",
+            "cli:cli/plugins-update",
+            "core:core/config",
+            "core:core/config-writer-port",
+            "core:core/get-skills-manifest",
+            "core:core/record-skill-install",
+            "cli:cli/project-init",
+            "cli:cli/project-update",
+            "cli:cli/skills-install",
+            "cli:cli/skills-list",
+            "cli:cli/skills-show",
+            "cli:cli/skills-update",
+            "skills:skills/skill",
+            "skills:skills/skill-bundle",
+            "skills:skills/template-reader-port",
+            "skills:skills/skill-repository",
+            "skills:skills/predefined-variables"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:core/plugins",
+            "cli:cli/plugins-install",
+            "cli:cli/plugins-list",
+            "cli:cli/plugins-show",
+            "cli:cli/plugins-update",
+            "core:core/config",
+            "core:core/config-writer-port",
+            "core:core/get-skills-manifest",
+            "core:core/record-skill-install",
+            "cli:cli/project-init",
+            "cli:cli/project-update",
+            "cli:cli/skills-install",
+            "cli:cli/skills-list",
+            "cli:cli/skills-show",
+            "cli:cli/skills-update",
+            "skills:skills/skill",
+            "skills:skills/skill-bundle",
+            "skills:skills/template-reader-port",
+            "skills:skills/skill-repository",
+            "skills:skills/predefined-variables"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-16T08:27:24.817Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [],
+      "filesRemoved": [
+        {
+          "type": "specs",
+          "key": "skills:skills/predefined-variables"
+        },
+        {
+          "type": "verify",
+          "key": "skills:skills/predefined-variables"
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-16T08:27:24.844Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:core/plugins",
+            "cli:cli/plugins-install",
+            "cli:cli/plugins-list",
+            "cli:cli/plugins-show",
+            "cli:cli/plugins-update",
+            "core:core/config",
+            "core:core/config-writer-port",
+            "core:core/get-skills-manifest",
+            "core:core/record-skill-install",
+            "cli:cli/project-init",
+            "cli:cli/project-update",
+            "cli:cli/skills-install",
+            "cli:cli/skills-list",
+            "cli:cli/skills-show",
+            "cli:cli/skills-update",
+            "skills:skills/skill",
+            "skills:skills/skill-bundle",
+            "skills:skills/template-reader-port",
+            "skills:skills/skill-repository"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:core/plugins",
+            "cli:cli/plugins-install",
+            "cli:cli/plugins-list",
+            "cli:cli/plugins-show",
+            "cli:cli/plugins-update",
+            "core:core/config",
+            "core:core/config-writer-port",
+            "core:core/get-skills-manifest",
+            "core:core/record-skill-install",
+            "cli:cli/project-init",
+            "cli:cli/project-update",
+            "cli:cli/skills-install",
+            "cli:cli/skills-list",
+            "cli:cli/skills-show",
+            "cli:cli/skills-update",
+            "skills:skills/skill",
+            "skills:skills/skill-bundle",
+            "skills:skills/template-reader-port",
+            "skills:skills/skill-repository"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-16T08:27:24.844Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [],
+      "filesRemoved": [
+        {
+          "type": "specs",
+          "key": "skills:skills/template-reader-port"
+        },
+        {
+          "type": "verify",
+          "key": "skills:skills/template-reader-port"
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-16T08:27:46.965Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:core/plugins",
+            "cli:cli/plugins-install",
+            "cli:cli/plugins-list",
+            "cli:cli/plugins-show",
+            "cli:cli/plugins-update",
+            "core:core/config",
+            "core:core/config-writer-port",
+            "core:core/get-skills-manifest",
+            "core:core/record-skill-install",
+            "cli:cli/project-init",
+            "cli:cli/project-update",
+            "cli:cli/skills-install",
+            "cli:cli/skills-list",
+            "cli:cli/skills-show",
+            "cli:cli/skills-update",
+            "skills:skills/skill",
+            "skills:skills/skill-bundle",
+            "skills:skills/skill-repository"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:core/plugins",
+            "cli:cli/plugins-install",
+            "cli:cli/plugins-list",
+            "cli:cli/plugins-show",
+            "cli:cli/plugins-update",
+            "core:core/config",
+            "core:core/config-writer-port",
+            "core:core/get-skills-manifest",
+            "core:core/record-skill-install",
+            "cli:cli/project-init",
+            "cli:cli/project-update",
+            "cli:cli/skills-install",
+            "cli:cli/skills-list",
+            "cli:cli/skills-show",
+            "cli:cli/skills-update",
+            "skills:skills/skill",
+            "skills:skills/skill-bundle",
+            "skills:skills/skill-repository"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-16T08:27:46.965Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "plugins:plugins/plugin-claude"
+        },
+        {
+          "type": "verify",
+          "key": "plugins:plugins/plugin-claude"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-16T08:27:46.992Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:core/plugins",
+            "cli:cli/plugins-install",
+            "cli:cli/plugins-list",
+            "cli:cli/plugins-show",
+            "cli:cli/plugins-update",
+            "core:core/config",
+            "core:core/config-writer-port",
+            "core:core/get-skills-manifest",
+            "core:core/record-skill-install",
+            "cli:cli/project-init",
+            "cli:cli/project-update",
+            "cli:cli/skills-install",
+            "cli:cli/skills-list",
+            "cli:cli/skills-show",
+            "cli:cli/skills-update",
+            "skills:skills/skill",
+            "skills:skills/skill-bundle",
+            "skills:skills/skill-repository",
+            "plugins:plugins/plugin-claude"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:core/plugins",
+            "cli:cli/plugins-install",
+            "cli:cli/plugins-list",
+            "cli:cli/plugins-show",
+            "cli:cli/plugins-update",
+            "core:core/config",
+            "core:core/config-writer-port",
+            "core:core/get-skills-manifest",
+            "core:core/record-skill-install",
+            "cli:cli/project-init",
+            "cli:cli/project-update",
+            "cli:cli/skills-install",
+            "cli:cli/skills-list",
+            "cli:cli/skills-show",
+            "cli:cli/skills-update",
+            "skills:skills/skill",
+            "skills:skills/skill-bundle",
+            "skills:skills/skill-repository",
+            "plugins:plugins/plugin-claude"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-16T08:27:46.992Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "cli:cli/plugins-uninstall"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/plugins-uninstall"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-16T09:23:25.166Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-16T10:33:39.834Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-16T10:33:43.905Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:core/plugins",
+            "cli:cli/plugins-install",
+            "cli:cli/plugins-list",
+            "cli:cli/plugins-show",
+            "cli:cli/plugins-update",
+            "core:core/config",
+            "core:core/config-writer-port",
+            "core:core/get-skills-manifest",
+            "core:core/record-skill-install",
+            "cli:cli/project-init",
+            "cli:cli/project-update",
+            "cli:cli/skills-install",
+            "cli:cli/skills-list",
+            "cli:cli/skills-show",
+            "cli:cli/skills-update",
+            "skills:skills/skill",
+            "skills:skills/skill-bundle",
+            "skills:skills/skill-repository",
+            "plugins:plugins/plugin-claude",
+            "cli:cli/plugins-uninstall"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:core/plugins",
+            "cli:cli/plugins-install",
+            "cli:cli/plugins-list",
+            "cli:cli/plugins-show",
+            "cli:cli/plugins-update",
+            "core:core/config",
+            "core:core/config-writer-port",
+            "core:core/get-skills-manifest",
+            "core:core/record-skill-install",
+            "cli:cli/project-init",
+            "cli:cli/project-update",
+            "cli:cli/skills-install",
+            "cli:cli/skills-list",
+            "cli:cli/skills-show",
+            "cli:cli/skills-update",
+            "skills:skills/skill",
+            "skills:skills/skill-bundle",
+            "skills:skills/skill-repository",
+            "plugins:plugins/plugin-claude",
+            "cli:cli/plugins-uninstall"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-16T10:33:43.905Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [],
+      "filesRemoved": [
+        {
+          "type": "specs",
+          "key": "core:core/plugins"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/plugins"
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-16T10:33:47.415Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:cli/plugins-install",
+            "cli:cli/plugins-list",
+            "cli:cli/plugins-show",
+            "cli:cli/plugins-update",
+            "core:core/config",
+            "core:core/config-writer-port",
+            "core:core/get-skills-manifest",
+            "core:core/record-skill-install",
+            "cli:cli/project-init",
+            "cli:cli/project-update",
+            "cli:cli/skills-install",
+            "cli:cli/skills-list",
+            "cli:cli/skills-show",
+            "cli:cli/skills-update",
+            "skills:skills/skill",
+            "skills:skills/skill-bundle",
+            "skills:skills/skill-repository",
+            "plugins:plugins/plugin-claude",
+            "cli:cli/plugins-uninstall"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:cli/plugins-install",
+            "cli:cli/plugins-list",
+            "cli:cli/plugins-show",
+            "cli:cli/plugins-update",
+            "core:core/config",
+            "core:core/config-writer-port",
+            "core:core/get-skills-manifest",
+            "core:core/record-skill-install",
+            "cli:cli/project-init",
+            "cli:cli/project-update",
+            "cli:cli/skills-install",
+            "cli:cli/skills-list",
+            "cli:cli/skills-show",
+            "cli:cli/skills-update",
+            "skills:skills/skill",
+            "skills:skills/skill-bundle",
+            "skills:skills/skill-repository",
+            "plugins:plugins/plugin-claude",
+            "cli:cli/plugins-uninstall"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-16T10:33:47.415Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "plugins:plugins/plugin-manager"
+        },
+        {
+          "type": "verify",
+          "key": "plugins:plugins/plugin-manager"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-16T10:54:23.931Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-16T10:57:32.167Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: design [design]",
+      "affectedArtifacts": [
+        {
+          "type": "design",
+          "files": ["design"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-16T10:57:32.167Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-16T10:58:23.808Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-16T11:02:36.797Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-16T11:08:54.291Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: design [design]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-16T11:08:54.291Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-16T13:21:57.250Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-16T13:29:23.429Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-16T13:33:07.003Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-16T13:34:47.346Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-16T13:39:53.120Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:cli/plugins-install",
+            "cli:cli/plugins-list",
+            "cli:cli/plugins-show",
+            "cli:cli/plugins-update",
+            "core:core/config",
+            "core:core/config-writer-port",
+            "core:core/get-skills-manifest",
+            "core:core/record-skill-install",
+            "cli:cli/project-init",
+            "cli:cli/project-update",
+            "cli:cli/skills-install",
+            "cli:cli/skills-list",
+            "cli:cli/skills-show",
+            "cli:cli/skills-update",
+            "skills:skills/skill",
+            "skills:skills/skill-bundle",
+            "skills:skills/skill-repository",
+            "plugins:plugins/plugin-claude",
+            "cli:cli/plugins-uninstall",
+            "plugins:plugins/plugin-manager"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:cli/plugins-install",
+            "cli:cli/plugins-list",
+            "cli:cli/plugins-show",
+            "cli:cli/plugins-update",
+            "core:core/config",
+            "core:core/config-writer-port",
+            "core:core/get-skills-manifest",
+            "core:core/record-skill-install",
+            "cli:cli/project-init",
+            "cli:cli/project-update",
+            "cli:cli/skills-install",
+            "cli:cli/skills-list",
+            "cli:cli/skills-show",
+            "cli:cli/skills-update",
+            "skills:skills/skill",
+            "skills:skills/skill-bundle",
+            "skills:skills/skill-repository",
+            "plugins:plugins/plugin-claude",
+            "cli:cli/plugins-uninstall",
+            "plugins:plugins/plugin-manager"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-16T13:39:53.120Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "plugin-manager:plugin-manager"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-agent-claude:plugin-agent"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:plugin-manager"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-agent-claude:plugin-agent"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-16T13:40:31.222Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:cli/plugins-install",
+            "cli:cli/plugins-list",
+            "cli:cli/plugins-show",
+            "cli:cli/plugins-update",
+            "core:core/config",
+            "core:core/config-writer-port",
+            "core:core/get-skills-manifest",
+            "core:core/record-skill-install",
+            "cli:cli/project-init",
+            "cli:cli/project-update",
+            "cli:cli/skills-install",
+            "cli:cli/skills-list",
+            "cli:cli/skills-show",
+            "cli:cli/skills-update",
+            "skills:skills/skill",
+            "skills:skills/skill-bundle",
+            "skills:skills/skill-repository",
+            "plugins:plugins/plugin-claude",
+            "cli:cli/plugins-uninstall",
+            "plugins:plugins/plugin-manager",
+            "plugin-manager:plugin-manager",
+            "plugin-agent-claude:plugin-agent"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:cli/plugins-install",
+            "cli:cli/plugins-list",
+            "cli:cli/plugins-show",
+            "cli:cli/plugins-update",
+            "core:core/config",
+            "core:core/config-writer-port",
+            "core:core/get-skills-manifest",
+            "core:core/record-skill-install",
+            "cli:cli/project-init",
+            "cli:cli/project-update",
+            "cli:cli/skills-install",
+            "cli:cli/skills-list",
+            "cli:cli/skills-show",
+            "cli:cli/skills-update",
+            "skills:skills/skill",
+            "skills:skills/skill-bundle",
+            "skills:skills/skill-repository",
+            "plugins:plugins/plugin-claude",
+            "cli:cli/plugins-uninstall",
+            "plugins:plugins/plugin-manager",
+            "plugin-manager:plugin-manager",
+            "plugin-agent-claude:plugin-agent"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-16T13:40:31.222Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [],
+      "filesRemoved": [
+        {
+          "type": "specs",
+          "key": "core:core/get-skills-manifest"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/record-skill-install"
+        },
+        {
+          "type": "specs",
+          "key": "cli:cli/skills-install"
+        },
+        {
+          "type": "specs",
+          "key": "cli:cli/skills-list"
+        },
+        {
+          "type": "specs",
+          "key": "cli:cli/skills-show"
+        },
+        {
+          "type": "specs",
+          "key": "cli:cli/skills-update"
+        },
+        {
+          "type": "specs",
+          "key": "plugins:plugins/plugin-claude"
+        },
+        {
+          "type": "specs",
+          "key": "plugins:plugins/plugin-manager"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/get-skills-manifest"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/record-skill-install"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/skills-install"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/skills-list"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/skills-show"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/skills-update"
+        },
+        {
+          "type": "verify",
+          "key": "plugins:plugins/plugin-claude"
+        },
+        {
+          "type": "verify",
+          "key": "plugins:plugins/plugin-manager"
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-16T13:45:34.581Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:cli/plugins-install",
+            "cli:cli/plugins-list",
+            "cli:cli/plugins-show",
+            "cli:cli/plugins-update",
+            "core:core/config",
+            "core:core/config-writer-port",
+            "cli:cli/project-init",
+            "cli:cli/project-update",
+            "skills:skills/skill",
+            "skills:skills/skill-bundle",
+            "skills:skills/skill-repository",
+            "cli:cli/plugins-uninstall",
+            "plugin-manager:plugin-manager",
+            "plugin-agent-claude:plugin-agent"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:cli/plugins-install",
+            "cli:cli/plugins-list",
+            "cli:cli/plugins-show",
+            "cli:cli/plugins-update",
+            "core:core/config",
+            "core:core/config-writer-port",
+            "cli:cli/project-init",
+            "cli:cli/project-update",
+            "skills:skills/skill",
+            "skills:skills/skill-bundle",
+            "skills:skills/skill-repository",
+            "cli:cli/plugins-uninstall",
+            "plugin-manager:plugin-manager",
+            "plugin-agent-claude:plugin-agent"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-16T13:45:34.581Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "plugin-agent-copilot:plugin-agent"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-agent-codex:plugin-agent"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-agent-copilot:plugin-agent"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-agent-codex:plugin-agent"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-16T13:45:47.735Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:cli/plugins-install",
+            "cli:cli/plugins-list",
+            "cli:cli/plugins-show",
+            "cli:cli/plugins-update",
+            "core:core/config",
+            "core:core/config-writer-port",
+            "cli:cli/project-init",
+            "cli:cli/project-update",
+            "skills:skills/skill",
+            "skills:skills/skill-bundle",
+            "skills:skills/skill-repository",
+            "cli:cli/plugins-uninstall",
+            "plugin-manager:plugin-manager",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:cli/plugins-install",
+            "cli:cli/plugins-list",
+            "cli:cli/plugins-show",
+            "cli:cli/plugins-update",
+            "core:core/config",
+            "core:core/config-writer-port",
+            "cli:cli/project-init",
+            "cli:cli/project-update",
+            "skills:skills/skill",
+            "skills:skills/skill-bundle",
+            "skills:skills/skill-repository",
+            "cli:cli/plugins-uninstall",
+            "plugin-manager:plugin-manager",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-16T13:45:47.736Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "plugin-manager:application/install-plugin"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-manager:application/uninstall-plugin"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-manager:application/update-plugin"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-manager:application/list-plugins"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-manager:application/load-plugin"
+        },
+        {
+          "type": "specs",
+          "key": "skills:skills/list-skills"
+        },
+        {
+          "type": "specs",
+          "key": "skills:skills/get-skill"
+        },
+        {
+          "type": "specs",
+          "key": "skills:skills/resolve-bundle"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:application/install-plugin"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:application/uninstall-plugin"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:application/update-plugin"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:application/list-plugins"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:application/load-plugin"
+        },
+        {
+          "type": "verify",
+          "key": "skills:skills/list-skills"
+        },
+        {
+          "type": "verify",
+          "key": "skills:skills/get-skill"
+        },
+        {
+          "type": "verify",
+          "key": "skills:skills/resolve-bundle"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-16T13:47:12.815Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:cli/plugins-install",
+            "cli:cli/plugins-list",
+            "cli:cli/plugins-show",
+            "cli:cli/plugins-update",
+            "core:core/config",
+            "core:core/config-writer-port",
+            "cli:cli/project-init",
+            "cli:cli/project-update",
+            "skills:skills/skill",
+            "skills:skills/skill-bundle",
+            "skills:skills/skill-repository",
+            "cli:cli/plugins-uninstall",
+            "plugin-manager:plugin-manager",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-manager:application/install-plugin",
+            "plugin-manager:application/uninstall-plugin",
+            "plugin-manager:application/update-plugin",
+            "plugin-manager:application/list-plugins",
+            "plugin-manager:application/load-plugin",
+            "skills:skills/list-skills",
+            "skills:skills/get-skill",
+            "skills:skills/resolve-bundle"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:cli/plugins-install",
+            "cli:cli/plugins-list",
+            "cli:cli/plugins-show",
+            "cli:cli/plugins-update",
+            "core:core/config",
+            "core:core/config-writer-port",
+            "cli:cli/project-init",
+            "cli:cli/project-update",
+            "skills:skills/skill",
+            "skills:skills/skill-bundle",
+            "skills:skills/skill-repository",
+            "cli:cli/plugins-uninstall",
+            "plugin-manager:plugin-manager",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-manager:application/install-plugin",
+            "plugin-manager:application/uninstall-plugin",
+            "plugin-manager:application/update-plugin",
+            "plugin-manager:application/list-plugins",
+            "plugin-manager:application/load-plugin",
+            "skills:skills/list-skills",
+            "skills:skills/get-skill",
+            "skills:skills/resolve-bundle"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-16T13:47:12.815Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "plugin-manager:domain/specd-plugin"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-manager:domain/agent-plugin"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-manager:domain/errors"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-manager:application/ports/plugin-repository"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-manager:infrastructure/loader"
+        },
+        {
+          "type": "specs",
+          "key": "skills:application/ports/skill-repository"
+        },
+        {
+          "type": "specs",
+          "key": "skills:infrastructure/skill-repository"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:domain/specd-plugin"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:domain/agent-plugin"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:domain/errors"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:application/ports/plugin-repository"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:infrastructure/loader"
+        },
+        {
+          "type": "verify",
+          "key": "skills:application/ports/skill-repository"
+        },
+        {
+          "type": "verify",
+          "key": "skills:infrastructure/skill-repository"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-16T13:49:20.884Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:cli/plugins-install",
+            "cli:cli/plugins-list",
+            "cli:cli/plugins-show",
+            "cli:cli/plugins-update",
+            "core:core/config",
+            "core:core/config-writer-port",
+            "cli:cli/project-init",
+            "cli:cli/project-update",
+            "skills:skills/skill",
+            "skills:skills/skill-bundle",
+            "skills:skills/skill-repository",
+            "cli:cli/plugins-uninstall",
+            "plugin-manager:plugin-manager",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-manager:application/install-plugin",
+            "plugin-manager:application/uninstall-plugin",
+            "plugin-manager:application/update-plugin",
+            "plugin-manager:application/list-plugins",
+            "plugin-manager:application/load-plugin",
+            "skills:skills/list-skills",
+            "skills:skills/get-skill",
+            "skills:skills/resolve-bundle",
+            "plugin-manager:domain/specd-plugin",
+            "plugin-manager:domain/agent-plugin",
+            "plugin-manager:domain/errors",
+            "plugin-manager:application/ports/plugin-repository",
+            "plugin-manager:infrastructure/loader",
+            "skills:application/ports/skill-repository",
+            "skills:infrastructure/skill-repository"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:cli/plugins-install",
+            "cli:cli/plugins-list",
+            "cli:cli/plugins-show",
+            "cli:cli/plugins-update",
+            "core:core/config",
+            "core:core/config-writer-port",
+            "cli:cli/project-init",
+            "cli:cli/project-update",
+            "skills:skills/skill",
+            "skills:skills/skill-bundle",
+            "skills:skills/skill-repository",
+            "cli:cli/plugins-uninstall",
+            "plugin-manager:plugin-manager",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-manager:application/install-plugin",
+            "plugin-manager:application/uninstall-plugin",
+            "plugin-manager:application/update-plugin",
+            "plugin-manager:application/list-plugins",
+            "plugin-manager:application/load-plugin",
+            "skills:skills/list-skills",
+            "skills:skills/get-skill",
+            "skills:skills/resolve-bundle",
+            "plugin-manager:domain/specd-plugin",
+            "plugin-manager:domain/agent-plugin",
+            "plugin-manager:domain/errors",
+            "plugin-manager:application/ports/plugin-repository",
+            "plugin-manager:infrastructure/loader",
+            "skills:application/ports/skill-repository",
+            "skills:infrastructure/skill-repository"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-16T13:49:20.884Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [],
+      "filesRemoved": [
+        {
+          "type": "specs",
+          "key": "plugin-manager:application/install-plugin"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-manager:application/uninstall-plugin"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-manager:application/update-plugin"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-manager:application/list-plugins"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-manager:application/load-plugin"
+        },
+        {
+          "type": "specs",
+          "key": "skills:skills/list-skills"
+        },
+        {
+          "type": "specs",
+          "key": "skills:skills/get-skill"
+        },
+        {
+          "type": "specs",
+          "key": "skills:skills/resolve-bundle"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-manager:domain/specd-plugin"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-manager:domain/agent-plugin"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-manager:domain/errors"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-manager:application/ports/plugin-repository"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-manager:infrastructure/loader"
+        },
+        {
+          "type": "specs",
+          "key": "skills:application/ports/skill-repository"
+        },
+        {
+          "type": "specs",
+          "key": "skills:infrastructure/skill-repository"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:application/install-plugin"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:application/uninstall-plugin"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:application/update-plugin"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:application/list-plugins"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:application/load-plugin"
+        },
+        {
+          "type": "verify",
+          "key": "skills:skills/list-skills"
+        },
+        {
+          "type": "verify",
+          "key": "skills:skills/get-skill"
+        },
+        {
+          "type": "verify",
+          "key": "skills:skills/resolve-bundle"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:domain/specd-plugin"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:domain/agent-plugin"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:domain/errors"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:application/ports/plugin-repository"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:infrastructure/loader"
+        },
+        {
+          "type": "verify",
+          "key": "skills:application/ports/skill-repository"
+        },
+        {
+          "type": "verify",
+          "key": "skills:infrastructure/skill-repository"
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-16T13:49:32.821Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:cli/plugins-install",
+            "cli:cli/plugins-list",
+            "cli:cli/plugins-show",
+            "cli:cli/plugins-update",
+            "core:core/config",
+            "core:core/config-writer-port",
+            "cli:cli/project-init",
+            "cli:cli/project-update",
+            "skills:skills/skill",
+            "skills:skills/skill-bundle",
+            "skills:skills/skill-repository",
+            "cli:cli/plugins-uninstall",
+            "plugin-manager:plugin-manager",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:cli/plugins-install",
+            "cli:cli/plugins-list",
+            "cli:cli/plugins-show",
+            "cli:cli/plugins-update",
+            "core:core/config",
+            "core:core/config-writer-port",
+            "cli:cli/project-init",
+            "cli:cli/project-update",
+            "skills:skills/skill",
+            "skills:skills/skill-bundle",
+            "skills:skills/skill-repository",
+            "cli:cli/plugins-uninstall",
+            "plugin-manager:plugin-manager",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-16T13:49:32.821Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "plugin-manager:plugin-manager/install-plugin-use-case"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-manager:plugin-manager/uninstall-plugin-use-case"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-manager:plugin-manager/update-plugin-use-case"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-manager:plugin-manager/list-plugins-use-case"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-manager:plugin-manager/load-plugin-use-case"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-manager:plugin-manager/plugin-repository-port"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-manager:plugin-manager/specd-plugin-type"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-manager:plugin-manager/agent-plugin-type"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-manager:plugin-manager/plugin-errors"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-manager:plugin-manager/plugin-loader-infra"
+        },
+        {
+          "type": "specs",
+          "key": "skills:skills/skill-repository-port"
+        },
+        {
+          "type": "specs",
+          "key": "skills:skills/skill-repository-infra"
+        },
+        {
+          "type": "specs",
+          "key": "skills:skills/list-skills-use-case"
+        },
+        {
+          "type": "specs",
+          "key": "skills:skills/get-skill-use-case"
+        },
+        {
+          "type": "specs",
+          "key": "skills:skills/resolve-bundle-use-case"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:plugin-manager/install-plugin-use-case"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:plugin-manager/uninstall-plugin-use-case"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:plugin-manager/update-plugin-use-case"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:plugin-manager/list-plugins-use-case"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:plugin-manager/load-plugin-use-case"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:plugin-manager/plugin-repository-port"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:plugin-manager/specd-plugin-type"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:plugin-manager/agent-plugin-type"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:plugin-manager/plugin-errors"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:plugin-manager/plugin-loader-infra"
+        },
+        {
+          "type": "verify",
+          "key": "skills:skills/skill-repository-port"
+        },
+        {
+          "type": "verify",
+          "key": "skills:skills/skill-repository-infra"
+        },
+        {
+          "type": "verify",
+          "key": "skills:skills/list-skills-use-case"
+        },
+        {
+          "type": "verify",
+          "key": "skills:skills/get-skill-use-case"
+        },
+        {
+          "type": "verify",
+          "key": "skills:skills/resolve-bundle-use-case"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-16T13:50:24.285Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:cli/plugins-install",
+            "cli:cli/plugins-list",
+            "cli:cli/plugins-show",
+            "cli:cli/plugins-update",
+            "core:core/config",
+            "core:core/config-writer-port",
+            "cli:cli/project-init",
+            "cli:cli/project-update",
+            "skills:skills/skill",
+            "skills:skills/skill-bundle",
+            "skills:skills/skill-repository",
+            "cli:cli/plugins-uninstall",
+            "plugin-manager:plugin-manager",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-manager:plugin-manager/install-plugin-use-case",
+            "plugin-manager:plugin-manager/uninstall-plugin-use-case",
+            "plugin-manager:plugin-manager/update-plugin-use-case",
+            "plugin-manager:plugin-manager/list-plugins-use-case",
+            "plugin-manager:plugin-manager/load-plugin-use-case",
+            "plugin-manager:plugin-manager/plugin-repository-port",
+            "plugin-manager:plugin-manager/specd-plugin-type",
+            "plugin-manager:plugin-manager/agent-plugin-type",
+            "plugin-manager:plugin-manager/plugin-errors",
+            "plugin-manager:plugin-manager/plugin-loader-infra",
+            "skills:skills/skill-repository-port",
+            "skills:skills/skill-repository-infra",
+            "skills:skills/list-skills-use-case",
+            "skills:skills/get-skill-use-case",
+            "skills:skills/resolve-bundle-use-case"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:cli/plugins-install",
+            "cli:cli/plugins-list",
+            "cli:cli/plugins-show",
+            "cli:cli/plugins-update",
+            "core:core/config",
+            "core:core/config-writer-port",
+            "cli:cli/project-init",
+            "cli:cli/project-update",
+            "skills:skills/skill",
+            "skills:skills/skill-bundle",
+            "skills:skills/skill-repository",
+            "cli:cli/plugins-uninstall",
+            "plugin-manager:plugin-manager",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-manager:plugin-manager/install-plugin-use-case",
+            "plugin-manager:plugin-manager/uninstall-plugin-use-case",
+            "plugin-manager:plugin-manager/update-plugin-use-case",
+            "plugin-manager:plugin-manager/list-plugins-use-case",
+            "plugin-manager:plugin-manager/load-plugin-use-case",
+            "plugin-manager:plugin-manager/plugin-repository-port",
+            "plugin-manager:plugin-manager/specd-plugin-type",
+            "plugin-manager:plugin-manager/agent-plugin-type",
+            "plugin-manager:plugin-manager/plugin-errors",
+            "plugin-manager:plugin-manager/plugin-loader-infra",
+            "skills:skills/skill-repository-port",
+            "skills:skills/skill-repository-infra",
+            "skills:skills/list-skills-use-case",
+            "skills:skills/get-skill-use-case",
+            "skills:skills/resolve-bundle-use-case"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-16T13:50:24.285Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [],
+      "filesRemoved": [
+        {
+          "type": "specs",
+          "key": "plugin-manager:plugin-manager"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:plugin-manager"
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-16T13:51:15.777Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:cli/plugins-install",
+            "cli:cli/plugins-list",
+            "cli:cli/plugins-show",
+            "cli:cli/plugins-update",
+            "core:core/config",
+            "core:core/config-writer-port",
+            "cli:cli/project-init",
+            "cli:cli/project-update",
+            "skills:skills/skill",
+            "skills:skills/skill-bundle",
+            "skills:skills/skill-repository",
+            "cli:cli/plugins-uninstall",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-manager:plugin-manager/install-plugin-use-case",
+            "plugin-manager:plugin-manager/uninstall-plugin-use-case",
+            "plugin-manager:plugin-manager/update-plugin-use-case",
+            "plugin-manager:plugin-manager/list-plugins-use-case",
+            "plugin-manager:plugin-manager/load-plugin-use-case",
+            "plugin-manager:plugin-manager/plugin-repository-port",
+            "plugin-manager:plugin-manager/specd-plugin-type",
+            "plugin-manager:plugin-manager/agent-plugin-type",
+            "plugin-manager:plugin-manager/plugin-errors",
+            "plugin-manager:plugin-manager/plugin-loader-infra",
+            "skills:skills/skill-repository-port",
+            "skills:skills/skill-repository-infra",
+            "skills:skills/list-skills-use-case",
+            "skills:skills/get-skill-use-case",
+            "skills:skills/resolve-bundle-use-case"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:cli/plugins-install",
+            "cli:cli/plugins-list",
+            "cli:cli/plugins-show",
+            "cli:cli/plugins-update",
+            "core:core/config",
+            "core:core/config-writer-port",
+            "cli:cli/project-init",
+            "cli:cli/project-update",
+            "skills:skills/skill",
+            "skills:skills/skill-bundle",
+            "skills:skills/skill-repository",
+            "cli:cli/plugins-uninstall",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-manager:plugin-manager/install-plugin-use-case",
+            "plugin-manager:plugin-manager/uninstall-plugin-use-case",
+            "plugin-manager:plugin-manager/update-plugin-use-case",
+            "plugin-manager:plugin-manager/list-plugins-use-case",
+            "plugin-manager:plugin-manager/load-plugin-use-case",
+            "plugin-manager:plugin-manager/plugin-repository-port",
+            "plugin-manager:plugin-manager/specd-plugin-type",
+            "plugin-manager:plugin-manager/agent-plugin-type",
+            "plugin-manager:plugin-manager/plugin-errors",
+            "plugin-manager:plugin-manager/plugin-loader-infra",
+            "skills:skills/skill-repository-port",
+            "skills:skills/skill-repository-infra",
+            "skills:skills/list-skills-use-case",
+            "skills:skills/get-skill-use-case",
+            "skills:skills/resolve-bundle-use-case"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-16T13:51:15.777Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "plugin-manager:plugin-manager"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:plugin-manager"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-16T13:52:03.965Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:cli/plugins-install",
+            "cli:cli/plugins-list",
+            "cli:cli/plugins-show",
+            "cli:cli/plugins-update",
+            "core:core/config",
+            "core:core/config-writer-port",
+            "cli:cli/project-init",
+            "cli:cli/project-update",
+            "skills:skills/skill",
+            "skills:skills/skill-bundle",
+            "skills:skills/skill-repository",
+            "cli:cli/plugins-uninstall",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-manager:plugin-manager/install-plugin-use-case",
+            "plugin-manager:plugin-manager/uninstall-plugin-use-case",
+            "plugin-manager:plugin-manager/update-plugin-use-case",
+            "plugin-manager:plugin-manager/list-plugins-use-case",
+            "plugin-manager:plugin-manager/load-plugin-use-case",
+            "plugin-manager:plugin-manager/plugin-repository-port",
+            "plugin-manager:plugin-manager/specd-plugin-type",
+            "plugin-manager:plugin-manager/agent-plugin-type",
+            "plugin-manager:plugin-manager/plugin-errors",
+            "plugin-manager:plugin-manager/plugin-loader-infra",
+            "skills:skills/skill-repository-port",
+            "skills:skills/skill-repository-infra",
+            "skills:skills/list-skills-use-case",
+            "skills:skills/get-skill-use-case",
+            "skills:skills/resolve-bundle-use-case",
+            "plugin-manager:plugin-manager"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:cli/plugins-install",
+            "cli:cli/plugins-list",
+            "cli:cli/plugins-show",
+            "cli:cli/plugins-update",
+            "core:core/config",
+            "core:core/config-writer-port",
+            "cli:cli/project-init",
+            "cli:cli/project-update",
+            "skills:skills/skill",
+            "skills:skills/skill-bundle",
+            "skills:skills/skill-repository",
+            "cli:cli/plugins-uninstall",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-manager:plugin-manager/install-plugin-use-case",
+            "plugin-manager:plugin-manager/uninstall-plugin-use-case",
+            "plugin-manager:plugin-manager/update-plugin-use-case",
+            "plugin-manager:plugin-manager/list-plugins-use-case",
+            "plugin-manager:plugin-manager/load-plugin-use-case",
+            "plugin-manager:plugin-manager/plugin-repository-port",
+            "plugin-manager:plugin-manager/specd-plugin-type",
+            "plugin-manager:plugin-manager/agent-plugin-type",
+            "plugin-manager:plugin-manager/plugin-errors",
+            "plugin-manager:plugin-manager/plugin-loader-infra",
+            "skills:skills/skill-repository-port",
+            "skills:skills/skill-repository-infra",
+            "skills:skills/list-skills-use-case",
+            "skills:skills/get-skill-use-case",
+            "skills:skills/resolve-bundle-use-case",
+            "plugin-manager:plugin-manager"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-16T13:52:03.965Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [],
+      "filesRemoved": [
+        {
+          "type": "specs",
+          "key": "plugin-manager:plugin-manager/install-plugin-use-case"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-manager:plugin-manager/uninstall-plugin-use-case"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-manager:plugin-manager/update-plugin-use-case"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-manager:plugin-manager/list-plugins-use-case"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-manager:plugin-manager/load-plugin-use-case"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-manager:plugin-manager/plugin-repository-port"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-manager:plugin-manager/specd-plugin-type"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-manager:plugin-manager/agent-plugin-type"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-manager:plugin-manager/plugin-errors"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-manager:plugin-manager/plugin-loader-infra"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-manager:plugin-manager"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:plugin-manager/install-plugin-use-case"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:plugin-manager/uninstall-plugin-use-case"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:plugin-manager/update-plugin-use-case"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:plugin-manager/list-plugins-use-case"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:plugin-manager/load-plugin-use-case"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:plugin-manager/plugin-repository-port"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:plugin-manager/specd-plugin-type"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:plugin-manager/agent-plugin-type"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:plugin-manager/plugin-errors"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:plugin-manager/plugin-loader-infra"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:plugin-manager"
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-16T13:52:09.970Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:cli/plugins-install",
+            "cli:cli/plugins-list",
+            "cli:cli/plugins-show",
+            "cli:cli/plugins-update",
+            "core:core/config",
+            "core:core/config-writer-port",
+            "cli:cli/project-init",
+            "cli:cli/project-update",
+            "skills:skills/skill",
+            "skills:skills/skill-bundle",
+            "skills:skills/skill-repository",
+            "cli:cli/plugins-uninstall",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "skills:skills/skill-repository-port",
+            "skills:skills/skill-repository-infra",
+            "skills:skills/list-skills-use-case",
+            "skills:skills/get-skill-use-case",
+            "skills:skills/resolve-bundle-use-case"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:cli/plugins-install",
+            "cli:cli/plugins-list",
+            "cli:cli/plugins-show",
+            "cli:cli/plugins-update",
+            "core:core/config",
+            "core:core/config-writer-port",
+            "cli:cli/project-init",
+            "cli:cli/project-update",
+            "skills:skills/skill",
+            "skills:skills/skill-bundle",
+            "skills:skills/skill-repository",
+            "cli:cli/plugins-uninstall",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "skills:skills/skill-repository-port",
+            "skills:skills/skill-repository-infra",
+            "skills:skills/list-skills-use-case",
+            "skills:skills/get-skill-use-case",
+            "skills:skills/resolve-bundle-use-case"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-16T13:52:09.970Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "plugin-manager:plugin-manager"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-manager:use-cases"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-manager:ports"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-manager:domain-types"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-manager:errors"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-manager:infrastructure"
+        },
+        {
+          "type": "specs",
+          "key": "skills:use-cases"
+        },
+        {
+          "type": "specs",
+          "key": "skills:ports"
+        },
+        {
+          "type": "specs",
+          "key": "skills:infrastructure"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:plugin-manager"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:use-cases"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:ports"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:domain-types"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:errors"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:infrastructure"
+        },
+        {
+          "type": "verify",
+          "key": "skills:use-cases"
+        },
+        {
+          "type": "verify",
+          "key": "skills:ports"
+        },
+        {
+          "type": "verify",
+          "key": "skills:infrastructure"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-16T13:52:35.402Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:cli/plugins-install",
+            "cli:cli/plugins-list",
+            "cli:cli/plugins-show",
+            "cli:cli/plugins-update",
+            "core:core/config",
+            "core:core/config-writer-port",
+            "cli:cli/project-init",
+            "cli:cli/project-update",
+            "skills:skills/skill",
+            "skills:skills/skill-bundle",
+            "skills:skills/skill-repository",
+            "cli:cli/plugins-uninstall",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "skills:skills/skill-repository-port",
+            "skills:skills/skill-repository-infra",
+            "skills:skills/list-skills-use-case",
+            "skills:skills/get-skill-use-case",
+            "skills:skills/resolve-bundle-use-case",
+            "plugin-manager:plugin-manager",
+            "plugin-manager:use-cases",
+            "plugin-manager:ports",
+            "plugin-manager:domain-types",
+            "plugin-manager:errors",
+            "plugin-manager:infrastructure",
+            "skills:use-cases",
+            "skills:ports",
+            "skills:infrastructure"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:cli/plugins-install",
+            "cli:cli/plugins-list",
+            "cli:cli/plugins-show",
+            "cli:cli/plugins-update",
+            "core:core/config",
+            "core:core/config-writer-port",
+            "cli:cli/project-init",
+            "cli:cli/project-update",
+            "skills:skills/skill",
+            "skills:skills/skill-bundle",
+            "skills:skills/skill-repository",
+            "cli:cli/plugins-uninstall",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "skills:skills/skill-repository-port",
+            "skills:skills/skill-repository-infra",
+            "skills:skills/list-skills-use-case",
+            "skills:skills/get-skill-use-case",
+            "skills:skills/resolve-bundle-use-case",
+            "plugin-manager:plugin-manager",
+            "plugin-manager:use-cases",
+            "plugin-manager:ports",
+            "plugin-manager:domain-types",
+            "plugin-manager:errors",
+            "plugin-manager:infrastructure",
+            "skills:use-cases",
+            "skills:ports",
+            "skills:infrastructure"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-16T13:52:35.402Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [],
+      "filesRemoved": [
+        {
+          "type": "specs",
+          "key": "skills:skills/skill-repository-port"
+        },
+        {
+          "type": "specs",
+          "key": "skills:skills/skill-repository-infra"
+        },
+        {
+          "type": "specs",
+          "key": "skills:skills/list-skills-use-case"
+        },
+        {
+          "type": "specs",
+          "key": "skills:skills/get-skill-use-case"
+        },
+        {
+          "type": "specs",
+          "key": "skills:skills/resolve-bundle-use-case"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-manager:plugin-manager"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-manager:use-cases"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-manager:ports"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-manager:domain-types"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-manager:errors"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-manager:infrastructure"
+        },
+        {
+          "type": "specs",
+          "key": "skills:use-cases"
+        },
+        {
+          "type": "specs",
+          "key": "skills:ports"
+        },
+        {
+          "type": "specs",
+          "key": "skills:infrastructure"
+        },
+        {
+          "type": "verify",
+          "key": "skills:skills/skill-repository-port"
+        },
+        {
+          "type": "verify",
+          "key": "skills:skills/skill-repository-infra"
+        },
+        {
+          "type": "verify",
+          "key": "skills:skills/list-skills-use-case"
+        },
+        {
+          "type": "verify",
+          "key": "skills:skills/get-skill-use-case"
+        },
+        {
+          "type": "verify",
+          "key": "skills:skills/resolve-bundle-use-case"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:plugin-manager"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:use-cases"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:ports"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:domain-types"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:errors"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:infrastructure"
+        },
+        {
+          "type": "verify",
+          "key": "skills:use-cases"
+        },
+        {
+          "type": "verify",
+          "key": "skills:ports"
+        },
+        {
+          "type": "verify",
+          "key": "skills:infrastructure"
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-16T13:57:09.906Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:cli/plugins-install",
+            "cli:cli/plugins-list",
+            "cli:cli/plugins-show",
+            "cli:cli/plugins-update",
+            "core:core/config",
+            "core:core/config-writer-port",
+            "cli:cli/project-init",
+            "cli:cli/project-update",
+            "skills:skills/skill",
+            "skills:skills/skill-bundle",
+            "skills:skills/skill-repository",
+            "cli:cli/plugins-uninstall",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:cli/plugins-install",
+            "cli:cli/plugins-list",
+            "cli:cli/plugins-show",
+            "cli:cli/plugins-update",
+            "core:core/config",
+            "core:core/config-writer-port",
+            "cli:cli/project-init",
+            "cli:cli/project-update",
+            "skills:skills/skill",
+            "skills:skills/skill-bundle",
+            "skills:skills/skill-repository",
+            "cli:cli/plugins-uninstall",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-16T13:57:09.906Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "plugin-manager:install-plugin-use-case"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-manager:uninstall-plugin-use-case"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-manager:update-plugin-use-case"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-manager:list-plugins-use-case"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-manager:load-plugin-use-case"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-manager:plugin-repository-port"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-manager:specd-plugin-type"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-manager:agent-plugin-type"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-manager:plugin-errors"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-manager:plugin-loader"
+        },
+        {
+          "type": "specs",
+          "key": "skills:list-skills-use-case"
+        },
+        {
+          "type": "specs",
+          "key": "skills:get-skill-use-case"
+        },
+        {
+          "type": "specs",
+          "key": "skills:resolve-bundle-use-case"
+        },
+        {
+          "type": "specs",
+          "key": "skills:skill-repository-port"
+        },
+        {
+          "type": "specs",
+          "key": "skills:skill-repository-infra"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:install-plugin-use-case"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:uninstall-plugin-use-case"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:update-plugin-use-case"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:list-plugins-use-case"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:load-plugin-use-case"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:plugin-repository-port"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:specd-plugin-type"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:agent-plugin-type"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:plugin-errors"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:plugin-loader"
+        },
+        {
+          "type": "verify",
+          "key": "skills:list-skills-use-case"
+        },
+        {
+          "type": "verify",
+          "key": "skills:get-skill-use-case"
+        },
+        {
+          "type": "verify",
+          "key": "skills:resolve-bundle-use-case"
+        },
+        {
+          "type": "verify",
+          "key": "skills:skill-repository-port"
+        },
+        {
+          "type": "verify",
+          "key": "skills:skill-repository-infra"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-16T14:02:53.831Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-16T14:25:31.584Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-16T14:27:01.108Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-16T14:27:46.551Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-16T14:29:05.264Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-16T14:30:15.732Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-16T14:34:16.312Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-16T14:41:02.441Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-16T14:44:03.396Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-16T14:47:44.101Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-16T14:49:44.786Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-16T14:51:47.273Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:cli/plugins-install",
+            "cli:cli/plugins-list",
+            "cli:cli/plugins-show",
+            "cli:cli/plugins-update",
+            "core:core/config",
+            "core:core/config-writer-port",
+            "cli:cli/project-init",
+            "cli:cli/project-update",
+            "skills:skills/skill",
+            "skills:skills/skill-bundle",
+            "skills:skills/skill-repository",
+            "cli:cli/plugins-uninstall",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-manager:install-plugin-use-case",
+            "plugin-manager:uninstall-plugin-use-case",
+            "plugin-manager:update-plugin-use-case",
+            "plugin-manager:list-plugins-use-case",
+            "plugin-manager:load-plugin-use-case",
+            "plugin-manager:plugin-repository-port",
+            "plugin-manager:specd-plugin-type",
+            "plugin-manager:agent-plugin-type",
+            "plugin-manager:plugin-errors",
+            "plugin-manager:plugin-loader",
+            "skills:list-skills-use-case",
+            "skills:get-skill-use-case",
+            "skills:resolve-bundle-use-case",
+            "skills:skill-repository-port",
+            "skills:skill-repository-infra"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:cli/plugins-install",
+            "cli:cli/plugins-list",
+            "cli:cli/plugins-show",
+            "cli:cli/plugins-update",
+            "core:core/config",
+            "core:core/config-writer-port",
+            "cli:cli/project-init",
+            "cli:cli/project-update",
+            "skills:skills/skill",
+            "skills:skills/skill-bundle",
+            "skills:skills/skill-repository",
+            "cli:cli/plugins-uninstall",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-manager:install-plugin-use-case",
+            "plugin-manager:uninstall-plugin-use-case",
+            "plugin-manager:update-plugin-use-case",
+            "plugin-manager:list-plugins-use-case",
+            "plugin-manager:load-plugin-use-case",
+            "plugin-manager:plugin-repository-port",
+            "plugin-manager:specd-plugin-type",
+            "plugin-manager:agent-plugin-type",
+            "plugin-manager:plugin-errors",
+            "plugin-manager:plugin-loader",
+            "skills:list-skills-use-case",
+            "skills:get-skill-use-case",
+            "skills:resolve-bundle-use-case",
+            "skills:skill-repository-port",
+            "skills:skill-repository-infra"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-16T14:51:47.273Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [],
+      "filesRemoved": [
+        {
+          "type": "specs",
+          "key": "skills:skills/skill"
+        },
+        {
+          "type": "specs",
+          "key": "skills:skills/skill-bundle"
+        },
+        {
+          "type": "specs",
+          "key": "skills:skills/skill-repository"
+        },
+        {
+          "type": "specs",
+          "key": "skills:list-skills-use-case"
+        },
+        {
+          "type": "specs",
+          "key": "skills:get-skill-use-case"
+        },
+        {
+          "type": "specs",
+          "key": "skills:resolve-bundle-use-case"
+        },
+        {
+          "type": "specs",
+          "key": "skills:skill-repository-port"
+        },
+        {
+          "type": "specs",
+          "key": "skills:skill-repository-infra"
+        },
+        {
+          "type": "verify",
+          "key": "skills:skills/skill"
+        },
+        {
+          "type": "verify",
+          "key": "skills:skills/skill-bundle"
+        },
+        {
+          "type": "verify",
+          "key": "skills:skills/skill-repository"
+        },
+        {
+          "type": "verify",
+          "key": "skills:list-skills-use-case"
+        },
+        {
+          "type": "verify",
+          "key": "skills:get-skill-use-case"
+        },
+        {
+          "type": "verify",
+          "key": "skills:resolve-bundle-use-case"
+        },
+        {
+          "type": "verify",
+          "key": "skills:skill-repository-port"
+        },
+        {
+          "type": "verify",
+          "key": "skills:skill-repository-infra"
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-16T14:51:53.174Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:cli/plugins-install",
+            "cli:cli/plugins-list",
+            "cli:cli/plugins-show",
+            "cli:cli/plugins-update",
+            "core:core/config",
+            "core:core/config-writer-port",
+            "cli:cli/project-init",
+            "cli:cli/project-update",
+            "cli:cli/plugins-uninstall",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-manager:install-plugin-use-case",
+            "plugin-manager:uninstall-plugin-use-case",
+            "plugin-manager:update-plugin-use-case",
+            "plugin-manager:list-plugins-use-case",
+            "plugin-manager:load-plugin-use-case",
+            "plugin-manager:plugin-repository-port",
+            "plugin-manager:specd-plugin-type",
+            "plugin-manager:agent-plugin-type",
+            "plugin-manager:plugin-errors",
+            "plugin-manager:plugin-loader"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:cli/plugins-install",
+            "cli:cli/plugins-list",
+            "cli:cli/plugins-show",
+            "cli:cli/plugins-update",
+            "core:core/config",
+            "core:core/config-writer-port",
+            "cli:cli/project-init",
+            "cli:cli/project-update",
+            "cli:cli/plugins-uninstall",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-manager:install-plugin-use-case",
+            "plugin-manager:uninstall-plugin-use-case",
+            "plugin-manager:update-plugin-use-case",
+            "plugin-manager:list-plugins-use-case",
+            "plugin-manager:load-plugin-use-case",
+            "plugin-manager:plugin-repository-port",
+            "plugin-manager:specd-plugin-type",
+            "plugin-manager:agent-plugin-type",
+            "plugin-manager:plugin-errors",
+            "plugin-manager:plugin-loader"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-16T14:51:53.174Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "skills:skill"
+        },
+        {
+          "type": "specs",
+          "key": "skills:skill-bundle"
+        },
+        {
+          "type": "specs",
+          "key": "skills:skill-repository"
+        },
+        {
+          "type": "specs",
+          "key": "skills:list-skills"
+        },
+        {
+          "type": "specs",
+          "key": "skills:get-skill"
+        },
+        {
+          "type": "specs",
+          "key": "skills:resolve-bundle"
+        },
+        {
+          "type": "specs",
+          "key": "skills:skill-repository-port"
+        },
+        {
+          "type": "specs",
+          "key": "skills:skill-repository-infra"
+        },
+        {
+          "type": "verify",
+          "key": "skills:skill"
+        },
+        {
+          "type": "verify",
+          "key": "skills:skill-bundle"
+        },
+        {
+          "type": "verify",
+          "key": "skills:skill-repository"
+        },
+        {
+          "type": "verify",
+          "key": "skills:list-skills"
+        },
+        {
+          "type": "verify",
+          "key": "skills:get-skill"
+        },
+        {
+          "type": "verify",
+          "key": "skills:resolve-bundle"
+        },
+        {
+          "type": "verify",
+          "key": "skills:skill-repository-port"
+        },
+        {
+          "type": "verify",
+          "key": "skills:skill-repository-infra"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-16T14:53:01.252Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-16T15:00:04.087Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-16T15:01:46.403Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-16T15:03:36.377Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-16T15:04:59.678Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-16T15:21:19.978Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-16T15:23:34.717Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-16T16:02:25.895Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-16T16:07:02.973Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:cli/plugins-install",
+            "cli:cli/plugins-list",
+            "cli:cli/plugins-show",
+            "cli:cli/plugins-update",
+            "core:core/config",
+            "core:core/config-writer-port",
+            "cli:cli/project-init",
+            "cli:cli/project-update",
+            "cli:cli/plugins-uninstall",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-manager:install-plugin-use-case",
+            "plugin-manager:uninstall-plugin-use-case",
+            "plugin-manager:update-plugin-use-case",
+            "plugin-manager:list-plugins-use-case",
+            "plugin-manager:load-plugin-use-case",
+            "plugin-manager:plugin-repository-port",
+            "plugin-manager:specd-plugin-type",
+            "plugin-manager:agent-plugin-type",
+            "plugin-manager:plugin-errors",
+            "plugin-manager:plugin-loader",
+            "skills:skill",
+            "skills:skill-bundle",
+            "skills:skill-repository",
+            "skills:list-skills",
+            "skills:get-skill",
+            "skills:resolve-bundle",
+            "skills:skill-repository-port",
+            "skills:skill-repository-infra"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:cli/plugins-install",
+            "cli:cli/plugins-list",
+            "cli:cli/plugins-show",
+            "cli:cli/plugins-update",
+            "core:core/config",
+            "core:core/config-writer-port",
+            "cli:cli/project-init",
+            "cli:cli/project-update",
+            "cli:cli/plugins-uninstall",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-manager:install-plugin-use-case",
+            "plugin-manager:uninstall-plugin-use-case",
+            "plugin-manager:update-plugin-use-case",
+            "plugin-manager:list-plugins-use-case",
+            "plugin-manager:load-plugin-use-case",
+            "plugin-manager:plugin-repository-port",
+            "plugin-manager:specd-plugin-type",
+            "plugin-manager:agent-plugin-type",
+            "plugin-manager:plugin-errors",
+            "plugin-manager:plugin-loader",
+            "skills:skill",
+            "skills:skill-bundle",
+            "skills:skill-repository",
+            "skills:list-skills",
+            "skills:get-skill",
+            "skills:resolve-bundle",
+            "skills:skill-repository-port",
+            "skills:skill-repository-infra"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-16T16:07:02.974Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "skills:skill-templates-source"
+        },
+        {
+          "type": "verify",
+          "key": "skills:skill-templates-source"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-16T16:07:31.090Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-16T17:08:45.679Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-17T07:45:11.977Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-17T07:51:08.297Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: design [design]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-17T07:51:15.157Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-17T08:01:42.669Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: design [design]",
+      "affectedArtifacts": [
+        {
+          "type": "design",
+          "files": ["design"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-17T08:02:56.825Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-17T08:05:29.854Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-17T14:46:56.148Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-17T14:46:56.148Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-18T10:07:25.371Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-18T10:23:50.671Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-18T10:24:53.574Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-18T10:28:54.065Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-18T10:30:32.081Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-18T10:31:03.597Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "description-updated",
+      "at": "2026-04-18T10:34:47.244Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "description": "Phase 1 introduces the plugin-based agent architecture and migrates the CLI and core flows from skills-manifest management to plugin lifecycle management. It adds the plugin-manager package, agent plugin packages (Claude/Copilot/Codex), canonical skills template/repository infrastructure, and new plugins install/list/show/update/uninstall command flows, including project init/update integration. The change also updates documentation, hooks, tests, and config persistence so plugin declarations in specd.yaml become the authoritative installation source."
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-18T10:35:18.003Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-04-18T10:37:33.755Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "m***a@g***.com"
+  }
+}

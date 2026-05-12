@@ -1,0 +1,475 @@
+{
+  "name": "remove-archived-change-workspace",
+  "createdAt": "2026-04-17T16:15:45.991Z",
+  "description": "Remove redundant workspace field from ArchivedChange entity and archive index",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": ["core:core/archive-change"],
+  "specDependsOn": {
+    "core:core/archive-change": [
+      "core:core/change",
+      "core:core/schema-format",
+      "core:core/delta-format",
+      "core:core/validate-artifacts",
+      "core:core/storage",
+      "core:core/run-step-hooks",
+      "core:core/hook-execution-model",
+      "core:core/template-variables",
+      "core:core/spec-metadata",
+      "core:core/content-extraction",
+      "default:_global/architecture",
+      "core:core/workspace",
+      "core:core/spec-id-format",
+      "core:core/spec-overlap"
+    ]
+  },
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:041e1550039b035e25442c08f40b6798db1e9c41473196b013a8a5e5b2ee4f0e"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:core/archive-change",
+          "filename": "deltas/core/core/archive-change/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:fd386da0ccb97a25989873951eba0b9b4040b64fd9a926c8a685fc753e456ae3"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:core/archive-change",
+          "filename": "deltas/core/core/archive-change/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:aed2b1cb5a01e5f233406602b31bb3a857c76a03cf09babe7d1c13d9817d7e47"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:38fddb5d17c498cce43d4122601c4054dbefe3e2ce716d21a3dd3d9069e0def6"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:22298af135785ce4eedd28bc088e6efd3df9fbae52558044a985fb63ea44dbd1"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-04-17T16:15:45.991Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "specIds": [],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-17T16:15:46.006Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-17T16:15:58.817Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": []
+        },
+        {
+          "type": "verify",
+          "files": []
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-17T16:15:58.817Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-17T16:15:58.817Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:core/archived-change"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/archived-change"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-17T16:18:19.256Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["core:core/archived-change"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:core/archived-change"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-17T16:18:19.256Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:core/archive-change"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/archive-change"
+        }
+      ],
+      "filesRemoved": [
+        {
+          "type": "specs",
+          "key": "core:core/archived-change"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/archived-change"
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-17T16:27:31.464Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: verify [core:core/archive-change]",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": ["core:core/archive-change"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-17T16:28:46.650Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: verify [core:core/archive-change]",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": ["core:core/archive-change"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-17T16:29:51.299Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: verify [core:core/archive-change]",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": ["core:core/archive-change"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-17T16:30:35.561Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-17T16:32:18.627Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: verify [core:core/archive-change]",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": ["core:core/archive-change"]
+        }
+      ]
+    },
+    {
+      "type": "description-updated",
+      "at": "2026-04-17T16:32:33.604Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "description": "Remove redundant workspace field from ArchivedChange entity and archive index"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-17T16:37:46.208Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: verify [core:core/archive-change]",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": ["core:core/archive-change"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-18T10:29:56.582Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: verify [core:core/archive-change]",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": ["core:core/archive-change"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-18T10:32:24.293Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: verify [core:core/archive-change]",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": ["core:core/archive-change"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-18T13:29:51.560Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: design [design]",
+      "affectedArtifacts": [
+        {
+          "type": "design",
+          "files": ["design"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-18T13:45:10.207Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-18T13:52:00.508Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-18T15:28:40.908Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-18T15:30:51.882Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-18T15:31:05.232Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-18T15:33:44.289Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-04-18T15:33:44.447Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "m***a@g***.com"
+  }
+}

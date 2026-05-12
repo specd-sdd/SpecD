@@ -1,0 +1,25 @@
+- op: modified
+  description: Expand canonical display requirement to skills and workflow artifacts.
+  selector:
+    type: section
+    matches: 'Requirement: Help and docs canonical display'
+  content: |
+    CLI help, project documentation, and agent-authored workflow artifacts SHALL present canonical plural command groups as the primary form. Singular aliases MAY be shown as aliases only.
+
+- op: added
+  description: Add requirement for deterministic command-equivalence mapping in workflow guidance.
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Behavioral equivalence'
+  content: |
+    ### Requirement: Workflow equivalence mapping
+
+    When workflow guidance allows skipping a command because another command already produced equivalent information, the mapping MUST be explicit and deterministic.
+
+    The equivalence mapping SHALL identify which canonical command output fields satisfy each decision check so command elimination remains auditable and safe.
+
+    If equivalence cannot be demonstrated deterministically, workflow guidance MUST require executing the explicit canonical command.

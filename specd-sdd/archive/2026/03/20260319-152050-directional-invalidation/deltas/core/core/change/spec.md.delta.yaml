@@ -1,0 +1,46 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Artifacts'
+  content: |
+    A Change holds a set of artifacts — typed files whose types and dependency graph are declared by the active schema. Each artifact is a `ChangeArtifact` that contains zero or more `ArtifactFile` entries — one per file the artifact produces.
+
+    A `ChangeArtifact` has:
+
+    - **`type`** — the artifact type ID from the schema (e.g. `proposal`, `specs`, `design`, `tasks`)
+    - **`optional`** — whether the artifact is required for archiving
+    - **`requires`** — ordered list of artifact type IDs that must be complete before this artifact can be validated
+    - **`files`** — a `Map<string, ArtifactFile>` of tracked files, keyed by file key
+
+    For `scope: change` artifacts there is typically one file keyed by the artifact type id. For `scope: spec` artifacts there is one file per spec ID in `change.specIds`.
+
+    Each `ArtifactFile` value object has:
+
+    - **`key`** — identifier for this file within the artifact (artifact type id for `scope: change`, spec ID for `scope: spec`)
+    - **`filename`** — the file path within the change directory
+    - **`status`** — derived at load time: `missing` | `in-progress` | `complete` | `skipped`
+    - **`validatedHash`** — the hash recorded when the file was last validated, computed after applying `preHashCleanup` if declared in the schema. The sentinel value `"__skipped__"` is used when an optional artifact is explicitly marked as not produced.
+
+    `ArtifactStatus` is never stored directly on the file — it is always derived on load from `validatedHash` and file presence:
+
+    1. `validatedHash === "__skipped__"` → `skipped` (only valid for `optional: true` artifacts)
+    2. File absent (and no sentinel) → `missing`
+    3. File present and cleaned hash matches `validatedHash` → `complete`
+    4. File present but hash differs or `validatedHash` is unset → `in-progress`
+
+    The aggregated `status` getter on `ChangeArtifact` derives its value from all files:
+
+    - `complete` — all files are complete or skipped (and at least one file exists)
+    - `skipped` — all files are skipped (and at least one file exists)
+    - `missing` — all files are missing or there are no files
+    - `in-progress` — some files exist but not all are complete/skipped
+
+    `skipped` is only valid for `optional: true` artifacts. Attempting to skip a non-optional artifact throws an error.
+
+    The `skipped` state must be set explicitly by an actor — human or agent via a CLI command. The agent must be instructed (via the schema `instruction` or skill definition) to call that command when it decides not to produce an optional artifact. The specific CLI command is defined in the CLI spec.
+
+    `ChangeArtifact.markComplete(key, hash)` takes two arguments — the file key and the content hash — and delegates to the corresponding `ArtifactFile.markComplete(hash)`. `ChangeArtifact.markSkipped()` marks ALL files in the artifact as skipped. These may only be called by the `ValidateArtifacts` and skip use cases respectively. No other code path may set these values.
+
+    **Rollback:** `invalidate()` accepts an optional `driftedArtifactIds` parameter — a set of artifact type IDs whose content has actually changed. When provided, only the drifted artifacts and their downstream dependents (artifacts whose `requires` chain includes a drifted artifact) have their `validatedHash` cleared via `resetValidation()`. Upstream artifacts that the drifted artifacts depend on are left intact. When `driftedArtifactIds` is not provided, all artifacts are reset (backward-compatible fallback). For the `verifying → implementing` transition, only artifacts in the `implementing` step's `requires` list are reset.
+
+    Effective status cascades: an artifact is `in-progress` if any artifact in its `requires` chain is neither `complete` nor `skipped`, even if its own aggregated status matches. A `skipped` optional artifact satisfies the dependency — downstream artifacts and workflow steps treat it as resolved.

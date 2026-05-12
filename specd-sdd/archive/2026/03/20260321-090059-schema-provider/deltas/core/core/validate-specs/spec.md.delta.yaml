@@ -1,0 +1,6 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Resolve the active schema'
+  content: |
+    The use case SHALL obtain the schema via `SchemaProvider.get()`. If the schema cannot be resolved (returns `null`), the use case MUST throw a `SchemaNotFoundError`.

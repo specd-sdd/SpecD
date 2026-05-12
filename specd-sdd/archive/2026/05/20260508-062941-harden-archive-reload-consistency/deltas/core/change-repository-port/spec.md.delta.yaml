@@ -1,0 +1,59 @@
+- op: added
+  description: 'Restrict artifact reads to tracked change artifact files'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: artifact loads a single artifact file$'
+  content: |
+    ### Requirement: artifact only loads tracked change artifact files
+
+    `artifact(change, filename)` MUST accept only filenames that correspond to tracked artifact files declared on the change's artifact file list.
+
+    If `filename` does not match a tracked artifact file for that change, the repository MUST reject the read rather than treating the change directory as a general-purpose file container.
+
+- op: added
+  description: 'Require confinement for change artifact reads and presence checks'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: artifact only loads tracked change artifact files$'
+  content: |
+    ### Requirement: Change artifact path confinement
+
+    `artifact(change, filename)`, `artifactExists(change, filename)`, and any related change-artifact file lookup MUST enforce strict confinement to the change directory.
+
+    The repository MUST reject any path that would escape the change directory or address an arbitrary file outside the tracked artifact set, including path traversal forms and alternate relative-path encodings.
+
+- op: added
+  description: 'Require debug logging for tracked artifact resolution and rejection'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Change artifact path confinement$'
+  content: |
+    ### Requirement: Change artifact resolution debug logging
+
+    Implementations SHOULD emit debug-level logs when resolving tracked change artifact files, rejecting untracked filenames, or rejecting a path-confinement violation.
+
+    These logs MUST follow the project's global logging conventions.
+
+- op: added
+  description: 'Add logging dependency for repository diagnostics'
+  position:
+    parent:
+      type: section
+      matches: '^Spec Dependencies$'
+    after:
+      type: list-item
+      matches: 'core:change-manifest'
+  content: |
+    - [`default:_global/logging`](../../_global/logging/spec.md) — debug logging requirements for tracked artifact resolution and path-confinement diagnostics

@@ -1,0 +1,236 @@
+{
+  "name": "cli-init-alias",
+  "createdAt": "2026-04-23T08:55:12.476Z",
+  "description": "Add specd init as a top-level CLI alias that delegates to specd project init, giving new users a shorter, conventional command to bootstrap a project. Both invocation forms share the same handler, flags, interactive wizard, and output — no duplication needed since registerProjectInit() already parameterises the parent command.",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": ["cli:cli/project-init", "cli:cli/entrypoint"],
+  "specDependsOn": {
+    "cli:cli/project-init": ["cli:cli/entrypoint", "cli:cli/skills-install", "core:core/config"],
+    "cli:cli/entrypoint": ["core:core/config"]
+  },
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:e009edd35bd9c375cdfad8568e07bf20bcbbe12ce9677583a48990a21e926672"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "cli:cli/project-init",
+          "filename": "deltas/cli/cli/project-init/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:6a1ab2ab2cc9bb09580abee9f8fc1dbc7c9dd65508d496d5133723d8720aab9c"
+        },
+        {
+          "key": "cli:cli/entrypoint",
+          "filename": "deltas/cli/cli/entrypoint/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:69429be2cf44e8e4d2fd01b576ae25047202e0e636029728ee7a6d33d2ecf856"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "cli:cli/project-init",
+          "filename": "deltas/cli/cli/project-init/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:c59ade4b6460c240385941e94ee72cccaca5d7dd76cb2a5bac97e0a1b39e04e9"
+        },
+        {
+          "key": "cli:cli/entrypoint",
+          "filename": "deltas/cli/cli/entrypoint/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:55bcaa881e4dd81239cd3decdca7bc8076faec8e44484855c6c1a1ff1da211d1"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:c32b7c181123d716b249fbe792ce81a1aa75c73f8f4e1eca510b7dacfbc80e28"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:5e56abbcfdfd6db61eb8c33e323da18ca36e45beacade5cbce54d460d1b2bccb"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-04-23T08:55:12.476Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "specIds": ["cli:cli/project-init", "cli:cli/entrypoint"],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-23T08:55:12.486Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "cli:cli/project-init"
+        },
+        {
+          "type": "specs",
+          "key": "cli:cli/entrypoint"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/project-init"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/entrypoint"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-23T08:59:46.708Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-23T09:14:46.083Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-23T09:19:14.293Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-23T09:49:26.909Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-23T09:52:19.342Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-23T09:52:59.268Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "description-updated",
+      "at": "2026-04-23T10:01:29.611Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "description": "Add specd init as a top-level CLI alias that delegates to specd project init, giving new users a shorter, conventional command to bootstrap a project. Both invocation forms share the same handler, flags, interactive wizard, and output — no duplication needed since registerProjectInit() already parameterises the parent command."
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-23T10:01:47.740Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-04-23T10:01:47.836Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "m***a@g***.com"
+  }
+}

@@ -1,0 +1,108 @@
+- op: modified
+  description: 'Cover explicit file paths, JSON files, and spec-preview note on success.'
+  selector:
+    type: section
+    matches: 'Requirement: Output on success'
+    index: 1
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    #### Scenario: All artifacts pass, no warnings
+
+    - **GIVEN** a change where all artifacts pass validation
+    - **AND** validation reports file `deltas/core/core/config/spec.md.delta.yaml`
+    - **WHEN** `specd change validate my-change core:core/config --artifact specs` is run
+    - **THEN** stdout contains `validated my-change/core:core/config: all artifacts pass`
+    - **AND** stdout contains `file: deltas/core/core/config/spec.md.delta.yaml`
+    - **AND** stdout contains `specd change spec-preview my-change core:core/config`
+    - **AND** the process exits with code 0
+
+    #### Scenario: Pass with warnings
+
+    - **GIVEN** a change where artifacts pass but there are optional rule mismatches
+    - **AND** validation reports file `deltas/core/core/config/spec.md.delta.yaml`
+    - **WHEN** `specd change validate my-change core:core/config --artifact specs` is run
+    - **THEN** stdout contains a pass message and `warning:` lines for each warning
+    - **AND** stdout contains `file: deltas/core/core/config/spec.md.delta.yaml`
+    - **AND** stdout contains `specd change spec-preview my-change core:core/config`
+    - **AND** the process exits with code 0
+
+    #### Scenario: JSON output on pass includes files
+
+    - **GIVEN** a change where all artifacts pass validation with no warnings
+    - **AND** validation reports file `deltas/core/core/config/spec.md.delta.yaml`
+    - **WHEN** `specd change validate my-change core:core/config --artifact specs --format json` is run
+    - **THEN** stdout is valid JSON with `passed` equal to `true`, `failures` equal to `[]`, and `warnings` equal to `[]`
+    - **AND** `files` contains an entry with `filename: "deltas/core/core/config/spec.md.delta.yaml"`
+    - **AND** the process exits with code 0
+
+- op: modified
+  description: 'Cover missing expected paths, JSON files, and spec-preview note on failure.'
+  selector:
+    type: section
+    matches: 'Requirement: Output on failure'
+    index: 2
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    #### Scenario: Validation failures
+
+    - **GIVEN** a change where a required artifact fails validation
+    - **AND** validation reports missing file `deltas/core/core/config/spec.md.delta.yaml`
+    - **WHEN** `specd change validate my-change core:core/config --artifact specs` is run
+    - **THEN** stdout contains `validation failed`
+    - **AND** stdout contains `missing: deltas/core/core/config/spec.md.delta.yaml`
+    - **AND** stdout contains `error:` lines for each failure
+    - **AND** stdout contains `specd change spec-preview my-change core:core/config`
+    - **AND** the process exits with code 1
+
+    #### Scenario: JSON output on failure includes files
+
+    - **GIVEN** a change where a required artifact fails validation
+    - **AND** validation reports missing file `deltas/core/core/config/spec.md.delta.yaml`
+    - **WHEN** `specd change validate my-change core:core/config --artifact specs --format json` is run
+    - **THEN** stdout is valid JSON with `passed` equal to `false`
+    - **AND** `failures` contains at least one entry with `artifactId`, `description`, and `filename`
+    - **AND** `files` contains an entry with `filename: "deltas/core/core/config/spec.md.delta.yaml"` and missing status
+    - **AND** the process exits with code 1
+
+- op: removed
+  description: 'Fold duplicate JSON failure scenarios into the main Output on failure section.'
+  selector:
+    type: section
+    matches: 'Requirement: Output on failure'
+    index: 8
+    parent:
+      type: section
+      matches: 'Requirements'
+
+- op: removed
+  description: 'Fold duplicate JSON success scenarios into the main Output on success section.'
+  selector:
+    type: section
+    matches: 'Requirement: Output on success'
+    index: 7
+    parent:
+      type: section
+      matches: 'Requirements'
+
+- op: added
+  description: 'Verify CLI delegates file path detail rendering to core result metadata.'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Command signature'
+  content: |
+    ### Requirement: Behaviour
+
+    #### Scenario: File path details come from validation metadata
+
+    - **GIVEN** `ValidateArtifacts.execute` returns a file entry with filename `deltas/core/core/config/spec.md.delta.yaml`
+    - **WHEN** `specd change validate my-change core:core/config --artifact specs` renders output
+    - **THEN** the CLI prints or serializes that filename from the result metadata
+    - **AND** it does not recompute a replacement path in the CLI layer

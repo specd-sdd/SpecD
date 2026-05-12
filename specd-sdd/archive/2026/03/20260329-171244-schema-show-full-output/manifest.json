@@ -1,0 +1,211 @@
+{
+  "name": "schema-show-full-output",
+  "createdAt": "2026-03-29T17:12:44.519Z",
+  "description": "Make schema show display the complete merged schema by default, add --templates to include template content, and add --raw to show unresolved schema YAML",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": ["cli:cli/schema-show", "core:core/get-active-schema"],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "validatedHash": "sha256:e72fd00113dd940c32d07dd0efd719e77114b826f847c2ca2d75d67dd5b5a91e"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "files": [
+        {
+          "key": "cli:cli/schema-show",
+          "filename": "deltas/cli/cli/schema-show/spec.md.delta.yaml",
+          "validatedHash": "sha256:e0646b588cda3c92e3a9ec8deaaa50e68cbf6be6897e40b1e528ab8ae589d1d8"
+        },
+        {
+          "key": "core:core/get-active-schema",
+          "filename": "deltas/core/core/get-active-schema/spec.md.delta.yaml",
+          "validatedHash": "sha256:3ff116eb17849fda49341b65be99459a041c60bdd404e2d983a1dd4b0b2e9c2b"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "files": [
+        {
+          "key": "cli:cli/schema-show",
+          "filename": "deltas/cli/cli/schema-show/verify.md.delta.yaml",
+          "validatedHash": "sha256:dffff04198d5804840c011aef0198e22f122b6ff354a3f9c1ff859373ac644cf"
+        },
+        {
+          "key": "core:core/get-active-schema",
+          "filename": "deltas/core/core/get-active-schema/verify.md.delta.yaml",
+          "validatedHash": "sha256:f6c6e8059c6b254effb5b665fcbc1356d67e77e16ac8f5b027ed94edb9a7c084"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "validatedHash": "sha256:026ac60a9b5691462a8043bdb15343b970985f46222e5553540fae3d31e2911d"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "validatedHash": "sha256:e266ff0023750ad6066e3bc24c21cc581c20814275c1b1b0e19f3e3fc0604e63"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-03-29T17:12:44.519Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "specIds": ["cli:cli/schema-show", "core:core/get-active-schema"],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-03-29T17:12:44.528Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "cli:cli/schema-show"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/get-active-schema"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/schema-show"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/get-active-schema"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-29T17:15:51.521Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-29T17:45:46.299Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-29T17:46:59.396Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-29T18:08:05.291Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-29T18:11:16.592Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-29T18:11:36.150Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-29T18:13:32.736Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-03-29T18:13:32.813Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "m***a@g***.com"
+  }
+}

@@ -1,0 +1,17 @@
+- op: added
+  description: >
+    Add requirement that use-case factories must use auto-detect for VCS-dependent
+    adapters instead of hardcoding a specific implementation.
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Internal ports are never exported$'
+  content: |
+    ### Requirement: Use-case factories must use auto-detect for VCS-dependent adapters
+
+    Standalone use-case factories that need an `ActorResolver` must call `createVcsActorResolver()` instead of constructing a specific implementation (e.g. `new GitActorResolver()`). The auto-detect chain (git → hg → svn → null) ensures the correct implementation is selected based on the project's actual VCS.
+
+    The same applies to any factory that needs a `VcsAdapter` — it must call `createVcsAdapter()`.

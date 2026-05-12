@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'AST structures are unchanged; this change only strengthens behavior verification across markdown, JSON, and YAML node types and operations.'

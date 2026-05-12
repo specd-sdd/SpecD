@@ -1,0 +1,4 @@
+releases:
+  core:core/schema-format: minor
+  core:core/transition-change: patch
+  cli:cli/change-status: minor

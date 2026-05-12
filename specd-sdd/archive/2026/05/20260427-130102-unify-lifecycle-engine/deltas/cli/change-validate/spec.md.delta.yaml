@@ -1,0 +1,45 @@
+# Delta: cli:change-validate
+
+- op: modified
+  description: 'Clarify that dependency-block wording is projected from core lifecycle interpretation without removing existing output-shape guarantees.'
+  selector:
+    type: section
+    matches: 'Requirement: Output on failure'
+  content: |
+    In `text` mode, the command prints each failure to stdout, exits with code 1, and includes any expected file paths that could not be validated.
+    For spec-scoped validation targets, it also prints a merged-preview hint:
+
+    ```text
+    validation failed <name>/<workspace:capability-path>:
+      missing: <path>
+        error: <artifactId> — <description>
+        ...
+        note: <artifactId> — <description>
+        ...
+      note: inspect merged spec output with `specd changes spec-preview <name> <workspace:capability-path>`
+    ```
+
+    When validation targets a spec-scoped artifact via `--artifact <artifactId>`, the preview hint SHOULD include the same artifact filter:
+
+    ```text
+    note: inspect merged spec output with `specd changes spec-preview <name> <workspace:capability-path> --artifact <artifactId>`
+    ```
+
+    For change-scoped validation targets, no preview hint is emitted.
+
+    Missing path lines MUST be derived from `ValidateArtifacts` result metadata. For an existing spec with a delta-capable artifact, this path is the expected `deltas/.../*.delta.yaml` file, even if a direct `specs/...` file exists.
+
+    For dependency-blocked failures, `<description>` MUST be rendered exactly from the core validation failure entry and therefore MUST preserve dependency status context. Because core dependency interpretation is lifecycle-engine-driven, the CLI MUST surface that wording verbatim instead of replacing it with generic "incomplete dependency" wording or recomputing blocker semantics locally.
+
+    In `json` or `toon` mode:
+
+    ```json
+    {
+      "passed": false,
+      "failures": [{ "artifactId": "...", "description": "...", "filename": "..." }],
+      "notes": [],
+      "files": [{ "artifactId": "...", "key": "...", "filename": "...", "status": "missing" }]
+    }
+    ```
+
+    The process exits with code 1 when `passed` is `false`, regardless of format.

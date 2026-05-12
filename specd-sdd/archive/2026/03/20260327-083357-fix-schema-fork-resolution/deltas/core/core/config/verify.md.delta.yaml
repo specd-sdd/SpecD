@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'The Workspaces requirement verification scenarios test the workspace structure broadly — the specific default schemasPath value (.specd/schemas vs specd/schemas) is covered by the config loader unit tests, not by spec-level scenarios'

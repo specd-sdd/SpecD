@@ -1,0 +1,16 @@
+- op: modified
+  selector:
+    type: section
+    matches: '^Requirement: Graceful degradation when schema resolution fails$'
+  content: |
+    If `SchemaProvider.get()` throws, the `lifecycle` object MUST still be present with degraded values:
+
+    - `validTransitions` MUST be populated normally (it is a static lookup, independent of schema)
+    - `availableTransitions` MUST be an empty array
+    - `blockers` MUST be an empty array
+    - `approvals` MUST be populated normally (it is injected config, independent of schema)
+    - `nextArtifact` MUST be `null`
+    - `changePath` MUST be populated normally
+    - `schemaInfo` MUST be `null`
+
+    The use case MUST NOT throw when schema resolution fails — it degrades the lifecycle fields silently. It MUST wrap the `SchemaProvider.get()` call in a `try/catch` to achieve this.

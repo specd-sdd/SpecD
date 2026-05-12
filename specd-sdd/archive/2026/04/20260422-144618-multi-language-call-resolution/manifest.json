@@ -1,0 +1,860 @@
+{
+  "name": "multi-language-call-resolution",
+  "createdAt": "2026-04-22T14:46:18.411Z",
+  "description": "Implements issues 52 and 54 by extending code-graph dependency resolution across the current built-in language adapters with deterministic binding/call facts, shared scoped resolution, and first-class USES_TYPE / CONSTRUCTS relations. The change also removes noisy self-relations and updates graph impact CLI/docs/skills to prefer the clearer dependents / dependencies direction aliases while preserving upstream / downstream compatibility.",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "code-graph:code-graph/language-adapter",
+    "code-graph:code-graph/indexer",
+    "code-graph:code-graph/symbol-model",
+    "cli:cli/graph-impact",
+    "skills:skill-templates-source",
+    "default:_global/docs"
+  ],
+  "specDependsOn": {
+    "code-graph:code-graph/symbol-model": ["default:_global/conventions"],
+    "code-graph:code-graph/language-adapter": ["code-graph:code-graph/symbol-model"],
+    "code-graph:code-graph/indexer": [
+      "code-graph:code-graph/graph-store",
+      "code-graph:code-graph/language-adapter",
+      "code-graph:code-graph/symbol-model",
+      "code-graph:code-graph/workspace-integration",
+      "core:core/config"
+    ],
+    "cli:cli/graph-impact": [
+      "cli:cli/entrypoint",
+      "core:core/config",
+      "code-graph:code-graph/composition",
+      "code-graph:code-graph/traversal"
+    ],
+    "skills:skill-templates-source": ["skills:skill"]
+  },
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:1de66641f7eda0944bd76a72e930e90cdf7511c36a4dfd5726085465bc913230"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "code-graph:code-graph/language-adapter",
+          "filename": "deltas/code-graph/code-graph/language-adapter/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:65aa7d89db59ff2e0c5ae50ec0c77be59d87ca2b643b434ae8bb184863ae508d"
+        },
+        {
+          "key": "code-graph:code-graph/indexer",
+          "filename": "deltas/code-graph/code-graph/indexer/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:b8155f72da8a849ee856de720a9c045dfbf7b54c73c15ae4c7868284afa71f10"
+        },
+        {
+          "key": "code-graph:code-graph/symbol-model",
+          "filename": "deltas/code-graph/code-graph/symbol-model/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:0f6bc5239fefc0ea704f7d7603896f36f10b956e7a83b9819df7a00b028e181b"
+        },
+        {
+          "key": "cli:cli/graph-impact",
+          "filename": "deltas/cli/cli/graph-impact/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:5706e63280a6ac4ef7efd7d73d8040ba7b49e234c96b93c8fda35d1e555ff51a"
+        },
+        {
+          "key": "skills:skill-templates-source",
+          "filename": "deltas/skills/skill-templates-source/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:ad08559e8d004464d75798b301ba0225fc662cf5796fcd9dcaaeab765dea07e3"
+        },
+        {
+          "key": "default:_global/docs",
+          "filename": "deltas/default/_global/docs/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:549b8f16ea5647363d04e194b6c84ba79f08f26cb552bc4afcbfba7a51b6ca95"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "code-graph:code-graph/language-adapter",
+          "filename": "deltas/code-graph/code-graph/language-adapter/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:84e16423b247d2c7dd9460a187ec369aba004120d787cf776e4a0e56c6e79918"
+        },
+        {
+          "key": "code-graph:code-graph/indexer",
+          "filename": "deltas/code-graph/code-graph/indexer/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:bd18dfd9fbb0af41d5daccd8a2f391671db922150ffac5ce5e05d29154e1a474"
+        },
+        {
+          "key": "code-graph:code-graph/symbol-model",
+          "filename": "deltas/code-graph/code-graph/symbol-model/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:eddde028cbe6c0838ffaa40f157da567ca9ae67ceda9434fc382d27e95bfa216"
+        },
+        {
+          "key": "cli:cli/graph-impact",
+          "filename": "deltas/cli/cli/graph-impact/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:213aac1b80741f4fbcb2b167d08136d74361f1585f9477940e042d07383d02c4"
+        },
+        {
+          "key": "skills:skill-templates-source",
+          "filename": "deltas/skills/skill-templates-source/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:d9c37a526ed39722573f78dfd813c83225f53eb9929403b7c780945950b693da"
+        },
+        {
+          "key": "default:_global/docs",
+          "filename": "deltas/default/_global/docs/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:324abf48fb74b73a6c68cef89b02d2e32a4013fc786be499b7f8a4d6221a7ada"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:16f373eadc49f5ce32e232d66242813bb8d8093ec6fb90a74f969c5cd0f964a7"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:ebce13bee21122ddaf703093ebd48730ba70544324af3d8cc706a6dfb9941b20"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-04-22T14:46:18.411Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "specIds": [
+        "code-graph:code-graph/language-adapter",
+        "code-graph:code-graph/indexer",
+        "code-graph:code-graph/symbol-model"
+      ],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-22T14:46:18.425Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:code-graph/language-adapter"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:code-graph/indexer"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:code-graph/symbol-model"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:code-graph/language-adapter"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:code-graph/indexer"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:code-graph/symbol-model"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-22T14:53:15.823Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-22T15:17:26.195Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-22T16:35:23.833Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [code-graph:code-graph/symbol-model]; verify [code-graph:code-graph/symbol-model]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:code-graph/symbol-model"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:code-graph/symbol-model"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-22T20:22:45.156Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]; specs [code-graph:code-graph/indexer, code-graph:code-graph/language-adapter, code-graph:code-graph/symbol-model]; verify [code-graph:code-graph/indexer, code-graph:code-graph/language-adapter, code-graph:code-graph/symbol-model]; design [design]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:code-graph/indexer",
+            "code-graph:code-graph/language-adapter",
+            "code-graph:code-graph/symbol-model"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:code-graph/indexer",
+            "code-graph:code-graph/language-adapter",
+            "code-graph:code-graph/symbol-model"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-22T20:30:59.231Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-22T20:32:05.474Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-23T05:01:51.363Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:code-graph/language-adapter",
+            "code-graph:code-graph/indexer",
+            "code-graph:code-graph/symbol-model"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:code-graph/language-adapter",
+            "code-graph:code-graph/indexer",
+            "code-graph:code-graph/symbol-model"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-23T05:01:51.363Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-23T05:02:44.888Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-23T05:06:55.003Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:code-graph/language-adapter",
+            "code-graph:code-graph/indexer",
+            "code-graph:code-graph/symbol-model"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:code-graph/language-adapter",
+            "code-graph:code-graph/indexer",
+            "code-graph:code-graph/symbol-model"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-23T05:06:55.003Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "cli:cli/graph-impact"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/graph-impact"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-23T05:07:00.811Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:code-graph/language-adapter",
+            "code-graph:code-graph/indexer",
+            "code-graph:code-graph/symbol-model",
+            "cli:cli/graph-impact"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:code-graph/language-adapter",
+            "code-graph:code-graph/indexer",
+            "code-graph:code-graph/symbol-model",
+            "cli:cli/graph-impact"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-23T05:07:00.811Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "skills:skill-templates-source"
+        },
+        {
+          "type": "verify",
+          "key": "skills:skill-templates-source"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-23T05:13:50.961Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:code-graph/language-adapter",
+            "code-graph:code-graph/indexer",
+            "code-graph:code-graph/symbol-model",
+            "cli:cli/graph-impact",
+            "skills:skill-templates-source"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:code-graph/language-adapter",
+            "code-graph:code-graph/indexer",
+            "code-graph:code-graph/symbol-model",
+            "cli:cli/graph-impact",
+            "skills:skill-templates-source"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-23T05:13:50.961Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "default:_global/docs"
+        },
+        {
+          "type": "verify",
+          "key": "default:_global/docs"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-23T05:18:33.941Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-23T05:20:07.528Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-23T05:23:23.257Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:code-graph/language-adapter",
+            "code-graph:code-graph/indexer",
+            "code-graph:code-graph/symbol-model",
+            "cli:cli/graph-impact",
+            "skills:skill-templates-source",
+            "default:_global/docs"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:code-graph/language-adapter",
+            "code-graph:code-graph/indexer",
+            "code-graph:code-graph/symbol-model",
+            "cli:cli/graph-impact",
+            "skills:skill-templates-source",
+            "default:_global/docs"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-23T05:23:23.257Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-23T05:25:38.939Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-23T07:08:03.132Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-23T07:20:02.765Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-23T10:25:51.467Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-23T10:29:20.257Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-23T10:29:52.013Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-23T11:07:37.601Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:code-graph/language-adapter",
+            "code-graph:code-graph/indexer",
+            "code-graph:code-graph/symbol-model",
+            "cli:cli/graph-impact",
+            "skills:skill-templates-source",
+            "default:_global/docs"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:code-graph/language-adapter",
+            "code-graph:code-graph/indexer",
+            "code-graph:code-graph/symbol-model",
+            "cli:cli/graph-impact",
+            "skills:skill-templates-source",
+            "default:_global/docs"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-23T11:07:37.601Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "archivable",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-23T11:10:17.683Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-23T11:29:02.116Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-23T15:22:06.921Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-23T15:27:40.882Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-23T15:30:18.284Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-23T15:30:36.191Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "description-updated",
+      "at": "2026-04-24T06:45:39.681Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "description": "Implements issues 52 and 54 by extending code-graph dependency resolution across the current built-in language adapters with deterministic binding/call facts, shared scoped resolution, and first-class USES_TYPE / CONSTRUCTS relations. The change also removes noisy self-relations and updates graph impact CLI/docs/skills to prefer the clearer dependents / dependencies direction aliases while preserving upstream / downstream compatibility."
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-24T06:46:29.950Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-04-24T06:46:30.217Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "m***a@g***.com"
+  }
+}

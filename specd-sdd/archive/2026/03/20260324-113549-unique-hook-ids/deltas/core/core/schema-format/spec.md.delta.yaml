@@ -1,0 +1,25 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Array entry identity'
+  content: |
+    Every entry in the following schema arrays must carry an `id` field:
+
+    - `workflow[].hooks.pre[]` and `workflow[].hooks.post[]`
+    - `artifacts[].validations[]`
+    - `artifacts[].deltaValidations[]`
+    - `artifacts[].rules.pre[]` and `artifacts[].rules.post[]`
+    - `artifacts[].preHashCleanup[]`
+    - `metadataExtraction` array entries (entries in `rules[]`, `constraints[]`, `scenarios[]`, `context[]`)
+
+    Format: `^[a-z][a-z0-9]*(-[a-z0-9]+)*$`, 1–64 characters.
+
+    **For hooks:** IDs must be globally unique across ALL workflow steps. No two hooks in any workflow step may share the same ID, regardless of whether they are in pre or post arrays.
+
+    **For all other array entries:** IDs must be unique within their immediate array.
+
+    Duplicate IDs within the same array (or for hooks, duplicate IDs across any workflow step) produce a `SchemaValidationError`.
+
+    Workflow steps use `step` as their identity field instead of `id`. Artifact entries use their existing `id` field.
+
+    Single-entry metadata fields (`title`, `description`, `dependsOn`, `keywords`) do not have `id` — they are scalars, not array entries.

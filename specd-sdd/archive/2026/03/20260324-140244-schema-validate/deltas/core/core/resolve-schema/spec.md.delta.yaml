@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'Active mode uses ResolveSchema as-is — no spec changes needed'

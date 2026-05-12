@@ -1,0 +1,101 @@
+- op: added
+  description: 'Require validation to resolve and use the exact expected file path.'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Per-file validation'
+  content: |
+    ### Requirement: Expected file path validation
+
+    Before validating a file for a spec-scoped artifact, `ValidateArtifacts` MUST determine the artifact's expected change-directory path using the target spec's existence and the schema artifact's delta capability.
+
+    For an existing spec with a delta-capable artifact, the expected path is `deltas/<workspace>/<capability-path>/<artifact-filename>.delta.yaml`. `ValidateArtifacts` MUST validate that delta file and MUST NOT accept a direct artifact file at `specs/<workspace>/<capability-path>/<artifact-filename>` as a fallback.
+
+    For a new spec, the expected path is `specs/<workspace>/<capability-path>/<artifact-filename>`. In that case `ValidateArtifacts` MUST validate the direct artifact file and MUST NOT require a delta.
+
+    For change-scoped artifacts, the expected path remains the artifact output basename at the change directory root.
+
+    If the expected file does not exist and the artifact is not optional, validation MUST record a failure that includes the expected file path. The file MUST NOT be marked complete.
+
+- op: modified
+  description: 'Clarify missing-file behavior now that validation has one expected path.'
+  selector:
+    type: section
+    matches: 'Requirement: Per-file validation'
+  content: |
+    If the expected artifact file does not exist in the change directory and the artifact is not optional, validation MUST record a failure before skipping. Only optional artifacts may be silently skipped when their expected file is missing.
+
+    For spec-scoped artifacts, the expected file is determined by `Requirement: Expected file path validation`. A file at the non-expected location MUST NOT satisfy this check.
+
+- op: modified
+  description: 'Make delta application conditional on the expected delta path, not fallback discovery.'
+  selector:
+    type: section
+    matches: 'Requirement: Delta application preview and conflict detection'
+  content: |
+    For artifacts with `delta: true` and an existing base spec in `SpecRepository`:
+
+    1. Load the base artifact file from `SpecRepository` using the spec path and artifact filename.
+    2. Load the expected delta file from the change directory at `deltas/<workspace>/<capability-path>/<filename>.delta.yaml`.
+    3. Resolve the `ArtifactParser` adapter for `artifact.format`.
+    4. Call `parser.parse(baseContent)` to produce the base AST.
+    5. Call `parser.apply(baseAST, deltaEntries)` to produce the merged AST.
+    6. If `apply` throws `DeltaApplicationError`, record it as a validation failure and do not proceed to `validations[]` or `markComplete`.
+
+    **No-op bypass:** When the expected delta contains only `no-op` entries, steps 1–6 are skipped entirely. The delta application preview is not needed because `no-op` produces no changes. `ValidateArtifacts` proceeds directly to hash computation on the raw delta file content.
+
+    The merged AST (from `parser.serialize(mergedAST)`) is used for `validations[]` checks. The base spec in `SpecRepository` is **not modified** — archive is the step that writes the merged content.
+
+    For new files being created in the change, `ValidateArtifacts` validates the expected direct artifact file under `specs/<workspace>/<capability-path>/<filename>` against `validations[]`.
+
+- op: modified
+  description: 'Add structured path detail to validation results.'
+  selector:
+    type: section
+    matches: 'Requirement: Result shape'
+  content: |
+    `ValidateArtifacts.execute` must return a result object — it must not throw for validation failures. The result must include:
+
+    - `passed: boolean` — `true` only if all required artifacts are present and all validations pass with no errors
+    - `failures: ValidationFailure[]` — one entry per failed rule, missing artifact, or `DeltaApplicationError`
+    - `warnings: ValidationWarning[]` — one entry per `required: false` rule that was absent
+    - `files: ValidationFileResult[]` — one entry per artifact file considered by validation, including `artifactId`, `key`, `filename`, and whether the file was validated, skipped, or missing
+
+    Each `ValidationFailure` must include the artifact ID, the rule or error description, and enough context for the CLI to produce a useful error message. Missing-file failures MUST include the expected `filename`.
+
+    `ValidationFileResult.filename` MUST be the expected path used by validation. It MUST NOT report an alternate file path that was present but intentionally ignored.
+
+- op: modified
+  description: 'Replace fallback constraint with the strict expected-path constraint.'
+  selector:
+    type: section
+    matches: 'Constraints'
+  content: |
+    - `ValidateArtifacts` is the **only** code path that may call `Artifact.markComplete(hash)` — enforced by convention and test coverage
+    - The merged spec is never written to `SpecRepository` during validate — only during `ArchiveChange`
+    - `change.invalidate('artifact-change', actor)` is called at most once per `execute` invocation, even if multiple artifacts have changed
+    - `deltaValidations` evaluate rules against the normalized YAML AST of the delta file; `validations` evaluate rules against the normalized artifact AST; both use the same rule evaluation algorithm
+    - `validations` run against the merged artifact content (or direct content for non-delta artifacts)
+    - `preHashCleanup` substitutions are applied only for hash computation, never to the actual file content on disk
+    - A missing `deltaValidations[]` is not an error — the step is skipped
+    - A missing `validations[]` is not an error — the step is skipped
+    - A missing expected delta file for an existing spec with a `delta: true` artifact is a validation failure; direct files under `specs/...` are valid only for new specs or non-delta artifacts
+
+- op: modified
+  description: 'Add manifest/layout dependencies introduced by strict path validation.'
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`core:core/change`](../change/spec.md) — change entity, approval invalidation, and artifact state
+    - [`core:core/change-layout`](../change-layout/spec.md) — expected file paths for new spec artifacts and delta artifacts
+    - [`core:core/change-manifest`](../change-manifest/spec.md) — persisted artifact filenames used by validation
+    - [`core:core/schema-format`](../schema-format/spec.md) — artifact definition, validations, delta behavior, and pre-hash cleanup
+    - [`core:core/delta-format`](../delta-format/spec.md) — parser contract and delta application errors
+    - [`core:core/selector-model`](../selector-model/spec.md) — selector rules for validations and delta validations
+    - [`core:core/storage`](../storage/spec.md) — validation as the only path to `complete`
+    - [`default:_global/architecture`](../../_global/architecture/spec.md) — port-per-workspace and manual DI constraints
+    - [`core:core/spec-id-format`](../spec-id-format/spec.md) — canonical spec ID format for spec-scoped artifacts

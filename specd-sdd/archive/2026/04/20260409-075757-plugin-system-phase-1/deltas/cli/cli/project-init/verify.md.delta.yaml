@@ -1,0 +1,29 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Command signature'
+  content: |
+    #### Scenario: --plugin flag
+
+    - **WHEN** `specd project init --plugin @specd/plugin-agent-claude` is invoked
+    - **THEN** the plugin is selected for installation
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Interactive mode'
+  content: |
+    #### Scenario: Plugin selection wizard
+
+    - **GIVEN** interactive mode is active
+    - **WHEN** the user selects plugins
+    - **THEN** selected plugins are marked for installation
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Skills installation after init'
+  content: |
+    #### Scenario: Plugins are installed for selected plugins after init
+
+    - **WHEN** `specd project init --plugin @specd/plugin-agent-claude` is run
+    - **THEN** each plugin's `install()` method is called
+    - **AND** `specd.yaml` records the plugin under `plugins.agents`

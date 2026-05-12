@@ -1,0 +1,98 @@
+- op: modified
+  description: 'Update change status text output with DAG, Blockers, and Next Action'
+  selector:
+    type: section
+    matches: 'Requirement: Output format'
+  content: |
+    In `text` mode (default), the command prints a structured summary to stdout:
+
+    ```
+    change:      <name>
+    state:       <state>
+    specs:       <specId>, <specId>, ...
+    description: <description>            ← only if set
+
+    artifacts (DAG):                      ← ASCII tree rendering
+      [✓] complete  [ ] missing  [!] drifted  [~] needs review  [?] in-progress
+
+      [~] proposal [scope: change]
+      └─ [~] specs [scope: spec]
+         ├─ [~] verify [scope: spec]
+         │  └─ [~] design [scope: change]
+         │     └─ [!] tasks [scope: change]
+
+    blockers:                             ← High-visibility section for errors
+      ! <CODE>: <message>
+      ...
+
+    next action:                          ← Direct recommendation
+      target:  <targetStep>
+      command: <command>
+      reason:  <reason>
+
+    lifecycle:
+      transitions:  <available1>, <available2>, ...    ← only availableTransitions
+      next artifact: <artifactId>                      ← omitted when null
+      approvals:     spec=on|off  signoff=on|off
+      path:          <changePath>
+
+    review:
+      required:  yes|no
+      route:     designing
+      reason:    artifact-drift|artifact-review-required|spec-overlap-conflict
+      overlap:                                         ← only when reason is spec-overlap-conflict
+        - archived: <name1>, specs: <specId1>, <specId2>
+        - archived: <name2>, specs: <specId3>
+      affected:
+        <artifact-type>:
+          - <absolute-path>
+          - <absolute-path>
+
+    artifacts (details):                  ← Detailed file list
+      <type>  <state>
+        <file-key>  <file-state>  <filename>
+      ...
+    ```
+
+    The `artifacts (DAG):` section renders an ASCII tree of the artifact dependency hierarchy. Each node MUST include a status symbol from the legend and an explicit `[scope: change]` or `[scope: spec]` label. The legend MUST be printed at the top of the DAG.
+
+    The status symbols map to aggregate artifact states:
+    - `[✓]` -> `complete` or `skipped`
+    - `[ ]` -> `missing`
+    - `[!]` -> `drifted-pending-review`
+    - `[~]` -> `pending-review` or `pending-parent-artifact-review`
+    - `[?]` -> `in-progress`
+
+    The `blockers:` section is a high-visibility list of the `blockers` array returned by `GetStatus`. It lists every blocker code and its descriptive message. This section is omitted when there are no blockers.
+
+    The `next action:` section presents the `nextAction` object from `GetStatus`. The `command:` line uses formatting that highlights the command for easy copy-pasting. This section is always present.
+
+    The `artifacts (details):` section provides the granular file-level statuses.
+
+    In `json` or `toon` mode, the output includes the `blockers`, `nextAction`, and `artifactDag` fields:
+
+    ```json
+    {
+      "name": "...",
+      "state": "...",
+      "blockers": [
+        { "code": "...", "message": "..." }
+      ],
+      "nextAction": {
+        "targetStep": "...",
+        "actionType": "...",
+        "reason": "...",
+        "command": "..."
+      },
+      "artifactDag": [
+        {
+          "id": "...",
+          "scope": "change|spec",
+          "state": "...",
+          "requires": ["..."],
+          "children": ["..."]
+        }
+      ],
+      ...
+    }
+    ```

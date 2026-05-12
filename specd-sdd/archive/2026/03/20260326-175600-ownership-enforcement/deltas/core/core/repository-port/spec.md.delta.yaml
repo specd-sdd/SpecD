@@ -1,0 +1,29 @@
+- op: added
+  description: 'Add ReadOnlyWorkspaceError requirement — shared error class for all ownership enforcement points'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Subclass contract'
+  content: |
+    ### Requirement: ReadOnlyWorkspaceError
+
+    `Repository` MUST export a `ReadOnlyWorkspaceError` class for use by subclasses and use cases that enforce `readOnly` ownership. The error MUST extend the project's base `DomainError` class.
+
+    The constructor MUST accept a `message` string. Callers construct the message with context appropriate to the enforcement point (spec ID, workspace name, operation type). The error class itself does not format messages — it is a marker type that consumers can catch or inspect.
+
+    `ReadOnlyWorkspaceError` is a domain error because ownership is a domain concept — it represents a violated invariant, not an I/O failure or a user input error.
+
+- op: modified
+  description: 'Add ReadOnlyWorkspaceError constraint'
+  selector:
+    type: section
+    matches: 'Constraints'
+  content: |
+    - Repository defines no storage operations — it is purely a construction and accessor base
+    - All three accessors are explicit methods, not property signatures (per architecture spec)
+    - Backing fields are private to Repository — subclasses cannot access them directly
+    - RepositoryConfig is a plain interface, not a class
+    - ReadOnlyWorkspaceError extends DomainError and is exported from the repository-port module

@@ -1,0 +1,112 @@
+# Delta: core:transition-change
+
+- op: modified
+  description: 'Clarify that TransitionChange delegates lifecycle interpretation to LifecycleEngine while preserving existing workflow semantics.'
+  selector:
+    type: section
+    matches: 'Purpose'
+  content: |
+    Changes must advance through a strict lifecycle, and the rules for doing so — approval gates, task completion checks, validation clearing, requires enforcement, and hook execution — are too complex for callers to enforce ad-hoc. The `TransitionChange` use case centralises lifecycle state transitions, delegating schema-aware lifecycle interpretation (approval-gate routing, workflow requires evaluation, recursive blocking, and task gating) to `LifecycleEngine` while still owning hook execution, redesign invalidation, and persistence of the final transitioned state.
+
+- op: modified
+  description: 'Preserve spec approval routing behavior while making LifecycleEngine the authority.'
+  selector:
+    type: section
+    matches: 'Requirement: Approval-gate routing for spec approval'
+  content: |
+    When the change is in `ready` state, the requested target is `implementing`, and `approvalsSpec` is `true`, the use case MUST route the transition to `pending-spec-approval` instead of `implementing`.
+
+    The routing decision SHALL be interpreted through `LifecycleEngine` so that approval-gate behavior is derived in the same place as workflow blocking and step availability.
+
+- op: modified
+  description: 'Preserve signoff routing behavior while making LifecycleEngine the authority.'
+  selector:
+    type: section
+    matches: 'Requirement: Approval-gate routing for signoff'
+  content: |
+    When the change is in `done` state, the requested target is `archivable`, and `approvalsSignoff` is `true`, the use case MUST route the transition to `pending-signoff` instead of `archivable`.
+
+    The routing decision SHALL be interpreted through `LifecycleEngine` so that signoff-gate behavior is derived in the same place as workflow blocking and step availability.
+
+- op: modified
+  description: 'Preserve requires enforcement details while delegating effective-status interpretation to LifecycleEngine.'
+  selector:
+    type: section
+    matches: 'Requirement: Workflow requires enforcement'
+  content: |
+    After resolving the effective target, the use case MUST obtain the active schema via `SchemaProvider` and look up the workflow step for the effective target via `schema.workflowStep(effectiveTarget)`. If the step declares a non-empty `requires` array, the use case MUST check each required artifact through `LifecycleEngine` rather than deriving dependency-aware effective status from `Change` directly. If any required artifact has an effective status other than `complete` or `skipped`, the use case MUST throw `InvalidStateTransitionError` with a structured reason explaining the block.
+
+    The error reason MUST include:
+
+    - `type`: `'incomplete-artifact'`
+    - `artifactId`: The ID of the blocking artifact.
+    - `status`: The artifact's current effective status (e.g. `'drifted-pending-review'`, `'pending-parent-artifact-review'`).
+    - `blockedBy`: (Optional) If the status is `'pending-parent-artifact-review'`, this MUST include the ID and status of the first upstream parent in the DAG that is causing the recursive block.
+
+    If no workflow step exists for the effective target (the schema does not declare one), or the schema cannot be resolved, the requires check is skipped.
+
+    The use case MUST emit a `requires-check` progress event per artifact checked, reporting whether the requirement was satisfied.
+
+- op: modified
+  description: 'Preserve task completion behavior while making LifecycleEngine the lifecycle authority.'
+  selector:
+    type: section
+    matches: 'Requirement: Task completion check during requires enforcement'
+  content: |
+    After workflow requires enforcement passes, if the target workflow step declares a non-empty `requiresTaskCompletion` array, the use case MUST check each listed artifact for incomplete task items:
+
+    1. Look up the `ArtifactType` from the schema.
+    2. **Defensive Check**: If the `ArtifactType` has `hasTasks: false`, the use case MUST throw `InvalidStateTransitionError` with reason `missing-task-capability`. This represents an invariant violation where a completion-gated step references an artifact that does not support tasks.
+    3. If `hasTasks: true`, proceed with content check.
+    4. Get the `ChangeArtifact` via `change.getArtifact(artifactId)`. If it does not exist, skip it.
+    5. Iterate the artifact's `files` map. For each `ArtifactFile`, load the file content via `ChangeRepository.artifact(change, file.filename)`.
+    6. If the file does not exist (returns `null`), skip it.
+    7. Use standard markdown checkbox patterns if `taskCompletionCheck` patterns are omitted in the schema:
+       - `incompletePattern`: `^\s*-\s+\[ \]`
+       - `completePattern`: `^\s*-\s+\[x\]`
+    8. Compile the patterns using `safeRegex` with the `'gm'` flags.
+    9. If the incomplete regex matches any line in the file content, throw `InvalidStateTransitionError` with reason `incomplete-tasks`, including the artifact ID and counts.
+
+    The target step and the set of completion-gated artifacts SHALL be interpreted in the same lifecycle decision flow as approval routing and requires enforcement. `TransitionChange` MAY ask `LifecycleEngine` to resolve that lifecycle decision context first, but content inspection of task artifacts remains the responsibility of this use case.
+
+    Only artifacts listed in `requiresTaskCompletion` are content-checked. When `requiresTaskCompletion` is absent or empty, no task completion gating applies.
+
+- op: modified
+  description: 'Inject LifecycleEngine as a dependency without removing existing responsibilities.'
+  selector:
+    type: section
+    matches: 'Requirement: Dependencies'
+  content: |
+    `TransitionChange` depends on the following ports injected via constructor:
+
+    - `ChangeRepository` — for loading, artifact content access, and persistence
+    - `ActorResolver` — for resolving the current actor identity
+    - `SchemaProvider` — for obtaining the fully-resolved active schema to look up workflow steps and requires
+    - `LifecycleEngine` — for authoritative schema-aware lifecycle routing, dependency interpretation, and blocker resolution
+    - `RunStepHooks` — for executing `run:` hooks at step boundaries
+
+- op: modified
+  description: 'Update constraints to remove Change-owned effective-status interpretation.'
+  selector:
+    type: section
+    matches: 'Constraints'
+  content: |
+    - The use case MUST NOT bypass the Change entity's transition validation — it only resolves the effective target and delegates
+    - Task completion checks are controlled by `requiresTaskCompletion` on the workflow step — only listed artifacts are content-checked
+    - Task completion checks use `safeRegex` to compile patterns; patterns that fail compilation or contain nested quantifiers are treated as non-matching (no error thrown)
+    - `InvalidStateTransitionError` carries a structured `reason` field: `'incomplete-artifact'`, `'incomplete-tasks'`, `'missing-task-capability'`, `'invalid-transition'`, or `'approval-required'`
+    - Approval-gate routing is purely input-driven, but its interpretation is centralized through `LifecycleEngine`
+    - Pre-hook failure aborts the transition — no state change occurs
+    - Post-hook failure aborts the transition — no state change occurs (both phases are fail-fast)
+    - When schema resolution fails or no workflow step exists for the target, requires and hooks are skipped gracefully
+    - Artifact validation clearing on `verifying → implementing` reads the `implementing` step's `requires` from the schema — the caller does not supply them
+    - A `designing → designing` transition MUST NOT trigger approval invalidation or artifact downgrade — it is a state-preserving transition that only re-enters the same step
+
+- op: added
+  description: 'Add LifecycleEngine to spec dependencies.'
+  position:
+    parent:
+      type: section
+      matches: 'Spec Dependencies'
+  content: |
+    - [`core:lifecycle-engine`](../lifecycle-engine/spec.md) — authoritative lifecycle routing and dependency interpretation used before hook execution and persistence

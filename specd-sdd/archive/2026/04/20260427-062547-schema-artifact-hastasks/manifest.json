@@ -1,0 +1,425 @@
+{
+  "name": "schema-artifact-hastasks",
+  "createdAt": "2026-04-27T06:25:47.908Z",
+  "description": "Introduced an explicit hasTasks boolean field to artifact definitions in the schema as a master switch for task tracking. Implemented semantic validation at schema load and defensive runtime checks in TransitionChange to ensure requiresTaskCompletion consistency, while providing default markdown checkbox patterns when enabled.",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": ["core:core/schema-format", "cli:cli/change-status", "core:core/transition-change"],
+  "specDependsOn": {
+    "core:core/schema-format": [
+      "core:core/delta-format",
+      "core:core/selector-model",
+      "core:core/content-extraction",
+      "core:core/schema-merge"
+    ],
+    "cli:cli/change-status": ["cli:cli/entrypoint", "core:core/change", "core:core/get-status"],
+    "core:core/transition-change": [
+      "core:core/change",
+      "core:core/run-step-hooks",
+      "core:core/hook-execution-model",
+      "core:core/workflow-model",
+      "default:_global/architecture"
+    ]
+  },
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:6e2ef7ecc99fc0a6790f461e1b2a17fc7ce4f2772790afe241f39a1090a2927d"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:core/schema-format",
+          "filename": "deltas/core/core/schema-format/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:550bb016a945a3b68ee42fdbbbd6e801c4a5a9e743e11d3b98bc2ca69baee197"
+        },
+        {
+          "key": "cli:cli/change-status",
+          "filename": "deltas/cli/cli/change-status/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:ee9afab5fc898cf5dfcbb6a8e939424f92867574e26b88aa70e0d952f9294c83"
+        },
+        {
+          "key": "core:core/transition-change",
+          "filename": "deltas/core/core/transition-change/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:472c55c20f98a7ededfe8b9a94dc06b99e7a374ba1299c7e71aedc5be9b4e843"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:core/schema-format",
+          "filename": "deltas/core/core/schema-format/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:d17acf022f54e06be7f2d400279f56e1954cafd298b53fbfe48ab0677d5886b2"
+        },
+        {
+          "key": "cli:cli/change-status",
+          "filename": "deltas/cli/cli/change-status/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:f43caf8b64f3c47cf1a38b612bd9de4c53cd8467d1c500a991a6c87bbe95023b"
+        },
+        {
+          "key": "core:core/transition-change",
+          "filename": "deltas/core/core/transition-change/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:6346d6f825b0790bf4076f95b9f23ce734fe962544aa6e7a56ed94094efc8ca4"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:946d10646e433a2df6d4adb6e248e86881490ddd4d2cc9337d5d7334c4c291b9"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:82689ed2a45181cacd7c8894d73c8ada884a69b05b3854c086e52908ba16d9d4"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-04-27T06:25:47.908Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "specIds": ["core:core/schema-format", "cli:cli/change-status"],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-27T06:25:47.918Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/schema-format"
+        },
+        {
+          "type": "specs",
+          "key": "cli:cli/change-status"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/schema-format"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/change-status"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-27T06:27:15.560Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-27T06:34:43.600Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-27T06:47:12.991Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [core:core/schema-format]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:core/schema-format"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-27T07:17:07.084Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]; specs [core:core/schema-format]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["core:core/schema-format"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-27T07:28:22.739Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [core:core/schema-format]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:core/schema-format"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-27T08:08:10.984Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]; specs [core:core/schema-format]; verify [core:core/schema-format]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["core:core/schema-format"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:core/schema-format"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-27T08:25:15.142Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]; specs [cli:cli/change-status]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["cli:cli/change-status"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-27T08:25:15.170Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["core:core/schema-format", "cli:cli/change-status"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:core/schema-format", "cli:cli/change-status"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-27T08:25:15.170Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:core/transition-change"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/transition-change"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-27T08:37:23.115Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-27T08:37:50.538Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-27T09:05:51.922Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-27T09:06:29.807Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-27T09:06:40.049Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "description-updated",
+      "at": "2026-04-27T09:14:53.188Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "description": "Introduced an explicit hasTasks boolean field to artifact definitions in the schema as a master switch for task tracking. Implemented semantic validation at schema load and defensive runtime checks in TransitionChange to ensure requiresTaskCompletion consistency, while providing default markdown checkbox patterns when enabled."
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-27T09:17:45.732Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-04-27T09:17:45.963Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "m***a@g***.com"
+  }
+}

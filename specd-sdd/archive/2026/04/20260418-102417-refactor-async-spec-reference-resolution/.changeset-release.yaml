@@ -1,0 +1,4 @@
+releases:
+  core:core/content-extraction: patch
+  core:core/generate-metadata: patch
+  core:core/spec-repository-port: patch

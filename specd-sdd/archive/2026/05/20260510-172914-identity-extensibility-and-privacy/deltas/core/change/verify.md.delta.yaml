@@ -1,0 +1,45 @@
+- op: modified
+  description: 'Update the description update scenario to ensure it uses the full ActorIdentity'
+  selector:
+    type: section
+    matches: 'Requirement: History and event sourcing'
+  content: |
+    #### Scenario: History is append-only
+
+    - **WHEN** any operation is performed on a Change
+    - **THEN** new events are appended to history; no existing event is modified or removed
+
+    #### Scenario: Invalidated event records artifact drift details
+
+    - **GIVEN** two validated spec files drift in the same invalidation pass
+    - **WHEN** the change is invalidated for artifact drift
+    - **THEN** the `invalidated` event contains `cause: 'artifact-drift'`
+    - **AND** it includes a human-readable `message`
+    - **AND** `affectedArtifacts` records the artifact type and both file keys
+
+    #### Scenario: Scope change invalidation records spec-change cause
+
+    - **WHEN** `specIds` are edited after prior validation
+    - **THEN** the appended `invalidated` event uses `cause: 'spec-change'`
+
+    #### Scenario: Review-required invalidation remains distinguishable from drift
+
+    - **GIVEN** a change returns to `designing` because verification requires artifact review
+    - **WHEN** the invalidation event is appended
+    - `THEN` its `cause` is `artifact-review-required`
+    - `AND` it is distinct from `artifact-drift`
+
+    #### Scenario: Description update appends description-updated event
+
+    - **GIVEN** a Change with description "Original"
+    - **WHEN** `updateDescription("New description", actor)` is called
+    - **THEN** a `description-updated` event is appended to history
+    - **AND** the event contains `description: "New description"`
+    - **AND** the event contains `by` with the full `ActorIdentity`
+
+    #### Scenario: Description update does not append invalidated event
+
+    - **GIVEN** a Change in `spec-approved` state with active approval
+    - **WHEN** `updateDescription("New description", actor)` is called
+    - **THEN** no `invalidated` event is appended
+    - **AND** the change remains in `spec-approved` state

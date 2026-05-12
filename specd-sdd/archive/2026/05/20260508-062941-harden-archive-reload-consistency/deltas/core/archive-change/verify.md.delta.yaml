@@ -1,0 +1,105 @@
+- op: added
+  description: 'Verify archive uses the tracked artifact file instead of probing alternate paths'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Result shape$'
+  content: |
+    ### Requirement: Tracked artifact selection at archive time
+
+    #### Scenario: Tracked direct artifact wins over stray delta file
+
+    - **GIVEN** a change tracks `verify` for `core:new-capability` as `specs/core/core/new-capability/verify.md`
+    - **AND** an unrelated file also exists at `deltas/core/core/new-capability/verify.md.delta.yaml`
+    - **WHEN** `ArchiveChange.execute` prepares archive input for that artifact
+    - **THEN** it reads the tracked `specs/.../verify.md` file from the change
+    - **AND** it does not probe or apply the stray `deltas/...` file
+
+    #### Scenario: Missing tracked file fails even if an alternate path exists
+
+    - **GIVEN** a change tracks `verify` for `core:new-capability` as `specs/core/core/new-capability/verify.md`
+    - **AND** that tracked file is missing
+    - **AND** a file exists at `deltas/core/core/new-capability/verify.md.delta.yaml`
+    - **WHEN** `ArchiveChange.execute` prepares archive input for that artifact
+    - **THEN** archive fails because the tracked file is missing
+    - **AND** the alternate path does not satisfy the artifact
+
+- op: added
+  description: 'Verify archive computes all merges before writing permanent specs'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Tracked artifact selection at archive time$'
+  content: |
+    ### Requirement: Prepare archive plan before permanent writes
+
+    #### Scenario: Later artifact failure prevents all permanent writes
+
+    - **GIVEN** archive can compute merged output for `spec.md`
+    - **AND** a later artifact such as `verify.md` fails during tracked-file resolution or delta application
+    - **WHEN** `ArchiveChange.execute` prepares the archive plan
+    - **THEN** no permanent spec artifact is written
+    - **AND** the change remains pending archive from an external observer's point of view
+
+    #### Scenario: Delta base is checked during prepare phase
+
+    - **GIVEN** a tracked delta artifact requires an existing base artifact in the target spec repository
+    - **AND** that base artifact is missing
+    - **WHEN** `ArchiveChange.execute` prepares the archive plan
+    - **THEN** the archive fails before any permanent write begins
+
+- op: added
+  description: 'Verify staged archive commit semantics and failure visibility'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Prepare archive plan before permanent writes$'
+  content: |
+    ### Requirement: Staged archive commit and failed-attempt visibility
+
+    #### Scenario: Pre-commit failure records archive-failed and leaves no partial spec sync
+
+    - **GIVEN** archive execution has started
+    - **AND** a failure occurs before staged commit begins
+    - **WHEN** `ArchiveChange.execute` aborts
+    - **THEN** the active change history records an `archive-failed` event
+    - **AND** no spec repository shows a partially synced artifact
+
+    #### Scenario: Successful archive traces completion through archived record
+
+    - **GIVEN** the staged archive commit succeeds
+    - **WHEN** archive completes
+    - **THEN** success traceability comes from the archived manifest metadata such as `archivedAt` and `archivedBy`
+    - **AND** the active change history is not extended with a post-archive success event
+
+- op: added
+  description: 'Verify debug logging around archive preparation and staged commit'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Staged archive commit and failed-attempt visibility$'
+  content: |
+    ### Requirement: Archive debug logging
+
+    #### Scenario: Archive emits debug diagnostics for tracked selection and commit phases
+
+    - **WHEN** `ArchiveChange.execute` runs with debug logging enabled
+    - **THEN** debug logs cover tracked artifact selection, archive-plan preparation, staged commit start, and staged commit completion
+
+    #### Scenario: Archive failure emits debug diagnostics
+
+    - **GIVEN** archive fails during tracked artifact resolution, delta application, or staged commit
+    - **WHEN** the failure is reported
+    - **THEN** debug logs include the failure phase and the artifact being processed

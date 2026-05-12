@@ -1,0 +1,84 @@
+- op: modified
+  description: Update PreviewSpecResult and PreviewSpecFileEntry to include status
+  selector:
+    type: section
+    matches: 'Requirement: Result shape'
+  content: |
+    `PreviewSpec.execute` MUST return a `PreviewSpecResult`:
+
+    ```typescript
+    interface PreviewSpecFileEntry {
+      /** The artifact filename (e.g. `spec.md`, `verify.md`). */
+      readonly filename: string
+      /** The original base content (before delta application). `null` for new specs. */
+      readonly base: string | null
+      /** The merged content (after delta application). */
+      readonly merged: string
+      /** 
+       * The preview status of this file. 
+       * - 'merged': delta applied successfully with changes, or new spec file
+       * - 'no-op': delta applied but resulted in no changes to base content
+       * - 'missing': delta file or base artifact not found, or delta application failed
+       */
+      readonly status: 'merged' | 'no-op' | 'missing'
+    }
+
+    interface PreviewSpecResult {
+      /** The spec ID that was previewed. */
+      readonly specId: string
+      /** The change name. */
+      readonly changeName: string
+      /** Per-file preview entries, ordered per the artifact file ordering requirement. */
+      readonly files: readonly PreviewSpecFileEntry[]
+      /** Warnings encountered during preview (e.g. parser errors, missing base). */
+      readonly warnings: readonly string[]
+    }
+
+- op: modified
+  description: Update Delta application to handle all artifacts and record status
+  selector:
+    type: section
+    matches: 'Requirement: Delta application'
+  content: |
+    `PreviewSpec` MUST process all artifact types defined in the active schema with `scope: spec`. For each artifact:
+
+    1. If `filename` ends with `.delta.yaml`, it is a delta file:
+       a. Load the delta content from `ChangeRepository.artifact(change, filename)`.
+       b. If content is missing, record status as `missing`.
+       c. Load the base artifact from `SpecRepository.artifact(spec, outputBasename)`.
+       d. If base artifact is missing, record status as `missing`.
+       e. Parse the delta and apply it to the base.
+       f. If all parsed entries are `no-op`, record status as `no-op`.
+       g. If application fails, record status as `missing` and add a warning.
+       h. Otherwise, record status as `merged`.
+       i. The `merged` field contains the result of application (or original content for `no-op`/`missing`).
+
+    2. If `filename` does not end with `.delta.yaml`, it is a new spec artifact:
+       a. Load the content from `ChangeRepository.artifact(change, filename)`.
+       b. If content is missing, record status as `missing`.
+       c. Otherwise, record status as `merged`.
+       d. The base content is `null`.
+
+    `PreviewSpec` MUST return an entry for every `scope: spec` artifact type, even if the status is `missing` or `no-op`.
+
+- op: modified
+  description: Update Error handling to not skip files
+  selector:
+    type: section
+    matches: 'Requirement: Error handling'
+  content: |
+    If delta application fails for an artifact file (e.g. selector resolution failure, parser error), `PreviewSpec` MUST NOT throw. Instead, it MUST:
+
+    1. Add a warning describing the failure and the affected filename
+    2. Include the file in the result with status `missing`
+
+    The preview MUST always succeed — partial results are acceptable, total failure is not.
+
+- op: removed
+  description: Remove delta constraint as preview should show all spec artifacts
+  selector:
+    type: list-item
+    matches: 'candidates for preview'
+    parent:
+      type: section
+      matches: 'Constraints'

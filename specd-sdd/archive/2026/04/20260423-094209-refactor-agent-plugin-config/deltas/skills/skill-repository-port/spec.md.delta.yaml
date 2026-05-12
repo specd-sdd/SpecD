@@ -1,0 +1,24 @@
+- op: modified
+  description: 'Update getBundle to accept optional SpecdConfig'
+  selector:
+    type: section
+    matches: 'Requirement: SkillRepositoryPort interface'
+  content: |
+    `SkillRepositoryPort` MUST define the same interface as `SkillRepository`:
+
+    - `list(): Skill[]`
+    - `get(name: string): Skill | undefined`
+    - `getBundle(name: string, variables?: Record<string, string>, config?: SpecdConfig): SkillBundle`
+    - `listSharedFiles(): SharedFile[]`
+
+    The `getBundle` method SHALL support receiving a `SpecdConfig` to enable the injection of built-in variables during template resolution.
+
+- op: modified
+  description: 'Add core:core/config dependency'
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`core:core/config`](../../core/core/config/spec.md) — defines SpecdConfig type
+    - [`skills:skill`](../skill/spec.md) — domain types
+    - [`skills:skill-bundle`](../skill-bundle/spec.md) — bundle type

@@ -1,0 +1,118 @@
+- op: modified
+  description: 'Update command signature verification for graph context flags and multi-kind input'
+  selector:
+    type: section
+    matches: '^Requirement: Command signature$'
+    parent:
+      type: section
+      matches: '^Requirements$'
+  content: |
+    #### Scenario: Search both categories by default
+
+    - **WHEN** `specd graph search "hook execution"` is run
+    - **THEN** both symbol and spec results are returned
+
+    #### Scenario: Search symbols only
+
+    - **WHEN** `specd graph search "transition" --symbols` is run
+    - **THEN** only symbol results are returned
+    - **AND** no spec results are shown
+
+    #### Scenario: Search specs only
+
+    - **WHEN** `specd graph search "workspace" --specs` is run
+    - **THEN** only spec results are returned
+    - **AND** no symbol results are shown
+
+    #### Scenario: Custom limit
+
+    - **WHEN** `specd graph search "hook" --limit 3` is run
+    - **THEN** at most 3 symbols and 3 specs are returned
+
+    #### Scenario: Explicit config path bypasses discovery
+
+    - **GIVEN** the current directory would autodiscover a different `specd.yaml`
+    - **WHEN** `specd graph search "kernel" --config /tmp/other/specd.yaml` is run
+    - **THEN** the command uses `/tmp/other/specd.yaml` directly
+
+    #### Scenario: Explicit path enters bootstrap mode
+
+    - **GIVEN** a `specd.yaml` exists under the current repository
+    - **WHEN** `specd graph search "kernel" --path /tmp/repo` is run
+    - **THEN** config discovery is ignored
+    - **AND** the command searches a synthetic single workspace `default` rooted at `/tmp/repo`
+- op: modified
+  description: 'Verify multi-kind validation and bootstrap fallback in search behaviour'
+  selector:
+    type: section
+    matches: '^Requirement: Search behaviour$'
+    parent:
+      type: section
+      matches: '^Requirements$'
+  content: |
+    #### Scenario: Results ranked by BM25 relevance
+
+    - **GIVEN** specs `hook-execution-model` (contains "hook execution" many times) and `architecture` (contains "hook" once)
+    - **WHEN** `specd graph search "hook execution"` is run
+    - **THEN** `hook-execution-model` appears before `architecture`
+    - **AND** `hook-execution-model` has a higher score
+
+    #### Scenario: Stemming matches word variants
+
+    - **GIVEN** a symbol with comment containing "executing"
+    - **WHEN** `specd graph search "execution"` is run
+    - **THEN** the symbol is returned (porter stemmer matches "executing" to "execution")
+
+    #### Scenario: Multi-word query matches across fields
+
+    - **GIVEN** a spec with title "Workspace Integration" and content containing "import resolution"
+    - **WHEN** `specd graph search "workspace import"` is run
+    - **THEN** the spec is returned
+
+    #### Scenario: No results
+
+    - **WHEN** `specd graph search "xyznonexistent"` is run
+    - **THEN** `No results found.` is output
+
+    #### Scenario: Missing config falls back to bootstrap mode
+
+    - **GIVEN** no `specd.yaml` is found by autodiscovery
+    - **WHEN** `specd graph search "kernel"` is run inside a repository
+    - **THEN** the command searches in bootstrap mode against the resolved VCS root as workspace `default`
+
+    #### Scenario: Multiple kinds are passed through to the query layer
+
+    - **WHEN** `specd graph search "transition" --kind class,method,function` is run
+    - **THEN** the command trims and validates all three kind tokens
+    - **AND** the provider receives the full kind list rather than only the last token
+
+    #### Scenario: Invalid kind token fails before query execution
+
+    - **WHEN** `specd graph search "transition" --kind method,unknownKind` is run
+    - **THEN** the command exits with code 1
+    - **AND** the search query is not executed
+- op: modified
+  description: 'Update filter verification for comma-separated kind lists'
+  selector:
+    type: section
+    matches: '^Requirement: Command signature \(filters\)$'
+    parent:
+      type: section
+      matches: '^Requirements$'
+  content: |
+    #### Scenario: Filter by multiple symbol kinds
+
+    - **WHEN** `specd graph search "transition" --kind class,method` is run
+    - **THEN** only symbols with kind `class` or `method` are returned
+    - **AND** symbols of other kinds are excluded
+
+    #### Scenario: Filter by file path wildcard
+
+    - **WHEN** `specd graph search "create" --file "*/composition/*"` is run
+    - **THEN** only symbols in files matching the pattern are returned
+
+    #### Scenario: Filter by workspace
+
+    - **WHEN** `specd graph search "kernel" --workspace core` is run
+    - **THEN** only symbols from workspace `core` are returned
+    - **AND** only specs from workspace `core` are returned

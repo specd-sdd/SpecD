@@ -1,0 +1,20 @@
+- op: modified
+  description: 'Clarify how command-specific bootstrap mode relates to the normal config discovery contract'
+  selector:
+    type: section
+    matches: '^Requirement: Config file location and format$'
+    parent:
+      type: section
+      matches: '^Requirements$'
+  content: |
+    `specd.yaml` must be a valid YAML file. specd discovers it using the following strategy, in order:
+
+    1. **`--config` flag** — if the CLI is invoked with `--config path/to/specd.yaml`, that path is used directly; no discovery takes place.
+    2. **Walk up from CWD, bounded by the git repo root** — specd walks up from the current working directory, checking each directory for `specd.yaml`. The walk stops at the **first match** (nearest to CWD) or at the git repo root (the nearest ancestor directory containing `.git/`), whichever comes first. If no `specd.yaml` is found before or at the repo root, specd exits with an error.
+    3. **CWD only, when not inside a git repo** — if no `.git/` ancestor exists (e.g. the user is running specd from outside any repository, as in a coordinator script), specd checks only the current working directory and stops there. It does not walk further up.
+
+    The search never goes above the git repo root. This prevents accidentally picking up a `specd.yaml` from a parent repository in nested or sibling monorepo layouts. In a monorepo where each package has its own `specd.yaml`, the package-level file is used when running specd from within that package — the root-level file is not considered.
+
+    Some command families may explicitly define a bootstrap mode that intentionally operates without loading project config. When they do, this requirement still governs normal configured operation and the meaning of `--config` remains unchanged: it is always an explicit config file path override, never a repository root selector.
+
+    Bootstrap mode, when defined by a command spec, is for setup and early repository exploration rather than the intended steady-state mode for configured projects. Such command specs MUST document when bootstrap mode is entered, how repository root is resolved, and how it differs from configured operation.

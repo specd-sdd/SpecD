@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'The new scenario for spec-overlap-conflict was already added in the spec.md delta (History and event sourcing section). No additional verify changes beyond the spec delta.'

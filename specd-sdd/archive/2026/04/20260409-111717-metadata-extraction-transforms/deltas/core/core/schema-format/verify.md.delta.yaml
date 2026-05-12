@@ -1,0 +1,44 @@
+- op: modified
+  description: 'Verify metadata extraction supports transform declarations on extractors and field mappings.'
+  selector:
+    type: section
+    matches: '^Requirement: Metadata extraction$'
+  content: |
+    #### Scenario: Extraction declared and metadata absent
+
+    - **GIVEN** the schema declares a `metadataExtraction` block with extractors for `rules` and `constraints`
+    - **AND** a spec in the context set has no `.specd-metadata.yaml`
+    - **WHEN** `CompileContext` or `GetProjectContext` processes that spec
+    - **THEN** the extraction engine runs the declared extractors against parsed artifact ASTs
+    - **AND** the extracted content is included in the compiled context
+
+    #### Scenario: Extractor transform shorthand accepted
+
+    - **GIVEN** a metadata extractor declares `transform: resolveSpecPath`
+    - **WHEN** `SchemaRegistry.resolve()` loads the schema
+    - **THEN** the schema is accepted and the transform declaration is preserved in the resolved extractor
+
+    #### Scenario: FieldMapping transform object with args accepted
+
+    - **GIVEN** a metadata extractor field mapping declares `transform: { name: "join", args: ["$2", "/", "$1"] }`
+    - **WHEN** `SchemaRegistry.resolve()` loads the schema
+    - **THEN** the schema is accepted and the transform declaration is preserved in the resolved field mapping
+
+    #### Scenario: Transform declarations do not imply silent omission semantics
+
+    - **GIVEN** a metadata extractor declares a transform on an extracted field
+    - **WHEN** the schema is resolved
+    - **THEN** the declaration means the runtime transform must either return a non-null normalized value or fail explicitly
+
+    #### Scenario: dependsOn extractor supports canonical labels with or without links
+
+    - **GIVEN** a metadata extractor for `dependsOn` captures a canonical dependency label as `value`
+    - **AND** the same capture also preserves an optional relative `href` as a transform arg when a link exists
+    - **WHEN** `SchemaRegistry.resolve()` loads the schema
+    - **THEN** the schema is accepted for both linked entries like ``[`core:core/config`](../config/spec.md)`` and unlinked entries like `` `core:core/config` ``
+
+    #### Scenario: GenerateSpecMetadata produces deterministic output
+
+    - **GIVEN** the schema declares `metadataExtraction` with extractors for title, rules, and constraints
+    - **WHEN** `GenerateSpecMetadata.execute` is called for a spec
+    - **THEN** the result contains extracted metadata with `generatedBy: 'core'` and computed `contentHashes`

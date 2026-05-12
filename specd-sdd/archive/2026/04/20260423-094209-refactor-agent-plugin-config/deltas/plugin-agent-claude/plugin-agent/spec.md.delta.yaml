@@ -1,0 +1,31 @@
+- op: modified
+  description: 'Update Factory export to accept PluginLoaderOptions'
+  selector:
+    type: section
+    matches: 'Requirement: Factory export'
+  content: |
+    The package MUST export `create(options: PluginLoaderOptions): AgentPlugin` as default or named export.
+
+    The factory function MUST read `specd-plugin.json` at the infrastructure boundary to obtain `name` and `version`. It MUST search for the manifest in its own directory first, then the parent directory as fallback. The `type` field MUST remain hardcoded as `'agent'`.
+
+- op: modified
+  description: 'Update Application layer and Install location to use SpecdConfig'
+  selector:
+    type: section
+    matches: 'Requirement: Application layer'
+  content: |
+    The application layer MUST have `InstallSkills` use case that orchestrates:
+
+    1. Get skills via `@specd/skills` repository, passing `SpecdConfig` for built-in variable resolution
+    2. Inject stored frontmatter to each skill template
+    3. Install to `.claude/skills/` relative to the `projectRoot` found in `SpecdConfig`
+
+- op: modified
+  description: 'Add core:core/config dependency'
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`core:core/config`](../../core/core/config/spec.md) — defines SpecdConfig type
+    - [`plugin-manager:agent-plugin-type`](../plugin-manager/agent-plugin-type/spec.md) — plugin interface
+    - [`skills:skill-repository`](../skills/skill-repository/spec.md) — skill access

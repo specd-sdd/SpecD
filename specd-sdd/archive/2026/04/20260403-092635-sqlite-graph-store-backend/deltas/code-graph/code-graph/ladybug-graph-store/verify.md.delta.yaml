@@ -1,0 +1,16 @@
+- op: added
+  description: 'Verify that Ladybug remains an explicitly selectable backend id'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Ladybug-backed implementation$'
+  content: |
+    #### Scenario: Ladybug remains available by backend id
+
+    - **GIVEN** a graph-store registry containing both `ladybug` and `sqlite`
+    - **WHEN** composition selects the backend id `ladybug`
+    - **THEN** `LadybugGraphStore` is constructed as the single active backend for that provider or kernel path
+    - **AND** callers do not need to know any Ladybug class name or constructor details

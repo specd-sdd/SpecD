@@ -1,0 +1,9 @@
+- op: modified
+  selector:
+    type: section
+    matches: '^Requirement: includes workspace information$'
+  content: |
+    The command output MUST include:
+    - Project root path
+    - Schema reference
+    - Workspaces: for each, name, prefix, ownership (owned|shared|readOnly), isExternal (boolean), and codeRoot (absolute path)

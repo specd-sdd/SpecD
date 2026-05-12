@@ -1,0 +1,70 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Interface shape'
+  content: |
+    The port MUST be declared as a TypeScript `interface` named `ConfigWriter` with four methods: `initProject`, `addPlugin`, `removePlugin`, and `listPlugins`. It SHALL NOT be an abstract class.
+- op: removed
+  selector:
+    type: section
+    matches: 'Requirement: RecordSkillInstall method signature'
+- op: removed
+  selector:
+    type: section
+    matches: 'Requirement: RecordSkillInstall behaviour'
+- op: removed
+  selector:
+    type: section
+    matches: 'Requirement: ReadSkillsManifest method signature'
+- op: removed
+  selector:
+    type: section
+    matches: 'Requirement: ReadSkillsManifest missing file handling'
+- op: removed
+  selector:
+    type: section
+    matches: 'Requirement: ReadSkillsManifest invalid YAML handling'
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: InitProject already-initialised guard'
+  content: |
+    ### Requirement: AddPlugin
+
+    The `addPlugin` method MUST accept three parameters:
+
+    1. `configPath: string` — absolute path to the `specd.yaml` to update
+    2. `type: string` — the plugin type (e.g. `"agents"`)
+    3. `name: string` — the plugin package name (e.g. `"@specd/plugin-agent-claude"`)
+
+    It MUST return `Promise<void>`. The method MUST add the plugin to the `plugins.<type>` array in `specd.yaml`. If the plugin is already present, the method MUST NOT duplicate it.
+
+    ### Requirement: RemovePlugin
+
+    The `removePlugin` method MUST accept two parameters:
+
+    1. `configPath: string` — absolute path to the `specd.yaml` to update
+    2. `type: string` — the plugin type (e.g. `"agents"`)
+
+    It MUST return `Promise<void>`. The method MUST remove the plugin from the `plugins.<type>` array by name. If the plugin is not present, the method MUST be a no-op.
+
+    ### Requirement: ListPlugins
+
+    The `listPlugins` method MUST accept one parameter:
+
+    1. `configPath: string` — absolute path to the `specd.yaml` to read
+
+    It MUST return `Promise<Array<{ name: string; config?: Record<string, unknown> }>>`. If the `plugins` section does not exist, it SHALL return an empty array.
+- op: modified
+  selector:
+    type: section
+    matches: 'Constraints'
+  content: |
+    - The port lives in `application/ports/` per the hexagonal architecture rule
+    - No direct dependency on `node:fs`, the `yaml` package, or any I/O at the port level
+    - `AlreadyInitialisedError` is an application-layer error
+    - The `plugins` key in `specd.yaml` follows the schema `plugins: { agents: Array<{ name: string, config?: Record<string, unknown> }> }`

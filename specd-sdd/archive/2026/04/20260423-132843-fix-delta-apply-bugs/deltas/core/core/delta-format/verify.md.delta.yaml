@@ -1,0 +1,53 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Delta application'
+  content: |
+    #### Scenario: entries applied in declaration order
+
+    - **WHEN** a delta has two `modified` entries targeting different nodes
+    - **THEN** the first entry is applied before the second, and both changes appear in the result
+
+    #### Scenario: removed followed by added at same position
+
+    - **WHEN** a delta removes a node and then adds a new node `after` the preceding sibling
+    - **THEN** the old node is absent and the new node appears at the correct position
+
+    #### Scenario: entire delta rejected on single selector failure
+
+    - **WHEN** a delta has three entries and the second selector resolves to no node
+    - **THEN** `apply` throws `DeltaApplicationError` and none of the three operations are applied
+
+    #### Scenario: modified operation does not strip inline formatting in untouched nodes
+
+    - **GIVEN** a markdown document with one untouched paragraph containing `` `inline` ``, `*emphasis*`, and `**strong**`
+    - **AND** a `modified` delta entry targets a different section
+    - **WHEN** `apply` is executed and the result is serialized
+    - **THEN** untouched paragraph inline formatting remains semantically equivalent and is not downgraded to plain text
+
+    #### Scenario: markdown apply output is deterministic for mixed style input
+
+    - **GIVEN** a markdown document that mixes supported style markers for the same construct
+    - **WHEN** a delta is applied and the markdown result is serialized
+    - **THEN** ambiguous constructs are emitted using deterministic project markdown conventions
+
+    #### Scenario: no-op delta is never passed to apply
+
+    - **GIVEN** a delta containing only `[{ op: "no-op" }]`
+    - **WHEN** the caller (e.g. `ValidateArtifacts`) processes this delta
+    - **THEN** `apply` is never called — the base artifact is not loaded or parsed
+
+    #### Scenario: added with multi-section content inserts all sections (Bug #1 fix)
+
+    - **GIVEN** an `added` operation with `content` containing two `### Requirement:` headings
+    - **AND** `position.parent` targeting a Requirements section
+    - **WHEN** `apply` is called
+    - **THEN** both requirement sections are inserted as children of the parent scope
+
+    #### Scenario: position.parent ambiguous rejects with DeltaApplicationError (Bug #2 fix)
+
+    - **GIVEN** an AST with two sections matching "Requirements" (e.g., two ## Requirements headings)
+    - **AND** an `added` operation with `position.parent: { type: section, matches: "Requirements" }`
+    - **WHEN** `apply` is called
+    - **THEN** `DeltaApplicationError` is thrown with message about ambiguous selector
+    - **AND** no nodes are inserted

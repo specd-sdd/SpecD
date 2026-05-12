@@ -1,0 +1,84 @@
+- op: modified
+  description: 'Update lifecycle scenarios to reference generic task completion gating'
+  selector:
+    type: section
+    matches: 'Requirement: Lifecycle'
+  content: |
+    #### Scenario: Valid transition — drafting to designing
+
+    - **WHEN** a Change in `drafting` state is transitioned to `designing`
+    - **THEN** a `transitioned` event with `from: 'drafting'` and `to: 'designing'` is appended and deriving state returns `designing`
+
+    #### Scenario: Invalid transition — drafting to implementing (skip designing)
+
+    - **WHEN** a Change in `drafting` state is transitioned to `implementing`
+    - **THEN** `InvalidStateTransitionError` is thrown, no event is appended, and the state remains `drafting`
+
+    #### Scenario: Invalid transition — drafting to archivable (skip everything)
+
+    - **WHEN** a Change in `drafting` state is transitioned to `archivable`
+    - **THEN** `InvalidStateTransitionError` is thrown, no event is appended, and the state remains `drafting`
+
+    #### Scenario: archivable is terminal
+
+    - **WHEN** a Change in `archivable` state is transitioned to any other state
+    - **THEN** `InvalidStateTransitionError` is thrown
+
+    #### Scenario: State derived from history — no snapshot
+
+    - **WHEN** a Change has a history containing two `transitioned` events ending with `to: 'implementing'`
+    - **THEN** deriving state from history returns `implementing` without reading any separate state field
+
+    #### Scenario: Valid transition — implementing to verifying when all task items complete
+
+    - **GIVEN** a Change in `implementing` state
+    - **AND** the `verifying` step requires an artifact with `taskCompletionCheck` and all items are complete
+    - **WHEN** the change is transitioned to `verifying`
+    - **THEN** a `transitioned` event with `from: 'implementing'` and `to: 'verifying'` is appended and deriving state returns `verifying`
+
+    #### Scenario: Task completion gating applies generically
+
+    - **GIVEN** a Change in a state transitioning to a step that requires an artifact with `taskCompletionCheck`
+    - **AND** incomplete items remain in the artifact
+    - **WHEN** the transition is attempted
+    - **THEN** `InvalidStateTransitionError` is thrown — this is not specific to `implementing → verifying`
+
+    #### Scenario: Default incompletePattern matches markdown unchecked checkboxes
+
+    - **GIVEN** an artifact with no `taskCompletionCheck` declared
+    - **AND** its file contains `- [ ] implement login` and `- [x] implement logout`
+    - **WHEN** a transition to a step requiring that artifact is attempted
+    - **THEN** the default pattern `^\s*-\s+\[ \]` matches `- [ ] implement login` and the transition is blocked
+
+    #### Scenario: Custom incompletePattern blocks transition
+
+    - **GIVEN** an artifact declares `taskCompletionCheck.incompletePattern: '^\s*TODO:'`
+    - **AND** its file contains `TODO: implement login` and `DONE: implement logout`
+    - **WHEN** a transition to a step requiring that artifact is attempted
+    - **THEN** the custom pattern matches `TODO: implement login` and the transition is blocked
+
+    #### Scenario: Invalid transition — implementing to verifying when a task item is incomplete
+
+    - **GIVEN** a Change in `implementing` state
+    - **AND** the `verifying` step requires an artifact with `taskCompletionCheck` and incomplete items remain
+    - **WHEN** the change is transitioned to `verifying`
+    - **THEN** `InvalidStateTransitionError` is thrown and the state remains `implementing`
+
+    #### Scenario: Progress reported from both patterns
+
+    - **GIVEN** an artifact with `taskCompletionCheck.completePattern` and `taskCompletionCheck.incompletePattern` both declared
+    - **AND** the artifact file contains 3 complete items and 2 incomplete items
+    - **WHEN** the CLI reports task progress
+    - **THEN** it reports `3/5 tasks complete`
+
+    #### Scenario: Invalid transition — implementing to done (skipping verifying)
+
+    - **WHEN** a Change in `implementing` state is transitioned directly to `done`
+    - **THEN** `InvalidStateTransitionError` is thrown and the state remains `implementing`
+
+    #### Scenario: Valid transition — verifying back to implementing when verification fails
+
+    - **GIVEN** a Change in `verifying` state where verification has failed and changes are required
+    - **WHEN** the change is transitioned back to `implementing`
+    - **THEN** a `transitioned` event with `from: 'verifying'` and `to: 'implementing'` is appended
+    - **AND** no approval invalidation is triggered

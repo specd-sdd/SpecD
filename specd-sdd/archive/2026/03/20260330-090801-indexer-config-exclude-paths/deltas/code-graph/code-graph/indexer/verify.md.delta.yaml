@@ -1,0 +1,44 @@
+- op: added
+  description: 'Add scenarios for custom excludePaths and respectGitignore in file discovery'
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Multi-workspace file discovery'
+    after:
+      type: section
+      matches: 'Scenario: Files with no adapter skipped'
+  content: |
+    #### Scenario: Custom excludePaths replaces built-in defaults
+
+    - **GIVEN** `WorkspaceIndexTarget.excludePaths` is `["fixtures/"]`
+    - **WHEN** file discovery runs
+    - **THEN** only `fixtures/` is excluded by config rules
+    - **AND** `node_modules/` and `dist/` (built-in defaults) are NOT automatically excluded
+
+    #### Scenario: Built-in defaults apply when excludePaths absent
+
+    - **GIVEN** `WorkspaceIndexTarget.excludePaths` is not set
+    - **WHEN** file discovery runs
+    - **THEN** `node_modules/`, `.git/`, `.specd/`, `dist/`, `build/`, `coverage/`, `.next/`, `.nuxt/` are excluded
+
+    #### Scenario: Negation pattern re-includes subdirectory
+
+    - **GIVEN** `WorkspaceIndexTarget.excludePaths` is `["node_modules/", ".git/", "dist/", ".specd/*", "!.specd/metadata/"]`
+    - **WHEN** file discovery runs
+    - **THEN** files under `.specd/metadata/` are discovered
+    - **AND** all other `.specd/` subdirectories are excluded
+
+    #### Scenario: respectGitignore false skips gitignore loading
+
+    - **GIVEN** a `.gitignore` containing `*.gen.ts`
+    - **AND** `WorkspaceIndexTarget.respectGitignore` is `false`
+    - **WHEN** file discovery runs
+    - **THEN** `.gen.ts` files are discovered (gitignore not loaded)
+
+    #### Scenario: gitignore has absolute priority over excludePaths
+
+    - **GIVEN** a `.gitignore` containing `generated/`
+    - **AND** `WorkspaceIndexTarget.excludePaths` is `["!generated/"]`
+    - **AND** `WorkspaceIndexTarget.respectGitignore` is `true` (default)
+    - **WHEN** file discovery runs
+    - **THEN** files under `generated/` are still excluded — `.gitignore` cannot be overridden by excludePaths

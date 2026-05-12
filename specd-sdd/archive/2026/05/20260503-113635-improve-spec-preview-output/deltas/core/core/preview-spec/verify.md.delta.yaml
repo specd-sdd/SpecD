@@ -1,0 +1,76 @@
+- op: modified
+  description: Update Delta application scenarios to verify status
+  selector:
+    type: section
+    matches: 'Requirement: Delta application'
+  content: |
+    #### Scenario: Delta merged into base spec content
+
+    - **GIVEN** a valid delta file and a matching base spec
+    - **WHEN** `PreviewSpec.execute` is called
+    - **THEN** the entry in `files` has status `merged`
+    - **AND** `merged` content contains the result of application
+
+    #### Scenario: No-op delta records status
+
+    - **GIVEN** a delta file containing only a `no-op` entry
+    - **WHEN** `PreviewSpec.execute` is called
+    - **THEN** the result contains an entry for that artifact with status `no-op`
+    - **AND** `merged` contains the original base content
+
+    #### Scenario: Missing delta file records status
+
+    - **GIVEN** a change with a `scope: spec` artifact whose delta file does not exist on disk
+    - **WHEN** `PreviewSpec.execute` is called
+    - **THEN** the result contains an entry for that artifact with status `missing`
+
+    #### Scenario: All schema artifacts returned
+
+    - **GIVEN** a schema with `spec.md` and `verify.md` artifact types
+    - **AND** a change that only has a delta for `spec.md`
+    - **WHEN** `PreviewSpec.execute` is called
+    - **THEN** the `files` array contains entries for both `spec.md` (status `merged`) and `verify.md` (status `missing`)
+
+- op: modified
+  description: Update Result shape scenarios for status field
+  selector:
+    type: section
+    matches: 'Requirement: Result shape'
+  content: |
+    #### Scenario: Base content and status included for delta files
+
+    - **GIVEN** a delta applied to an existing spec
+    - **WHEN** `PreviewSpec.execute` returns
+    - **THEN** the `PreviewSpecFileEntry` has status `merged`
+    - **AND** `base` is set to the original content
+    - **AND** `merged` is set to the result after delta application
+
+    #### Scenario: Base is null and status is merged for new specs
+
+    - **GIVEN** a new spec file (not a delta)
+    - **WHEN** `PreviewSpec.execute` returns
+    - **THEN** the `PreviewSpecFileEntry` has status `merged`
+    - **AND** `base: null`
+    - **AND** `merged` is set to the new file content
+
+- op: modified
+  description: Update Error handling scenarios for missing status
+  selector:
+    type: section
+    matches: 'Requirement: Error handling'
+  content: |
+    #### Scenario: Delta application failure produces warning and missing status
+
+    - **GIVEN** a delta with a selector that does not match any node in the base spec
+    - **WHEN** `PreviewSpec.execute` is called
+    - **THEN** the result includes a warning describing the failure
+    - **AND** the failing file is included in `files` with status `missing`
+    - **AND** the use case does not throw
+
+    #### Scenario: Other files still returned on partial failure
+
+    - **GIVEN** a change with two delta files — one valid, one with a bad selector
+    - **WHEN** `PreviewSpec.execute` is called
+    - **THEN** both files appear in `files`
+    - **AND** the valid one has status `merged`
+    - **AND** the failing one has status `missing`

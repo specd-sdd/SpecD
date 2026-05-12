@@ -1,0 +1,77 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Interface shape'
+  content: |
+    #### Scenario: Implementation satisfies the contract
+
+    - **GIVEN** a concrete class implementing `ConfigWriter`
+    - **WHEN** the class implements `initProject`, `addPlugin`, `removePlugin`, and `listPlugins`
+    - **THEN** it compiles and can be instantiated
+
+- op: removed
+  selector:
+    type: section
+    matches: 'Requirement: RecordSkillInstall behaviour'
+- op: removed
+  selector:
+    type: section
+    matches: 'Requirement: ReadSkillsManifest missing file handling'
+- op: removed
+  selector:
+    type: section
+    matches: 'Requirement: ReadSkillsManifest invalid YAML handling'
+- op: removed
+  selector:
+    type: section
+    matches: 'Requirement: ReadSkillsManifest method signature'
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: InitProject already-initialised guard'
+  content: |
+    ### Requirement: AddPlugin behaviour
+
+    #### Scenario: Adds plugin to agents array
+
+    - **GIVEN** `specd.yaml` with `plugins: { agents: [] }`
+    - **WHEN** `addPlugin(configPath, 'agents', '@specd/plugin-agent-claude')` is called
+    - **THEN** the plugin is added to `plugins.agents`
+
+    #### Scenario: Duplicate plugin updates existing
+
+    - **GIVEN** `specd.yaml` with `plugins: { agents: [{ name: '@specd/plugin-agent-claude' }] }`
+    - **WHEN** `addPlugin(configPath, 'agents', '@specd/plugin-agent-claude')` is called
+    - **THEN** the existing entry is updated
+
+    ### Requirement: RemovePlugin behaviour
+
+    #### Scenario: Removes plugin from array
+
+    - **GIVEN** `specd.yaml` with `plugins: { agents: [{ name: '@specd/plugin-agent-claude' }] }`
+    - **WHEN** `removePlugin(configPath, 'agents', '@specd/plugin-agent-claude')` is called
+    - **THEN** the plugin is removed from `plugins.agents`
+
+    #### Scenario: Non-existent plugin is no-op
+
+    - **GIVEN** `specd.yaml` with no matching plugin
+    - **WHEN** `removePlugin(configPath, 'agents', 'nonexistent')` is called
+    - **THEN** no error is thrown
+
+    ### Requirement: ListPlugins behaviour
+
+    #### Scenario: Returns all plugins
+
+    - **GIVEN** `specd.yaml` with `plugins: { agents: [{ name: '@specd/plugin-agent-claude' }] }`
+    - **WHEN** `listPlugins(configPath)` is called
+    - **THEN** it returns the plugins array
+
+    #### Scenario: Filters by type
+
+    - **GIVEN** `specd.yaml` with multiple plugin types
+    - **WHEN** `listPlugins(configPath, 'agents')` is called
+    - **THEN** only `agents` plugins are returned

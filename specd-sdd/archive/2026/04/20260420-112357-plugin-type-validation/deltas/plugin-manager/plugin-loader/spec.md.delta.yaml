@@ -1,0 +1,27 @@
+- op: modified
+  description: 'Update load workflow to use domain type guards'
+  selector:
+    type: section
+    matches: 'Requirement: Load workflow'
+  content: |-
+    The loader MUST:
+
+    1. **Package availability**: The package must be in node_modules (installed via npm/pnpm or linked as workspace)
+    2. **Resolve path**: Use `import.meta.resolve()` or `require.resolve()` to get package path
+    3. **Read manifest**: Read `specd-plugin.json` (no import yet)
+    4. **Validate manifest**: Validate with Zod schema
+    5. **Dynamic import**: `import(name)` as ESM module
+    6. **Factory call**: Call `create()` factory function
+    7. **Validate interface**: Use `isSpecdPlugin` and `isAgentPlugin` from the domain layer to validate the returned object
+
+- op: modified
+  description: 'Update error handling to mention domain type guards and unknown type rejection'
+  selector:
+    type: section
+    matches: 'Requirement: Error handling'
+  content: |-
+    Validation failures MUST throw `PluginValidationError`:
+
+    - Base contract violation (missing `name`, `type`, `version`, `configSchema`, `init`, `destroy`) — caught by `isSpecdPlugin`
+    - Unknown plugin type (type not in `PLUGIN_TYPES`) — caught by `isSpecdPlugin`
+    - Agent-specific contract violation (missing `install` or `uninstall` when `pluginType` is `'agent'`) — caught by `isAgentPlugin`

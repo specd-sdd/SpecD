@@ -1,0 +1,19 @@
+- op: modified
+  description: 'Replace implementation verification with a retirement marker'
+  selector:
+    type: section
+    matches: '^Requirements$'
+  content: |
+    ### Requirement: Spec retirement
+
+    #### Scenario: Existing readers are redirected to replacement specs
+
+    - **WHEN** a contributor needs the Ladybug-specific physical schema requirements
+    - **THEN** they are directed to `code-graph:code-graph/ladybug-graph-store`
+    - **AND** storage-agnostic behavior is read from `code-graph:code-graph/graph-store`
+
+    #### Scenario: Deprecated spec adds no new runtime behavior
+
+    - **WHEN** this deprecated spec remains present during the migration
+    - **THEN** it serves only as a transition marker
+    - **AND** it does not introduce additional runtime requirements beyond the replacement specs

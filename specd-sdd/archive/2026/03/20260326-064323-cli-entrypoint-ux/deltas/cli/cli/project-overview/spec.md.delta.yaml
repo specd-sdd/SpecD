@@ -1,0 +1,102 @@
+- op: modified
+  description: "Rename top-level section from 'Project Overview' to 'Project Dashboard'"
+  selector:
+    type: section
+    matches: '^Project Overview$'
+  rename: 'Project Dashboard'
+
+- op: modified
+  description: 'Update Purpose to reflect new name and auto-invocation behavior'
+  selector:
+    type: section
+    matches: '^Purpose$'
+  content: |
+    Users joining a project or returning after time away need a quick snapshot of what exists and what is in flight. The `specd project dashboard` command displays a visual dashboard summarising the current state of a SpecD project — project metadata, spec counts per workspace, and change counts by state — as an ASCII box layout in text mode or a structured data object in `json`/`toon` mode. It is also the default output when `specd` is invoked with no subcommand and a valid config is present.
+
+- op: modified
+  description: "Rename command signature from 'project overview' to 'project dashboard'"
+  selector:
+    type: section
+    matches: 'Requirement: Command signature'
+  content: |
+    ```
+    specd project dashboard [--format text|json|toon] [--config <path>]
+    ```
+
+    - `--format text|json|toon` — optional; output format. Defaults to `text`.
+    - `--config <path>` — optional; path to `specd.yaml`. Uses standard config discovery when omitted.
+
+- op: modified
+  description: "Add 'Using config:' header line, wider box, and project root wrap requirement"
+  selector:
+    type: section
+    matches: 'Requirement: Text dashboard'
+  content: |
+    In `text` mode the command outputs:
+
+    1. **Config line** — a plain text line `Using config: <relative-path>` printed to stdout before any box decoration. `<relative-path>` is the path to the loaded `specd.yaml` relative to `process.cwd()`.
+    2. **Banner** — the SpecD ASCII logo rendered above the dashboard box.
+    3. **Outer container** — a rounded `boxen` box with the title `SpecD project dashboard` centred at the top and a cyan border. The minimum inner width of this box MUST be at least the default `boxen` width plus 10 characters to accommodate typical project root paths.
+    4. **Project box** — an inner box labelled `Project` showing:
+       - `root:` — absolute path to the project root. If the value would cause the row to overflow the outer box width, the value wraps to a new line indented to align with the start of the value column (i.e. the column position where values begin).
+       - `schema:` — the schema reference from `specd.yaml`.
+       - `workspaces:` — comma-separated list of workspace names.
+    5. **Specs box** — an inner box labelled `Specs` showing total spec count and a per-workspace breakdown.
+    6. **Changes box** — an inner box labelled `Changes` showing active count, draft count, discarded count, and a per-state breakdown of active changes.
+    7. **Layout** — the Project box occupies the full width on its own row; the Specs and Changes boxes are rendered side by side on the row below.
+
+- op: modified
+  description: 'Update JSON/toon output section — title string update only'
+  selector:
+    type: section
+    matches: 'Requirement: JSON and toon output'
+  content: |
+    In `json` or `toon` mode the command outputs a single object:
+
+    ```json
+    {
+      "projectRoot": "<absolute-path>",
+      "schemaRef": "<schema-ref>",
+      "workspaces": ["<id>", ...],
+      "specs": {
+        "total": <number>,
+        "byWorkspace": { "<workspace-id>": <number>, ... }
+      },
+      "changes": {
+        "active": <number>,
+        "drafts": <number>,
+        "discarded": <number>
+      }
+    }
+    ```
+
+    No config line, banner, or box decoration is included in non-text output.
+
+- op: modified
+  description: 'Update constraints for wider box and project root wrap'
+  selector:
+    type: section
+    matches: '^Constraints$'
+  content: |
+    - The outer dashboard box MUST have a minimum inner width of at least the default `boxen` width plus 10 characters.
+    - When the `root:` value would overflow the outer box width, it MUST wrap to the next line, indented to align with the value column start position.
+    - ANSI escape codes must be stripped before measuring string lengths for column alignment and overflow detection.
+    - The command is read-only; it never modifies any files.
+    - The `Using config:` line is always printed to stdout in text mode, even when the banner is suppressed (no suppression flag exists; this note is for future-proofing).
+
+- op: modified
+  description: 'Update examples to use new command name'
+  selector:
+    type: section
+    matches: '^Examples$'
+  content: |
+    ```
+    # Text dashboard (default) — also triggered automatically by bare 'specd' invocation
+    specd project dashboard
+
+    # JSON output for scripting
+    specd project dashboard --format json
+
+    # Use a non-default config
+    specd project dashboard --config /path/to/specd.yaml
+    ```

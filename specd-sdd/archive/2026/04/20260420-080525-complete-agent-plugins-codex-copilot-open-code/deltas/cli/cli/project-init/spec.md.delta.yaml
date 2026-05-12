@@ -1,0 +1,18 @@
+- op: added
+  description: 'Require Open Code plugin in known interactive wizard options.'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Interactive mode'
+  content: |
+    ### Requirement: Known plugin options
+
+    The interactive plugin-selection wizard MUST expose this known agent plugin option set:
+
+    - `@specd/plugin-agent-claude`
+    - `@specd/plugin-agent-copilot`
+    - `@specd/plugin-agent-codex`
+    - `@specd/plugin-agent-opencode`

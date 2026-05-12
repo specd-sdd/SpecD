@@ -1,0 +1,393 @@
+{
+  "name": "enrich-schema-show",
+  "createdAt": "2026-03-19T17:52:59.252Z",
+  "description": "Add description, output, and hasTaskCompletionCheck to schema show JSON output so skills can be schema-agnostic",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "cli:cli/schema-show",
+    "core:core/schema-format",
+    "core:core/get-artifact-instruction",
+    "cli:cli/change-artifact-instruction"
+  ],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "validatedHash": "sha256:e35e6ae4680b2d63e5b5c2cf2bbb13f69d9cf96659830b524b7f833e07c3745e"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "files": [
+        {
+          "key": "cli:cli/schema-show",
+          "filename": "deltas/cli/cli/schema-show/spec.md.delta.yaml",
+          "validatedHash": "sha256:37f1970a2eb49b09fbd8bfd50d41202153380f5868f60778859d4c2cfc189cca"
+        },
+        {
+          "key": "core:core/schema-format",
+          "filename": "deltas/core/core/schema-format/spec.md.delta.yaml",
+          "validatedHash": "sha256:ce019d170b6f1618649f92068d204950e3566b4c033f54ee7481a83a779727f2"
+        },
+        {
+          "key": "core:core/get-artifact-instruction",
+          "filename": "deltas/core/core/get-artifact-instruction/spec.md.delta.yaml",
+          "validatedHash": "sha256:190b900c575c40aa3e18d2dce845c9d0edb0a160c2a6f7f8ff1257745c5fe607"
+        },
+        {
+          "key": "cli:cli/change-artifact-instruction",
+          "filename": "deltas/cli/cli/change-artifact-instruction/spec.md.delta.yaml",
+          "validatedHash": "sha256:6acc7fcadbde371da01396807efb15ae4a58dd1c8d741941e329c37726b50fbd"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "files": [
+        {
+          "key": "cli:cli/schema-show",
+          "filename": "deltas/cli/cli/schema-show/verify.md.delta.yaml",
+          "validatedHash": "sha256:8199b8ae9d5926893a5b3783cfa6f3e93c1017355ee32f5150631c0df9d4508a"
+        },
+        {
+          "key": "core:core/schema-format",
+          "filename": "deltas/core/core/schema-format/verify.md.delta.yaml",
+          "validatedHash": "sha256:f2210e80d3bc73ef9cc7f32e2c9a5308c9b345010f294f76ab3438ebf3278a4a"
+        },
+        {
+          "key": "core:core/get-artifact-instruction",
+          "filename": "deltas/core/core/get-artifact-instruction/verify.md.delta.yaml",
+          "validatedHash": "sha256:f9fc526da22b577109785d4b6409a663b50fbebab799d76b24358781de8abcac"
+        },
+        {
+          "key": "cli:cli/change-artifact-instruction",
+          "filename": "deltas/cli/cli/change-artifact-instruction/verify.md.delta.yaml",
+          "validatedHash": "sha256:e9a7ad813abe7b933769e34c11f877638f4e9d148675bbbe6e00ca80552e9a0d"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal"],
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "validatedHash": "sha256:32340b67b8a98055a8ea3d6fc93d699b91d7354f9779d64c09e6313c5262b967"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "validatedHash": "sha256:f3a7c3559d38de880972cc417e9ff7353340ad2e03bb27a2d22364f2bff1eea7"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-03-19T17:52:59.252Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "specIds": ["cli:cli/schema-show"],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-03-19T17:52:59.261Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "cli:cli/schema-show"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/schema-show"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-19T17:53:09.986Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-03-19T17:55:25.980Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change"
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-03-19T17:55:25.980Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:core/schema-format"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/schema-format"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-03-19T17:58:00.028Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change"
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-03-19T17:58:00.028Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:core/get-artifact-instruction"
+        },
+        {
+          "type": "specs",
+          "key": "cli:cli/change-artifact-instruction"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/get-artifact-instruction"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/change-artifact-instruction"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-19T18:42:10.141Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-03-19T18:46:25.383Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-change"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-19T18:46:25.383Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-19T18:47:01.484Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-03-19T18:48:58.888Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-change"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-19T18:48:58.888Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-19T18:49:10.349Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-19T18:50:09.710Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-03-19T18:59:46.665Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-change"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-19T18:59:46.665Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-20T10:19:06.461Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-20T10:19:06.959Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-20T10:19:11.370Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-20T10:19:48.873Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-20T10:20:08.767Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-20T10:26:18.474Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-03-20T10:35:41.402Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "m***a@g***.com"
+  }
+}

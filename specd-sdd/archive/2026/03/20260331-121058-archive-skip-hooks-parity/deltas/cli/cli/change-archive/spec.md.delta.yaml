@@ -1,0 +1,41 @@
+- op: modified
+  selector:
+    type: section
+    matches: '^Requirement: Command signature$'
+  content: |
+    ```
+    specd change archive <name> [--skip-hooks <phases>] [--allow-overlap] [--format text|json|toon]
+    ```
+
+    - `<name>` — required positional; the name of the change to archive
+    - `--skip-hooks <phases>` — optional; comma-separated list of archive hook phases to skip. Valid values: `pre`, `post`, `all`. When `all` is specified, all hook execution is skipped. When omitted, both phases execute.
+    - `--allow-overlap` — optional flag; permits archiving despite spec overlap with other active changes
+    - `--format text|json|toon` — optional; output format, defaults to `text`
+- op: modified
+  selector:
+    type: section
+    matches: '^Requirement: Hook execution$'
+  content: |
+    By default, the `ArchiveChange` use case executes `run:` hooks for the `archiving` workflow step (pre-hooks before file modifications, post-hooks after the archive). When `--skip-hooks` is passed with specific phases, only those phases are skipped. When `--skip-hooks all` is passed, all hook execution is skipped — the caller is responsible for invoking hooks via `specd change run-hooks`.
+
+    The CLI maps the `--skip-hooks` option to an archive hook-phase selector set on `ArchiveChangeInput`.
+- op: modified
+  selector:
+    type: section
+    matches: '^Examples$'
+  content: |
+    ```
+    specd change archive add-oauth-login
+    specd change archive add-oauth-login --skip-hooks all
+    specd change archive add-oauth-login --skip-hooks pre
+    # → archived change add-oauth-login → .specd/archive/2026-02/add-oauth-login
+    ```
+- op: modified
+  selector:
+    type: section
+    matches: '^Spec Dependencies$'
+  content: |
+    - [`specs/cli/entrypoint/spec.md`](../../cli/entrypoint/spec.md) — config discovery, exit codes, output conventions
+    - [`specs/core/change/spec.md`](../../core/change/spec.md) — archivable state, archive semantics
+    - [`specs/core/archive-change/spec.md`](../../core/archive-change/spec.md) — archive hook phase selectors and hook delegation
+    - [`specs/core/hook-execution-model/spec.md`](../../core/hook-execution-model/spec.md) — `--skip-hooks` manual-control pattern

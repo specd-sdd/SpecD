@@ -1,0 +1,114 @@
+- op: modified
+  description: 'Expose artifact and file state, plus a review summary, in change status output.'
+  selector:
+    type: section
+    matches: '^Requirement: Output format$'
+  content: |
+    In `text` mode (default), the command prints a structured summary to stdout:
+
+    ```
+    change:      <name>
+    state:       <state>
+    specs:       <specId>, <specId>, ...
+    description: <description>            ← only if set
+
+    artifacts:
+      <type>  <state>
+        <file-key>  <file-state>  <filename>
+      ...
+
+    lifecycle:
+      transitions:  <available1>, <available2>, ...    ← only availableTransitions
+      next artifact: <artifactId>                      ← omitted when null
+      approvals:     spec=on|off  signoff=on|off
+      path:          <changePath>
+
+    review:
+      required:  yes|no
+      route:     designing
+      reason:    artifact-drift|artifact-review-required
+      affected:
+        <artifact-type>:
+          - <absolute-path>
+          - <absolute-path>
+    ```
+
+    The `description:` line is omitted when no description is set on the change.
+
+    Each artifact line shows the artifact type ID and its persisted aggregate `state`. Under each artifact, the command prints every tracked file with its file key, persisted file `state`, and relative filename. Artifacts are listed in schema-declared order, with file rows in artifact order.
+
+    The `lifecycle:` section is always present. The `transitions:` line shows only `availableTransitions` (transitions that would succeed now). It is omitted when the list is empty. The `next artifact:` line is omitted when `nextArtifact` is `null`.
+
+    If there are blockers, they are shown after the lifecycle section:
+
+    ```
+    blockers:
+      → <transition>: <reason> — <blocking1>, <blocking2>, ...
+    ```
+
+    The `blockers:` section is omitted when there are no blockers.
+
+    The `review:` section is omitted when `review.required` is `false`. When present, it summarizes why the change must return through design review. Within that section, affected files are rendered using their absolute paths so an operator or agent can jump directly to the file that needs review. If supplemental `key` data is present, it is secondary and must not replace the path-first rendering.
+
+    In `json` or `toon` mode, the output is:
+
+    ```json
+    {
+      "name": "...",
+      "state": "...",
+      "specIds": ["..."],
+      "schema": { "name": "...", "version": 1 },
+      "description": "...",
+      "artifacts": [
+        {
+          "type": "...",
+          "state": "pending-review",
+          "effectiveStatus": "pending-review",
+          "files": [
+            {
+              "key": "...",
+              "filename": "...",
+              "state": "drifted-pending-review"
+            }
+          ]
+        }
+      ],
+      "review": {
+        "required": true,
+        "route": "designing",
+        "reason": "artifact-drift",
+        "affectedArtifacts": [
+          {
+            "type": "specs",
+            "files": [
+              {
+                "key": "core:core/change",
+                "filename": "deltas/core/core/change/spec.md.delta.yaml",
+                "path": "/abs/path/.specd/changes/<change>/deltas/core/core/change/spec.md.delta.yaml"
+              }
+            ]
+          }
+        ]
+      },
+      "lifecycle": {
+        "validTransitions": ["..."],
+        "availableTransitions": ["..."],
+        "blockers": [{ "transition": "...", "reason": "requires", "blocking": ["..."] }],
+        "approvals": { "spec": false, "signoff": false },
+        "nextArtifact": "...",
+        "changePath": "...",
+        "schemaInfo": { "name": "...", "version": 1 }
+      }
+    }
+    ```
+
+    `description` is omitted from the JSON object when not set. The `lifecycle` object is always present. `nextArtifact` is `null` (not omitted) when all artifacts are done.
+- op: modified
+  description: 'Normalize dependencies for metadata extraction.'
+  selector:
+    type: section
+    matches: '^Spec Dependencies$'
+  content: |
+    - [`cli:cli/entrypoint`](../entrypoint/spec.md) — CLI config discovery, exit codes, and output conventions
+    - [`core:core/change`](../../core/change/spec.md) — change and artifact state model
+    - [`core:core/get-status`](../../core/get-status/spec.md) — status payload returned by core

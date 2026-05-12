@@ -1,0 +1,15 @@
+- op: added
+  description: 'Add external VCS providers ahead of built-in detection'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Detection probes in priority order$'
+  content: |
+    ### Requirement: External providers run before built-in probes
+
+    `createVcsAdapter` SHALL support additive external VCS providers. When external providers are registered, they SHALL be probed in registration order before the built-in git, hg, and svn probes.
+
+    If no external or built-in provider matches, the factory SHALL continue to fall back to `NullVcsAdapter`.

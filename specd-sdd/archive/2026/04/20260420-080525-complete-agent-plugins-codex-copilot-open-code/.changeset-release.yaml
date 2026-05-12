@@ -1,0 +1,7 @@
+releases:
+  plugin-agent-codex:plugin-agent: minor
+  plugin-agent-copilot:plugin-agent: minor
+  skills:skill-templates-source: minor
+  plugin-agent-opencode:plugin-agent: minor
+  cli:cli/project-init: patch
+  specd:meta-package: patch

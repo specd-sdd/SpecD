@@ -1,0 +1,44 @@
+- op: modified
+  description: 'Verify implementation-only retries no longer clear validated artifacts.'
+  selector:
+    type: section
+    matches: '^Requirement: Artifact validation clearing on verifying to implementing$'
+  content: |
+    #### Scenario: Implementation-only retry preserves validated artifacts
+
+    - **GIVEN** a change in `verifying` state with validated artifacts
+    - **AND** verification fails for implementation-only reasons
+    - **WHEN** `execute` is called with `to: 'implementing'`
+    - **THEN** unchanged validated artifacts are not cleared
+
+    #### Scenario: Artifact review required does not route through implementing
+
+    - **GIVEN** a change in `verifying` state
+    - **AND** the required fix needs new tasks or revised artifacts
+    - **WHEN** lifecycle routing is resolved
+    - **THEN** the caller must transition to `designing`, not `implementing`
+- op: modified
+  description: 'Verify redesign downgrades files to pending review while preserving drift.'
+  selector:
+    type: section
+    matches: '^Requirement: Transition to designing from any state$'
+  content: |
+    #### Scenario: Transition from archivable to designing
+
+    - **GIVEN** a change in `archivable` state
+    - **WHEN** `execute` is called with `to: 'designing'`
+    - **THEN** the change transitions to `designing`
+
+    #### Scenario: Transition to designing downgrades files to pending-review
+
+    - **GIVEN** a change with validated artifacts
+    - **AND** one file is already `drifted-pending-review`
+    - **WHEN** `execute` is called with `to: 'designing'`
+    - **THEN** every other tracked file becomes `pending-review`
+    - **AND** the drifted file remains `drifted-pending-review`
+
+    #### Scenario: Transition to designing invalidates active approvals
+
+    - **GIVEN** a change in `implementing` state with an active spec approval
+    - **WHEN** `execute` is called with `to: 'designing'`
+    - **THEN** the approval is invalidated before the transition

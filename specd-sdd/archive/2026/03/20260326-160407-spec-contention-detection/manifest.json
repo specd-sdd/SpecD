@@ -1,0 +1,492 @@
+{
+  "name": "spec-contention-detection",
+  "createdAt": "2026-03-26T16:04:07.002Z",
+  "description": "Early detection and warning when multiple active changes target the same spec",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "core:core/kernel",
+    "core:core/archive-change",
+    "core:core/spec-overlap",
+    "cli:cli/change-overlap"
+  ],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "validatedHash": "sha256:e811e303146c3d9975a92d334bb91ac46cfc1c3465855d984343fe2bd6bb133b"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "files": [
+        {
+          "key": "core:core/kernel",
+          "filename": "deltas/core/core/kernel/spec.md.delta.yaml",
+          "validatedHash": "sha256:99804c8f79a033ae33f09902caf6d38e943580cf82a1778c80435da156c6a290"
+        },
+        {
+          "key": "core:core/archive-change",
+          "filename": "deltas/core/core/archive-change/spec.md.delta.yaml",
+          "validatedHash": "sha256:5f1baac77c33ab03a874d004cd5bd4d7b6b4f718a57da586656b1c1bc06584b1"
+        },
+        {
+          "key": "core:core/spec-overlap",
+          "filename": "specs/core/core/spec-overlap/spec.md",
+          "validatedHash": "sha256:62948852cb85ebb62b71213055654991f4976ec4e1cfb57a706d377e2f3f4370"
+        },
+        {
+          "key": "cli:cli/change-overlap",
+          "filename": "specs/cli/cli/change-overlap/spec.md",
+          "validatedHash": "sha256:6fffa582a9c072aa537531df8f634449dbf82f53b26592f130d212d1a629893a"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "files": [
+        {
+          "key": "core:core/kernel",
+          "filename": "deltas/core/core/kernel/verify.md.delta.yaml",
+          "validatedHash": "sha256:fde101de413141b81d75376844aaa47abd2718cdb64ff652203cec0c501ff59e"
+        },
+        {
+          "key": "core:core/archive-change",
+          "filename": "deltas/core/core/archive-change/verify.md.delta.yaml",
+          "validatedHash": "sha256:ebebbbb6da3092010764e725febac24c14eac65cf1f0b2ee7e57dd809b3724b5"
+        },
+        {
+          "key": "core:core/spec-overlap",
+          "filename": "specs/core/core/spec-overlap/verify.md",
+          "validatedHash": "sha256:4c783eb17e79577c575182f2e3d8dcb6d4332bd27914ec36fee2fc5b1ee5850e"
+        },
+        {
+          "key": "cli:cli/change-overlap",
+          "filename": "specs/cli/cli/change-overlap/verify.md",
+          "validatedHash": "sha256:20ca15eaffc6357856bd9cc104bdeae0ec1e3cbf04753a45eed9aa4aa7bc6c1e"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "validatedHash": "sha256:78d23972a65a9ecc99d46a77e85260ce46cdd30485fa6551a2cfa327156eb6aa"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "validatedHash": "sha256:a63b7d7f2acaed4ca91d44d5a982acf5beab11664002c59caf12a7ba6c0117a2"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-03-26T16:04:07.002Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "specIds": ["core:core/kernel", "core:core/spec-contention", "cli:cli/change-contention"],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-03-26T16:04:07.011Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/kernel"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/spec-contention"
+        },
+        {
+          "type": "specs",
+          "key": "cli:cli/change-contention"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/kernel"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/spec-contention"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/change-contention"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-26T16:07:30.140Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-26T16:53:21.428Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-03-26T17:21:26.611Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-26T17:21:26.611Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-03-26T17:21:26.611Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:core/create-change"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/create-change"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-03-26T17:21:31.624Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change"
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-03-26T17:21:31.624Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:core/edit-change"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/edit-change"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-03-26T17:21:32.088Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change"
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-03-26T17:21:32.088Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:core/archive-change"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/archive-change"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-03-26T18:00:43.323Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change"
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-03-26T18:00:43.323Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [],
+      "filesRemoved": [
+        {
+          "type": "specs",
+          "key": "core:core/create-change"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/create-change"
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-03-26T18:00:43.797Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change"
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-03-26T18:00:43.797Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [],
+      "filesRemoved": [
+        {
+          "type": "specs",
+          "key": "core:core/edit-change"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/edit-change"
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-03-26T18:00:50.753Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change"
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-03-26T18:00:50.754Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:core/spec-overlap"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/spec-overlap"
+        }
+      ],
+      "filesRemoved": [
+        {
+          "type": "specs",
+          "key": "core:core/spec-contention"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/spec-contention"
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-03-26T18:00:55.797Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change"
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-03-26T18:00:55.797Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "cli:cli/change-overlap"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/change-overlap"
+        }
+      ],
+      "filesRemoved": [
+        {
+          "type": "specs",
+          "key": "cli:cli/change-contention"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/change-contention"
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-26T18:08:21.874Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-26T18:25:38.086Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-26T18:48:59.598Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-26T18:52:45.511Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-26T18:53:17.947Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-26T19:13:29.553Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-03-26T19:13:55.550Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "m***a@g***.com"
+  }
+}

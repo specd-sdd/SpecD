@@ -1,0 +1,46 @@
+- op: modified
+  description: 'Update factory logic for explicit selection and privacy'
+  selector:
+    type: section
+    matches: 'Requirement: Detection probes in priority order'
+  content: |
+    `createVcsActorResolver` MUST determine the provider to use based on the following precedence:
+
+    1. **Forced Provider**: If `actorProvider` is configured, the factory MUST attempt to load that specific provider by name. If not found, it SHALL throw. If found, it MUST call `create()` on that provider, bypassing all other probes.
+    2. **Auto-Detection**: If no forced provider is set, the factory MUST iterate through all registered `AutoDetectActorProvider` instances (e.g. git, hg, svn) in priority order and call `detect()`.
+
+    The first successful provider (manual or auto) determines the base resolver.
+
+- op: added
+  description: 'Add privacy wrapping requirement (kernel composition level)'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Returns the ActorResolver port interface'
+  content: |
+    ### Requirement: Privacy wrapping
+
+    Privacy wrapping is NOT the responsibility of `createVcsActorResolver`. The factory returns the raw base resolver (VCS-detected or custom). Privacy wrapping is applied at the **kernel composition level**, where `config.privacy` is available.
+
+    The kernel wires the actor resolver as:
+    ```typescript
+    const baseActor = await resolveActorResolver(...)
+    i.actor = config.privacy
+      ? new PrivacyActorResolver(baseActor, config.privacy)
+      : baseActor
+    ```
+
+    This approach ensures privacy is applied uniformly to ALL actor sources — VCS-backed (git, hg, svn), custom providers registered via the registry, and the null fallback — without coupling `createVcsActorResolver` to the privacy config shape.
+
+- op: modified
+  description: 'Update dependencies'
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [core:actor-provider](../actor-provider/spec.md) -- factory interfaces
+    - [core:actor-resolver-privacy](../actor-resolver-privacy/spec.md) -- privacy decorator
+    - [core:composition](../composition/spec.md) -- kernel wiring of privacy decorator

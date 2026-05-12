@@ -1,0 +1,18 @@
+- op: added
+  description: Ensure validate success is not interpreted as semantic approval.
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Behaviour'
+  content: |
+    ### Requirement: Structural validation scope
+
+    #### Scenario: Successful validate does not imply semantic approval
+
+    - **GIVEN** `specd changes validate my-change core:core/config` passes
+    - **WHEN** a workflow step evaluates artifact quality
+    - **THEN** the pass result is treated as structural/state validation only
+    - **AND** semantic/content review remains a separate required activity

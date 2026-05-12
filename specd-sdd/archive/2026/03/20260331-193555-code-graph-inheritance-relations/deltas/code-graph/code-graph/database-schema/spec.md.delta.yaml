@@ -1,0 +1,60 @@
+- op: modified
+  description: Persist hierarchy relations as first-class edge tables.
+  selector:
+    type: section
+    matches: '^Requirement: Relationship tables$'
+  content: |-
+    The database SHALL define the following relationship tables:
+
+    | Relationship | From   | To     | Populated by        |
+    | ------------ | ------ | ------ | ------------------- |
+    | IMPORTS      | File   | File   | Indexer Pass 2      |
+    | DEFINES      | File   | Symbol | Indexer Pass 1      |
+    | CALLS        | Symbol | Symbol | Indexer Pass 2      |
+    | EXPORTS      | File   | Symbol | Indexer Pass 1      |
+    | DEPENDS_ON   | Spec   | Spec   | Spec indexing phase |
+    | COVERS       | Spec   | File   | Deferred to v2+     |
+    | EXTENDS      | Symbol | Symbol | Indexer Pass 2      |
+    | IMPLEMENTS   | Symbol | Symbol | Indexer Pass 2      |
+    | OVERRIDES    | Symbol | Symbol | Indexer Pass 2      |
+
+    Relationships have no properties — they are pure edges.
+
+- op: modified
+  description: Bump schema version for persisted hierarchy edges.
+  selector:
+    type: section
+    matches: '^Requirement: Schema versioning$'
+  content: |-
+    The schema SHALL be versioned with an integer `SCHEMA_VERSION` constant. The current version is **6**. When the database is opened:
+
+    1. Execute the DDL statements (all use `IF NOT EXISTS` — safe to re-run)
+    2. Create FTS indexes if they do not exist
+    3. Store the schema version in the `Meta` table
+
+    Schema version changes require a `--force` re-index to rebuild the database from scratch. There is no incremental migration between versions — the `.lbug` file is deleted and recreated.
+
+- op: modified
+  description: Reflect hierarchy edge persistence in constraints.
+  selector:
+    type: section
+    matches: '^Constraints$'
+  content: |-
+    - All node table primary keys are STRING — no auto-increment
+    - `comment` on Symbol is stored as empty string (not NULL) when no comment exists, to enable FTS indexing
+    - `searchName` on Symbol is computed at insert time by `expandSymbolName(name)` — it is a derived column, never set directly by callers
+    - `content` on Spec may be large (full spec text) — no size limit enforced
+    - FTS indexes are rebuilt on `--force` re-index (dropped with the database)
+    - Relationship tables have no properties — metadata is not persisted on edges
+    - The `COVERS` relationship table exists in the schema but is not populated until v2+
+    - `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES` are first-class persisted relationship tables in schema version 6
+
+- op: modified
+  description: Update dependency on symbol-model to include hierarchy relation semantics.
+  selector:
+    type: section
+    matches: '^Spec Dependencies$'
+  content: |-
+    - [`specs/code-graph/symbol-model/spec.md`](../symbol-model/spec.md) — node types, field definitions, hierarchy relation types
+    - [`specs/code-graph/graph-store/spec.md`](../graph-store/spec.md) — `GraphStore` port and `LadybugGraphStore` adapter
+    - [`specs/code-graph/workspace-integration/spec.md`](../workspace-integration/spec.md) — workspace-prefixed paths and specId format

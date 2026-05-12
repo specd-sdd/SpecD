@@ -1,0 +1,215 @@
+{
+  "name": "change-spec-preview-artifact-flag",
+  "createdAt": "2026-04-28T15:57:17.890Z",
+  "description": "This change adds an optional --artifact <name> flag to specd change spec-preview so reviewers can focus output on a single spec-scoped artifact such as spec.md or verify.md. The CLI now resolves artifact IDs via the active schema, filters merged/diff/json preview output accordingly, and reports consistent errors for unknown, wrong-scope, or missing artifacts.",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": ["cli:cli/change-spec-preview"],
+  "specDependsOn": {
+    "cli:cli/change-spec-preview": ["core:core/preview-spec"]
+  },
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:c82c6dc22bb84b562b49ab5c29dac2ad16750d2403e6a5d7288befe601e610a2"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "cli:cli/change-spec-preview",
+          "filename": "deltas/cli/cli/change-spec-preview/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:418c59c755e39b84cf94a23f07dcd364428b6dd56c996a129f2e66d326378c3c"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "cli:cli/change-spec-preview",
+          "filename": "deltas/cli/cli/change-spec-preview/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:1df93d9aea3afcb30d9afdb829118d358096538c82e76652556bc07e00b84698"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:3422dd879d2653ed311ff750af255f0896d4cba3ba2ae19712e42284e09f9f40"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:245c5b7d1c9c39656e469d7b0185bf4b02ebd4f4515f60e5512d051921b17635"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-04-28T15:57:17.890Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "specIds": ["cli:cli/change-spec-preview"],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-28T15:57:17.901Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "cli:cli/change-spec-preview"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/change-spec-preview"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-28T16:03:35.286Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-28T16:11:41.882Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-28T16:11:51.846Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-28T17:25:12.011Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-28T17:25:34.446Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-28T17:25:47.065Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "description-updated",
+      "at": "2026-04-28T17:30:13.190Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "description": "This change adds an optional --artifact <name> flag to specd change spec-preview so reviewers can focus output on a single spec-scoped artifact such as spec.md or verify.md. The CLI now resolves artifact IDs via the active schema, filters merged/diff/json preview output accordingly, and reports consistent errors for unknown, wrong-scope, or missing artifacts."
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-28T17:30:13.212Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-04-28T17:30:13.273Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "m***a@g***.com"
+  }
+}

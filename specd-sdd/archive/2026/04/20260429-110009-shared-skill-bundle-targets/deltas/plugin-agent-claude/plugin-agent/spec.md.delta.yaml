@@ -1,0 +1,74 @@
+- op: modified
+  description: 'Route shared bundle files separately during Claude skill installation.'
+  selector:
+    type: section
+    matches: 'Requirement: Application layer'
+  content: |
+    The application layer MUST have `InstallSkills` use case that orchestrates:
+
+    1. Get skills via `@specd/skills` repository, passing `SpecdConfig` for built-in variable resolution
+    2. Inject stored frontmatter to each skill-local markdown template
+    3. Install files not marked as shared to `.claude/skills/<skill-name>/` relative to the `projectRoot` found in `SpecdConfig`
+    4. Install files marked as shared to `.claude/skills/_specd-shared/` relative to the `projectRoot` found in `SpecdConfig`
+
+- op: modified
+  description: 'Keep frontmatter injection limited to skill-local markdown files.'
+  selector:
+    type: section
+    matches: 'Requirement: Frontmatter injection'
+  content: |
+    During install, the plugin MUST prepend YAML frontmatter to each skill-local markdown file:
+
+    ```yaml
+    ---
+    name: { { name } }
+    description: { { description } }
+    allowed_tools: { { allowed_tools } }
+    argument_hint: { { argument_hint } }
+    ---
+    ```
+
+    The plugin MUST NOT prepend skill frontmatter to files marked as shared.
+
+- op: modified
+  description: 'Define the Claude shared skills resource directory.'
+  selector:
+    type: section
+    matches: 'Requirement: Install location'
+  content: |
+    Skills MUST be installed to `.claude/skills/` in the project root.
+
+    For each skill, files not marked as shared MUST be installed under `.claude/skills/<skill-name>/`.
+
+    Files marked as shared MUST be installed under `.claude/skills/_specd-shared/`. This shared directory MUST NOT contain a `SKILL.md` file.
+
+- op: modified
+  description: 'Add the shared bundle contract dependency.'
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`core:core/config`](../../core/core/config/spec.md) — defines SpecdConfig type
+    - [`plugin-manager:agent-plugin-type`](../plugin-manager/agent-plugin-type/spec.md) — plugin interface
+    - [`skills:skill-bundle`](../skills/skill-bundle/spec.md) — shared bundle file routing contract
+    - [`skills:skill-repository`](../skills/skill-repository/spec.md) — skill access
+
+- op: added
+  description: 'Define how Claude uninstall handles the shared resource directory.'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Install location'
+  content: |
+    ### Requirement: Uninstall behavior
+
+    `uninstall(config: SpecdConfig, options?: AgentInstallOptions)` MUST remove installed skill directories from `.claude/skills/` relative to `config.projectRoot`.
+
+    When `options.skills` is provided, uninstall MUST remove only the selected specd-managed skill directories. The shared resource directory MUST remain in place because other installed skills may still reference it.
+
+    When `options.skills` is omitted, uninstall MUST remove all specd-managed skill directories and `_specd-shared/`.
+
+    Uninstall MUST NOT remove unrelated directories or files under `.claude/skills/` that are not part of the specd-managed skill set.

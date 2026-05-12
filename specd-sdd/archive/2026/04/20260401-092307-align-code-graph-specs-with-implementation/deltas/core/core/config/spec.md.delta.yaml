@@ -1,0 +1,28 @@
+- op: added
+  description: 'Add project-level configPath for graph persistence and temporary graph artifacts'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Storage configuration$'
+  content: |
+    ### Requirement: Graph config path
+
+    `specd.yaml` MAY declare a top-level `configPath` field for derived graph persistence and temporary graph artifacts.
+
+    ```yaml
+    configPath: .specd/config
+    ```
+
+    When omitted, `configPath` defaults to `.specd/config` relative to the directory containing `specd.yaml`.
+
+    `configPath` is project-level only. It MUST resolve inside the project repo root and is used for tool-owned graph artifacts rather than authored project content.
+
+    The following derived directories are defined from it:
+
+    - **`{configPath}/graph`** — graph persistence root used by code-graph backends
+    - **`{configPath}/tmp`** — temporary scratch directory for graph/indexing artifacts
+
+    `configPath` does not replace the `storage` section for changes, drafts, discarded changes, or archives. Those remain governed by `storage.*`.

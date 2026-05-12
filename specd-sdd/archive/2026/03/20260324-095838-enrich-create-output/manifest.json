@@ -1,0 +1,250 @@
+{
+  "name": "enrich-create-output",
+  "createdAt": "2026-03-24T09:58:38.564Z",
+  "description": "Add changePath to change create output so agents know where to write artifacts",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": ["core:core/create-change", "cli:cli/change-create"],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "validatedHash": "sha256:c3889fb514f0f3bcf52ecde845329b21a50f7184815a1a7f6ef9789547601377"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "files": [
+        {
+          "key": "core:core/create-change",
+          "filename": "deltas/core/core/create-change/spec.md.delta.yaml",
+          "validatedHash": "sha256:355b7c59f0876c4bfbc91dc9583d31e1b3a2eadf8a75635424c371f808ed27c9"
+        },
+        {
+          "key": "cli:cli/change-create",
+          "filename": "deltas/cli/cli/change-create/spec.md.delta.yaml",
+          "validatedHash": "sha256:de7bb54d63f918468e4aa27e83d1f37268ee34946d9398edceb8ad8034f5b021"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "files": [
+        {
+          "key": "core:core/create-change",
+          "filename": "deltas/core/core/create-change/verify.md.delta.yaml",
+          "validatedHash": "sha256:74493170dbab66526113bc5992e5963605ff2f4f473e193d8807567c651e48ae"
+        },
+        {
+          "key": "cli:cli/change-create",
+          "filename": "deltas/cli/cli/change-create/verify.md.delta.yaml",
+          "validatedHash": "sha256:e9786d24f6156b5472413afc0716b497a20d7649508f7f679937ae24967385b5"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "validatedHash": "sha256:49e352d30032dc4e5600777c46fee588300122960ea86b906273abf56c59872b"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "validatedHash": "sha256:aa228879fccdefa161d2f9865f833911cbfb9d061cf4562cfe685c4880e210cf"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-03-24T09:58:38.564Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "specIds": ["core:core/create-change", "cli:cli/change-create"],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-03-24T09:58:38.574Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/create-change"
+        },
+        {
+          "type": "specs",
+          "key": "cli:cli/change-create"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/create-change"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/change-create"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-24T09:58:50.724Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-24T10:02:30.572Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-24T10:02:31.056Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-03-24T10:09:19.595Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-change"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-24T10:09:19.595Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-24T10:09:47.072Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-24T10:09:47.505Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-24T10:09:59.826Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-24T10:10:00.414Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-24T10:10:00.833Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-24T10:21:14.600Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-03-24T10:21:27.795Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "m***a@g***.com"
+  }
+}

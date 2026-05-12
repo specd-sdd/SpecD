@@ -1,0 +1,20 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Ports and constructor'
+  content: |
+    `GetArtifactInstruction` receives at construction time: `ChangeRepository`, a map of `SpecRepository` instances, `SchemaProvider`, `ArtifactParserRegistry`, and `TemplateExpander`.
+
+    ```typescript
+    class GetArtifactInstruction {
+      constructor(
+        changes: ChangeRepository,
+        specs: ReadonlyMap<string, SpecRepository>,
+        schemaProvider: SchemaProvider,
+        parsers: ArtifactParserRegistry,
+        expander: TemplateExpander,
+      )
+    }
+    ```
+
+    `ArtifactParserRegistry` is needed to generate delta format instructions and existing artifact outlines. `SpecRepository` is needed to read existing artifact files for outlines. `TemplateExpander.expand()` is called on `instruction`, `template`, `deltaInstruction`, and `rules` text before returning them (verbatim expansion, no shell escaping). `SchemaProvider` provides the fully-resolved schema (with plugins and overrides applied), which includes pre-loaded template content in each `ArtifactType`. It replaces the previous `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths` triple. The use case builds contextual variables (`change` namespace) from the resolved change and `ChangeRepository.changePath()`, passing them to the expander.

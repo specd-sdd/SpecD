@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'No verify changes are needed because the plugin-manager agent contract remains unchanged in this change.'

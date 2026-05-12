@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'The abstract GraphStore verification scenarios already cover the unchanged port contract'

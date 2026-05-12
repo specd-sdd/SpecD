@@ -1,0 +1,41 @@
+added:
+  - position:
+      parent: '### Requirement: Command signature'
+    content: |
+      - `--mode list|summary|full|hybrid` — optional; overrides the `contextMode` from `specd.yaml`. When set to `hybrid`, maintains tiers (change specs as full, others as summary).
+  - position:
+      parent: '### Requirement: Output'
+    content: |
+      #### Scenario: Default sections in full mode
+      When a spec is rendered in `full` mode (either due to `--mode full` or being a change spec in `hybrid` mode) and no section flags (`--rules`, `--constraints`, `--scenarios`) are provided, the output MUST default to rendering **Description + Rules + Constraints**.
+
+      #### Scenario: Smart section filtering in hybrid mode
+      When in `hybrid` mode (default or explicit) and section flags are provided, they apply as filters ONLY to the specs in the `full` tier (change specs). Non-change specs MUST remain in `summary` mode.
+modified:
+  - selector: '### Requirement: Command signature'
+    content: |
+      ```
+      specd change context <name> <step>
+        [--mode list|summary|full|hybrid]
+        [--rules] [--constraints] [--scenarios]
+        [--include-change-specs]
+        [--follow-deps [--depth <n>]]
+        [--fingerprint <hash>]
+        [--format text|json|toon]
+      ```
+  - selector: '### Requirement: Output'
+    rename: '### Requirement: Output and rendering'
+    content: |
+      The CLI MUST assemble the final output from the structured `CompileContextResult` returned by the use case. `full` mode rendering MUST use structured output (derived from metadata or extraction) instead of raw markdown.
+
+      **In `text` mode** (default):
+
+      1. The first rendered line is `Context Fingerprint: <sha256...>`, before any project context or spec content.
+      2. Project context entries are rendered next, each preceded by its source label. Entries are separated by `---`.
+      3. Spec entries follow with explicit mode labels:
+         - **Full-mode specs** (`mode: 'full'`) are rendered under a `### Spec: <specId>` heading and include structured sections. If no section flags are passed, render Description, Rules, and Constraints.
+         - **Summary-mode specs** (`mode: 'summary'`) are rendered under `## Available context specs` with spec ID, title, description, source, and an explicit summary label.
+         - **List-mode specs** (`mode: 'list'`) are rendered under `## Available context specs` with spec ID, source, and an explicit list label.
+         - Non-full sections include this instruction: `Use \`specd change spec-preview <change-name> <specId>\` to load the merged full content of any change spec you need.\`
+         - Specs from `dependsOnTraversal` source MUST be visually distinguished from `includePattern` specs.
+      4. Available steps are rendered last, each annotated with availability status.

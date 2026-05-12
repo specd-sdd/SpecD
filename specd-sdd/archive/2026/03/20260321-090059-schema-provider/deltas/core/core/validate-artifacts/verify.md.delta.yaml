@@ -1,0 +1,13 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Scenario: Non-optional artifact missing — failure'
+    parent:
+      type: section
+      matches: 'Requirement: Required artifacts check'
+  content: |
+    #### Scenario: Non-optional artifact missing — failure
+
+    - **GIVEN** a change with a required (non-optional) artifact that has no files
+    - **WHEN** `ValidateArtifacts.execute` is called
+    - **THEN** the result includes a validation failure for the missing artifact

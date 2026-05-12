@@ -1,0 +1,41 @@
+- op: modified
+  description: 'Add scenario for designing-to-designing not downgrading artifacts'
+  selector:
+    type: section
+    matches: 'Requirement: Lifecycle'
+  content: |
+    #### Scenario: Valid transition — drafting to designing
+
+    - **WHEN** a Change in `drafting` state is transitioned to `designing`
+    - **THEN** a `transitioned` event with `from: 'drafting'` and `to: 'designing'` is appended and deriving state returns `designing`
+
+    #### Scenario: Valid transition — verifying back to implementing for implementation-only failure
+
+    - **GIVEN** a Change in `verifying` state
+    - **AND** the current artifacts still describe the intended behavior
+    - **AND** the required fix fits within the already-defined tasks
+    - **WHEN** the change is transitioned back to `implementing`
+    - **THEN** a `transitioned` event with `from: 'verifying'` and `to: 'implementing'` is appended
+    - **AND** no approval invalidation is triggered
+
+    #### Scenario: Verification requiring new tasks returns to designing
+
+    - **GIVEN** a Change in `verifying` state
+    - **AND** the required fix would introduce tasks not already defined
+    - **WHEN** verification routes the change out of `verifying`
+    - **THEN** the change transitions to `designing`, not `implementing`
+
+    #### Scenario: archivable can return to designing
+
+    - **GIVEN** a Change in `archivable` state
+    - **WHEN** it is transitioned to `designing`
+    - **THEN** the transition succeeds
+
+    #### Scenario: Designing to designing does not downgrade artifacts or approvals
+
+    - **GIVEN** a Change already in `designing` state with validated artifacts and an active spec approval
+    - **WHEN** the change is transitioned to `designing` again
+    - **THEN** no `invalidated` event is appended
+    - **AND** no artifact files are downgraded to `pending-review`
+    - **AND** the active spec approval remains valid
+    - **AND** a `transitioned` event with `from: 'designing'` and `to: 'designing'` is appended

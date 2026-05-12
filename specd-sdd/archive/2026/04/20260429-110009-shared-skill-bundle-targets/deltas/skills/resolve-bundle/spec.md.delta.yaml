@@ -1,0 +1,17 @@
+- op: modified
+  description: 'Ensure variable substitution does not drop shared-file metadata.'
+  selector:
+    type: section
+    matches: 'Requirement: Behavior'
+  content: |
+    The use case MUST:
+
+    1. **Built-in Variable Injection**: If `config` is provided, merge built-in variables with the provided `variables` map (user-provided variables override built-ins).
+       Built-in variables SHALL include:
+       - `{{projectRoot}}`: `config.projectRoot`
+       - `{{configPath}}`: `config.configPath`
+       - `{{schemaRef}}`: `config.schemaRef`
+    2. Call `SkillRepository.getBundle(input.name, mergedVariables)`
+    3. Replace `{{key}}` placeholders in each resolved file's content with values from the merged variables map
+    4. Preserve all non-content `ResolvedFile` metadata, including whether a file is marked as shared
+    5. Return the resolved bundle

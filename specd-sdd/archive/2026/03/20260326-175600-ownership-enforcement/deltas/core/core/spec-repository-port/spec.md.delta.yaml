@@ -1,0 +1,36 @@
+- op: modified
+  description: 'Add readOnly guard to save — throw ReadOnlyWorkspaceError before any write'
+  selector:
+    type: section
+    matches: 'Requirement: save persists a single artifact with conflict detection'
+  content: |
+    `save(spec, artifact, options?)` MUST first check `this.ownership()`. If the ownership is `readOnly`, the method MUST throw `ReadOnlyWorkspaceError` with a message indicating the spec ID and workspace name. This check MUST occur before any filesystem operation or conflict detection.
+
+    If the ownership is `owned` or `shared`, `save` proceeds normally: it MUST write a single artifact file within the spec directory. If the spec directory does not exist, it MUST be created. If `artifact.originalHash` is set and does not match the current file hash on disk, the save MUST be rejected by throwing `ArtifactConflictError` to prevent silently overwriting concurrent modifications. When `options.force` is `true`, the conflict check MUST be skipped and the file MUST be overwritten unconditionally.
+
+- op: modified
+  description: 'Add readOnly guard to saveMetadata — throw ReadOnlyWorkspaceError before any write'
+  selector:
+    type: section
+    matches: 'Requirement: saveMetadata persists metadata with conflict detection'
+  content: |
+    `saveMetadata(spec, content, options?)` MUST first check `this.ownership()`. If the ownership is `readOnly`, the method MUST throw `ReadOnlyWorkspaceError` with a message indicating the spec ID and workspace name. This check MUST occur before any filesystem operation or conflict detection.
+
+    If the ownership is `owned` or `shared`, `saveMetadata` proceeds normally: it MUST write the metadata content for the given spec. The `content` parameter is a JSON string. If `originalHash` is set on the content and does not match the current file hash on disk, the save MUST be rejected by throwing `ArtifactConflictError`. When `options.force` is `true`, the conflict check MUST be skipped. If the metadata directory does not exist, it MUST be created. This method replaces the previous pattern of `save(spec, new SpecArtifact('.specd-metadata.yaml', content))` for metadata writes.
+
+- op: modified
+  description: 'Add readOnly constraint for save and saveMetadata'
+  selector:
+    type: section
+    matches: 'Constraints'
+  content: |
+    - Each instance is bound to a single workspace; workspace is immutable after construction
+    - `get` and `list` return lightweight `Spec` metadata — artifact content is never loaded by these methods
+    - `save` creates the spec directory if it does not already exist
+    - `ArtifactConflictError` is the sole error type for concurrent modification detection on `save` and `saveMetadata`
+    - `resolveFromPath` with a relative path and no `from` parameter is invalid and the implementation MUST handle this as an error or return `null`
+    - `originalHash` on loaded artifacts MUST use `sha256` of the file content as read from disk
+    - `metadata` and `saveMetadata` operate on a storage location determined by the adapter — callers MUST NOT assume metadata lives alongside spec content
+    - `metadata` returns parsed content; `artifact` returns raw content — they are not interchangeable
+    - `save` and `saveMetadata` MUST throw `ReadOnlyWorkspaceError` before any I/O when ownership is `readOnly`
+    - Read operations (`get`, `list`, `artifact`, `metadata`, `resolveFromPath`) are not affected by ownership — readOnly workspaces can always be read

@@ -1,0 +1,50 @@
+- op: modified
+  description: 'Align config-show output requirements with the current SpecdConfig shape'
+  selector:
+    type: section
+    matches: '^Requirement: Output format$'
+  content: |
+    In `text` mode (default), the command prints the resolved config as structured key-value output:
+
+    ```
+    projectRoot:  <absolute-path>
+    schemaRef:    <schema-ref>
+    approvals:    spec=<true|false>  signoff=<true|false>
+
+    workspaces:
+      <name>  <ownership>  <specsPath>
+      ...
+
+    storage:
+      changes:   <absolute-path>
+      drafts:    <absolute-path>
+      discarded: <absolute-path>
+      archive:   <absolute-path>
+    ```
+
+    Optional fields are shown only when present in the config:
+
+    ```
+    storage:
+      pattern: <archive-pattern>
+
+    context:
+      file: <path>
+      instruction: <text>
+      ...
+
+    contextIncludeSpecs: <pattern>, <pattern>, ...
+    contextExcludeSpecs: <pattern>, <pattern>, ...
+    llmOptimizedContext: <true|false>
+    schemaPlugins: <ref>, <ref>, ...
+
+    artifactRules:
+      <artifactId>: <count> rules
+      ...
+
+    schemaOverrides: (present)
+    ```
+
+    The text view is intentionally summarized. It shows the resolved workspace and storage paths used by humans for diagnosis, but it does not expand the full adapter-binding structure.
+
+    In `json` or `toon` mode, the command MUST serialize the `SpecdConfig` object directly — no manual field selection. The output is the config as-is, encoded in the respective format. This ensures that new fields added to `SpecdConfig`, including named adapter bindings such as `specsAdapter`, `schemasAdapter`, `changesAdapter`, `draftsAdapter`, `discardedAdapter`, and `archiveAdapter`, appear automatically without CLI changes. Optional fields that are `undefined` are omitted by the serializer.

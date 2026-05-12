@@ -1,0 +1,281 @@
+{
+  "name": "indexer-config-exclude-paths",
+  "createdAt": "2026-03-30T09:08:01.003Z",
+  "description": "Add per-workspace graph.excludePaths (gitignore-syntax) and graph.respectGitignore to workspace config, replacing hardcoded EXCLUDED_DIRS",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "core:core/config",
+    "code-graph:code-graph/indexer",
+    "code-graph:code-graph/workspace-integration",
+    "cli:cli/graph-index"
+  ],
+  "specDependsOn": {
+    "code-graph:code-graph/workspace-integration": ["core:core/config"]
+  },
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "validatedHash": "sha256:519782d6db7b17015a2150aa2b794de59478e6bb23f296c84ec00ec4c8e5dcd3"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "files": [
+        {
+          "key": "core:core/config",
+          "filename": "deltas/core/core/config/spec.md.delta.yaml",
+          "validatedHash": "sha256:95368048cb38647c7eee928da8d76dd07fcf0b211bba55485b51dd39d612f605"
+        },
+        {
+          "key": "code-graph:code-graph/indexer",
+          "filename": "deltas/code-graph/code-graph/indexer/spec.md.delta.yaml",
+          "validatedHash": "sha256:615879da479d0b85675fa9676d052a7bff75cbc9fda419b88eeb8b9f8d6fd36d"
+        },
+        {
+          "key": "code-graph:code-graph/workspace-integration",
+          "filename": "deltas/code-graph/code-graph/workspace-integration/spec.md.delta.yaml",
+          "validatedHash": "sha256:ea865005c9b068b7e952083ef1bc349886fbec51449f87bb0813c3d2a3b444a9"
+        },
+        {
+          "key": "cli:cli/graph-index",
+          "filename": "deltas/cli/cli/graph-index/spec.md.delta.yaml",
+          "validatedHash": "sha256:601a06b31efdd5d3501874fe82761e451a4f9d9526f1b4958ae6c34b3c55cd8b"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "files": [
+        {
+          "key": "core:core/config",
+          "filename": "deltas/core/core/config/verify.md.delta.yaml",
+          "validatedHash": "sha256:8faa371cda2270297ee6549f5325872d219f7fcb5bdf78a3b50eef6a14e5aa30"
+        },
+        {
+          "key": "code-graph:code-graph/indexer",
+          "filename": "deltas/code-graph/code-graph/indexer/verify.md.delta.yaml",
+          "validatedHash": "sha256:1c04ac9d1bdd377a03a537ddb0ba070c9cecc57df43f857745f1106719347d4a"
+        },
+        {
+          "key": "code-graph:code-graph/workspace-integration",
+          "filename": "deltas/code-graph/code-graph/workspace-integration/verify.md.delta.yaml",
+          "validatedHash": "sha256:74c3e3e22ac1a22de02bd031c38013426203585099bf905775f49f8f02795aa1"
+        },
+        {
+          "key": "cli:cli/graph-index",
+          "filename": "deltas/cli/cli/graph-index/verify.md.delta.yaml",
+          "validatedHash": "sha256:85e89ab51b54ea7624d48a1a0fe31b9673ace7557cdda02fdca0ad080562431f"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "validatedHash": "sha256:06552a046d7697a4ee1ef2ae948d431ac532eab3a6757b2523da7b377c1c65e8"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "validatedHash": "sha256:91afe6192713a471a578baafb529bc69cba93df093114b6dd6be376de38f6345"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-03-30T09:08:01.003Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "specIds": [
+        "core:core/config",
+        "code-graph:code-graph/indexer",
+        "code-graph:code-graph/workspace-integration"
+      ],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-03-30T09:08:01.012Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/config"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:code-graph/indexer"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:code-graph/workspace-integration"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/config"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:code-graph/indexer"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:code-graph/workspace-integration"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-30T09:13:49.925Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-03-30T09:42:39.582Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change"
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-03-30T09:42:39.582Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "cli:cli/graph-index"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/graph-index"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-30T10:13:33.805Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-30T10:15:12.488Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-30T11:53:32.866Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-30T13:13:51.089Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-30T13:14:30.570Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-30T13:20:42.058Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-03-30T13:20:42.230Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "m***a@g***.com"
+  }
+}

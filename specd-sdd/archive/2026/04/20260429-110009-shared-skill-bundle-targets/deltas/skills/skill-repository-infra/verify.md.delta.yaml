@@ -1,0 +1,17 @@
+- op: modified
+  description: 'Cover shared marker emission by fs repository implementation.'
+  selector:
+    type: section
+    matches: 'Requirement: File reading'
+  content: |
+    #### Scenario: Reads template files
+
+    - **WHEN** getBundle is called
+    - **THEN** template files are read from `packages/skills/templates/`
+
+    #### Scenario: Shared template entries are marked in resolved bundle files
+
+    - **GIVEN** `templates/shared/*.meta.json` associates `shared.md` to a skill
+    - **WHEN** `getBundle` resolves that skill
+    - **THEN** the resulting `ResolvedFile` for `shared.md` is marked as shared
+    - **AND** files loaded from `templates/<skill-name>/` are not marked as shared

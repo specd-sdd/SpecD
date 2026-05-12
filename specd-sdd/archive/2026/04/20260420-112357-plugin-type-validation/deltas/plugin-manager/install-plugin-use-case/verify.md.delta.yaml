@@ -1,0 +1,17 @@
+- op: added
+  description: 'Add scenario for non-agent plugin rejection'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Behavior'
+  content: |-
+    ### Requirement: Error handling
+
+    #### Scenario: Non-agent plugin rejected
+
+    - **GIVEN** a loaded plugin that is a valid SpecdPlugin but not an AgentPlugin
+    - **WHEN** `InstallPlugin.execute()` is called
+    - **THEN** `PluginValidationError` is thrown

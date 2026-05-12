@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'The existing SpecdContextMode and contextMode requirement already cover the necessary modes (list, summary, full, hybrid). The new logic for defaults and CLI overrides is handled in the command and use-case specs.'

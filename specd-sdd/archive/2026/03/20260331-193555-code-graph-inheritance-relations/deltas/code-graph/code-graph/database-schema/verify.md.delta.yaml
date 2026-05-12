@@ -1,0 +1,39 @@
+- op: modified
+  description: Verify the new hierarchy relationship tables.
+  selector:
+    type: section
+    matches: '^Requirement: Relationship tables$'
+  content: |-
+    #### Scenario: DEPENDS_ON connects specs
+
+    - **GIVEN** spec A depends on spec B
+    - **WHEN** a DEPENDS_ON relation is created
+    - **THEN** querying spec A's dependencies returns spec B
+
+    #### Scenario: COVERS table exists but is empty
+
+    - **WHEN** the database schema is initialized
+    - **THEN** the COVERS relationship table exists
+    - **AND** it contains no rows (v2+ feature)
+
+    #### Scenario: Hierarchy relationship tables exist
+
+    - **WHEN** the database schema is initialized
+    - **THEN** `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES` relationship tables exist
+
+- op: modified
+  description: Bump schema-version verification for hierarchy persistence.
+  selector:
+    type: section
+    matches: '^Requirement: Schema versioning$'
+  content: |-
+    #### Scenario: Schema version 6
+
+    - **WHEN** a fresh database is opened
+    - **THEN** the schema version stored in the Meta table is `6`
+
+    #### Scenario: Old schema requires force re-index
+
+    - **GIVEN** a database created with schema version 5
+    - **WHEN** the application opens it expecting version 6
+    - **THEN** a `--force` re-index is required to rebuild

@@ -1,0 +1,306 @@
+{
+  "name": "fix-schema-overrides",
+  "createdAt": "2026-03-21T17:05:13.984Z",
+  "description": "Fix schemaOverrides hook format normalization and remove redundant top-level workflow from config",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "core:core/resolve-schema",
+    "core:core/run-step-hooks",
+    "core:core/get-hook-instructions",
+    "core:core/config",
+    "core:core/kernel"
+  ],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "validatedHash": "sha256:5923a1f56923624ab03483d61c54974dc7c04c55c3a196180cf7a971fc154744"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "files": [
+        {
+          "key": "core:core/resolve-schema",
+          "filename": "deltas/core/core/resolve-schema/spec.md.delta.yaml",
+          "validatedHash": "sha256:72d5227bad079465d3866badd1d108c9afb55fbb4f72d1cf317c03ca3e823ee1"
+        },
+        {
+          "key": "core:core/run-step-hooks",
+          "filename": "deltas/core/core/run-step-hooks/spec.md.delta.yaml",
+          "validatedHash": "sha256:733249218eb825389fd101a4f3fcbcc6dd83fe778c417cabfa0d95493412aff9"
+        },
+        {
+          "key": "core:core/get-hook-instructions",
+          "filename": "deltas/core/core/get-hook-instructions/spec.md.delta.yaml",
+          "validatedHash": "sha256:ee4166b01d4188b37912f8c8bb1c4c6d0804d32387793324bb0515f93a44a38d"
+        },
+        {
+          "key": "core:core/config",
+          "filename": "deltas/core/core/config/spec.md.delta.yaml",
+          "validatedHash": "sha256:74b892fa8ee1446ae2891f67f218ea017119f3ad97bb6e8252bbf0e8dbc46eed"
+        },
+        {
+          "key": "core:core/kernel",
+          "filename": "deltas/core/core/kernel/spec.md.delta.yaml",
+          "validatedHash": "sha256:64549ae2c1db49dbc7dbdba7e637a40f1e187fef1ee547b4b9b409fd8f85f9e9"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "files": [
+        {
+          "key": "core:core/resolve-schema",
+          "filename": "deltas/core/core/resolve-schema/verify.md.delta.yaml",
+          "validatedHash": "sha256:1018e1b3b7818f8dcfb4d688cfe05b92801a9d33ab9f047bca733a0f40dae577"
+        },
+        {
+          "key": "core:core/run-step-hooks",
+          "filename": "deltas/core/core/run-step-hooks/verify.md.delta.yaml",
+          "validatedHash": "sha256:3cc5195ed1a6e084afcaa819f2f3bca51cfdf1ec7b3372cdca5014a331c1220c"
+        },
+        {
+          "key": "core:core/get-hook-instructions",
+          "filename": "deltas/core/core/get-hook-instructions/verify.md.delta.yaml",
+          "validatedHash": "sha256:60606e963de3f1c7286f884e083f70aecb4c0a1fef6f94a8cfbf48dd296beac4"
+        },
+        {
+          "key": "core:core/config",
+          "filename": "deltas/core/core/config/verify.md.delta.yaml",
+          "validatedHash": "sha256:8d8e22e3f25e81b16cbcb5e71cfb1409a36fc11d92fdf0ae09339c985a61bc7b"
+        },
+        {
+          "key": "core:core/kernel",
+          "filename": "deltas/core/core/kernel/verify.md.delta.yaml",
+          "validatedHash": "sha256:2312100c576c7217bd030dfb7f1b900c0b262396ac1ac2f45cb6c3c44ebe63da"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "validatedHash": "sha256:9995a774f2166efa08522ce1db7f989d58ec4122b8aac538cf48d252ada46b3f"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "validatedHash": "sha256:6fda77c67d6d93ab782bda3c34b1b06ba712a712c0409715da5807be3a97c1d7"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-03-21T17:05:13.984Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "specIds": [
+        "core:core/resolve-schema",
+        "core:core/run-step-hooks",
+        "core:core/get-hook-instructions",
+        "core:core/config",
+        "core:core/kernel"
+      ],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-03-21T17:05:13.992Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/resolve-schema"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/run-step-hooks"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/get-hook-instructions"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/config"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/kernel"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/resolve-schema"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/run-step-hooks"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/get-hook-instructions"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/config"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/kernel"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-21T17:05:19.236Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-21T17:19:35.657Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-03-21T17:24:14.177Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-change"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-21T17:24:14.177Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-21T17:26:52.731Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-21T17:26:53.011Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-21T17:49:41.560Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-21T17:49:41.869Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-21T17:49:42.211Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-21T17:50:14.791Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-03-21T17:50:17.062Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "m***a@g***.com"
+  }
+}

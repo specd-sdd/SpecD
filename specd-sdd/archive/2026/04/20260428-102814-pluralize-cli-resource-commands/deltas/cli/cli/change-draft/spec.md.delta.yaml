@@ -1,0 +1,40 @@
+- op: modified
+  description: 'Prefer canonical plural command group and keep singular alias'
+  selector:
+    type: section
+    matches: '^Purpose$'
+  content: |
+    Sometimes work needs to be paused without losing progress or polluting the active change list. `specd changes draft <name> [--reason <text>]` is the canonical form and shelves an active change to `drafts/` without affecting its lifecycle state, keeping it recoverable at any time via `specd drafts restore`.
+
+    `specd change draft <name> ...` remains supported as an alias.
+
+- op: modified
+  description: 'Update signature to canonical plural with alias'
+  selector:
+    type: section
+    matches: '^Requirement: Command signature$'
+  content: |
+    ```
+    specd changes draft <name> [--reason <text>] [--force] [--format text|json|toon]
+    ```
+
+    Alias:
+
+    ```
+    specd change draft <name> [--reason <text>] [--force] [--format text|json|toon]
+    ```
+
+    - `<name>` — required positional; the name of the change to shelve
+    - `--reason <text>` — optional; a human-readable explanation for shelving the change
+    - `--force` — optional; bypasses the historical implementation guard when the change has previously reached `implementing`
+    - `--format text|json|toon` — optional; output format, defaults to `text`
+
+- op: modified
+  description: 'Add naming policy dependency'
+  selector:
+    type: section
+    matches: '^Spec Dependencies$'
+  content: |
+    - [`cli:cli/entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
+    - [`core:core/change`](../../core/change/spec.md) — drafting semantics, storage locations
+    - [`cli:cli/command-resource-naming`](../command-resource-naming/spec.md) — canonical plural naming and singular alias policy

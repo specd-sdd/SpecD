@@ -1,0 +1,15 @@
+- op: added
+  description: 'Add external actor providers ahead of built-in detection'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Detection probes in priority order$'
+  content: |
+    ### Requirement: External providers run before built-in probes
+
+    `createVcsActorResolver` SHALL support additive external actor providers. When external providers are registered, they SHALL be probed in registration order before the built-in git, hg, and svn-backed resolver probes.
+
+    If no external or built-in provider matches, the factory SHALL continue to fall back to `NullActorResolver`.

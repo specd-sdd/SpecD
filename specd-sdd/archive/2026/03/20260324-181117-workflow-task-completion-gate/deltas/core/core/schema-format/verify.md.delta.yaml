@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'No verify changes — the Workflow requirement has no dedicated scenario section in verify.md. Scenarios are covered by workflow-model and transition-change verify files.'

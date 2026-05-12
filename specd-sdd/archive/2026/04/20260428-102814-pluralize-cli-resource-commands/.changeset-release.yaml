@@ -1,0 +1,10 @@
+releases:
+  cli:cli/command-resource-naming: patch
+  cli:cli/change-draft: patch
+  cli:cli/drafts-list: patch
+  cli:cli/drafts-show: patch
+  cli:cli/drafts-restore: patch
+  cli:cli/change-list: patch
+  cli:cli/spec-list: patch
+  cli:cli/change-archive: patch
+  skills:workflow-automation: patch

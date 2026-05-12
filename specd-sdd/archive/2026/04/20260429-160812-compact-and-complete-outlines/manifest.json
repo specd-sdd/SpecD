@@ -1,0 +1,716 @@
+{
+  "name": "compact-and-complete-outlines",
+  "createdAt": "2026-04-29T16:08:12.767Z",
+  "description": "Implemented a compact-first outline workflow by keeping changes artifact-instruction focused on availableOutlines references and moving full structure retrieval to on-demand specs outline. Added --full and --hints modes, with parser-owned default subsets and parser-provided root-level selectorHints, reducing verbosity while preserving complete selector coverage when needed. Updated core/CLI contracts, parser adapters, tests, and workflow guidance to keep the behavior consistent across current and future parsers.",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "cli:cli/change-artifact-instruction",
+    "core:core/get-artifact-instruction",
+    "core:core/delta-format",
+    "cli:cli/spec-outline",
+    "core:core/get-spec-outline",
+    "core:core/artifact-parser-port",
+    "skills:workflow-automation"
+  ],
+  "specDependsOn": {
+    "core:core/get-artifact-instruction": [
+      "core:core/schema-format",
+      "core:core/delta-format",
+      "core:core/change",
+      "core:core/schema-merge",
+      "core:core/template-variables"
+    ],
+    "core:core/delta-format": [
+      "core:core/artifact-ast",
+      "core:core/selector-model",
+      "core:core/schema-format"
+    ],
+    "core:core/get-spec-outline": [
+      "core:core/get-spec",
+      "core:core/artifact-parser-port",
+      "core:core/get-active-schema"
+    ],
+    "core:core/artifact-parser-port": [
+      "default:_global/architecture",
+      "core:core/artifact-ast",
+      "core:core/delta-format",
+      "core:core/selector-model"
+    ],
+    "skills:workflow-automation": ["cli:cli/command-resource-naming"],
+    "cli:cli/spec-outline": ["core:core/get-spec-outline", "cli:cli/command-resource-naming"],
+    "cli:cli/change-artifact-instruction": [
+      "cli:cli/entrypoint",
+      "core:core/get-artifact-instruction"
+    ]
+  },
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:c41599f160f60d57cda4a39d502d4c8934c69ccf215232b5ea0a1f0ba730fd96"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "cli:cli/change-artifact-instruction",
+          "filename": "deltas/cli/cli/change-artifact-instruction/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:36baa20e185e4f0db54608c9c6dc61b6e8a455b7542e9bb792552bf880dd2624"
+        },
+        {
+          "key": "core:core/get-artifact-instruction",
+          "filename": "deltas/core/core/get-artifact-instruction/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:1ff9905aa86dbc04dd6e34065beeed7b4bf223bb3d4efd2142f899d714216f3c"
+        },
+        {
+          "key": "core:core/delta-format",
+          "filename": "deltas/core/core/delta-format/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:5bbb2c2d64627adbff5bd05d0a0ea8239c694de8e2227afc3f024d327424ca40"
+        },
+        {
+          "key": "cli:cli/spec-outline",
+          "filename": "deltas/cli/cli/spec-outline/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:03801d76c84e62319fc9884c7ae2a04ea644d012544b3ea9c786f907e091086f"
+        },
+        {
+          "key": "core:core/get-spec-outline",
+          "filename": "deltas/core/core/get-spec-outline/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:879e117c12fb7b2ab117a58d5bbc1480cb67f8d1741ff55690db0f866c9697f6"
+        },
+        {
+          "key": "core:core/artifact-parser-port",
+          "filename": "deltas/core/core/artifact-parser-port/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:5f5d13e565935474c9d6a1e5f2ff923062aa1c80ccb961439c197df8b9dd5447"
+        },
+        {
+          "key": "skills:workflow-automation",
+          "filename": "deltas/skills/workflow-automation/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:cdf9878f9f7dc0866699f11f261d99a84a4d65b006ecaf0c3ea99c7d78df3854"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "cli:cli/change-artifact-instruction",
+          "filename": "deltas/cli/cli/change-artifact-instruction/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:9749acc090f281fc9ee0777ff6d19ef8ef864515fa5c8f9a43cded64b69639c6"
+        },
+        {
+          "key": "core:core/get-artifact-instruction",
+          "filename": "deltas/core/core/get-artifact-instruction/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:61d4ca3e4fa4b4dcb6dd4c410804449a86e43733d955d156612d33a9f0ee3218"
+        },
+        {
+          "key": "core:core/delta-format",
+          "filename": "deltas/core/core/delta-format/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:06e9a0ee574f49b240fd995601146815136c10c5f047b452a5e7b3f3c8edb42f"
+        },
+        {
+          "key": "cli:cli/spec-outline",
+          "filename": "deltas/cli/cli/spec-outline/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:7c4c28dc8fe2c5f5da6825f41c98a9957c3b1d3bc5a4111e4db4eb9ddcaec344"
+        },
+        {
+          "key": "core:core/get-spec-outline",
+          "filename": "deltas/core/core/get-spec-outline/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:2d19720bbe2bf969f39e594c8208d0e0f31eaf994a0774287637f3e3be2a6c41"
+        },
+        {
+          "key": "core:core/artifact-parser-port",
+          "filename": "deltas/core/core/artifact-parser-port/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:81a05ebd883732867ce5c436a35ab4c9965a654fd5d9010a951221dc2d6a74c5"
+        },
+        {
+          "key": "skills:workflow-automation",
+          "filename": "deltas/skills/workflow-automation/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:4d5d3c956200002b1dd929aef307fe72e471c44bfdeec7ae9cd5e63a789ccb11"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:41bbd5745c0b459b0ddb3ba609146f1b6ad589d4c2fd0d012736c6577f6f55e1"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:08375f7c986e7e36458cdf08f8b1eff6f09afe28db2a940c474d87cfbd5898bf"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-04-29T16:08:12.767Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "specIds": [
+        "cli:cli/change-artifact-instruction",
+        "core:core/get-artifact-instruction",
+        "core:core/delta-format"
+      ],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-29T16:08:12.781Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "cli:cli/change-artifact-instruction"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/get-artifact-instruction"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/delta-format"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/change-artifact-instruction"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/get-artifact-instruction"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/delta-format"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-29T16:09:40.184Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-29T16:13:14.251Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:cli/change-artifact-instruction",
+            "core:core/get-artifact-instruction",
+            "core:core/delta-format"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:cli/change-artifact-instruction",
+            "core:core/get-artifact-instruction",
+            "core:core/delta-format"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-29T16:13:14.252Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "cli:cli/spec-outline"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/get-spec-outline"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/artifact-parser-port"
+        },
+        {
+          "type": "specs",
+          "key": "skills:workflow-automation"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/spec-outline"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/get-spec-outline"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/artifact-parser-port"
+        },
+        {
+          "type": "verify",
+          "key": "skills:workflow-automation"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-29T16:14:14.412Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-29T16:18:44.693Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-29T16:25:04.915Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-29T16:26:58.488Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: design [design]",
+      "affectedArtifacts": [
+        {
+          "type": "design",
+          "files": ["design"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-29T16:26:58.488Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-29T16:28:53.108Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-29T16:29:37.342Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-30T05:51:35.952Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:cli/change-artifact-instruction",
+            "core:core/get-artifact-instruction",
+            "core:core/delta-format",
+            "cli:cli/spec-outline",
+            "core:core/get-spec-outline",
+            "core:core/artifact-parser-port",
+            "skills:workflow-automation"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:cli/change-artifact-instruction",
+            "core:core/get-artifact-instruction",
+            "core:core/delta-format",
+            "cli:cli/spec-outline",
+            "core:core/get-spec-outline",
+            "core:core/artifact-parser-port",
+            "skills:workflow-automation"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-30T05:51:35.952Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-30T06:00:09.819Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-30T06:00:41.632Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-30T06:01:01.285Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-30T06:06:25.096Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-30T06:06:57.513Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-30T06:25:52.029Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]; specs [core:core/artifact-parser-port, core:core/get-spec-outline]; design [design]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["core:core/artifact-parser-port", "core:core/get-spec-outline"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-30T06:25:52.029Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-30T06:45:27.691Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-30T06:45:37.054Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-30T06:46:05.927Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-30T06:46:19.401Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-30T06:46:47.446Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-30T06:46:55.868Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-30T06:47:31.192Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-30T06:49:09.658Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-30T06:49:23.173Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "description-updated",
+      "at": "2026-04-30T06:53:52.871Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "description": "Implemented a compact-first outline workflow by keeping changes artifact-instruction focused on availableOutlines references and moving full structure retrieval to on-demand specs outline. Added --full and --hints modes, with parser-owned default subsets and parser-provided root-level selectorHints, reducing verbosity while preserving complete selector coverage when needed. Updated core/CLI contracts, parser adapters, tests, and workflow guidance to keep the behavior consistent across current and future parsers."
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-30T06:53:57.943Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-04-30T06:53:58.146Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "m***a@g***.com"
+  }
+}

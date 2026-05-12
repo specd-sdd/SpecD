@@ -1,0 +1,21 @@
+- op: modified
+  description: 'Rename artifact rule entry shape in schema-merge verification scenarios'
+  selector:
+    type: section
+    matches: 'Requirement: Cross-layer ordering'
+  content: |
+    #### Scenario: Later layer overrides earlier layer
+
+    - **GIVEN** a base schema
+    - **AND** layer 1 (plugin) sets `description` to `'Plugin description'`
+    - **AND** layer 2 (override) sets `description` to `'Override description'`
+    - **WHEN** `mergeSchemaLayers` is applied with `[layer1, layer2]`
+    - **THEN** the result `description` is `'Override description'`
+
+    #### Scenario: Plugin appends, then override removes
+
+    - **GIVEN** a base schema with no `rules.post` on artifact `specs`
+    - **AND** layer 1 (plugin) appends `rules.post: [{ id: rfc-rule, instruction: '...' }]` to `specs`
+    - **AND** layer 2 (override) removes `rules.post` entry `id: rfc-rule` from `specs`
+    - **WHEN** `mergeSchemaLayers` is applied with `[layer1, layer2]`
+    - **THEN** the `specs` artifact has no `rfc-rule` in `rules.post`

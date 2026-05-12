@@ -1,0 +1,119 @@
+- op: modified
+  description: 'Update apply return type to DeltaApplicationResult.'
+  selector:
+    type: section
+    matches: 'Requirement: ArtifactParser interface shape'
+  content: |
+    The port MUST be declared as a TypeScript `interface` named `ArtifactParser`. It SHALL define the following members:
+
+    - `fileExtensions: readonly string[]` — the file extensions this adapter handles
+    - `parse(content: string): ArtifactAST` — parse content into a normalised AST
+    - `apply(ast: ArtifactAST, delta: readonly DeltaEntry[]): DeltaApplicationResult` — apply delta entries to an AST, returning the modified AST plus any semantic validation warnings
+    - `serialize(ast: ArtifactAST): string` — serialise an AST back to native format
+    - `renderSubtree(node: ArtifactNode): string` — serialise a single node and its descendants
+    - `nodeTypes(): readonly NodeTypeDescriptor[]` — describe addressable node types for the format
+    - `outline(ast: ArtifactAST): readonly OutlineEntry[]` — produce a navigable summary of addressable nodes
+    - `deltaInstructions(): string` — return format-specific static text for delta generation context
+    - `parseDelta(content: string): readonly DeltaEntry[]` — parse a YAML delta file into typed entries
+
+- op: added
+  description: 'Enrich NodeTypeDescriptor with nature flags and add operation semantic validation requirement.'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: NodeTypes contract'
+  content: |
+    ### Requirement: Node nature descriptors
+
+    Each `NodeTypeDescriptor` returned by `nodeTypes()` MUST include boolean flags that declaratively describe the nature of the node type. These flags drive the `applyDelta` engine's collection-aware logic and semantic validation — they MUST accurately reflect the AST structure that the parser produces.
+
+    #### Structural flags
+
+    - `isContainer: boolean` — the node has or can have a `children` array. True for any node that can hold child nodes, regardless of whether those children are homogeneous or heterogeneous. Examples: `document` (holds sections, paragraphs, lists...), `section` (holds paragraphs, lists, nested sections...), `list` (holds `list-item` nodes), `object` (holds `property` nodes).
+
+    - `isLeaf: boolean` — the node has or can have a scalar `value` field (`string | number | boolean | null`). True for nodes that represent atomic data, not structural containers. Examples: `paragraph` (text content), `code-block` (source code), `line` (single line of text). A node that wraps a complex value (e.g. JSON `property` wrapping an object) can be BOTH `isContainer: true` AND `isLeaf: true` — these are hybrid types.
+
+    - A node that is neither container nor leaf (e.g. markdown `thematic-break`) is a void node — it has neither `children` nor `value`. All three flags being `false` is valid but means the node cannot be meaningfully modified by delta operations.
+
+    #### Collection flags
+
+    - `isCollection: boolean` — the node's children are homogeneous: ALL children are of the same type (or the same small set of closely related types). For example: `list` always has `list-item` children, `object` always has `property` children, `array` always has `array-item` children. Contrast with `section` which has heterogeneous children (paragraphs, lists, code blocks, nested sections) — `section` is `isContainer: true` but `isCollection: false`. Controls same-type unwrapping in `added` entries: when the parent scope is a collection and parsed content starts with the same type, the engine unwraps to the inner children instead of nesting.
+
+    - `isSequence: boolean` — the node is an ordered sequential collection where position matters and items can be appended, reordered, or merged by key. This is a subset of `isCollection`: `list`, `array`, and `sequence` are sequences, but `object` and `mapping` are NOT (their children are key-value pairs identified by name, not by position). Controls whether `strategy` (append/merge-by) is valid and whether the node is treated as "array-like" by the delta engine.
+
+    - `isSequenceItem: boolean` — the node is a positional item within a sequential collection. True for `list-item`, `array-item`, and `sequence-item`. These nodes may themselves be hybrids (e.g. an `array-item` can wrap a scalar value or an entire object). Used for "all children are sequence items" detection and for finding inner array nodes wrapped inside property/pair containers.
+
+    #### Example flag assignments
+
+    | Node | isCollection | isSequence | isSequenceItem | isContainer | isLeaf | Why |
+    |------|:---:|:---:|:---:|:---:|:---:|-----|
+    | `document` (md) | F | F | F | T | F | Has heterogeneous children (sections, paragraphs...) |
+    | `section` (md) | F | F | F | T | F | Has heterogeneous children (paragraphs, lists...) |
+    | `list` (md) | T | T | F | T | F | Homogeneous ordered children (list-items), supports strategy |
+    | `list-item` (md) | F | F | T | T | F | Item within a list, may have nested lists as children |
+    | `paragraph` (md) | F | F | F | F | T | Scalar text value, no children |
+    | `object` (json) | T | F | F | T | F | Homogeneous children (properties), but keyed not ordered |
+    | `property` (json) | F | F | F | T | T | Hybrid: wraps scalar value OR object/array as child |
+    | `array` (json) | T | T | F | T | F | Homogeneous ordered children (array-items), supports strategy |
+    | `array-item` (json) | F | F | T | T | T | Hybrid item: scalar value OR object/array as child |
+    | `thematic-break` (md) | F | F | F | F | F | Void: no children, no value |
+
+    The shared `applyDelta` engine MUST use these flags instead of hardcoded type vectors for all collection-aware logic.
+
+    ### Requirement: Operation semantic validation
+
+    The `applyDelta` engine MUST validate all conditions (`isContainer`, `isLeaf`, `hasLabel`) for every operation and return errors or warnings based on the complete semantics matrix:
+
+    | isContainer | isLeaf | hasLabel | content | value | rename |
+    |:---:|:---:|:---:|---|---|---|
+    | false | false | false | ERROR (no alternatives) | ERROR (no alternatives) | ERROR (no alternatives) |
+    | true | false | false | OK | ERROR → use content | ERROR → use content |
+    | false | true | false | ERROR → use value | OK | ERROR → use value |
+    | false | false | true | ERROR → use rename | ERROR → use rename | OK |
+    | true | true | false | WARNING → use value | WARNING → use content | ERROR → use content or value |
+    | true | false | true | WARNING → use rename | ERROR → use content or rename | WARNING → use content |
+    | false | true | true | ERROR → use value or rename | WARNING → use rename | WARNING → use value |
+    | true | true | true | WARNING → use value or rename | WARNING → use content or rename | WARNING → use content or value |
+
+    Additionally, `value` on an `isSequence` node is always valid (default strategy is `replace`).
+
+    - **ERROR**: operation is invalid; message MUST suggest valid alternatives for this node type
+    - **WARNING**: operation is valid but ambiguous (hybrid node); message MUST warn that other fields might be appropriate
+    - **OK**: operation is valid without reservations
+
+    The `hasLabel` check is derived from the descriptor — if `identifiedBy.length > 0`, the node has a label. This is not a separate field.
+
+    Validation is implemented via exported helper functions (`validateContent`, `validateValue`, `validateRename`) on the port. Each function takes the descriptor map, the delta entry, the node type, and a `warnings` array. They return an error message string if the operation is invalid, or `undefined` if valid. Warning-level messages are appended to the `warnings` array.
+
+    The validation result is returned via a wrapper type, not by modifying `ArtifactAST`:
+
+    ```typescript
+    interface DeltaApplicationResult {
+      readonly ast: ArtifactAST
+      readonly warnings: readonly string[]
+    }
+    ```
+
+    The `applyDelta` function returns `DeltaApplicationResult` instead of `ArtifactAST`. Callers MUST check the `warnings` array for any ambiguity warnings. This is a breaking change that requires updating all callers (tests, adapters) to handle the new return type.
+
+- op: modified
+  description: 'Update Apply contract to reference DeltaApplicationResult.'
+  selector:
+    type: section
+    matches: 'Requirement: Apply contract — atomic selector resolution'
+  content: |
+    The `apply` method MUST resolve all selectors before applying any operation. If any selector fails to resolve (no match or ambiguous match), the entire application MUST be rejected with a `DeltaApplicationError`. Partial application SHALL NOT occur.
+
+    The method returns a `DeltaApplicationResult` containing the modified AST and any semantic validation warnings. Callers MUST check `result.warnings` for ambiguity warnings on hybrid node types.
+
+- op: modified
+  description: 'Update Supporting type shapes to include nature flags.'
+  selector:
+    type: section
+    matches: 'Requirement: Supporting type shapes'
+  content: |
+    - `NodeTypeDescriptor` MUST contain `type: string`, `identifiedBy: readonly string[]`, `description: string`, `isCollection: boolean`, `isSequence: boolean`, `isSequenceItem: boolean`, `isContainer: boolean`, and `isLeaf: boolean`.
+    - `OutlineEntry` MUST contain `type: string`, `label: string`, `depth: number`, and optional `children: readonly OutlineEntry[]`.

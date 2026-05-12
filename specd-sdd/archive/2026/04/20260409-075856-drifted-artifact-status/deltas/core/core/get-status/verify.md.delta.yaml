@@ -1,0 +1,60 @@
+- op: modified
+  description: 'Verify GetStatus returns persisted state and review summary.'
+  selector:
+    type: section
+    matches: '^Requirement: Returns the change and its artifact statuses$'
+  content: |
+    #### Scenario: Result includes artifact state, effective status, and file state
+
+    - **GIVEN** a change with one artifact in `pending-review`
+    - **WHEN** `execute({ name: 'add-login' })` is called
+    - **THEN** the artifact entry includes its persisted `state`
+    - **AND** it includes `effectiveStatus`
+    - **AND** each file entry includes its own persisted `state`
+
+    #### Scenario: review.required becomes true when any file is pending review
+
+    - **GIVEN** a change with one file in `pending-review`
+    - **WHEN** `execute()` is called
+    - **THEN** `review.required` is `true`
+    - **AND** `review.route` is `'designing'`
+    - **AND** `review.reason` is `'artifact-review-required'`
+
+    #### Scenario: review.reason prefers artifact-drift when any file drifted
+
+    - **GIVEN** a change with one file in `drifted-pending-review`
+    - **WHEN** `execute()` is called
+    - **THEN** `review.required` is `true`
+    - **AND** `review.reason` is `'artifact-drift'`
+    - **AND** `review.affectedArtifacts` includes that artifact with the affected file's `filename` and absolute `path`
+
+    #### Scenario: review.required is false when no file needs review
+
+    - **GIVEN** a change whose files are all `complete`, `skipped`, `missing`, or `in-progress`
+    - **WHEN** `execute()` is called
+    - **THEN** `review.required` is `false`
+    - **AND** `review.route` is `null`
+- op: modified
+  description: 'Verify lifecycle context uses persisted state for gating.'
+  selector:
+    type: section
+    matches: '^Requirement: Returns lifecycle context$'
+  content: |
+    #### Scenario: Available transitions require persisted complete or skipped state
+
+    - **GIVEN** a change in `designing` state
+    - **AND** an artifact required by `ready` is `pending-review`
+    - **WHEN** `execute()` is called
+    - **THEN** `lifecycle.availableTransitions` does not include `ready`
+
+    #### Scenario: Next artifact resolves from persisted state
+
+    - **GIVEN** a change with `proposal` in `complete`, `specs` in `complete`, and `verify` in `missing`
+    - **WHEN** `execute()` is called
+    - **THEN** `lifecycle.nextArtifact` is `'verify'`
+
+    #### Scenario: Skipped artifacts still satisfy lifecycle gating
+
+    - **GIVEN** a change whose required optional artifact is `skipped`
+    - **WHEN** `execute()` is called
+    - **THEN** that artifact does not block `availableTransitions`

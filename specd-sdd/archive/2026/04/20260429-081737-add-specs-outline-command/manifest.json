@@ -1,0 +1,410 @@
+{
+  "name": "add-specs-outline-command",
+  "createdAt": "2026-04-29T08:17:37.242Z",
+  "description": "Add 'specd specs outline' command that retrieves the navigable structure (outline) of spec artifacts using domain parsers. Introduces GetSpecOutline use case in core, wires it through the Kernel, and exposes it as a CLI subcommand with --artifact, --file, and --format flags. Without filters, outlines all spec-scoped artifacts.",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": ["cli:cli/spec-outline", "core:core/get-spec-outline"],
+  "specDependsOn": {
+    "core:core/get-spec-outline": [
+      "core:core/get-spec",
+      "core:core/artifact-parser-port",
+      "core:core/get-active-schema"
+    ],
+    "cli:cli/spec-outline": ["core:core/get-spec-outline", "cli:cli/command-resource-naming"]
+  },
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:49baf21715aa6d3a132568c42ec672779c4169ca2976de0d69f3cb24d011d88f"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "cli:cli/spec-outline",
+          "filename": "specs/cli/cli/spec-outline/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:5c0a01c0bc9b6006758a408c9779679abeb2b9d0387333f7b807891cdef63232"
+        },
+        {
+          "key": "core:core/get-spec-outline",
+          "filename": "specs/core/core/get-spec-outline/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:9f0dd062a4727bec4481625ab4a4ebfff8126bb1cddf96d0afef7d6420bd503c"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "cli:cli/spec-outline",
+          "filename": "specs/cli/cli/spec-outline/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:9652dba9d1b927a766057a0bd2fd7a1838e220b042b154d8df32e5caf511d8ad"
+        },
+        {
+          "key": "core:core/get-spec-outline",
+          "filename": "specs/core/core/get-spec-outline/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:386e0cac85f8edc09e0fd5cafe3e0262a33c0e8d68305c16ad0b15486b1fe311"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:b219002ba3bb84fd0664f4dee4cafbaebeda10a10b2bb2428276eed783e7d198"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:66d34ba7cc8dc7f74eac63dcf438530a9d08bbdf519bdd211eff3ba49bc76bb1"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-04-29T08:17:37.242Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "specIds": ["cli:cli/spec-outline", "core:core/get-spec-outline"],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-29T08:17:37.252Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "cli:cli/spec-outline"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/get-spec-outline"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/spec-outline"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/get-spec-outline"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-29T08:22:36.022Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-29T08:44:04.575Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-29T10:04:05.563Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [core:core/get-spec-outline]; verify [core:core/get-spec-outline]; design [design]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:core/get-spec-outline"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:core/get-spec-outline"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-29T10:06:34.818Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:cli/spec-outline]; verify [cli:cli/spec-outline]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["cli:cli/spec-outline"]
+        },
+        {
+          "type": "verify",
+          "files": ["cli:cli/spec-outline"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-29T10:14:53.510Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: design [design]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-29T10:16:11.730Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-29T10:29:40.720Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: design [design]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-29T10:29:40.720Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-29T10:30:16.486Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-29T10:41:00.862Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-29T14:50:59.905Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:cli/spec-outline, core:core/get-spec-outline]; verify [cli:cli/spec-outline, core:core/get-spec-outline]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["cli:cli/spec-outline", "core:core/get-spec-outline"]
+        },
+        {
+          "type": "verify",
+          "files": ["cli:cli/spec-outline", "core:core/get-spec-outline"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-29T14:50:59.905Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-29T15:07:21.335Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-29T15:07:43.962Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-29T15:20:11.805Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-29T15:23:39.156Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-29T15:23:51.664Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "description-updated",
+      "at": "2026-04-29T15:31:06.203Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "description": "Add 'specd specs outline' command that retrieves the navigable structure (outline) of spec artifacts using domain parsers. Introduces GetSpecOutline use case in core, wires it through the Kernel, and exposes it as a CLI subcommand with --artifact, --file, and --format flags. Without filters, outlines all spec-scoped artifacts."
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-29T15:31:26.621Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-04-29T15:31:26.669Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "m***a@g***.com"
+  }
+}

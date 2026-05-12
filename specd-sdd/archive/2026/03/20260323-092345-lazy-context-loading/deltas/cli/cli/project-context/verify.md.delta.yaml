@@ -1,0 +1,29 @@
+- op: modified
+  description: 'Update output scenarios for structured result'
+  selector:
+    type: section
+    matches: 'Requirement: Output'
+  content: |
+    #### Scenario: Text output — all specs rendered with full content
+
+    - **GIVEN** `GetProjectContext` returns specs (always `mode: 'full'`)
+    - **WHEN** `specd project context` is called with `--format text`
+    - **THEN** output is unchanged from previous behaviour — all specs under `## Spec content` with full content
+
+    #### Scenario: JSON output — structured spec entries
+
+    - **GIVEN** `GetProjectContext` returns structured `ContextSpecEntry` objects
+    - **WHEN** `specd project context` is called with `--format json`
+    - **THEN** the JSON output includes `contextEntries`, `specs` (with `specId`, `title`, `description`, `source`, `mode`, `content`), and `warnings`
+
+    #### Scenario: JSON output — all specs have mode full and source includePattern
+
+    - **GIVEN** `GetProjectContext` operates without a change
+    - **WHEN** `specd project context` is called with `--format json`
+    - **THEN** all spec entries have `mode: 'full'` and `source: 'includePattern'`
+
+    #### Scenario: No project context configured
+
+    - **GIVEN** no `context:` entries and no specs match include patterns
+    - **WHEN** `specd project context` is called
+    - **THEN** the command prints `no project context configured` and exits with code 0

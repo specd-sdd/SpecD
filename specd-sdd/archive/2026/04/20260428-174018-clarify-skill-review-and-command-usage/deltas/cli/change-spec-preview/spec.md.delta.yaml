@@ -1,0 +1,37 @@
+- op: modified
+  description: Use canonical plural command signature in guidance.
+  selector:
+    type: section
+    matches: 'Requirement: Command signature'
+  content: |
+    ```
+    specd changes spec-preview <name> <specId> [--artifact <name>] [--diff] [--format text|json|toon]
+    ```
+
+    - `<name>` — required positional; the change name
+    - `<specId>` — required positional; the fully-qualified spec ID to preview (e.g. `core:core/compile-context`); MUST be one of the change's `specIds`
+    - `--artifact <name>` — optional; filters the output to only include the artifact with the given ID (e.g. `specs`, `verify`)
+    - `--diff` — optional flag; when present, outputs a unified diff instead of the full merged content
+    - `--format text|json|toon` — optional; output format, defaults to `text`
+
+    Canonical agent-facing guidance MUST use plural command groups (for example `changes`). Singular groups remain alias-compatible.
+
+- op: added
+  description: Document role in overlap/drift safety review.
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Error handling'
+  content: |
+    ### Requirement: Drift and overlap review support
+
+    The command SHALL be suitable as the authoritative merged-content checkpoint when artifact drift or overlap risk exists.
+
+    Workflow guidance that detects overlap/drift risk MUST use this command to review merged output before accepting delta results.
+
+    Reading raw delta files alone MUST NOT be treated as equivalent to merged preview review, because deltas can be stale relative to the current base spec.
+
+    When only one spec-scoped artifact is required for that review, guidance SHOULD pass `--artifact <name>` to limit output to the relevant merged artifact.

@@ -1,0 +1,18 @@
+- op: removed
+  description: 'Remove old Successful install scenario'
+  selector:
+    type: section
+    matches: 'Scenario: Successful install'
+
+- op: added
+  description: 'Add new Successful install scenario with SpecdConfig'
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Behavior'
+  content: |
+    #### Scenario: Successful install
+
+    - **GIVEN** a valid `SpecdConfig` is provided
+    - **WHEN** InstallPlugin is executed with valid plugin and configuration
+    - **THEN** it returns success with message

@@ -1,0 +1,82 @@
+- op: modified
+  description: 'Verify persisted file identity, dependency relation coverage, and fingerprint stats.'
+  selector:
+    type: section
+    matches: '^Requirement: Minimum graph semantics$'
+  content: |
+    #### Scenario: Backend preserves canonical and config-relative file identity
+
+    - **WHEN** indexing and query features use the abstract `GraphStore`
+    - **THEN** file nodes retain both canonical workspace-prefixed `path` values and `configRelativePath` values needed for CLI lookup
+    - **AND** storage-agnostic consumers do not depend on backend-specific column or label names
+
+    #### Scenario: Backend persists scoped-binding dependency relations
+
+    - **WHEN** a backend advertises conformance to `GraphStore`
+    - **THEN** its persisted relation model includes `CALLS`, `CONSTRUCTS`, and `USES_TYPE`
+    - **AND** these relations remain queryable through the abstract dependency methods
+
+    #### Scenario: Backend persists derivation metadata
+
+    - **WHEN** a graph has been indexed successfully
+    - **THEN** the store can persist and later return `lastIndexedAt`, `lastIndexedRef`, and the graph fingerprint
+
+- op: modified
+  description: 'Verify config-relative lookup and dependency query semantics.'
+  selector:
+    type: section
+    matches: '^Requirement: Query methods$'
+  content: |
+    #### Scenario: findFilesByConfigRelativePath returns exact matches
+
+    - **GIVEN** indexed files `core:src/index.ts` with `configRelativePath` `packages/core/src/index.ts`
+    - **AND** `cli:src/index.ts` with `configRelativePath` `packages/cli/src/index.ts`
+    - **WHEN** `findFilesByConfigRelativePath('packages/core/src/index.ts')` is called
+    - **THEN** only the `core:src/index.ts` file node is returned
+
+    #### Scenario: findFilesByConfigRelativePath may return multiple canonical files
+
+    - **GIVEN** two indexed files from different workspaces share the same `configRelativePath`
+    - **WHEN** `findFilesByConfigRelativePath('src/index.ts')` is called
+    - **THEN** both canonical file nodes are returned so the caller can raise an ambiguity error
+
+    #### Scenario: getCallers includes USES_TYPE and CONSTRUCTS dependents
+
+    - **GIVEN** symbol `TemplateExpander` has one incoming `CALLS`, one incoming `CONSTRUCTS`, and one incoming `USES_TYPE` relation
+    - **WHEN** `getCallers(TemplateExpander.id)` is called
+    - **THEN** all three dependency relations are returned
+
+    #### Scenario: getCallees includes USES_TYPE and CONSTRUCTS dependencies
+
+    - **GIVEN** symbol `createKernel` has outgoing `CALLS`, `CONSTRUCTS`, and `USES_TYPE` relations
+    - **WHEN** `getCallees(createKernel.id)` is called
+    - **THEN** all three dependency relations are returned
+
+- op: modified
+  description: 'Verify graph statistics expose fingerprint and relation counts.'
+  selector:
+    type: section
+    matches: '^Requirement: Graph statistics$'
+  content: |
+    #### Scenario: Statistics include all expected fields
+
+    - **WHEN** `getStatistics()` is called on a populated store
+    - **THEN** the result includes `fileCount`, `symbolCount`, `specCount`, `relationCounts`, `languages`, `lastIndexedAt`, `lastIndexedRef`, and `graphFingerprint`
+
+    #### Scenario: graphFingerprint defaults to null
+
+    - **GIVEN** no derivation fingerprint has been stored yet
+    - **WHEN** `getStatistics()` is called
+    - **THEN** `graphFingerprint` is `null`
+
+    #### Scenario: Statistics include scoped-binding relation counts
+
+    - **GIVEN** the store contains persisted `CONSTRUCTS` and `USES_TYPE` relations
+    - **WHEN** `getStatistics()` is called
+    - **THEN** `relationCounts` includes counts for both relation types
+
+    #### Scenario: graphFingerprint reflects stored value
+
+    - **GIVEN** the graph fingerprint meta key has been set to `code-graph@0.2.0:workspaces:abc123`
+    - **WHEN** `getStatistics()` is called
+    - **THEN** `graphFingerprint` is `code-graph@0.2.0:workspaces:abc123`

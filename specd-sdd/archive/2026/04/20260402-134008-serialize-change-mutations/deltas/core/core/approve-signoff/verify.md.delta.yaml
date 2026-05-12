@@ -1,0 +1,13 @@
+- op: modified
+  description: Verify that signoff persistence and transition happen through mutate.
+  selector:
+    type: section
+    matches: 'Requirement: Persistence and return value'
+  content: |
+    #### Scenario: Change is saved and returned through serialized mutation
+
+    - **GIVEN** a successful signoff
+    - **WHEN** `execute()` returns
+    - **THEN** `ChangeRepository.mutate(input.name, fn)` has been called
+    - **AND** the callback records the signoff and transitions the fresh persisted change to `signed-off`
+    - **AND** the returned `Change` has state `signed-off`

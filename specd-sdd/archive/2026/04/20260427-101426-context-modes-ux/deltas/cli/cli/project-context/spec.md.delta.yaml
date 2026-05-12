@@ -1,0 +1,33 @@
+added:
+  - position:
+      parent: '### Requirement: Command signature'
+    content: |
+      - `--mode list|summary|full|hybrid` — optional; overrides the `contextMode` from `specd.yaml`
+  - position:
+      parent: '### Requirement: Output'
+    content: |
+      #### Scenario: Default sections in full mode
+      When a spec is rendered in `full` mode and no section flags (`--rules`, `--constraints`, `--scenarios`) are provided, the output MUST default to rendering **Description + Rules + Constraints**. If any section flags are provided, the default is overridden and only the requested sections are shown.
+modified:
+  - selector: '### Requirement: Command signature'
+    content: |
+      ```
+      specd project context
+        [--mode list|summary|full|hybrid]
+        [--rules] [--constraints] [--scenarios]
+        [--follow-deps [--depth <n>]]
+        [--format text|json|toon]
+      ```
+  - selector: '### Requirement: Output'
+    rename: '### Requirement: Output and rendering'
+    content: |
+      The CLI MUST assemble the final output from the structured `GetProjectContextResult` returned by the use case. `full` mode rendering MUST use structured output (derived from metadata or extraction) instead of raw markdown.
+
+      **In `text` mode** (default):
+
+      1. Project context entries are rendered first, each preceded by its source label. Entries are separated by `---`.
+      2. Spec entries follow:
+         - Full entries are rendered under `## Spec content` with structured sections. If no section flags are passed, render Description, Rules, and Constraints.
+         - Summary entries are rendered under `## Available context specs` with spec ID, title, and description.
+         - List entries are rendered under `## Available context specs` with spec ID only plus an explicit list-mode label.
+      3. If nothing is configured (no `context:` entries and no specs matched), the command prints `no project context configured` and exits with code 0.

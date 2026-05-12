@@ -1,0 +1,19 @@
+- op: added
+  description: >
+    Add requirement that project-level VCS and actor adapters must use
+    auto-detect factories instead of hardcoded git implementations.
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: createKernel constructs shared adapters once$'
+  content: |
+    ### Requirement: Project-level VCS and actor adapters must use auto-detect
+
+    `createKernelInternals` must use `createVcsAdapter(config.projectRoot)` and `createVcsActorResolver(config.projectRoot)` to construct the project-level `VcsAdapter` and `ActorResolver`. It must NOT hardcode a specific VCS implementation (e.g. `new GitVcsAdapter()`).
+
+    The same rule applies to the standalone use-case factory functions in `composition/use-cases/`: they must use `createVcsActorResolver()` instead of `new GitActorResolver()`.
+
+    This ensures specd works correctly in git, Mercurial, Subversion, and non-VCS environments without caller-visible changes.

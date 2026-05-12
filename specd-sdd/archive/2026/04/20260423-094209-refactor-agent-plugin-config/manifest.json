@@ -1,0 +1,957 @@
+{
+  "name": "refactor-agent-plugin-config",
+  "createdAt": "2026-04-23T09:42:09.451Z",
+  "description": "Replace projectRoot: string with SpecdConfig in AgentPlugin and PluginContext, rename InstallOptions/InstallResult to agent-specific names, and inject built-in variables automatically when resolving skill bundles.",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "plugin-manager:specd-plugin-type",
+    "plugin-manager:agent-plugin-type",
+    "plugin-manager:install-plugin-use-case",
+    "skills:resolve-bundle",
+    "skills:skill-repository-port",
+    "plugin-agent-claude:plugin-agent",
+    "plugin-agent-copilot:plugin-agent",
+    "plugin-agent-codex:plugin-agent",
+    "plugin-agent-opencode:plugin-agent",
+    "plugin-manager:uninstall-plugin-use-case",
+    "plugin-manager:update-plugin-use-case",
+    "plugin-manager:plugin-loader"
+  ],
+  "specDependsOn": {
+    "plugin-manager:agent-plugin-type": ["core:core/config", "plugin-manager:specd-plugin-type"],
+    "plugin-manager:install-plugin-use-case": [
+      "core:core/config",
+      "plugin-manager:agent-plugin-type",
+      "plugin-manager:plugin-loader"
+    ],
+    "plugin-manager:specd-plugin-type": ["core:core/config", "default:_global/architecture"],
+    "plugin-manager:uninstall-plugin-use-case": [
+      "core:core/config",
+      "plugin-manager:agent-plugin-type",
+      "plugin-manager:plugin-loader"
+    ],
+    "plugin-manager:update-plugin-use-case": [
+      "core:core/config",
+      "plugin-manager:agent-plugin-type",
+      "plugin-manager:plugin-loader"
+    ],
+    "plugin-manager:plugin-loader": [
+      "core:core/config",
+      "plugin-manager:specd-plugin-type",
+      "plugin-manager:plugin-errors"
+    ],
+    "skills:resolve-bundle": [
+      "core:core/config",
+      "skills:skill-bundle",
+      "skills:skill-repository-port"
+    ],
+    "skills:skill-repository-port": ["core:core/config", "skills:skill", "skills:skill-bundle"],
+    "plugin-agent-claude:plugin-agent": [
+      "core:core/config",
+      "plugin-manager:agent-plugin-type",
+      "skills:skill-repository"
+    ],
+    "plugin-agent-copilot:plugin-agent": [
+      "core:core/config",
+      "plugin-manager:agent-plugin-type",
+      "skills:skill-templates-source"
+    ],
+    "plugin-agent-codex:plugin-agent": [
+      "core:core/config",
+      "plugin-manager:agent-plugin-type",
+      "skills:skill-templates-source"
+    ],
+    "plugin-agent-opencode:plugin-agent": [
+      "core:core/config",
+      "plugin-manager:agent-plugin-type",
+      "skills:skill-templates-source"
+    ]
+  },
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:b21d46288928098ad6cf5588c6b0beab697f280431b5cd613fb77b0115f489d1"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "plugin-manager:specd-plugin-type",
+          "filename": "deltas/plugin-manager/specd-plugin-type/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:6ac8dc08bf06fc657d2a397cd2d797dbe4478bebec69a4e90d2b2d8782aa3e29"
+        },
+        {
+          "key": "plugin-manager:agent-plugin-type",
+          "filename": "deltas/plugin-manager/agent-plugin-type/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:e9a1bf28d687c3b2025c9e1c336ba5abbbdbe8074a6db640c63b41f8f7589f05"
+        },
+        {
+          "key": "plugin-manager:install-plugin-use-case",
+          "filename": "deltas/plugin-manager/install-plugin-use-case/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:152067f874b859c99980cedfa535c051697f36a1b82adfdf1e0b2e858a3fc824"
+        },
+        {
+          "key": "skills:resolve-bundle",
+          "filename": "deltas/skills/resolve-bundle/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:65637a613512a67a0c335929bb7dd2e757e05b073788364dc4569fbacfaa2a94"
+        },
+        {
+          "key": "skills:skill-repository-port",
+          "filename": "deltas/skills/skill-repository-port/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:170205fac84a98cfe4e136c32a7ce1cef3ffeedec8545cdce5f04389a2a770fb"
+        },
+        {
+          "key": "plugin-agent-claude:plugin-agent",
+          "filename": "deltas/plugin-agent-claude/plugin-agent/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:83dafb977f3f8956a26e49a3791d764ab0db37ba64edfed3b3a4b3c42ea0c791"
+        },
+        {
+          "key": "plugin-agent-copilot:plugin-agent",
+          "filename": "deltas/plugin-agent-copilot/plugin-agent/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:04f48c89ca7acc59e4dcfed6230c92ac51c53ceb7fd583a13901eb9c1fc62700"
+        },
+        {
+          "key": "plugin-agent-codex:plugin-agent",
+          "filename": "deltas/plugin-agent-codex/plugin-agent/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:51e7fa131dfc711040d93607bb6c5da88763cea3dfb23a9e0acb47af5c4b97d0"
+        },
+        {
+          "key": "plugin-agent-opencode:plugin-agent",
+          "filename": "deltas/plugin-agent-opencode/plugin-agent/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:5b0271d9f715d193f2b15a46fc98db1c342f13f325db0effeb60ab5f94c65ec1"
+        },
+        {
+          "key": "plugin-manager:uninstall-plugin-use-case",
+          "filename": "deltas/plugin-manager/uninstall-plugin-use-case/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:d4464a2e935b4de1d08f149d5a3f3afa21ffa223df01c2eb62723dedb6cb81ae"
+        },
+        {
+          "key": "plugin-manager:update-plugin-use-case",
+          "filename": "deltas/plugin-manager/update-plugin-use-case/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:ce9ffe47d03d923370f026be50df1b8b377ac6196d5b29bad8ca1840326ba98b"
+        },
+        {
+          "key": "plugin-manager:plugin-loader",
+          "filename": "deltas/plugin-manager/plugin-loader/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:71aadf787609895d971fd106077bebf354a7b27636bed700140c08be18d7c743"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "plugin-manager:specd-plugin-type",
+          "filename": "deltas/plugin-manager/specd-plugin-type/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:16b563c251c7c33705fe18c1d0edd13e421493acd604346737658a8f33b8edf4"
+        },
+        {
+          "key": "plugin-manager:agent-plugin-type",
+          "filename": "deltas/plugin-manager/agent-plugin-type/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:c04e8f3e56e93eb06c778f00f5a889a984e24607e22b18782aca1964e024544d"
+        },
+        {
+          "key": "plugin-manager:install-plugin-use-case",
+          "filename": "deltas/plugin-manager/install-plugin-use-case/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:6ed3981d5d3dde2302ffa2ba2a7ae8e98ecdf920d5651dd47f8b7acba290db2c"
+        },
+        {
+          "key": "skills:resolve-bundle",
+          "filename": "deltas/skills/resolve-bundle/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:30da74e75992d820a0b285679c89750c9bf702f225ee30c82c959d45ce087f53"
+        },
+        {
+          "key": "skills:skill-repository-port",
+          "filename": "deltas/skills/skill-repository-port/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:3216eba9b5aedc9eb7d4bc8919348b83807f56ed2c175271b3c9fa2ee700d64d"
+        },
+        {
+          "key": "plugin-agent-claude:plugin-agent",
+          "filename": "deltas/plugin-agent-claude/plugin-agent/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:eab0c9834d5d64175d8fa203e79b7cfdb59d658cbd7e2f2be214e1121549e675"
+        },
+        {
+          "key": "plugin-agent-copilot:plugin-agent",
+          "filename": "deltas/plugin-agent-copilot/plugin-agent/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:60e00cdbdd20b63926da0c39bac14dd4b1e4701bb3f17ac2bdfcbb13502e678d"
+        },
+        {
+          "key": "plugin-agent-codex:plugin-agent",
+          "filename": "deltas/plugin-agent-codex/plugin-agent/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:60e00cdbdd20b63926da0c39bac14dd4b1e4701bb3f17ac2bdfcbb13502e678d"
+        },
+        {
+          "key": "plugin-agent-opencode:plugin-agent",
+          "filename": "deltas/plugin-agent-opencode/plugin-agent/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:0a545ffcd3155e32a0ce44ba077f00573256c81689cd41cb46ec8471a9f2cd03"
+        },
+        {
+          "key": "plugin-manager:uninstall-plugin-use-case",
+          "filename": "deltas/plugin-manager/uninstall-plugin-use-case/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:e421f3fb5a54a6fa2e74e74325e30337581fd9ce662bbc45e375481855029c47"
+        },
+        {
+          "key": "plugin-manager:update-plugin-use-case",
+          "filename": "deltas/plugin-manager/update-plugin-use-case/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:f4640dd5f7bfabc1d2b94dde02698e396d674db3b7534c533cae674987fe7980"
+        },
+        {
+          "key": "plugin-manager:plugin-loader",
+          "filename": "deltas/plugin-manager/plugin-loader/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:b8342f836d1cbb3b506e0c3cfa6ee9018eeed9aa93e03874173cfeefd37e9019"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:a699d48eeed1ecca305d1f6e2c71050342c61b91bcdef388c129409f06981584"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:9c98096c5f944684ae50116c55408c83a8a9b6552f42dc097096f34b334a2cdf"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-04-23T09:42:09.451Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "specIds": [
+        "plugin-manager:specd-plugin-type",
+        "plugin-manager:agent-plugin-type",
+        "plugin-manager:install-plugin-use-case",
+        "skills:resolve-bundle",
+        "skills:skill-repository-port",
+        "plugin-agent-claude:plugin-agent",
+        "plugin-agent-copilot:plugin-agent",
+        "plugin-agent-codex:plugin-agent",
+        "plugin-agent-opencode:plugin-agent"
+      ],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-23T09:42:09.460Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-manager:specd-plugin-type"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-manager:agent-plugin-type"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-manager:install-plugin-use-case"
+        },
+        {
+          "type": "specs",
+          "key": "skills:resolve-bundle"
+        },
+        {
+          "type": "specs",
+          "key": "skills:skill-repository-port"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-agent-claude:plugin-agent"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-agent-copilot:plugin-agent"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-agent-codex:plugin-agent"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-agent-opencode:plugin-agent"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:specd-plugin-type"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:agent-plugin-type"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:install-plugin-use-case"
+        },
+        {
+          "type": "verify",
+          "key": "skills:resolve-bundle"
+        },
+        {
+          "type": "verify",
+          "key": "skills:skill-repository-port"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-agent-claude:plugin-agent"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-agent-copilot:plugin-agent"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-agent-codex:plugin-agent"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-agent-opencode:plugin-agent"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-23T10:35:22.037Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-24T18:36:23.890Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-24T18:37:39.940Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "plugin-manager:specd-plugin-type",
+            "plugin-manager:agent-plugin-type",
+            "plugin-manager:install-plugin-use-case",
+            "skills:resolve-bundle",
+            "skills:skill-repository-port",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-agent-opencode:plugin-agent"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "plugin-manager:specd-plugin-type",
+            "plugin-manager:agent-plugin-type",
+            "plugin-manager:install-plugin-use-case",
+            "skills:resolve-bundle",
+            "skills:skill-repository-port",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-agent-opencode:plugin-agent"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-24T18:37:39.941Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "plugin-manager:uninstall-plugin-use-case"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-manager:update-plugin-use-case"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-manager:plugin-loader"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:uninstall-plugin-use-case"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:update-plugin-use-case"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:plugin-loader"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-24T18:45:46.338Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-24T18:52:31.546Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: verify [plugin-manager:specd-plugin-type]",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": ["plugin-manager:specd-plugin-type"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-24T18:54:36.047Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: verify [plugin-manager:agent-plugin-type]",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": ["plugin-manager:agent-plugin-type"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-24T18:54:52.734Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [plugin-manager:agent-plugin-type]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["plugin-manager:agent-plugin-type"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-24T18:55:59.058Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [plugin-manager:agent-plugin-type]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["plugin-manager:agent-plugin-type"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-24T18:56:16.895Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [plugin-manager:specd-plugin-type]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["plugin-manager:specd-plugin-type"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-24T18:58:22.781Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [skills:resolve-bundle]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["skills:resolve-bundle"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-24T19:00:41.409Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [plugin-manager:agent-plugin-type]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["plugin-manager:agent-plugin-type"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-24T19:08:38.407Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: design [design]",
+      "affectedArtifacts": [
+        {
+          "type": "design",
+          "files": ["design"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-24T19:09:47.428Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "plugin-manager:specd-plugin-type",
+            "plugin-manager:agent-plugin-type",
+            "plugin-manager:install-plugin-use-case",
+            "skills:resolve-bundle",
+            "skills:skill-repository-port",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-agent-opencode:plugin-agent",
+            "plugin-manager:uninstall-plugin-use-case",
+            "plugin-manager:update-plugin-use-case",
+            "plugin-manager:plugin-loader"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "plugin-manager:specd-plugin-type",
+            "plugin-manager:agent-plugin-type",
+            "plugin-manager:install-plugin-use-case",
+            "skills:resolve-bundle",
+            "skills:skill-repository-port",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-agent-opencode:plugin-agent",
+            "plugin-manager:uninstall-plugin-use-case",
+            "plugin-manager:update-plugin-use-case",
+            "plugin-manager:plugin-loader"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-24T19:09:47.430Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "cli:_global/conventions"
+        },
+        {
+          "type": "verify",
+          "key": "cli:_global/conventions"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-24T19:13:58.776Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "plugin-manager:specd-plugin-type",
+            "plugin-manager:agent-plugin-type",
+            "plugin-manager:install-plugin-use-case",
+            "skills:resolve-bundle",
+            "skills:skill-repository-port",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-agent-opencode:plugin-agent",
+            "plugin-manager:uninstall-plugin-use-case",
+            "plugin-manager:update-plugin-use-case",
+            "plugin-manager:plugin-loader",
+            "cli:_global/conventions"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "plugin-manager:specd-plugin-type",
+            "plugin-manager:agent-plugin-type",
+            "plugin-manager:install-plugin-use-case",
+            "skills:resolve-bundle",
+            "skills:skill-repository-port",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-agent-opencode:plugin-agent",
+            "plugin-manager:uninstall-plugin-use-case",
+            "plugin-manager:update-plugin-use-case",
+            "plugin-manager:plugin-loader",
+            "cli:_global/conventions"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-24T19:13:58.777Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [],
+      "filesRemoved": [
+        {
+          "type": "specs",
+          "key": "cli:_global/conventions"
+        },
+        {
+          "type": "verify",
+          "key": "cli:_global/conventions"
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-24T19:18:04.652Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-24T19:19:07.933Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-24T19:19:07.933Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-24T19:22:24.529Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-24T19:22:53.301Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-24T19:38:35.336Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-24T19:38:35.336Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-24T20:10:46.089Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-24T20:10:47.000Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-24T20:10:47.995Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-24T20:10:56.595Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-24T20:11:02.753Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-24T20:18:10.083Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-04-24T20:18:10.221Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "m***a@g***.com"
+  }
+}

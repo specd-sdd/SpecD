@@ -1,0 +1,40 @@
+- op: modified
+  description: 'Clarify that bootstrap mode does not change the meaning of --config'
+  selector:
+    type: section
+    matches: '^Requirement: Config file location and format$'
+    parent:
+      type: section
+      matches: '^Requirements$'
+  content: |
+    #### Scenario: Config found — nearest file used
+
+    - **WHEN** a `specd.yaml` exists somewhere between the CWD and the git repo root
+    - **THEN** specd uses the nearest one (closest to CWD) and stops walking
+
+    #### Scenario: Monorepo — package config takes precedence
+
+    - **WHEN** a monorepo has a `specd.yaml` at the root and another at `packages/billing/specd.yaml`, and the user runs specd from within `packages/billing/`
+    - **THEN** specd uses `packages/billing/specd.yaml` and does not continue walking up to the root
+
+    #### Scenario: Config not found inside repo
+
+    - **WHEN** the user runs any specd command inside a git repository and no `specd.yaml` exists between the CWD and the repo root
+    - **THEN** specd exits with an error explaining that `specd.yaml` was not found and pointing to `specd init`
+
+    #### Scenario: Invoked outside a git repo
+
+    - **WHEN** the user runs specd from a directory that is not inside any git repository
+    - **THEN** specd checks only the current working directory for `specd.yaml` and exits with an error if not found there
+
+    #### Scenario: Explicit config flag bypasses local override
+
+    - **WHEN** `specd --config /path/to/specd.yaml <command>` is invoked
+    - **THEN** specd uses the specified file exactly as-is — discovery and `specd.local.yaml` lookup are both skipped
+
+    #### Scenario: Command-specific bootstrap mode does not redefine --config
+
+    - **GIVEN** a command family defines a bootstrap mode that can operate without loading project config
+    - **WHEN** the user passes `--config /path/to/specd.yaml`
+    - **THEN** `--config` still means an explicit config file path override
+    - **AND** bootstrap mode is not selected by reinterpreting `--config` as a repository root

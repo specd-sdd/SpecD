@@ -1,0 +1,98 @@
+- op: modified
+  description: 'Verify direction aliases and user-facing terminology.'
+  selector:
+    type: section
+    matches: 'Requirement: Command signature'
+  content: |
+    #### Scenario: Explicit config path bypasses discovery
+
+    - **GIVEN** the current directory would autodiscover a different `specd.yaml`
+    - **WHEN** `specd graph impact --file src/auth.ts --config /tmp/other/specd.yaml` is run
+    - **THEN** the command uses `/tmp/other/specd.yaml` directly
+
+    #### Scenario: Explicit path enters bootstrap mode
+
+    - **GIVEN** a `specd.yaml` exists under the current repository
+    - **WHEN** `specd graph impact --file src/auth.ts --path /tmp/repo` is run
+    - **THEN** config discovery is ignored
+    - **AND** the command analyzes impact against a synthetic single workspace `default` rooted at `/tmp/repo`
+
+    #### Scenario: Direction terminology distinguishes dependents from dependencies
+
+    - **WHEN** graph impact command documentation or help text describes `--direction`
+    - **THEN** `dependents` is described as symbols and files that depend on the target
+    - **AND** `dependencies` is described as symbols and files the target depends on
+    - **AND** `upstream` is documented as a compatibility alias for dependents
+    - **AND** `downstream` is documented as a compatibility alias for dependencies
+    - **AND** documentation does not describe `downstream` as dependents
+
+    #### Scenario: Dependents direction alias maps to upstream
+
+    - **GIVEN** `src/auth.ts` is indexed in the graph with upstream dependents
+    - **WHEN** `specd graph impact --file src/auth.ts --direction dependents` is run
+    - **THEN** the command analyzes the same dependency direction as `--direction upstream`
+    - **AND** the process exits with code 0
+
+    #### Scenario: Dependencies direction alias maps to downstream
+
+    - **GIVEN** `src/utils.ts` is indexed with downstream dependencies
+    - **WHEN** `specd graph impact --file src/utils.ts --direction dependencies` is run
+    - **THEN** the command analyzes the same dependency direction as `--direction downstream`
+    - **AND** the process exits with code 0
+
+    #### Scenario: Invalid direction fails before provider access
+
+    - **WHEN** `specd graph impact --file src/auth.ts --direction sideways` is run
+    - **THEN** the command exits with code 1
+    - **AND** stderr explains that the direction value is invalid
+    - **AND** no graph provider is opened
+
+- op: modified
+  description: 'Verify output count descriptions align with selected direction terminology.'
+  selector:
+    type: section
+    matches: 'Requirement: Output format'
+  content: |
+    #### Scenario: Text output shows risk level and counts
+
+    - **GIVEN** `src/auth.ts` has risk level HIGH with 6 direct, 3 indirect, and 1 transitive dependencies
+    - **WHEN** `specd graph impact --file src/auth.ts` is run
+    - **THEN** stdout contains `Risk level:       HIGH`
+    - **AND** stdout contains `Direct deps:      6`
+
+    #### Scenario: Text output shows depth indicators
+
+    - **GIVEN** `src/auth.ts` has affected symbols at various depths
+    - **WHEN** `specd graph impact --file src/auth.ts` is run
+    - **THEN** each affected symbol line includes a depth indicator `(d=N)` after the symbol name and line
+
+    #### Scenario: Non-default depth shown in header
+
+    - **WHEN** `specd graph impact --file src/auth.ts --depth 5` is run
+    - **THEN** stdout header includes `(depth=5)` after the file path
+
+    #### Scenario: Default depth not shown in header
+
+    - **WHEN** `specd graph impact --file src/auth.ts` is run without `--depth`
+    - **THEN** stdout header does not include a depth indicator
+
+    #### Scenario: JSON output includes depth in affectedSymbols
+
+    - **WHEN** `specd graph impact --file src/auth.ts --format json` is run
+    - **THEN** stdout is valid JSON containing `affectedSymbols` where each entry has `id`, `name`, `filePath`, `line`, and `depth`
+
+    #### Scenario: JSON output for symbol impact
+
+    - **WHEN** `specd graph impact --symbol createKernel --format json` is run
+    - **THEN** stdout is valid JSON containing `symbol` and `impact` objects
+
+    #### Scenario: JSON output for change detection
+
+    - **WHEN** `specd graph impact --changes src/auth.ts --format json` is run
+    - **THEN** stdout is valid JSON containing `changedFiles`, `changedSymbols`, `affectedSymbols`, `riskLevel`, and `summary`
+
+    #### Scenario: Human-facing count labels match direction
+
+    - **WHEN** graph impact documentation explains text output counts for omitted, `dependents`, or `upstream` direction
+    - **THEN** the counts are explained as dependent counts
+    - **AND** when documentation explains `--direction dependencies` or `--direction downstream`, the same fields are explained as dependency counts

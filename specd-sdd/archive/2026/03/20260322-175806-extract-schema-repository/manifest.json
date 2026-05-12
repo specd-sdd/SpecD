@@ -1,0 +1,343 @@
+{
+  "name": "extract-schema-repository",
+  "createdAt": "2026-03-22T17:58:06.445Z",
+  "description": "Extract SchemaRepository port from SchemaRegistry to follow the repository pattern used by SpecRepository and ChangeRepository (issue #32)",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": ["core:core/schema-registry-port", "core:core/schema-repository-port"],
+  "specDependsOn": {
+    "default:core/schema-repository-port": [
+      "default:core/repository-port",
+      "default:core/workspace",
+      "default:core/parse-schema-yaml"
+    ],
+    "default:core/schema-registry-port": [
+      "default:core/resolve-schema",
+      "default:core/parse-schema-yaml",
+      "default:core/schema-repository-port"
+    ],
+    "core:core/schema-repository-port": [
+      "core:core/repository-port",
+      "core:core/workspace",
+      "core:core/parse-schema-yaml"
+    ],
+    "core:core/schema-registry-port": [
+      "core:core/resolve-schema",
+      "core:core/parse-schema-yaml",
+      "core:core/schema-repository-port"
+    ]
+  },
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "validatedHash": "sha256:3931b3312b7743c26e68561243a8a2c018b3055221c8e9aaeaa26321519e480b"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "files": [
+        {
+          "key": "core:core/schema-registry-port",
+          "filename": "deltas/core/core/schema-registry-port/spec.md.delta.yaml",
+          "validatedHash": "sha256:b630da4398fe75f8a187f5f698e666803e1007ed8ce3c560b7a9d0e9efeaca2d"
+        },
+        {
+          "key": "core:core/schema-repository-port",
+          "filename": "specs/core/core/schema-repository-port/spec.md",
+          "validatedHash": "sha256:26e9a7e859209f3c7a4fbadbde10320523e2731537e7c70519190e5eede9d80f"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "files": [
+        {
+          "key": "core:core/schema-registry-port",
+          "filename": "deltas/core/core/schema-registry-port/verify.md.delta.yaml",
+          "validatedHash": "sha256:6c5fe913ba1df72ce2d92c78a4d0680f4268f1d00594dbb1c64f2fb1bd3aceeb"
+        },
+        {
+          "key": "core:core/schema-repository-port",
+          "filename": "specs/core/core/schema-repository-port/verify.md",
+          "validatedHash": "sha256:896defcd37f270352a3d980f03e0e255814ae63c795267a2f86e8b2df2eba8c0"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "validatedHash": "sha256:77e048e3939d0983a4d8db8a1ebc95a67f6ac44da9da7659e05aaf5d4b526edc"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "validatedHash": "sha256:05a7ff424169f5d2f842c09e1ce3eecbbb203210acbeda3cb819467842c011c7"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-03-22T17:58:06.445Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "specIds": ["default:core/port-schema-registry", "default:core/port-schema-repository"],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-03-22T17:58:06.455Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "default:core/port-schema-registry"
+        },
+        {
+          "type": "specs",
+          "key": "default:core/port-schema-repository"
+        },
+        {
+          "type": "verify",
+          "key": "default:core/port-schema-registry"
+        },
+        {
+          "type": "verify",
+          "key": "default:core/port-schema-repository"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-22T17:58:24.398Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-03-22T18:00:29.567Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change"
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-03-22T18:00:29.567Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "default:core/schema-registry-port"
+        },
+        {
+          "type": "specs",
+          "key": "default:core/schema-repository-port"
+        },
+        {
+          "type": "verify",
+          "key": "default:core/schema-registry-port"
+        },
+        {
+          "type": "verify",
+          "key": "default:core/schema-repository-port"
+        }
+      ],
+      "filesRemoved": [
+        {
+          "type": "specs",
+          "key": "default:core/port-schema-registry"
+        },
+        {
+          "type": "specs",
+          "key": "default:core/port-schema-repository"
+        },
+        {
+          "type": "verify",
+          "key": "default:core/port-schema-registry"
+        },
+        {
+          "type": "verify",
+          "key": "default:core/port-schema-repository"
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-03-22T18:17:02.241Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change"
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-03-22T18:17:02.241Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:core/schema-registry-port"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/schema-repository-port"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/schema-registry-port"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/schema-repository-port"
+        }
+      ],
+      "filesRemoved": [
+        {
+          "type": "specs",
+          "key": "default:core/schema-registry-port"
+        },
+        {
+          "type": "specs",
+          "key": "default:core/schema-repository-port"
+        },
+        {
+          "type": "verify",
+          "key": "default:core/schema-registry-port"
+        },
+        {
+          "type": "verify",
+          "key": "default:core/schema-repository-port"
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-22T18:24:28.075Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-22T18:25:17.646Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-22T18:51:41.013Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-22T18:52:27.128Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-22T18:52:59.726Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-22T18:55:33.753Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-03-22T18:56:12.303Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "m***a@g***.com"
+  }
+}

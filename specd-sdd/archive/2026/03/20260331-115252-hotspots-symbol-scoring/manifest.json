@@ -1,0 +1,280 @@
+{
+  "name": "hotspots-symbol-scoring",
+  "createdAt": "2026-03-31T11:52:52.559Z",
+  "description": "Reduce file-import dominance in hotspot symbol ranking",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": ["code-graph:code-graph/hotspots", "cli:cli/graph-hotspots"],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "validatedHash": "sha256:00ed7797e60936d79a4e6cfd3431c7ae0f300e2a7c72415725e0c0785af88348"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "files": [
+        {
+          "key": "code-graph:code-graph/hotspots",
+          "filename": "deltas/code-graph/code-graph/hotspots/spec.md.delta.yaml",
+          "validatedHash": "sha256:7f0ec4b7f498fb4fc4c4ff1e5fedd55fcdf06aba2b70a2ad854d09b9282006a1"
+        },
+        {
+          "key": "cli:cli/graph-hotspots",
+          "filename": "deltas/cli/cli/graph-hotspots/spec.md.delta.yaml",
+          "validatedHash": "sha256:5c0639887dc78353356b745c2c829087f9cbce2eb02b8c5dd35079205f34e68a"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "files": [
+        {
+          "key": "code-graph:code-graph/hotspots",
+          "filename": "deltas/code-graph/code-graph/hotspots/verify.md.delta.yaml",
+          "validatedHash": "sha256:7c3e6c452748893832451ae0b2a9f5081885d8f27a66d6677897e27a16168c48"
+        },
+        {
+          "key": "cli:cli/graph-hotspots",
+          "filename": "deltas/cli/cli/graph-hotspots/verify.md.delta.yaml",
+          "validatedHash": "sha256:c93b4fde7e8c41f902cecb6bb37fe97995445a3c9fcb3d978dbb2b6095c69c4d"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "validatedHash": "sha256:b228a8a11792825758c8f4e8c801721f96c510c581467131c27b553512ab1626"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "validatedHash": "sha256:f2f49b402d4204c9d31e1a3af1cf5a248828d7edba9aa7003d8880c38d624527"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-03-31T11:52:52.559Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "specIds": ["code-graph:code-graph/hotspots", "cli:cli/graph-hotspots"],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-03-31T11:52:52.568Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:code-graph/hotspots"
+        },
+        {
+          "type": "specs",
+          "key": "cli:cli/graph-hotspots"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:code-graph/hotspots"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/graph-hotspots"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-31T11:56:00.677Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-31T14:33:24.025Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-31T14:35:36.786Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-31T15:02:58.603Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-31T15:19:00.901Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-31T15:19:08.879Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-03-31T15:36:13.834Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-change"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-31T15:36:13.834Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-31T15:41:53.871Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-31T15:42:01.284Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-31T15:44:26.230Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-31T15:45:57.666Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-31T15:46:10.950Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-31T15:51:37.864Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-03-31T15:51:37.958Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "m***a@g***.com"
+  }
+}

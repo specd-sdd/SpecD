@@ -1,0 +1,73 @@
+- op: modified
+  description: Make impact analysis hierarchy-aware.
+  selector:
+    type: section
+    matches: '^Requirement: Impact analysis$'
+    contains: 'analyzeImpact'
+  content: |-
+    `analyzeImpact(store: GraphStore, target: string, direction: 'upstream' | 'downstream' | 'both', maxDepth?: number): Promise<ImpactResult>` SHALL compute the blast radius of modifying the target symbol. The optional `maxDepth` parameter (default: 3) controls how deep the traversal goes — it is passed through to `getUpstream`/`getDownstream` and limits the IMPORTS BFS loop.
+
+    The function produces an `ImpactResult` containing:
+
+    - **`target`** — the symbol being analyzed
+    - **`directDependents`** — count of depth-1 results (WILL BREAK)
+    - **`indirectDependents`** — count of depth-2 results (LIKELY AFFECTED)
+    - **`transitiveDependents`** — count of depth-3+ results (MAY NEED TESTING)
+    - **`riskLevel`** — computed from dependent counts: `LOW`, `MEDIUM`, `HIGH`, or `CRITICAL`
+    - **`affectedFiles`** — unique file paths containing any affected symbol
+    - **`affectedSymbols`** — array of `AffectedSymbol` entries with depth information
+    - **`affectedProcesses`** — execution flows that include the target or any affected symbol (when process data is available)
+
+    `AffectedSymbol` SHALL contain:
+
+    - **`id`** (`string`) — the symbol identifier
+    - **`name`** (`string`) — the symbol's declared name
+    - **`filePath`** (`string`) — workspace-prefixed file path
+    - **`line`** (`number`) — 1-based line number
+    - **`depth`** (`number`) — distance from the target: 1 = direct dependent, 2 = indirect, 3+ = transitive
+
+    Impact analysis MUST include hierarchy relations in addition to existing call/import reachability:
+
+    - changing a type symbol MUST affect symbols connected through `EXTENDS` and `IMPLEMENTS` according to traversal direction
+    - changing a method symbol MUST affect symbols connected through `OVERRIDES` according to traversal direction
+    - hierarchy-derived affected symbols participate in depth counts, risk calculation, and affected-file aggregation the same way as other affected symbols
+
+    Risk level thresholds:
+
+    | Level      | Condition                                                |
+    | ---------- | -------------------------------------------------------- |
+    | `LOW`      | 0–2 direct dependents, no indirect                       |
+    | `MEDIUM`   | 3–5 direct dependents, or any indirect                   |
+    | `HIGH`     | 6+ direct dependents, or 10+ total dependents            |
+    | `CRITICAL` | 20+ total dependents, or target is in 3+ execution flows |
+
+- op: modified
+  description: Propagate hierarchy-aware impact through file-level impact.
+  selector:
+    type: section
+    matches: '^Requirement: File impact$'
+    contains: 'analyzeFileImpact'
+  content: |-
+    `analyzeFileImpact(store: GraphStore, filePath: string, direction: 'upstream' | 'downstream' | 'both', maxDepth?: number): Promise<FileImpactResult>` SHALL compute aggregate impact for all symbols defined in the given file. The optional `maxDepth` parameter (default: 3) is passed through to each per-symbol `analyzeImpact` call and limits the file-level IMPORTS BFS.
+
+    It:
+
+    1. Retrieves all symbols in the file via `findSymbols({ filePath })`
+    2. Runs `analyzeImpact` for each symbol with the given `maxDepth`
+    3. Merges results: deduplicates affected symbols (keeping the shallowest depth), takes the maximum risk level, unions affected files
+
+    `FileImpactResult` extends `ImpactResult` with:
+
+    - **`symbols`** — array of per-symbol `ImpactResult` entries
+    - **`riskLevel`** — the maximum risk level across all symbols in the file
+
+    When symbols in the file participate in `EXTENDS`, `IMPLEMENTS`, or `OVERRIDES`, their hierarchy-derived impact MUST be reflected in the aggregate result.
+
+- op: modified
+  description: Mention hierarchy semantics in spec dependencies.
+  selector:
+    type: section
+    matches: '^Spec Dependencies$'
+  content: |-
+    - [`specs/code-graph/symbol-model/spec.md`](../symbol-model/spec.md) — `SymbolNode`, `Relation`, `RelationType`, hierarchy relations
+    - [`specs/code-graph/graph-store/spec.md`](../graph-store/spec.md) — `GraphStore` query methods

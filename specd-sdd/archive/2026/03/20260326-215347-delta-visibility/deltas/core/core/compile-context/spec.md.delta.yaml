@@ -1,0 +1,82 @@
+- op: added
+  description: 'Add requirement for PreviewSpec dependency and delta merge in context'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Staleness detection and content fallback'
+  content: |
+    ### Requirement: Ports and constructor — PreviewSpec
+
+    `CompileContext` MUST receive a `PreviewSpec` instance at construction time, in addition to its existing ports. This is the use case it delegates to for merging deltas into spec content.
+
+    ```typescript
+    class CompileContext {
+      constructor(
+        changes: ChangeRepository,
+        specs: ReadonlyMap<string, SpecRepository>,
+        schemaProvider: SchemaProvider,
+        files: FileReader,
+        parsers: ArtifactParserRegistry,
+        hasher: ContentHasher,
+        previewSpec: PreviewSpec,
+      )
+    }
+    ```
+
+    ### Requirement: Materialized delta view
+
+    When rendering full-mode spec content for a spec in `change.specIds`, `CompileContext` MUST attempt to produce a materialized view by calling `PreviewSpec.execute({ name: change.name, specId, diff: false })`.
+
+    If `PreviewSpec` returns a non-empty `files` array, `CompileContext` MUST use the merged content from the `PreviewSpecFileEntry` whose `filename` is the primary spec artifact (typically `spec.md`) as the `ContextSpecEntry.content`, replacing the base content that would otherwise be rendered from metadata or fallback extraction.
+
+    If `PreviewSpec` returns an empty `files` array (no deltas to apply, or all no-ops), `CompileContext` MUST fall back to the existing behaviour — render content from metadata or the extraction fallback.
+
+    If `PreviewSpec` throws or returns warnings indicating a failure, `CompileContext` MUST fall back to the existing behaviour and add the warning(s) to its own warnings array. Context compilation MUST NOT fail due to a preview error.
+
+    The materialized view replaces the base content entirely — `CompileContext` does not blend metadata-extracted fields with preview output. When preview succeeds, the merged spec content is the rendered content.
+
+- op: modified
+  description: 'Add PreviewSpec to Spec Dependencies'
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`specs/core/change/spec.md`](../change/spec.md) — Change entity, `effectiveStatus`, active workspaces
+    - [`specs/core/config/spec.md`](../config/spec.md) — 5-step context spec resolution, include/exclude patterns, workspace-level patterns
+    - [`specs/core/spec-metadata/spec.md`](../spec-metadata/spec.md) — `.specd-metadata.yaml` format, `dependsOn` traversal, staleness detection
+    - [`specs/core/schema-format/spec.md`](../schema-format/spec.md) — `metadataExtraction` (fallback path), `workflow`
+    - [`specs/core/delta-format/spec.md`](../delta-format/spec.md) — `ArtifactParser` port (for metadataExtraction fallback)
+    - [`specs/core/selector-model/spec.md`](../selector-model/spec.md) — selector fields used in `metadataExtraction` extractors
+    - [`specs/core/spec-id-format/spec.md`](../spec-id-format/spec.md) — canonical `workspace:capabilityPath` format, parsing rules for `specIds`
+    - [`specs/core/workspace/spec.md`](../workspace/spec.md) — active workspace determination, workspace-level context patterns, port-per-workspace pattern
+    - [`specs/core/get-artifact-instruction/spec.md`](../get-artifact-instruction/spec.md) — artifact instructions (separate concern)
+    - [`specs/core/get-hook-instructions/spec.md`](../get-hook-instructions/spec.md) — step hook instructions (separate concern)
+    - [`specs/core/preview-spec/spec.md`](../preview-spec/spec.md) — delta merge for materialized spec views in context
+
+- op: modified
+  description: 'Add constraint about preview fallback'
+  selector:
+    type: section
+    matches: 'Constraints'
+  content: |
+    - Project `context` entries always appear first in `projectContext`, before spec entries
+    - Missing `file` references in `context` emit a warning and are skipped — no error
+    - Steps 1–4 (include/exclude patterns) are applied before `dependsOn` traversal (step 5)
+    - Specs added via `dependsOn` traversal are never removed by exclude rules
+    - A spec always appears at most once in the `specs` array, classified by its highest-priority source
+    - `CompileContext` MUST NOT perform direct filesystem reads — all file access goes through `SpecRepository` (for spec files and metadata) or `FileReader` (for `config.context` file entries)
+    - The caller resolves the config and constructs all `SpecRepository` and `FileReader` instances before calling the constructor
+    - The `specs` map must contain one entry per workspace declared in `specd.yaml`; workspaces missing from the map produce a warning, not an error
+    - Artifact instructions, rules, and delta context are NOT part of the result — they are retrieved via `GetArtifactInstruction`
+    - `instruction:` hook entries are NOT part of the result — they are retrieved via `GetHookInstructions`
+    - `dependsOn` traversal is opt-in via `followDeps: true`; when absent or `false`, step 5 is skipped entirely
+    - `depth` is only meaningful when `followDeps: true`; it limits traversal levels (1 = direct deps only)
+    - `sections` applies only to full-mode spec content rendering; summary-mode specs, project context entries, and available steps are unaffected
+    - Cycle detection is mandatory — cycles in `dependsOn` must not cause infinite loops
+    - Fresh metadata (via `SpecRepository.metadata()`) is always preferred; the `metadataExtraction` fallback is only used when metadata is absent or stale
+    - When `contextMode` is `'lazy'` (default), tier 2 specs MUST have `mode: 'summary'` with no `content` field — only `specId`, `title`, `description`, and `source`
+    - When `contextMode` is `'full'`, all specs MUST have `mode: 'full'` — behaviour is identical to the pre-change implementation except for the structured result shape
+    - `PreviewSpec` errors MUST NOT block context compilation — `CompileContext` falls back to base content on any preview failure

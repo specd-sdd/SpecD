@@ -1,0 +1,27 @@
+added:
+  - position:
+      parent: '### Requirement: Context display modes'
+    content: |
+      #### Scenario: Default sections in full mode
+      When a spec is rendered in `full` mode and the `sections` input is absent or empty, the use case MUST default to rendering **Description + Rules + Constraints**. If `sections` is provided, it MUST override this default.
+modified:
+  - selector: '### Requirement: Input'
+    content: |
+      `CompileContext.execute` receives:
+
+      - ... (existing fields)
+      - `sections` (optional) — when present, restricts the metadata-derived content rendered for each full-mode spec. When absent, the use case defaults to rendering **Description + Rules + Constraints** via structured output. To get the full raw content of all artifacts, `hybrid` or `full` modes MUST be combined with an explicit request for all sections if supported, but the default is now structured.
+  - selector: '### Requirement: Structured result assembly'
+    content: |
+      ... (existing rules)
+
+      Full-mode rendering follows these rules:
+
+      - The use case MUST prefer structured rendering (`_renderFromMetadata` or equivalent) for `full` mode.
+      - If `sections` is absent, the default sections to render are **Description + Rules + Constraints**.
+      - Raw artifact file concatenation is no longer the default for `full` mode; it is only used if the implementation provides a specific way to request it, otherwise structured metadata-derived content is the standard for `full` mode in `CompileContext`.
+  - selector: '### Requirement: Staleness detection and content fallback'
+    content: |
+      Whenever `CompileContext` needs structured metadata-derived content for a spec — summary fields (`title`, `description`) or section-filtered full content (`rules`, `constraints`, `scenarios`) — it must check whether the spec's metadata exists and is fresh.
+
+      Structured rendering is now the mandatory path for `full` mode, even when `sections` is absent (using the default sections).

@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'Existing documentation verification scenarios already require CLI reference updates when command documentation changes.'

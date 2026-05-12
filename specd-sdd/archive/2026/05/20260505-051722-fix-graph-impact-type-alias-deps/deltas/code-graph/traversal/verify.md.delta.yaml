@@ -1,0 +1,37 @@
+- op: added
+  description: 'Verify static type and construct relations participate in impact traversal.'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Impact analysis$'
+  content: |
+    ### Requirement: Static type dependency impact
+
+    #### Scenario: USES_TYPE dependent contributes to upstream impact
+
+    - **GIVEN** class `ArtifactParserRegistry` has an incoming `USES_TYPE` relation from `GenerateSpecMetadata`
+    - **WHEN** `analyzeImpact(store, ArtifactParserRegistry.id, 'upstream')` is called
+    - **THEN** `GenerateSpecMetadata` appears in `affectedSymbols`
+    - **AND** its file contributes to `affectedFiles`
+
+    #### Scenario: CONSTRUCTS dependency contributes to downstream impact
+
+    - **GIVEN** function `createKernel` has an outgoing `CONSTRUCTS` relation to `TemplateExpander`
+    - **WHEN** `analyzeImpact(store, createKernel.id, 'downstream')` is called
+    - **THEN** `TemplateExpander` appears in `affectedSymbols`
+
+    #### Scenario: Static type and hierarchy dependents affect depth and risk
+
+    - **GIVEN** a target symbol has one direct `USES_TYPE` dependent, one depth-2 `CALLS` dependent, and one overriding method dependent
+    - **WHEN** `analyzeImpact(store, target.id, 'upstream')` is called
+    - **THEN** all three relations contribute to depth counts
+    - **AND** risk calculation treats them the same as ordinary call-derived dependents
+
+    #### Scenario: File impact aggregates USES_TYPE-derived dependents
+
+    - **GIVEN** a file defines a type symbol with upstream `USES_TYPE` dependents in other files
+    - **WHEN** `analyzeFileImpact(store, filePath, 'upstream')` is called
+    - **THEN** those dependents are included in the aggregate `affectedSymbols` and `affectedFiles`

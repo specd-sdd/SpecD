@@ -1,0 +1,53 @@
+- op: modified
+  description: 'Make search behavior backend-agnostic'
+  selector:
+    type: section
+    matches: '^Purpose$'
+  content: |
+    The code graph contains symbols with names and comments, and specs with titles, descriptions, and full content. Users and agents need to find relevant symbols and specs by concept or keyword without knowing exact names. The `specd graph search` command provides relevance-ranked search across both through the abstract code-graph search capabilities.
+
+- op: modified
+  description: 'Remove Ladybug-specific FTS details from the command behavior'
+  selector:
+    type: section
+    matches: '^Requirement: Search behaviour$'
+    parent:
+      type: section
+      matches: '^Requirements$'
+  content: |
+    The command uses the shared graph CLI context model to resolve explicit config, autodetected config, or bootstrap mode before creating a `CodeGraphProvider` via `withProvider`.
+
+    It delegates to:
+
+    - `provider.searchSymbols(options)` — search across symbol search text and symbol comments, with filters applied at the store level
+    - `provider.searchSpecs(options)` — search across spec title, description, and content, with filters applied at the store level
+
+    The concrete scoring and indexing strategy are implementation concerns of the active graph-store backend. Results are returned ordered by score descending — highest relevance first.
+
+    The `--kind` option SHALL accept exactly one comma-separated list value. Each token SHALL be trimmed and validated against the allowed `SymbolKind` values before the provider query is executed. Any invalid token SHALL cause a CLI error and SHALL prevent the search from running.
+
+    The validated kind list SHALL be passed to the query layer as a multi-kind filter rather than being collapsed to a single last value.
+
+    Before attempting to open the provider, the command SHALL check the shared graph indexing lock used by `graph index`. If indexing is currently in progress, the command SHALL fail fast with a short user-facing retry-later message instead of surfacing backend lock errors.
+
+- op: modified
+  description: 'Keep constraints at the abstract capability level'
+  selector:
+    type: section
+    matches: '^Constraints$'
+  content: |
+    - The CLI does not contain search logic — it delegates to `CodeGraphProvider.searchSymbols` and `CodeGraphProvider.searchSpecs`
+    - Search depends on the active graph-store backend having prepared its search indexes during indexing or store maintenance
+    - The command checks the shared graph indexing lock before opening the provider and fails fast while indexing is in progress
+    - The `process.exit(0)` pattern is required after closing the provider
+
+- op: modified
+  description: 'Remove dependency on the Ladybug-specific database schema spec'
+  selector:
+    type: section
+    matches: '^Spec Dependencies$'
+  content: |
+    - [`specs/cli/entrypoint/spec.md`](../entrypoint/spec.md) — config discovery, exit codes, and output conventions
+    - [`specs/core/config/spec.md`](../../core/config/spec.md) — configured operation, explicit config path handling, and bootstrap-mode relationship
+    - [`specs/code-graph/composition/spec.md`](../../code-graph/composition/spec.md) — `CodeGraphProvider` facade
+    - [`specs/code-graph/graph-store/spec.md`](../../code-graph/graph-store/spec.md) — abstract graph-store search capabilities

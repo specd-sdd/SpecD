@@ -1,0 +1,78 @@
+- op: removed
+  description: 'Replace requirement block to ensure explicit scenario section is preserved.'
+  selector:
+    type: section
+    matches: 'Requirement: Application layer'
+
+- op: added
+  description: 'Add Application layer verification with explicit scenario block.'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: Application layer
+
+    #### Scenario: InstallSkills follows required workflow
+
+    - **GIVEN** skills are available from `@specd/skills`
+    - **WHEN** `InstallSkills` runs
+    - **THEN** it reads skill templates, resolves per-skill frontmatter, prepends Open Code YAML frontmatter only to skill-local markdown files, and writes installed skill files
+    - **AND** shared-marked files are written under the Open Code shared skills resource directory
+
+- op: modified
+  description: 'Cover frontmatter exclusion for shared files.'
+  selector:
+    type: section
+    matches: 'Requirement: Frontmatter injection'
+  content: |
+    #### Scenario: Install prepends only Open Code-compatible fields
+
+    - **WHEN** skill markdown files are written during install
+    - **THEN** YAML frontmatter is prepended before markdown content
+    - **AND** emitted fields are limited to the configured Open Code-supported keys
+
+    #### Scenario: Shared files do not receive skill frontmatter
+
+    - **GIVEN** a resolved bundle includes files marked as shared
+    - **WHEN** install writes those files
+    - **THEN** shared files are written without Open Code skill frontmatter
+
+- op: modified
+  description: 'Cover split install location and shared folder invariant.'
+  selector:
+    type: section
+    matches: 'Requirement: Install location'
+  content: |
+    #### Scenario: Skills install into Open Code directory
+
+    - **GIVEN** a `SpecdConfig` with `projectRoot`
+    - **WHEN** install writes skill files
+    - **THEN** non-shared files are created under `.opencode/skills/<skill-name>/`
+    - **AND** shared files are created under `.opencode/skills/_specd-shared/`
+
+    #### Scenario: Shared directory is not discovered as a skill
+
+    - **WHEN** install creates `.opencode/skills/_specd-shared/`
+    - **THEN** the directory does not contain a `SKILL.md` file
+
+- op: modified
+  description: 'Align uninstall scenarios with shared directory retention semantics.'
+  selector:
+    type: section
+    matches: 'Requirement: Uninstall behavior'
+  content: |
+    #### Scenario: Uninstall removes selected skills when filter is provided
+
+    - **GIVEN** a `SpecdConfig` and multiple skills installed under `.opencode/skills/`
+    - **WHEN** `uninstall(config, { skills: ['specd-design'] })` is executed
+    - **THEN** only the selected specd-managed skill directories are removed
+    - **AND** `.opencode/skills/_specd-shared/` remains when other installed skills may still reference it
+
+    #### Scenario: Uninstall without filter removes only specd-managed skills and shared resources
+
+    - **GIVEN** a `SpecdConfig` with specd-managed skills and unrelated user skills installed under `.opencode/skills/`
+    - **WHEN** `uninstall(config, optionsWithoutSkills)` is executed
+    - **THEN** all specd-managed skill directories are removed
+    - **AND** `.opencode/skills/_specd-shared/` is removed
+    - **AND** unrelated user skill directories remain

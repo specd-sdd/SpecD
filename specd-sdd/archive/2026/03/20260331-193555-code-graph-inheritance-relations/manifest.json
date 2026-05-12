@@ -1,0 +1,342 @@
+{
+  "name": "code-graph-inheritance-relations",
+  "createdAt": "2026-03-31T19:35:55.505Z",
+  "description": "add language-agnostic inheritance and implementation relations to the code graph and propagate them through indexing, traversal, and hotspot analysis",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "code-graph:code-graph/symbol-model",
+    "code-graph:code-graph/language-adapter",
+    "code-graph:code-graph/traversal",
+    "code-graph:code-graph/hotspots",
+    "code-graph:code-graph/indexer",
+    "code-graph:code-graph/database-schema",
+    "code-graph:code-graph/graph-store"
+  ],
+  "specDependsOn": {
+    "code-graph:code-graph/language-adapter": ["code-graph:code-graph/symbol-model"],
+    "code-graph:code-graph/graph-store": ["code-graph:code-graph/symbol-model"]
+  },
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "validatedHash": "sha256:06950b689ee70b9f47b7d4b690fd0e221d44ee809bb527bbe2a9446842ae40ce"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "files": [
+        {
+          "key": "code-graph:code-graph/symbol-model",
+          "filename": "deltas/code-graph/code-graph/symbol-model/spec.md.delta.yaml",
+          "validatedHash": "sha256:19c72bb794ae93d2597a0c85696489be23ce440a1a1e3a6e03787f3ffb806af4"
+        },
+        {
+          "key": "code-graph:code-graph/language-adapter",
+          "filename": "deltas/code-graph/code-graph/language-adapter/spec.md.delta.yaml",
+          "validatedHash": "sha256:298b5c8eeba1d8376c6e4bc899fe77eca46a8530d2a61f41262d144117041391"
+        },
+        {
+          "key": "code-graph:code-graph/traversal",
+          "filename": "deltas/code-graph/code-graph/traversal/spec.md.delta.yaml",
+          "validatedHash": "sha256:d28e21557c26a52a9ac681ba6113f9aeb384e5324c06fe62442d3203431ae3c2"
+        },
+        {
+          "key": "code-graph:code-graph/hotspots",
+          "filename": "deltas/code-graph/code-graph/hotspots/spec.md.delta.yaml",
+          "validatedHash": "sha256:f079300841680c4fc2e80c7e6235a84b22d6a16cdbd39c058d22daa1876c77c8"
+        },
+        {
+          "key": "code-graph:code-graph/indexer",
+          "filename": "deltas/code-graph/code-graph/indexer/spec.md.delta.yaml",
+          "validatedHash": "sha256:0ca4a06fdbacc1081eacd174d641cf316fcbaf1e073f8bf464b7080e64f20374"
+        },
+        {
+          "key": "code-graph:code-graph/database-schema",
+          "filename": "deltas/code-graph/code-graph/database-schema/spec.md.delta.yaml",
+          "validatedHash": "sha256:113849ef75c0e15124bd18cceedab6930a4346ac69fcd2072e781ea8b7a53535"
+        },
+        {
+          "key": "code-graph:code-graph/graph-store",
+          "filename": "deltas/code-graph/code-graph/graph-store/spec.md.delta.yaml",
+          "validatedHash": "sha256:75e2ce60152f7e6b2db744f01717c8e9690d26893dae1060296db6d93587f7ac"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "files": [
+        {
+          "key": "code-graph:code-graph/symbol-model",
+          "filename": "deltas/code-graph/code-graph/symbol-model/verify.md.delta.yaml",
+          "validatedHash": "sha256:4848b4c1532e300dda39eeb7cc24b453ab5e4522bb198f2045144f338d832006"
+        },
+        {
+          "key": "code-graph:code-graph/language-adapter",
+          "filename": "deltas/code-graph/code-graph/language-adapter/verify.md.delta.yaml",
+          "validatedHash": "sha256:f5fe556dcbd8768e14efa333ae3f4a32d3ee94850207f9dc145eb9cbf5b685dc"
+        },
+        {
+          "key": "code-graph:code-graph/traversal",
+          "filename": "deltas/code-graph/code-graph/traversal/verify.md.delta.yaml",
+          "validatedHash": "sha256:08031b8277f7f89a4245cd5b29f17a1fd1a0013328f27fa374d94c8eefeee442"
+        },
+        {
+          "key": "code-graph:code-graph/hotspots",
+          "filename": "deltas/code-graph/code-graph/hotspots/verify.md.delta.yaml",
+          "validatedHash": "sha256:c768f46fa5cca0fc3ac0447c6051ad137b7a9349b346fddb11cfcddad0cdf14e"
+        },
+        {
+          "key": "code-graph:code-graph/indexer",
+          "filename": "deltas/code-graph/code-graph/indexer/verify.md.delta.yaml",
+          "validatedHash": "sha256:d45aaeb5b15808bd4e67bf78e7c06c1a0f83848a5b210573828deabca4c02803"
+        },
+        {
+          "key": "code-graph:code-graph/database-schema",
+          "filename": "deltas/code-graph/code-graph/database-schema/verify.md.delta.yaml",
+          "validatedHash": "sha256:14319742c8a9df86716c04072eec41cdb017501d7dbbe3ef933ed2ada07a7245"
+        },
+        {
+          "key": "code-graph:code-graph/graph-store",
+          "filename": "deltas/code-graph/code-graph/graph-store/verify.md.delta.yaml",
+          "validatedHash": "sha256:2941a7233b9c75f3613587f80ff325722207634c3de478b39feaa18fa50ae04a"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "validatedHash": "sha256:d2cc5e1a58933fe3187c3986d07393141cdfbd364ff0e917d1d958eb8bc3fadf"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "validatedHash": "sha256:96d90ac5507e9995256e9b320dd6555fab3e09a076b1fd3ea053bb3418f26dab"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-03-31T19:35:55.505Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "specIds": [
+        "code-graph:code-graph/symbol-model",
+        "code-graph:code-graph/language-adapter",
+        "code-graph:code-graph/traversal",
+        "code-graph:code-graph/hotspots",
+        "code-graph:code-graph/indexer",
+        "code-graph:code-graph/database-schema"
+      ],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-03-31T19:35:55.514Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:code-graph/symbol-model"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:code-graph/language-adapter"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:code-graph/traversal"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:code-graph/hotspots"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:code-graph/indexer"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:code-graph/database-schema"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:code-graph/symbol-model"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:code-graph/language-adapter"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:code-graph/traversal"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:code-graph/hotspots"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:code-graph/indexer"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:code-graph/database-schema"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-31T19:41:00.520Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-03-31T20:35:00.102Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change"
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-03-31T20:35:00.102Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "code-graph:code-graph/graph-store"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:code-graph/graph-store"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-31T21:01:09.538Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-31T21:02:24.373Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-31T22:33:16.210Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-31T22:34:31.433Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-31T22:35:46.165Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-31T22:42:45.857Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-03-31T22:42:46.131Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "m***a@g***.com"
+  }
+}

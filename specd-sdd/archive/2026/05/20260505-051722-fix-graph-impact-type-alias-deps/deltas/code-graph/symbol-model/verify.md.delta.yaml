@@ -1,0 +1,73 @@
+- op: modified
+  description: 'Verify canonical and config-relative file identity fields.'
+  selector:
+    type: section
+    matches: '^Requirement: File node$'
+  content: |
+    #### Scenario: FileNode equality still uses canonical path
+
+    - **GIVEN** two `FileNode` values with the same canonical `path` but different `contentHash` and `configRelativePath`
+    - **WHEN** equality is checked
+    - **THEN** they are considered equal because `path` remains the canonical graph identity
+
+    #### Scenario: FileNode path normalization
+
+    - **GIVEN** a file discovered under workspace `core` at OS path `src\\domain\\entities\\change.ts`
+    - **WHEN** a `FileNode` is created
+    - **THEN** `path` is stored as `core:src/domain/entities/change.ts`
+
+    #### Scenario: FileNode configRelativePath is repository-style
+
+    - **GIVEN** the active `specd.yaml` lives at `/project/specd.yaml`
+    - **AND** workspace `core` has codeRoot `/project/packages/core`
+    - **AND** the discovered file is `/project/packages/core/src/index.ts`
+    - **WHEN** a `FileNode` is created
+    - **THEN** `path` is `core:src/index.ts`
+    - **AND** `configRelativePath` is `packages/core/src/index.ts`
+    - **AND** `workspace` is `core`
+
+    #### Scenario: FileNode configRelativePath may include parent segments
+
+    - **GIVEN** the active `specd.yaml` lives at `/project/apps/web/specd.yaml`
+    - **AND** workspace `core` has codeRoot `/project/packages/core`
+    - **AND** the discovered file is `/project/packages/core/src/index.ts`
+    - **WHEN** a `FileNode` is created
+    - **THEN** `configRelativePath` is `../../packages/core/src/index.ts`
+    - **AND** it does not replace the canonical `path`
+
+- op: modified
+  description: 'Verify SymbolNode ID includes column offset.'
+  selector:
+    type: section
+    matches: '^Requirement: Symbol node$'
+  content: |
+    #### Scenario: Deterministic id generation
+
+    - **GIVEN** a symbol with `filePath: 'core/src/utils.ts'`, `kind: function`, `name: 'hash'`, `line: 10`, `column: 0`
+    - **WHEN** the id is computed
+    - **THEN** it produces `'core/src/utils.ts:function:hash:10:0'` every time for these inputs
+
+    #### Scenario: Different line produces different id
+
+    - **GIVEN** two symbols with the same `filePath`, `kind`, and `name` but different `line` values
+    - **WHEN** their ids are computed
+    - **THEN** the ids are different
+
+    #### Scenario: Id includes workspace-prefixed path
+
+    - **GIVEN** a symbol in file `core:src/index.ts` (workspace-prefixed path)
+    - **WHEN** the id is computed
+    - **THEN** the id starts with `core:src/index.ts:`
+    - **AND** the id is globally unique across workspaces
+
+    #### Scenario: Comment extracted from JSDoc
+
+    - **GIVEN** a TypeScript file with `/** Computes the hash. */` immediately before `function computeHash()`
+    - **WHEN** the symbol is extracted
+    - **THEN** `comment` is `'/** Computes the hash. */'`
+
+    #### Scenario: Symbol without comment
+
+    - **GIVEN** a function declaration with no preceding comment
+    - **WHEN** the symbol is extracted
+    - **THEN** `comment` is `undefined`

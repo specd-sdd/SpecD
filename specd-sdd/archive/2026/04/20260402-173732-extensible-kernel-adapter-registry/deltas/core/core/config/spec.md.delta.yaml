@@ -1,0 +1,15 @@
+- op: added
+  description: 'Allow named storage adapters with hard errors for unknown names'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Storage configuration$'
+  content: |
+    ### Requirement: Named storage adapters
+
+    Workspace storage configuration SHALL support named storage adapter selection rather than assuming only the built-in filesystem composition path.
+
+    When a workspace selects a named storage adapter, any adapter-specific config block for that adapter SHALL be passed through as adapter-owned configuration. Referencing an adapter name that is not present in the merged built-in plus external storage registries MUST fail with a clear error.

@@ -1,0 +1,465 @@
+{
+  "name": "fix-config-compliance",
+  "createdAt": "2026-04-22T07:36:33.735Z",
+  "description": "Align config behavior with current spec contracts by removing legacy artifactRules/skills handling, enforcing plugins validation at load time, and tightening workspace contextMode errors. The change also adds unknown-template warning callbacks and updates config show/docs so runtime output, verification scenarios, and documentation all reflect the same model. This closes the compliance gaps without changing the broader plugin-manager workflow.",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "core:core/config",
+    "cli:cli/config-show",
+    "core:core/template-variables",
+    "core:core/config-writer-port"
+  ],
+  "specDependsOn": {
+    "core:core/config": [
+      "core:core/schema-format",
+      "core:core/schema-merge",
+      "default:_global/architecture",
+      "core:core/storage",
+      "core:core/spec-metadata",
+      "core:core/workspace"
+    ],
+    "cli:cli/config-show": ["cli:cli/entrypoint", "core:core/config"],
+    "core:core/template-variables": [
+      "core:core/hook-runner-port",
+      "core:core/hook-execution-model",
+      "core:core/get-hook-instructions",
+      "core:core/get-artifact-instruction",
+      "core:core/run-step-hooks",
+      "core:core/archive-change"
+    ],
+    "core:core/config-writer-port": ["default:_global/architecture", "core:core/config"]
+  },
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:13da1ef419d8a88f074feddc36a62eb0391785914ff4da4d73c5b9b618d93103"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:core/config",
+          "filename": "deltas/core/core/config/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:33681615df18b4fc7225e32b01206e0a84e2d5f518be3c0dfcd3467a0866dc53"
+        },
+        {
+          "key": "cli:cli/config-show",
+          "filename": "deltas/cli/cli/config-show/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:73402b3e969f995717168988481cc685c5da71ff13defb46192e5cb17002ceb5"
+        },
+        {
+          "key": "core:core/template-variables",
+          "filename": "deltas/core/core/template-variables/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:6f77d65917c33c9a544c00ed7ac4cf66c989c0941191e381ff54f56bc4722dd7"
+        },
+        {
+          "key": "core:core/config-writer-port",
+          "filename": "deltas/core/core/config-writer-port/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:cbf28ab67e556290d8a9e267b340c88bfc1fe4eebd0d321442c0f498d09e86ad"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:core/config",
+          "filename": "deltas/core/core/config/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:f4c5b596116c831ba15029b6dc54bce613dc4609a880a284f7c651520ecb65b3"
+        },
+        {
+          "key": "cli:cli/config-show",
+          "filename": "deltas/cli/cli/config-show/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:b5daefc3045f4cc5158c5aaac5a5e3b8e3371c3b3a8982866feb4a6ae1459934"
+        },
+        {
+          "key": "core:core/template-variables",
+          "filename": "deltas/core/core/template-variables/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:92001b6904316f141f818cd86e83ac0c84766b798465085bc8573f0591198006"
+        },
+        {
+          "key": "core:core/config-writer-port",
+          "filename": "deltas/core/core/config-writer-port/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:b4b4c92b2d63ca8ed0aaaacab0fe6900d6750a96d6cbb1e809afce89d0bc8d33"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:0477c66f35c35be2c0a7134256ee542597cf91f3309563c674002e7ded44a3e3"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:92de03a01a03e3cd4e2e6d0c4c7bc81ee2cf3bb87160f6d95fbb2cf1138049ea"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-04-22T07:36:33.735Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "specIds": ["core:core/config"],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-22T07:36:33.745Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/config"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/config"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-22T07:40:41.410Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-22T07:54:44.972Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-22T07:54:44.999Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["core:core/config"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:core/config"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-22T07:54:44.999Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "cli:cli/config-show"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/config-show"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-22T08:07:04.191Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["core:core/config", "cli:cli/config-show"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:core/config", "cli:cli/config-show"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-22T08:07:04.191Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:core/template-variables"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/config-writer-port"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/template-variables"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/config-writer-port"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-22T09:05:38.565Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: design [design]",
+      "affectedArtifacts": [
+        {
+          "type": "design",
+          "files": ["design"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-22T09:15:21.829Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-22T09:24:30.596Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-22T09:24:30.596Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-22T09:25:25.609Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-22T09:37:14.141Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-22T10:47:08.522Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-22T11:09:47.900Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-22T11:12:33.532Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-22T11:13:32.130Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "description-updated",
+      "at": "2026-04-22T11:57:34.043Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "description": "Align config behavior with current spec contracts by removing legacy artifactRules/skills handling, enforcing plugins validation at load time, and tightening workspace contextMode errors. The change also adds unknown-template warning callbacks and updates config show/docs so runtime output, verification scenarios, and documentation all reflect the same model. This closes the compliance gaps without changing the broader plugin-manager workflow."
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-22T11:58:20.889Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-04-22T11:58:21.073Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "m***a@g***.com"
+  }
+}

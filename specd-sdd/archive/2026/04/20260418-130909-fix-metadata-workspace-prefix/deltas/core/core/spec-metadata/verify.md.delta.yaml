@@ -1,0 +1,51 @@
+- op: modified
+  description: 'Update File location scenarios to include workspace in path'
+  selector:
+    type: section
+    matches: 'Requirement: File location and naming'
+  content: |
+    #### Scenario: Metadata file present
+
+    - **GIVEN** a spec at `core:core/config` with a `metadata.json` at `.specd/metadata/core/config/metadata.json`
+    - **WHEN** `metadata(spec)` is called
+    - **THEN** the result contains the parsed JSON fields
+
+    #### Scenario: Metadata file absent
+
+    - **GIVEN** no `metadata.json` exists for the spec
+    - **WHEN** `metadata(spec)` is called
+    - **THEN** the result is `null`
+
+    #### Scenario: Workspace without prefix stores metadata correctly
+
+    - **GIVEN** a workspace `skills` with no prefix configured
+    - **AND** a spec at `skills:get-skill`
+    - **WHEN** metadata is saved for that spec
+    - **THEN** the file is stored at `.specd/metadata/skills/get-skill/metadata.json`
+
+    #### Scenario: Workspace with prefix stores metadata correctly
+
+    - **GIVEN** a workspace `core` with prefix `core` configured
+    - **AND** a spec at `core:core/config`
+    - **WHEN** metadata is saved for that spec
+    - **THEN** the file is stored at `.specd/metadata/core/core/config/metadata.json`
+
+    #### Scenario: Explicit metadataPath in workspace config
+
+    - **GIVEN** a workspace config with `specs.fs.metadataPath: .specd/metadata`
+    - **WHEN** metadata is requested for a spec in that workspace
+    - **THEN** the adapter reads from the configured path at `<metadataPath>/<workspace>/<specPath>/metadata.json`
+
+    #### Scenario: Auto-derived metadataPath from VCS root
+
+    - **GIVEN** a workspace config with no explicit `specs.fs.metadataPath`
+    - **AND** the specs path is inside a VCS repository
+    - **WHEN** the kernel boots
+    - **THEN** the composition layer resolves the VCS root of `specs.path` and derives `<vcsRoot>/.specd/metadata/` as the metadata path
+
+    #### Scenario: NullVcsAdapter fallback for metadataPath
+
+    - **GIVEN** a workspace config with no explicit `specs.fs.metadataPath`
+    - **AND** the specs path is not inside any VCS (NullVcsAdapter returned)
+    - **WHEN** the kernel boots
+    - **THEN** the composition layer falls back to `.specd/metadata/` relative to the specs root parent

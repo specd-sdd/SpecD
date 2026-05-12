@@ -1,0 +1,233 @@
+{
+  "name": "remove-spec-cleanup",
+  "createdAt": "2026-03-21T15:34:45.306Z",
+  "description": "change edit --remove-spec leaves orphan scaffold directories",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": ["core:core/edit-change", "core:core/change-repository-port"],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "validatedHash": "sha256:a5f7bcc74fa2dfd5083ff30af4f222403e03cf42fe4e0e5bf9a25046a2d074ec"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "files": [
+        {
+          "key": "core:core/edit-change",
+          "filename": "deltas/core/core/edit-change/spec.md.delta.yaml",
+          "validatedHash": "sha256:275542129673fe5ffa09eac550c571d82a04c4668ccb4b049abedb3be4f717bb"
+        },
+        {
+          "key": "core:core/change-repository-port",
+          "filename": "deltas/core/core/change-repository-port/spec.md.delta.yaml",
+          "validatedHash": "sha256:e2fac37a17c9b100ac6b68b6f88990b845bb0989d3b87e34e7dec13b54d72385"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "files": [
+        {
+          "key": "core:core/edit-change",
+          "filename": "deltas/core/core/edit-change/verify.md.delta.yaml",
+          "validatedHash": "sha256:9b36c0e979e73bd7eae79904d5d9b37b92ae7859e20371653dfa5fce1c92ad1c"
+        },
+        {
+          "key": "core:core/change-repository-port",
+          "filename": "deltas/core/core/change-repository-port/verify.md.delta.yaml",
+          "validatedHash": "sha256:9ede551428f6f236135073210fd066088bfcfd2f5963657975d7273c93caec4a"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "validatedHash": "sha256:5c36ba97bc6347319aecb5ba540053350843dd2f518de645345a825ad33eff2f"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "validatedHash": "sha256:adffa918778c55aeef576596d4463d026ba31cf705c4145e07dfb36f5ab18c0d"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-03-21T15:34:45.306Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "specIds": ["core:core/edit-change"],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-03-21T15:34:45.329Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/edit-change"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/edit-change"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-21T15:34:49.282Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-03-21T15:37:40.977Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change"
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-03-21T15:37:40.977Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:core/change-repository-port"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/change-repository-port"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-21T15:40:23.368Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-21T15:41:50.573Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-21T15:46:09.773Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-21T15:47:25.798Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-21T15:47:34.732Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-21T15:48:45.113Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-03-21T15:48:46.994Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "m***a@g***.com"
+  }
+}

@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'configPath verified via RepositoryConfig'

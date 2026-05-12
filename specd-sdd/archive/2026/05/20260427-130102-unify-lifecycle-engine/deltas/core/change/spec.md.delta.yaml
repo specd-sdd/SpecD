@@ -1,0 +1,39 @@
+# Delta: core:change
+
+- op: added
+  description: 'Clarify that persisted change facts and schema-aware lifecycle interpretation have different owners.'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: Lifecycle interpretation authority
+
+    The `Change` entity is the source of truth for persisted lifecycle facts: history, the current persisted state, artifact files, aggregate artifact states, approvals, and invalidation events.
+
+    Dependency-aware lifecycle interpretation is a separate concern. Any decision that depends on the schema DAG, workflow `requires`, recursive parent blocking, approval-gate routing, or step availability SHALL be interpreted by `LifecycleEngine`, not by the `Change` entity itself.
+
+    This separation ensures the entity does not need schema knowledge in order to answer questions such as:
+
+    - whether an artifact is effectively blocked by an upstream parent
+    - which lifecycle step is reachable next under the active schema
+    - whether a requested transition must route through an approval boundary
+    - which blocker or next action should be surfaced to callers
+
+- op: added
+  description: 'Add a constraint clarifying that schema-aware lifecycle interpretation is external to Change.'
+  position:
+    parent:
+      type: section
+      matches: 'Constraints'
+  content: |
+    - Schema-aware effective artifact status, recursive blocker resolution, and workflow-step availability are not entity-owned concerns; they are interpreted by `LifecycleEngine` from persisted change facts plus the active schema
+
+- op: added
+  description: 'Add LifecycleEngine to spec dependencies.'
+  position:
+    parent:
+      type: section
+      matches: 'Spec Dependencies'
+  content: |
+    - [`core:lifecycle-engine`](../lifecycle-engine/spec.md) — interprets schema-aware lifecycle and dependency status from persisted change facts

@@ -1,0 +1,18 @@
+- op: added
+  description: 'Add native .env scenarios'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Forced mode'
+  content: |
+    ### Requirement: Native environment file support
+
+    #### Scenario: .env.local takes precedence over .env
+
+    - **GIVEN** `.env` has `FOO=bar`
+    - **AND** `.env.local` has `FOO=baz`
+    - **WHEN** loader runs
+    - **THEN** `process.env.FOO` is `baz` (or mapped accordingly)

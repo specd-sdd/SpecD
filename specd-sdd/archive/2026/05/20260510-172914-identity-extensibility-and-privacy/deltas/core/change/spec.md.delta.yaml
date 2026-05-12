@@ -1,0 +1,58 @@
+- op: modified
+  description: 'Extend ActorIdentity interface for richer identity data'
+  selector:
+    type: section
+    matches: 'Requirement: Identity'
+  content: |
+    A Change has a unique, user-defined slug name (e.g. `add-auth-flow`) and a `createdAt` timestamp recorded at creation time. Both are immutable.
+
+    Identities in specd are represented by the `ActorIdentity` interface:
+    - **`name`** — human-readable name of the actor
+    - **`email`** — unique identifier (often a real email, but may be a hash or masked value)
+    - **`provider`** — optional identifier of the identity source (e.g. 'git', 'ldap')
+    - **`providerId`** — optional unique ID within that provider (e.g. LDAP DN)
+    - **`metadata`** — optional bag of arbitrary string-valued metadata (`Record<string, string>`)
+
+- op: modified
+  description: 'Update history common fields to reference the extended identity'
+  selector:
+    type: list-item
+    matches: 'by — git identity'
+  content: |
+    by — the `ActorIdentity` of the person or system performing the operation, mandatory on all events
+
+- op: modified
+  description: 'Update SYSTEM_ACTOR definition to include provider'
+  selector:
+    type: section
+    matches: 'Requirement: Artifact sync'
+  content: |
+    A Change can reconcile its artifact map against the current schema's artifact types via the `syncArtifacts(artifactTypes)` method. This method:
+
+    1. Compares the current artifact map against the provided `artifactTypes` array.
+    2. Adds new artifact types and their expected files (based on scope and specIds).
+    3. Removes artifact types no longer in the schema.
+    4. For existing artifacts, adds files for new spec IDs and removes files for spec IDs no longer in the change.
+    5. Returns `true` if any changes were made, `false` if the artifact map was already in sync.
+    6. When changes are made, appends an `ArtifactsSyncedEvent` to history with the `SYSTEM_ACTOR` identity.
+
+    `SYSTEM_ACTOR` is a constant `{ name: 'specd', email: 'system@getspecd.dev', provider: 'system' }` used for automated operations.
+
+- op: modified
+  description: 'Update drafting/discarding requirements for identity'
+  selector:
+    type: section
+    matches: 'Requirement: Drafting and discarding'
+  content: |
+    A change may be moved between storage locations without affecting its lifecycle state. All operations are recorded as events in history.
+
+    - **Draft** (changes/ → drafts/) — shelves the change. Appends a `drafted` event. If the change has ever reached `implementing`, drafting SHALL fail by default.
+      - **`by`** — mandatory `ActorIdentity` of the person shelving
+      - **`at`** — timestamp
+      - **`reason`** — optional explanation
+    - **Restore** (drafts/ → changes/) — recovers a drafted change. Appends a `restored` event.
+    - **Discard** (changes/ or drafts/ → discarded/) — permanently abandons the change. Appends a `discarded` event. If the change has ever reached `implementing`, discarding SHALL fail by default.
+      - **`reason`** — mandatory human-provided explanation
+      - **`by`** — mandatory `ActorIdentity` of the person discarding
+      - **`at`** — timestamp
+      - **`supersededBy`** — optional list of change names that replace this one

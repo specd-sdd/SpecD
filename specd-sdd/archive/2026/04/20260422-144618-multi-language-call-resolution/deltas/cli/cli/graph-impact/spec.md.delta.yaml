@@ -1,0 +1,85 @@
+- op: modified
+  description: 'Add dependents/dependencies direction aliases while preserving existing CLI values.'
+  selector:
+    type: section
+    matches: 'Requirement: Command signature'
+  content: |
+    ```text
+    specd graph impact [--file <path>] [--symbol <name>] [--changes <files...>] [--direction dependents|dependencies|upstream|downstream|both] [--depth <n>] [--config <path> | --path <path>] [--format text|json|toon]
+    ```
+
+    Exactly one of `--file`, `--symbol`, or `--changes` must be provided.
+
+    - `--file` — analyze impact of a single file
+    - `--symbol` — analyze impact of a symbol by name. If multiple symbols match, all are analyzed and results listed
+    - `--changes` — detect impact of changes to multiple files (variadic; accepts multiple space-separated paths)
+    - `--direction` — optional; analysis direction, defaults to `upstream`. Values:
+      - `dependents` — find symbols and files that depend on the target; alias of `upstream`
+      - `dependencies` — find symbols and files that the target depends on; alias of `downstream`
+      - `upstream` — compatibility value for `dependents`
+      - `downstream` — compatibility value for `dependencies`
+      - `both` — combined dependents and dependencies analysis
+    - `--depth` — optional; maximum traversal depth, defaults to `3`. Must be a positive integer. Passed through to `analyzeImpact`/`analyzeFileImpact` as `maxDepth`
+    - `--config <path>` — optional; explicit path to `specd.yaml`, matching the standard CLI meaning
+    - `--path <path>` — optional; repo-root bootstrap mode
+    - `--format text|json|toon` — optional; output format, defaults to `text`
+
+    The CLI SHALL normalize `dependents` to `upstream` and `dependencies` to `downstream` before calling `analyzeImpact()` or `analyzeFileImpact()`. Invalid direction values SHALL fail with a CLI usage error before opening the graph provider.
+
+    User-facing documentation for this command MUST prefer the concrete aliases `dependents` and `dependencies` before the compatibility graph-theory terms `upstream` and `downstream`. Documentation MAY mention the compatibility values, but it MUST NOT describe `downstream` as dependents.
+
+    `--config` and `--path` are mutually exclusive.
+
+    `--path` and no-config fallback are bootstrap mechanisms for setup and early repository exploration, not the intended steady-state mode for configured projects.
+
+- op: modified
+  description: 'Clarify text output labels so counts are not confused with downstream dependencies.'
+  selector:
+    type: section
+    matches: 'Requirement: Output format'
+  content: |
+    **File impact** in `text` mode:
+
+    ```text
+    Impact analysis for src/auth.ts (depth=5)
+      Risk level:       HIGH
+      Direct deps:      6
+      Indirect deps:    3
+      Transitive deps:  1
+      Affected files:   8
+
+    Affected files:
+      src/login.ts: handleLogin:12 (d=1), validateSession:45 (d=1)
+      src/session.ts: createSession:8 (d=2)
+
+    Per-symbol breakdown:
+      src/auth.ts:function:validate:10:0  risk=HIGH direct=4
+      src/auth.ts:class:AuthService:20:0  risk=MEDIUM direct=2
+    ```
+
+    When affected symbols are available, each file line shows the symbols grouped after a colon with depth indicators: `path: name:line (d=N), name:line (d=N)`. Files reached only via IMPORTS (file-level) are listed without symbols. The depth value `d=N` indicates the distance from the analysis target (1 = direct, 2 = indirect, 3+ = transitive).
+
+    When `--direction` is omitted or set to `dependents` / `upstream`, human-facing documentation and help text SHOULD explain these counts as dependent counts. When `--direction dependencies` / `downstream` is used, documentation SHOULD explain that the same fields represent dependencies reached from the target.
+
+    When `--depth` is not the default (3), the header line includes `(depth=N)` to show the configured depth.
+
+    **Symbol impact** in `text` mode:
+
+    ```text
+    Impact analysis for function createKernel (packages/core/src/composition/kernel.ts:147) (depth=5)
+      Risk level:       CRITICAL
+      Direct deps:      1
+      Indirect deps:    1
+      Transitive deps:  38
+      Affected files:   40
+
+    Affected files:
+      packages/cli/src/kernel.ts: wireKernel:5 (d=1)
+      ...
+    ```
+
+    When multiple symbols match, each analysis is listed sequentially.
+
+    **Change detection** in `text` mode outputs the summary string from `ChangeDetectionResult.summary` followed by the affected files list.
+
+    In `json` or `toon` mode, the full result object is output as-is. The `AffectedSymbol` entries in JSON include the `depth` field.

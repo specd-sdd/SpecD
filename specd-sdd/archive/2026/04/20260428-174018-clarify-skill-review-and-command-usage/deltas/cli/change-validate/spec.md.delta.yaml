@@ -1,0 +1,126 @@
+- op: modified
+  description: Clarify structural scope and canonical plural signature.
+  selector:
+    type: section
+    matches: 'Requirement: Command signature'
+  content: |
+    ```
+    specd changes validate <name> [workspace:capability-path] [--all] [--artifact <artifactId>] [--format text|json|toon]
+    ```
+
+    - `<name>` — required positional; the name of the change to validate
+    - `[workspace:capability-path]` — optional positional; the spec ID to validate against (e.g. `default:auth/oauth`). Must be one of the change's declared `specIds`. Required unless `--all` is used OR `--artifact` targets a `scope: change` artifact.
+    - `--all` — validate all `specIds` declared in the change. Mutually exclusive with `<workspace:capability-path>`.
+    - `--artifact <artifactId>` — optional; when provided, only the specified artifact is validated instead of all artifacts for the spec. Works with both single-spec and `--all` modes. When the artifact is `scope: change`, `specPath` is not required.
+    - `--format text|json|toon` — optional; output format, defaults to `text`
+
+    Canonical agent-facing guidance MUST use plural command groups (for example `changes`). Singular groups remain alias-compatible.
+
+- op: added
+  description: Define validate as structural gating only.
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Behaviour'
+  content: |
+    ### Requirement: Structural validation scope
+
+    `specd changes validate` SHALL validate artifact structure, schema conformance, dependency readiness, and lifecycle validation status only.
+
+    A successful validate result MUST NOT be interpreted as semantic approval of artifact intent, requirement quality, or implementation correctness.
+
+    Semantic/content review is a separate workflow obligation and SHALL be performed by human/agent review steps outside validate.
+
+- op: modified
+  description: Align preview hint to canonical plural command.
+  selector:
+    type: section
+    matches: 'Requirement: Output on success'
+  content: |
+    In `text` mode (default), when all artifacts pass, the command prints the validated artifact paths.
+    For spec-scoped validation targets, it also prints a merged-preview hint:
+
+    ```text
+    validated <name>/<workspace:capability-path>: all artifacts pass
+      file: <path>
+      file: <path>
+    note: inspect merged spec output with `specd changes spec-preview <name> <workspace:capability-path>`
+    ```
+
+    In `text` mode, when there are notes but no failures:
+
+    ```text
+    validated <name>/<workspace:capability-path>: pass (N note(s))
+      file: <path>
+    note: <artifactId> — <description>
+    ...
+    note: inspect merged spec output with `specd changes spec-preview <name> <workspace:capability-path>`
+    ```
+
+    When validation targets a spec-scoped artifact via `--artifact <artifactId>`, the preview hint SHOULD include the same artifact filter:
+
+    ```text
+    note: inspect merged spec output with `specd changes spec-preview <name> <workspace:capability-path> --artifact <artifactId>`
+    ```
+
+    The listed file paths MUST come from `ValidateArtifacts` result metadata and MUST be the exact paths validated for the requested spec/artifact. Any non-blocking suggestion MUST be labeled as a `note`.
+
+    In `json` or `toon` mode, the output includes a `notes` array:
+
+    ```json
+    {
+      "passed": true,
+      "failures": [],
+      "notes": [{ "artifactId": "...", "description": "..." }],
+      "files": [{ "artifactId": "...", "key": "...", "filename": "...", "status": "validated" }]
+    }
+    ```
+
+    The process exits with code 0 when `passed` is `true`.
+
+- op: modified
+  description: Align preview hint to canonical plural command in failures too.
+  selector:
+    type: section
+    matches: 'Requirement: Output on failure'
+  content: |
+    In `text` mode, the command prints each failure to stdout, exits with code 1, and includes any expected file paths that could not be validated.
+    For spec-scoped validation targets, it also prints a merged-preview hint:
+
+    ```text
+    validation failed <name>/<workspace:capability-path>:
+      missing: <path>
+        error: <artifactId> — <description>
+        ...
+        note: <artifactId> — <description>
+        ...
+      note: inspect merged spec output with `specd changes spec-preview <name> <workspace:capability-path>`
+    ```
+
+    When validation targets a spec-scoped artifact via `--artifact <artifactId>`, the preview hint SHOULD include the same artifact filter:
+
+    ```text
+    note: inspect merged spec output with `specd changes spec-preview <name> <workspace:capability-path> --artifact <artifactId>`
+    ```
+
+    For change-scoped validation targets, no preview hint is emitted.
+
+    Missing path lines MUST be derived from `ValidateArtifacts` result metadata. For an existing spec with a delta-capable artifact, this path is the expected `deltas/.../*.delta.yaml` file, even if a direct `specs/...` file exists.
+
+    For dependency-blocked failures, `<description>` MUST be rendered exactly from the core validation failure entry and therefore MUST preserve dependency status context. When core reports review-propagation context (for example, a blocker status of `pending-parent-artifact-review` and an upstream parent blocker), the CLI MUST surface that context verbatim instead of replacing it with generic "incomplete dependency" wording.
+
+    In `json` or `toon` mode:
+
+    ```json
+    {
+      "passed": false,
+      "failures": [{ "artifactId": "...", "description": "...", "filename": "..." }],
+      "notes": [],
+      "files": [{ "artifactId": "...", "key": "...", "filename": "...", "status": "missing" }]
+    }
+    ```
+
+    The process exits with code 1 when `passed` is `false`, regardless of format.

@@ -1,0 +1,19 @@
+- op: added
+  description: 'Assign archive-local ignore maintenance to the fs archive repository implementation'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: get returns an archived change or null$'
+  content: |
+    ### Requirement: fs implementation maintains archive runtime ignore rules
+
+    When the filesystem implementation creates or maintains runtime archive artifacts, it MUST also maintain archive-local ignore rules for those artifacts.
+
+    `FsArchiveRepository` MUST ensure that the archive root `.gitignore` contains entries for `.specd-index.jsonl` and `.staging`.
+
+    This guarantee MUST be provided by runtime archive behavior, not only by project initialization.
+
+    The guarantee MUST cover archive creation, `reindex()`, and runtime index recovery or append paths that recreate or maintain `.specd-index.jsonl`.

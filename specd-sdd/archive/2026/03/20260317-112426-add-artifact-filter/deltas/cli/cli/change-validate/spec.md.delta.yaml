@@ -1,0 +1,45 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Command signature'
+  content: |
+    ```
+    specd change validate <name> <workspace:capability-path> [--artifact <artifactId>] [--format text|json|toon]
+    ```
+
+    - `<name>` — required positional; the name of the change to validate
+    - `<workspace:capability-path>` — required positional; the spec ID to validate against (e.g. `default:auth/oauth`). Must be one of the change's declared `specIds`.
+    - `--artifact <artifactId>` — optional; when provided, only the specified artifact is validated instead of all artifacts for the spec. The artifact ID must exist in the active schema.
+    - `--format text|json|toon` — optional; output format, defaults to `text`
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Behaviour'
+  content: |
+    The command invokes the `ValidateArtifacts` use case, passing the change name, spec ID, and optionally the artifact ID from `--artifact`.
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Error cases'
+  content: |
+    ### Requirement: Unknown artifact ID
+
+    If `--artifact` is provided with an artifact ID that does not exist in the active schema, the command exits with code 1 and prints the validation failure from the use case to stdout (not stderr — it is a validation result, not a CLI error).
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Examples'
+  content: |
+    ```
+    specd change validate add-oauth-login default:auth/oauth
+    specd change validate update-billing default:billing/invoices
+    specd change validate add-oauth-login default:auth/oauth --artifact proposal
+    specd change validate update-billing default:billing/invoices --artifact specs
+    ```

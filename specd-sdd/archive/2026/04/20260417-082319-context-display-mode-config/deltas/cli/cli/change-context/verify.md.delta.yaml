@@ -1,0 +1,87 @@
+- op: modified
+  description: 'Extend command signature coverage with include-change-specs.'
+  selector:
+    type: section
+    matches: 'Requirement: Command signature'
+  content: |
+    #### Scenario: Missing step argument
+
+    - **WHEN** `specd change context my-change` is run without the step
+    - **THEN** the command exits with code 1 and prints a usage error to stderr
+
+    #### Scenario: --depth without --follow-deps
+
+    - **WHEN** `specd change context my-change designing --depth 2` is run without `--follow-deps`
+    - **THEN** the command exits with code 1 and prints a usage error to stderr
+
+    #### Scenario: --fingerprint flag accepted
+
+    - **WHEN** `specd change context my-change designing --fingerprint sha256:abc123...` is run
+    - **THEN** the command proceeds normally
+
+    #### Scenario: --include-change-specs flag accepted
+
+    - **WHEN** `specd change context my-change designing --include-change-specs` is run
+    - **THEN** the command proceeds normally and requests direct change-spec seeding
+
+- op: modified
+  description: 'Update output verification for list/summary/full and spec-preview guidance.'
+  selector:
+    type: section
+    matches: 'Requirement: Output'
+  content: |
+    #### Scenario: Text output begins with fingerprint before context sections
+
+    - **GIVEN** the current context fingerprint is `sha256:abc123...`
+    - **WHEN** `specd change context my-change designing --format text` is called
+    - **THEN** the first rendered line is `Context Fingerprint: sha256:abc123...`
+
+    #### Scenario: Text output shows unchanged message when fingerprint matches
+
+    - **GIVEN** the current context fingerprint is `sha256:abc123...`
+    - **WHEN** `specd change context my-change designing --fingerprint sha256:abc123... --format text` is called
+    - **THEN** the output includes `Context unchanged since last call.`
+    - **AND** no spec content is printed
+
+    #### Scenario: Text output labels full-mode specs explicitly
+
+    - **GIVEN** `CompileContext` returns a full-mode spec entry
+    - **WHEN** `specd change context <name> <step> --format text` is called
+    - **THEN** the rendered block includes an explicit full-mode label
+
+    #### Scenario: Text output labels summary-mode specs explicitly
+
+    - **GIVEN** `CompileContext` returns a summary-mode spec entry
+    - **WHEN** `specd change context <name> <step> --format text` is called
+    - **THEN** the rendered block includes an explicit summary-mode label
+
+    #### Scenario: Text output labels list-mode specs explicitly
+
+    - **GIVEN** `CompileContext` returns a list-mode spec entry
+    - **WHEN** `specd change context <name> <step> --format text` is called
+    - **THEN** the rendered block includes an explicit list-mode label
+
+    #### Scenario: Non-full output instructs spec-preview usage
+
+    - **GIVEN** the output contains summary-mode or list-mode entries
+    - **WHEN** text output is rendered
+    - **THEN** it includes guidance to run `specd change spec-preview <change-name> <specId>` for merged full content
+
+    #### Scenario: JSON output includes list-mode entries
+
+    - **GIVEN** `CompileContext` returns `mode: "list"` entries
+    - **WHEN** `specd change context <name> <step> --format json` is called
+    - **THEN** JSON includes those entries with mode and source fields
+
+    #### Scenario: Section flags have no effect on list and summary entries
+
+    - **GIVEN** the result is rendered in list mode or summary mode
+    - **WHEN** `--rules` or `--constraints` are passed
+    - **THEN** output remains list/summary shaped without full content blocks
+
+    #### Scenario: include-change-specs false still allows reinjection
+
+    - **GIVEN** `--include-change-specs` is omitted
+    - **AND** a change spec matches include patterns or traversal
+    - **WHEN** the command is executed
+    - **THEN** that spec can still appear in emitted context entries

@@ -1,0 +1,24 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Plugin declarations'
+  content: |
+    #### Scenario: Plugins section with agents array
+
+    - **WHEN** `specd.yaml` has a `plugins` section
+    - **THEN** it contains an `agents` array
+
+    #### Scenario: Agent plugin entry
+
+    - **GIVEN** `plugins.agents` has an entry
+    - **THEN** each entry has `name` (required) and optional `config`
+
+    #### Scenario: ConfigWriter.addPlugin adds to array
+
+    - **WHEN** `ConfigWriter.addPlugin(configPath, 'agents', '@specd/plugin-agent-claude')` is called
+    - **THEN** the plugin is added to `plugins.agents` array
+
+    #### Scenario: ConfigWriter.removePlugin removes from array
+
+    - **WHEN** `ConfigWriter.removePlugin(configPath, 'agents', '@specd/plugin-agent-claude')` is called
+    - **THEN** the plugin is removed from the array

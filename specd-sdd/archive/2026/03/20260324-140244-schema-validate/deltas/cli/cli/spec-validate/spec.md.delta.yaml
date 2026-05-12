@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'Reference pattern only — no spec changes needed'

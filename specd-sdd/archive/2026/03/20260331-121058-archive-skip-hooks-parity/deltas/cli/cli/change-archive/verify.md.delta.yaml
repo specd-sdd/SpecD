@@ -1,0 +1,42 @@
+- op: added
+  position:
+    parent:
+      type: section
+      matches: '^Requirement: Command signature$'
+    after:
+      type: section
+      matches: '^Scenario: Missing name argument$'
+  content: |
+    #### Scenario: Skip hooks accepts archive phases
+
+    - **WHEN** `specd change archive my-change --skip-hooks pre,post` is run
+    - **THEN** the command accepts the invocation
+    - **AND** it forwards both archive hook phases to the use case
+- op: added
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Behaviour$'
+  content: |
+    ### Requirement: Hook execution
+
+    #### Scenario: Skip all archive hooks
+
+    - **WHEN** `specd change archive my-change --skip-hooks all` is run
+    - **THEN** the command skips all archive hook execution
+    - **AND** the archive still delegates the rest of the work to `ArchiveChange`
+
+    #### Scenario: Skip only pre-archive hooks
+
+    - **WHEN** `specd change archive my-change --skip-hooks pre` is run
+    - **THEN** pre-archive hooks are skipped
+    - **AND** post-archive hooks remain enabled
+
+    #### Scenario: Skip only post-archive hooks
+
+    - **WHEN** `specd change archive my-change --skip-hooks post` is run
+    - **THEN** post-archive hooks are skipped
+    - **AND** pre-archive hooks remain enabled

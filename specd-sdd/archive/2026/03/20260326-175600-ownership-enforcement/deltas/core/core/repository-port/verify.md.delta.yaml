@@ -1,0 +1,23 @@
+- op: added
+  description: 'Add verification scenarios for ReadOnlyWorkspaceError'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Subclass contract'
+  content: |
+    ### Requirement: ReadOnlyWorkspaceError
+
+    #### Scenario: Error extends DomainError
+
+    - **WHEN** a `ReadOnlyWorkspaceError` is constructed
+    - **THEN** it is an instance of `DomainError`
+    - **AND** it is an instance of `Error`
+
+    #### Scenario: Error preserves message
+
+    - **GIVEN** a message `'Cannot write to spec "platform:auth/tokens" — workspace "platform" is readOnly.'`
+    - **WHEN** `ReadOnlyWorkspaceError` is constructed with that message
+    - **THEN** `error.message` equals the provided message

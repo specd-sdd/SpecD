@@ -1,0 +1,5 @@
+releases:
+  core:core/change-layout: patch
+  core:core/change-manifest: patch
+  core:core/validate-artifacts: patch
+  cli:cli/change-validate: patch

@@ -1,0 +1,490 @@
+{
+  "name": "align-code-graph-specs-with-implementation",
+  "createdAt": "2026-04-01T09:23:07.231Z",
+  "description": "Align code-graph specs with the current indexer, graph-store, and PHP language-adapter behaviour.",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "code-graph:code-graph/indexer",
+    "code-graph:code-graph/graph-store",
+    "code-graph:code-graph/language-adapter",
+    "core:core/config",
+    "code-graph:code-graph/ladybug-graph-store",
+    "cli:cli/graph-search",
+    "code-graph:code-graph/database-schema",
+    "cli:cli/graph-index",
+    "cli:cli/graph-hotspots",
+    "cli:cli/graph-impact",
+    "cli:cli/graph-stats"
+  ],
+  "specDependsOn": {
+    "code-graph:code-graph/ladybug-graph-store": [
+      "code-graph:code-graph/graph-store",
+      "core:core/config"
+    ],
+    "code-graph:code-graph/indexer": ["core:core/config"],
+    "cli:cli/graph-search": ["code-graph:code-graph/graph-store"],
+    "code-graph:code-graph/database-schema": [
+      "code-graph:code-graph/ladybug-graph-store",
+      "code-graph:code-graph/graph-store"
+    ],
+    "cli:cli/graph-index": ["code-graph:code-graph/graph-store"]
+  },
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "validatedHash": "sha256:d4fe579a219fe452dbe7f6d0ed390a2eb22e4ce4799d09516dec2b98a4310bf0"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "files": [
+        {
+          "key": "code-graph:code-graph/indexer",
+          "filename": "deltas/code-graph/code-graph/indexer/spec.md.delta.yaml",
+          "validatedHash": "sha256:185c5a2d6e92b11e907fa64cf4084574a493ccf75f2944e164fc6e23c3c29143"
+        },
+        {
+          "key": "code-graph:code-graph/graph-store",
+          "filename": "deltas/code-graph/code-graph/graph-store/spec.md.delta.yaml",
+          "validatedHash": "sha256:6d0c8c336bdd1066418720ac72560a2677bcd19689322e9f6e37d2c7d31b828f"
+        },
+        {
+          "key": "code-graph:code-graph/language-adapter",
+          "filename": "deltas/code-graph/code-graph/language-adapter/spec.md.delta.yaml",
+          "validatedHash": "sha256:ba271c87f55ec7d09332cbe7b87a47ec82fa5c9f59b00ab7293393bbe48446a8"
+        },
+        {
+          "key": "core:core/config",
+          "filename": "deltas/core/core/config/spec.md.delta.yaml",
+          "validatedHash": "sha256:4a26a94e8a553d1f8697eabc5ce2c21792f8973371e472ce443ba2166aac2e59"
+        },
+        {
+          "key": "code-graph:code-graph/ladybug-graph-store",
+          "filename": "specs/code-graph/code-graph/ladybug-graph-store/spec.md",
+          "validatedHash": "sha256:6611daa5d456c07c2ef82392e872a4d779f8ecd79b0b8d11167473fcf4d7298a"
+        },
+        {
+          "key": "cli:cli/graph-search",
+          "filename": "deltas/cli/cli/graph-search/spec.md.delta.yaml",
+          "validatedHash": "sha256:6b93cadb4160911243a987cf6cb78424289bcd03076f2ca5c43c48f7b53c13a5"
+        },
+        {
+          "key": "code-graph:code-graph/database-schema",
+          "filename": "deltas/code-graph/code-graph/database-schema/spec.md.delta.yaml",
+          "validatedHash": "sha256:b6d685ce9da9aec26d59d2aeaae60fd58d9a38d2e15400f272986a9a4ccbcc25"
+        },
+        {
+          "key": "cli:cli/graph-index",
+          "filename": "deltas/cli/cli/graph-index/spec.md.delta.yaml",
+          "validatedHash": "sha256:d5e0f85ab7d3f5c173d96f55a52ceeb6973e01841b5681e506fcd1a40fde872c"
+        },
+        {
+          "key": "cli:cli/graph-hotspots",
+          "filename": "deltas/cli/cli/graph-hotspots/spec.md.delta.yaml",
+          "validatedHash": "sha256:0a6c3d087890183e32db05a175c017ace60e5dcfac7dd09f61adb9f35ff78dc9"
+        },
+        {
+          "key": "cli:cli/graph-impact",
+          "filename": "deltas/cli/cli/graph-impact/spec.md.delta.yaml",
+          "validatedHash": "sha256:e7b8d72d9539e8fff137a31e4ae0d5ff7c3be6f13839ef72300d06eb749acf78"
+        },
+        {
+          "key": "cli:cli/graph-stats",
+          "filename": "deltas/cli/cli/graph-stats/spec.md.delta.yaml",
+          "validatedHash": "sha256:34a9804e3d440e8f12c7e33559b4417cf326b0226a7ec3399649c455cd300b2e"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "files": [
+        {
+          "key": "code-graph:code-graph/indexer",
+          "filename": "deltas/code-graph/code-graph/indexer/verify.md.delta.yaml",
+          "validatedHash": "sha256:5575f3df50834d43bb5456b091bcb8223a5eff91ab6fa285af1d210afb35705f"
+        },
+        {
+          "key": "code-graph:code-graph/graph-store",
+          "filename": "deltas/code-graph/code-graph/graph-store/verify.md.delta.yaml",
+          "validatedHash": "sha256:812570544d7f5513291de3e7c37818a9481e07d3fd20e7ba263deaa4d4d2132b"
+        },
+        {
+          "key": "code-graph:code-graph/language-adapter",
+          "filename": "deltas/code-graph/code-graph/language-adapter/verify.md.delta.yaml",
+          "validatedHash": "sha256:fc22e1ef9d7e939042dde2f92de08239561975f94c3516d9f23c2093ecefc97d"
+        },
+        {
+          "key": "core:core/config",
+          "filename": "deltas/core/core/config/verify.md.delta.yaml",
+          "validatedHash": "sha256:3381073081e16d2b48e364c9a85ac8e63b96c198d062006d0610a858f61886bd"
+        },
+        {
+          "key": "code-graph:code-graph/ladybug-graph-store",
+          "filename": "specs/code-graph/code-graph/ladybug-graph-store/verify.md",
+          "validatedHash": "sha256:36c57a1b8d7b7dc81bed8ec3336b6b43c6bfcfb79c10b66661d455509f0958ec"
+        },
+        {
+          "key": "cli:cli/graph-search",
+          "filename": "deltas/cli/cli/graph-search/verify.md.delta.yaml",
+          "validatedHash": "sha256:edb9181a87c5e4bfba689539f3fe994d917c1ad0d90f0a5f1c701350555d7118"
+        },
+        {
+          "key": "code-graph:code-graph/database-schema",
+          "filename": "deltas/code-graph/code-graph/database-schema/verify.md.delta.yaml",
+          "validatedHash": "sha256:7949ef3b6d0c6447b44b0c2463288962093ecdc9031555796f94b9225117bf7e"
+        },
+        {
+          "key": "cli:cli/graph-index",
+          "filename": "deltas/cli/cli/graph-index/verify.md.delta.yaml",
+          "validatedHash": "sha256:313b48293a221f06bd940e602ad8e37edd9f61ebcb90a594c9f2f4bf4a04456e"
+        },
+        {
+          "key": "cli:cli/graph-hotspots",
+          "filename": "deltas/cli/cli/graph-hotspots/verify.md.delta.yaml",
+          "validatedHash": "sha256:aa969f8cabeb19db10932d66fb37a2d464d4a7741759adba606af2f98514ba8a"
+        },
+        {
+          "key": "cli:cli/graph-impact",
+          "filename": "deltas/cli/cli/graph-impact/verify.md.delta.yaml",
+          "validatedHash": "sha256:35072d260da9cdc4f1f5a30154fb99d01b55a0a2cd742e3259309f398dcdf2a9"
+        },
+        {
+          "key": "cli:cli/graph-stats",
+          "filename": "deltas/cli/cli/graph-stats/verify.md.delta.yaml",
+          "validatedHash": "sha256:b3562f630790b42ae2ab88a1b92ce658e37ec3567e3577a8f1f51e8e8c821962"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "validatedHash": "sha256:7f398071ebdfb841c11e2177c2fee5c35ffdb237c66fa3d37dfba9a8554fe846"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "validatedHash": "sha256:fe697b31cc5a74a866e4db97a4f39ad7ca4ba06fed64ac022346801c5528c8fc"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-04-01T09:23:07.231Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "specIds": [
+        "code-graph:code-graph/indexer",
+        "code-graph:code-graph/graph-store",
+        "code-graph:code-graph/language-adapter"
+      ],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-01T09:23:07.244Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:code-graph/indexer"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:code-graph/graph-store"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:code-graph/language-adapter"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:code-graph/indexer"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:code-graph/graph-store"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:code-graph/language-adapter"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-01T09:27:11.657Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-01T09:45:13.573Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change"
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-01T09:45:13.573Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:core/config"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:code-graph/ladybug-graph-store"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/config"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:code-graph/ladybug-graph-store"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-01T09:58:26.356Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change"
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-01T09:58:26.356Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "cli:cli/graph-search"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:code-graph/database-schema"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/graph-search"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:code-graph/database-schema"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-01T10:45:10.581Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change"
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-01T10:45:10.582Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "cli:cli/graph-index"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/graph-index"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-01T10:56:15.224Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change"
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-01T10:56:15.224Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "cli:cli/graph-hotspots"
+        },
+        {
+          "type": "specs",
+          "key": "cli:cli/graph-impact"
+        },
+        {
+          "type": "specs",
+          "key": "cli:cli/graph-stats"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/graph-hotspots"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/graph-impact"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/graph-stats"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-01T11:06:39.994Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-01T11:10:42.029Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-01T16:27:38.569Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-01T16:34:41.504Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-01T16:35:12.629Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-02T10:52:02.155Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-04-02T10:52:02.656Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "m***a@g***.com"
+  }
+}

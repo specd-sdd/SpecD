@@ -1,0 +1,59 @@
+- op: added
+  description: 'Define confinement as a storage-level invariant'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Change manifest format$'
+  content: |
+    ### Requirement: Repository path confinement
+
+    Fs-backed repositories MUST treat path confinement as a storage invariant.
+
+    Change, spec, archive, and metadata operations MUST reject any derived path that would escape their configured storage root or address an arbitrary untracked file outside the permitted artifact set for the operation.
+
+- op: added
+  description: 'Define staged archive persistence at the storage layer'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Repository path confinement$'
+  content: |
+    ### Requirement: Staged archive persistence
+
+    Fs-backed archive persistence MUST prefer staged commit semantics over ad hoc rollback.
+
+    When archive requires multiple durable updates, storage behavior MUST prepare the complete result first and only then expose the committed archive result, so failures before commit do not leave partially visible permanent archive state.
+
+- op: added
+  description: 'Define debug logging expectations for storage diagnostics'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Staged archive persistence$'
+  content: |
+    ### Requirement: Storage debug logging
+
+    Fs-backed repositories SHOULD emit debug-level logs for tracked artifact resolution, path-confinement rejections, staged archive commit progress, and archive failure diagnostics.
+
+    These logs MUST follow the project's global logging conventions.
+
+- op: added
+  description: 'Add logging dependency for storage diagnostics'
+  position:
+    parent:
+      type: section
+      matches: '^Spec Dependencies$'
+    after:
+      type: list-item
+      matches: 'core:change-manifest'
+  content: |
+    - [`default:_global/logging`](../../_global/logging/spec.md) — debug logging requirements for repository diagnostics and staged archive persistence

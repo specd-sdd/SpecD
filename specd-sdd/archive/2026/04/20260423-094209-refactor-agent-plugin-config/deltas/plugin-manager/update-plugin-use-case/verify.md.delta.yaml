@@ -1,0 +1,11 @@
+- op: removed
+  selector: { type: section, matches: 'Scenario: Multiple updates produce same result' }
+- op: added
+  position:
+    parent: { type: section, matches: 'Requirement: Idempotency' }
+  content: |
+    #### Scenario: Multiple updates produce same result
+
+    - **GIVEN** a valid `SpecdConfig` is provided
+    - **WHEN** UpdatePlugin is executed twice with same configuration
+    - **THEN** both return the same result

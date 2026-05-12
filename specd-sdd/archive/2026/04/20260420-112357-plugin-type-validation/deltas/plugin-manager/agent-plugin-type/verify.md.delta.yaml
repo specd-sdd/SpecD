@@ -1,0 +1,23 @@
+- op: added
+  description: 'Add scenarios for new isAgentPlugin type guard requirement'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: AgentPlugin extends SpecdPlugin'
+  content: |-
+    ### Requirement: isAgentPlugin type guard
+
+    #### Scenario: Rejects plugin without install method
+
+    - **GIVEN** a SpecdPlugin with `type: 'agent'` but no `install` method
+    - **WHEN** `isAgentPlugin` is called
+    - **THEN** it returns `false`
+
+    #### Scenario: Rejects plugin with wrong type
+
+    - **GIVEN** a SpecdPlugin with `install` and `uninstall` methods but `type` is not `'agent'`
+    - **WHEN** `isAgentPlugin` is called
+    - **THEN** it returns `false`

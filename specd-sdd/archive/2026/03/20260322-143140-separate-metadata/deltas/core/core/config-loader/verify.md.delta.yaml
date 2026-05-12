@@ -1,0 +1,37 @@
+- op: modified
+  description: 'Add scenarios for specs.fs.metadataPath resolution'
+  selector:
+    type: section
+    matches: 'Requirement: Path resolution relative to config directory'
+  content: |
+    #### Scenario: Relative spec path resolved from config directory
+
+    - **GIVEN** the config file is at `/repo/specd.yaml` and declares `specs.fs.path: specs/`
+    - **WHEN** `load()` is called
+    - **THEN** the workspace's `specsPath` is `/repo/specs`
+
+    #### Scenario: Storage paths resolved from config directory
+
+    - **GIVEN** the config file is at `/repo/specd.yaml` and declares `storage.changes.fs.path: specd/changes`
+    - **WHEN** `load()` is called
+    - **THEN** the resolved changes path is `/repo/specd/changes`
+
+    #### Scenario: Explicit metadataPath resolved from config directory
+
+    - **GIVEN** the config file is at `/repo/specd.yaml` and declares `specs.fs.metadataPath: .specd/metadata`
+    - **WHEN** `load()` is called
+    - **THEN** the workspace's `metadataPath` is `/repo/.specd/metadata`
+
+    #### Scenario: Absent metadataPath auto-derived from VCS root
+
+    - **GIVEN** the config file is at `/repo/specd.yaml` with no `specs.fs.metadataPath`
+    - **AND** the specs path is inside a git repo rooted at `/repo`
+    - **WHEN** `load()` is called
+    - **THEN** the workspace's `metadataPath` is `/repo/.specd/metadata`
+
+    #### Scenario: Absent metadataPath with NullVcsAdapter fallback
+
+    - **GIVEN** the config has `specs.fs.path: /external/specs` with no `specs.fs.metadataPath`
+    - **AND** `/external/specs` is not inside any VCS
+    - **WHEN** `load()` is called
+    - **THEN** the workspace's `metadataPath` is `/external/.specd/metadata`

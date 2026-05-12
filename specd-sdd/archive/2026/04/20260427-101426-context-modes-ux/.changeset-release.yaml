@@ -1,0 +1,8 @@
+releases:
+  cli:cli/project-context: minor
+  cli:cli/change-context: minor
+  cli:cli/spec-context: minor
+  core:core/compile-context: minor
+  core:core/get-spec-context: minor
+  core:core/get-project-context: minor
+  core:core/config: patch

@@ -1,0 +1,53 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Scenario: Text output shows all sections'
+  content: |
+    #### Scenario: Text output shows all sections
+
+    - **GIVEN** a valid config with one workspace, storage paths, and optional fields set (`contextIncludeSpecs`, `workflow`, `llmOptimizedContext`)
+    - **WHEN** `specd config show` is run
+    - **THEN** stdout contains `projectRoot`, `schemaRef`, `approvals`, `workspaces`, and `storage` sections
+    - **AND** stdout contains `contextIncludeSpecs` line
+    - **AND** stdout contains `llmOptimizedContext` line
+    - **AND** stdout contains `workflow` section with step entries
+    - **AND** all paths are absolute
+    - **AND** the process exits with code 0
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Scenario: JSON output is full SpecdConfig'
+  content: |
+    #### Scenario: JSON output is full SpecdConfig
+
+    - **GIVEN** a config with `workflow`, `contextIncludeSpecs`, `context`, and `llmOptimizedContext` set
+    - **WHEN** `specd config show --format json` is run
+    - **THEN** stdout is valid JSON containing `projectRoot`, `schemaRef`, `workspaces`, `storage`, `approvals`
+    - **AND** JSON contains `workflow` array with step entries
+    - **AND** JSON contains `contextIncludeSpecs` array
+    - **AND** JSON contains `context` array
+    - **AND** JSON contains `llmOptimizedContext` boolean
+    - **AND** all path values are absolute strings
+    - **AND** the process exits with code 0
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Output format'
+    after:
+      type: section
+      matches: 'Scenario: JSON output is full SpecdConfig'
+  content: |
+    #### Scenario: Optional fields omitted when not set
+
+    - **GIVEN** a config with no `workflow`, `context`, `schemaOverrides`, or `schemaPlugins` set
+    - **WHEN** `specd config show --format json` is run
+    - **THEN** the JSON output does not contain `workflow`, `context`, `schemaOverrides`, or `schemaPlugins` keys
+
+    #### Scenario: Workspace entries include all fields
+
+    - **GIVEN** a workspace with `schemasPath`, `codeRoot`, and `prefix` set
+    - **WHEN** `specd config show --format json` is run
+    - **THEN** the workspace entry in JSON contains `schemasPath`, `codeRoot`, and `prefix`

@@ -1,0 +1,72 @@
+- op: modified
+  description: 'Verify force mode through abstract graph-store recreation instead of backend file deletion'
+  selector:
+    type: section
+    matches: '^Requirement: Indexing behaviour$'
+  content: |
+    #### Scenario: Successful indexing with autodetected config
+
+    - **GIVEN** the current working directory resolves to a project with `specd.yaml`
+    - **WHEN** `specd graph index` is run
+    - **THEN** the command uses the discovered config to build workspace index targets
+    - **AND** stdout shows `Indexed N file(s) in Xms` followed by the summary lines
+    - **AND** the process exits with code 0
+
+    #### Scenario: Explicit config path bypasses discovery
+
+    - **GIVEN** the current directory would autodiscover a different `specd.yaml`
+    - **WHEN** `specd graph index --config /tmp/other/specd.yaml` is run
+    - **THEN** the command uses `/tmp/other/specd.yaml` directly
+    - **AND** indexing targets come from that config rather than from autodiscovery
+
+    #### Scenario: Explicit path enters bootstrap mode
+
+    - **GIVEN** a `specd.yaml` exists under the current repository
+    - **WHEN** `specd graph index --path /tmp/repo` is run
+    - **THEN** config discovery is ignored
+    - **AND** indexing runs against a synthetic single workspace `default` rooted at `/tmp/repo`
+
+    #### Scenario: Missing config falls back to bootstrap mode
+
+    - **GIVEN** no `specd.yaml` is found by autodiscovery
+    - **WHEN** `specd graph index` is run inside a repository
+    - **THEN** the command indexes the resolved VCS root in bootstrap mode as workspace `default`
+
+    #### Scenario: Force flag recreates backend state through the graph-store contract
+
+    - **GIVEN** the workspace has been previously indexed
+    - **WHEN** `specd graph index --force` is run
+    - **THEN** the command invokes the graph-store recreation capability before indexing
+    - **AND** the CLI does not delete backend-specific database files directly
+
+    #### Scenario: Indexing acquires the shared graph lock before mutation work
+
+    - **WHEN** `specd graph index` starts an indexing run
+    - **THEN** it acquires the shared graph indexing lock before opening the provider for mutation work
+
+    #### Scenario: Indexing releases the shared graph lock on shutdown
+
+    - **GIVEN** `specd graph index` acquired the shared graph indexing lock
+    - **WHEN** the command finishes normally or handles shutdown via signal
+    - **THEN** the lock is released before the process exits
+
+    #### Scenario: Competing indexing run fails fast while the lock is held
+
+    - **GIVEN** another `graph index` process already holds the shared graph indexing lock
+    - **WHEN** a second `specd graph index` is started
+    - **THEN** it exits with code 3
+    - **AND** it prints a short retry-later message explaining that the graph is currently being indexed
+
+    #### Scenario: Process exits explicitly
+
+    - **GIVEN** indexing completes successfully
+    - **WHEN** the provider is closed
+    - **THEN** `process.exit(0)` is called to prevent the LadybugDB addon from keeping the process alive
+
+    #### Scenario: --exclude-path merges on top of config excludePaths
+
+    - **GIVEN** workspace config has `graph.excludePaths: ["dist/"]`
+    - **AND** the command is run with `--exclude-path "fixtures/"`
+    - **WHEN** indexing runs
+    - **THEN** the effective exclusion list is `["dist/", "fixtures/"]`
+    - **AND** `specd.yaml` is not modified

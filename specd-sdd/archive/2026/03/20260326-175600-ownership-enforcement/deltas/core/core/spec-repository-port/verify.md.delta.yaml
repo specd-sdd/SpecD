@@ -1,0 +1,58 @@
+- op: modified
+  description: 'Add readOnly guard scenario to save requirement'
+  selector:
+    type: section
+    matches: 'Requirement: save persists a single artifact with conflict detection'
+  content: |
+    #### Scenario: ReadOnly workspace rejects save
+
+    - **GIVEN** a `SpecRepository` bound to a workspace with `readOnly` ownership
+    - **WHEN** `save(spec, artifact)` is called
+    - **THEN** `ReadOnlyWorkspaceError` is thrown
+    - **AND** no file is written to disk
+
+    #### Scenario: First write creates spec directory
+
+    - **GIVEN** a spec whose directory does not yet exist
+    - **AND** the workspace ownership is `owned`
+    - **WHEN** `save(spec, artifact)` is called
+    - **THEN** the directory is created and the artifact file is written
+
+    #### Scenario: Conflict detected on save
+
+    - **GIVEN** an artifact loaded with `originalHash` and the file on disk was modified by another process
+    - **WHEN** `save(spec, artifact)` is called without `force`
+    - **THEN** `ArtifactConflictError` is thrown
+
+    #### Scenario: Force save bypasses conflict detection
+
+    - **GIVEN** an artifact whose `originalHash` does not match the current file on disk
+    - **WHEN** `save(spec, artifact, { force: true })` is called
+    - **THEN** the file is overwritten without error
+
+- op: modified
+  description: 'Add readOnly guard scenario to metadata requirement (saveMetadata scenarios live here)'
+  selector:
+    type: section
+    matches: 'Requirement: metadata returns parsed metadata or null'
+  content: |
+    #### Scenario: ReadOnly workspace rejects saveMetadata
+
+    - **GIVEN** a `SpecRepository` bound to a workspace with `readOnly` ownership
+    - **WHEN** `saveMetadata(spec, content)` is called
+    - **THEN** `ReadOnlyWorkspaceError` is thrown
+    - **AND** no file is written to disk
+
+    #### Scenario: Metadata exists
+
+    - **GIVEN** a spec `core:core/config` with a `metadata.json` in the metadata storage
+    - **WHEN** `metadata(spec)` is called
+    - **THEN** the result contains the parsed JSON content with `originalHash`
+    - **AND** `saveMetadata(spec, '{"title":"Config"}')` persists the JSON content
+    - **AND** the file can be read back via `metadata(spec)` with `title: "Config"`
+
+    #### Scenario: Metadata does not exist
+
+    - **GIVEN** a spec with no metadata on disk
+    - **WHEN** `metadata(spec)` is called
+    - **THEN** `null` is returned

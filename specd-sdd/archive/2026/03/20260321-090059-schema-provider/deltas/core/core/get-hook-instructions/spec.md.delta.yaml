@@ -1,0 +1,19 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Ports and constructor'
+  content: |
+    `GetHookInstructions` receives at construction time: `ChangeRepository`, `SchemaProvider`, `TemplateExpander`, and `projectWorkflowHooks`.
+
+    ```typescript
+    class GetHookInstructions {
+      constructor(
+        changes: ChangeRepository,
+        schemaProvider: SchemaProvider,
+        expander: TemplateExpander,
+        projectWorkflowHooks: ProjectWorkflowHooks,
+      )
+    }
+    ```
+
+    `SchemaProvider` is a lazy, caching port that returns the fully-resolved schema (with plugins and overrides applied). It replaces the previous `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths` triple. `projectWorkflowHooks` is the full array of project-level workflow step definitions from `specd.yaml`. All are injected at kernel composition time.

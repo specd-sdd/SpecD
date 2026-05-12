@@ -1,0 +1,22 @@
+- op: modified
+  description: 'Remove workspace requirement from ArchivedChange record - now derived from specIds'
+  selector:
+    type: section
+    matches: 'Requirement: Archive repository call'
+  content: |
+    After syncing all specs, `ArchiveChange` must resolve the actor via `ActorResolver.identity()` before calling `archiveRepository.archive()`. If `identity()` throws (e.g. no VCS config), the archive proceeds without an actor.
+
+    `ArchiveChange` must then call `archiveRepository.archive(change, { actor })` when an actor is available, or `archiveRepository.archive(change, {})` when it is not. The `ArchiveRepository` port is responsible for constructing the `ArchivedChange` record — the use case never builds it directly, because `archivedAt` can only be set by the operation that performs the archive, and `archivedName` is an infrastructure naming concern.
+
+    The port's contract requires:
+
+    - `archivedName` — the full timestamped directory name: `YYYYMMDD-HHmmss-<name>` where the timestamp is derived from `change.createdAt` (zero-padded), never from wall-clock time at execution
+    - `archivedAt` — the timestamp when the archive operation completes, set by the repository
+    - `archivedBy` (optional) — the git identity of the actor who performed the archive; absent if git identity was unavailable
+    - `artifacts` — artifact metadata tracked by the repository
+
+    The `FsArchiveRepository` implementation additionally moves the change directory from its current location (`changes/` or `drafts/`) to the archive directory using the configured pattern, then appends an entry to `index.jsonl`. The use case has no knowledge of these implementation details.
+
+    `ArchivedChange` has no `approval` field and no `wasStructural` flag — these were removed from the domain model.
+
+    Note: The `workspace` property is no longer stored in `ArchivedChange`. It is derived at runtime from the first entry in `archivedChange.specIds`, matching how `Change.workspaces` works.

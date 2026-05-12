@@ -1,0 +1,17 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Graceful degradation when schema resolution fails'
+  content: |
+    #### Scenario: Schema resolution failure degrades lifecycle fields
+
+    - **GIVEN** `SchemaProvider.get()` returns `null`
+    - **WHEN** `execute()` is called
+    - **THEN** the result does not throw
+    - **AND** `lifecycle.validTransitions` is populated normally
+    - **AND** `lifecycle.availableTransitions` is an empty array
+    - **AND** `lifecycle.blockers` is an empty array
+    - **AND** `lifecycle.approvals` is populated normally
+    - **AND** `lifecycle.nextArtifact` is `null`
+    - **AND** `lifecycle.changePath` is populated normally
+    - **AND** `lifecycle.schemaInfo` is `null`

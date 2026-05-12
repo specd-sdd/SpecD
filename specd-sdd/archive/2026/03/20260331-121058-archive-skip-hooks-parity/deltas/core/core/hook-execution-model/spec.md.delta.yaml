@@ -1,0 +1,86 @@
+- op: modified
+  selector:
+    type: section
+    matches: '^Purpose$'
+  content: |
+    Workflow steps declare hooks via `instruction:` and `run:` entries, but the schema format only defines their YAML structure — not who executes each type, when execution happens, or what failure means in each context. Without a unified execution model, hook behaviour is scattered across use cases and undocumented agent conventions. This spec defines the complete hook execution model: the two hook types and their consumers, hook execution for transitions and archives, failure semantics for each phase, hook ordering rules, the `--skip-hooks` pattern for manual control, and the boundary between compile-time and runtime concerns.
+- op: modified
+  selector:
+    type: section
+    matches: '^Requirement: Manual hook control with skipHooks$'
+  content: |
+    Manual hook control uses phase selectors rather than a separate boolean flag.
+
+    - `TransitionChange` accepts `skipHookPhases` values `'source.pre'`, `'source.post'`, `'target.pre'`, `'target.post'`, and `'all'`.
+    - `ArchiveChange` accepts `skipHookPhases` values `'pre'`, `'post'`, and `'all'`.
+
+    When the selector set contains all phases for the current use case, `TransitionChange` or `ArchiveChange` skips every `run:` hook. This gives the caller (typically an LLM agent) manual control over hook timing:
+
+    1. Call `specd change hook-instruction <name> <step> --phase pre` to read `instruction:` hooks
+    2. Call `specd change run-hooks <name> <step> --phase pre` to execute `run:` pre-hooks
+    3. Call the lifecycle command with `--skip-hooks ...` to perform the transition or archive without the skipped auto-hooks
+    4. Call `specd change run-hooks <name> <step> --phase post` to execute `run:` post-hooks
+    5. Call `specd change hook-instruction <name> <step> --phase post` to read post-step instructions
+
+    The `--skip-hooks` CLI flag maps to the `skipHookPhases` selector set in the corresponding use case input. The agent is responsible for invoking hooks at the appropriate time.
+- op: modified
+  selector:
+    type: section
+    matches: '^Examples$'
+  content: |
+    ### Default transition with hooks
+
+    ```
+    1. specd change transition <name> implementing
+       → TransitionChange internally:
+         a. enforces workflow requires
+         b. runs pre-implementing run: hooks (fail-fast)
+         c. transitions state to implementing
+         d. runs post-implementing run: hooks (fail-soft)
+         e. returns result with change and any postHookFailures
+    ```
+
+    ### Manual transition hook control (`--skip-hooks`)
+
+    ```
+    1. specd change hook-instruction <name> implementing --phase pre   → get pre instructions
+    2. specd change run-hooks <name> implementing --phase pre          → execute run: pre-hooks
+    3. specd change transition <name> implementing --skip-hooks all    → transition only
+    4. specd change run-hooks <name> implementing --phase post         → execute run: post-hooks
+    5. specd change hook-instruction <name> implementing --phase post  → get post instructions
+    ```
+
+    ### Deterministic step (archiving) with hooks
+
+    ```
+    1. specd change archive <name>
+       → ArchiveChange internally:
+         a. runs pre-archive run: hooks (fail-fast) via RunStepHooks
+         b. merges deltas, syncs specs
+         c. archives the change
+         d. runs post-archive run: hooks (fail-soft) via RunStepHooks
+         e. generates metadata
+    ```
+
+    ### Manual archive hook control (`--skip-hooks`)
+
+    ```
+    1. specd change run-hooks <name> archiving --phase pre       → execute pre-archive hooks
+    2. specd change archive <name> --skip-hooks all              → archive without auto-hooks
+    3. specd change run-hooks <name> archiving --phase post      → execute post-archive hooks
+    ```
+- op: modified
+  selector:
+    type: section
+    matches: '^Spec Dependencies$'
+  content: |
+    - [`specs/core/workflow-model/spec.md`](../workflow-model/spec.md) — step semantics, step availability
+    - [`specs/core/schema-format/spec.md`](../schema-format/spec.md) — `workflow[].hooks` structure, `instruction:` and `run:` entries
+    - [`specs/core/hook-runner-port/spec.md`](../hook-runner-port/spec.md) — `HookRunner` interface, `HookResult`, `HookVariables`, template expansion
+    - [`specs/core/transition-change/spec.md`](../transition-change/spec.md) — hook execution during transitions
+    - [`specs/core/archive-change/spec.md`](../archive-change/spec.md) — hook execution during archiving
+    - [`specs/core/run-step-hooks/spec.md`](../run-step-hooks/spec.md) — shared hook execution engine
+    - [`specs/core/get-hook-instructions/spec.md`](../get-hook-instructions/spec.md) — `instruction:` hook query
+    - [`specs/core/config/spec.md`](../config/spec.md) — project-level hooks via `schemaOverrides`
+    - [`specs/cli/change-transition/spec.md`](../../cli/change-transition/spec.md) — transition `--skip-hooks` selectors
+    - [`specs/cli/change-archive/spec.md`](../../cli/change-archive/spec.md) — archive `--skip-hooks` selectors

@@ -1,0 +1,65 @@
+- op: added
+  description: 'Verify archive repository persists through a staged commit'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: archive moves a change to the archive$'
+  content: |
+    ### Requirement: archive persists through a staged commit
+
+    #### Scenario: Failure before commit does not expose a successful archive result
+
+    - **GIVEN** archive persistence requires more than one durable update
+    - **AND** a failure occurs before commit completes
+    - **WHEN** `archive(change)` aborts
+    - **THEN** no partial archive result is visible as a successful archived change
+    - **AND** no final archive index entry is exposed as committed
+
+    #### Scenario: Successful commit exposes the archive result once
+
+    - **WHEN** `archive(change)` completes successfully
+    - **THEN** the archived manifest and index entry become visible as one committed archive result
+
+- op: added
+  description: 'Verify archive repository confines derived paths to archive root'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: archive persists through a staged commit$'
+  content: |
+    ### Requirement: Archive path confinement
+
+    #### Scenario: Escaping archive pattern is rejected
+
+    - **GIVEN** archive path derivation from pattern variables would resolve outside the configured archive root
+    - **WHEN** `archive(change)` or `archivePath(archivedChange)` resolves that path
+    - **THEN** the repository rejects the path
+
+    #### Scenario: Recovered index path outside root is rejected
+
+    - **GIVEN** a stored or recovered archive location points outside the configured archive root
+    - **WHEN** the repository consumes that location
+    - **THEN** it is rejected instead of being treated as a valid archive entry
+
+- op: added
+  description: 'Verify debug logging for archive staging and confinement failures'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Archive path confinement$'
+  content: |
+    ### Requirement: Archive repository debug logging
+
+    #### Scenario: Debug logs cover staging and confinement diagnostics
+
+    - **WHEN** debug logging is enabled for `ArchiveRepository`
+    - **THEN** logs include archive path resolution, staged commit start, staged commit completion, and confinement-related failures

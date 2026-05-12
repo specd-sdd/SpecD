@@ -1,0 +1,10 @@
+# Delta: cli:change-status
+
+- op: added
+  description: 'Clarify that lifecycle semantics are projected from core rather than rederived in the CLI.'
+  position:
+    parent:
+      type: section
+      matches: 'Constraints'
+  content: |
+    - Lifecycle semantics shown by the command (effective artifact status, blockers, available transitions, next artifact, review summary, next action) are projections of the `GetStatus` result, which is itself derived from `LifecycleEngine`; the CLI must not re-derive them independently

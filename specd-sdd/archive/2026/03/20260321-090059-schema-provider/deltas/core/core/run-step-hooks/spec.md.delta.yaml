@@ -1,0 +1,28 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Ports and constructor'
+  content: |
+    `RunStepHooks` receives at construction time: `ChangeRepository`, `HookRunner`, `SchemaProvider`, and `projectWorkflowHooks`.
+
+    ```typescript
+    class RunStepHooks {
+      constructor(
+        changes: ChangeRepository,
+        hooks: HookRunner,
+        schemaProvider: SchemaProvider,
+        projectWorkflowHooks: ProjectWorkflowHooks,
+      )
+    }
+    ```
+
+    `HookRunner` uses `TemplateExpander.expandForShell()` internally — `RunStepHooks` does not call the expander directly. It builds the `TemplateVariables` map and passes it to `HookRunner.run()`.
+
+    `SchemaProvider` is a lazy, caching port that returns the fully-resolved schema (with plugins and overrides applied). It replaces the previous `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths` triple. `projectWorkflowHooks` is the full array of project-level workflow step definitions from `specd.yaml` — `RunStepHooks` filters internally for the requested step. If `undefined`, it defaults to `[]`. All are injected at kernel composition time, not passed per invocation.
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Schema name guard'
+  content: |
+    After obtaining the schema from `SchemaProvider`, `RunStepHooks` MUST compare `schema.name()` with `change.schemaName`. If they differ, it MUST throw `SchemaMismatchError`. This MUST happen before any hook resolution or execution.

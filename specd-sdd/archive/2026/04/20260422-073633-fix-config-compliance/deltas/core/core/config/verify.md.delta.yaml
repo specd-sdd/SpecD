@@ -1,0 +1,102 @@
+- op: modified
+  description: 'Update Plugin declarations scenarios for config-loader validation'
+  selector:
+    type: section
+    matches: 'Requirement: Plugin declarations'
+  content: |
+    #### Scenario: Plugins section with agents array
+
+    - **WHEN** `specd.yaml` has a `plugins` section
+    - **THEN** it is validated by the config loader's Zod schema at load time
+
+    #### Scenario: Agent plugin entry
+
+    - **GIVEN** `plugins.agents` has an entry
+    - **THEN** each entry has `name` (required) and optional `config`
+
+    #### Scenario: Invalid plugin structure rejected at startup
+
+    - **WHEN** `specd.yaml` has `plugins.agents: [{ invalid: true }]` (missing `name`)
+    - **THEN** config validation fails with `ConfigValidationError`
+
+    #### Scenario: ConfigWriter.addPlugin adds to array
+
+    - **WHEN** `ConfigWriter.addPlugin(configPath, 'agents', '@specd/plugin-agent-claude')` is called
+    - **THEN** the plugin is added to `plugins.agents` array
+
+    #### Scenario: ConfigWriter.addPlugin with config
+
+    - **WHEN** `ConfigWriter.addPlugin(configPath, 'agents', '@specd/plugin-agent-claude', { commandsDir: '.claude/commands' })` is called
+    - **THEN** the plugin entry includes both `name` and `config`
+
+    #### Scenario: ConfigWriter.removePlugin removes from array
+
+    - **WHEN** `ConfigWriter.removePlugin(configPath, 'agents', '@specd/plugin-agent-claude')` is called
+    - **THEN** the plugin is removed from the array
+
+- op: modified
+  description: 'Update Template variables scenario for unknown warning'
+  selector:
+    type: section
+    matches: 'Requirement: Template variables'
+  content: |
+    #### Scenario: Archive pattern with year prefix
+
+    - **WHEN** `storage.archive.fs.pattern` is `'{{year}}/{{change.archivedName}}'`
+    - **THEN** a change archived in 2024 is stored at `specd/archive/2024/<archivedName>/`
+
+    #### Scenario: Unknown template variable emits warning
+
+    - **GIVEN** a `TemplateExpander` constructed with an `onUnknown` callback
+    - **WHEN** a template string contains `{{unknown.variable}}`
+    - **THEN** the literal string `{{unknown.variable}}` is preserved in the output
+    - **AND** the `onUnknown` callback is called with `"unknown.variable"`
+
+    #### Scenario: Unknown variable without callback is silent
+
+    - **GIVEN** a `TemplateExpander` constructed without an `onUnknown` callback
+    - **WHEN** a template string contains `{{unknown.variable}}`
+    - **THEN** the literal string `{{unknown.variable}}` is preserved in the output
+    - **AND** no callback is invoked
+
+- op: modified
+  description: 'Update Startup validation scenarios'
+  selector:
+    type: section
+    matches: 'Requirement: Startup validation'
+  content: |
+    #### Scenario: Valid minimal config passes validation
+
+    - **GIVEN** a `specd.yaml` with only `schema: schema-std@1`
+    - **WHEN** config is validated at startup
+    - **THEN** validation passes with defaults applied
+
+    #### Scenario: Invalid contextMode value rejected
+
+    - **GIVEN** `specd.yaml` contains `contextMode: partial`
+    - **WHEN** config is validated at startup
+    - **THEN** validation fails with a `ConfigValidationError` identifying the invalid `contextMode` value
+
+    #### Scenario: Legacy lazy contextMode rejected
+
+    - **GIVEN** `specd.yaml` contains `contextMode: lazy`
+    - **WHEN** config is validated at startup
+    - **THEN** validation fails with a `ConfigValidationError` because lazy is no longer accepted
+
+    #### Scenario: contextMode in workspace entry rejected with specific message
+
+    - **GIVEN** `specd.yaml` contains a workspace with `contextMode: summary`
+    - **WHEN** config is validated at startup
+    - **THEN** validation fails with a `ConfigValidationError` with the message "`contextMode` is not valid inside a workspace — it is a project-level setting"
+
+    #### Scenario: artifactRules rejected at startup
+
+    - **GIVEN** `specd.yaml` contains `artifactRules: { specs: [...] }`
+    - **WHEN** config is validated at startup
+    - **THEN** validation fails with `ConfigValidationError` suggesting migration to `schemaOverrides`
+
+    #### Scenario: skills field rejected at startup
+
+    - **GIVEN** `specd.yaml` contains a `skills` field
+    - **WHEN** config is validated at startup
+    - **THEN** validation fails with `ConfigValidationError` explaining skills are managed via the plugin system

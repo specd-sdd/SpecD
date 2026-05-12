@@ -1,0 +1,18 @@
+- op: modified
+  description: 'Update purpose to reference metadata instead of .specd-metadata.yaml'
+  selector:
+    type: section
+    matches: 'Purpose'
+  content: |
+    Metadata files must be regenerated whenever spec content changes, and doing it manually is error-prone. The `specd spec generate-metadata` command generates metadata content deterministically from schema extraction rules, delegating to `GenerateSpecMetadata` for generation and optionally to `SaveSpecMetadata` for persistence.
+
+- op: modified
+  description: 'Update write mode output to reference metadata instead of .specd-metadata.yaml'
+  selector:
+    type: section
+    matches: 'Requirement: Write mode'
+  content: |
+    With `--write`, the command generates metadata, persists it via `SaveSpecMetadata`, and outputs a confirmation:
+
+    - **Text format:** `wrote metadata for <workspace:path>`
+    - **JSON/toon format:** `{ result: "ok", spec: "<workspace:path>", written: true }`

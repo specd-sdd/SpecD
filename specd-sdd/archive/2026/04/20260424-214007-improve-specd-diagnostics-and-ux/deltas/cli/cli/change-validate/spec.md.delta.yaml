@@ -1,0 +1,60 @@
+- op: modified
+  description: 'Rename warnings to notes in change validate output'
+  selector:
+    type: section
+    matches: 'Requirement: Output on success'
+  content: |
+    In `text` mode (default), when all artifacts pass, the command prints the validated artifact paths:
+
+    ```text
+    validated <name>/<workspace:capability-path>: all artifacts pass
+      file: <path>
+      file: <path>
+    note: inspect merged spec output with `specd change spec-preview <name> <workspace:capability-path>`
+    ```
+
+    In `text` mode, when there are notes but no failures:
+
+    ```text
+    validated <name>/<workspace:capability-path>: pass (N note(s))
+      file: <path>
+    note: <artifactId> — <description>
+    ...
+    note: inspect merged spec output with `specd change spec-preview <name> <workspace:capability-path>`
+    ```
+
+    Any non-blocking suggestion previously labeled as a `warning` MUST now be labeled as a `note`.
+
+    In `json` or `toon` mode, the output includes a `notes` array instead of `warnings`:
+
+    ```json
+    {
+      "passed": true,
+      "failures": [],
+      "notes": [{ "artifactId": "...", "description": "..." }],
+      "files": [{ "artifactId": "...", "key": "...", "filename": "...", "status": "validated" }]
+    }
+    ```
+
+- op: modified
+  description: 'Rename warnings to notes in change validate failure output'
+  selector:
+    type: section
+    matches: 'Requirement: Output on failure'
+  content: |
+    In `text` mode, the command prints each failure to stdout, exits with code 1, and includes any expected file paths that could not be validated:
+
+    ```text
+    validation failed <name>/<workspace:capability-path>:\n  missing: <path>\n  error: <artifactId> — <description>\n  ...\n  note: <artifactId> — <description>\n  ...\nnote: inspect merged spec output with `specd change spec-preview <name> <workspace:capability-path>`
+    ```
+
+    In `json` or `toon` mode:
+
+    ```json
+    {
+      "passed": false,
+      "failures": [{ "artifactId": "...", "description": "...", "filename": "..." }],
+      "notes": [],
+      "files": [{ "artifactId": "...", "key": "...", "filename": "...", "status": "missing" }]
+    }
+    ```

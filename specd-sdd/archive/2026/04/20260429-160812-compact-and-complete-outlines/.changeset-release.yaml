@@ -1,0 +1,8 @@
+releases:
+  cli:cli/change-artifact-instruction: patch
+  core:core/get-artifact-instruction: patch
+  core:core/delta-format: patch
+  cli:cli/spec-outline: minor
+  core:core/get-spec-outline: minor
+  core:core/artifact-parser-port: patch
+  skills:workflow-automation: patch

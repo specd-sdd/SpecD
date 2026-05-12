@@ -1,0 +1,64 @@
+- op: modified
+  description: 'Expand purpose to explicit multi-agent contract.'
+  selector:
+    type: section
+    matches: 'Purpose'
+  content: |
+    Defines how skill templates are sourced, stored, and how frontmatter is handled across supported agent runtimes. Templates live without frontmatter in the skills package, and each agent plugin injects frontmatter that is exact for its target runtime.
+
+- op: modified
+  description: 'Broaden frontmatter source requirement to include vendor-documented field contracts.'
+  selector:
+    type: section
+    matches: 'Requirement: Frontmatter source'
+  content: |
+    Frontmatter definitions MUST come from canonical skill metadata and vendor documentation for each target agent runtime. Plugin-specific frontmatter types and maps MUST reflect those documented contracts exactly.
+
+- op: modified
+  description: 'Require runtime-specific field filtering during injection.'
+  selector:
+    type: section
+    matches: 'Requirement: Frontmatter injection'
+  content: |
+    Each agent plugin MUST inject its stored frontmatter when installing a skill.
+
+    Injection MUST be runtime-specific: each plugin emits only fields recognized by its target runtime and excludes unsupported fields.
+
+- op: added
+  description: 'Add explicit frontmatter field matrix per agent runtime.'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Frontmatter injection'
+  content: |
+    ### Requirement: Agent frontmatter matrix
+
+    The plugin frontmatter models MUST cover the complete known field set per runtime:
+
+    - **Codex**: `name`, `description`
+    - **Copilot**: `name`, `description`, `license`, `allowed-tools`, `user-invocable`, `disable-model-invocation`
+    - **Open Code**: `name`, `description`, `license`, `compatibility`, `metadata`
+
+    Runtime defaults MAY emit a smaller subset, but model/type coverage MUST include each runtime's full supported set.
+
+- op: modified
+  description: 'Update rationale for explicit runtime contracts without cross-plugin coupling.'
+  selector:
+    type: section
+    matches: 'Requirement: Why no frontmatter in skills package'
+  content: |
+    The skills package does not include frontmatter because each agent environment has different metadata fields and compatibility rules. Agent plugins know their target environment and inject the appropriate metadata while preserving the base skill definition.
+
+- op: modified
+  description: 'Add constraints for exact per-runtime modeling and filtered emission.'
+  selector:
+    type: section
+    matches: 'Constraints'
+  content: |
+    - Templates in skills package MUST NOT contain frontmatter YAML.
+    - Each agent plugin is responsible for storing and injecting its own frontmatter.
+    - Agent plugins MUST model the full supported frontmatter field set for their target runtime.
+    - Agent plugins MUST NOT emit fields unsupported by their target runtime.

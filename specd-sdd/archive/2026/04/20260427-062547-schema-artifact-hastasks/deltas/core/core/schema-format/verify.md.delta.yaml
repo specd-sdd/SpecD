@@ -1,0 +1,161 @@
+- op: modified
+  description: 'Update Artifact definition scenarios to include hasTasks'
+  selector:
+    type: section
+    matches: 'Requirement: Artifact definition'
+  content: |
+    #### Scenario: Filename derived from glob literal segment
+
+    - **WHEN** an artifact declares `output: "specs/**/spec.md"` and a new file is created within the change
+    - **THEN** the file is named `spec.md`; the subdirectory path (e.g. `auth/login/`) is chosen by the user
+
+    #### Scenario: Filename derived from template when glob segment is a wildcard
+
+    - **WHEN** an artifact declares `output: "specs/**/*.md"` and `template: "templates/spec.md"`
+    - **THEN** the file is named `spec.md`, taken from the template filename
+
+    #### Scenario: Filename indeterminate — no literal segment and no template
+
+    - **WHEN** an artifact declares `output: "specs/**/*.md"` and omits `template`
+    - **THEN** `SchemaRegistry.resolve()` must throw a `SchemaValidationError` identifying the artifact
+
+    #### Scenario: hasTasks enables task capability
+
+    - **GIVEN** an artifact declares `hasTasks: true`
+    - **WHEN** the schema is resolved
+    - **THEN** the `ArtifactType` has `hasTasks: true`
+
+    #### Scenario: hasTasks defaults to false
+
+    - **GIVEN** an artifact omits `hasTasks`
+    - **WHEN** the schema is resolved
+    - **THEN** the `ArtifactType` has `hasTasks: false`
+
+    #### Scenario: Artifact with no requirements
+
+    - **WHEN** an artifact omits `requires`
+    - **THEN** its effective status depends only on its own validated hash
+
+    #### Scenario: Artifact with dependency chain
+
+    - **WHEN** artifact B declares `requires: [a]` and artifact A is `in-progress`
+    - **THEN** `Change.effectiveStatus('b')` must return `in-progress`
+
+    #### Scenario: Circular dependency in artifact graph
+
+    - **WHEN** artifact A declares `requires: [b]` and artifact B declares `requires: [a]`
+    - **THEN** `SchemaRegistry.resolve()` must throw a `SchemaValidationError` identifying the cycle
+
+    #### Scenario: Non-optional artifact requires optional artifact
+
+    - **WHEN** artifact A is `optional: true` and artifact B is `optional: false` and declares `requires: [a]`
+    - **THEN** `SchemaRegistry.resolve()` must throw a `SchemaValidationError`
+
+    #### Scenario: Optional artifact requiring optional artifact is valid
+
+    - **WHEN** artifact A is `optional: true` and artifact B is also `optional: true` and declares `requires: [a]`
+    - **THEN** `SchemaRegistry.resolve()` loads successfully
+
+    #### Scenario: deltaValidations on non-delta artifact
+
+    - **WHEN** an artifact declares `delta: false` and also declares `deltaValidations`
+    - **THEN** `SchemaRegistry.resolve()` must throw a `SchemaValidationError`
+
+    #### Scenario: format inferred from output extension
+
+    - **WHEN** an artifact omits `format` and its derived output filename ends in `.md`
+    - **THEN** the resolved artifact has `format: markdown`
+
+    #### Scenario: format indeterminate requires explicit declaration
+
+    - **WHEN** an artifact omits `format` and its derived output filename has an extension not in `.md`, `.json`, `.yaml`, `.yml`
+    - **THEN** the resolved artifact uses `format: plaintext`
+
+    #### Scenario: preHashCleanup entry requires id
+
+    - **WHEN** a `preHashCleanup` entry omits the `id` field
+    - **THEN** `SchemaRegistry.resolve()` must throw a `SchemaValidationError`
+
+- op: added
+  description: 'Add verification scenarios for taskCompletionCheck'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Artifact definition'
+  content: |
+    ### Requirement: taskCompletionCheck
+
+    #### Scenario: hasTasks is the master switch over patterns
+
+    - **GIVEN** an artifact has `hasTasks: false`
+    - **AND** it defines `taskCompletionCheck` patterns
+    - **WHEN** the schema is resolved
+    - **THEN** the `ArtifactType` has `hasTasks: false`
+    - **AND** task completion checks remain disabled
+
+    #### Scenario: Default patterns detect markdown checkboxes
+
+    - **GIVEN** an artifact with `hasTasks: true` and no `taskCompletionCheck` declared
+    - **AND** its file contains `- [ ] pending` and `- [x] done`
+    - **WHEN** the CLI checks task completion
+    - **THEN** `incompletePattern` defaults to `^\s*-\s+\[ \]` and matches `- [ ] pending`
+    - **AND** `completePattern` defaults to `^\s*-\s+\[x\]` (case-insensitive) and matches `- [x] done`
+
+    #### Scenario: Custom patterns override defaults
+
+    - **GIVEN** an artifact with `hasTasks: true`
+    - **AND** it declares `taskCompletionCheck.incompletePattern: '^\s*TODO:'` and `taskCompletionCheck.completePattern: '^\s*DONE:'`
+    - **AND** its file contains `TODO: implement login` and `DONE: implement logout`
+    - **WHEN** the CLI checks task completion
+    - **THEN** `incompletePattern` matches `TODO: implement login` and the transition is blocked
+
+    #### Scenario: All tasks complete — no incomplete matches
+
+    - **GIVEN** an artifact with `hasTasks: true`
+    - **AND** a file where all checkboxes are checked and none are unchecked
+    - **WHEN** the `implementing → verifying` transition is attempted
+    - **THEN** `incompletePattern` matches zero lines and the transition is allowed
+
+- op: modified
+  description: 'Update Workflow scenarios to include requiresTaskCompletion validation failure'
+  selector:
+    type: section
+    matches: 'Requirement: Workflow'
+  content: |
+    #### Scenario: Pre hook failure aborts step
+
+    - **WHEN** a `pre` `run:` hook exits with a non-zero code
+    - **THEN** the step is aborted, the user is informed, and the agent offers to fix the problem before retrying
+
+    #### Scenario: Post hook failure prompts user
+
+    - **WHEN** a `post` `run:` hook exits with a non-zero code
+    - **THEN** the user is prompted to continue or stop; the completed step is not rolled back
+
+    #### Scenario: Step with unsatisfied prerequisites
+
+    - **WHEN** a step's `requires` lists an artifact that is not `complete`
+    - **THEN** `CompileContext` must report that the step is blocked
+
+    #### Scenario: Step blocked when required artifact deleted mid-lifecycle
+
+    - **GIVEN** a workflow step `implementing` with `requires: [proposal, specs, verify, design, tasks]`
+    - **AND** a change where `design` artifact has been deleted (status reverts to `missing`)
+    - **WHEN** `CompileContext` evaluates step availability for `implementing`
+    - **THEN** `stepAvailable` is `false`
+    - **AND** `blockingArtifacts` includes `"design"`
+
+    #### Scenario: Hook entries require id
+
+    - **WHEN** a `workflow[].hooks.pre` entry omits the `id` field
+    - **THEN** `SchemaRegistry.resolve()` must throw a `SchemaValidationError`
+
+    #### Scenario: requiresTaskCompletion references artifact without hasTasks
+
+    - **GIVEN** a workflow step declares `requiresTaskCompletion: ["proposal"]`
+    - **AND** artifact `proposal` has `hasTasks: false`
+    - **WHEN** the schema is resolved
+    - **THEN** `SchemaRegistry.resolve()` must throw a `SchemaValidationError`

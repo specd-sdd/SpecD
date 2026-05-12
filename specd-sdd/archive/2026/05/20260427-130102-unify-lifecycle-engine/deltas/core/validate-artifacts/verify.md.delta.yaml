@@ -1,0 +1,195 @@
+# Delta: core:validate-artifacts (Verification)
+
+- op: modified
+  description: 'Preserve dependency-order scenarios while clarifying that effective dependency status is interpreted through LifecycleEngine.'
+  selector:
+    type: section
+    matches: 'Requirement: Dependency order check'
+  content: |
+    #### Scenario: Dependency complete — validation proceeds
+
+    - **GIVEN** artifact `specs` requires `proposal`, and `LifecycleEngine` reports `proposal` as `complete`
+    - **WHEN** `ValidateArtifacts.execute` is called for `specs`
+    - **THEN** validation of `specs` proceeds normally
+
+    #### Scenario: Dependency skipped — validation proceeds
+
+    - **GIVEN** artifact `tasks` requires `design`, and `LifecycleEngine` reports `design` as `skipped`
+    - **WHEN** `ValidateArtifacts.execute` is called for `tasks`
+    - **THEN** validation of `tasks` proceeds — `skipped` satisfies the dependency
+
+    #### Scenario: Dependency incomplete — validation blocked
+
+    - **GIVEN** artifact `specs` requires `proposal`, and `LifecycleEngine` reports `proposal` as `in-progress`
+    - **WHEN** `ValidateArtifacts.execute` is called for `specs`
+    - **THEN** `specs` is reported as dependency-blocked and `markComplete` is not called for it
+
+    #### Scenario: Dependency-block failure includes effective dependency status
+
+    - **GIVEN** artifact `specs` requires `proposal`, and `LifecycleEngine` reports `proposal` effective status as `missing`
+    - **WHEN** `ValidateArtifacts.execute` is called for `specs`
+    - **THEN** the dependency-blocked failure description includes dependency `proposal`
+    - **AND** the description includes status `missing`
+
+    #### Scenario: Review-propagation blocker includes recursive parent context
+
+    - **GIVEN** artifact `verify` depends on `specs`
+    - **AND** `LifecycleEngine` reports `specs` effective status as `pending-parent-artifact-review`
+    - **AND** recursive blocker resolution identifies parent artifact `proposal` with status `pending-review`
+    - **WHEN** `ValidateArtifacts.execute` is called for `verify`
+    - **THEN** the dependency-blocked failure description includes status `pending-parent-artifact-review`
+    - **AND** the description includes parent blocker context (`proposal`, `pending-review`)
+
+    #### Scenario: Direct review blocker status is reported as review-state
+
+    - **GIVEN** artifact `verify` depends on `specs`
+    - **AND** `LifecycleEngine` reports `specs` effective status as `pending-review` or `drifted-pending-review`
+    - **WHEN** `ValidateArtifacts.execute` is called for `verify`
+    - **THEN** the dependency-blocked failure description includes the exact dependency status
+    - **AND** the status is presented as a review blocker, not as generic incompleteness
+
+    #### Scenario: Skipped artifact is not validated
+
+    - **GIVEN** artifact `design` is `optional: true` with `validatedHash === "__skipped__"`
+    - **WHEN** `ValidateArtifacts.execute` is called
+    - **THEN** no delta validation, application preview, or structural validation is run for `design` — there is no file to check
+
+- op: added
+  description: 'Add missing requirement headings required by the spec contract.'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: Ports and constructor
+
+    #### Scenario: ValidateArtifacts is constructed with LifecycleEngine
+
+    - **WHEN** `ValidateArtifacts` is assembled
+    - **THEN** it receives `LifecycleEngine` alongside its existing repositories, parser registry, actor resolver, and hasher
+
+- op: added
+  description: 'Add the verify requirement for input.'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: Input
+
+    #### Scenario: Change-scoped validation does not require specPath
+
+    - **GIVEN** a change-scoped artifact such as `design`
+    - **WHEN** `ValidateArtifacts.execute` is called for that artifact
+    - **THEN** `specPath` is optional
+
+- op: added
+  description: 'Add the verify requirement for schema name guard.'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: Schema name guard
+
+    #### Scenario: Schema mismatch throws before validation
+
+    - **GIVEN** the change was created under a different schema name
+    - **WHEN** `ValidateArtifacts.execute` is called
+    - **THEN** it throws `SchemaMismatchError` before validating artifacts
+
+- op: added
+  description: 'Add the verify requirement for metadataExtraction validation failures.'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: MetadataExtraction validation failures are validation failures
+
+    #### Scenario: Invalid extracted metadata prevents completion
+
+    - **GIVEN** metadata extraction succeeds but its result fails schema validation
+    - **WHEN** `ValidateArtifacts.execute` processes the artifact
+    - **THEN** a validation failure is recorded
+    - **AND** the artifact is not marked complete
+
+- op: added
+  description: 'Preserve single-artifact filtering scenarios under the Input contract.'
+  position:
+    after:
+      type: section
+      matches: 'Requirement: Input'
+  content: |
+    #### Scenario: Validating one spec does not fail on missing artifacts from other specs
+
+    - **GIVEN** a change with two specs: `specA` and `specB`
+    - **AND** `specA` has all its artifact files present
+    - **AND** `specB` does not have its artifact files yet (not yet created)
+    - **WHEN** `ValidateArtifacts.execute` is called with `specPath: 'specA'`
+    - **THEN** only `specA`'s artifacts are validated
+    - **AND** missing artifacts from `specB` do NOT cause validation failure
+    - **AND** `result.passed` is `true` if `specA`'s artifacts pass validation
+
+    #### Scenario: Only the specified artifact is validated
+
+    - **GIVEN** the schema has artifacts `proposal`, `specs`, and `verify`
+    - **AND** `artifactId` is `"specs"`
+    - **WHEN** `ValidateArtifacts.execute` is called
+    - **THEN** only `specs` goes through dependency check, delta validation, structural validation, and hash computation
+    - **AND** `proposal` and `verify` are not checked, not reported as missing, and not included in the result
+
+    #### Scenario: Dependency order still applies to the specified artifact
+
+    - **GIVEN** `artifactId` is `"specs"` and artifact `specs` requires `proposal`
+    - **AND** `LifecycleEngine` reports `proposal` as not `complete` or `skipped`
+    - **WHEN** `ValidateArtifacts.execute` is called
+    - **THEN** `specs` is reported as dependency-blocked and `markComplete` is not called
+
+    #### Scenario: Specified artifact with satisfied dependencies proceeds normally
+
+    - **GIVEN** `artifactId` is `"specs"` and artifact `specs` requires `proposal`
+    - **AND** `LifecycleEngine` reports `proposal` as `complete`
+    - **WHEN** `ValidateArtifacts.execute` is called
+    - **THEN** `specs` is validated normally and `markComplete` is called if all validations pass
+
+- op: added
+  description: 'Preserve dependsOn persistence scenarios under Save after validation.'
+  position:
+    after:
+      type: section
+      matches: 'Requirement: Save after validation'
+  content: |
+    #### Scenario: Transformed dependsOn values are persisted on the change
+
+    - **GIVEN** a validated `scope: spec` artifact whose metadata extraction declares `transform: resolveSpecPath`
+    - **AND** extraction against the validated content returns canonical spec IDs
+    - **WHEN** `ValidateArtifacts.execute` completes successfully
+    - **THEN** `change.setSpecDependsOn(specId, deps)` is called with those already-transformed spec IDs
+    - **AND** no separate `SpecRepository.resolveFromPath(...)` repair step is run afterward
+
+    #### Scenario: Transform failure blocks dependsOn extraction persistence
+
+    - **GIVEN** a declared transform throws because required origin context is absent
+    - **WHEN** `ValidateArtifacts.execute` attempts automatic dependsOn extraction
+    - **THEN** validation fails for the artifact
+    - **AND** dependency updates are not persisted for that artifact
+
+    #### Scenario: Found dependency values may not be silently discarded by transform execution
+
+    - **GIVEN** extraction finds dependency values in the validated artifact content
+    - **AND** the configured transform receives those values but cannot normalize them
+    - **WHEN** `ValidateArtifacts.execute` completes dependency extraction
+    - **THEN** validation fails for the artifact instead of treating `dependsOn` as absent
+
+- op: removed
+  description: 'Remove the old verify-only artifactId-filter heading now that its scenarios live under Input.'
+  selector:
+    type: section
+    matches: 'Requirement: Input — artifactId filter'
+
+- op: removed
+  description: 'Remove the old verify-only dependsOn-extraction heading now that its scenarios live under Save after validation.'
+  selector:
+    type: section
+    matches: 'Requirement: Automatic dependsOn extraction'

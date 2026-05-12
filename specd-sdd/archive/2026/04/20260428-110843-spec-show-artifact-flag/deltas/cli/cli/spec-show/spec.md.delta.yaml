@@ -1,0 +1,54 @@
+- op: modified
+  description: 'Update command signature to include --artifact flag'
+  selector:
+    type: section
+    matches: 'Requirement: Command signature'
+  content: |
+    ```
+    specd spec show <workspace:capability-path> [--artifact <name>] [--format text|json|toon]
+    ```
+
+    - `<workspace:capability-path>` — required positional; the fully-qualified spec ID (e.g. `default:auth/login`)
+    - `--artifact <name>` — optional; filters the output to only include the artifact with the given ID (e.g. `specs`, `verify`)
+    - `--format text|json|toon` — optional; output format, defaults to `text`
+
+- op: added
+  description: 'Add Requirement: Artifact filtering'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Error cases'
+  content: |
+    ### Requirement: Artifact filtering
+
+    When the `--artifact <name>` flag is provided, the command MUST resolve the `<name>` to a filename using the active schema's artifact definitions.
+
+    - Only the content of the artifact matching the resolved filename SHALL be printed.
+    - If `<name>` does not exist in the active schema, the command SHALL exit with code 1 and print an `error:` message to stderr.
+    - If the artifact exists in the schema but is missing on disk for the specified spec, the command SHALL exit with code 1 and print an `error:` message to stderr (unlike the default behavior which skips missing files).
+
+- op: modified
+  description: 'Update Output format requirement for artifact filtering'
+  selector:
+    type: section
+    matches: 'Requirement: Output format'
+  content: |
+    In `text` mode (default), the command prints each artifact file for the spec in schema-declared order. Each file is preceded by a header line:
+
+    ```
+    --- <filename> ---
+    <content>
+    ```
+
+    If `--artifact` is provided, the header line for the single artifact IS still printed.
+
+    In `json` or `toon` mode, the output is an array (encoded in the respective format):
+
+    ```json
+    [{ "filename": "...", "content": "..." }]
+    ```
+
+    If `--artifact` is provided, the array SHALL contain exactly one entry for the requested artifact.

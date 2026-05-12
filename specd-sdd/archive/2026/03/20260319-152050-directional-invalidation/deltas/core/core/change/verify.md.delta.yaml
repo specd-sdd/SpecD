@@ -1,0 +1,89 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Artifacts'
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    #### Scenario: Status derived — complete
+
+    - **WHEN** the cleaned hash of an artifact's current file matches its `validatedHash`
+    - **THEN** `effectiveStatus` returns `complete`
+
+    #### Scenario: Status derived — missing
+
+    - **WHEN** an artifact's file does not exist
+    - **THEN** `effectiveStatus` returns `missing`
+
+    #### Scenario: Status derived — in-progress
+
+    - **WHEN** an artifact's cleaned file hash differs from `validatedHash`
+    - **THEN** `effectiveStatus` returns `in-progress`
+
+    #### Scenario: preHashCleanup applied before status comparison
+
+    - **WHEN** an artifact has `preHashCleanup` defined and a progress marker changes (e.g. a checkbox is checked)
+    - **THEN** `effectiveStatus` remains `complete` — the cleaned hash is unchanged
+
+    #### Scenario: Status derived — skipped
+
+    - **GIVEN** an `optional: true` artifact with no file on disk
+    - **AND** its `validatedHash` is `"__skipped__"`
+    - **WHEN** `effectiveStatus` is derived
+    - **THEN** it returns `skipped`
+
+    #### Scenario: skipped persists across calls
+
+    - **GIVEN** an `optional: true` artifact with `validatedHash === "__skipped__"` persisted in the manifest
+    - **WHEN** `effectiveStatus` is derived in a subsequent CLI invocation
+    - **THEN** it returns `skipped` — the sentinel in the manifest is the source of truth
+
+    #### Scenario: skipping a non-optional artifact fails
+
+    - **WHEN** an attempt is made to skip an artifact with `optional: false`
+    - **THEN** the operation fails with an error and `validatedHash` is not modified
+
+    #### Scenario: invalidated event with driftedArtifactIds clears only downstream
+
+    - **GIVEN** a DAG: proposal → specs → verify, proposal → design, specs + design → tasks
+    - **AND** all artifacts are `complete`
+    - **WHEN** `invalidate('artifact-change', actor, ['tasks'])` is called
+    - **THEN** only `tasks.validatedHash` is cleared (no downstream dependents)
+    - **AND** `proposal`, `specs`, `verify`, and `design` remain `complete`
+
+    #### Scenario: invalidated event with driftedArtifactIds cascades downstream
+
+    - **GIVEN** a DAG: proposal → specs → verify, proposal → design, specs + design → tasks
+    - **AND** all artifacts are `complete`
+    - **WHEN** `invalidate('artifact-change', actor, ['specs'])` is called
+    - **THEN** `specs`, `verify`, and `tasks` are cleared (specs + its downstream)
+    - **AND** `proposal` and `design` remain `complete`
+
+    #### Scenario: invalidated event without driftedArtifactIds clears all
+
+    - **GIVEN** a change with one `complete` artifact and one `skipped` artifact
+    - **WHEN** `invalidate('artifact-change', actor)` is called without `driftedArtifactIds`
+    - **THEN** all `validatedHash` values are cleared — the `complete` artifact becomes `in-progress` and the `skipped` artifact becomes `missing`
+
+    #### Scenario: verifying → implementing clears only implementing.requires artifacts
+
+    - **GIVEN** a change with `implementing.requires: [tasks]` and `tasks` is `complete`
+    - **WHEN** the change transitions `verifying → implementing`
+    - **THEN** only `tasks.validatedHash` is cleared — other artifacts retain their status
+
+    #### Scenario: Dependency cascade — skipped optional satisfies dependency
+
+    - **GIVEN** artifact B requires artifact A, and artifact A is `optional: true` and `skipped`
+    - **WHEN** `effectiveStatus` for artifact B is derived
+    - **THEN** it is not blocked by A — `skipped` is treated as resolved
+
+    #### Scenario: Dependency cascade — incomplete dependency
+
+    - **WHEN** artifact B requires artifact A, and artifact A is `in-progress`
+    - **THEN** `effectiveStatus` for artifact B returns `in-progress` even if B's own cleaned hash matches its `validatedHash`
+
+    #### Scenario: markComplete only from ValidateArtifacts
+
+    - **WHEN** any code path other than `ValidateArtifacts` calls `Artifact.markComplete(hash)`
+    - **THEN** this is a violation of the domain contract — no other use case may set an artifact to `complete`

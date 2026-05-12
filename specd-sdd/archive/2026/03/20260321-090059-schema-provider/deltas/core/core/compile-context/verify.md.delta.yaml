@@ -1,0 +1,13 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Scenario: Project-level include applied regardless of active workspace'
+    parent:
+      type: section
+      matches: 'Requirement: Context spec collection'
+  content: |
+    #### Scenario: Project-level include applied regardless of active workspace
+
+    - **GIVEN** a project-level `contextIncludeSpecs` pattern that matches specs in multiple workspaces
+    - **WHEN** `CompileContext.execute` is called for a specific workspace
+    - **THEN** all specs matching the project-level pattern are included regardless of the active workspace

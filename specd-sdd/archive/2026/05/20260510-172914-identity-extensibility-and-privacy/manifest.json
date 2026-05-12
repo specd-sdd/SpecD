@@ -1,0 +1,1090 @@
+{
+  "name": "identity-extensibility-and-privacy",
+  "createdAt": "2026-05-10T17:29:14.219Z",
+  "description": "Extends ActorIdentity with optional provider, providerId, and metadata fields to support richer identity sources (LDAP, SSO) and audit trails. Introduces a project-level privacy configuration (hash/mask/anonymous) that automatically obfuscates actor data in change manifests to protect user privacy in public repositories. Adds native .env file support via process.loadEnvFile() with environment variable overrides for all privacy and config settings. Refactors actor resolution into separate ActorProvider/AutoDetectActorProvider interfaces to enable extensible identity providers beyond built-in VCS backends (Git, Hg, Svn, Null).",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "core:actor-resolver-port",
+    "core:change-manifest",
+    "core:config",
+    "core:config-loader",
+    "core:change",
+    "core:actor-resolver",
+    "core:actor-provider",
+    "core:actor-resolver-privacy",
+    "core:actor-resolver-git",
+    "core:actor-resolver-hg",
+    "core:actor-resolver-svn",
+    "core:actor-resolver-null"
+  ],
+  "specDependsOn": {
+    "core:actor-resolver-port": ["core:actor-resolver", "core:change"],
+    "core:change-manifest": [
+      "core:change",
+      "core:change-layout",
+      "core:storage",
+      "core:spec-metadata",
+      "core:spec-id-format",
+      "core:workspace"
+    ],
+    "core:config-loader": [
+      "core:config",
+      "core:composition",
+      "core:schema-merge",
+      "default:_global/architecture"
+    ],
+    "core:actor-resolver": [
+      "core:actor-provider",
+      "core:actor-resolver-privacy",
+      "core:composition"
+    ],
+    "core:actor-resolver-privacy": ["core:actor-resolver-port", "core:config"],
+    "core:actor-resolver-git": ["core:actor-provider"],
+    "core:actor-resolver-hg": ["core:actor-provider"],
+    "core:actor-resolver-svn": ["core:actor-provider"],
+    "core:actor-resolver-null": ["core:actor-provider"],
+    "core:actor-provider": ["core:actor-resolver-port"],
+    "core:change": [
+      "core:change-manifest",
+      "core:workflow-model",
+      "core:spec-metadata",
+      "core:spec-id-format",
+      "default:_global/architecture",
+      "core:lifecycle-engine",
+      "default:_global/logging"
+    ],
+    "core:config": [
+      "core:schema-format",
+      "core:schema-merge",
+      "default:_global/architecture",
+      "core:storage",
+      "core:spec-metadata",
+      "core:workspace",
+      "default:_global/logging"
+    ]
+  },
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:016dabbfbe55b3164d17ce87b5ad3ba54da1a3d74a18e86e3457ac51adffa128"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:actor-resolver-port",
+          "filename": "deltas/core/actor-resolver-port/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:ab0ef37a99c7c4c9ac1843b366be603a4864d6e0ba1da8ee263ec327cf4e58a8"
+        },
+        {
+          "key": "core:change-manifest",
+          "filename": "deltas/core/change-manifest/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:fcd5d2fb28b1309a039fb84a2f8009f96f415af167371bca298ce28018bbe792"
+        },
+        {
+          "key": "core:config",
+          "filename": "deltas/core/config/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:ee59392e195026691496e488f1d63eb0a7268614d25c514a9b0283e7bafbe655"
+        },
+        {
+          "key": "core:config-loader",
+          "filename": "deltas/core/config-loader/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:263f97a571f1072b1727c07bb951b40395e8083cc3ea411b9718b8de47131a7d"
+        },
+        {
+          "key": "core:change",
+          "filename": "deltas/core/change/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:18ffd0b343c61bda73791717d367d5425e2ff734bc42a48cb7775ab5cf22038f"
+        },
+        {
+          "key": "core:actor-resolver",
+          "filename": "deltas/core/actor-resolver/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:f567bc94497d571f322ec7bedfb4d5d7465972c601aa8f4d22de7ece1a002a07"
+        },
+        {
+          "key": "core:actor-provider",
+          "filename": "specs/core/actor-provider/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:c3ee4dde91d692a63d1ca651f8089d4214dfa8d41a195c6d9cbe74f8eab5e5bc"
+        },
+        {
+          "key": "core:actor-resolver-privacy",
+          "filename": "specs/core/actor-resolver-privacy/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:5ca5694df5dee5c14907a4160141c8b7107397d685f7968e1f05d20caf7184ab"
+        },
+        {
+          "key": "core:actor-resolver-git",
+          "filename": "specs/core/actor-resolver-git/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:eef4257b4d0972b37ddeede10cfe28ac8ea9f070f61e49c86e12258a6e8ce333"
+        },
+        {
+          "key": "core:actor-resolver-hg",
+          "filename": "specs/core/actor-resolver-hg/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:74b454eb1e0af372fc0f77568a512228fc871d80c5505969b9f125607d2dbee4"
+        },
+        {
+          "key": "core:actor-resolver-svn",
+          "filename": "specs/core/actor-resolver-svn/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:99d7c77f9c09045ffd374d4ab3f65231916f4eb655f7f38bb5c7d6cd3aedffe8"
+        },
+        {
+          "key": "core:actor-resolver-null",
+          "filename": "specs/core/actor-resolver-null/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:86010337927407b7eb43434d71aa741613c98877bd30c43430c3cada360740ec"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:actor-resolver-port",
+          "filename": "deltas/core/actor-resolver-port/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:35f89bb41fb0b10597c36683ca490444ab4e4a28d4a75112832b3cc7e1e8b9c1"
+        },
+        {
+          "key": "core:change-manifest",
+          "filename": "deltas/core/change-manifest/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:0aec596d49c00328a6f56bfe8e83b435eb071e4e69c19a5d76b32d82d4ff7f7c"
+        },
+        {
+          "key": "core:config",
+          "filename": "deltas/core/config/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:d320bfae008699f30f8321b9e9e819f2a09fa86cdc83f25253d747ad1673f885"
+        },
+        {
+          "key": "core:config-loader",
+          "filename": "deltas/core/config-loader/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:ab6683888096303f21cde6f6c90251ddc5b73e9be8795166e86322af5556343b"
+        },
+        {
+          "key": "core:change",
+          "filename": "deltas/core/change/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:dc54390467a0da1acd637efb1713d10719d48b27765e51e9baae3c4efd3e1a1e"
+        },
+        {
+          "key": "core:actor-resolver",
+          "filename": "deltas/core/actor-resolver/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:5cdc542d363143068d3a271aaae6f3582493c26085185d5442bb29c87babcc73"
+        },
+        {
+          "key": "core:actor-provider",
+          "filename": "specs/core/actor-provider/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:58ea6cb9255b86c5307ac06eeb4da86d115bdec1828ccea61caea965e3a8faf1"
+        },
+        {
+          "key": "core:actor-resolver-privacy",
+          "filename": "specs/core/actor-resolver-privacy/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:7575d35927d88acd47aea10292564da4f01f70fccdc04b218657fcd600a0aca9"
+        },
+        {
+          "key": "core:actor-resolver-git",
+          "filename": "specs/core/actor-resolver-git/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:aa2e85728225c3303bf57e49ca954307d2cb482173b0297666d3c44a272e9fa2"
+        },
+        {
+          "key": "core:actor-resolver-hg",
+          "filename": "specs/core/actor-resolver-hg/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:881173dc3980ada8af2e000656c2dd5b6be8fb4f54d65743b74cf09807c72dfb"
+        },
+        {
+          "key": "core:actor-resolver-svn",
+          "filename": "specs/core/actor-resolver-svn/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:c605caf235a317429c68515c060644b13262ce09f6d8733f87bd039b35cdde36"
+        },
+        {
+          "key": "core:actor-resolver-null",
+          "filename": "specs/core/actor-resolver-null/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:1249888dab7d77df618d1ee4f093c4e7fd5f33800f3b90164002bbc2496e96d2"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:7656b92d1219e9ddd936e63b5920bb1d93d4e18d59fc28b97124378fbe6a1bf3"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:329f23403ff27aa565cee07190a26676527805023a556d5dedcffe26b20552eb"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-05-10T17:29:14.219Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "specIds": [
+        "core:actor-resolver-port",
+        "core:change-manifest",
+        "core:config",
+        "core:config-loader"
+      ],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-05-10T17:29:14.229Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "core:actor-resolver-port"
+        },
+        {
+          "type": "specs",
+          "key": "core:change-manifest"
+        },
+        {
+          "type": "specs",
+          "key": "core:config"
+        },
+        {
+          "type": "specs",
+          "key": "core:config-loader"
+        },
+        {
+          "type": "verify",
+          "key": "core:actor-resolver-port"
+        },
+        {
+          "type": "verify",
+          "key": "core:change-manifest"
+        },
+        {
+          "type": "verify",
+          "key": "core:config"
+        },
+        {
+          "type": "verify",
+          "key": "core:config-loader"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-10T17:29:59.508Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-10T17:31:27.784Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:actor-resolver-port",
+            "core:change-manifest",
+            "core:config",
+            "core:config-loader"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:actor-resolver-port",
+            "core:change-manifest",
+            "core:config",
+            "core:config-loader"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-05-10T17:31:27.786Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:change"
+        },
+        {
+          "type": "verify",
+          "key": "core:change"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-10T17:37:23.316Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-10T17:49:38.780Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-10T17:52:17.638Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-10T17:54:39.375Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-10T17:57:02.355Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-10T17:58:59.034Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-10T18:00:21.373Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-10T18:02:28.639Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-10T18:03:23.652Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-10T18:08:27.113Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-10T18:09:22.423Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-10T18:12:14.194Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-10T18:14:48.420Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-10T18:39:19.973Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-10T18:40:54.487Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-10T18:45:52.557Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-10T18:45:53.578Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:actor-resolver-port",
+            "core:change-manifest",
+            "core:config",
+            "core:config-loader",
+            "core:change"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:actor-resolver-port",
+            "core:change-manifest",
+            "core:config",
+            "core:config-loader",
+            "core:change"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-05-10T18:45:53.578Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:actor-resolver"
+        },
+        {
+          "type": "verify",
+          "key": "core:actor-resolver"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-10T18:46:03.898Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:actor-resolver-port",
+            "core:change-manifest",
+            "core:config",
+            "core:config-loader",
+            "core:change",
+            "core:actor-resolver"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:actor-resolver-port",
+            "core:change-manifest",
+            "core:config",
+            "core:config-loader",
+            "core:change",
+            "core:actor-resolver"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-05-10T18:46:03.899Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:actor-provider"
+        },
+        {
+          "type": "specs",
+          "key": "core:actor-resolver-privacy"
+        },
+        {
+          "type": "specs",
+          "key": "core:actor-resolver-git"
+        },
+        {
+          "type": "specs",
+          "key": "core:actor-resolver-hg"
+        },
+        {
+          "type": "specs",
+          "key": "core:actor-resolver-svn"
+        },
+        {
+          "type": "specs",
+          "key": "core:actor-resolver-null"
+        },
+        {
+          "type": "verify",
+          "key": "core:actor-provider"
+        },
+        {
+          "type": "verify",
+          "key": "core:actor-resolver-privacy"
+        },
+        {
+          "type": "verify",
+          "key": "core:actor-resolver-git"
+        },
+        {
+          "type": "verify",
+          "key": "core:actor-resolver-hg"
+        },
+        {
+          "type": "verify",
+          "key": "core:actor-resolver-svn"
+        },
+        {
+          "type": "verify",
+          "key": "core:actor-resolver-null"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-10T19:01:22.771Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: design [design]",
+      "affectedArtifacts": [
+        {
+          "type": "design",
+          "files": ["design"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-10T19:07:48.662Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-10T19:14:38.700Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-10T19:14:38.700Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-10T19:15:17.707Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-10T19:16:29.767Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-11T16:04:00.338Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-11T16:13:55.306Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-11T16:14:22.544Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-11T17:20:34.084Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [core:actor-resolver, core:actor-resolver-null, core:actor-resolver-port, core:actor-resolver-privacy]; verify [core:actor-resolver, core:actor-resolver-null, core:actor-resolver-port]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "core:actor-resolver",
+            "core:actor-resolver-null",
+            "core:actor-resolver-port",
+            "core:actor-resolver-privacy"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": ["core:actor-resolver", "core:actor-resolver-null", "core:actor-resolver-port"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-11T17:20:34.084Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "archivable",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-11T17:31:01.724Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: verify [core:actor-resolver-hg, core:actor-resolver-svn]",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": ["core:actor-resolver-hg", "core:actor-resolver-svn"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-11T17:34:28.990Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-11T17:36:46.135Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-11T17:40:04.499Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-11T17:41:12.184Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-11T17:41:34.195Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "description-updated",
+      "at": "2026-05-11T17:45:47.044Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "description": "Extends ActorIdentity with optional provider, providerId, and metadata fields to support richer identity sources (LDAP, SSO) and audit trails. Introduces a project-level privacy configuration (hash/mask/anonymous) that automatically obfuscates actor data in change manifests to protect user privacy in public repositories. Adds native .env file support via process.loadEnvFile() with environment variable overrides for all privacy and config settings. Refactors actor resolution into separate ActorProvider/AutoDetectActorProvider interfaces to enable extensible identity providers beyond built-in VCS backends (Git, Hg, Svn, Null)."
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-11T17:46:03.758Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-05-11T17:46:04.033Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "1***i@u***.com",
+    "provider": "git"
+  }
+}

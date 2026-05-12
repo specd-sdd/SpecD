@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'Existing scenarios verify all requirements - implementation just needs to catch up'

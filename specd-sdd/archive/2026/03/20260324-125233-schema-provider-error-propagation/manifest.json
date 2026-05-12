@@ -1,0 +1,337 @@
+{
+  "name": "schema-provider-error-propagation",
+  "createdAt": "2026-03-24T12:52:33.053Z",
+  "description": "Remove null return from SchemaProvider and propagate schema errors instead of swallowing them",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "core:core/kernel",
+    "core:core/validate-specs",
+    "core:core/generate-metadata",
+    "core:core/approve-signoff",
+    "core:core/approve-spec",
+    "core:core/get-status",
+    "core:core/get-project-context",
+    "core:core/resolve-schema"
+  ],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "validatedHash": "sha256:f4f973aebf681e16b6d7b54cb03bd216e7ebf0d02826a263333d5b5375589110"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "files": [
+        {
+          "key": "core:core/kernel",
+          "filename": "deltas/core/core/kernel/spec.md.delta.yaml",
+          "validatedHash": "sha256:a51ec3d0af7a584b26ba6d4d3e5775314e7d12bd48bc9aa762f729f3fa411a84"
+        },
+        {
+          "key": "core:core/validate-specs",
+          "filename": "deltas/core/core/validate-specs/spec.md.delta.yaml",
+          "validatedHash": "sha256:b1066512265d2da3e7b198b0ae4e6820b40a2c086f611e2a653929312cf0b172"
+        },
+        {
+          "key": "core:core/generate-metadata",
+          "filename": "deltas/core/core/generate-metadata/spec.md.delta.yaml",
+          "validatedHash": "sha256:b69a394dcfae0c40497b36363cb73321eea60761d1595f5ddb1ed8947e027a7a"
+        },
+        {
+          "key": "core:core/approve-signoff",
+          "filename": "deltas/core/core/approve-signoff/spec.md.delta.yaml",
+          "validatedHash": "sha256:f57a3f01d30e902c72d4510947cee16466834f25e2d96acb25d8da47b17d3658"
+        },
+        {
+          "key": "core:core/approve-spec",
+          "filename": "deltas/core/core/approve-spec/spec.md.delta.yaml",
+          "validatedHash": "sha256:177b3c11c9cf7c94c19d5df1254a986c18e93fc886212a134009b2cc070767e8"
+        },
+        {
+          "key": "core:core/get-status",
+          "filename": "deltas/core/core/get-status/spec.md.delta.yaml",
+          "validatedHash": "sha256:03ed30e1750c0a30840ea4682c4e2c30910e9e259dbea541182c3bd32185945d"
+        },
+        {
+          "key": "core:core/get-project-context",
+          "filename": "deltas/core/core/get-project-context/spec.md.delta.yaml",
+          "validatedHash": "sha256:5b6160d950922e98d40371ce92cc7066ac30696f1f9fcf2cb38a5bde321e206f"
+        },
+        {
+          "key": "core:core/resolve-schema",
+          "filename": "deltas/core/core/resolve-schema/spec.md.delta.yaml",
+          "validatedHash": "sha256:a960207d08d2e6407828ccdf320ebc244a531346921423a9badd4848054ebba1"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "files": [
+        {
+          "key": "core:core/kernel",
+          "filename": "deltas/core/core/kernel/verify.md.delta.yaml",
+          "validatedHash": "sha256:41e25e4a8497f5d165724a8f633691f960f9358e045453e0471426755c6a51e3"
+        },
+        {
+          "key": "core:core/validate-specs",
+          "filename": "deltas/core/core/validate-specs/verify.md.delta.yaml",
+          "validatedHash": "sha256:7569147dc1fb6ef47549a581207cffbce0b3909b4cb811994be6c9dcc511af44"
+        },
+        {
+          "key": "core:core/generate-metadata",
+          "filename": "deltas/core/core/generate-metadata/verify.md.delta.yaml",
+          "validatedHash": "sha256:c06adaf3854e36f2df321edbfbd5243600fb700530216d188c769485923c6131"
+        },
+        {
+          "key": "core:core/approve-signoff",
+          "filename": "deltas/core/core/approve-signoff/verify.md.delta.yaml",
+          "validatedHash": "sha256:b37346b60287eb9adfd07bc7506c58f1d08a1caf88c777cfc9ebd2bff6232f2b"
+        },
+        {
+          "key": "core:core/approve-spec",
+          "filename": "deltas/core/core/approve-spec/verify.md.delta.yaml",
+          "validatedHash": "sha256:b37346b60287eb9adfd07bc7506c58f1d08a1caf88c777cfc9ebd2bff6232f2b"
+        },
+        {
+          "key": "core:core/get-status",
+          "filename": "deltas/core/core/get-status/verify.md.delta.yaml",
+          "validatedHash": "sha256:a1005538d3fdc74a6decc178ad932a8b3d65c8cc91149ec856ef5026a4337012"
+        },
+        {
+          "key": "core:core/get-project-context",
+          "filename": "deltas/core/core/get-project-context/verify.md.delta.yaml",
+          "validatedHash": "sha256:c164e3cde27e3360194938f3f557dabe04762ffd955dfee381dc0f18bf37915f"
+        },
+        {
+          "key": "core:core/resolve-schema",
+          "filename": "deltas/core/core/resolve-schema/verify.md.delta.yaml",
+          "validatedHash": "sha256:015eaab9f01c9da11729d753b544ce9750d67049102077949c7e732ab0fae45d"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "validatedHash": "sha256:95cde9840ded1677355a960b4b74cd6330b7113596724c76dd9705b45aa49abf"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "validatedHash": "sha256:1dc5c4a191a69c8ec9f5b9c78a29a8e031d8010ba0193771ff6b366188aff8d0"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-03-24T12:52:33.053Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "specIds": [
+        "core:core/kernel",
+        "core:core/validate-specs",
+        "core:core/generate-metadata",
+        "core:core/approve-signoff",
+        "core:core/approve-spec",
+        "core:core/get-status",
+        "core:core/get-project-context",
+        "core:core/resolve-schema"
+      ],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-03-24T12:52:33.064Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/kernel"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/validate-specs"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/generate-metadata"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/approve-signoff"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/approve-spec"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/get-status"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/get-project-context"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/resolve-schema"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/kernel"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/validate-specs"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/generate-metadata"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/approve-signoff"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/approve-spec"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/get-status"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/get-project-context"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/resolve-schema"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-24T12:53:15.328Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-24T13:02:47.828Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-24T13:08:22.701Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-24T13:10:42.612Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-24T13:14:35.293Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-24T13:22:20.201Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-24T13:22:47.868Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-03-24T13:23:00.514Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "m***a@g***.com"
+  }
+}

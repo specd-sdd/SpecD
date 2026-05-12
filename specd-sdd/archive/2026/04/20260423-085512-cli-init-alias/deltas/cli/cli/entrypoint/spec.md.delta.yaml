@@ -1,0 +1,43 @@
+- op: added
+  description: 'Add Top-level init alias requirement to document specd init'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Auto-show dashboard'
+  content: |
+    ### Requirement: Top-level init alias
+
+    `specd init` SHALL be available as a top-level command that delegates to the same handler as `specd project init`. Both invocation forms MUST produce identical behaviour — same flags, interactive wizard, exit codes, and output formats. The top-level `init` command SHALL appear in the output of `specd --help` alongside other top-level commands.
+
+- op: modified
+  description: 'Add specd init examples to the Examples section'
+  selector:
+    type: section
+    matches: 'Examples'
+  content: |
+    ```
+    # Discovery from CWD — also auto-shows project dashboard if config is found
+    specd
+
+    # Initialize a new project (top-level alias)
+    specd init
+
+    # Same as above, using the full form
+    specd project init
+
+    # Global --config before subcommand
+    specd --config /path/to/specd.yaml change list
+
+    # Per-subcommand --config after subcommand name (equivalent)
+    specd change list --config /path/to/specd.yaml
+
+    # Auto-dashboard with explicit config
+    specd --config /path/to/specd.yaml
+
+    # Hook failure example — exit code 2 even if the hook printed its own error
+    specd change transition my-change implementing
+    # → hook exits 1 → specd exits 2
+    ```

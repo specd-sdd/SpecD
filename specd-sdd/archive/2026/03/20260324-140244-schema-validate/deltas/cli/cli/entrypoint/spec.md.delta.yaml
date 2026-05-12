@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'New command follows existing entrypoint conventions — no spec changes needed'

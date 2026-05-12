@@ -1,0 +1,13 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Scenario: Schema not found'
+    parent:
+      type: section
+      matches: 'Requirement: Resolves schema before processing'
+  content: |
+    #### Scenario: Schema not found
+
+    - **GIVEN** `SchemaProvider.get()` returns `null` for the configured schema reference
+    - **WHEN** `execute` is called
+    - **THEN** a `SchemaNotFoundError` is thrown with the schema reference string

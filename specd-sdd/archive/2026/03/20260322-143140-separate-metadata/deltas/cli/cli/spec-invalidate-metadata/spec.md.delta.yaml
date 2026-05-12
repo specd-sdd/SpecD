@@ -1,0 +1,23 @@
+- op: modified
+  description: 'Update purpose to reference metadata via port instead of .specd-metadata.yaml'
+  selector:
+    type: section
+    matches: 'Purpose'
+  content: |
+    Sometimes metadata needs to be forcibly marked stale without deleting the file or losing fields like `dependsOn`. The `specd spec invalidate-metadata` command marks a spec's metadata as stale by removing its `contentHashes` field, forcing regeneration on the next pass.
+
+- op: modified
+  description: 'Update text output to reference metadata instead of .specd-metadata.yaml'
+  selector:
+    type: section
+    matches: 'Requirement: Text output'
+  content: |
+    On success, text format outputs: `invalidated metadata for <workspace:path>`
+
+- op: modified
+  description: 'Update error cases to reference metadata instead of .specd-metadata.yaml'
+  selector:
+    type: section
+    matches: 'Requirement: Error — spec not found or no metadata'
+  content: |
+    If the spec does not exist, or has no metadata, the command writes `error: spec '<specPath>' not found or has no metadata` to stderr and exits with code 1.

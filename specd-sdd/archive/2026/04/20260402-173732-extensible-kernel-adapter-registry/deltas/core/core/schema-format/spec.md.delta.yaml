@@ -1,0 +1,22 @@
+- op: added
+  description: 'Add explicit external hook entries to workflow schema data'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Workflow$'
+  content: |
+    ### Requirement: Explicit external hook entries
+
+    Workflow hook entries SHALL support an explicit external hook form in addition to `instruction:` and shell `run:` entries.
+
+    An external hook entry MUST include:
+
+    - `id`
+    - an `external` object
+    - `external.type`
+    - `external.config` as the opaque payload for the selected external hook backend
+
+    Unknown external hook types MUST be rejected when resolved against the merged built-in plus external runner registries. They are not ignored and are not treated as no-ops.

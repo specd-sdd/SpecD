@@ -1,0 +1,13 @@
+releases:
+  core:change: patch
+  core:get-status: patch
+  core:compile-context: patch
+  core:transition-change: patch
+  core:lifecycle-engine: minor
+  core:validate-artifacts: patch
+  core:get-artifact-instruction: patch
+  cli:change-status: patch
+  cli:change-context: patch
+  cli:change-transition: patch
+  cli:change-validate: patch
+  cli:change-artifact-instruction: patch

@@ -1,0 +1,32 @@
+- op: added
+  description: 'Add pending-parent-artifact-review to allowed states'
+  position:
+    parent: { type: section, matches: 'Requirement: Artifacts' }
+    after: { type: list-item, matches: 'drifted-pending-review' }
+  content: |
+    - `pending-parent-artifact-review`
+
+- op: added
+  description: 'Add pending-parent-artifact-review semantics'
+  position:
+    parent: { type: section, matches: 'Requirement: Artifacts' }
+    after: { type: list-item, matches: 'drifted-pending-review' }
+  content: |
+    - `pending-parent-artifact-review` — the file's upstream dependency in the artifact DAG is `drifted-pending-review` or `pending-review`, recursively blocking this file until the parent is resolved.
+
+- op: added
+  description: 'Add pending-parent-artifact-review to aggregated state logic'
+  position:
+    parent: { type: section, matches: 'Requirement: Artifacts' }
+    after: { type: list-item, matches: 'pending-review' }
+  content: |
+    - `pending-parent-artifact-review` — no file is drifted or pending review, and at least one file is `pending-parent-artifact-review`
+
+- op: modified
+  description: 'Add pending-parent-artifact-review to dependency satisfaction logic'
+  selector:
+    type: paragraph
+    contains: 'Dependency satisfaction is driven by the persisted artifact'
+    parent: { type: section, matches: 'Requirement: Artifacts' }
+  value: |
+    Dependency satisfaction is driven by the persisted artifact `state`. Only artifacts in `complete` or `skipped` satisfy `requires`. Artifacts in `missing`, `in-progress`, `pending-review`, `drifted-pending-review`, or `pending-parent-artifact-review` block dependents.

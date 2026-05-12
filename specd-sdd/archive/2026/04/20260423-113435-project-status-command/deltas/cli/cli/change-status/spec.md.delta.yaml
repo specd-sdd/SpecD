@@ -1,0 +1,35 @@
+- op: added
+  description: 'Add Schema-derived fields and Approval gates requirements after Change not found'
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Change not found'
+    last: true
+  content: |
+    ### Requirement: Schema-derived fields
+
+    When the change uses any schema (not just schema-std), the JSON output MUST include a nested schema object with derived fields:
+
+    schema:
+      name: "..."
+      version: 1
+      artifactDag:
+        - id: "..."
+          scope: "change|spec"
+          optional: true|false
+          requires: ["..."]
+          hasTaskCompletionCheck: true|false
+          output: "..."
+
+    artifactDag is derived from the schemas artifacts array.
+    hasTaskCompletionCheck is true when the artifact has a taskCompletionCheck declaration.
+    This allows design/implement skills to replace schema show calls.
+
+    ### Requirement: Approval gates in output
+
+    The JSON output MUST include an approvalGates object indicating which approval gates are enabled.
+
+    approvalGates: specEnabled: true|false, signoffEnabled: true|false
+
+    specEnabled is true when spec approval is required for this change.
+    signoffEnabled is true when signoff approval is required for this change.

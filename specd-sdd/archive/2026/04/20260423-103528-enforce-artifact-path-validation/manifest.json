@@ -1,0 +1,317 @@
+{
+  "name": "enforce-artifact-path-validation",
+  "createdAt": "2026-04-23T10:35:28.371Z",
+  "description": "Ensures change manifests and validation strictly target correct artifact paths (deltas vs specs) from creation time, and enhances CLI output to report explicit file paths with merged-spec preview guidance.",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "core:core/change-layout",
+    "core:core/change-manifest",
+    "core:core/validate-artifacts",
+    "cli:cli/change-validate"
+  ],
+  "specDependsOn": {
+    "core:core/change-manifest": [
+      "core:core/change",
+      "core:core/change-layout",
+      "core:core/storage",
+      "core:core/spec-metadata",
+      "core:core/spec-id-format",
+      "core:core/workspace"
+    ],
+    "core:core/validate-artifacts": [
+      "core:core/change",
+      "core:core/change-layout",
+      "core:core/change-manifest",
+      "core:core/schema-format",
+      "core:core/delta-format",
+      "core:core/selector-model",
+      "core:core/storage",
+      "default:_global/architecture",
+      "core:core/spec-id-format"
+    ],
+    "cli:cli/change-validate": [
+      "cli:cli/entrypoint",
+      "core:core/change",
+      "core:core/validate-artifacts",
+      "core:core/spec-id-format"
+    ],
+    "core:core/change-layout": [
+      "core:core/storage",
+      "core:core/change-manifest",
+      "core:core/delta-format",
+      "core:core/schema-format",
+      "core:core/archive-change",
+      "core:core/workspace"
+    ]
+  },
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:8fd64ab05371706f5743f16f827e073f6cd8b2ce1556df81e668514e67a2a9da"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:core/change-layout",
+          "filename": "deltas/core/core/change-layout/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:571639efe4681b0552e79db197ef372d7af97a7d47d7e346b9c9804a625ffc96"
+        },
+        {
+          "key": "core:core/change-manifest",
+          "filename": "deltas/core/core/change-manifest/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:9ecb6c81d7595328f99ee44324eb294f88671ba7fe474570ff03766ad57fcf38"
+        },
+        {
+          "key": "core:core/validate-artifacts",
+          "filename": "deltas/core/core/validate-artifacts/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:f3014f710c90e2bc503e655ea6cb88a80d074d1a0f723ac6f544a4c35c785c13"
+        },
+        {
+          "key": "cli:cli/change-validate",
+          "filename": "deltas/cli/cli/change-validate/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:7f9452f1f42f47c49a28eb68129f306f218a522ac699f1e5b477343354018d4d"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:core/change-layout",
+          "filename": "deltas/core/core/change-layout/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:8f971a9a5f001984dd37e2facb56ab6593428fabf09ba480e6e63972e56086a0"
+        },
+        {
+          "key": "core:core/change-manifest",
+          "filename": "deltas/core/core/change-manifest/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:7f23e06e3991fb2dc0763d74bc7099f044e6b155a89fe5c4900ade01ec2ce9a3"
+        },
+        {
+          "key": "core:core/validate-artifacts",
+          "filename": "deltas/core/core/validate-artifacts/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:db3966aaa13dd0b6c8aa669979b523feed1ad8f1a1d545edd1fe307d4db88148"
+        },
+        {
+          "key": "cli:cli/change-validate",
+          "filename": "deltas/cli/cli/change-validate/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:e57ef7abb305b681cbf8c83e8948489205de5d5947d58b2f1bcaffac7e633e5a"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:d8aba1c4eb0f6bf3935685c536a57257d8c06aec9bc6dc9b6c10d795407d20b7"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:ed4ae350f1555756d4123cdbeef14545188b1377b41bb4b4c6e88e0eca782d9b"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-04-23T10:35:28.371Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "specIds": [
+        "core:core/change-layout",
+        "core:core/change-manifest",
+        "core:core/validate-artifacts",
+        "cli:cli/change-validate"
+      ],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-23T10:35:28.388Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/change-layout"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/change-manifest"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/validate-artifacts"
+        },
+        {
+          "type": "specs",
+          "key": "cli:cli/change-validate"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/change-layout"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/change-manifest"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/validate-artifacts"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/change-validate"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-23T11:11:21.152Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-24T07:04:40.617Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-24T07:11:51.059Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-24T18:13:50.572Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-24T18:15:33.828Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-24T18:15:44.699Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "description-updated",
+      "at": "2026-04-24T18:22:28.424Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "description": "Ensures change manifests and validation strictly target correct artifact paths (deltas vs specs) from creation time, and enhances CLI output to report explicit file paths with merged-spec preview guidance."
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-24T18:22:32.785Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-04-24T18:22:32.920Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "m***a@g***.com"
+  }
+}

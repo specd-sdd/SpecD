@@ -1,0 +1,15 @@
+- op: modified
+  description: 'Remove archive-local gitignore expectation from init-project verification'
+  selector:
+    type: section
+    matches: '^Requirement: Side effects performed by the port$'
+  content: |
+    #### Scenario: Storage directories created
+
+    - **WHEN** `execute` completes successfully
+    - **THEN** the `changes/`, `drafts/`, `discarded/`, and `archive/` directories exist under the storage path
+
+    #### Scenario: Gitignore entries added
+
+    - **WHEN** `execute` completes successfully
+    - **THEN** `specd.local.yaml` is listed in the project's `.gitignore`

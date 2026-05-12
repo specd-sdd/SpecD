@@ -1,0 +1,7 @@
+- op: modified
+  description: 'Update metadata serialization from YAML to JSON'
+  selector:
+    type: section
+    matches: 'Requirement: Spec metadata generation'
+  content: |
+    After merging deltas and archiving the change, the archive process generates metadata for each spec in the change's `specIds`. For each spec, it runs `GenerateSpecMetadata` to extract metadata deterministically, merges manifest `specDependsOn` entries (highest priority), serializes the result as JSON via `JSON.stringify(metadata, null, 2)`, and writes via `SaveSpecMetadata` with `force: true`. Failures are recorded in `staleMetadataSpecPaths` but do not abort the archive.

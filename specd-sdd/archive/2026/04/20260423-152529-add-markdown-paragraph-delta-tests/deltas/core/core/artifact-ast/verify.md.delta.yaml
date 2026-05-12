@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'Artifact AST verification scenarios remain valid; this change broadens selector/apply operation tests without changing AST shape.'

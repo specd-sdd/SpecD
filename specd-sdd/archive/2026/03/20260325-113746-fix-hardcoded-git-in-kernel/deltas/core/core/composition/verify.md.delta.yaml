@@ -1,0 +1,23 @@
+- op: added
+  description: >
+    Add verification scenarios for the auto-detect requirement in use-case factories.
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Internal ports are never exported$'
+  content: |
+    ### Requirement: Use-case factories must use auto-detect for VCS-dependent adapters
+
+    #### Scenario: Standalone factory uses auto-detect for actor resolution
+
+    - **WHEN** any standalone use-case factory in `composition/use-cases/` constructs an `ActorResolver`
+    - **THEN** it calls `createVcsActorResolver()` instead of `new GitActorResolver()`
+
+    #### Scenario: No hardcoded VCS imports in standalone factories
+
+    - **WHEN** inspecting the import statements of all files in `composition/use-cases/`
+    - **THEN** none import `GitActorResolver`, `HgActorResolver`, `SvnActorResolver`, or `NullActorResolver` directly
+    - **AND** all import `createVcsActorResolver` from the composition layer instead

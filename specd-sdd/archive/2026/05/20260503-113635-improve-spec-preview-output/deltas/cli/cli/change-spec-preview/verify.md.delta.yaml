@@ -1,0 +1,48 @@
+- op: modified
+  description: Update text output scenarios to verify status labels
+  selector:
+    type: section
+    matches: 'Requirement: Text output — merged mode'
+  content: |
+    #### Scenario: Files separated by header lines with status labels
+
+    - **GIVEN** a change with `merged`, `no-op`, and `missing` artifacts
+    - **WHEN** the command is invoked without `--diff`
+    - **THEN** each file header includes the appropriate label
+    - **AND** `spec.md` with status `merged` header is `--- spec.md ---`
+    - **AND** `verify.md` with status `no-op` header is `--- verify.md --- (no-op delta, showing original)`
+    - **AND** `other.md` with status `missing` (delta) header is `--- other.md --- (missing artifact, showing original)`
+    - **AND** `new.md` with status `missing` (new spec) header is `--- new.md --- (missing artifact)`
+
+    #### Scenario: Filtered artifact shows status label
+
+    - **GIVEN** a change where `specs` artifact is `no-op`
+    - **WHEN** `specd change spec-preview my-change my-spec --artifact specs` is run
+    - **THEN** stdout contains `--- spec.md --- (no-op delta, showing original)`
+
+- op: modified
+  description: Update Error handling scenarios for SpecNotInChange suggestion
+  selector:
+    type: section
+    matches: 'Requirement: Error handling'
+  content: |
+    #### Scenario: Non-existent change exits with error
+
+    - **GIVEN** no change named `ghost`
+    - **WHEN** `specd change spec-preview ghost core:core/config` is invoked
+    - **THEN** the command prints an error message and exits with code 1
+
+    #### Scenario: Spec not in change exits with error and suggestion
+
+    - **GIVEN** a change `my-change` that does not include `core:core/other`
+    - **WHEN** `specd change spec-preview my-change core:core/other` is invoked
+    - **THEN** the command prints an error message
+    - **AND** the message includes `use specd specs show core:core/other`
+    - **AND** the command exits with code 1
+
+    #### Scenario: Warnings printed to stderr
+
+    - **GIVEN** a change where delta application produces warnings
+    - **WHEN** the command is invoked
+    - **THEN** warnings appear on stderr
+    - **AND** the command still exits successfully with the partial result on stdout

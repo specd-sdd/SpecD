@@ -1,0 +1,20 @@
+# Delta: cli:change-context
+
+- op: modified
+  description: 'Clarify that availability warnings and step summaries come from core lifecycle interpretation.'
+  selector:
+    type: section
+    matches: 'Requirement: Step availability warning'
+  content: |
+    If the requested step is not currently available (i.e. `stepAvailable: false`), the command prints a warning to stderr listing the blocking artifacts returned by `CompileContext` and still prints the context block to stdout. The process exits with code 0.
+
+    The CLI must treat these fields as projections of core lifecycle interpretation; it MUST NOT re-evaluate workflow readiness independently.
+
+- op: added
+  description: 'State explicitly that available step summaries are projected from core.'
+  position:
+    parent:
+      type: section
+      matches: 'Constraints'
+  content: |
+    - `availableSteps`, `stepAvailable`, and `blockingArtifacts` are rendered from `CompileContext` output; the CLI must not re-derive lifecycle readiness locally

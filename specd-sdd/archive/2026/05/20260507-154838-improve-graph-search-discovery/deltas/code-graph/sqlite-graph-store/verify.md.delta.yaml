@@ -1,0 +1,45 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: SQLite full-text search'
+  content: |
+    #### Scenario: Symbol and spec search use SQLite full-text search
+
+    - **GIVEN** symbols and specs have been indexed into SQLite
+    - **WHEN** abstract search methods are called
+    - **THEN** results come back in descending relevance order from SQLite-backed full-text
+      search structures
+
+    #### Scenario: Multi-token search uses OR logic for discovery
+
+    - **GIVEN** symbols "effectiveStatus" and "findBlockingParent" exist in different files
+    - **WHEN** `searchSymbols({ query: 'effectiveStatus findBlockingParent' })` is called
+    - **THEN** both symbols are returned in the results
+    - **AND** the FTS5 MATCH clause uses the `OR` operator between tokens
+
+    #### Scenario: BM25 ranking prioritizes multiple matches for precision
+
+    - **GIVEN** symbol A contains "status", symbol B contains "effective status"
+    - **WHEN** `searchSymbols({ query: 'effective status' })` is called
+    - **THEN** symbol B has a higher relevance score than symbol A
+    - **AND** symbol B appears first in the results
+
+    #### Scenario: FTS structures can be refreshed after bulk writes
+
+    - **GIVEN** the backend has inserted symbols and specs through bulk-loading operations
+    - **WHEN** `rebuildFtsIndexes()` is invoked
+    - **THEN** subsequent abstract search queries see the newly indexed data
+
+    #### Scenario: Queries with hyphens do not crash FTS5
+
+    - **GIVEN** symbols and specs have been indexed into SQLite
+    - **WHEN** `searchSymbols({ query: 'pending-parent-artifact-review' })` is called
+    - **THEN** no `SqliteError` is thrown
+    - **AND** results matching the literal search term are returned
+
+    #### Scenario: Queries with FTS5 operators are treated as literal text
+
+    - **GIVEN** symbols and specs have been indexed into SQLite
+    - **WHEN** `searchSpecs({ query: 'AND OR NOT' })` is called
+    - **THEN** the query does not perform boolean logic
+    - **AND** results matching the literal terms are returned

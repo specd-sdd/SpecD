@@ -1,0 +1,43 @@
+- op: added
+  description: 'Add shared graph indexing lock behavior to hotspot retrieval'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Hotspot retrieval$'
+  content: |
+    ### Requirement: Concurrent indexing guard
+
+    Before attempting to open the provider, `graph hotspots` SHALL check the shared graph indexing lock used by `graph index`.
+
+    If indexing is currently in progress, the command SHALL fail fast with a short user-facing retry-later message indicating that the graph is being indexed and should be queried again in a few seconds.
+
+    This guard exists so the command does not surface backend lock failures opportunistically while another CLI process is rebuilding the graph.
+
+- op: modified
+  description: 'Document lock-aware error behavior for hotspot reads'
+  selector:
+    type: section
+    matches: '^Requirement: Error cases$'
+    parent:
+      type: section
+      matches: '^Requirements$'
+  content: |
+    If both `--config` and `--path` are passed, the command SHALL fail with a CLI error before attempting any graph access.
+
+    If the shared graph indexing lock is present, the command SHALL exit with code 3 after printing a user-facing retry-later message.
+
+    If the provider cannot be opened or hotspot retrieval fails due to an infrastructure error, the command SHALL exit with code 3.
+
+- op: modified
+  description: 'Record the shared indexing lock as a command constraint'
+  selector:
+    type: section
+    matches: '^Constraints$'
+  content: |
+    - The CLI SHALL delegate hotspot computation to `@specd/code-graph`
+    - `--kind` validation SHALL use the same allowed kind set as the code graph symbol model
+    - Bootstrap mode SHALL not reinterpret `--config`; it is selected only by `--path` or by missing config
+    - The command checks the shared graph indexing lock before opening the provider and fails fast while indexing is in progress

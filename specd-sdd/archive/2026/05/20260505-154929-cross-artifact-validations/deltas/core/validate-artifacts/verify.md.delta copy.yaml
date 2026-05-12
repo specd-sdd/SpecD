@@ -1,0 +1,154 @@
+- op: modified
+  description: 'Replace vacuous delta validation behaviour with required/count coverage'
+  selector:
+    type: section
+    matches: '^Requirement: Delta validation$'
+  content: |
+    #### Scenario: Delta validation failure blocks application
+
+    - **GIVEN** an artifact with a `deltaValidations` rule `{ type: sequence-item, where: { op: 'added' }, required: true }`
+    - **AND** the delta YAML AST contains no `sequence-item` node where the correlated `op` pair has `value: added`
+    - **WHEN** `ValidateArtifacts.execute` is called
+    - **THEN** `result.passed` is `false`, the artifact is not advanced to application preview, and `markComplete` is not called
+
+    #### Scenario: Delta validation warning does not block application
+
+    - **GIVEN** a `deltaValidations` rule with `required: false` that matches zero nodes in the delta YAML AST
+    - **WHEN** `ValidateArtifacts.execute` is called
+    - **THEN** the artifact proceeds to application preview and `result.warnings` includes the unsatisfied rule
+
+    #### Scenario: Delta validation count mismatch blocks application
+
+    - **GIVEN** a `deltaValidations` rule with `count: { min: 2 }`
+    - **AND** only one delta entry matches the rule selector
+    - **WHEN** `ValidateArtifacts.execute` is called
+    - **THEN** `result.passed` is `false`
+    - **AND** the artifact is not advanced to application preview
+
+    #### Scenario: no-op delta bypasses deltaValidations entirely
+
+    - **GIVEN** an artifact with `deltaValidations` rules including a `required: true` rule
+    - **AND** the delta file contains only `[{ op: "no-op" }]`
+    - **WHEN** `ValidateArtifacts.execute` is called
+    - **THEN** `deltaValidations` are not evaluated
+    - **AND** `result.passed` is `true`
+    - **AND** `markComplete` is called with the hash of the raw delta file content
+
+- op: modified
+  description: 'Verify count-aware local structural validation'
+  selector:
+    type: section
+    matches: '^Requirement: Structural validation$'
+  content: |
+    #### Scenario: Required section absent — failure
+
+    - **GIVEN** an artifact with a `validations` rule `{ type: section, matches: '^Purpose$', required: true }`
+    - **AND** the merged artifact content has no top-level `Purpose` section
+    - **WHEN** `ValidateArtifacts.execute` is called
+    - **THEN** `result.failures` includes the missing section and `markComplete` is not called
+
+    #### Scenario: Optional section absent — warning only
+
+    - **GIVEN** a `validations` rule with `required: false` that matches no node in the artifact AST
+    - **WHEN** `ValidateArtifacts.execute` is called
+    - **THEN** `result.warnings` includes the absent section and validation still passes
+
+    #### Scenario: count exactly rejects duplicate local matches
+
+    - **GIVEN** a `validations` rule with `count: { exactly: 1 }`
+    - **AND** the merged artifact content contains two matching nodes
+    - **WHEN** `ValidateArtifacts.execute` is called
+    - **THEN** `result.failures` includes the count mismatch and `markComplete` is not called
+
+    #### Scenario: All validation failures collected before returning
+
+    - **GIVEN** two `required: true` validation rules both fail for the same artifact
+    - **WHEN** `ValidateArtifacts.execute` is called
+    - **THEN** `result.failures` contains both failures — validation does not stop at the first
+
+    #### Scenario: no-op delta skips structural validation
+
+    - **GIVEN** an artifact with `validations` rules and a delta file containing only `[{ op: "no-op" }]`
+    - **WHEN** `ValidateArtifacts.execute` is called
+    - **THEN** `validations[]` rules are not evaluated against the base content
+    - **AND** `markComplete` is called with the hash of the raw delta file content
+
+- op: added
+  description: 'Add verification coverage for cross-artifact validation execution'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Structural validation$'
+  content: |
+    ### Requirement: Cross-artifact structural validation
+
+    #### Scenario: Spec-scoped relation compares merged outputs
+
+    - **GIVEN** `specs` and `verify` are delta-capable `scope: spec` artifacts for the same spec
+    - **AND** both local validations pass
+    - **WHEN** `ValidateArtifacts.execute` evaluates a matching cross-artifact rule
+    - **THEN** it compares the merged/materialized outputs, not the raw delta YAML files
+
+    #### Scenario: Single-artifact validation still runs relevant cross-artifact rules
+
+    - **GIVEN** validation is invoked with `artifactId: verify`
+    - **AND** a cross-artifact rule references `verify` and `specs`
+    - **AND** both participants are locally valid and available
+    - **WHEN** `ValidateArtifacts.execute` runs
+    - **THEN** the relational rule is evaluated during that invocation
+
+    #### Scenario: Missing ready participant defers cross-artifact validation
+
+    - **GIVEN** a cross-artifact rule references `specs` and `verify`
+    - **AND** `verify` is locally valid
+    - **AND** `specs` is missing or still locally invalid
+    - **WHEN** `ValidateArtifacts.execute` runs
+    - **THEN** the relational rule is deferred
+    - **AND** the result includes a non-failing warning explaining why it was deferred
+
+    #### Scenario: Ordered subset preserves relative order
+
+    - **GIVEN** a cross-artifact rule with `kind: subset` and `options.ordering: strict`
+    - **AND** participant `A` yields keys `[a, c]`
+    - **AND** participant `B` yields keys `[a, b, c]`
+    - **WHEN** `ValidateArtifacts.execute` evaluates the rule
+    - **THEN** the rule passes because `A` appears as an order-preserving subsequence of `B`
+
+- op: modified
+  description: 'Expose deferred cross-artifact notices in result verification'
+  selector:
+    type: section
+    matches: '^Requirement: Result shape$'
+  content: |
+    #### Scenario: passed is false when any required artifact is missing
+
+    - **WHEN** at least one non-optional artifact is `missing`
+    - **THEN** `result.passed` is `false`
+
+    #### Scenario: passed is true when all pass
+
+    - **WHEN** all non-optional artifacts are present and all validations pass
+    - **THEN** `result.passed` is `true` and `result.failures` is empty
+
+    #### Scenario: deferred cross-artifact rule is reported as warning
+
+    - **GIVEN** a cross-artifact rule cannot run because one participant is not yet locally valid
+    - **WHEN** `ValidateArtifacts.execute` returns
+    - **THEN** `result.warnings` includes a non-failing deferred validation notice
+
+    #### Scenario: files list reports the expected validated filename
+
+    - **GIVEN** validation succeeds for existing spec `core:config` with delta file `deltas/core/core/config/spec.md.delta.yaml`
+    - **WHEN** `ValidateArtifacts.execute` returns
+    - **THEN** `result.files` contains an entry with `filename: "deltas/core/core/config/spec.md.delta.yaml"`
+    - **AND** that entry status indicates the file was validated
+
+    #### Scenario: files list reports the expected missing filename
+
+    - **GIVEN** validation fails because `deltas/core/core/config/spec.md.delta.yaml` is missing
+    - **WHEN** `ValidateArtifacts.execute` returns
+    - **THEN** `result.files` contains an entry with `filename: "deltas/core/core/config/spec.md.delta.yaml"`
+    - **AND** that entry status indicates the file is missing

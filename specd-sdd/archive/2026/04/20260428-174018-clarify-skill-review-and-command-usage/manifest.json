@@ -1,0 +1,469 @@
+{
+  "name": "clarify-skill-review-and-command-usage",
+  "createdAt": "2026-04-28T17:40:18.184Z",
+  "description": "Align workflow-skill guidance and CLI-facing contracts with the current canonical commands and artifact-focused flags so agents can avoid redundant reads while preserving deterministic safety checks. Clarify that changes validate is structural/state validation only and must not be used as semantic content approval, with explicit review expectations in skills and docs. Reinforce overlap/drift protection by requiring merged-content review patterns (including artifact-filtered preview when targeted) before archiving or accepting spec deltas.",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "skills:workflow-automation",
+    "cli:change-validate",
+    "cli:change-spec-preview",
+    "cli:command-resource-naming"
+  ],
+  "specDependsOn": {
+    "skills:workflow-automation": ["cli:cli/command-resource-naming"],
+    "cli:command-resource-naming": ["cli:cli/entrypoint"],
+    "cli:change-validate": [
+      "cli:cli/entrypoint",
+      "core:core/change",
+      "core:core/validate-artifacts",
+      "core:core/spec-id-format"
+    ],
+    "cli:change-spec-preview": ["core:core/preview-spec"]
+  },
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:c18d1e252666b77927a97a89acf96c6ad7bcc4af0e976581e18e90119bdb911b"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "skills:workflow-automation",
+          "filename": "deltas/skills/workflow-automation/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:09fe8fb845218c8bbbafc45bf7db6c1875bdccfdc05ce73d9d550b4c00a3c3c7"
+        },
+        {
+          "key": "cli:change-validate",
+          "filename": "deltas/cli/change-validate/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:a32a1cb74cc6552dc9d3a7fc12783636bc9d5f7bee805896ef700d27015b08d1"
+        },
+        {
+          "key": "cli:change-spec-preview",
+          "filename": "deltas/cli/change-spec-preview/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:497f3aa747cc610f182520b5f16f7d99ed7677b3c3d9cb9150c527e5aed4582f"
+        },
+        {
+          "key": "cli:command-resource-naming",
+          "filename": "deltas/cli/command-resource-naming/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:a12023ca8bbb210b19638b7408a7a229d8455061a3a2644863ff3d25a2a8b93b"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "skills:workflow-automation",
+          "filename": "deltas/skills/workflow-automation/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:1b79e458f3e7a7757a37abb265be211d2ddb552ce02458ecf3bbad7ca5911e69"
+        },
+        {
+          "key": "cli:change-validate",
+          "filename": "deltas/cli/change-validate/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:346087c41698703c096f2145fcac32770709e15cdc3b19ae723b00b16ae6a75f"
+        },
+        {
+          "key": "cli:change-spec-preview",
+          "filename": "deltas/cli/change-spec-preview/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:1cef395b28fb87b6b97fa5f7325adb8997080badaac79f380146404ad76dd0a0"
+        },
+        {
+          "key": "cli:command-resource-naming",
+          "filename": "deltas/cli/command-resource-naming/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:6800022cc7cc0d059bcd42b69cbfb0e2843e3fad5a04a5fae5f72a82ee01aaf2"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:403f72e1102b859a09c2e9c2a1e57e23c6820a40975176c64d5f92bd17d73eda"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:c6721d7cf2c81617f35659ae6a54864d689d5afde866c7298030768e64718a6d"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-04-28T17:40:18.184Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "specIds": [
+        "skills:workflow-automation",
+        "cli:change-validate",
+        "cli:change-spec-preview",
+        "cli:command-resource-naming"
+      ],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-28T17:40:18.204Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "skills:workflow-automation"
+        },
+        {
+          "type": "specs",
+          "key": "cli:change-validate"
+        },
+        {
+          "type": "specs",
+          "key": "cli:change-spec-preview"
+        },
+        {
+          "type": "specs",
+          "key": "cli:command-resource-naming"
+        },
+        {
+          "type": "verify",
+          "key": "skills:workflow-automation"
+        },
+        {
+          "type": "verify",
+          "key": "cli:change-validate"
+        },
+        {
+          "type": "verify",
+          "key": "cli:change-spec-preview"
+        },
+        {
+          "type": "verify",
+          "key": "cli:command-resource-naming"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-28T20:54:01.974Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-28T20:58:37.535Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-28T20:59:43.811Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-28T21:02:26.845Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-28T21:05:16.258Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-28T21:18:13.474Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-29T05:00:28.797Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-29T05:02:48.252Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-29T07:26:19.965Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: design [design]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-29T07:26:19.965Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-29T08:28:08.833Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-29T08:30:03.055Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-29T10:09:49.819Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:change-validate]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["cli:change-validate"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-29T10:09:49.819Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-29T10:10:26.016Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-29T10:11:42.076Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-29T10:20:05.546Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-29T10:20:37.653Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-29T10:21:00.311Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "description-updated",
+      "at": "2026-04-29T10:36:40.837Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "description": "Align workflow-skill guidance and CLI-facing contracts with the current canonical commands and artifact-focused flags so agents can avoid redundant reads while preserving deterministic safety checks. Clarify that changes validate is structural/state validation only and must not be used as semantic content approval, with explicit review expectations in skills and docs. Reinforce overlap/drift protection by requiring merged-content review patterns (including artifact-filtered preview when targeted) before archiving or accepting spec deltas."
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-29T10:37:17.875Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-04-29T10:37:18.067Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "m***a@g***.com"
+  }
+}

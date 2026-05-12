@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'No new verification scenarios are required while the port contract remains unchanged and the change is confined to how extraction callers use repository-backed resolution.'

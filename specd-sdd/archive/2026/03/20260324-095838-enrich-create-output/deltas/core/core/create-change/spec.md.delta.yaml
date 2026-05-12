@@ -1,0 +1,9 @@
+- op: modified
+  description: 'Add changePath to the return type'
+  selector:
+    type: section
+    matches: 'Requirement: Persistence and scaffolding'
+  content: |
+    After construction, the use case MUST persist the change via `ChangeRepository.save`. After saving, it MUST call `ChangeRepository.scaffold(change, specExists)` to create the artifact directory structure. The `specExists` callback checks the `SpecRepository` map for each spec ID's workspace. Finally, the use case returns an object containing the newly created `Change` instance and the `changePath` (obtained via `ChangeRepository.changePath(change)`).
+
+    The return type is `{ change: Change; changePath: string }`.

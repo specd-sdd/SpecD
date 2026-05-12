@@ -1,0 +1,53 @@
+- op: modified
+  description: 'Replace skipHooks boolean with granular skipHookPhases set'
+  selector:
+    type: section
+    matches: 'Requirement: Input contract'
+  content: |
+    `TransitionChange.execute` SHALL accept a `TransitionChangeInput` with the following fields:
+
+    - `name` (string, required) — the change to transition
+    - `to` (ChangeState, required) — the requested target state
+    - `approvalsSpec` (boolean, required) — whether the spec approval gate is enabled
+    - `approvalsSignoff` (boolean, required) — whether the signoff gate is enabled
+    - `implementingRequires` (readonly string\[], optional) — artifact IDs whose validation is cleared on `verifying` to `implementing`
+    - `implementingTaskChecks` (ReadonlyArray\<TaskCompletionCheck>, optional) — task completion checks for `implementing` to `verifying`
+    - `skipHookPhases` (ReadonlySet\<HookPhaseSelector>, optional, default empty set) — which hook phases to skip. Valid values: `'source.pre'`, `'source.post'`, `'target.pre'`, `'target.post'`, `'all'`. When `'all'` is in the set, all hook phases are skipped. When the set is empty (default), all applicable hooks execute.
+
+    The previous `skipHooks: boolean` field is removed. Callers that passed `skipHooks: true` should pass `skipHookPhases: new Set(['all'])` instead.
+
+- op: modified
+  description: 'Fix post-hook execution: use source state, run before transition, fail-fast'
+  selector:
+    type: section
+    matches: 'Requirement: Post-hook execution'
+  content: |
+    **Before** the state transition (and before pre-hooks), when `'all'` and `'source.post'` are both absent from `skipHookPhases`, the use case MUST look up the workflow step for the **source state** (`fromState`) via `schema.workflowStep(fromState)`. If the step has `run:` post-hooks, the use case MUST execute them via `RunStepHooks.execute({ name, step: fromState, phase: 'post' })`. It MUST emit `hook-start` and `hook-done` progress events (with `phase: 'post'`) for each hook. If any post-hook fails, the use case MUST throw `HookFailedError` — no state transition occurs.
+
+    The source state is the state the change was in **before** the transition — post hooks represent "after finishing this step". This means hooks configured as `implementing.post` run when transitioning **out of** implementing (e.g. `implementing → verifying`), not when transitioning **into** implementing.
+
+    The execution order is: source.post hooks → target.pre hooks → state transition. Both phases are fail-fast — a failure in either aborts the transition.
+
+    If no workflow step exists for the source state, or the schema cannot be resolved, post-hook execution is skipped.
+
+- op: modified
+  description: 'Add skipHookPhases guard to pre-hook execution and clarify ordering'
+  selector:
+    type: section
+    matches: 'Requirement: Pre-hook execution'
+  content: |
+    After source.post hooks succeed (or are skipped), when `'all'` and `'target.pre'` are both absent from `skipHookPhases`, and the target workflow step has `run:` pre-hooks, the use case MUST execute them via `RunStepHooks.execute({ name, step: effectiveTarget, phase: 'pre' })`. It MUST emit `hook-start` and `hook-done` progress events (with `phase: 'pre'`) for each hook. If any pre-hook fails, the use case MUST throw `HookFailedError` — no state transition occurs.
+
+    When `'all'` or `'target.pre'` is in `skipHookPhases`, pre-hook execution is skipped entirely.
+
+- op: modified
+  description: 'Update result type — postHookFailures no longer needed'
+  selector:
+    type: section
+    matches: 'Requirement: Result type'
+  content: |
+    `TransitionChange.execute` MUST return a `TransitionChangeResult` containing:
+
+    - `change` — the updated `Change` instance after the transition
+
+    The previous `postHookFailures` field is removed because both hook phases are now fail-fast — a hook failure throws `HookFailedError` and prevents the transition. There are no post-transition hook failures to collect.

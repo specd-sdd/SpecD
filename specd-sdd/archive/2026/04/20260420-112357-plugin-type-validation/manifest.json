@@ -1,0 +1,362 @@
+{
+  "name": "plugin-type-validation",
+  "createdAt": "2026-04-20T11:23:57.509Z",
+  "description": "Add plugin type validation to plugin-manager. Derive PluginType from PLUGIN_TYPES const array, add isSpecdPlugin and isAgentPlugin type guards to domain, and verify AgentPlugin in use cases before install/uninstall to prevent runtime errors with unknown plugin types.",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "plugin-manager:specd-plugin-type",
+    "plugin-manager:agent-plugin-type",
+    "plugin-manager:install-plugin-use-case",
+    "plugin-manager:uninstall-plugin-use-case",
+    "plugin-manager:update-plugin-use-case",
+    "plugin-manager:plugin-loader"
+  ],
+  "specDependsOn": {
+    "plugin-manager:install-plugin-use-case": [
+      "plugin-manager:agent-plugin-type",
+      "plugin-manager:plugin-loader"
+    ],
+    "plugin-manager:specd-plugin-type": ["default:_global/architecture"],
+    "plugin-manager:plugin-loader": [
+      "plugin-manager:specd-plugin-type",
+      "plugin-manager:plugin-errors"
+    ],
+    "plugin-manager:update-plugin-use-case": [
+      "plugin-manager:agent-plugin-type",
+      "plugin-manager:plugin-loader"
+    ],
+    "plugin-manager:uninstall-plugin-use-case": [
+      "plugin-manager:agent-plugin-type",
+      "plugin-manager:plugin-loader"
+    ],
+    "plugin-manager:agent-plugin-type": ["plugin-manager:specd-plugin-type"]
+  },
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:0942c22654c617d1556cd9baef0b71806db34490975ac7afebe754dc766dc7b8"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "plugin-manager:specd-plugin-type",
+          "filename": "deltas/plugin-manager/specd-plugin-type/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:f875092cca3a87a9ab0ee045a39a9a06b8a24a5f409bd834494bc254b66a7620"
+        },
+        {
+          "key": "plugin-manager:agent-plugin-type",
+          "filename": "deltas/plugin-manager/agent-plugin-type/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:ccabe380b4451c323fb3066d28bd7c6f70560184a0c3a8eeafa607e065ed64cb"
+        },
+        {
+          "key": "plugin-manager:install-plugin-use-case",
+          "filename": "deltas/plugin-manager/install-plugin-use-case/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:34053313468cabe15ecf129e21442186b6b82fff6c62c5dd792fd866d107609f"
+        },
+        {
+          "key": "plugin-manager:uninstall-plugin-use-case",
+          "filename": "deltas/plugin-manager/uninstall-plugin-use-case/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:92004596edeb06a242d454ce7ca0a91cd10948044982080723525ce4aed61c80"
+        },
+        {
+          "key": "plugin-manager:update-plugin-use-case",
+          "filename": "deltas/plugin-manager/update-plugin-use-case/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:ceb128f22596f6de6d12faac69858fed1ddfa2dca261fab9c1805fec8cfb86bc"
+        },
+        {
+          "key": "plugin-manager:plugin-loader",
+          "filename": "deltas/plugin-manager/plugin-loader/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:19525e530cfa507cbe71e63ff69bacb224aef6c2ff085ead9470340ef63c8dcb"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "plugin-manager:specd-plugin-type",
+          "filename": "deltas/plugin-manager/specd-plugin-type/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:a96e19a122cf846dea93aa71f0e631c1eb6e013d36d145bbbcaa3911e237cc0c"
+        },
+        {
+          "key": "plugin-manager:agent-plugin-type",
+          "filename": "deltas/plugin-manager/agent-plugin-type/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:c0b7ec495287dd0c1fb81cb197be520c5efebef4a79e60ed2b6ef1a5f806515b"
+        },
+        {
+          "key": "plugin-manager:install-plugin-use-case",
+          "filename": "deltas/plugin-manager/install-plugin-use-case/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:ad308051c124bb9d188b1ea6390349b453dbf581706ffedd669d0c98c83a07cc"
+        },
+        {
+          "key": "plugin-manager:uninstall-plugin-use-case",
+          "filename": "deltas/plugin-manager/uninstall-plugin-use-case/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:59736779dab59d9be278dfb7979cec9a0f917f8f5f55a12e8d41d129f94918ad"
+        },
+        {
+          "key": "plugin-manager:update-plugin-use-case",
+          "filename": "deltas/plugin-manager/update-plugin-use-case/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:62e02497a119bc15da7ac526de4352d3ca2686747cf3eb77c275771e7159ed3d"
+        },
+        {
+          "key": "plugin-manager:plugin-loader",
+          "filename": "deltas/plugin-manager/plugin-loader/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:72eb77daf52351c76bef6222fb09643338578b7f1d61a09f04acbce8328a763a"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:c0e143a97b13d759c4deab8ff2247c38bdbf0757c4a55686c663bd344cfae5bd"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:b0434f8895b03043e40aa8c8657988505de8c6159b8d1a9f9196d50e8f867b42"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-04-20T11:23:57.509Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "specIds": [
+        "plugin-manager:specd-plugin-type",
+        "plugin-manager:agent-plugin-type",
+        "plugin-manager:install-plugin-use-case",
+        "plugin-manager:uninstall-plugin-use-case",
+        "plugin-manager:update-plugin-use-case",
+        "plugin-manager:plugin-loader"
+      ],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-20T11:23:57.521Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-manager:specd-plugin-type"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-manager:agent-plugin-type"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-manager:install-plugin-use-case"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-manager:uninstall-plugin-use-case"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-manager:update-plugin-use-case"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-manager:plugin-loader"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:specd-plugin-type"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:agent-plugin-type"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:install-plugin-use-case"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:uninstall-plugin-use-case"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:update-plugin-use-case"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:plugin-loader"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-20T11:29:34.109Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-20T13:20:25.434Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-20T13:21:23.874Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-20T13:25:03.171Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-20T13:51:09.614Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-20T13:53:35.877Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-20T13:54:14.716Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "description-updated",
+      "at": "2026-04-20T15:19:00.437Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "description": "Add plugin type validation to plugin-manager. Derive PluginType from PLUGIN_TYPES const array, add isSpecdPlugin and isAgentPlugin type guards to domain, and verify AgentPlugin in use cases before install/uninstall to prevent runtime errors with unknown plugin types."
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-20T15:19:11.901Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-04-20T15:19:12.115Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "m***a@g***.com"
+  }
+}

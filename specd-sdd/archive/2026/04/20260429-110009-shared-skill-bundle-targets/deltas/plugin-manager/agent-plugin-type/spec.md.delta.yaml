@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'The shared target is resolved inside each agent plugin from its existing install root, so AgentInstallOptions and AgentInstallResult do not need new fields.'

@@ -1,0 +1,16 @@
+- op: modified
+  selector:
+    type: section
+    matches: '^Requirement: Delta application$'
+  content: |
+    Delta entries are applied in declaration order after all selectors are validated. For each entry:
+
+    - `modified`: replace the targeted node body (`content`) and/or rename the identifying field (`rename`)
+    - `removed`: remove the targeted node
+    - `added`: insert new node(s) according to `position` semantics
+
+    `apply` first resolves selectors against the original AST to guarantee atomicity. If any selector is invalid or ambiguous, `apply` fails with `DeltaApplicationError` and applies nothing.
+
+    During `modified` operations on markdown artifacts, replacing node body content must not destroy inline formatting metadata for unaffected sibling/ancestor nodes. Implementations must preserve representable inline structure so serialization does not strip backticks or rewrite emphasis/strong markers in untouched nodes.
+
+    For markdown serialization after delta apply, list/emphasis/strong marker output should track source style when unambiguous. If the source is mixed/ambiguous for a construct, the serializer must choose deterministic project markdown conventions.

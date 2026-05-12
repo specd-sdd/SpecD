@@ -1,0 +1,41 @@
+- op: modified
+  description: 'Update Load workflow and factory function requirements to use SpecdConfig'
+  selector:
+    type: section
+    matches: 'Requirement: Load workflow'
+  content: |
+    The loader MUST:
+
+    1. **Package availability**: The package must be in node_modules (installed via npm/pnpm or linked as workspace)
+    2. **Resolve path**: Use `import.meta.resolve()` or `require.resolve()` to get package path
+    3. **Read manifest**: Read `specd-plugin.json` from the package root
+    4. **Validate manifest**: Validate with Zod schema (including `version` field)
+    5. **Dynamic import**: `import(name)` as ESM module
+    6. **Factory call**: Call `create()` factory function, passing the loader options
+    7. **Validate interface**: Use `isSpecdPlugin` and `isAgentPlugin` from the domain layer to validate the returned object
+
+- op: modified
+  description: 'Update Factory function to accept SpecdConfig'
+  selector:
+    type: section
+    matches: 'Requirement: Factory function'
+  content: |
+    The npm package MUST export `create(options: PluginLoaderOptions): SpecdPlugin` as default or named export.
+
+    The `PluginLoaderOptions` SHALL contain the fully-resolved `SpecdConfig`:
+
+    ```typescript
+    interface PluginLoaderOptions {
+      readonly config: SpecdConfig
+    }
+    ```
+
+- op: modified
+  description: 'Add core:core/config dependency'
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`core:core/config`](../../core/core/config/spec.md) — defines SpecdConfig type
+    - [`plugin-manager:specd-plugin-type`](../specd-plugin-type/spec.md) — plugin type
+    - [`plugin-manager:plugin-errors`](../plugin-errors/spec.md) — error classes

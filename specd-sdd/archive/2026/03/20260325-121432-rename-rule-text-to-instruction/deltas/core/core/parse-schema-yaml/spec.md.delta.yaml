@@ -1,0 +1,10 @@
+- op: modified
+  description: "Rename 'text' to 'instruction' in rules Zod validation"
+  selector:
+    type: list-item
+    matches: 'rules.*on artifacts'
+    parent:
+      type: section
+      matches: 'Requirement: Zod structural validation'
+  content: |
+    `rules` on artifacts is an optional object with `pre` and `post` arrays of `{ id, instruction }`

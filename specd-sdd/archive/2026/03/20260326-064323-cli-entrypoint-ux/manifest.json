@@ -1,0 +1,358 @@
+{
+  "name": "cli-entrypoint-ux",
+  "createdAt": "2026-03-26T06:43:23.936Z",
+  "description": "Global --config flag, remove --hide-banner, banner in help, improve command descriptions, rename project overview to dashboard, auto-show dashboard on bare invocation",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": ["cli:cli/entrypoint", "cli:cli/project-overview", "core:core/config-loader"],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "validatedHash": "sha256:7b6e7d793a2db1bf3af9d39dc1b0a369dc56c0d9d39dd48c66ac01e0ba34a70b"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "files": [
+        {
+          "key": "cli:cli/entrypoint",
+          "filename": "deltas/cli/cli/entrypoint/spec.md.delta.yaml",
+          "validatedHash": "sha256:566f3a8cd43eee19a184e4560f2fbe00f1cd7080ca2e4f2f81f3cf5d8ed351a5"
+        },
+        {
+          "key": "cli:cli/project-overview",
+          "filename": "deltas/cli/cli/project-overview/spec.md.delta.yaml",
+          "validatedHash": "sha256:25d68781a4d91222cf2581935410004bb25fef9ef6144b7b50c63d292991ea64"
+        },
+        {
+          "key": "core:core/config-loader",
+          "filename": "deltas/core/core/config-loader/spec.md.delta.yaml",
+          "validatedHash": "sha256:be51b5f531695a1e20a5f7882ee108872c1409c36a9e29c0785d9422c98cfc9d"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "files": [
+        {
+          "key": "cli:cli/entrypoint",
+          "filename": "deltas/cli/cli/entrypoint/verify.md.delta.yaml",
+          "validatedHash": "sha256:fdceaa754c854aa1db237d83b661c81c0aa1f7c7511a60c6a6f5a26189b90446"
+        },
+        {
+          "key": "cli:cli/project-overview",
+          "filename": "deltas/cli/cli/project-overview/verify.md.delta.yaml",
+          "validatedHash": "sha256:052ce8938986f02989594e0007fdb6f0834200a10ea1e7b983b88075f3804047"
+        },
+        {
+          "key": "core:core/config-loader",
+          "filename": "deltas/core/core/config-loader/verify.md.delta.yaml",
+          "validatedHash": "sha256:e1d6312e866489c0bd29d3283d09b6391f8fcbda01ca1a9f0203fe087f01fd89"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "validatedHash": "sha256:fac1a2e98feaac9e4243cddd072fe959a1be73ff2adaf3cddabecf7c143ba022"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "validatedHash": "sha256:6d0362bdca7a350b8d8f270bdf0249e1a0060bbc27397b46b4e686eab6ef0331"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-03-26T06:43:23.936Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "specIds": ["cli:cli/entrypoint", "cli:cli/project-overview"],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-03-26T06:43:23.945Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "cli:cli/entrypoint"
+        },
+        {
+          "type": "specs",
+          "key": "cli:cli/project-overview"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/entrypoint"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/project-overview"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-26T06:44:09.062Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-26T06:56:49.501Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-03-26T08:51:42.472Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-change"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-26T08:51:42.472Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-03-26T08:51:42.494Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change"
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-03-26T08:51:42.494Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:core/config-loader"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/config-loader"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-26T08:55:19.579Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-26T08:55:27.418Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-03-26T09:07:22.470Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-change"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-26T09:07:22.470Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-26T09:17:35.504Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-26T09:17:44.354Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-03-26T09:53:59.456Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-change"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-26T09:53:59.456Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-26T09:54:34.660Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-26T09:54:35.623Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-26T10:09:32.716Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-26T10:16:10.282Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-26T10:16:37.001Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-26T10:20:36.050Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-03-26T10:20:36.150Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "m***a@g***.com"
+  }
+}

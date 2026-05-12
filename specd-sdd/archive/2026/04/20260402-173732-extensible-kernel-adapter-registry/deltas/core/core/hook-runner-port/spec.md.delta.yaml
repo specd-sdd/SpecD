@@ -1,0 +1,15 @@
+- op: added
+  description: 'Keep HookRunner limited to shell run hooks'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Hook type distinction$'
+  content: |
+    ### Requirement: HookRunner is shell-only
+
+    `HookRunner` SHALL remain the internal shell runner for built-in `run:` hooks only. It MUST NOT become the contract for externally dispatched hook backends.
+
+    External hooks use a separate runner abstraction with its own dispatch rules and accepted-type declaration.

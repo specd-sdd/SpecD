@@ -1,0 +1,28 @@
+- op: modified
+  description: 'Update the selection scenario'
+  selector:
+    type: section
+    matches: 'Scenario: Git repository detected'
+  content: |
+    - **GIVEN** `actorProvider: "git"` is configured
+    - **AND** the environment has an `hg` repository
+    - **WHEN** `createVcsActorResolver()` is called
+    - **THEN** it returns the `git` resolver without probing for `hg`
+
+- op: added
+  description: 'Add privacy wrapping requirement and scenario'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Returns the ActorResolver port interface'
+  content: |
+    ### Requirement: Privacy wrapping
+
+    #### Scenario: Privacy wrapping applied at kernel level
+
+    - **GIVEN** `privacy.mode` is `mask`
+    - **WHEN** the kernel is constructed with a privacy config
+    - **THEN** the actor resolver exposed by `kernel-internals` is a `PrivacyActorResolver` wrapping the detected base resolver

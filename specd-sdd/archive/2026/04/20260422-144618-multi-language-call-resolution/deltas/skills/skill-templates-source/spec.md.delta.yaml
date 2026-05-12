@@ -1,0 +1,31 @@
+- op: added
+  description: 'Require bundled workflow skills to use clear graph impact direction wording.'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Template migration'
+  content: |
+    ### Requirement: Graph impact terminology in workflow templates
+
+    Workflow skill templates that instruct agents to run `specd graph impact` SHALL use clear user-facing terminology for impact direction:
+
+    - **dependents** — symbols and files that depend on the target; implemented by `--direction dependents`, with `--direction upstream` as a compatibility value
+    - **dependencies** — symbols and files the target depends on; implemented by `--direction dependencies`, with `--direction downstream` as a compatibility value
+    - **both** — combined dependents and dependencies analysis; implemented by `--direction both`
+
+    Templates MUST NOT ask for "downstream dependents" or otherwise describe `downstream` as dependents. When a skill needs the blast radius of changing a symbol or file, it SHALL use `--direction dependents` or describe the query as dependents.
+
+- op: modified
+  description: 'Add graph-impact terminology to template constraints.'
+  selector:
+    type: section
+    matches: 'Constraints'
+  content: |
+    - Templates in skills package MUST NOT contain frontmatter YAML.
+    - Each agent plugin is responsible for storing and injecting its own frontmatter.
+    - Agent plugins MUST model the full supported frontmatter field set for their target runtime.
+    - Agent plugins MUST NOT emit fields unsupported by their target runtime.
+    - Workflow templates MUST use dependents/dependencies wording for graph impact guidance and MUST prefer `--direction dependents` / `--direction dependencies`; `upstream` / `downstream` may appear only as compatibility values.

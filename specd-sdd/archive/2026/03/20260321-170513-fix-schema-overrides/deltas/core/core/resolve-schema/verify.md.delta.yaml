@@ -1,0 +1,21 @@
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Resolution pipeline'
+    after:
+      type: section
+      matches: 'Scenario: Base schema with overrides'
+  content: |
+    #### Scenario: Override workflow hooks are normalized from YAML format
+
+    - **GIVEN** a base schema with workflow step `implementing` and `schemaOverrides` appending a hook `{ id: 'test', run: 'echo ok' }` in YAML format
+    - **WHEN** `execute()` is called
+    - **THEN** the resolved schema's `implementing` workflow step contains a hook with `{ id: 'test', type: 'run', command: 'echo ok' }`
+    - **AND** the hook is usable by `RunStepHooks` (matches `h.type === 'run'`)
+
+    #### Scenario: Override instruction hooks are normalized
+
+    - **GIVEN** `schemaOverrides` appending a hook `{ id: 'guide', instruction: 'Do X' }` in YAML format
+    - **WHEN** `execute()` is called
+    - **THEN** the resolved schema contains a hook with `{ id: 'guide', type: 'instruction', text: 'Do X' }`

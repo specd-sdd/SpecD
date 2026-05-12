@@ -1,0 +1,35 @@
+- op: modified
+  description: 'Verify change status shows artifact/file state and review summary.'
+  selector:
+    type: section
+    matches: '^Requirement: Output format$'
+  content: |
+    #### Scenario: Text output shows artifact and file state
+
+    - **GIVEN** a change with artifact `specs` in `pending-review`
+    - **AND** one file under `specs` is `drifted-pending-review`
+    - **WHEN** `specd change status <name>` is run
+    - **THEN** stdout shows the artifact aggregate state
+    - **AND** it lists the individual file row with `drifted-pending-review`
+
+    #### Scenario: Text output shows review section when review is required
+
+    - **GIVEN** `GetStatus` returns `review.required: true`
+    - **WHEN** `specd change status <name>` is run in text mode
+    - **THEN** stdout includes a `review:` section
+    - **AND** it shows the route, reason, and affected absolute file paths
+
+    #### Scenario: JSON output includes review and file state
+
+    - **GIVEN** a change in `designing`
+    - **WHEN** `specd change status <name> --format json` is run
+    - **THEN** stdout includes `artifacts[].state`
+    - **AND** each artifact includes `files[].state`
+    - **AND** the top-level payload includes `review`
+    - **AND** `review.affectedArtifacts[].files[]` includes `filename` and `path`
+
+    #### Scenario: Review section omitted when not required
+
+    - **GIVEN** `GetStatus` returns `review.required: false`
+    - **WHEN** `specd change status <name>` is run in text mode
+    - **THEN** stdout omits the `review:` section

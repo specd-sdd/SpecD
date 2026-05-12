@@ -1,0 +1,29 @@
+# Delta: cli:change-artifact-instruction (Verification)
+
+- op: added
+  description: 'Add missing delegation verification.'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: Delegates to GetArtifactInstruction
+
+    #### Scenario: CLI delegates directly to the use case
+
+    - **WHEN** `specd change artifact-instruction add-auth specs` is run
+    - **THEN** the command delegates instruction resolution to `GetArtifactInstruction`
+
+- op: added
+  description: 'Extend the existing command-signature requirement with omitted-artifact auto-resolution coverage.'
+  position:
+    after:
+      type: section
+      matches: 'Requirement: Command signature'
+  content: |
+    #### Scenario: Omitted artifact-id uses use-case-selected artifact
+
+    - **GIVEN** `GetArtifactInstruction` auto-resolves `specs` as the next artifact
+    - **WHEN** `specd change artifact-instruction add-auth` is run without an explicit artifact ID
+    - **THEN** the returned instruction block is for `specs`
+    - **AND** the CLI does not walk artifact dependencies on its own

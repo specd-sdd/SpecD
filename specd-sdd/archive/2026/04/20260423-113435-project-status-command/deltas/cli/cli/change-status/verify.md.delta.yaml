@@ -1,0 +1,38 @@
+- op: added
+  description: 'Add verify scenarios for Schema-derived fields and Approval gates'
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Change not found'
+    last: true
+  content: |
+    ### Requirement: Schema-derived fields
+
+    #### Scenario: JSON output includes artifactDag
+
+    - **GIVEN** a change using schema-std
+    - **WHEN** `specd change status <name> --format json` is run
+    - **THEN** the JSON output includes `schema.artifactDag` array
+    - **AND** each entry includes id, scope, optional, requires, hasTaskCompletionCheck, output
+
+    #### Scenario: JSON output for non-schema-std also includes artifactDag
+
+    - **GIVEN** a change using a custom schema
+    - **WHEN** `specd change status <name> --format json` is run
+    - **THEN** the JSON output includes `schema.artifactDag` array
+
+    ### Requirement: Approval gates in output
+
+    #### Scenario: JSON output includes approvalGates
+
+    - **GIVEN** a change where spec approval is required
+    - **WHEN** `specd change status <name> --format json` is run
+    - **THEN** the JSON output includes `approvalGates.specEnabled: true`
+    - **AND** `approvalGates.signoffEnabled` reflects the configuration
+
+    #### Scenario: JSON output when approvals are disabled
+
+    - **GIVEN** a change where no approvals are required
+    - **WHEN** `specd change status <name> --format json` is run
+    - **THEN** the JSON output includes `approvalGates.specEnabled: false`
+    - **AND** `approvalGates.signoffEnabled: false`

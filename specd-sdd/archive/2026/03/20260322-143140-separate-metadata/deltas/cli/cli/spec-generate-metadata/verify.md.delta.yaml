@@ -1,0 +1,11 @@
+- op: modified
+  description: 'Update write mode scenario output message'
+  selector:
+    type: section
+    matches: 'Requirement: Write mode'
+  content: |
+    #### Scenario: Write persists metadata and confirms
+
+    - **WHEN** `specd spec generate-metadata auth/login --write` is invoked
+    - **THEN** `SaveSpecMetadata` is called with the generated YAML content
+    - **AND** stdout contains `wrote metadata for default:auth/login`

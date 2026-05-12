@@ -1,0 +1,395 @@
+{
+  "name": "fix-delta-apply-bugs",
+  "createdAt": "2026-04-23T13:28:43.759Z",
+  "description": "Fix two bugs in delta application: (1) last: true position hint not implemented, (2) only first child from multi-section content is added",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": ["core:core/artifact-ast", "core:core/artifact-parser-port", "core:core/delta-format"],
+  "specDependsOn": {
+    "core:core/delta-format": [
+      "core:core/artifact-ast",
+      "core:core/selector-model",
+      "core:core/schema-format"
+    ]
+  },
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:e7d66a144d863f5deff0d35cfe960d0819a5d8be0a05fc32289c8fbb07880aab"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:core/artifact-ast",
+          "filename": "deltas/core/core/artifact-ast/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:70b8855cc911417cf889824e7c72e7af4ea55d73bf4f7dcdf5c1ad2bad3bb627"
+        },
+        {
+          "key": "core:core/artifact-parser-port",
+          "filename": "deltas/core/core/artifact-parser-port/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:0997687912588d3e964f6031d160a764b8bf301c33ea06ce7f85f41fe318919e"
+        },
+        {
+          "key": "core:core/delta-format",
+          "filename": "deltas/core/core/delta-format/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:c8c49b7ff83e1fb248c515582b034d114a361d83b78c59ea00be7698b50b37a7"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:core/artifact-ast",
+          "filename": "deltas/core/core/artifact-ast/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:d38100c8f23065a814428f84e287c88963ec642c798108a3b497a7c6d39de413"
+        },
+        {
+          "key": "core:core/artifact-parser-port",
+          "filename": "deltas/core/core/artifact-parser-port/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:36ad927eb045cc763d2c34253bfb5d6b699ede75a1a9ddd2a0f1194de77a3fac"
+        },
+        {
+          "key": "core:core/delta-format",
+          "filename": "deltas/core/core/delta-format/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:217c3672ed952cfb75076642efeb2cbac1e0dac51ea0b23e9be6e0e839439984"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:ce98ba6be011cb492d5d9507696639d256d2712ed65681278b8fb636a017648f"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:32cfc5ac6509a0da97eed3fe51a29a49ea7b7f881b5e9f00cb05df5fa952f177"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-04-23T13:28:43.759Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "specIds": ["core:core/artifact-ast", "core:core/artifact-parser-port"],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-23T13:28:43.768Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/artifact-ast"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/artifact-parser-port"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/artifact-ast"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/artifact-parser-port"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-23T13:30:17.799Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-23T13:50:17.722Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-23T13:52:23.178Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-23T13:53:19.714Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["core:core/artifact-ast", "core:core/artifact-parser-port"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:core/artifact-ast", "core:core/artifact-parser-port"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-23T13:53:19.714Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:core/delta-format"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/delta-format"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-23T14:08:22.593Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [core:core/delta-format]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:core/delta-format"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-23T14:11:15.276Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: verify [core:core/delta-format]",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": ["core:core/delta-format"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-23T14:13:00.361Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-23T14:14:12.441Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: verify [core:core/delta-format]",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": ["core:core/delta-format"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-23T14:14:12.441Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-23T14:18:12.792Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-23T14:18:47.152Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-23T15:11:57.175Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-23T15:12:43.535Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-23T15:14:20.860Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-23T15:15:35.827Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-04-23T15:15:35.961Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "m***a@g***.com"
+  }
+}

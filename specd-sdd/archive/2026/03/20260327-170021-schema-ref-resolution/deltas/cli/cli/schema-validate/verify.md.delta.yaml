@@ -1,0 +1,147 @@
+- op: modified
+  description: 'Add [ref] scenario to command signature'
+  selector:
+    type: section
+    matches: 'Requirement: Command signature'
+  content: |
+    #### Scenario: No flags defaults to project resolved mode
+
+    - **WHEN** the user runs `specd schema validate` without `[ref]`, `--file`, or `--raw`
+    - **THEN** the command validates the project's fully-resolved schema
+
+    #### Scenario: --raw triggers project raw mode
+
+    - **WHEN** the user runs `specd schema validate --raw`
+    - **THEN** the command validates only the base schema without plugins or overrides
+
+    #### Scenario: --file triggers file mode
+
+    - **WHEN** the user runs `specd schema validate --file ./my-schema.yaml`
+    - **THEN** the command validates the specified file with extends resolution
+
+    #### Scenario: [ref] triggers ref mode
+
+    - **WHEN** the user runs `specd schema validate @specd/schema-std`
+    - **THEN** the command validates the referenced schema with extends resolution
+
+- op: added
+  description: 'Add ref mode scenarios'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: File mode'
+  content: |
+    ### Requirement: Ref mode
+
+    #### Scenario: Valid schema resolved by ref
+
+    - **GIVEN** `@specd/schema-std` is installed as an npm package
+    - **WHEN** the user runs `specd schema validate @specd/schema-std`
+    - **THEN** exit code is 0
+    - **AND** output contains `[ref]` suffix
+
+    #### Scenario: Ref with extends resolves chain
+
+    - **GIVEN** a workspace schema `#default:my-schema` that declares `extends: @specd/schema-std`
+    - **WHEN** the user runs `specd schema validate '#default:my-schema'`
+    - **THEN** the extends chain is resolved
+    - **AND** exit code is 0
+
+    #### Scenario: Ref with invalid schema content
+
+    - **GIVEN** a workspace schema with an invalid artifact ID
+    - **WHEN** the user runs `specd schema validate '#default:bad-schema'`
+    - **THEN** exit code is 1
+    - **AND** the error mentions the invalid artifact ID
+
+- op: modified
+  description: 'Add ref mode success text scenario'
+  selector:
+    type: section
+    matches: 'Requirement: Text output — success'
+  content: |
+    #### Scenario: Project resolved mode success text
+
+    - **WHEN** project resolved validation succeeds with schema `my-schema` v1 with 3 artifacts and 2 workflow steps
+    - **THEN** stdout contains `schema valid: my-schema v1 (3 artifacts, 2 workflow steps)`
+
+    #### Scenario: Project raw mode success text
+
+    - **WHEN** project raw validation succeeds
+    - **THEN** stdout contains `[raw]` suffix
+
+    #### Scenario: File mode success text
+
+    - **WHEN** file mode validation succeeds
+    - **THEN** stdout contains `[file]` suffix
+
+    #### Scenario: Ref mode success text
+
+    - **WHEN** ref mode validation succeeds
+    - **THEN** stdout contains `[ref]` suffix
+
+- op: modified
+  description: 'Add ref mode to JSON output scenario'
+  selector:
+    type: section
+    matches: 'Requirement: JSON output'
+  content: |
+    #### Scenario: JSON success contains expected keys
+
+    - **WHEN** the user runs `specd schema validate --format json` and validation succeeds
+    - **THEN** the JSON output contains `result`, `schema`, `artifacts`, `workflowSteps`, `mode`, and `warnings`
+
+    #### Scenario: JSON failure contains error details
+
+    - **WHEN** the user runs `specd schema validate --format json` and validation fails
+    - **THEN** the JSON output contains `result: "error"`, `errors`, `warnings`, and `mode`
+
+    #### Scenario: JSON ref mode includes mode ref
+
+    - **WHEN** the user runs `specd schema validate @specd/schema-std --format json` and validation succeeds
+    - **THEN** the JSON output contains `"mode": "ref"`
+
+- op: added
+  description: 'Add ref not found scenario'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Error — file not found'
+  content: |
+    ### Requirement: Error — ref not found
+
+    #### Scenario: [ref] with nonexistent schema
+
+    - **WHEN** the user runs `specd schema validate @nonexistent/schema`
+    - **THEN** the error mentions the reference
+    - **AND** exit code is 1
+
+- op: modified
+  description: 'Expand mutual exclusivity scenarios for [ref]'
+  selector:
+    type: section
+    matches: 'Requirement: Mutually exclusive flags'
+  content: |
+    #### Scenario: --file and --raw together
+
+    - **WHEN** the user runs `specd schema validate --file ./schema.yaml --raw`
+    - **THEN** stderr contains `--file and --raw are mutually exclusive`
+    - **AND** exit code is 1
+
+    #### Scenario: [ref] and --file together
+
+    - **WHEN** the user runs `specd schema validate @specd/schema-std --file ./schema.yaml`
+    - **THEN** stderr contains `[ref] and --file are mutually exclusive`
+    - **AND** exit code is 1
+
+    #### Scenario: [ref] and --raw together
+
+    - **WHEN** the user runs `specd schema validate @specd/schema-std --raw`
+    - **THEN** stderr contains `[ref] and --raw are mutually exclusive`
+    - **AND** exit code is 1

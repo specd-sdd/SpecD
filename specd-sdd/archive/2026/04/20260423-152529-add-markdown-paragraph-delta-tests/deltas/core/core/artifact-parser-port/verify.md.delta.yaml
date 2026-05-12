@@ -1,0 +1,146 @@
+- op: modified
+  description: 'Update Apply contract scenarios for DeltaApplicationResult return type.'
+  selector:
+    type: section
+    matches: 'Requirement: Apply contract — atomic selector resolution'
+  content: |
+    #### Scenario: All selectors resolve successfully
+
+    - **GIVEN** a valid AST and delta entries whose selectors all match exactly one node
+    - **WHEN** `apply` is called
+    - **THEN** it returns a `DeltaApplicationResult` whose `ast` has all operations applied
+    - **AND** `warnings` is empty when no semantic issues are detected
+
+    #### Scenario: One selector fails to resolve
+
+    - **GIVEN** a valid AST and delta entries where one selector matches no node
+    - **WHEN** `apply` is called
+    - **THEN** it throws a `DeltaApplicationError` and no changes are applied
+
+    #### Scenario: Ambiguous selector match
+
+    - **GIVEN** a valid AST and a delta entry whose selector matches multiple nodes
+    - **WHEN** `apply` is called
+    - **THEN** it throws a `DeltaApplicationError`
+
+- op: added
+  description: 'Add verify scenarios for Node nature descriptors and Operation semantic validation.'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: NodeTypes contract'
+  content: |
+    ### Requirement: Node nature descriptors
+
+    #### Scenario: Markdown nodeTypes include nature flags
+
+    - **WHEN** `nodeTypes()` is called on the markdown adapter
+    - **THEN** each `NodeTypeDescriptor` includes `isCollection`, `isSequence`, `isSequenceItem`, `isContainer`, and `isLeaf` flags
+    - **AND** `document` has `isCollection: false, isSequence: false, isSequenceItem: false, isContainer: true, isLeaf: false`
+    - **AND** `section` has `isCollection: false, isSequence: false, isSequenceItem: false, isContainer: true, isLeaf: false`
+    - **AND** `paragraph` has `isCollection: false, isSequence: false, isSequenceItem: false, isContainer: false, isLeaf: true`
+    - **AND** `list` has `isCollection: true, isSequence: true, isSequenceItem: false, isContainer: true, isLeaf: false`
+    - **AND** `list-item` has `isCollection: false, isSequence: false, isSequenceItem: true, isContainer: true, isLeaf: false`
+    - **AND** `code-block` has `isCollection: false, isSequence: false, isSequenceItem: false, isContainer: false, isLeaf: true`
+    - **AND** `thematic-break` has `isCollection: false, isSequence: false, isSequenceItem: false, isContainer: false, isLeaf: false`
+
+    #### Scenario: JSON nodeTypes include nature flags
+
+    - **WHEN** `nodeTypes()` is called on the JSON adapter
+    - **THEN** `document` has `isCollection: false, isSequence: false, isContainer: true, isLeaf: false`
+    - **AND** `object` has `isCollection: true, isSequence: false, isContainer: true, isLeaf: false`
+    - **AND** `property` has `isCollection: false, isSequence: false, isContainer: true, isLeaf: true` (identifiedBy includes "matches", so has label)
+    - **AND** `array` has `isCollection: true, isSequence: true, isContainer: true, isLeaf: false`
+    - **AND** `array-item` has `isCollection: false, isSequence: false, isSequenceItem: true, isContainer: true, isLeaf: true`
+
+    #### Scenario: YAML nodeTypes include nature flags
+
+    - **WHEN** `nodeTypes()` is called on the YAML adapter
+    - **THEN** `document` has `isCollection: false, isSequence: false, isContainer: true, isLeaf: false`
+    - **AND** `mapping` has `isCollection: true, isSequence: false, isContainer: true, isLeaf: false`
+    - **AND** `pair` has `isCollection: false, isSequence: false, isContainer: true, isLeaf: true` (identifiedBy includes "matches", so has label)
+    - **AND** `sequence` has `isCollection: true, isSequence: true, isContainer: true, isLeaf: false`
+    - **AND** `sequence-item` has `isCollection: false, isSequence: false, isSequenceItem: true, isContainer: true, isLeaf: true`
+
+    #### Scenario: Plaintext nodeTypes include nature flags
+
+    - **WHEN** `nodeTypes()` is called on the plaintext adapter
+    - **THEN** `document` has `isCollection: false, isSequence: false, isContainer: true, isLeaf: false`
+    - **AND** `paragraph` has `isCollection: true, isSequence: false, isContainer: false, isLeaf: false`
+    - **AND** `line` has `isCollection: false, isSequence: false, isContainer: false, isLeaf: true`
+
+    #### Scenario: No hardcoded type vectors in applyDelta
+
+    - **WHEN** the source of `applyDelta` is inspected
+    - **THEN** there are no hardcoded arrays of type names like `['array', 'sequence', 'list']` or `['array-item', 'sequence-item', 'list-item']`
+    - **AND** all collection-aware logic uses descriptor flag lookups (`isSequence`, `isSequenceItem`, `isCollection`)
+
+    ### Requirement: Operation semantic validation
+
+    #### Scenario: content on pure leaf node is rejected with suggestion
+
+    - **GIVEN** a markdown document with a `paragraph` node (isContainer: false, isLeaf: true, identifiedBy: ["contains"])
+    - **AND** a delta entry with `op: modified`, selector targeting the paragraph, and `content: "text"`
+    - **WHEN** `apply` is called
+    - **THEN** it throws `DeltaApplicationError` with message containing "use value"
+
+    #### Scenario: content on container-without-label is accepted
+
+    - **GIVEN** a JSON document with an `object` node (isContainer: true, isLeaf: false, hasLabel: false)
+    - **AND** a delta entry with `op: modified`, selector targeting the object, and `content: '{"new": true}'`
+    - **WHEN** `apply` is called
+    - **THEN** the operation succeeds
+
+    #### Scenario: value on non-sequence container without strategy is rejected
+
+    - **GIVEN** a markdown document with a `section` node (isContainer: true, isLeaf: false, isSequence: false)
+    - **AND** a delta entry with `op: modified`, selector targeting the section, and `value: "text"`
+    - **WHEN** `apply` is called
+    - **THEN** it throws `DeltaApplicationError` with message containing "use content"
+
+    #### Scenario: value on sequence node is accepted without explicit strategy
+
+    - **GIVEN** a JSON document with an `array` node (isSequence: true)
+    - **AND** a delta entry with `op: modified`, selector targeting the array, and `value: [1,2]`
+    - **WHEN** `apply` is called
+    - **THEN** the operation succeeds (default strategy is replace)
+
+    #### Scenario: rename on node without label is rejected
+
+    - **GIVEN** a markdown document with a `list` node (hasLabel: false, identifiedBy: [])
+    - **AND** a delta entry with `op: modified`, selector targeting the list, and `rename: "new name"`
+    - **WHEN** `apply` is called
+    - **THEN** it throws `DeltaApplicationError` with message "this node has no identifying property to rename"
+
+    #### Scenario: content on hybrid node emits warning
+
+    - **GIVEN** a JSON document with a `property` node (isContainer: true, isLeaf: true)
+    - **AND** a delta entry with `op: modified`, selector targeting the property, and `content: '{"v":2}'`
+    - **WHEN** `apply` is called
+    - **THEN** it returns a `DeltaApplicationResult` with the AST modified
+    - **AND** `warnings` contains a message about the node accepting both content and value
+
+    #### Scenario: value on hybrid node emits warning
+
+    - **GIVEN** a YAML document with a `pair` node (isContainer: true, isLeaf: true)
+    - **AND** a delta entry with `op: modified`, selector targeting the pair, and `value: "new value"`
+    - **WHEN** `apply` is called
+    - **THEN** it returns a `DeltaApplicationResult` with the AST modified
+    - **AND** `warnings` contains a message about the node accepting both content and value
+
+    #### Scenario: content on thematic-break is rejected
+
+    - **GIVEN** a markdown document with a `thematic-break` node (isContainer: false, isLeaf: false, hasLabel: false)
+    - **AND** a delta entry with `op: modified`, selector targeting the thematic-break, and `content: "---"`
+    - **WHEN** `apply` is called
+    - **THEN** it throws `DeltaApplicationError` indicating this node type cannot be modified
+
+    #### Scenario: operation semantic validation happens in Phase 1 before any application
+
+    - **GIVEN** a delta with multiple entries, where the second entry has an invalid operation for its target type
+    - **WHEN** `apply` is called
+    - **THEN** the error is thrown before any of the entries are applied (atomic semantics)
+    - **AND** the error message suggests the valid alternative for that node type

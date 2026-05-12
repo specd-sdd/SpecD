@@ -1,0 +1,30 @@
+- op: modified
+  selector:
+    type: section
+    matches: '^Requirement: Input$'
+  content: |
+    `ArchiveChange.execute` receives:
+
+    - `name` — the change name to archive
+    - `skipHookPhases` (ReadonlySet<ArchiveHookPhaseSelector>, optional, default empty set) — which archive hook phases to skip. Valid values: `'pre'`, `'post'`, `'all'`. When `'all'` is in the set, all archive hook execution is skipped. When the set is empty (default), both phases execute.
+    - `allowOverlap` (boolean, optional, default `false`) — when `true`, the use case skips the overlap check and permits archiving even when other active changes target the same specs
+- op: modified
+  selector:
+    type: section
+    matches: '^Requirement: Pre-archive hooks$'
+  content: |
+    After the archivable guard passes, when `'all'` and `'pre'` are both absent from `skipHookPhases`, `ArchiveChange` must execute pre-archive hooks by delegating to `RunStepHooks.execute({ name, step: 'archiving', phase: 'pre' })`.
+
+    If any pre-archive `run:` hook fails, `ArchiveChange` must throw `HookFailedError` with the hook command, exit code, and stderr. No files are modified before a failed pre-archive hook.
+
+    When `'all'` or `'pre'` is in `skipHookPhases`, pre-archive hook execution is skipped entirely.
+- op: modified
+  selector:
+    type: section
+    matches: '^Requirement: Post-archive hooks$'
+  content: |
+    After `archiveRepository.archive()` succeeds, when `'all'` and `'post'` are both absent from `skipHookPhases`, `ArchiveChange` must execute post-archive hooks by delegating to `RunStepHooks.execute({ name, step: 'archiving', phase: 'post' })`.
+
+    Post-archive hook failures do not roll back the archive. Every failed hook command must be appended to `postHookFailures` in declaration order.
+
+    When `'all'` or `'post'` is in `skipHookPhases`, post-archive hook execution is skipped entirely.

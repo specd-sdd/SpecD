@@ -1,0 +1,57 @@
+- op: modified
+  description: 'Define verification outcomes and route artifact review back to designing.'
+  selector:
+    type: section
+    matches: '^Requirement: Step semantics$'
+  content: |
+    Each workflow step has a defined semantic role in the change lifecycle:
+
+    - **Designing** (`designing`) — the agent creates or modifies spec artifacts (proposal, specs, verify, design, tasks). This step iterates over the artifact DAG: `CompileContext` is called once per artifact being authored. The step is typically always available (empty `requires`).
+    - **Implementing** (`implementing`) — the agent writes code and completes tasks. All working artifacts must already be in a review-complete state before implementation proceeds. The step runs once (not per-artifact).
+    - **Verifying** (`verifying`) — the agent confirms the implementation satisfies verify.md scenarios. Verification has two semantic outcomes:
+      - `implementation-failure` — artifacts remain correct and the fix fits within the already-defined tasks; route back to `implementing`
+      - `artifact-review-required` — artifacts must be revised, or new tasks are required before implementation can continue; route back to `designing`
+    - **Archiving** (`archiving`) — deterministic finalization: delta merge, spec sync, metadata generation, archive move. Executed atomically by the `ArchiveChange` use case, not by an agent interactively.
+
+    Any file already marked `drifted-pending-review` also forces the workflow back to `designing`; drift is never treated as an implementation-only retry.
+- op: modified
+  description: 'Evaluate requires from persisted artifact state.'
+  selector:
+    type: section
+    matches: '^Requirement: Requires-based gating$'
+  content: |
+    Each workflow step declares a `requires` array of artifact IDs. `TransitionChange` enforces this at transition time: before allowing a transition to a state that has a workflow step, it checks the persisted artifact `state` for each required artifact ID. If any required artifact has a state other than `complete` or `skipped`, the transition is rejected with `InvalidStateTransitionError`.
+
+    An empty or omitted `requires` means the step has no gating — the transition proceeds without artifact checks.
+
+    A skipped optional artifact satisfies the requirement identically to a completed one.
+
+    Artifacts in `missing`, `in-progress`, `pending-review`, or `drifted-pending-review` do not satisfy `requires`.
+- op: modified
+  description: 'Align step availability evaluation with persisted state.'
+  selector:
+    type: section
+    matches: '^Requirement: Step availability evaluation$'
+  content: |
+    Step availability MUST be evaluated consistently by all consumers that need it. `CompileContext` evaluates step availability during context assembly. `GetStatus` reports the current change state, which corresponds directly to the active workflow step (since step name = state name). The evaluation is:
+
+    ```
+    stepAvailable(step, change) =
+      step.requires.every(id => artifact(id).state ∈ { complete, skipped })
+    ```
+
+    This evaluation is performed dynamically on each invocation — it is not cached or snapshotted.
+- op: modified
+  description: 'Normalize dependencies for metadata extraction.'
+  selector:
+    type: section
+    matches: '^Spec Dependencies$'
+  content: |
+    - [`core:core/change`](../change/spec.md) — change lifecycle states and artifact state lookup
+    - [`core:core/schema-format`](../schema-format/spec.md) — workflow array structure and artifact definitions
+    - [`core:core/build-schema`](../build-schema/spec.md) — DAG cycle detection at schema build time
+    - [`core:core/compile-context`](../compile-context/spec.md) — step availability during context assembly
+    - [`core:core/get-status`](../get-status/spec.md) — status reporting of the active workflow step
+    - [`core:core/transition-change`](../transition-change/spec.md) — runtime transition enforcement
+    - [`core:core/archive-change`](../archive-change/spec.md) — deterministic archiving step behavior
+    - [`core:core/hook-execution-model`](../hook-execution-model/spec.md) — hook execution semantics

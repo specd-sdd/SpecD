@@ -1,0 +1,15 @@
+- op: added
+  description: 'Add alias coverage for draft list'
+  position:
+    parent:
+      type: section
+      matches: '^Requirement: Output format — text$'
+    after:
+      type: section
+      matches: '^Scenario: Rows sorted by createdAt ascending$'
+  content: |
+    #### Scenario: Singular alias invocation
+
+    - **WHEN** `specd draft list` is run
+    - **THEN** it behaves as `specd drafts list`
+    - **AND** the process exits with the same code as the canonical invocation

@@ -1,0 +1,29 @@
+- op: modified
+  description: 'Verify skill templates use --file and workspace-aware file selectors.'
+  selector:
+    type: section
+    matches: '^Requirement: Graph impact terminology in workflow templates$'
+  content: |
+    #### Scenario: Workflow templates use dependents for blast-radius queries
+
+    - **WHEN** workflow skill templates instruct an agent to find the blast radius of changing a symbol or file
+    - **THEN** they describe the query as dependents or use `--direction dependents`
+    - **AND** they do not call this query downstream impact or downstream dependents
+
+    #### Scenario: Workflow templates reserve downstream for dependencies
+
+    - **WHEN** workflow skill templates mention `--direction downstream`
+    - **THEN** they describe it as dependencies: symbols and files the target depends on
+    - **AND** combined analysis is described as both dependents and dependencies
+
+    #### Scenario: Workflow templates use --file instead of --changes
+
+    - **WHEN** workflow skill templates include a concrete file-impact command example
+    - **THEN** they use `specd graph impact --file ...`
+    - **AND** they do not reference `specd graph impact --changes`
+
+    #### Scenario: Workflow templates prefer workspace-aware file selectors
+
+    - **WHEN** workflow skill templates show file selector examples for configured projects
+    - **THEN** they prefer canonical workspace-prefixed paths or config-relative paths
+    - **AND** they do not rely on implicit `default:` resolution

@@ -1,0 +1,16 @@
+- op: modified
+  description: 'Add plugin-agent-standard to scope-enum for commitlint enforcement'
+  selector:
+    type: section
+    matches: 'Automated enforcement'
+  content: |
+    Commit conventions must be automatically enforced by commitlint via a husky `commit-msg` hook. Commits that violate the format are rejected at commit time before they reach the repository.
+
+    commitlint configuration must:
+
+    - Extend `@commitlint/config-conventional` as the base
+    - Restrict `scope-enum` to the known specd package names: `core`, `cli`, `mcp`, `skills`, `schema-std`, `plugin-manager`, `plugin-agent-claude`, `plugin-agent-copilot`, `plugin-agent-codex`, `plugin-agent-opencode`, `plugin-agent-standard`, `code-graph`, `root`, `all`
+    - Enforce `subject-case: lower-case`
+    - Enforce `header-max-length: 72`
+    - Enforce `body-max-line-length: 100`
+    - Reject commits that include AI co-author trailers (`Co-Authored-By: ... @anthropic.com`)

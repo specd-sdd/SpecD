@@ -1,0 +1,40 @@
+- op: added
+  position:
+    parent:
+      type: section
+      matches: '^Requirement: Pre-archive hooks$'
+    after:
+      type: section
+      matches: '^Scenario: instruction entries in pre hooks are not executed$'
+  content: |
+    #### Scenario: skipHookPhases pre skips only pre hooks
+
+    - **GIVEN** a change in `archivable` state
+    - **AND** `skipHookPhases` is `new Set(['pre'])`
+    - **WHEN** `ArchiveChange.execute` is called
+    - **THEN** pre-archive hooks are skipped
+    - **AND** post-archive hooks still execute after the archive
+
+    #### Scenario: skipHookPhases all skips all archive hooks
+
+    - **GIVEN** a change in `archivable` state
+    - **AND** `skipHookPhases` is `new Set(['all'])`
+    - **WHEN** `ArchiveChange.execute` is called
+    - **THEN** no archive hooks are executed
+    - **AND** the archive still completes
+- op: added
+  position:
+    parent:
+      type: section
+      matches: '^Requirement: Post-archive hooks$'
+    after:
+      type: section
+      matches: '^Scenario: Failing post-archive hook does not roll back archive$'
+  content: |
+    #### Scenario: skipHookPhases post skips only post hooks
+
+    - **GIVEN** a change in `archivable` state
+    - **AND** `skipHookPhases` is `new Set(['post'])`
+    - **WHEN** `ArchiveChange.execute` is called
+    - **THEN** post-archive hooks are skipped
+    - **AND** pre-archive hooks still execute before file modifications

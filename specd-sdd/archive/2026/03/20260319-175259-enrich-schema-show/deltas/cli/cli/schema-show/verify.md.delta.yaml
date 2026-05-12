@@ -1,0 +1,43 @@
+# Delta: cli:cli/schema-show verify — add scenarios for new fields
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Output format'
+    after:
+      type: section
+      matches: 'Scenario: JSON output structure'
+  content: |
+    #### Scenario: JSON output includes description, output, and hasTaskCompletionCheck
+
+    - **GIVEN** a schema with artifact `tasks` that has `description: "Implementation checklist"`, `output: "tasks.md"`, and a `taskCompletionCheck` declared
+    - **WHEN** `specd schema show --format json` is run
+    - **THEN** the `tasks` artifact entry includes `"description": "Implementation checklist"`
+    - **AND** the entry includes `"output": "tasks.md"`
+    - **AND** the entry includes `"hasTaskCompletionCheck": true`
+
+    #### Scenario: JSON output has null description when not declared
+
+    - **GIVEN** a schema with an artifact that does not declare `description`
+    - **WHEN** `specd schema show --format json` is run
+    - **THEN** that artifact entry includes `"description": null`
+
+    #### Scenario: hasTaskCompletionCheck is false when not declared
+
+    - **GIVEN** a schema with artifact `proposal` that has no `taskCompletionCheck`
+    - **WHEN** `specd schema show --format json` is run
+    - **THEN** the `proposal` entry includes `"hasTaskCompletionCheck": false`
+
+    #### Scenario: Text output includes output and description
+
+    - **GIVEN** a schema with artifact `tasks` that has `description: "Implementation checklist"` and `output: "tasks.md"`
+    - **WHEN** `specd schema show` is run
+    - **THEN** the `tasks` line includes `output=tasks.md`
+    - **AND** the `tasks` line includes `[Implementation checklist]`
+
+    #### Scenario: Text output omits description when not declared
+
+    - **GIVEN** a schema with an artifact that does not declare `description`
+    - **WHEN** `specd schema show` is run
+    - **THEN** that artifact's line does not include brackets with a description

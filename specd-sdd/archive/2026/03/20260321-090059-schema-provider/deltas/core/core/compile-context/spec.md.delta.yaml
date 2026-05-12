@@ -1,0 +1,20 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Ports and constructor'
+  content: |
+    `CompileContext` receives at construction time: `ChangeRepository`, a map of `SpecRepository` instances (one per configured workspace), `SchemaProvider`, `FileReader`, and `ArtifactParserRegistry`.
+
+    ```typescript
+    class CompileContext {
+      constructor(
+        changes: ChangeRepository,
+        specs: ReadonlyMap<string, SpecRepository>,
+        schemaProvider: SchemaProvider,
+        files: FileReader,
+        parsers: ArtifactParserRegistry,
+      )
+    }
+    ```
+
+    `SchemaProvider` is a lazy, caching port that returns the fully-resolved schema (with plugins and overrides applied). It replaces the previous `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths` triple. All are injected at kernel composition time, not passed per invocation.

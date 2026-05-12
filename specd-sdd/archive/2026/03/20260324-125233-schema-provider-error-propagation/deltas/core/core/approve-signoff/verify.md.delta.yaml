@@ -1,0 +1,24 @@
+- op: modified
+  selector:
+    type: section
+    matches: '^Requirement: Artifact hash computation$'
+  content: |
+    #### Scenario: Artifacts are hashed with schema cleanup rules
+
+    - **GIVEN** the change has two artifacts of type `spec` and `verify`
+    - **AND** the schema defines a pre-hash cleanup rule for `spec` but not `verify`
+    - **WHEN** the use case computes artifact hashes
+    - **THEN** the `spec` artifact content has the cleanup rule applied before hashing
+    - **AND** the `verify` artifact content is hashed without cleanup
+
+    #### Scenario: Artifact cannot be loaded
+
+    - **GIVEN** the change has an artifact entry but `ChangeRepository.artifact()` returns `null` for it
+    - **WHEN** the use case computes artifact hashes
+    - **THEN** that artifact is skipped and does not appear in the hash map
+
+    #### Scenario: Schema resolution failure propagates
+
+    - **GIVEN** `SchemaProvider.get()` throws for the configured schema
+    - **WHEN** the use case executes
+    - **THEN** the error propagates from the gate guard before hash computation is reached

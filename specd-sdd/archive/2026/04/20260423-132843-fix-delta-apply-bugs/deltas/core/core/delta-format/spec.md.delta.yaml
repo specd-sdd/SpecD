@@ -1,0 +1,21 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Delta application'
+  content: |
+    Delta entries are applied in declaration order after all selectors are validated. For each entry:
+
+    - `modified`: replace the targeted node body (`content`) and/or rename the identifying field (`rename`)
+    - `removed`: remove the targeted node
+    - `added`: insert new node(s) according to `position` semantics
+      `apply` first resolves selectors against the original AST to guarantee atomicity. If any selector is invalid or ambiguous, `apply` fails with `DeltaApplicationError` and applies nothing.
+
+    For `added` operations, when the `content` field contains multiple top-level nodes, ALL nodes SHALL be inserted as children of the parent scope. This is consistent with `modified` operations, which replace all children of the targeted node.
+
+    For `added` operations with `position.parent`, if the selector matches more than one node, `apply` SHALL reject with `DeltaApplicationError`. This is consistent with the behavior for `modified` and `removed` selectors.
+
+    `no-op` entries are never passed to `apply` — they are handled entirely by the caller (e.g. `ValidateArtifacts`). When the caller detects that all parsed delta entries are `no-op`, it MUST skip loading the base artifact, skip calling `apply`, skip `deltaValidations`, and skip structural `validations`. The caller proceeds directly to hash computation on the raw delta file content and calls `markComplete`. The `no-op` operation declares that the existing artifact content is already valid — there is nothing to parse, apply, or validate.
+
+    During `modified` operations on markdown artifacts, replacing node body content must not destroy inline formatting metadata for unaffected sibling/ancestor nodes. Implementations must preserve representable inline structure so serialization does not strip backticks or rewrite emphasis/strong markers in untouched nodes.
+
+    For markdown serialization after delta apply, list/emphasis/strong marker output should track source style when unambiguous. If the source is mixed/ambiguous for a construct, the serializer must choose deterministic project markdown conventions.

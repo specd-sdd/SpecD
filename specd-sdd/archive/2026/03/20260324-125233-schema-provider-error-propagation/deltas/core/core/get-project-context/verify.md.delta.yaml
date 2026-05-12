@@ -1,0 +1,9 @@
+- op: modified
+  selector:
+    type: section
+    matches: '^Requirement: Resolves schema before processing$'
+  content: |
+    #### Scenario: Schema resolution failure propagates
+
+    - **WHEN** `SchemaProvider.get()` throws `SchemaNotFoundError`
+    - **THEN** the error propagates — the use case does not catch it

@@ -1,0 +1,63 @@
+- op: modified
+  description: 'Update Output format requirements to include hasTasks verification in DAG'
+  selector:
+    type: section
+    matches: 'Requirement: Output format'
+  content: |
+    #### Scenario: Text output shows artifact and file state
+
+    - **GIVEN** a change with artifact `specs` in `pending-review`
+    - **AND** one file under `specs` is `drifted-pending-review`
+    - **WHEN** `specd change status <name>` is run
+    - **THEN** stdout shows the artifact aggregate state
+    - **AND** it lists the individual file row with `drifted-pending-review`
+
+    #### Scenario: Text output shows review section when review is required
+
+    - **GIVEN** `GetStatus` returns `review.required: true`
+    - **WHEN** `specd change status <name>` is run in text mode
+    - **THEN** stdout includes a `review:` section
+    - **AND** it shows the route, reason, and affected absolute file paths
+
+    #### Scenario: JSON output includes review and file state
+
+    - **GIVEN** a change in `designing`
+    - **WHEN** `specd change status <name> --format json` is run
+    - **THEN** stdout includes `artifacts[].state`
+    - **AND** each artifact includes `files[].state`
+    - **AND** the top-level payload includes `review`
+    - **AND** `review.affectedArtifacts[].files[]` includes `filename` and `path`
+
+    #### Scenario: Review section omitted when not required
+
+    - **GIVEN** `GetStatus` returns `review.required: false`
+    - **WHEN** `specd change status <name>` is run in text mode
+    - **THEN** stdout omits the `review:` section
+
+    #### Scenario: Text output renders Artifact DAG tree
+
+    - **GIVEN** a change with an artifact that has `hasTasks: true`
+    - **WHEN** `specd change status <name>` is run
+    - **THEN** stdout includes an `artifacts (DAG):` section
+    - **AND** it renders the artifact dependency tree using ASCII characters
+    - **AND** each node includes a status symbol (e.g., `[✓]`, `[~]`), a scope label (e.g., `[scope: change]`), and the `[hasTasks]` tag if enabled
+
+- op: modified
+  description: 'Update Schema-derived fields scenarios to include hasTasks in JSON'
+  selector:
+    type: section
+    matches: 'Requirement: Schema-derived fields'
+  content: |
+    #### Scenario: JSON output includes artifactDag
+
+    - **GIVEN** a change using a schema where one artifact has `hasTasks: true`
+    - **WHEN** `specd change status <name> --format json` is run
+    - **THEN** the JSON output includes `schema.artifactDag` array
+    - **AND** each entry includes id, scope, optional, requires, hasTasks, output
+    - **AND** the `hasTasks` boolean reflects the schema definition
+
+    #### Scenario: JSON output for non-schema-std also includes artifactDag
+
+    - **GIVEN** a change using a custom schema
+    - **WHEN** `specd change status <name> --format json` is run
+    - **THEN** the JSON output includes `schema.artifactDag` array

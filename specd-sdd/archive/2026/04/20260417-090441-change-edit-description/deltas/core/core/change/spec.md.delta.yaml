@@ -1,0 +1,58 @@
+# Delta: core:core/change — add description-updated event type
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: History and event sourcing'
+  content: |
+    The change manifest contains an **append-only `history` array** of typed events. Every significant operation appends one or more events. Events are never modified or removed.
+
+    The **current lifecycle state** of a Change is derived entirely from its history: the `to` field of the most recent `transitioned` event. If no `transitioned` event exists, the state is `drafting`. No separate state snapshot is stored. The JSON serialization of these events in `manifest.json` is defined in [`specs/core/change-manifest/spec.md` — Requirement: Manifest structure](../change-manifest/spec.md).
+
+    The **current draft/active status** is derived from history: if the most recent `drafted` or `restored` event is of type `drafted`, the change is currently shelved in `drafts/`; otherwise it is active in `changes/`.
+
+    The **active approval** for each gate is the most recent `spec-approved` or `signed-off` event that has not been superseded by a subsequent `invalidated` event.
+
+    All events share common fields:
+
+    - **`type`** — identifies the event kind
+    - **`at`** — ISO 8601 timestamp
+    - **`by`** — git identity (`name` + `email`) of the actor, mandatory on all events
+
+    Event types:
+
+    | Type                  | Additional fields                                          | When appended                                                 |
+    | --------------------- | ---------------------------------------------------------- | ------------------------------------------------------------- |
+    | `created`             | `specIds`, `schemaName`, `schemaVersion`                   | Once, when the change is first created                        |
+    | `transitioned`        | `from: ChangeState`, `to: ChangeState`                     | Each lifecycle state transition                              |
+    | `spec-approved`       | `reason: string`, `artifactHashes: Record<string, string>` | When the spec approval gate is passed                        |
+    | `signed-off`          | `reason: string`, `artifactHashes: Record<string, string>` | When the signoff gate is passed                              |
+    | `invalidated`         | `cause`, `message`, `affectedArtifacts`                    | When scope or artifact review invalidates prior approvals     |
+    | `drafted`             | `reason?: string`                                          | When a change is shelved to `drafts/`                         |
+    | `restored`            | _(none beyond common fields)_                              | When a drafted change is moved back to `changes/`             |
+    | `artifact-skipped`    | `artifactId: string`, `reason?: string`                    | When an optional artifact is explicitly marked as not produced |
+    | `artifacts-synced`    | `typesAdded`, `typesRemoved`, `filesAdded`, `filesRemoved` | When artifact sync reconciles the artifact map against schema  |
+    | `description-updated` | `description: string`                                      | When the change description is updated via `EditChange` with `--description` |
+    | `discarded`           | `reason: string`, `supersededBy?: string[]`                | When a change is permanently abandoned                        |
+
+    `invalidated.cause` is explicit and machine-readable:
+
+    - `spec-change` — the change scope changed (for example, `specIds` were edited)
+    - `artifact-drift` — one or more validated artifact files changed on disk
+    - `artifact-review-required` — the change returned to `designing` because the artifacts must be revised even though no drifted file was detected
+
+    `invalidated.message` is a clear human-readable explanation, not a one-word label. `invalidated.affectedArtifacts` is a structured list of the affected artifact types and file keys so callers can explain exactly what triggered the review:
+
+    - `type` — artifact type ID
+    - `files` — list of file keys, using the artifact file key for `scope: change` and the spec ID for `scope: spec`
+
+    Approval invalidation caused by artifact drift MUST capture the full set of affected files before the event is appended. If multiple files drift in the same invalidation pass, they are recorded in the same `invalidated` event.
+
+    #### Scenario: Overlap conflict invalidation
+
+    - **GIVEN** change `beta` targets `core:core/config`
+    - **AND** change `alpha` also targets `core:core/config` and is archived with `allowOverlap: true`
+    - **WHEN** the archive invalidates `beta`
+    - **THEN** an `invalidated` event with `cause: 'spec-overlap-conflict'` is appended to `beta`'s history
+    - **AND** a `transitioned` event rolling back to `designing` is appended
+    - **AND** the `invalidated.message` includes the archived change name and the overlapping spec IDs

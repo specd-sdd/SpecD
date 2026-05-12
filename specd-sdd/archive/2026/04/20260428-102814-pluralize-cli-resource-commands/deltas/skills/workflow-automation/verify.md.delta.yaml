@@ -1,0 +1,17 @@
+- op: added
+  description: 'Add verification for canonical command references'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Repair Strategy$'
+  content: |
+    ### Requirement: Canonical Command References
+
+    #### Scenario: Agent uses plural canonical groups in instructions
+
+    - **WHEN** an agent writes workflow command examples for countable resources
+    - **THEN** examples use canonical plural groups (`changes`, `specs`, `archives`, `drafts`)
+    - **AND** singular forms are referenced only as aliases

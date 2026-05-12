@@ -1,0 +1,11 @@
+- op: removed
+  selector: { type: section, matches: 'Scenario: Successful uninstall' }
+- op: added
+  position:
+    parent: { type: section, matches: 'Requirement: Behavior' }
+  content: |
+    #### Scenario: Successful uninstall
+
+    - **GIVEN** a valid `SpecdConfig` is provided
+    - **WHEN** UninstallPlugin is executed with valid configuration
+    - **THEN** it returns void

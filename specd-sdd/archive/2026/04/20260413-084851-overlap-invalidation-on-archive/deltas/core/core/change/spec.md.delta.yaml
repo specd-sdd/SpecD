@@ -1,0 +1,34 @@
+- op: modified
+  description: 'Add spec-overlap-conflict as a fourth invalidation cause'
+  selector:
+    type: paragraph
+    contains: 'invalidated.cause'
+    parent:
+      type: section
+      matches: 'History and event sourcing'
+  content: |
+    `invalidated.cause` is explicit and machine-readable:
+
+    - `spec-change` — the change scope changed (for example, `specIds` were edited)
+    - `artifact-drift` — one or more validated artifact files changed on disk
+    - `artifact-review-required` — the change returned to `designing` because the artifacts must be revised even though no drifted file was detected
+    - `spec-overlap-conflict` — another change was archived with overlapping specs, making this change's spec baseline stale
+
+- op: added
+  description: 'Add scenario for spec-overlap-conflict invalidation cause'
+  position:
+    parent:
+      type: section
+      matches: 'History and event sourcing'
+    after:
+      type: section
+      matches: 'Scenario: SpecIds edit triggers spec-change invalidation'
+  content: |
+    #### Scenario: Overlap conflict invalidation
+
+    - **GIVEN** change `beta` targets `core:core/config`
+    - **AND** change `alpha` also targets `core:core/config` and is archived with `allowOverlap: true`
+    - **WHEN** the archive invalidates `beta`
+    - **THEN** an `invalidated` event with `cause: 'spec-overlap-conflict'` is appended to `beta`'s history
+    - **AND** a `transitioned` event rolling back to `designing` is appended
+    - **AND** the `invalidated.message` includes the archived change name and the overlapping spec IDs

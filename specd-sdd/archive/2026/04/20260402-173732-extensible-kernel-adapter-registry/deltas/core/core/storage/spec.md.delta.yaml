@@ -1,0 +1,15 @@
+- op: added
+  description: 'Introduce named storage factories into kernel composition'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Archive index$'
+  content: |
+    ### Requirement: Named storage factories
+
+    Kernel composition SHALL support named storage factories for repository-backed capabilities. A storage factory SHALL be selected by adapter name and SHALL be responsible for creating the repository implementation needed for that storage mode.
+
+    When storage selection requires workspace-specific VCS or null-VCS handling, that responsibility SHALL remain within the selected storage factory rather than leaking into unrelated composition paths.

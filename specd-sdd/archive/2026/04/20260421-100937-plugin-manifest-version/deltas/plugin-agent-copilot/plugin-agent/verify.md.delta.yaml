@@ -1,0 +1,34 @@
+- op: modified
+  description: 'Add scenarios for manifest-sourced name/version'
+  selector:
+    type: section
+    matches: 'Requirement: Factory export'
+  content: |-
+    #### Scenario: Exposes plugin factory
+
+    - **WHEN** plugin package exports are loaded
+    - **THEN** `create()` is available and returns an `AgentPlugin`
+
+    #### Scenario: Factory reads manifest for name and version
+
+    - **GIVEN** `specd-plugin.json` contains `name: "@specd/plugin-agent-copilot"` and `version: "1.0.0"`
+    - **WHEN** `create()` is called
+    - **THEN** the returned plugin has `name === "@specd/plugin-agent-copilot"` and `version === "1.0.0"`
+
+    #### Scenario: Type is hardcoded
+
+    - **WHEN** `create()` is called
+    - **THEN** the returned plugin has `type === 'agent'`
+
+- op: modified
+  description: 'Update runtime contract scenario to note manifest-sourced fields'
+  selector:
+    type: section
+    matches: 'Requirement: Plugin runtime contract'
+  content: |-
+    #### Scenario: Created plugin satisfies runtime contract
+
+    - **WHEN** `create()` is called
+    - **THEN** the returned plugin has `type: 'agent'` (hardcoded)
+    - **AND** the returned plugin has `name` and `version` sourced from `specd-plugin.json`
+    - **AND** the returned plugin exposes `install(projectRoot, options)` and `uninstall(projectRoot, options)` functions

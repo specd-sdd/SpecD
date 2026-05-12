@@ -1,0 +1,59 @@
+- op: added
+  description: 'Add contextMode verification scenarios'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Context spec selection'
+  content: |
+    ### Requirement: Context mode
+
+    #### Scenario: contextMode lazy is the default
+
+    - **GIVEN** `specd.yaml` does not declare `contextMode`
+    - **WHEN** config is loaded
+    - **THEN** `config.contextMode` defaults to `'lazy'` at the use case level
+
+    #### Scenario: contextMode lazy is accepted
+
+    - **GIVEN** `specd.yaml` declares `contextMode: lazy`
+    - **WHEN** config is loaded
+    - **THEN** `config.contextMode` is `'lazy'`
+
+    #### Scenario: Invalid contextMode rejected at startup
+
+    - **GIVEN** `specd.yaml` declares `contextMode: partial`
+    - **WHEN** config is loaded
+    - **THEN** startup validation fails with an error identifying the invalid value
+
+    #### Scenario: contextMode inside workspace is rejected
+
+    - **GIVEN** `specd.yaml` declares `contextMode: lazy` inside a workspace entry
+    - **WHEN** config is loaded
+    - **THEN** startup validation fails with an error indicating `contextMode` is project-level only
+
+- op: modified
+  description: 'Add contextMode to startup validation scenarios'
+  selector:
+    type: section
+    matches: 'Requirement: Startup validation'
+  content: |
+    #### Scenario: Valid minimal config passes validation
+
+    - **GIVEN** a `specd.yaml` with only `schema: schema-std@1`
+    - **WHEN** config is validated at startup
+    - **THEN** validation passes with defaults applied
+
+    #### Scenario: Invalid contextMode value rejected
+
+    - **GIVEN** `specd.yaml` contains `contextMode: partial`
+    - **WHEN** config is validated at startup
+    - **THEN** validation fails with a `ConfigValidationError` identifying the invalid `contextMode` value
+
+    #### Scenario: contextMode in workspace entry rejected
+
+    - **GIVEN** `specd.yaml` contains a workspace with `contextMode: lazy`
+    - **WHEN** config is validated at startup
+    - **THEN** validation fails with a `ConfigValidationError` indicating `contextMode` is not valid inside a workspace

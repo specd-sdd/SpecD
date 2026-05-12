@@ -1,0 +1,56 @@
+- op: modified
+  description: 'Replace --no-hooks with --skip-hooks accepting granular phase selectors'
+  selector:
+    type: section
+    matches: 'Requirement: Command signature'
+  content: |
+    ```
+    specd change transition <name> <step> [--skip-hooks <phases>] [--format text|json|toon]
+    ```
+
+    - `<name>` — required positional; the name of the change to transition
+    - `<step>` — required positional; the target lifecycle state (e.g. `designing`, `ready`, `implementing`, `verifying`, `done`, `archivable`, `pending-spec-approval`, `spec-approved`, `pending-signoff`, `signed-off`)
+    - `--skip-hooks <phases>` — optional; comma-separated list of hook phases to skip. Valid values: `source.pre`, `source.post`, `target.pre`, `target.post`, `all`. When `all` is specified, all hook phases are skipped. When omitted, all applicable hooks execute.
+    - `--format text|json|toon` — optional; output format, defaults to `text`
+
+    The previous `--no-hooks` flag is removed. Use `--skip-hooks all` for equivalent behaviour.
+
+- op: modified
+  description: 'Update hook execution requirement to reference --skip-hooks and new ordering'
+  selector:
+    type: section
+    matches: 'Requirement: Hook execution'
+  content: |
+    By default, the `TransitionChange` use case executes `run:` hooks at step boundaries in this order: source.post hooks (finishing the previous step), then target.pre hooks (preparing the new step), then the state transition. Both phases are fail-fast — a failure in either aborts the transition. When `--skip-hooks` is passed with specific phases, those hook phases are skipped. When `--skip-hooks all` is passed, all hook execution is skipped — the caller is responsible for invoking hooks via `specd change run-hooks`.
+
+    The CLI maps the `--skip-hooks` option to a `skipHookPhases` set on `TransitionChangeInput`.
+
+- op: modified
+  description: 'Remove post-hook failure warning — hooks are now fail-fast'
+  selector:
+    type: section
+    matches: 'Requirement: Post-hook failure warning'
+  content: |
+    Since both hook phases (source.post and target.pre) are fail-fast, a hook failure causes the command to exit with code 1 and print an `error:` message to stderr. The previous `postHookFailures` warning (exit code 2) is removed — there are no post-transition hook failures to report.
+
+- op: modified
+  description: 'Update output on success — remove postHookFailures'
+  selector:
+    type: section
+    matches: 'Requirement: Output on success'
+  content: |
+    On success, output depends on `--format`:
+
+    - `text` (default): prints a single line to stdout:
+
+      ```
+      transitioned <name>: <from> → <to>
+      ```
+
+    - `json` or `toon`: outputs the following to stdout (encoded in the respective format):
+
+      ```json
+      { "result": "ok", "name": "<name>", "from": "<from>", "to": "<to>" }
+      ```
+
+    where `<to>` is the effective target state after routing.

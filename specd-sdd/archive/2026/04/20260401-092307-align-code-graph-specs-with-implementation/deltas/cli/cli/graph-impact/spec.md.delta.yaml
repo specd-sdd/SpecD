@@ -1,0 +1,49 @@
+- op: added
+  description: 'Add shared graph indexing lock behavior to impact analysis'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Change detection$'
+  content: |
+    ### Requirement: Concurrent indexing guard
+
+    Before attempting to open the provider or execute graph-backed analysis, `graph impact` SHALL check the shared graph indexing lock used by `graph index`.
+
+    If indexing is currently in progress, the command SHALL fail fast with a short user-facing retry-later message indicating that the graph is being indexed and should be queried again in a few seconds.
+
+    This guard exists so the command does not surface backend lock failures opportunistically while another CLI process is rebuilding the graph.
+
+- op: modified
+  description: 'Document lock-aware error behavior for impact analysis'
+  selector:
+    type: section
+    matches: '^Requirement: Error cases$'
+    parent:
+      type: section
+      matches: '^Requirements$'
+  content: |
+    Exactly one of `--file`, `--symbol`, or `--changes` must be provided. If none or more than one is given, the command exits with code 1 and prints `error: provide exactly one of --file, --symbol, or --changes`.
+
+    If both `--config` and `--path` are passed, the command SHALL fail with a CLI error before attempting graph access.
+
+    If the shared graph indexing lock is present, the command SHALL exit with code 3 after printing a user-facing retry-later message.
+
+    If the provider cannot be opened, the command exits with code 3.
+
+- op: modified
+  description: 'Record the shared indexing lock as a command constraint'
+  selector:
+    type: section
+    matches: '^Constraints$'
+  content: |
+    - The CLI does not contain impact analysis logic — it delegates entirely to `@specd/code-graph`
+    - `process.exit(0)` is called explicitly after closing the provider
+    - All file paths are workspace-relative, not absolute
+    - `--direction` only applies to `--file` and `--symbol`, not to `--changes`
+    - `--depth` applies to all selectors (`--file`, `--symbol`, `--changes`)
+    - `--depth` must be a positive integer; invalid values exit with code 1
+    - Context resolution SHALL use the shared graph CLI model rather than command-local path semantics
+    - The command checks the shared graph indexing lock before opening the provider and fails fast while indexing is in progress

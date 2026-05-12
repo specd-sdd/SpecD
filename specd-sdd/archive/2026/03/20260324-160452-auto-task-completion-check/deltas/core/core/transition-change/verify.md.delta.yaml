@@ -1,0 +1,71 @@
+- op: modified
+  description: 'Replace hardcoded implementing→verifying scenarios with generic requires-based task check scenarios'
+  selector:
+    type: section
+    matches: 'Requirement: Task completion check on implementing to verifying'
+  rename: 'Requirement: Task completion check during requires enforcement'
+  content: |
+    #### Scenario: Transition blocked by incomplete tasks in required artifact
+
+    - **GIVEN** a change in `implementing` state
+    - **AND** the `verifying` step requires an artifact whose type declares `taskCompletionCheck`
+    - **AND** the artifact file contains a line matching `incompletePattern`
+    - **WHEN** `execute` is called with `to: 'verifying'`
+    - **THEN** it throws `InvalidStateTransitionError`
+
+    #### Scenario: Transition allowed when all tasks are complete
+
+    - **GIVEN** a change in `implementing` state
+    - **AND** the `verifying` step requires an artifact whose type declares `taskCompletionCheck`
+    - **AND** the artifact file contains only completed items
+    - **WHEN** `execute` is called with `to: 'verifying'`
+    - **THEN** the change transitions to `verifying`
+
+    #### Scenario: Missing artifact file is skipped
+
+    - **GIVEN** a change in `implementing` state
+    - **AND** the `verifying` step requires an artifact with `taskCompletionCheck`
+    - **AND** the artifact file does not exist
+    - **WHEN** `execute` is called with `to: 'verifying'`
+    - **THEN** the check is skipped and the transition proceeds
+
+    #### Scenario: Invalid regex pattern is treated as non-matching
+
+    - **GIVEN** a required artifact with `taskCompletionCheck.incompletePattern` set to an invalid regex
+    - **WHEN** a transition to the step requiring it is attempted
+    - **THEN** the check is skipped and the transition proceeds
+
+    #### Scenario: Task check applies to any step with taskCompletionCheck requires
+
+    - **GIVEN** a change transitioning to a step whose `requires` includes an artifact with `taskCompletionCheck`
+    - **AND** the artifact file contains incomplete items
+    - **WHEN** `execute` is called
+    - **THEN** `InvalidStateTransitionError` is thrown — not limited to `implementing → verifying`
+
+    #### Scenario: Required artifact without taskCompletionCheck is not content-checked
+
+    - **GIVEN** a step that requires `[specs, tasks]`
+    - **AND** `specs` has no `taskCompletionCheck`
+    - **AND** `tasks` has `taskCompletionCheck` with incomplete items
+    - **WHEN** `execute` is called
+    - **THEN** only `tasks` triggers the content check; `specs` is checked only via `effectiveStatus`
+
+- op: modified
+  description: 'Update artifact validation clearing scenarios to reflect schema-derived requires'
+  selector:
+    type: section
+    matches: 'Requirement: Artifact validation clearing on verifying to implementing'
+  content: |
+    #### Scenario: Artifact validations are cleared using schema requires
+
+    - **GIVEN** a change in `verifying` state with validated artifacts
+    - **AND** the schema's `implementing` step declares `requires: ['specs', 'tasks']`
+    - **WHEN** `execute` is called with `to: 'implementing'`
+    - **THEN** `change.clearArtifactValidations` is called with `['specs', 'tasks']` from the schema
+
+    #### Scenario: No implementing step in schema defaults to no clearing
+
+    - **GIVEN** a change in `verifying` state
+    - **AND** the schema does not declare an `implementing` workflow step
+    - **WHEN** `execute` is called with `to: 'implementing'`
+    - **THEN** `change.clearArtifactValidations` is not called

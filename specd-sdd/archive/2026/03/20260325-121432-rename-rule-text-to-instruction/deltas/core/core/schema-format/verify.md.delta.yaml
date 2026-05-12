@@ -1,0 +1,23 @@
+- op: removed
+  description: 'Remove schema-format verification scenario that still uses the old rule-entry field name'
+  selector:
+    type: section
+    matches: 'Scenario: Artifact with rules.pre and rules.post'
+    parent:
+      type: section
+      matches: 'Requirement: Artifact definition'
+- op: added
+  description: 'Add updated schema-format verification scenario for instruction-based rule entries'
+  position:
+    before:
+      type: section
+      matches: 'Scenario: preHashCleanup entry requires id'
+      parent:
+        type: section
+        matches: 'Requirement: Artifact definition'
+  content: |
+    #### Scenario: Artifact with rules.pre and rules.post
+
+    - **GIVEN** an artifact declares `rules: { pre: [{ id: pre-rule, instruction: "Before instruction" }], post: [{ id: post-rule, instruction: "After instruction" }] }`
+    - **WHEN** `CompileContext` assembles the instruction block for that artifact
+    - **THEN** `pre-rule` instruction appears before the artifact's `instruction` and `post-rule` instruction appears after it

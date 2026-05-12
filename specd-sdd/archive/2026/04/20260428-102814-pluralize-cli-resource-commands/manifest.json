@@ -1,0 +1,563 @@
+{
+  "name": "pluralize-cli-resource-commands",
+  "createdAt": "2026-04-28T10:28:14.577Z",
+  "description": "Standardize CLI countable resource command groups to canonical plural forms (changes, specs, archives, drafts) while maintaining singular aliases for backward compatibility. This change includes a new governing policy spec (cli:cli/command-resource-naming), updates to affected CLI specs, and comprehensive updates to documentation and skill examples to ensure a consistent command vocabulary across the ecosystem.",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "cli:cli/change-draft",
+    "cli:cli/drafts-list",
+    "cli:cli/drafts-show",
+    "cli:cli/drafts-restore",
+    "cli:cli/command-resource-naming",
+    "cli:cli/change-list",
+    "cli:cli/spec-list",
+    "cli:cli/change-archive",
+    "skills:workflow-automation"
+  ],
+  "specDependsOn": {
+    "cli:cli/change-draft": [
+      "cli:cli/entrypoint",
+      "core:core/change",
+      "cli:cli/command-resource-naming"
+    ],
+    "cli:cli/drafts-list": [
+      "cli:cli/entrypoint",
+      "core:core/change",
+      "cli:cli/command-resource-naming"
+    ],
+    "cli:cli/drafts-show": [
+      "cli:cli/entrypoint",
+      "core:core/change",
+      "cli:cli/command-resource-naming"
+    ],
+    "cli:cli/drafts-restore": [
+      "cli:cli/entrypoint",
+      "core:core/change",
+      "cli:cli/command-resource-naming"
+    ],
+    "cli:cli/change-list": [
+      "cli:cli/entrypoint",
+      "core:core/change",
+      "cli:cli/command-resource-naming"
+    ],
+    "cli:cli/spec-list": [
+      "cli:cli/entrypoint",
+      "core:core/spec",
+      "cli:cli/command-resource-naming"
+    ],
+    "cli:cli/change-archive": [
+      "cli:cli/entrypoint",
+      "core:core/change",
+      "core:core/archive-change",
+      "core:core/hook-execution-model",
+      "cli:cli/command-resource-naming"
+    ],
+    "skills:workflow-automation": ["cli:cli/command-resource-naming"],
+    "cli:cli/command-resource-naming": ["cli:cli/entrypoint"]
+  },
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:57812d5259d589855ea35466c53bb1c0c9f5ae64e3c43ba387a67171952459af"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "cli:cli/change-draft",
+          "filename": "deltas/cli/cli/change-draft/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:a88bad8f82b515f54ecf55e97e381e26ade4eba089dc91af262eaa334957c5df"
+        },
+        {
+          "key": "cli:cli/drafts-list",
+          "filename": "deltas/cli/cli/drafts-list/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:442ea72c4d831ac01900e1806047604a9ac75ed434ddf1486a083ca5a6c0214b"
+        },
+        {
+          "key": "cli:cli/drafts-show",
+          "filename": "deltas/cli/cli/drafts-show/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:42458e0e08d400df8c2f1438fd46a045c7fece7fbfd6e3bbadf6c5d4c9213494"
+        },
+        {
+          "key": "cli:cli/drafts-restore",
+          "filename": "deltas/cli/cli/drafts-restore/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:10723fdfbe6deb15c46a60319a2124816562baa3895be2a65cd6b4b5041a170f"
+        },
+        {
+          "key": "cli:cli/command-resource-naming",
+          "filename": "specs/cli/cli/command-resource-naming/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:d62e4c09a3b15bba5845b4796465981ba2f14b0c2eaefcc9d70dd112bed6e22e"
+        },
+        {
+          "key": "cli:cli/change-list",
+          "filename": "deltas/cli/cli/change-list/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:72351193e805c6e66d54270367ad8d1cafaa6ede85ae8c0b130cfed37b5ec417"
+        },
+        {
+          "key": "cli:cli/spec-list",
+          "filename": "deltas/cli/cli/spec-list/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:d61c1830b5141d37aac2cf54942ada6cb14e1213f3d589931517584bfc16fb1e"
+        },
+        {
+          "key": "cli:cli/change-archive",
+          "filename": "deltas/cli/cli/change-archive/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:95a64d3590119db890afa12b183fe3a6cea89b8cd707e749a35a79e0ea030b14"
+        },
+        {
+          "key": "skills:workflow-automation",
+          "filename": "deltas/skills/workflow-automation/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:77e88e2b8a31b493307845693d44f1bcaecefd7262594557b4154fc259fa6356"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "cli:cli/change-draft",
+          "filename": "deltas/cli/cli/change-draft/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:a1ddc77d588eb5e49399733c87cbfcd30cfeb779712097fc9c8ee24874be3573"
+        },
+        {
+          "key": "cli:cli/drafts-list",
+          "filename": "deltas/cli/cli/drafts-list/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:459b6423ddb9dc620241bb63c5204880beff0a4fd4e8b774b93eab59f502e952"
+        },
+        {
+          "key": "cli:cli/drafts-show",
+          "filename": "deltas/cli/cli/drafts-show/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:0c5233ddd787af316d66286ff664a9d4ab5399baa04ae6cb89c285e8996f036c"
+        },
+        {
+          "key": "cli:cli/drafts-restore",
+          "filename": "deltas/cli/cli/drafts-restore/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:1c97edeb6500cd013b4e87c1d5060655a868360ef89cdbef234c6c84c5f84ab9"
+        },
+        {
+          "key": "cli:cli/command-resource-naming",
+          "filename": "specs/cli/cli/command-resource-naming/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:bba7a2ff1b8507080fa8883459eaeb7746430ca4f0738f5c655085e42c65d982"
+        },
+        {
+          "key": "cli:cli/change-list",
+          "filename": "deltas/cli/cli/change-list/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:fec3de52073041c66ad7235b41d5cb035b5db672a9d2aee5c1a4a881bcc2fba2"
+        },
+        {
+          "key": "cli:cli/spec-list",
+          "filename": "deltas/cli/cli/spec-list/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:41b777643e7d92ed55a5990fdcecb4d0f4f0b38a5341901f301fbf222d37abf4"
+        },
+        {
+          "key": "cli:cli/change-archive",
+          "filename": "deltas/cli/cli/change-archive/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:f2974fc293f1f8ff7077c136d7842301646330f49e965c3b1785c458058ee1b1"
+        },
+        {
+          "key": "skills:workflow-automation",
+          "filename": "deltas/skills/workflow-automation/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:49d38ac54fba933a7dc53b03378d4253797da1621da580792e9752f8d3bca26b"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:501c2bd3b259a4f13f7893130469b8a901b46daa71f0f82db2c21a6fa27c76af"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:0ccc5dcbbd15a157fb4aaa115f32d3d04875ad7adf9a590b8cf9e92612d62a92"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-04-28T10:28:14.577Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "specIds": [
+        "cli:cli/change-draft",
+        "cli:cli/drafts-list",
+        "cli:cli/drafts-show",
+        "cli:cli/drafts-restore"
+      ],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-28T10:28:14.595Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "cli:cli/change-draft"
+        },
+        {
+          "type": "specs",
+          "key": "cli:cli/drafts-list"
+        },
+        {
+          "type": "specs",
+          "key": "cli:cli/drafts-show"
+        },
+        {
+          "type": "specs",
+          "key": "cli:cli/drafts-restore"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/change-draft"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/drafts-list"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/drafts-show"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/drafts-restore"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-28T10:29:10.411Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-28T10:34:02.234Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-28T10:38:11.058Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-28T10:40:09.040Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-28T10:40:47.581Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-28T10:42:15.204Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-28T10:42:19.919Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:cli/change-draft",
+            "cli:cli/drafts-list",
+            "cli:cli/drafts-show",
+            "cli:cli/drafts-restore"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:cli/change-draft",
+            "cli:cli/drafts-list",
+            "cli:cli/drafts-show",
+            "cli:cli/drafts-restore"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-28T10:42:19.920Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "cli:cli/command-resource-naming"
+        },
+        {
+          "type": "specs",
+          "key": "cli:cli/change-list"
+        },
+        {
+          "type": "specs",
+          "key": "cli:cli/spec-list"
+        },
+        {
+          "type": "specs",
+          "key": "cli:cli/change-archive"
+        },
+        {
+          "type": "specs",
+          "key": "skills:workflow-automation"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/command-resource-naming"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/change-list"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/spec-list"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/change-archive"
+        },
+        {
+          "type": "verify",
+          "key": "skills:workflow-automation"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-28T10:45:54.751Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-28T10:49:23.700Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-28T10:55:24.779Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-28T10:55:48.893Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-28T10:55:58.450Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "description-updated",
+      "at": "2026-04-28T10:57:32.945Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "description": "Standardize CLI countable resource command groups to canonical plural forms (changes, specs, archives, drafts) while maintaining singular aliases for backward compatibility. This change includes a new governing policy spec (cli:cli/command-resource-naming), updates to affected CLI specs, and comprehensive updates to documentation and skill examples to ensure a consistent command vocabulary across the ecosystem."
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-28T11:00:26.801Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-04-28T11:00:26.932Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "m***a@g***.com"
+  }
+}

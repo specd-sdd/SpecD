@@ -1,0 +1,47 @@
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Output'
+  content: |
+    #### Scenario: Default sections in full mode
+    - **WHEN** `specd spec context <spec-id>` is run without section flags
+    - **THEN** output includes Title, Description, Rules, and Constraints by default
+    - **AND** Scenarios are omitted unless explicitly requested
+
+    #### Scenario: Header persistence in full mode
+    - **WHEN** `specd spec context <spec-id> --rules` is run
+    - **THEN** output includes Title and Description
+    - **AND** output includes the Rules section
+    - **AND** Constraints and Scenarios are omitted
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Behaviour'
+  content: |
+    #### Scenario: Full mode is the absolute default
+    - **GIVEN** `specd.yaml` sets `contextMode: summary`
+    - **WHEN** `specd spec context <spec-id>` is run
+    - **THEN** output contains `full` mode sections (Description, Rules, Constraints)
+    - **AND** the config mode is ignored
+
+    #### Scenario: Fresh metadata used in full mode
+    - **GIVEN** a spec has fresh metadata
+    - **WHEN** `specd spec context <spec-id>` is run
+    - **THEN** stdout contains full metadata-derived context
+
+    #### Scenario: Stale metadata falls back to raw artifacts
+    - **GIVEN** a spec has stale metadata
+    - **WHEN** `specd spec context <spec-id>` is run
+    - **THEN** stderr contains a stale-metadata warning
+
+    #### Scenario: Section flags filter only full-mode output
+    - **WHEN** `specd spec context <spec-id> --rules --scenarios` is run
+    - **THEN** output includes Title, Description, Rules, and Scenarios
+    - **AND** Constraints are omitted
+
+    #### Scenario: --follow-deps includes dependency specs
+    - **GIVEN** a root spec depends on another spec
+    - **WHEN** `specd spec context <spec-id> --follow-deps` is run
+    - **THEN** output contains root and dependency entries in `full` mode

@@ -1,0 +1,38 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Plugin declarations'
+  content: |
+    `specd.yaml` MUST include a `plugins` section declaring installed plugins, grouped by type. Each entry MUST include `name`; `config` is plugin-specific and optional.
+
+    ```yaml
+    plugins:
+      agents:
+        - name: '@specd/plugin-agent-claude'
+        - name: '@specd/plugin-agent-copilot'
+          config:
+            commandsDir: .github/copilot/instructions
+    ```
+
+    - `plugins.agents` is an array of plugin declarations
+    - Each entry has `name` (required) and optional `config` (plugin-specific)
+    - ConfigWriter.addPlugin() adds to this array
+    - ConfigWriter.removePlugin() removes by name
+    - ConfigWriter.listPlugins() returns this array
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Config writer port'
+  content: |
+    `@specd/core` exposes a `ConfigWriter` application port for all operations that mutate `specd.yaml`. Adapters (CLI, MCP) never serialise or deserialise YAML directly — they call use cases that delegate to `ConfigWriter`.
+
+    The port defines the following operations:
+
+    - **`initProject(options)`** — writes a new `specd.yaml` at the given path with the provided schema reference, workspace id, and workspace specs path.
+    - **`addPlugin(configPath, type, name)`** — adds a plugin to `plugins.<type>` array.
+    - **`removePlugin(configPath, type, name)`** — removes a plugin from `plugins.<type>` array by name.
+    - **`listPlugins(configPath, type?)`** — returns declared plugins, optionally filtered by type.
+
+    The `FsConfigWriter` adapter implements this port.
+
+    See [`core:core/config-writer-port`](../config-writer-port/spec.md) for full method specifications.

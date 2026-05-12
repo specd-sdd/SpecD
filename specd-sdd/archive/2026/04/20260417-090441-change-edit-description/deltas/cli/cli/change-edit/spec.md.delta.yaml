@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'The spec already correctly documents that --description does not trigger invalidation. Implementation needs to catch up to match this spec.'

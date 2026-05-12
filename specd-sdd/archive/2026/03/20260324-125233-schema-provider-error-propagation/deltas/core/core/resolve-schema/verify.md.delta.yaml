@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'Resolve-schema verify scenarios do not reference SchemaProvider null return — validation error attribution is tested via build-schema scenarios'

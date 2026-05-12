@@ -1,0 +1,71 @@
+- op: added
+  description: 'Add contextMode requirement'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Context spec selection'
+  content: |
+    ### Requirement: Context mode
+
+    `specd.yaml` MUST accept an optional top-level `contextMode` field that controls how `CompileContext` renders specs in the compiled context.
+
+    Valid values:
+
+    - `'lazy'` (default) — specs are split into two tiers. Tier 1 specs (those in the change's `specIds` and `specDependsOn`) are rendered with full content. Tier 2 specs (those from include patterns and `dependsOn` traversal) are rendered as summaries (spec ID, title, description only).
+    - `'full'` — all collected specs are rendered with full structured content (rules, constraints, scenarios). This preserves the pre-change behaviour.
+
+    `contextMode` is project-level only — it MUST NOT appear inside workspace entries. If declared inside a workspace, startup validation MUST reject it as an unknown field.
+
+    When omitted, `contextMode` defaults to `'lazy'`.
+
+- op: modified
+  description: 'Add contextMode to startup validation'
+  selector:
+    type: section
+    matches: 'Requirement: Startup validation'
+  content: |
+    `specd.yaml` MUST be validated at startup. The following conditions are **errors** that prevent startup:
+
+    - File does not exist at the discovered path (after traversal)
+    - YAML parse failure
+    - Missing required top-level field: `schema`
+    - `schema` value does not match `<name>@<version>` format (when string) or is not a valid object with `name` and `version`
+    - Duplicate workspace names (last-wins in YAML; reject if detected)
+    - Unknown adapter value in any `specs`, `schemas`, or storage section
+    - Required adapter-specific fields are absent (e.g. `fs.path` missing when `adapter: fs`)
+    - Storage path (`changes.fs.path` or `archive.fs.path`) resolves outside the repo root
+    - Invalid `contextIncludeSpecs` or `contextExcludeSpecs` pattern syntax (e.g. `*` in a disallowed position)
+    - `schemaPlugins` entry is not a valid string reference
+    - `schemaOverrides` has an invalid structure (unknown operation keys, wrong types)
+    - `contextMode` value is not `'full'` or `'lazy'`
+    - `contextMode` appears inside a workspace entry (it is project-level only)
+
+    The following conditions emit **warnings** but allow startup to proceed:
+
+    - Duplicate workspace names (YAML retains last-wins; warn about the pattern)
+    - Unknown workspace qualifier in a `contextIncludeSpecs` or `contextExcludeSpecs` pattern (runtime only — `specd config validate` treats this as an error)
+
+- op: modified
+  description: 'Add contextMode to constraints'
+  selector:
+    type: section
+    matches: 'Constraints'
+  content: |
+    - `specd.yaml` is the single source of truth for project configuration
+    - One schema reference per project — all workspaces share the same schema, with optional per-workspace schema overrides
+    - `adapter` is required in every `specs`, `schemas`, and storage section; adapter-specific fields are nested under the adapter key
+    - `storage` section is required and must contain both `changes` and `archive` sub-keys
+    - All relative paths resolve from the `specd.yaml` directory; storage paths (`fs.path` in `changes` and `archive`) must remain within the repo root
+    - Project-level `contextIncludeSpecs` defaults to `['default:*']`; project-level `contextExcludeSpecs` defaults to `[]`
+    - Workspace-level `contextIncludeSpecs` defaults to `['*']` (all specs in that workspace); workspace-level `contextExcludeSpecs` defaults to `[]`
+    - `contextMode` is optional; defaults to `'lazy'`; must be `'full'` or `'lazy'` — any other value is a startup validation error
+    - `contextMode` is project-level only; it MUST NOT appear inside workspace entries
+    - `llmOptimizedContext` is optional; defaults to `false`; must be a boolean — any other type is a startup validation error
+    - `context` is optional; each entry is an object with exactly one key: either `file` or `instruction` — no other shapes are valid
+    - `context` file paths are resolved relative to the `specd.yaml` directory; absolute paths are accepted
+    - `approvals` is optional; when present it must contain at least one of `spec` or `signoff`; each is an object with required `enabled` boolean and optional `actor` string
+    - `skills` is optional; when present it must be an object (the manifest body); specd does not validate skill content beyond YAML structure
+    - `plugins` is optional; each entry must contain a `package` string pointing to a resolvable npm package, with optional `config` of any shape; specd validates structure but not plugin-specific config semantics

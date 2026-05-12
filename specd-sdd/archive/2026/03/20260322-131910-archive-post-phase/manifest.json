@@ -1,0 +1,385 @@
+{
+  "name": "archive-post-phase",
+  "createdAt": "2026-03-22T13:19:10.336Z",
+  "description": "Fix post-archive phase: RunStepHooks and GetHookInstructions fail with CHANGE_NOT_FOUND after ArchiveChange moves the change to archive",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "core:core/run-step-hooks",
+    "core:core/get-hook-instructions",
+    "core:core/archive-repository-port"
+  ],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "validatedHash": "sha256:717e9f957bc9a439312a829aa08cc06b652e5532234eed77dbb8bc399b8a29cc"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "files": [
+        {
+          "key": "core:core/run-step-hooks",
+          "filename": "deltas/core/core/run-step-hooks/spec.md.delta.yaml",
+          "validatedHash": "sha256:639aba29b7f1fa07758b23467390feb1ce1b18887a2462722a622c8878b20cf0"
+        },
+        {
+          "key": "core:core/get-hook-instructions",
+          "filename": "deltas/core/core/get-hook-instructions/spec.md.delta.yaml",
+          "validatedHash": "sha256:d016663a7cf74149ed1a5b4173a02256349f006cf98d4c1514c327e328914588"
+        },
+        {
+          "key": "core:core/archive-repository-port",
+          "filename": "deltas/core/core/archive-repository-port/spec.md.delta.yaml",
+          "validatedHash": "sha256:6628862af0c6ec5a1d601bff1410e7273b63ed4825f945e188b1c9f0c475f443"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "files": [
+        {
+          "key": "core:core/run-step-hooks",
+          "filename": "deltas/core/core/run-step-hooks/verify.md.delta.yaml",
+          "validatedHash": "sha256:91a738e18dfdc9ec8ec7b0787a8ee43499ea1c745426b9330faba1ef7daee4fa"
+        },
+        {
+          "key": "core:core/get-hook-instructions",
+          "filename": "deltas/core/core/get-hook-instructions/verify.md.delta.yaml",
+          "validatedHash": "sha256:ac7a80807cc3d7515cdec1c94e123bee89ae6c9ed76ee58295b2f9a6e4584b20"
+        },
+        {
+          "key": "core:core/archive-repository-port",
+          "filename": "deltas/core/core/archive-repository-port/verify.md.delta.yaml",
+          "validatedHash": "sha256:46a031a047132bca368f5d187b02f94eab7683b39c68770470c4260cf3b493ea"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "validatedHash": "sha256:ae7a16a41c4fab03ce0b5624c2cb262e41db9d0762e752cf1724b009a97f1c4c"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "validatedHash": "sha256:38fb4dd307f852a24b2983c4d45c9a8248b47b1ae2d344d15b26ffe8eec60b39"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-03-22T13:19:10.336Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "specIds": [
+        "core:core/archive-change",
+        "core:core/run-step-hooks",
+        "core:core/get-hook-instructions"
+      ],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-03-22T13:19:10.345Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/archive-change"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/run-step-hooks"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/get-hook-instructions"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/archive-change"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/run-step-hooks"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/get-hook-instructions"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-22T13:19:36.309Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-03-22T13:22:50.078Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change"
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-03-22T13:22:50.078Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:core/archive-repository-port"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/archive-repository-port"
+        }
+      ],
+      "filesRemoved": [
+        {
+          "type": "specs",
+          "key": "core:core/archive-change"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/archive-change"
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-22T13:26:53.659Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-03-22T13:47:51.896Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-change"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-22T13:47:51.896Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-22T13:48:12.869Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-22T13:52:13.047Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "pending-spec-approval"
+    },
+    {
+      "type": "spec-approved",
+      "at": "2026-03-22T13:53:38.995Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "reason": "Specs accepted",
+      "artifactHashes": {
+        "proposal:proposal": "sha256:717e9f957bc9a439312a829aa08cc06b652e5532234eed77dbb8bc399b8a29cc",
+        "specs:core:core/run-step-hooks": "sha256:639aba29b7f1fa07758b23467390feb1ce1b18887a2462722a622c8878b20cf0",
+        "specs:core:core/get-hook-instructions": "sha256:d016663a7cf74149ed1a5b4173a02256349f006cf98d4c1514c327e328914588",
+        "specs:core:core/archive-repository-port": "sha256:6628862af0c6ec5a1d601bff1410e7273b63ed4825f945e188b1c9f0c475f443",
+        "verify:core:core/run-step-hooks": "sha256:91a738e18dfdc9ec8ec7b0787a8ee43499ea1c745426b9330faba1ef7daee4fa",
+        "verify:core:core/get-hook-instructions": "sha256:ac7a80807cc3d7515cdec1c94e123bee89ae6c9ed76ee58295b2f9a6e4584b20",
+        "verify:core:core/archive-repository-port": "sha256:46a031a047132bca368f5d187b02f94eab7683b39c68770470c4260cf3b493ea",
+        "design:design": "sha256:ae7a16a41c4fab03ce0b5624c2cb262e41db9d0762e752cf1724b009a97f1c4c",
+        "tasks:tasks": "sha256:38fb4dd307f852a24b2983c4d45c9a8248b47b1ae2d344d15b26ffe8eec60b39"
+      }
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-22T13:53:38.995Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "pending-spec-approval",
+      "to": "spec-approved"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-22T13:54:04.392Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "spec-approved",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-22T14:05:18.268Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-22T14:05:52.371Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-22T14:06:10.103Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "done",
+      "to": "pending-signoff"
+    },
+    {
+      "type": "signed-off",
+      "at": "2026-03-22T14:07:46.856Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "reason": "comprobado",
+      "artifactHashes": {
+        "proposal:proposal": "sha256:717e9f957bc9a439312a829aa08cc06b652e5532234eed77dbb8bc399b8a29cc",
+        "specs:core:core/run-step-hooks": "sha256:639aba29b7f1fa07758b23467390feb1ce1b18887a2462722a622c8878b20cf0",
+        "specs:core:core/get-hook-instructions": "sha256:d016663a7cf74149ed1a5b4173a02256349f006cf98d4c1514c327e328914588",
+        "specs:core:core/archive-repository-port": "sha256:6628862af0c6ec5a1d601bff1410e7273b63ed4825f945e188b1c9f0c475f443",
+        "verify:core:core/run-step-hooks": "sha256:91a738e18dfdc9ec8ec7b0787a8ee43499ea1c745426b9330faba1ef7daee4fa",
+        "verify:core:core/get-hook-instructions": "sha256:ac7a80807cc3d7515cdec1c94e123bee89ae6c9ed76ee58295b2f9a6e4584b20",
+        "verify:core:core/archive-repository-port": "sha256:46a031a047132bca368f5d187b02f94eab7683b39c68770470c4260cf3b493ea",
+        "design:design": "sha256:ae7a16a41c4fab03ce0b5624c2cb262e41db9d0762e752cf1724b009a97f1c4c",
+        "tasks:tasks": "sha256:38fb4dd307f852a24b2983c4d45c9a8248b47b1ae2d344d15b26ffe8eec60b39"
+      }
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-22T14:07:46.856Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "pending-signoff",
+      "to": "signed-off"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-22T14:08:09.164Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "signed-off",
+      "to": "archivable"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-22T14:09:02.407Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-03-22T14:09:15.311Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "m***a@g***.com"
+  }
+}

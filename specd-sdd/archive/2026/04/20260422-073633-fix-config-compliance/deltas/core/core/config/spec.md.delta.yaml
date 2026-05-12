@@ -1,0 +1,88 @@
+- op: removed
+  description: 'Remove obsolete Skills manifest requirement — replaced by plugin system'
+  selector:
+    type: section
+    matches: 'Requirement: Skills manifest'
+
+- op: modified
+  description: 'Update Plugin declarations to require config-loader validation'
+  selector:
+    type: section
+    matches: 'Requirement: Plugin declarations'
+  content: |
+    `specd.yaml` MUST include a `plugins` section declaring installed plugins, grouped by type. The config loader MUST validate the `plugins` field at load time using the Zod schema — structural errors MUST produce a `ConfigValidationError` before any command runs.
+
+    The validated structure is:
+
+    ```typescript
+    plugins: {
+      agents?: Array<{ name: string; config?: Record<string, unknown> }>
+    }
+    ```
+
+    Each plugin entry has `name` (required) and optional `config`. Unknown plugin types are rejected at validation time.
+
+- op: modified
+  description: 'Update ConfigWriter.addPlugin signature to include optional config parameter'
+  selector:
+    type: section
+    matches: 'Requirement: Config writer port'
+  content: |
+    `ConfigWriter` is an application-layer port that defines the contract for writing to `specd.yaml`. It complements the read-only `ConfigLoader` with mutation operations for project initialisation and plugin management.
+
+    The port MUST define the following methods:
+
+    - `initProject(configPath: string, options: InitProjectOptions): Promise<InitProjectResult>` — creates a new `specd.yaml` with default content
+    - `addPlugin(configPath: string, type: string, name: string, config?: Record<string, unknown>): Promise<void>` — adds a plugin entry to `plugins.<type>`, with optional config
+    - `removePlugin(configPath: string, type: string, name: string): Promise<void>` — removes a plugin entry from `plugins.<type>`
+    - `listPlugins(configPath: string, type: string): Promise<Array<{ name: string; config?: Record<string, unknown> }>>` — reads plugin entries from `plugins.<type>`
+
+    The `addPlugin` method accepts four parameters:
+
+    1. `configPath: string` — absolute path to the `specd.yaml` to update
+    2. `type: string` — the plugin type (e.g. `"agents"`)
+    3. `name: string` — the plugin package name (e.g. `"@specd/plugin-agent-claude"`)
+    4. `config?: Record<string, unknown>` — optional plugin configuration
+
+    It MUST return `Promise<void>`. The method MUST add the plugin to the `plugins.<type>` array in `specd.yaml`. If the plugin is already present, the method MUST NOT duplicate it.
+
+- op: modified
+  description: 'Update Template variables to require warning for unknowns'
+  selector:
+    type: section
+    matches: 'Requirement: Template variables'
+  content: |
+    Archive patterns and hook commands contain `{{namespace.key}}` tokens expanded at runtime. The `TemplateExpander` resolves each token against the variable map.
+
+    When a token does not match any registered namespace or key, the original token MUST be preserved unchanged in the output and a warning MUST be emitted. The warning identifies the unresolved token and is informational only — it does not halt processing.
+
+- op: modified
+  description: 'Update Startup validation to mention artifactRules rejection and plugins validation'
+  selector:
+    type: section
+    matches: 'Requirement: Startup validation'
+  content: |
+    Before constructing any use case, the config loader MUST validate the loaded config against the Zod schema. The following startup validation rules apply:
+
+    - `schema` field is required — if missing, `ConfigValidationError` is thrown
+    - `workspaces.default` is required — if missing, `ConfigValidationError` is thrown
+    - Adapter values in storage and workspace configs MUST be recognised strings
+    - `contextMode` MUST be one of `list`, `summary`, `full`, or `hybrid` — `lazy` is rejected
+    - `contextMode` inside a workspace entry is rejected with the specific message: "`contextMode` is not valid inside a workspace — it is a project-level setting"
+    - Pattern syntax in `contextIncludeSpecs` and `contextExcludeSpecs` MUST be valid (no mid-segment wildcards)
+    - `plugins` section, if present, MUST conform to the validated structure
+    - `artifactRules` is NOT accepted — if present, `ConfigValidationError` is thrown suggesting migration to `schemaOverrides`
+
+- op: modified
+  description: 'Remove artifactRules from constraints'
+  selector:
+    type: section
+    matches: 'Constraints'
+  content: |
+    - Every field in `specd.yaml` is validated at load time by the Zod schema
+    - `artifactRules` is not a valid config field — use `schemaOverrides` instead
+    - `skills` is not a valid config field — skills are managed via the plugin system
+    - `contextMode` is project-level only — rejected inside workspace entries
+    - Unknown fields at the top level are rejected by the strict Zod schema
+    - `configPath` MUST resolve inside the repository root
+    - Storage paths MUST resolve inside the repository root

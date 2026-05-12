@@ -1,0 +1,77 @@
+- op: modified
+  description: Add --artifact flag to command signature
+  selector:
+    type: section
+    matches: 'Requirement: Command signature'
+  content: |
+    ```
+    specd change spec-preview <name> <specId> [--artifact <name>] [--diff] [--format text|json|toon]
+    ```
+
+    - `<name>` — required positional; the change name
+    - `<specId>` — required positional; the fully-qualified spec ID to preview (e.g. `core:core/compile-context`); MUST be one of the change's `specIds`
+    - `--artifact <name>` — optional; filters the output to only include the artifact with the given ID (e.g. `specs`, `verify`)
+    - `--diff` — optional flag; when present, outputs a unified diff instead of the full merged content
+    - `--format text|json|toon` — optional; output format, defaults to `text`
+
+- op: modified
+  description: Define artifact filtering for merged mode
+  selector:
+    type: section
+    matches: 'Requirement: Text output . merged mode \(no --diff\)'
+  content: |
+    When `--diff` is not present, the command MUST output the merged spec content. Artifact files MUST be concatenated in order: `spec.md` first (if present), then remaining files alphabetically. Each file MUST be preceded by a `--- <filename> ---` separator line, matching the format used by `specd spec show`.
+
+    If `--artifact <name>` is provided, the command MUST resolve `<name>` to a filename using the active schema. Only the content of the matching artifact SHALL be printed, still preceded by its `--- <filename> ---` header line.
+
+- op: modified
+  description: Define artifact filtering for diff mode
+  selector:
+    type: section
+    matches: 'Requirement: Text output . diff mode \(--diff\)'
+  content: |
+    When `--diff` is present, the command MUST generate a unified diff locally from the `base` and `merged` fields returned by `PreviewSpec`, using the `diff` npm package's `createTwoFilesPatch` function with 3 lines of context. The diff MUST be colorized using `chalk`:
+
+    - Lines starting with `+` (additions) — green
+    - Lines starting with `-` (removals) — red
+    - Lines starting with `@@` (hunk headers) — cyan
+    - All other lines (context) — dim
+
+    Each file's diff MUST be preceded by a `--- <filename> ---` separator line. Files with no changes (no-op deltas) MUST be omitted from the diff output entirely.
+
+    If `--artifact <name>` is provided, the command MUST only output the diff for the requested artifact. If the requested artifact has no changes, the command SHALL exit with code 0 and output nothing (or a message indicating no changes if applicable to text format), matching the default diff behavior for individual files.
+
+- op: modified
+  description: Define artifact filtering for JSON/TOON output
+  selector:
+    type: section
+    matches: 'Requirement: JSON/TOON output'
+  content: |
+    JSON and TOON output MUST return the `PreviewSpecResult` object from the use case. When `--diff` is present, the CLI MUST generate non-colorized unified diff strings and include them as a `diff` field on each file entry. When `--diff` is absent, file entries include `base` and `merged` fields as returned by the use case.
+
+    If `--artifact <name>` is provided, the `files` array in the result object SHALL contain exactly one entry for the requested artifact.
+
+- op: added
+  description: Define error cases for artifact filtering
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Error handling'
+  content: |
+    ### Requirement: Artifact filtering errors
+
+    - If `--artifact <name>` is provided and `<name>` does not exist in the active schema, the command SHALL exit with code 1 and print an `error:` message to stderr.
+    - If the artifact exists in the schema but its scope is not `spec`, the command SHALL exit with code 1 and print an `error:` message to stderr.
+    - If the artifact is valid in the schema but is not present in the change's artifacts for the given `specId`, the command SHALL exit with code 1 and print an `error:` message to stderr.
+
+- op: added
+  description: Add constraint for artifact filtering
+  position:
+    parent:
+      type: section
+      matches: 'Constraints'
+  content: |
+    - Artifact filtering resolve IDs to filenames using the same logic as `specd spec show`.

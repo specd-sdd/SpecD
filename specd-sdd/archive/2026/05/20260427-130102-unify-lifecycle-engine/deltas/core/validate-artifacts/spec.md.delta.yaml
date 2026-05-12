@@ -1,0 +1,62 @@
+# Delta: core:validate-artifacts
+
+- op: modified
+  description: 'Inject LifecycleEngine while preserving existing validation responsibilities.'
+  selector:
+    type: section
+    matches: 'Requirement: Ports and constructor'
+  content: |
+    `ValidateArtifacts` receives at construction time: `ChangeRepository`, a map of `SpecRepository` instances (one per configured workspace), `SchemaProvider`, `ArtifactParserRegistry`, `ActorResolver`, `ContentHasher`, and `LifecycleEngine`.
+
+    ```typescript
+    class ValidateArtifacts {
+      constructor(
+        changes: ChangeRepository,
+        specs: ReadonlyMap<string, SpecRepository>,
+        schemaProvider: SchemaProvider,
+        parsers: ArtifactParserRegistry,
+        actor: ActorResolver,
+        hasher: ContentHasher,
+        lifecycle: LifecycleEngine,
+      )
+    }
+    ```
+
+    `SchemaProvider` is a lazy, caching port that returns the fully-resolved schema (with plugins and overrides applied). It replaces the previous `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths` triple. All are injected at kernel composition time, not passed per invocation.
+
+    `ActorResolver` supplies the identity recorded on approval invalidation events. `ContentHasher` is used both for approval drift detection and for the cleaned hashes persisted when validation succeeds. `LifecycleEngine` is used only for schema-aware dependency interpretation; structural validation, delta preview, metadata extraction, and artifact completion remain owned by `ValidateArtifacts`.
+
+- op: modified
+  description: 'Preserve dependency-blocking semantics while moving recursive blocker interpretation to LifecycleEngine.'
+  selector:
+    type: section
+    matches: 'Requirement: Dependency order check'
+  content: |
+    Before validating an artifact, `ValidateArtifacts` must check that all artifact IDs in its `requires` list are either `complete` or `skipped`.
+
+    The dependency-aware status lookup SHALL be interpreted through `LifecycleEngine`, since recursive parent blocking and schema DAG semantics do not belong on the `Change` entity. If a required dependency is neither `complete` nor `skipped`, validation of the dependent artifact is skipped and reported as a dependency-blocked failure. A `skipped` optional artifact satisfies the dependency. `skipped` artifacts are not validated — there is no file to check.
+
+    Dependency-blocked failures MUST include the dependency artifact ID and its effective status as observed at validation time.
+
+    When the dependency status is `pending-parent-artifact-review`, the failure description MUST also include the upstream parent blocker context (artifact ID and status) when available from recursive blocker resolution.
+
+    For blockers outside review-propagation (`missing` and `in-progress`), the failure description MUST still include the dependency status and MUST NOT degrade to generic "incomplete dependency" wording.
+
+    `pending-review` and `drifted-pending-review` are review blockers. For these statuses, the failure description MUST present them as review-state blockers (not generic incompleteness) and MUST include the status explicitly.
+
+- op: modified
+  description: 'Add LifecycleEngine to spec dependencies without dropping existing related specs.'
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`core:change`](../change/spec.md) — change entity, approval invalidation, and artifact state
+    - [`core:change-layout`](../change-layout/spec.md) — expected file paths for new spec artifacts and delta artifacts
+    - [`core:change-manifest`](../change-manifest/spec.md) — persisted artifact filenames used by validation
+    - [`core:lifecycle-engine`](../lifecycle-engine/spec.md) — schema-aware dependency interpretation and recursive blocker resolution
+    - [`core:schema-format`](../schema-format/spec.md) — artifact definition, validations, delta behavior, and pre-hash cleanup
+    - [`core:delta-format`](../delta-format/spec.md) — parser contract and delta application errors
+    - [`core:selector-model`](../selector-model/spec.md) — selector rules for validations and delta validations
+    - [`core:storage`](../storage/spec.md) — validation as the only path to `complete`
+    - [`default:_global/architecture`](../../_global/architecture/spec.md) — port-per-workspace and manual DI constraints
+    - [`core:spec-id-format`](../spec-id-format/spec.md) — canonical spec ID format for spec-scoped artifacts

@@ -1,0 +1,219 @@
+{
+  "name": "enrich-get-status-lifecycle",
+  "createdAt": "2026-03-20T11:22:34.512Z",
+  "description": "Enrich GetStatus with lifecycle context (transitions, blockers, approvals, nextArtifact, changePath) so consumers can drive the lifecycle with a single call",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": ["core:core/get-status", "cli:cli/change-status"],
+  "specDependsOn": {
+    "core:core/get-status": [
+      "core:core/transition-change",
+      "core:core/schema-format",
+      "core:core/config"
+    ],
+    "cli:cli/change-status": ["core:core/get-status"]
+  },
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "validatedHash": "sha256:2f4c2fb7c7515c37c90eecef2a9e26d6662525a95603b6afef029a2a66e3f8a8"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "files": [
+        {
+          "key": "core:core/get-status",
+          "filename": "deltas/core/core/get-status/spec.md.delta.yaml",
+          "validatedHash": "sha256:2197717ca01c24fd3d763b85f65789265f590fed0a2bfc9c54f05ae82ecccb36"
+        },
+        {
+          "key": "cli:cli/change-status",
+          "filename": "deltas/cli/cli/change-status/spec.md.delta.yaml",
+          "validatedHash": "sha256:cead12100231e047ee0479f16ed10d8ce8042846c174959e361b593a19fc3a76"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "files": [
+        {
+          "key": "core:core/get-status",
+          "filename": "deltas/core/core/get-status/verify.md.delta.yaml",
+          "validatedHash": "sha256:2b25e6533121f47a3f35cd232d9f753c3de9c2731bccba53281fd230449172db"
+        },
+        {
+          "key": "cli:cli/change-status",
+          "filename": "deltas/cli/cli/change-status/verify.md.delta.yaml",
+          "validatedHash": "sha256:f386c21e0e3df499d4cb4efdecf067a513b5b59266ba2423d259394825f9b3ff"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "validatedHash": "sha256:cd8a4548b51877077bb72ba078b98008bfb26538a534c7e513e1c69472aca459"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "validatedHash": "sha256:c7b5ba96208a342308d1e1c4d54b710e70cbaca194efd54b619a4072b3b0c8e4"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-03-20T11:22:34.512Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "specIds": ["core:core/get-status", "cli:cli/change-status"],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-03-20T11:22:34.524Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/get-status"
+        },
+        {
+          "type": "specs",
+          "key": "cli:cli/change-status"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/get-status"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/change-status"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-20T11:22:43.074Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-20T11:50:42.440Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-20T11:56:13.195Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-20T12:11:11.500Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-20T12:11:51.349Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-20T12:12:01.330Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-20T12:12:51.167Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-03-20T12:12:52.864Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "m***a@g***.com"
+  }
+}

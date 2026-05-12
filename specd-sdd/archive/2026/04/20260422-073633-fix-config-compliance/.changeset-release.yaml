@@ -1,0 +1,5 @@
+releases:
+  core:core/config: patch
+  cli:cli/config-show: patch
+  core:core/template-variables: patch
+  core:core/config-writer-port: patch

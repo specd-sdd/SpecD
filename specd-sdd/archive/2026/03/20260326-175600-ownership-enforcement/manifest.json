@@ -1,0 +1,297 @@
+{
+  "name": "ownership-enforcement",
+  "createdAt": "2026-03-26T17:56:00.764Z",
+  "description": "Enforce readOnly workspace ownership — block spec and code modifications at change create/edit, archive, and SpecRepository levels with clear error messages",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "core:core/workspace",
+    "core:core/spec-repository-port",
+    "core:core/archive-change",
+    "cli:cli/change-create",
+    "cli:cli/change-edit",
+    "core:core/repository-port"
+  ],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "validatedHash": "sha256:5073110a1f601d65ffb50ccb53acfd6d9a31228ef6f94e7d0953148ac6b68b86"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "files": [
+        {
+          "key": "core:core/workspace",
+          "filename": "deltas/core/core/workspace/spec.md.delta.yaml",
+          "validatedHash": "sha256:b9f14b74caf156dd1b35af8e7ea2b6d7dea76124e29e4e90bf362a1283636ce0"
+        },
+        {
+          "key": "core:core/spec-repository-port",
+          "filename": "deltas/core/core/spec-repository-port/spec.md.delta.yaml",
+          "validatedHash": "sha256:a6d7b2bdb36d831314fc142ed1a09e185153b25450806473ff0154ba20988a97"
+        },
+        {
+          "key": "core:core/archive-change",
+          "filename": "deltas/core/core/archive-change/spec.md.delta.yaml",
+          "validatedHash": "sha256:9b881dbd7f87b731d9200263cedc575a031d177d1b94a430a1e6904bda94e5ef"
+        },
+        {
+          "key": "cli:cli/change-create",
+          "filename": "deltas/cli/cli/change-create/spec.md.delta.yaml",
+          "validatedHash": "sha256:a323f697e9cd81d79b79aa83aece8a62781a7cc639c518c7dda2504e0ef3fa91"
+        },
+        {
+          "key": "cli:cli/change-edit",
+          "filename": "deltas/cli/cli/change-edit/spec.md.delta.yaml",
+          "validatedHash": "sha256:042e8ce103a791fc21c9d5ca308be9f280694ed4736efb1012578ab4c077d572"
+        },
+        {
+          "key": "core:core/repository-port",
+          "filename": "deltas/core/core/repository-port/spec.md.delta.yaml",
+          "validatedHash": "sha256:4bec7f9fbd91b8899ec99f592a405b591833e53e62dc75e3149d147b5f22ff2f"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "files": [
+        {
+          "key": "core:core/workspace",
+          "filename": "deltas/core/core/workspace/verify.md.delta.yaml",
+          "validatedHash": "sha256:93a26aa4ad53e5da897934eafc9f1c102ea2e0cf36072dc76dfa290eaf0ebec8"
+        },
+        {
+          "key": "core:core/spec-repository-port",
+          "filename": "deltas/core/core/spec-repository-port/verify.md.delta.yaml",
+          "validatedHash": "sha256:e966d14b363bb797893b7c55f7f6e3b5fa8f6539b2e933cda42406c6f37a63b7"
+        },
+        {
+          "key": "core:core/archive-change",
+          "filename": "deltas/core/core/archive-change/verify.md.delta.yaml",
+          "validatedHash": "sha256:598709aa81de0935dde9a8186e0583f0aa18a239e6fa4087b0ce4fe5fa73f4b9"
+        },
+        {
+          "key": "cli:cli/change-create",
+          "filename": "deltas/cli/cli/change-create/verify.md.delta.yaml",
+          "validatedHash": "sha256:28f5ccb1dc242b7e73f726a23f5f1ba68455c1dabff0c223cd02389514186529"
+        },
+        {
+          "key": "cli:cli/change-edit",
+          "filename": "deltas/cli/cli/change-edit/verify.md.delta.yaml",
+          "validatedHash": "sha256:cf36e0ff7caee95e01a2e7cb0387eaa375beeef5b0255bba3e3026b36c74a9ce"
+        },
+        {
+          "key": "core:core/repository-port",
+          "filename": "deltas/core/core/repository-port/verify.md.delta.yaml",
+          "validatedHash": "sha256:bc3371d9bac8154346e4b0974a839d4a36cb56d3d989ce5d23a888d3098e4e74"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "validatedHash": "sha256:e0f50a0f7364f2b9b889170914a39e9b8ba41c8b24962741ad918d59197e9a8f"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "validatedHash": "sha256:bc448657ca233bab32c5c9f8111bb84f3c135b874e658953007adc4763cd04df"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-03-26T17:56:00.764Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "specIds": [
+        "core:core/workspace",
+        "core:core/spec-repository-port",
+        "core:core/archive-change",
+        "cli:cli/change-create",
+        "cli:cli/change-edit",
+        "core:core/repository-port"
+      ],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-03-26T17:56:00.772Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/workspace"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/spec-repository-port"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/archive-change"
+        },
+        {
+          "type": "specs",
+          "key": "cli:cli/change-create"
+        },
+        {
+          "type": "specs",
+          "key": "cli:cli/change-edit"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/repository-port"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/workspace"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/spec-repository-port"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/archive-change"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/change-create"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/change-edit"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/repository-port"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-26T18:06:03.004Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-26T18:29:15.955Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-26T19:56:24.314Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-26T20:09:12.126Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-26T20:13:15.193Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-26T20:13:36.344Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-26T20:15:18.111Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-03-26T20:15:18.312Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "m***a@g***.com"
+  }
+}

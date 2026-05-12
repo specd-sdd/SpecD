@@ -1,0 +1,190 @@
+# Delta: core:compile-context (Verification)
+
+- op: modified
+  description: 'Update step availability scenarios to reflect engine delegation.'
+  selector:
+    type: section
+    matches: 'Requirement: Step availability'
+  content: |
+    #### Scenario: Step availability is derived from LifecycleEngine
+
+    - **GIVEN** a requested step that is blocked according to the engine
+    - **WHEN** `CompileContext.execute` is called
+    - **THEN** it calls `LifecycleEngine.evaluate`
+    - **AND** `result.stepAvailable` matches the engine's verdict
+    - **AND** `result.blockingArtifacts` is populated from the engine's blockers
+
+    #### Scenario: Step available when all required artifacts are complete
+
+    - **GIVEN** `workflow.implementing.requires: ['tasks']`
+    - **AND** the `tasks` artifact's effective status is `complete` according to the engine
+    - **WHEN** `CompileContext.execute` is called with `step: 'implementing'`
+    - **THEN** `result.stepAvailable` is `true`
+    - **AND** `result.blockingArtifacts` is empty
+
+    #### Scenario: Unavailability does not throw
+
+    - **GIVEN** the requested step's required artifacts are not complete
+    - **WHEN** `CompileContext.execute` is called
+    - **THEN** the result is returned normally — no exception is thrown
+
+- op: removed
+  description: 'Replace the structured result assembly requirement scenarios.'
+  selector:
+    type: section
+    matches: 'Requirement: Structured result assembly'
+
+- op: added
+  description: 'Add updated structured result assembly scenarios for enriched availableSteps.'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: Structured result assembly
+
+    #### Scenario: availableSteps includes all workflow steps
+
+    - **WHEN** `CompileContext.execute` is called
+    - **THEN** `availableSteps` includes all steps from the active schema workflow
+    - **AND** each entry contains `available`, `isReady`, `isPermitted`, `blockingArtifacts`, and `blockers` from the engine
+
+    #### Scenario: List-mode structured entry omits summary and content fields
+
+    - **GIVEN** `contextMode: "list"`
+    - **WHEN** `CompileContext.execute` is called
+    - **THEN** each list entry includes `specId`, `source`, and `mode`
+    - **AND** list entries omit full content
+
+    #### Scenario: Summary-mode structured entry omits content
+
+    - **GIVEN** `contextMode: "summary"`
+    - **WHEN** `CompileContext.execute` is called
+    - **THEN** each summary entry omits full content
+
+    #### Scenario: Full-mode structured entry includes content
+
+    - **GIVEN** `contextMode: "full"`
+    - **WHEN** `CompileContext.execute` is called
+    - **THEN** each full entry includes content
+
+- op: added
+  description: 'Add missing requirement headings required by the spec contract.'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: Ports and constructor
+
+    #### Scenario: CompileContext is constructed with LifecycleEngine
+
+    - **WHEN** `CompileContext` is assembled
+    - **THEN** it receives `PreviewSpec` and `LifecycleEngine` alongside its existing repositories and utilities
+
+- op: added
+  description: 'Add the verify requirement for input.'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: Input
+
+    #### Scenario: Input includes step, config, and optional traversal controls
+
+    - **WHEN** `CompileContext.execute` is called
+    - **THEN** it accepts the change name, target step, resolved config, and optional flags such as `includeChangeSpecs`, `followDeps`, `depth`, `sections`, and `fingerprint`
+
+- op: added
+  description: 'Add the verify requirement for schema name guard.'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: Schema name guard
+
+    #### Scenario: Schema mismatch throws before context compilation
+
+    - **GIVEN** the change was created under a different schema name
+    - **WHEN** `CompileContext.execute` is called
+    - **THEN** it throws `SchemaMismatchError` before collecting context
+
+- op: added
+  description: 'Add the verify requirement for workspace resolution.'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: Workspace resolution for spec IDs
+
+    #### Scenario: Unqualified include pattern resolves to default workspace
+
+    - **GIVEN** a project-level include pattern with no workspace qualifier
+    - **WHEN** `CompileContext.execute` resolves that pattern
+    - **THEN** it treats the pattern as targeting the `default` workspace
+
+- op: added
+  description: 'Add the verify requirement for result shape.'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: Result shape
+
+    #### Scenario: Result contains fingerprint, availability, context entries, and warnings
+
+    - **WHEN** `CompileContext.execute` returns a changed result
+    - **THEN** the payload includes `contextFingerprint`, `stepAvailable`, `blockingArtifacts`, `projectContext`, `specs`, `availableSteps`, and `warnings`
+
+- op: added
+  description: 'Preserve merged-preview verification under the structured result assembly contract.'
+  position:
+    after:
+      type: section
+      matches: 'Requirement: Structured result assembly'
+  content: |
+    #### Scenario: Spec with validated delta returns merged content
+
+    - **GIVEN** a change with `specIds: ["core:config"]` and a validated delta for `spec.md`
+    - **AND** `PreviewSpec` returns a `files` entry with `filename: "spec.md"` and `merged: "merged content"`
+    - **WHEN** `CompileContext.execute` renders content for `core:config` in full mode
+    - **THEN** the `ContextSpecEntry.content` equals `"merged content"`
+
+    #### Scenario: Spec with no delta falls back to base content
+
+    - **GIVEN** a change with `specIds: ["core:config"]` and no delta files
+    - **AND** `PreviewSpec` returns an empty `files` array
+    - **WHEN** `CompileContext.execute` renders content for `core:config` in full mode
+    - **THEN** the `ContextSpecEntry.content` is rendered from metadata or extraction fallback as before
+
+    #### Scenario: PreviewSpec failure falls back gracefully
+
+    - **GIVEN** a change with `specIds: ["core:config"]` and a delta file
+    - **AND** `PreviewSpec` throws an error during execution
+    - **WHEN** `CompileContext.execute` renders content for `core:config`
+    - **THEN** the `ContextSpecEntry.content` is rendered from metadata or extraction fallback
+    - **AND** a warning is added to the result
+
+    #### Scenario: Preview only applies to specIds specs
+
+    - **GIVEN** a change with `specIds: ["core:config"]`
+    - **AND** the context includes `default:_global/architecture` via include pattern
+    - **WHEN** `CompileContext.execute` is called
+    - **THEN** `PreviewSpec` is NOT called for `default:_global/architecture`
+    - **AND** `default:_global/architecture` content is rendered from its base (metadata or fallback)
+
+    #### Scenario: Non-full specs are not previewed
+
+    - **GIVEN** `contextMode: "summary"` and a spec matched only via include pattern
+    - **WHEN** `CompileContext.execute` is called
+    - **THEN** `PreviewSpec` is NOT called for that spec — non-full specs have no merged content to render
+
+- op: removed
+  description: 'Remove the old verify-only materialized-delta heading now that its scenarios live under Structured result assembly.'
+  selector:
+    type: section
+    matches: 'Requirement: Materialized delta view'

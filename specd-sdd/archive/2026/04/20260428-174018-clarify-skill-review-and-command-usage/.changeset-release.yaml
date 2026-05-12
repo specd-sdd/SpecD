@@ -1,0 +1,5 @@
+releases:
+  skills:workflow-automation: patch
+  cli:change-validate: patch
+  cli:change-spec-preview: patch
+  cli:command-resource-naming: patch

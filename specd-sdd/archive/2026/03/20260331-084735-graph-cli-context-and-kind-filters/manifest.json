@@ -1,0 +1,463 @@
+{
+  "name": "graph-cli-context-and-kind-filters",
+  "createdAt": "2026-03-31T08:47:35.617Z",
+  "description": "Define graph CLI context resolution for --config/--path/cwd/no-config flows and normalize multi-kind filtering",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "cli:cli/graph-hotspots",
+    "cli:cli/graph-index",
+    "cli:cli/graph-search",
+    "cli:cli/graph-stats",
+    "cli:cli/graph-impact",
+    "core:core/config"
+  ],
+  "specDependsOn": {
+    "cli:cli/graph-hotspots": [
+      "cli:cli/entrypoint",
+      "core:core/config",
+      "code-graph:code-graph/composition"
+    ],
+    "cli:cli/graph-index": ["core:core/config"],
+    "cli:cli/graph-search": ["core:core/config"],
+    "cli:cli/graph-stats": ["core:core/config"],
+    "cli:cli/graph-impact": ["core:core/config"]
+  },
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "validatedHash": "sha256:4167f7936bf99015f27d37400eecfe59b7749ad09373c85891c64755ab696e2d"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "files": [
+        {
+          "key": "cli:cli/graph-hotspots",
+          "filename": "specs/cli/cli/graph-hotspots/spec.md",
+          "validatedHash": "sha256:9ca3e3b31ab64e67fc244a7f56ed19321a11886df1820401c76a556cf7169afa"
+        },
+        {
+          "key": "cli:cli/graph-index",
+          "filename": "deltas/cli/cli/graph-index/spec.md.delta.yaml",
+          "validatedHash": "sha256:9644491a1019fde51070b9dc64da44742e55284d35239aaa425f34846a04af6d"
+        },
+        {
+          "key": "cli:cli/graph-search",
+          "filename": "deltas/cli/cli/graph-search/spec.md.delta.yaml",
+          "validatedHash": "sha256:99fbe1f827438600ad97d6ffacab0ffc0e60ccca7ff1e2839b01dd4367ea3956"
+        },
+        {
+          "key": "cli:cli/graph-stats",
+          "filename": "deltas/cli/cli/graph-stats/spec.md.delta.yaml",
+          "validatedHash": "sha256:c363af540fd7df19d453fdabf64011b31c0b0ffd4a4e718f03119e12af99c8f6"
+        },
+        {
+          "key": "cli:cli/graph-impact",
+          "filename": "deltas/cli/cli/graph-impact/spec.md.delta.yaml",
+          "validatedHash": "sha256:8e6343b334f5c40e2dd934fae31f61a13576a9a999c52c7e53e064eeffe4ac2e"
+        },
+        {
+          "key": "core:core/config",
+          "filename": "deltas/core/core/config/spec.md.delta.yaml",
+          "validatedHash": "sha256:7eeff02386090b17c4e401a1046ed74fd57b86bf35f9aeb96351492cc0b2bfb6"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "files": [
+        {
+          "key": "cli:cli/graph-hotspots",
+          "filename": "specs/cli/cli/graph-hotspots/verify.md",
+          "validatedHash": "sha256:4f4b4c5cff591d10ee73814408e9956e3226a77e45bd783f680105f2a2c9c158"
+        },
+        {
+          "key": "cli:cli/graph-index",
+          "filename": "deltas/cli/cli/graph-index/verify.md.delta.yaml",
+          "validatedHash": "sha256:8e6776a5d7d1744b7b7401fd4009de8f3843a0b426d4440e87e2f52545493ab1"
+        },
+        {
+          "key": "cli:cli/graph-search",
+          "filename": "deltas/cli/cli/graph-search/verify.md.delta.yaml",
+          "validatedHash": "sha256:601bb1dbed1a9931368811f26d1b2c2665e8ecaa249f12e867d9d051644d6587"
+        },
+        {
+          "key": "cli:cli/graph-stats",
+          "filename": "deltas/cli/cli/graph-stats/verify.md.delta.yaml",
+          "validatedHash": "sha256:f2b05854d4acd07640c61cf8099fb1ddf0efa0717e13a62bfda562024200379f"
+        },
+        {
+          "key": "cli:cli/graph-impact",
+          "filename": "deltas/cli/cli/graph-impact/verify.md.delta.yaml",
+          "validatedHash": "sha256:de95f153eeaeba9925a7252d1bfc67879e74bf5fd99db08834b9e7769567d218"
+        },
+        {
+          "key": "core:core/config",
+          "filename": "deltas/core/core/config/verify.md.delta.yaml",
+          "validatedHash": "sha256:027bfebe034cc426c70c74010721f5338366fb0f6ba8517948e52156b63f1b06"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "validatedHash": "sha256:5ed17618af4758970c643f6bad4aa0df11506d4a6d3e2ba4de0e31b40c73409f"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "validatedHash": "sha256:3aeab082c9727ecde340b13452f98d0255c53b0e539ff69afce9b2b0f5aebba3"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-03-31T08:47:35.617Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "specIds": [],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-03-31T08:47:35.626Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-31T08:57:45.710Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-03-31T08:59:58.425Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change"
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-03-31T08:59:58.426Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "cli:cli/graph-hotspots"
+        },
+        {
+          "type": "specs",
+          "key": "cli:cli/graph-index"
+        },
+        {
+          "type": "specs",
+          "key": "cli:cli/graph-search"
+        },
+        {
+          "type": "specs",
+          "key": "cli:cli/graph-stats"
+        },
+        {
+          "type": "specs",
+          "key": "cli:cli/graph-impact"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/config"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/graph-hotspots"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/graph-index"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/graph-search"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/graph-stats"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/graph-impact"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/config"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-03-31T09:48:16.786Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change"
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-03-31T09:48:16.786Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [],
+      "filesRemoved": [
+        {
+          "type": "specs",
+          "key": "cli:cli/graph-hotspots"
+        },
+        {
+          "type": "specs",
+          "key": "cli:cli/graph-index"
+        },
+        {
+          "type": "specs",
+          "key": "cli:cli/graph-search"
+        },
+        {
+          "type": "specs",
+          "key": "cli:cli/graph-stats"
+        },
+        {
+          "type": "specs",
+          "key": "cli:cli/graph-impact"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/config"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/graph-hotspots"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/graph-index"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/graph-search"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/graph-stats"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/graph-impact"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/config"
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-03-31T09:48:29.546Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change"
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-03-31T09:48:29.546Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "cli:cli/graph-hotspots"
+        },
+        {
+          "type": "specs",
+          "key": "cli:cli/graph-index"
+        },
+        {
+          "type": "specs",
+          "key": "cli:cli/graph-search"
+        },
+        {
+          "type": "specs",
+          "key": "cli:cli/graph-stats"
+        },
+        {
+          "type": "specs",
+          "key": "cli:cli/graph-impact"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/config"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/graph-hotspots"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/graph-index"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/graph-search"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/graph-stats"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/graph-impact"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/config"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-31T10:27:35.297Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-31T10:27:45.262Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-31T10:46:55.699Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-31T10:48:06.381Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-31T10:48:20.873Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-03-31T10:51:28.412Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-03-31T10:51:28.608Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "m***a@g***.com"
+  }
+}

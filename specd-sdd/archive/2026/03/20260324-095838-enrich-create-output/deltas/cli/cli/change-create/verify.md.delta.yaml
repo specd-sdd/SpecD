@@ -1,0 +1,17 @@
+- op: added
+  description: 'Add scenario for changePath in JSON output'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Output on success'
+  content: |
+    ### Requirement: JSON output includes changePath
+
+    #### Scenario: JSON output contains changePath
+
+    - **WHEN** `specd change create my-change --format json` succeeds
+    - **THEN** the JSON output includes `changePath` as an absolute path string
+    - **AND** the path points to the change directory under `.specd/changes/`

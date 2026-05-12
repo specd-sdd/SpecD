@@ -1,0 +1,88 @@
+- op: modified
+  description: 'Add raw mode scenarios to Optional input requirement'
+  selector:
+    type: section
+    matches: 'Requirement: Optional input'
+  content: |
+    #### Scenario: Execute called without arguments resolves project schema
+
+    - **WHEN** `execute()` is called with no arguments
+    - **THEN** the call succeeds and resolves the project's active schema via `ResolveSchema`
+
+    #### Scenario: Execute called with ref resolves referenced schema
+
+    - **GIVEN** `@specd/schema-std` is registered in the SchemaRegistry
+    - **WHEN** `execute({ mode: 'ref', ref: '@specd/schema-std' })` is called
+    - **THEN** the result is the Schema resolved from that ref with extends chain applied
+    - **AND** no project plugins or overrides are applied
+
+    #### Scenario: Execute called with file resolves file schema
+
+    - **GIVEN** a valid schema file at `/tmp/test-schema.yaml`
+    - **WHEN** `execute({ mode: 'file', filePath: '/tmp/test-schema.yaml' })` is called
+    - **THEN** the result is the Schema resolved from that file with extends chain applied
+    - **AND** no project plugins or overrides are applied
+
+    #### Scenario: Ref not found throws SchemaNotFoundError
+
+    - **GIVEN** a ref that does not resolve in the SchemaRegistry
+    - **WHEN** `execute({ mode: 'ref', ref: '@nonexistent/schema' })` is called
+    - **THEN** `SchemaNotFoundError` is thrown
+
+    #### Scenario: File not found throws SchemaNotFoundError
+
+    - **GIVEN** a file path that does not exist
+    - **WHEN** `execute({ mode: 'file', filePath: '/tmp/nonexistent.yaml' })` is called
+    - **THEN** `SchemaNotFoundError` is thrown
+
+    #### Scenario: Raw mode returns SchemaYamlData without resolving extends
+
+    - **GIVEN** a schema that declares `extends: '@specd/schema-std'`
+    - **WHEN** `execute(undefined, { raw: true })` is called
+    - **THEN** the result has `raw: true`
+    - **AND** `data` contains the parsed `SchemaYamlData` with the `extends` field intact
+    - **AND** artifacts from the parent schema are NOT included
+
+    #### Scenario: Raw mode with ref
+
+    - **GIVEN** `@specd/schema-std` is registered in the SchemaRegistry
+    - **WHEN** `execute({ mode: 'ref', ref: '@specd/schema-std' }, { raw: true })` is called
+    - **THEN** the result has `raw: true`
+    - **AND** `data` contains the raw parsed data from the schema package
+
+    #### Scenario: Raw mode with resolveTemplates
+
+    - **GIVEN** a schema with artifacts that declare template references
+    - **WHEN** `execute(undefined, { raw: true, resolveTemplates: true })` is called
+    - **THEN** the result has `raw: true`
+    - **AND** `templates` map contains entries for each declared template reference
+
+- op: modified
+  description: 'Update return type scenarios for discriminated union'
+  selector:
+    type: section
+    matches: 'Requirement: Returns the resolved Schema on success'
+  content: |
+    #### Scenario: Default mode returns Schema with raw false
+
+    - **GIVEN** `ResolveSchema.execute()` returns a valid `Schema` object
+    - **WHEN** `execute()` is called without options
+    - **THEN** the returned result has `raw: false` and `schema` is the resolved `Schema` object
+
+    #### Scenario: Raw mode returns SchemaYamlData with raw true
+
+    - **GIVEN** `SchemaRegistry.resolveRaw()` returns valid data
+    - **WHEN** `execute(undefined, { raw: true })` is called
+    - **THEN** the returned result has `raw: true` and `data` is the `SchemaYamlData`
+
+    #### Scenario: Schema not found
+
+    - **GIVEN** `ResolveSchema.execute()` throws `SchemaNotFoundError`
+    - **WHEN** `execute()` is called
+    - **THEN** the `SchemaNotFoundError` propagates to the caller
+
+    #### Scenario: Schema validation failure
+
+    - **GIVEN** `ResolveSchema.execute()` throws `SchemaValidationError` (e.g. extends cycle, plugin kind mismatch)
+    - **WHEN** `execute()` is called
+    - **THEN** the `SchemaValidationError` propagates to the caller

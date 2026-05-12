@@ -1,0 +1,835 @@
+{
+  "name": "20260428-unified-logging-system",
+  "createdAt": "2026-04-27T14:55:52.923Z",
+  "description": "Introduce a structured logging system using Pino and a global proxy to minimize injection boilerplate.",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "core:core/logger-port",
+    "cli:cli/logging-integration",
+    "core:core/pino-logger",
+    "core:core/kernel-logging",
+    "core:core/config",
+    "default:_global/logging",
+    "cli:entrypoint"
+  ],
+  "specDependsOn": {
+    "core:core/logger-port": ["default:_global/logging", "default:_global/architecture"],
+    "core:core/pino-logger": ["core:core/logger-port", "default:_global/architecture"],
+    "core:core/kernel-logging": [
+      "core:core/logger-port",
+      "core:core/pino-logger",
+      "core:core/config",
+      "default:_global/architecture"
+    ],
+    "cli:cli/logging-integration": [
+      "core:core/kernel-logging",
+      "core:core/logger-port",
+      "default:_global/architecture"
+    ],
+    "core:core/config": [
+      "core:core/schema-format",
+      "core:core/schema-merge",
+      "default:_global/architecture",
+      "core:core/storage",
+      "core:core/spec-metadata",
+      "core:core/workspace",
+      "default:_global/logging"
+    ],
+    "cli:entrypoint": ["core:core/config"]
+  },
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:94ecbb9dc8f721a014ae3fa1a8e5eae1cf2c2160edc0470d9f50cc4979b5948f"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:core/logger-port",
+          "filename": "specs/core/core/logger-port/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:29b69601b782575b19f7e0b5026c274f7cc4f223ab7831a575368dfae9ee5ba3"
+        },
+        {
+          "key": "cli:cli/logging-integration",
+          "filename": "specs/cli/cli/logging-integration/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:3b030ab52e7d23fc990d443594ae613a50ddb08a34a98d03f9facc9964c29263"
+        },
+        {
+          "key": "core:core/pino-logger",
+          "filename": "specs/core/core/pino-logger/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:0c995b832ca22a6afb5d223ca677b3d300ab3f0aee67ad481253b1661eda9935"
+        },
+        {
+          "key": "core:core/kernel-logging",
+          "filename": "specs/core/core/kernel-logging/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:13343658d1e9a5a7cff3bc87f6e1bf288b2a6005e1616a342e80b26fc4bff129"
+        },
+        {
+          "key": "core:core/config",
+          "filename": "deltas/core/core/config/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:a955b3e580435bbdfca8d55b8a16ee39a0133943b6d9a175511831c43920a808"
+        },
+        {
+          "key": "default:_global/logging",
+          "filename": "specs/default/_global/logging/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:0b9615178094559439f97c9c683b74ea590eabeb839fb97afd021f3af4e60402"
+        },
+        {
+          "key": "cli:entrypoint",
+          "filename": "deltas/cli/entrypoint/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:647535a8580942dd0b46b013579249992d0d7a6db8bddbc572260de0e4d12f2e"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:core/logger-port",
+          "filename": "specs/core/core/logger-port/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:ee212c8dedafdc28ddeae65bfa00cf63188a92f57918991de4c7f3465ad23566"
+        },
+        {
+          "key": "cli:cli/logging-integration",
+          "filename": "specs/cli/cli/logging-integration/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:1d2c33659e09d84e636783b8f74ea4936ecb50699a8f9f39b918a37adb209b13"
+        },
+        {
+          "key": "core:core/pino-logger",
+          "filename": "specs/core/core/pino-logger/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:6e05efc420fc1b2ea253327131ad1d37ef23ef07ff8dba472c944207ef93b8ff"
+        },
+        {
+          "key": "core:core/kernel-logging",
+          "filename": "specs/core/core/kernel-logging/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:cbede472beb41651d54c8c62fbfcd92c4a730fdb31ec7ebe03e8853e7d11e046"
+        },
+        {
+          "key": "core:core/config",
+          "filename": "deltas/core/core/config/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:0e259194fdc4163d1568cf9bf52da431db03cf2a0febd1b1600ddea5a19be93b"
+        },
+        {
+          "key": "default:_global/logging",
+          "filename": "specs/default/_global/logging/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:5f48fb8819f2810987cfb9f65ae5b847c5d08945425a59df7cfeefb1b30f20e9"
+        },
+        {
+          "key": "cli:entrypoint",
+          "filename": "deltas/cli/entrypoint/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:c972382e27adacb73a1c3fcf7a029c67e355e8291eb8acc26709ec39c3409870"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:91cedcc20f8482bab83b2847e78ea978d0293cb9e41510126e71e8af1c2b4244"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:592807666ee9dcfa10349ad2a8efdca8908b6e11617c347caf35d510a3e4123c"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-04-27T14:55:52.923Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "specIds": ["core:core/logger-port", "cli:cli/logging-integration"],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-27T14:55:52.934Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/logger-port"
+        },
+        {
+          "type": "specs",
+          "key": "cli:cli/logging-integration"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/logger-port"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/logging-integration"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-27T14:57:20.029Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-27T15:01:43.398Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["core:core/logger-port", "cli:cli/logging-integration"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:core/logger-port", "cli:cli/logging-integration"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-27T15:01:43.398Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:core/pino-logger"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/pino-logger"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-27T15:03:59.052Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["core:core/logger-port", "cli:cli/logging-integration", "core:core/pino-logger"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:core/logger-port", "cli:cli/logging-integration", "core:core/pino-logger"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-27T15:03:59.053Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:core/kernel-logging"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/kernel-logging"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-27T15:25:35.274Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-27T15:25:35.305Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:core/logger-port",
+            "cli:cli/logging-integration",
+            "core:core/pino-logger",
+            "core:core/kernel-logging"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:core/logger-port",
+            "cli:cli/logging-integration",
+            "core:core/pino-logger",
+            "core:core/kernel-logging"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-27T15:25:35.306Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:core/config"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/config"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-27T15:32:58.754Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-27T15:32:58.788Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:core/logger-port",
+            "cli:cli/logging-integration",
+            "core:core/pino-logger",
+            "core:core/kernel-logging",
+            "core:core/config"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:core/logger-port",
+            "cli:cli/logging-integration",
+            "core:core/pino-logger",
+            "core:core/kernel-logging",
+            "core:core/config"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-27T15:32:58.789Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "default:_global/logging"
+        },
+        {
+          "type": "verify",
+          "key": "default:_global/logging"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-27T15:45:30.800Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:cli/logging-integration, core:core/config]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["cli:cli/logging-integration", "core:core/config"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-27T15:51:00.184Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:cli/logging-integration, core:core/kernel-logging]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["cli:cli/logging-integration", "core:core/kernel-logging"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-27T15:57:59.184Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:cli/logging-integration, core:core/logger-port]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["cli:cli/logging-integration", "core:core/logger-port"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-27T16:17:11.670Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:cli/logging-integration, core:core/kernel-logging, core:core/logger-port, default:_global/logging]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "cli:cli/logging-integration",
+            "core:core/kernel-logging",
+            "core:core/logger-port",
+            "default:_global/logging"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-27T17:43:57.409Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:cli/logging-integration, core:core/kernel-logging, core:core/logger-port, core:core/pino-logger]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "cli:cli/logging-integration",
+            "core:core/kernel-logging",
+            "core:core/logger-port",
+            "core:core/pino-logger"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-28T09:37:26.065Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'context-modes-ux' was archived with overlapping specs: core:core/config",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:core/config"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:core/config"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-28T15:41:38.552Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-28T15:47:45.436Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-28T16:34:04.225Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:core/logger-port",
+            "cli:cli/logging-integration",
+            "core:core/pino-logger",
+            "core:core/kernel-logging",
+            "core:core/config",
+            "default:_global/logging"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:core/logger-port",
+            "cli:cli/logging-integration",
+            "core:core/pino-logger",
+            "core:core/kernel-logging",
+            "core:core/config",
+            "default:_global/logging"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-28T16:34:04.225Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-28T16:39:27.517Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:core/logger-port",
+            "cli:cli/logging-integration",
+            "core:core/pino-logger",
+            "core:core/kernel-logging",
+            "core:core/config",
+            "default:_global/logging"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:core/logger-port",
+            "cli:cli/logging-integration",
+            "core:core/pino-logger",
+            "core:core/kernel-logging",
+            "core:core/config",
+            "default:_global/logging"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-28T16:39:27.519Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "cli:entrypoint"
+        },
+        {
+          "type": "verify",
+          "key": "cli:entrypoint"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-28T16:51:58.387Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-28T16:51:59.192Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-28T16:57:25.753Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-28T16:59:10.151Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-28T16:59:29.369Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-28T16:59:33.748Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-04-28T16:59:54.904Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "m***a@g***.com"
+  }
+}

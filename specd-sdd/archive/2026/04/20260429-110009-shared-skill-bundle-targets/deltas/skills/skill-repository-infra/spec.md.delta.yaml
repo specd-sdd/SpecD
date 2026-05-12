@@ -1,0 +1,18 @@
+- op: modified
+  description: 'Require shared template files to be marked when added to resolved bundles.'
+  selector:
+    type: section
+    matches: 'Requirement: Shared file scanning'
+  content: |
+    The infrastructure MUST scan `templates/shared/` for `.meta.json` files containing:
+
+    ```json
+    {
+      "filename": "...",
+      "skills": ["skill1", "skill2"]
+    }
+    ```
+
+    Each shared file's content is loaded on demand.
+
+    When `getBundle()` adds a shared file to a skill bundle because the metadata lists the requested skill, the resulting `ResolvedFile` MUST be marked as shared. Skill-local template files read from `templates/<skill-name>/` MUST NOT be marked as shared.

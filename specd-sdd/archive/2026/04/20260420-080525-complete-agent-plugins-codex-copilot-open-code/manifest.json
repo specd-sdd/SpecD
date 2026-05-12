@@ -1,0 +1,618 @@
+{
+  "name": "complete-agent-plugins-codex-copilot-open-code",
+  "createdAt": "2026-04-20T08:05:25.360Z",
+  "description": "Replace stub Codex and Copilot agent plugins with real install/uninstall behavior at parity with Claude, create a new Open Code plugin package following the same architecture, update CLI wizard and metapackage wiring, and expand the skills template source spec to cover all four runtimes' frontmatter contracts.",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "plugin-agent-codex:plugin-agent",
+    "plugin-agent-copilot:plugin-agent",
+    "skills:skill-templates-source",
+    "plugin-agent-opencode:plugin-agent",
+    "cli:cli/project-init",
+    "specd:meta-package"
+  ],
+  "specDependsOn": {
+    "plugin-agent-codex:plugin-agent": [
+      "plugin-manager:agent-plugin-type",
+      "skills:skill-templates-source"
+    ],
+    "plugin-agent-copilot:plugin-agent": [
+      "plugin-manager:agent-plugin-type",
+      "skills:skill-templates-source"
+    ],
+    "plugin-agent-opencode:plugin-agent": [
+      "plugin-manager:agent-plugin-type",
+      "skills:skill-templates-source"
+    ],
+    "skills:skill-templates-source": ["skills:skill"],
+    "specd:meta-package": ["plugin-agent-opencode:plugin-agent"],
+    "cli:cli/project-init": ["cli:cli/entrypoint", "cli:cli/skills-install", "core:core/config"]
+  },
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:7d0d54624253dc19575eb93aa886ef334733e9697b77787ddffbf6cd0f44c698"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "plugin-agent-codex:plugin-agent",
+          "filename": "deltas/plugin-agent-codex/plugin-agent/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:3d78052fea8b401603b85d0056926a78dc26a14ac4ea44c0ae7b4937c2c607c1"
+        },
+        {
+          "key": "plugin-agent-copilot:plugin-agent",
+          "filename": "deltas/plugin-agent-copilot/plugin-agent/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:af2fae348b49747b470ac5fc6a07c307a64cfc61822b94d973df5efb9b1d9a45"
+        },
+        {
+          "key": "skills:skill-templates-source",
+          "filename": "deltas/skills/skill-templates-source/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:7002a0b8270c4fa6400048b13dfabe0d354c128b11f327d7953232c936c0d439"
+        },
+        {
+          "key": "plugin-agent-opencode:plugin-agent",
+          "filename": "specs/plugin-agent-opencode/plugin-agent/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:d08027c368d79b9f421b8db1a6be29bb3855fdc3c8063cc14a8f8b4c92541e57"
+        },
+        {
+          "key": "cli:cli/project-init",
+          "filename": "deltas/cli/cli/project-init/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:dbb91e68372ce56e5ee28ca6f19206112673047cfa227107be19dec07459321f"
+        },
+        {
+          "key": "specd:meta-package",
+          "filename": "specs/specd/meta-package/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:7ae20d1ed6071f06fa3de56006e7ee1753096e45070cd9fb8aad6b378f9cdb18"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "plugin-agent-codex:plugin-agent",
+          "filename": "deltas/plugin-agent-codex/plugin-agent/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:08c1789d305a9de1654ff219f6f302b9f7fe9320c350cf3658a2c2d2542ff729"
+        },
+        {
+          "key": "plugin-agent-copilot:plugin-agent",
+          "filename": "deltas/plugin-agent-copilot/plugin-agent/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:23f020d7af60708a583cf25f2e7ac4cbe3fc33b64c70e70c38f98919321f6d94"
+        },
+        {
+          "key": "skills:skill-templates-source",
+          "filename": "deltas/skills/skill-templates-source/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:f3b84d75bb176af7263c11257595bf35e787106461c12f83120086d4b1638e46"
+        },
+        {
+          "key": "plugin-agent-opencode:plugin-agent",
+          "filename": "specs/plugin-agent-opencode/plugin-agent/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:b37b23191915af5859cfac153e16b437e390383ba3a83b59199b67b464507d41"
+        },
+        {
+          "key": "cli:cli/project-init",
+          "filename": "deltas/cli/cli/project-init/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:5738cb6ad1d931a58529222fcaf476a91ea24e29d606947e6096be090175944b"
+        },
+        {
+          "key": "specd:meta-package",
+          "filename": "specs/specd/meta-package/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:efc26293485b1a2aaac2be94d19eb6028e557e7c4b47f6a978afc6659f51956e"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:f43d05b5b6effb42d7a3d13833e0957a9589f0801e991637ea4d2bb41ac6f31c"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:5aabfcf764056bc79b811cb51437a4c9f2fce8c842aa7dbc2bc46945a5538ce8"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-04-20T08:05:25.360Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "specIds": [
+        "plugin-agent-codex:plugin-agent",
+        "plugin-agent-copilot:plugin-agent",
+        "skills:skill-templates-source"
+      ],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-20T08:05:25.369Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-agent-codex:plugin-agent"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-agent-copilot:plugin-agent"
+        },
+        {
+          "type": "specs",
+          "key": "skills:skill-templates-source"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-agent-codex:plugin-agent"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-agent-copilot:plugin-agent"
+        },
+        {
+          "type": "verify",
+          "key": "skills:skill-templates-source"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-20T08:11:47.268Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-20T08:44:42.480Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-20T08:48:26.722Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-20T08:54:01.186Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-20T09:05:41.943Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-20T09:08:23.697Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "plugin-agent-codex:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "skills:skill-templates-source"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "plugin-agent-codex:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "skills:skill-templates-source"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-20T09:08:23.697Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "plugin-agent-opencode:plugin-agent"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-agent-opencode:plugin-agent"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-20T09:23:50.472Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [plugin-agent-codex:plugin-agent, plugin-agent-copilot:plugin-agent, skills:skill-templates-source]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "plugin-agent-codex:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "skills:skill-templates-source"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-20T09:26:36.984Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [plugin-agent-codex:plugin-agent, plugin-agent-copilot:plugin-agent]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["plugin-agent-codex:plugin-agent", "plugin-agent-copilot:plugin-agent"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-20T09:27:25.817Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-20T13:14:44.298Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [plugin-agent-opencode:plugin-agent]; verify [plugin-agent-opencode:plugin-agent]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["plugin-agent-opencode:plugin-agent"]
+        },
+        {
+          "type": "verify",
+          "files": ["plugin-agent-opencode:plugin-agent"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-20T13:19:46.604Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "plugin-agent-codex:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "skills:skill-templates-source",
+            "plugin-agent-opencode:plugin-agent"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "plugin-agent-codex:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "skills:skill-templates-source",
+            "plugin-agent-opencode:plugin-agent"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-20T13:19:46.604Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "cli:cli/project-init"
+        },
+        {
+          "type": "specs",
+          "key": "specd:meta-package"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/project-init"
+        },
+        {
+          "type": "verify",
+          "key": "specd:meta-package"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-20T13:39:51.254Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-20T13:52:35.576Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: design [design]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-20T13:52:35.576Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-20T13:53:56.008Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-21T07:25:31.400Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-21T09:32:52.568Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-21T09:41:01.548Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-21T09:42:19.165Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "description-updated",
+      "at": "2026-04-21T09:44:55.917Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "description": "Replace stub Codex and Copilot agent plugins with real install/uninstall behavior at parity with Claude, create a new Open Code plugin package following the same architecture, update CLI wizard and metapackage wiring, and expand the skills template source spec to cover all four runtimes' frontmatter contracts."
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-21T09:45:20.191Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-04-21T09:45:20.265Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "m***a@g***.com"
+  }
+}

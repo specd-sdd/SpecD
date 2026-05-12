@@ -1,0 +1,33 @@
+- op: modified
+  description: 'Add requiresTaskCompletion field to workflow step definition'
+  selector:
+    type: section
+    matches: 'Requirement: Workflow'
+  content: |
+    `workflow` is an array of named lifecycle phase definitions for a change. Each entry describes a distinct phase — such as designing specs, applying changes, verifying work, or archiving — and declares what artifact conditions must be met for that phase to become active, along with any hooks to run at phase boundaries.
+
+    Steps are not limited to AI agent invocations. They may represent human review phases, automated checks, artifact generation, or any recurring activity in the change lifecycle. `CompileContext` uses step definitions to gate context compilation and evaluate step availability.
+
+    A step's `requires` array serves as a defensive gate: `CompileContext` evaluates whether all required artifacts are `complete` (or `skipped`) to determine step availability. If any required artifact is missing or incomplete, the step is blocked. This prevents the agent from entering a phase when prerequisites have been deleted or corrupted. Steps that need all artifacts intact (e.g. implementing, archiving) SHOULD require all artifacts. Steps that focus on a specific concern (e.g. verifying) MAY require only the relevant artifacts.
+
+    Note: `CompileContext` does NOT include change artifact content (proposal.md, design.md, tasks.md) in the compiled context block — it only includes spec content and project context. The agent reads change artifacts directly from disk, guided by hook instructions.
+
+    Entries must include:
+
+    - `step` (string, required) — step name identifying a phase of the change lifecycle
+    - `requires` (array of artifact IDs, optional) — artifacts that must be `complete` before this step is available; empty or omitted means always available
+    - `requiresTaskCompletion` (array of artifact IDs, optional) — subset of `requires` for which task completion gating is enforced on this step. Each listed artifact ID must be present in `requires` and must reference an artifact type that declares `taskCompletionCheck`. When present, the transition system checks the artifact's file content for incomplete task items (matching `incompletePattern`) before allowing the transition. When absent or empty, no task completion gating applies to this step.
+    - `hooks` (object, optional) — hooks for this step's boundaries; each key is `pre` or `post`, each value is an array of `instruction:` or `run:` hook entries
+
+    Every hook entry must include an `id` field (standard array entry identity format) and exactly one of:
+
+    - `{ id: string, instruction: string }` — AI context injected when this step is compiled; used to guide agent behaviour during this phase
+    - `{ id: string, run: string }` — shell command executed at the phase boundary; supports template variables `{{change.name}}`, `{{change.path}}`, `{{project.root}}`
+
+    **`pre` hook failure** — if a `run:` hook exits with a non-zero code, the step is aborted and the user is informed of the failure. The agent should offer to attempt to fix the problem before retrying.
+
+    **`post` hook failure** — the step has already completed, so the operation is not rolled back. After each failing `run:` hook, the user is prompted to choose: continue with the remaining hooks, or stop.
+
+    The order of entries in `workflow` is the intended progression of the change lifecycle and is used by tooling to display status. It does not enforce sequential blocking between consecutive steps — each step is independently gated by its own `requires`.
+
+    Project-level hook additions are no longer declared via a `workflow` section in `specd.yaml`. Instead, they are expressed as `schemaOverrides` targeting `workflow[].hooks` — see [`specs/core/config/spec.md`](../config/spec.md).

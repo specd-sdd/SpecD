@@ -1,0 +1,37 @@
+- op: modified
+  description: 'Task completion gating is now controlled by requiresTaskCompletion on the workflow step'
+  selector:
+    type: section
+    matches: 'Requirement: Task completion gating'
+  content: |
+    When a workflow step declares a `requiresTaskCompletion` array, the transition system MUST verify that each listed artifact's content contains no incomplete task items before allowing the transition. Only artifacts listed in `requiresTaskCompletion` are content-checked — other artifacts in `requires` are checked only via `effectiveStatus`.
+
+    The `requiresTaskCompletion` array MUST be a subset of the step's `requires` array. Each listed artifact ID MUST reference an artifact type that declares `taskCompletionCheck` on its `ArtifactType`. These constraints are validated at schema build time by `buildSchema`.
+
+    For each artifact ID in `requiresTaskCompletion`:
+
+    1. Look up the `ArtifactType` from the schema to obtain `taskCompletionCheck.incompletePattern`.
+    2. Get the `ChangeArtifact` via `change.getArtifact(artifactId)`. If it does not exist, skip it.
+    3. Iterate the artifact's `files` map. For each `ArtifactFile`, load the file content via `ChangeRepository.artifact(change, file.filename)`.
+    4. If the file does not exist (returns `null`), skip it.
+    5. Compile `incompletePattern` using `safeRegex` with the `'m'` flag.
+    6. If the regex is valid and matches any line in the file content, reject the transition with `InvalidStateTransitionError` including a structured reason (`incomplete-tasks`) with the artifact ID and match counts.
+
+    When `requiresTaskCompletion` is absent or empty on a workflow step, no task completion gating applies — even if the step requires artifacts that declare `taskCompletionCheck`. The `taskCompletionCheck` on the artifact type defines *what* pattern to check; the workflow step's `requiresTaskCompletion` controls *when* it applies.
+
+- op: modified
+  description: 'Update constraints for requiresTaskCompletion'
+  selector:
+    type: section
+    matches: 'Constraints'
+  content: |
+    - Lifecycle states are defined by the Change entity — the schema selects which states are workflow-visible, it does not create new ones
+    - Step availability is always computed dynamically from `change.effectiveStatus()` — never cached
+    - `workflow` array order is display order only; it does not create implicit sequential dependencies
+    - A step with an empty `requires` is always available regardless of change state
+    - Step `requires` contains artifact IDs, not step names — step-to-step cycles are structurally impossible
+    - The artifact dependency graph is validated as a DAG by `buildSchema()` — cycles are rejected at schema load time
+    - The archiving step is the only step that is both a workflow step and handled by a dedicated use case (`ArchiveChange`)
+    - Task completion gating is controlled by `requiresTaskCompletion` on the workflow step — not by the mere presence of `taskCompletionCheck` on the artifact type
+    - `requiresTaskCompletion` must be a subset of `requires` and reference artifacts with `taskCompletionCheck` — validated at schema build time
+    - Task completion checks use `safeRegex` to compile patterns; patterns that fail compilation or contain nested quantifiers are treated as non-matching (no error thrown)

@@ -1,0 +1,16 @@
+- op: added
+  description: Add coverage for status-aware dependency-block diagnostics passthrough from core failures.
+  position:
+    parent:
+      type: section
+      matches: '^Requirement: Output on failure$'
+    after:
+      type: section
+      matches: '^Scenario: JSON output on failure includes notes and files$'
+  content: |
+    #### Scenario: Dependency-block failure preserves core blocker status context
+
+    - **GIVEN** validation reports a dependency-blocked failure from core including dependency status context
+    - **WHEN** `specd change validate my-change core:core/config --artifact specs` is run
+    - **THEN** stdout contains the failure description exactly as emitted by core validation
+    - **AND** the CLI does not replace it with generic "incomplete dependency" wording

@@ -1,0 +1,352 @@
+{
+  "name": "prevent-draft-discard-after-implementation",
+  "createdAt": "2026-04-13T05:12:08.394Z",
+  "description": "Block drafting or discarding a change once it has ever reached implementing, unless the caller explicitly forces it, to avoid leaving code/specs out of sync.",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "core:core/change",
+    "core:core/draft-change",
+    "core:core/discard-change",
+    "cli:cli/change-draft",
+    "cli:cli/change-discard"
+  ],
+  "specDependsOn": {
+    "core:core/discard-change": ["core:core/change", "default:_global/architecture"],
+    "core:core/draft-change": ["core:core/change", "default:_global/architecture"],
+    "core:core/change": [
+      "core:core/change-manifest",
+      "core:core/workflow-model",
+      "core:core/spec-metadata",
+      "core:core/spec-id-format",
+      "default:_global/architecture"
+    ],
+    "cli:cli/change-draft": ["cli:cli/entrypoint", "core:core/change"],
+    "cli:cli/change-discard": ["cli:cli/entrypoint", "core:core/change"]
+  },
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:5eed97b8760133a41731b32bcd6151ac3211782df96743cc91f676a23b7781f8"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:core/change",
+          "filename": "deltas/core/core/change/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:74edd55f2c6b72252574fa84a5d5221ab896002d67ced450c25b31c8e2c0fca4"
+        },
+        {
+          "key": "core:core/draft-change",
+          "filename": "deltas/core/core/draft-change/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:ecfcb253fd3d5d6698b9aabfb3dfcf1f8988e48e84ca016145635e64823e7c74"
+        },
+        {
+          "key": "core:core/discard-change",
+          "filename": "deltas/core/core/discard-change/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:a5af14243373008c9cadee7dd7eb185386ccbdef0cffc26bb9fb5c93a129852e"
+        },
+        {
+          "key": "cli:cli/change-draft",
+          "filename": "deltas/cli/cli/change-draft/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:90deb30d99dbd91ba8db99ab826790f8c1dee0ebc96942d5a632619b0408b4ec"
+        },
+        {
+          "key": "cli:cli/change-discard",
+          "filename": "deltas/cli/cli/change-discard/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:86754833dc1ac650a0593b0953878061ea50ad7909046542a7554851e5de3450"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:core/change",
+          "filename": "deltas/core/core/change/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:e561b7bf0d55733e0e8afbac137cebf90a05e4e125336a88f888e85b3a150183"
+        },
+        {
+          "key": "core:core/draft-change",
+          "filename": "deltas/core/core/draft-change/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:b4cd8941c4e0648c4be94728bad0fd5bd7f241b8b91b3f311eb021685b4bd296"
+        },
+        {
+          "key": "core:core/discard-change",
+          "filename": "deltas/core/core/discard-change/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:5db780cf100ff1f536f378903b05802c8047f0c90642fb9bb8b4fb91285794d2"
+        },
+        {
+          "key": "cli:cli/change-draft",
+          "filename": "deltas/cli/cli/change-draft/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:078ec26989f98e6cb3cd7221a266970740430ebf102364c0eafcf26ac8f1f20f"
+        },
+        {
+          "key": "cli:cli/change-discard",
+          "filename": "deltas/cli/cli/change-discard/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:e2ef03ec72b558a9433368e01f533ff96f9b187691db209b8ce3a741d2ce60c7"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:f5426e12d96de7d8fd76135a3be05e9b96d54f4af4fbb515731e2e95ae3d44b2"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:12bbcd81e21d5f8b194c4b7649d8d45f4d863c226984afbe41424cd74fed4da6"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-04-13T05:12:08.394Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "specIds": [
+        "core:core/change",
+        "core:core/draft-change",
+        "core:core/discard-change",
+        "cli:cli/change-draft",
+        "cli:cli/change-discard"
+      ],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-13T05:12:08.410Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/change"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/draft-change"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/discard-change"
+        },
+        {
+          "type": "specs",
+          "key": "cli:cli/change-draft"
+        },
+        {
+          "type": "specs",
+          "key": "cli:cli/change-discard"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/change"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/draft-change"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/discard-change"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/change-draft"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/change-discard"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-13T05:17:54.001Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-13T05:56:36.888Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:core/change",
+            "core:core/draft-change",
+            "core:core/discard-change",
+            "cli:cli/change-draft",
+            "cli:cli/change-discard"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:core/change",
+            "core:core/draft-change",
+            "core:core/discard-change",
+            "cli:cli/change-draft",
+            "cli:cli/change-discard"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-13T06:07:43.322Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-13T06:10:35.039Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-13T06:34:40.202Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-13T06:44:49.966Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-13T06:45:30.074Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-13T07:41:35.635Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-04-13T07:42:26.956Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "m***a@g***.com"
+  }
+}

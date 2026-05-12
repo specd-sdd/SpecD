@@ -1,0 +1,584 @@
+{
+  "name": "extensible-kernel-adapter-registry",
+  "createdAt": "2026-04-02T17:37:32.028Z",
+  "description": "Extend createKernel with additive adapter registries for storages, VCS/actor providers, parsers, and external hook runners, and expose the merged registry to consumers.",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "core:core/kernel",
+    "core:core/config",
+    "core:core/storage",
+    "core:core/schema-format",
+    "core:core/hook-execution-model",
+    "core:core/hook-runner-port",
+    "core:core/artifact-parser-port",
+    "core:core/vcs-adapter",
+    "core:core/actor-resolver",
+    "core:core/composition",
+    "core:core/kernel-builder",
+    "core:core/external-hook-runner-port",
+    "core:core/run-step-hooks",
+    "cli:cli/config-show"
+  ],
+  "specDependsOn": {
+    "core:core/kernel-builder": ["core:core/kernel", "core:core/composition"],
+    "core:core/external-hook-runner-port": [
+      "core:core/hook-execution-model",
+      "core:core/schema-format"
+    ],
+    "core:core/run-step-hooks": ["core:core/external-hook-runner-port"]
+  },
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "validatedHash": "sha256:a4234de2f719a48bfc47f4bb143ad8f7b4fe537f3215df8786eee21a7f3652ae"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "files": [
+        {
+          "key": "core:core/kernel",
+          "filename": "deltas/core/core/kernel/spec.md.delta.yaml",
+          "validatedHash": "sha256:556ffed61be4db7611acc59f3e6e333614a2058a48299ad695a2ecf8a1967252"
+        },
+        {
+          "key": "core:core/config",
+          "filename": "deltas/core/core/config/spec.md.delta.yaml",
+          "validatedHash": "sha256:f14ceebe4d3584bc4e1bbba9a6a333463713d2cff847262f662a25a01fb49a57"
+        },
+        {
+          "key": "core:core/storage",
+          "filename": "deltas/core/core/storage/spec.md.delta.yaml",
+          "validatedHash": "sha256:c1c8a8561bbef81dd9f0e4176be64b0bae1576cb6887cafe3a8f1fefaa0568f9"
+        },
+        {
+          "key": "core:core/schema-format",
+          "filename": "deltas/core/core/schema-format/spec.md.delta.yaml",
+          "validatedHash": "sha256:c7488cf7fd2f77e5f6ef12b344211026540f93b0091fbc6828fd6bac9e8dd762"
+        },
+        {
+          "key": "core:core/hook-execution-model",
+          "filename": "deltas/core/core/hook-execution-model/spec.md.delta.yaml",
+          "validatedHash": "sha256:9bcc5d48f261f522da3e9afcacb0b7450387f870ae17d9435d34f6e1d6c3a828"
+        },
+        {
+          "key": "core:core/hook-runner-port",
+          "filename": "deltas/core/core/hook-runner-port/spec.md.delta.yaml",
+          "validatedHash": "sha256:441175ae0d6fa9af22ba0463928639d9de3c02bce14e76932a2d2aee459b8ca5"
+        },
+        {
+          "key": "core:core/artifact-parser-port",
+          "filename": "deltas/core/core/artifact-parser-port/spec.md.delta.yaml",
+          "validatedHash": "sha256:c6d2bf7325bfa21a8992a96373ac631b237ec8cf0eb3fcb2713b74ccdf3f06ab"
+        },
+        {
+          "key": "core:core/vcs-adapter",
+          "filename": "deltas/core/core/vcs-adapter/spec.md.delta.yaml",
+          "validatedHash": "sha256:73d0c2cb80264ce3f2762b34f7d69266f85d52ad4c5eac6ec2566c4eae35d431"
+        },
+        {
+          "key": "core:core/actor-resolver",
+          "filename": "deltas/core/core/actor-resolver/spec.md.delta.yaml",
+          "validatedHash": "sha256:a713474f1ddc481064d8a4ce324d68a9a16fcfa5ad0ffd5dc08ef69786bb1373"
+        },
+        {
+          "key": "core:core/composition",
+          "filename": "deltas/core/core/composition/spec.md.delta.yaml",
+          "validatedHash": "sha256:cf7a858afc85a65aa796abf8a0844184dd3db33167f29f7ad210bc8ddf0f19bf"
+        },
+        {
+          "key": "core:core/kernel-builder",
+          "filename": "specs/core/core/kernel-builder/spec.md",
+          "validatedHash": "sha256:c2c5fbe0ca4976936a00e70cb9cf3624f4d44c2f56b7337c2435e9dce54447cb"
+        },
+        {
+          "key": "core:core/external-hook-runner-port",
+          "filename": "specs/core/core/external-hook-runner-port/spec.md",
+          "validatedHash": "sha256:6a83e99a0b00e4c2eca53b374596c640e0818d12fa3b5f80d3217c256d54b96e"
+        },
+        {
+          "key": "core:core/run-step-hooks",
+          "filename": "deltas/core/core/run-step-hooks/spec.md.delta.yaml",
+          "validatedHash": "sha256:d226e913c89ad2cddf5a16cd5d34d4fa84101ef259267f1911a164cf979facb4"
+        },
+        {
+          "key": "cli:cli/config-show",
+          "filename": "deltas/cli/cli/config-show/spec.md.delta.yaml",
+          "validatedHash": "sha256:2c5c06b32a9f1076e3531c9c5b63c6ad9d551b5977eaed3960c98d4af56fa4d7"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "files": [
+        {
+          "key": "core:core/kernel",
+          "filename": "deltas/core/core/kernel/verify.md.delta.yaml",
+          "validatedHash": "sha256:ea2a224ccd8aee0f067001f4f87782ca26944a199adc48c99f4025df24d3f63b"
+        },
+        {
+          "key": "core:core/config",
+          "filename": "deltas/core/core/config/verify.md.delta.yaml",
+          "validatedHash": "sha256:a5e540c8a69e6424bbefc0d145a49f23d2878f8949a3db7c0998758f710d1f65"
+        },
+        {
+          "key": "core:core/storage",
+          "filename": "deltas/core/core/storage/verify.md.delta.yaml",
+          "validatedHash": "sha256:1514b96847755d4665264527e8f322fe95c7f47cea58f4322bcddee07b786a8b"
+        },
+        {
+          "key": "core:core/schema-format",
+          "filename": "deltas/core/core/schema-format/verify.md.delta.yaml",
+          "validatedHash": "sha256:9fcb0dcd4fc6e7a2c99f80053dd9b1b0d79924a0626e0d51a7eecc79b774d32f"
+        },
+        {
+          "key": "core:core/hook-execution-model",
+          "filename": "deltas/core/core/hook-execution-model/verify.md.delta.yaml",
+          "validatedHash": "sha256:af2a43bdb56303fda80b505cdf347469c919397100d4eb7b7dead41b4cb584f7"
+        },
+        {
+          "key": "core:core/hook-runner-port",
+          "filename": "deltas/core/core/hook-runner-port/verify.md.delta.yaml",
+          "validatedHash": "sha256:51a0726ec8bc6439f661d68250e84fc4aa7c38d022c78239d309720a015fa12c"
+        },
+        {
+          "key": "core:core/artifact-parser-port",
+          "filename": "deltas/core/core/artifact-parser-port/verify.md.delta.yaml",
+          "validatedHash": "sha256:3b0492a38a5474a8259a7e9b78ce432debe50e2420994896e524f047d8a1f65b"
+        },
+        {
+          "key": "core:core/vcs-adapter",
+          "filename": "deltas/core/core/vcs-adapter/verify.md.delta.yaml",
+          "validatedHash": "sha256:c107f554e3b98ba7b3d8b4dc4ce62a62b5bee7ed4815ce35e5c57bf58da2787f"
+        },
+        {
+          "key": "core:core/actor-resolver",
+          "filename": "deltas/core/core/actor-resolver/verify.md.delta.yaml",
+          "validatedHash": "sha256:774ef9cbe8537eeb4bf80e9d1afcfcfecfd950af502087d28633f880f7851c2f"
+        },
+        {
+          "key": "core:core/composition",
+          "filename": "deltas/core/core/composition/verify.md.delta.yaml",
+          "validatedHash": "sha256:0ee36052d803c56d2997abf7da8355918aec77c9cfecb12504126148d29a724e"
+        },
+        {
+          "key": "core:core/kernel-builder",
+          "filename": "specs/core/core/kernel-builder/verify.md",
+          "validatedHash": "sha256:13098af642cc290b1d04487ccde3a77217e1a0cb6b1a7cd25038d1746baad17c"
+        },
+        {
+          "key": "core:core/external-hook-runner-port",
+          "filename": "specs/core/core/external-hook-runner-port/verify.md",
+          "validatedHash": "sha256:9a0c211e0f2e4768e700c8a502c547b6e12a48bfd226db2c439c9437e78fd701"
+        },
+        {
+          "key": "core:core/run-step-hooks",
+          "filename": "deltas/core/core/run-step-hooks/verify.md.delta.yaml",
+          "validatedHash": "sha256:c69b9002925f84f5aab239755d28aa6644c8c9f03a37226385e2c6bfcb9f1efc"
+        },
+        {
+          "key": "cli:cli/config-show",
+          "filename": "deltas/cli/cli/config-show/verify.md.delta.yaml",
+          "validatedHash": "sha256:51b0b9c71bc3303ecf54c5df2b215fe279136a6d114f4286e2ec447388f568eb"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "validatedHash": "sha256:052fb3cff908c4a2e293f1c7e2c1834c3981b79463e5d6f398d9a34268d90611"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "validatedHash": "sha256:1e35c2e9a52364d2342dac35d7c669fe7b967797b4cc60619d29472a7fbd1aa3"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-04-02T17:37:32.028Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "specIds": [
+        "core:core/kernel",
+        "core:core/config",
+        "core:core/storage",
+        "core:core/schema-format",
+        "core:core/hook-execution-model",
+        "core:core/hook-runner-port",
+        "core:core/artifact-parser-port",
+        "core:core/vcs-adapter",
+        "core:core/actor-resolver"
+      ],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-02T17:37:32.037Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/kernel"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/config"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/storage"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/schema-format"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/hook-execution-model"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/hook-runner-port"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/artifact-parser-port"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/vcs-adapter"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/actor-resolver"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/kernel"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/config"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/storage"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/schema-format"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/hook-execution-model"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/hook-runner-port"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/artifact-parser-port"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/vcs-adapter"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/actor-resolver"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-02T17:41:31.109Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-02T18:13:23.042Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change"
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-02T18:13:23.042Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:core/composition"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/kernel-builder"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/external-hook-runner-port"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/run-step-hooks"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/composition"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/kernel-builder"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/external-hook-runner-port"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/run-step-hooks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-02T18:39:52.610Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-02T18:40:50.178Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-02T18:43:17.461Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-02T18:45:53.444Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-02T18:53:30.556Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-02T18:54:52.861Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-02T20:06:16.467Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-02T20:06:16.467Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-02T20:06:16.467Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "cli:cli/config-show"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/config-show"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-02T20:06:16.508Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-02T20:14:17.908Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-02T20:21:47.778Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-02T20:24:55.235Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-02T20:26:50.739Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-02T20:27:15.747Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-02T20:49:06.241Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-04-02T20:49:06.660Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "m***a@g***.com"
+  }
+}

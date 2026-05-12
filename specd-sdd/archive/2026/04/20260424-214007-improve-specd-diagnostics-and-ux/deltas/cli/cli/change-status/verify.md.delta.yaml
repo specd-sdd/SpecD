@@ -1,0 +1,29 @@
+- op: added
+  description: 'Add DAG, Blockers, and Next Action verification scenarios'
+  position:
+    parent: { type: section, matches: 'Requirement: Output format' }
+  content: |
+    #### Scenario: Text output renders Artifact DAG tree
+
+    - **WHEN** `specd change status <name>` is run in text mode
+    - **THEN** stdout includes an `artifacts (DAG):` section
+    - **AND** it renders the artifact dependency tree using ASCII characters
+    - **AND** each node includes a status symbol (e.g., `[✓]`, `[~]`) and a scope label (e.g., `[scope: change]`)
+
+    #### Scenario: Text output shows high-visibility blockers
+
+    - **GIVEN** `GetStatus` returns a non-empty `blockers` array
+    - **WHEN** `specd change status <name>` is run in text mode
+    - **THEN** stdout includes a `blockers:` section
+    - **AND** it lists each blocker with its code and message (e.g., `! ARTIFACT_DRIFT: ...`)
+
+    #### Scenario: Text output shows next action recommendation
+
+    - **WHEN** `specd change status <name>` is run in text mode
+    - **THEN** stdout includes a `next action:` section
+    - **AND** it shows the target step, command, and reason
+
+    #### Scenario: JSON output includes blockers, nextAction, and artifactDag
+
+    - **WHEN** `specd change status <name> --format json` is run
+    - **THEN** the JSON payload includes `blockers` array, `nextAction` object, and `artifactDag` array

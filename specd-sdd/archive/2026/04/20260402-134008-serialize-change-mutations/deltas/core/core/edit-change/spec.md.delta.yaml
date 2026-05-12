@@ -1,0 +1,20 @@
+- op: modified
+  description: Clarify that effective spec-scope changes use the repository mutation primitive.
+  selector:
+    type: section
+    matches: 'Requirement: Change lookup'
+  content: |
+    The use case MUST throw `ChangeNotFoundError` when no change with the given name exists.
+
+    Snapshot reads via `ChangeRepository.get(name)` MAY be used for read-only early returns, but any effective update to an existing persisted change's `specIds` MUST be performed through `ChangeRepository.mutate(name, fn)` so the mutation runs against fresh persisted state.
+- op: modified
+  description: Define the actual invalidation and serialized persistence behavior for effective scope changes.
+  selector:
+    type: section
+    matches: 'Requirement: Approval invalidation on effective change'
+  content: |
+    When the resulting `specIds` differ from the current set, the use case MUST resolve the current actor identity, then update the change inside `ChangeRepository.mutate(name, fn)`.
+
+    Inside the mutation callback, the use case MUST call `change.updateSpecIds(specIds, actor)` on the fresh persisted `Change`. This is the operation that invalidates active approvals and appends the corresponding history events for a spec-scope change.
+
+    The repository MUST persist the updated change before `EditChange.execute` returns an `invalidated: true` result.

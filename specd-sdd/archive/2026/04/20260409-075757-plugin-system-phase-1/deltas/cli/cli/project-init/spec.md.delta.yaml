@@ -1,0 +1,42 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Command signature'
+  content: |
+    ```
+    specd project init [--schema <ref>] [--workspace <id>] [--workspace-path <path>] [--plugin <name>...] [--force] [--format text|json|toon]
+    ```
+
+    - `--schema <ref>` — optional; the schema reference to activate (e.g. `@specd/schema-std`, `./schemas/custom/schema.yaml`). Defaults to `@specd/schema-std`.
+    - `--workspace <id>` — optional; the ID of the default workspace. Defaults to `default`.
+    - `--workspace-path <path>` — optional; the specs path for the default workspace, relative to the config file. Defaults to `specs/`.
+    - `--plugin <name>` — optional, repeatable; agent plugins to install after initialisation (e.g. `--plugin @specd/plugin-agent-claude`). When not provided in interactive mode, the wizard asks.
+    - `--force` — optional; overwrite an existing config without prompting.
+    - `--format text|json|toon` — optional; forces non-interactive mode; defaults to `text`.
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Interactive mode'
+  content: |
+    The command enters interactive mode when **all** of the following are true:
+
+    - stdout is a TTY
+    - `--format` is not `json` or `toon`
+    - No configuration flags (`--schema`, `--workspace`, `--workspace-path`, `--plugin`) are provided
+
+    In interactive mode the command presents a guided wizard:
+
+    1. **Welcome header** — an ASCII banner and a short description of specd, shown once at startup.
+
+    2. **Project settings prompts** — prompts for each setting with its default value pre-filled:
+       - Schema reference (default: `@specd/schema-std`)
+       - Default workspace ID (default: `default`)
+       - Specs path (default: `specs/`)
+
+    3. **Plugin selection** — a multi-select listing available agent plugins. The user selects which plugins to install. Selecting none is valid (plugins can be installed later with `specd plugins install`).
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Skills installation after init'
+  content: |
+    After `InitProject` succeeds, if any plugins were selected (interactively or via `--plugin`), the CLI installs each selected plugin using `specd plugins install`. Each plugin's `install()` method handles writing its skill files.

@@ -1,0 +1,33 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Input contract'
+  content: |
+    `EditChange.execute` SHALL accept an `EditChangeInput` with the following fields:
+
+    - `name` (required, string) — the change slug to edit
+    - `addSpecIds` (optional, string array) — spec IDs to add to the change's `specIds`
+    - `removeSpecIds` (optional, string array) — spec IDs to remove from the change's `specIds`
+    - `description` (optional, string) — new description for the change
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: No-op when no spec changes requested'
+  content: |
+    If both `addSpecIds` and `removeSpecIds` are absent or empty BUT `description` is provided, the use case MUST update the change's description and return with `invalidated: false`.
+
+    If NO specification changes are requested at all (no addSpecIds, no removeSpecIds, no description), the use case MUST return the unchanged change with `invalidated: false` without persisting or resolving actor identity.
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: No-op when no spec changes requested'
+  content: |
+    ### Requirement: Description update does not invalidate
+
+    When the only modification requested is updating the description field (no addSpecIds or removeSpecIds), the use case MUST update `Change.description` and return with `invalidated: false`. The change remains in its current state without triggering approval invalidation.

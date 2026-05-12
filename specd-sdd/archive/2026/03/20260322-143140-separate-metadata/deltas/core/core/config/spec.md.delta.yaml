@@ -1,0 +1,51 @@
+- op: modified
+  description: 'Add optional specs.fs.metadataPath field to workspace config'
+  selector:
+    type: section
+    matches: 'Requirement: Workspaces'
+  content: |
+    `specd.yaml` must declare at least one workspace under the `workspaces` key. Each workspace defines where its specs live, where the implementation code lives, where its local schemas are stored, and the ownership relationship the project has with those specs.
+
+    `default` is a reserved workspace name that identifies the local project workspace. Every config must contain a `default` workspace. `specd init` creates it automatically if no `workspaces` section is present.
+
+    ```yaml
+    workspaces:
+      default: # required — the local project workspace
+        prefix: _global # optional — logical path prefix for all specs in this workspace
+        specs: # where this workspace's spec files live (required)
+          adapter: fs # storage adapter (required; only "fs" in v1)
+          fs:
+            path: specs/_global
+            metadataPath: .specd/metadata # optional — where metadata.yaml files live
+        schemas: # where named local schemas live (optional)
+          adapter: fs
+          fs:
+            path: specd/schemas # default: specd/schemas (relative to specd.yaml)
+        codeRoot: ./ # where implementation code lives (default: project root)
+        ownership: owned # owned | shared | readOnly (default: owned)
+
+      billing: # additional workspace
+        specs:
+          adapter: fs
+          fs:
+            path: ../billing/specd/specs
+        schemas:
+          adapter: fs
+          fs:
+            path: ../billing/dev/schemas
+        codeRoot: ../billing # required for non-default workspaces — no default
+        ownership: readOnly # default for non-default workspaces
+    ```
+
+    **`specs`** (required) — declares where this workspace's spec files live. Has its own `adapter` and adapter-specific config block. Only `"fs"` is supported in v1.
+
+    **`specs.fs.path`** (required for `fs` adapter) — directory where spec files live. Relative paths are resolved from the directory containing `specd.yaml`. May point outside the project repo root, in which case `RepositoryConfig.isExternal` is set to `true` by the application layer.
+
+    **`specs.fs.metadataPath`** (optional for `fs` adapter) — directory where `metadata.yaml` files live, mirroring the spec capability path structure. Relative paths are resolved from the directory containing `specd.yaml`. When absent, the config loader auto-derives the path from the VCS root of `specs.fs.path` + `/.specd/metadata/`. When the specs path is not inside any VCS, the fallback is `.specd/metadata/` relative to the specs path parent directory.
+
+    **`schemas`** (optional) — declares where named local schemas for this workspace are stored. Has its own `adapter` and adapter-specific config block, independent of `specs`. Used when the `schema` field references `#workspace:name` or a bare/hash-prefixed name targeting this workspace.
+
+    - For the `default` workspace, if omitted, defaults to `adapter: fs` with `fs.path: specd/schemas`.
+    - For non-`default` workspaces, if omitted, the workspace has no local schemas — any schema reference targeting it (e.g. `#billing:name`) will produce a `SchemaNotFoundError`.
+
+    **`codeRoot`** — directory where the implementation code for this workspace lives. Used by `CompileContext` to tell the agent where to write code.

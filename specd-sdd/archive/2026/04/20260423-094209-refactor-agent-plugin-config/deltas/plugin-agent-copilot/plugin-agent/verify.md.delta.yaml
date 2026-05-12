@@ -1,0 +1,12 @@
+- op: removed
+  selector: { type: section, matches: 'Scenario: Created plugin satisfies runtime contract' }
+- op: added
+  position:
+    parent: { type: section, matches: 'Requirement: Plugin runtime contract' }
+  content: |
+    #### Scenario: Created plugin satisfies runtime contract
+
+    - **WHEN** `create()` is called
+    - **THEN** the returned plugin has `type: 'agent'` (hardcoded)
+    - **AND** the returned plugin has `name` and `version` sourced from `specd-plugin.json`
+    - **AND** the returned plugin exposes `install(config, options)` and `uninstall(config, options)` functions using `SpecdConfig`

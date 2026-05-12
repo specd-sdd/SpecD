@@ -1,0 +1,59 @@
+- op: added
+  description: 'Restrict spec artifact access to expected artifact filenames'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: artifact loads a single artifact file$'
+  content: |
+    ### Requirement: Spec artifact access is limited to expected artifact files
+
+    `artifact(spec, filename)` and `save(spec, artifact, options?)` MUST operate only on artifact filenames that are valid for that spec under the active schema or adapter-owned metadata contract.
+
+    The repository MUST NOT treat the spec directory as a general-purpose file container for arbitrary extra filenames when serving the normal artifact API.
+
+- op: added
+  description: 'Require confinement for spec artifact reads and writes'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Spec artifact access is limited to expected artifact files$'
+  content: |
+    ### Requirement: Spec artifact path confinement
+
+    `artifact(spec, filename)` and `save(spec, artifact, options?)` MUST enforce strict confinement to the target spec directory.
+
+    The repository MUST reject any filename that would escape the spec directory or address a non-artifact path outside the permitted artifact set.
+
+- op: added
+  description: 'Require debug logging for spec artifact resolution and rejection'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Spec artifact path confinement$'
+  content: |
+    ### Requirement: Spec artifact resolution debug logging
+
+    Implementations SHOULD emit debug-level logs when resolving expected spec artifact files, rejecting unsupported filenames, or rejecting a path-confinement violation.
+
+    These logs MUST follow the project's global logging conventions.
+
+- op: added
+  description: 'Add logging dependency for repository diagnostics'
+  position:
+    parent:
+      type: section
+      matches: '^Spec Dependencies$'
+    after:
+      type: list-item
+      matches: 'core:search-specs'
+  content: |
+    - [`default:_global/logging`](../../_global/logging/spec.md) — debug logging requirements for expected artifact resolution and path-confinement diagnostics

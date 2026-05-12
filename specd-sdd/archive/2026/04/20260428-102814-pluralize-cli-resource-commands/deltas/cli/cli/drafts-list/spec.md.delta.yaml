@@ -1,0 +1,27 @@
+- op: modified
+  description: 'Document drafts canonical group with singular alias'
+  selector:
+    type: section
+    matches: '^Requirement: Command signature$'
+  content: |
+    ```
+    specd drafts list [--format text|json|toon]
+    ```
+
+    Alias:
+
+    ```
+    specd draft list [--format text|json|toon]
+    ```
+
+    No positional arguments. The `--format` flag controls output encoding; defaults to `text`.
+
+- op: modified
+  description: 'Add naming policy dependency'
+  selector:
+    type: section
+    matches: '^Spec Dependencies$'
+  content: |
+    - [`cli:cli/entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
+    - [`core:core/change`](../../core/change/spec.md) — drafting semantics
+    - [`cli:cli/command-resource-naming`](../command-resource-naming/spec.md) — canonical plural naming and singular alias policy

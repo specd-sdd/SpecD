@@ -1,0 +1,27 @@
+- op: modified
+  description: 'Verify change artifacts exposes artifact and file state explicitly.'
+  selector:
+    type: section
+    matches: '^Requirement: Output format$'
+  content: |
+    #### Scenario: Text output includes artifact state and file state
+
+    - **GIVEN** a change with `specs` in `drifted-pending-review`
+    - **AND** one tracked file is `drifted-pending-review`
+    - **WHEN** `specd change artifacts <name>` is run
+    - **THEN** the line includes both the artifact state and the file state
+    - **AND** it includes the absolute path
+
+    #### Scenario: JSON output exposes both state levels
+
+    - **GIVEN** a change with one tracked artifact file
+    - **WHEN** `specd change artifacts <name> --format json` is run
+    - **THEN** each JSON row includes `artifactState`
+    - **AND** it includes `fileState`
+    - **AND** it includes the absolute `path`
+
+    #### Scenario: Artifacts still listed in schema-declared order
+
+    - **GIVEN** the schema declares three artifacts
+    - **WHEN** `specd change artifacts <name>` is run
+    - **THEN** rows are grouped and emitted in schema-declared order

@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'Existing workspace scenarios test structural config validation which remains unchanged — metadataPath is optional and does not alter existing validation behaviour'

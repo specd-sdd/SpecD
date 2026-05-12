@@ -1,0 +1,72 @@
+- op: added
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Approvals$'
+  content: |
+    ### Requirement: Logging configuration
+
+    `specd.yaml` MAY declare a `logging` section at the root. This section is OPTIONAL. If omitted, the system SHALL fallback to built-in defaults.
+
+    - **`level`** (optional) — sets the minimum log level for the project. Supported values MUST include `trace`, `debug`, `info`, `warn`, `error`, and `silent`. Defaults to `info`.
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: '^Requirement: Startup validation$'
+  content: |
+    - `logging.level`, if present, MUST be one of the recognized level strings
+
+- op: modified
+  selector:
+    type: section
+    matches: '^Single-repo project \(minimal\)$'
+  content: |
+    ```yaml
+    schema: '@specd/schema-std'
+
+    # logging section is optional (defaults to level: info)
+    logging:
+      level: info
+
+    llmOptimizedContext: true # omit or set false for deterministic-only processing
+
+    context:
+      - file: specd-bootstrap.md
+      - file: AGENTS.md
+      - instruction: 'Always prefer editing existing files over creating new ones.'
+
+    workspaces:
+      default:
+        specs:
+          adapter: fs
+          fs:
+            path: specs/
+
+    storage:
+      changes:
+        adapter: fs
+        fs:
+          path: specd/changes
+      archive:
+        adapter: fs
+        fs:
+          path: specd/archive
+    ```
+
+- op: modified
+  selector:
+    type: section
+    matches: '^Spec Dependencies$'
+  content: |
+    - [`core:core/schema-format`](../schema-format/spec.md) — schema structure, `kind`, `extends`, and resolution order
+    - [`core:core/schema-merge`](../schema-merge/spec.md) — merge engine operations used by `schemaOverrides`
+    - [`default:_global/architecture`](../../_global/architecture/spec.md) — port and adapter design
+    - [`core:core/storage`](../storage/spec.md) — storage adapter behavior
+    - [`core:core/spec-metadata`](../spec-metadata/spec.md) — `.specd-metadata.yaml` format, `dependsOn` traversal in step 5
+    - [`core:core/workspace`](../workspace/spec.md) — workspace identity, properties, ownership, and prefix semantics
+    - [`default:_global/logging`](../../_global/logging/spec.md) — global logging standards followed by the config schema

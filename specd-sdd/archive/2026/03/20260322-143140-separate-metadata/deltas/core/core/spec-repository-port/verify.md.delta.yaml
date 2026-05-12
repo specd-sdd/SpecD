@@ -1,0 +1,43 @@
+- op: added
+  description: 'Add scenarios for new metadata() method'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: resolveFromPath resolves storage paths to spec identity'
+  content: |
+    ### Requirement: metadata returns parsed metadata or null
+
+    #### Scenario: Metadata exists
+
+    - **GIVEN** a spec with metadata on disk
+    - **WHEN** `metadata(spec)` is called
+    - **THEN** a parsed `SpecMetadata` object is returned with `originalHash` set
+
+    #### Scenario: Metadata does not exist
+
+    - **GIVEN** a spec with no metadata on disk
+    - **WHEN** `metadata(spec)` is called
+    - **THEN** `null` is returned
+
+    ### Requirement: saveMetadata persists metadata with conflict detection
+
+    #### Scenario: First metadata write creates directory
+
+    - **GIVEN** a spec whose metadata directory does not yet exist
+    - **WHEN** `saveMetadata(spec, content)` is called
+    - **THEN** the directory is created and the metadata file is written
+
+    #### Scenario: Conflict detected on metadata save
+
+    - **GIVEN** metadata loaded with `originalHash` and the file on disk was modified by another process
+    - **WHEN** `saveMetadata(spec, content)` is called without `force`
+    - **THEN** `ArtifactConflictError` is thrown
+
+    #### Scenario: Force metadata save bypasses conflict detection
+
+    - **GIVEN** metadata whose `originalHash` does not match the current file on disk
+    - **WHEN** `saveMetadata(spec, content, { force: true })` is called
+    - **THEN** the file is overwritten without error

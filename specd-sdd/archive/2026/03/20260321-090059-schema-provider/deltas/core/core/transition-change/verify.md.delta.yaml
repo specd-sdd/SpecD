@@ -1,0 +1,12 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Scenario: Non-existent change is rejected'
+    parent:
+      type: section
+      matches: 'Requirement: Change must exist'
+  content: |
+    #### Scenario: Non-existent change is rejected
+
+    - **WHEN** `TransitionChange.execute` is called with a name that does not exist in the repository
+    - **THEN** a `ChangeNotFoundError` is thrown

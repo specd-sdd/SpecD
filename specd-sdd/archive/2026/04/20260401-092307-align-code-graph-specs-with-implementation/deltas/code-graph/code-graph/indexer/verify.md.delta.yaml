@@ -1,0 +1,75 @@
+- op: modified
+  description: 'Cover the combined extraction fast path and backend-agnostic store commit behavior'
+  selector:
+    type: section
+    matches: '^Requirement: Two-pass extraction with in-memory index$'
+  content: |
+    #### Scenario: Symbols from all workspaces available before relation resolution
+
+    - **GIVEN** two workspaces contain symbols that import/call each other
+    - **WHEN** Pass 2 runs
+    - **THEN** cross-workspace relations can be resolved from the in-memory `SymbolIndex`
+    - **AND** no store query is needed during extraction
+
+    #### Scenario: Combined namespace and symbol extraction uses one adapter fast path
+
+    - **GIVEN** a language adapter implements `extractSymbolsWithNamespace()`
+    - **WHEN** Pass 1 processes a file from that language
+    - **THEN** the indexer may obtain symbols and namespace information from that single adapter call
+    - **AND** it does not need a separate namespace-only extraction step for that file
+
+    #### Scenario: PHP unresolved qualified name falls back to path resolution
+
+    - **GIVEN** a PHP file importing `App\Services\Mailer`
+    - **AND** `App\Services\Mailer` is NOT present in the in-memory symbol index
+    - **AND** the PHP adapter's `resolveQualifiedNameToPath` resolves it to `{codeRoot}/src/Services/Mailer.php`
+    - **WHEN** Pass 2 runs
+    - **THEN** a file-to-file `IMPORTS` relation is emitted from the importing file to `src/Services/Mailer.php`
+
+    #### Scenario: PHP import unresolvable via both mechanisms produces no relation
+
+    - **GIVEN** a PHP file containing `use Vendor\\External\\Class`
+    - **AND** the qualified name is not in the symbol index
+    - **AND** `resolveQualifiedNameToPath` returns `undefined` for that name
+    - **WHEN** Pass 2 runs
+    - **THEN** no `IMPORTS` relation is created for that import and no error is thrown
+
+    #### Scenario: DEPENDS_ON relations from dynamic loaders accumulated in Pass 2
+
+    - **GIVEN** a PHP file from which `extractRelations` returns `DEPENDS_ON` relations for dynamic loader calls
+    - **WHEN** Pass 2 runs
+    - **THEN** those `DEPENDS_ON` relations are accumulated and passed to bulk load
+
+    #### Scenario: Hierarchy relations are accumulated in Pass 2
+
+    - **GIVEN** an adapter returns `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES` relations for a file
+    - **WHEN** Pass 2 runs
+    - **THEN** those hierarchy relations are accumulated with the other extracted relations
+    - **AND** they are included in the single bulk load
+
+- op: modified
+  description: 'Verify bounded-memory staging under the graph temp directory'
+  selector:
+    type: section
+    matches: '^Requirement: Chunked processing$'
+  content: |
+    #### Scenario: Files grouped by byte budget
+
+    - **GIVEN** workspaces with files totaling 50 MB and a chunk budget of 20 MB
+    - **WHEN** Pass 1 runs
+    - **THEN** files are processed in at least 3 chunks
+    - **AND** file content strings from completed chunks are eligible for garbage collection
+
+    #### Scenario: Custom chunk budget respected
+
+    - **GIVEN** `IndexOptions.chunkBytes` is set to 5 MB
+    - **WHEN** indexing runs
+    - **THEN** chunks do not exceed 5 MB of source content
+
+    #### Scenario: Staged artifacts use the configured graph temp directory
+
+    - **GIVEN** the implementation spills intermediate indexing artifacts to disk
+    - **AND** project config resolves a graph temp directory from `configPath`
+    - **WHEN** indexing runs
+    - **THEN** run-scoped staged artifacts are written under that graph temp directory
+    - **AND** they are cleaned after a successful run

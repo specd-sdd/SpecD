@@ -1,0 +1,92 @@
+- op: modified
+  description: 'Add detectOverlap to the changes group description'
+  selector:
+    type: section
+    matches: 'Requirement: Kernel interface groups use cases by domain area'
+  content: |
+    The `Kernel` interface organises use cases into three groups that mirror the domain areas of the platform:
+
+    - `changes` — use cases that operate on change lifecycle (create, transition, draft, restore, discard, archive, validate, compile context, list, edit, skip artifact, update spec deps, list drafts, list discarded, list archived, get archived, get status, detect overlap)
+    - `specs` — use cases that operate on specs and approval gates (approve spec, approve signoff, list, get, save metadata, invalidate metadata, get active schema, validate, generate metadata, get context)
+    - `project` — use cases that operate on the project configuration (init, record skill install, get skills manifest, get project context)
+
+    Use cases must not appear at the top level of the kernel object — they must be nested under their domain-area group.
+
+- op: modified
+  description: 'Add changes.detectOverlap row to the kernel.changes mapping table'
+  selector:
+    type: section
+    matches: 'kernel\.changes'
+    parent:
+      type: section
+      matches: 'Requirement: Kernel entry mapping'
+  content: |
+    | Kernel path                      | Use case class           | Spec                                                            | Description                                             |
+    | -------------------------------- | ------------------------ | --------------------------------------------------------------- | ------------------------------------------------------- |
+    | `changes.repo`                   | `ChangeRepository`       | —                                                               | Underlying repository for adapter-level queries         |
+    | `changes.create`                 | `CreateChange`           | [create-change](../create-change/spec.md)                       | Creates a new change                                    |
+    | `changes.status`                 | `GetStatus`              | [get-status](../get-status/spec.md)                             | Reports lifecycle state and artifact statuses           |
+    | `changes.transition`             | `TransitionChange`       | [transition-change](../transition-change/spec.md)               | Performs a lifecycle state transition                   |
+    | `changes.draft`                  | `DraftChange`            | [draft-change](../draft-change/spec.md)                         | Shelves a change to drafts                              |
+    | `changes.restore`                | `RestoreChange`          | [restore-change](../restore-change/spec.md)                     | Recovers a drafted change                               |
+    | `changes.discard`                | `DiscardChange`          | [discard-change](../discard-change/spec.md)                     | Permanently abandons a change                           |
+    | `changes.archive`                | `ArchiveChange`          | [archive-change](../archive-change/spec.md)                     | Finalises a change: merges deltas, moves to archive     |
+    | `changes.validate`               | `ValidateArtifacts`      | [validate-artifacts](../validate-artifacts/spec.md)             | Validates artifact files against the active schema      |
+    | `changes.compile`                | `CompileContext`         | [compile-context](../compile-context/spec.md)                   | Assembles the context block for a lifecycle step        |
+    | `changes.list`                   | `ListChanges`            | [list-changes](../list-changes/spec.md)                         | Lists all active changes                                |
+    | `changes.listDrafts`             | `ListDrafts`             | [list-drafts](../list-drafts/spec.md)                           | Lists all drafted changes                               |
+    | `changes.listDiscarded`          | `ListDiscarded`          | [list-discarded](../list-discarded/spec.md)                     | Lists all discarded changes                             |
+    | `changes.edit`                   | `EditChange`             | [edit-change](../edit-change/spec.md)                           | Edits the spec scope of a change                        |
+    | `changes.skipArtifact`           | `SkipArtifact`           | [skip-artifact](../skip-artifact/spec.md)                       | Explicitly skips an optional artifact                   |
+    | `changes.updateSpecDeps`         | `UpdateSpecDeps`         | [update-spec-deps](../update-spec-deps/spec.md)                 | Updates declared dependencies for a spec                |
+    | `changes.listArchived`           | `ListArchived`           | [list-archived](../list-archived/spec.md)                       | Lists all archived changes                              |
+    | `changes.getArchived`            | `GetArchivedChange`      | [get-archived-change](../get-archived-change/spec.md)           | Retrieves a single archived change by name              |
+    | `changes.runStepHooks`           | `RunStepHooks`           | [run-step-hooks](../run-step-hooks/spec.md)                     | Executes run: hooks for a step and phase                |
+    | `changes.getHookInstructions`    | `GetHookInstructions`    | [get-hook-instructions](../get-hook-instructions/spec.md)       | Returns instruction: hook text for a step and phase     |
+    | `changes.getArtifactInstruction` | `GetArtifactInstruction` | [get-artifact-instruction](../get-artifact-instruction/spec.md) | Returns artifact instruction block with rules and delta |
+    | `changes.detectOverlap`          | `DetectOverlap`          | [spec-overlap](../spec-overlap/spec.md)                         | Detects specs targeted by multiple active changes       |
+
+- op: modified
+  description: 'Add spec-overlap to kernel spec dependencies'
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`specs/_global/architecture/spec.md`](../../_global/architecture/spec.md)
+    - [`specs/core/composition/spec.md`](../composition/spec.md)
+    - [`specs/core/create-change/spec.md`](../create-change/spec.md)
+    - [`specs/core/get-status/spec.md`](../get-status/spec.md)
+    - [`specs/core/transition-change/spec.md`](../transition-change/spec.md)
+    - [`specs/core/draft-change/spec.md`](../draft-change/spec.md)
+    - [`specs/core/restore-change/spec.md`](../restore-change/spec.md)
+    - [`specs/core/discard-change/spec.md`](../discard-change/spec.md)
+    - [`specs/core/archive-change/spec.md`](../archive-change/spec.md)
+    - [`specs/core/validate-artifacts/spec.md`](../validate-artifacts/spec.md)
+    - [`specs/core/compile-context/spec.md`](../compile-context/spec.md)
+    - [`specs/core/list-changes/spec.md`](../list-changes/spec.md)
+    - [`specs/core/list-drafts/spec.md`](../list-drafts/spec.md)
+    - [`specs/core/list-discarded/spec.md`](../list-discarded/spec.md)
+    - [`specs/core/edit-change/spec.md`](../edit-change/spec.md)
+    - [`specs/core/skip-artifact/spec.md`](../skip-artifact/spec.md)
+    - [`specs/core/update-spec-deps/spec.md`](../update-spec-deps/spec.md)
+    - [`specs/core/list-archived/spec.md`](../list-archived/spec.md)
+    - [`specs/core/get-archived-change/spec.md`](../get-archived-change/spec.md)
+    - [`specs/core/run-step-hooks/spec.md`](../run-step-hooks/spec.md)
+    - [`specs/core/get-hook-instructions/spec.md`](../get-hook-instructions/spec.md)
+    - [`specs/core/get-artifact-instruction/spec.md`](../get-artifact-instruction/spec.md)
+    - [`specs/core/approve-spec/spec.md`](../approve-spec/spec.md)
+    - [`specs/core/approve-signoff/spec.md`](../approve-signoff/spec.md)
+    - [`specs/core/list-specs/spec.md`](../list-specs/spec.md)
+    - [`specs/core/get-spec/spec.md`](../get-spec/spec.md)
+    - [`specs/core/save-spec-metadata/spec.md`](../save-spec-metadata/spec.md)
+    - [`specs/core/invalidate-spec-metadata/spec.md`](../invalidate-spec-metadata/spec.md)
+    - [`specs/core/get-active-schema/spec.md`](../get-active-schema/spec.md)
+    - [`specs/core/validate-specs/spec.md`](../validate-specs/spec.md)
+    - [`specs/core/generate-metadata/spec.md`](../generate-metadata/spec.md)
+    - [`specs/core/get-spec-context/spec.md`](../get-spec-context/spec.md)
+    - [`specs/core/init-project/spec.md`](../init-project/spec.md)
+    - [`specs/core/record-skill-install/spec.md`](../record-skill-install/spec.md)
+    - [`specs/core/get-skills-manifest/spec.md`](../get-skills-manifest/spec.md)
+    - [`specs/core/get-project-context/spec.md`](../get-project-context/spec.md)
+    - [`specs/core/resolve-schema/spec.md`](../resolve-schema/spec.md)
+    - [`specs/core/spec-overlap/spec.md`](../spec-overlap/spec.md)

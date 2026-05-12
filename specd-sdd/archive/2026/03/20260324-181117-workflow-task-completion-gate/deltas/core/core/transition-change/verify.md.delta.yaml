@@ -1,0 +1,68 @@
+- op: modified
+  description: 'Rewrite task completion scenarios for requiresTaskCompletion and structured reason'
+  selector:
+    type: section
+    matches: 'Requirement: Task completion check during requires enforcement'
+  content: |
+    #### Scenario: Transition blocked by requiresTaskCompletion artifact with incomplete items
+
+    - **GIVEN** a change in `implementing` state
+    - **AND** the `verifying` step declares `requiresTaskCompletion: [tasks]`
+    - **AND** the `tasks` artifact file contains `- [ ] unfinished task`
+    - **WHEN** `execute` is called with `to: 'verifying'`
+    - **THEN** it throws `InvalidStateTransitionError` with reason `incomplete-tasks`
+
+    #### Scenario: Transition allowed when all tasks complete
+
+    - **GIVEN** a change in `implementing` state
+    - **AND** the `verifying` step declares `requiresTaskCompletion: [tasks]`
+    - **AND** the tasks file contains only `- [x] done task`
+    - **WHEN** `execute` is called with `to: 'verifying'`
+    - **THEN** the change transitions to `verifying`
+
+    #### Scenario: No gating when requiresTaskCompletion absent
+
+    - **GIVEN** a change in `implementing` state
+    - **AND** the `verifying` step has `requires: [tasks]` but no `requiresTaskCompletion`
+    - **AND** the tasks file contains incomplete items
+    - **WHEN** `execute` is called with `to: 'verifying'`
+    - **THEN** the change transitions to `verifying` — no content check
+
+    #### Scenario: Missing artifact file is skipped
+
+    - **GIVEN** a step with `requiresTaskCompletion: [tasks]`
+    - **AND** the tasks file does not exist
+    - **WHEN** `execute` is called
+    - **THEN** the check is skipped and the transition proceeds
+
+    #### Scenario: Error carries incomplete and complete counts
+
+    - **GIVEN** a step with `requiresTaskCompletion: [tasks]`
+    - **AND** the tasks file has 5 complete items and 3 incomplete items
+    - **WHEN** `execute` is called
+    - **THEN** the error reason includes `artifactId: 'tasks'`, `incomplete: 3`, `complete: 5`, `total: 8`
+
+    #### Scenario: task-completion-failed progress event emitted before throwing
+
+    - **GIVEN** a step with `requiresTaskCompletion: [tasks]` and incomplete items
+    - **WHEN** `execute` is called with an `onProgress` callback
+    - **THEN** a `task-completion-failed` event is emitted with counts before the error is thrown
+
+- op: added
+  description: 'Add scenario for structured reason on requires enforcement failure'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Task completion check during requires enforcement'
+  content: |
+    ### Requirement: Workflow requires enforcement
+
+    #### Scenario: Unsatisfied requirement throws with structured reason
+
+    - **GIVEN** a workflow step with `requires: [specs, tasks]`
+    - **AND** `specs` has effective status `in-progress`
+    - **WHEN** `execute` is called
+    - **THEN** `InvalidStateTransitionError` is thrown with reason `incomplete-artifact` and blocking artifact `specs`

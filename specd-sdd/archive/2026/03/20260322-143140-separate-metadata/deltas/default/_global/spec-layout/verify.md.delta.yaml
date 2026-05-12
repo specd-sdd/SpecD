@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'Existing scenarios remain valid — spec-layout verify has no .specd-metadata.yaml references'

@@ -1,0 +1,9 @@
+releases:
+  code-graph:traversal: patch
+  code-graph:symbol-model: patch
+  code-graph:graph-store: patch
+  code-graph:indexer: patch
+  code-graph:staleness-detection: patch
+  cli:graph-impact: patch
+  code-graph:workspace-integration: patch
+  skills:skill-templates-source: patch

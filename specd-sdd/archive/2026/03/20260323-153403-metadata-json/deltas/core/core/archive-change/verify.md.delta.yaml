@@ -1,0 +1,11 @@
+- op: modified
+  description: 'Update metadata generation scenario to reference JSON'
+  selector:
+    type: section
+    matches: 'Scenario: Metadata generated for modified specs after archive'
+  content: |
+    #### Scenario: Metadata generated for modified specs after archive
+
+    - **GIVEN** a change with specIds `["default:auth/login"]` is archived
+    - **WHEN** the archive process runs post-merge metadata generation
+    - **THEN** `SaveSpecMetadata` is called with JSON-serialized content for each spec

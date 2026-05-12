@@ -1,0 +1,18 @@
+- op: added
+  description: 'Add pending-parent-artifact-review verification scenarios'
+  position:
+    parent: { type: section, matches: 'Requirement: Artifacts' }
+  content: |
+    #### Scenario: Artifact aggregate status is pending-parent-artifact-review
+
+    - **GIVEN** an artifact with all files in `complete` state
+    - **AND** the artifact depends on a parent artifact that is `pending-review`
+    - **WHEN** the artifact aggregate state is computed
+    - **THEN** the artifact state SHALL be `pending-parent-artifact-review`
+
+    #### Scenario: pending-parent-artifact-review blocks downstream requirements
+
+    - **GIVEN** artifact B requires artifact A
+    - **AND** artifact A is `pending-parent-artifact-review`
+    - **WHEN** dependency satisfaction is evaluated
+    - **THEN** artifact A MUST NOT satisfy the requirement

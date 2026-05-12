@@ -1,0 +1,7 @@
+releases:
+  plugin-manager:specd-plugin-type: patch
+  plugin-manager:agent-plugin-type: patch
+  plugin-manager:install-plugin-use-case: patch
+  plugin-manager:uninstall-plugin-use-case: patch
+  plugin-manager:update-plugin-use-case: patch
+  plugin-manager:plugin-loader: patch

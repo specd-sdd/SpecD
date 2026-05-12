@@ -1,0 +1,104 @@
+- op: modified
+  description: 'Update dependsOn traversal scenario to reference metadata instead of .specd-metadata.yaml'
+  selector:
+    type: section
+    matches: 'Requirement: Context spec collection'
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    #### Scenario: Project-level include applied regardless of active workspace
+
+    - **GIVEN** a project-level `contextIncludeSpecs` pattern that matches specs in multiple workspaces
+    - **WHEN** `CompileContext.execute` is called for a specific workspace
+    - **THEN** all specs matching the project-level pattern are included regardless of the active workspace
+
+    #### Scenario: Workspace-level include applied only for active workspace
+
+    - **GIVEN** `billing` workspace declares `contextIncludeSpecs: ['*']`
+    - **AND** the current change has no spec in the `billing` workspace
+    - **WHEN** `CompileContext.execute` is called
+    - **THEN** no `billing` specs are included via workspace-level patterns
+
+    #### Scenario: Project-level exclude removes spec before workspace patterns are applied
+
+    - **GIVEN** `contextIncludeSpecs: ['default:*']` and `contextExcludeSpecs: ['default:drafts/*']`
+    - **AND** `default:drafts/old-spec` was matched by the project-level include
+    - **WHEN** `CompileContext.execute` applies step 2 (project-level exclude)
+    - **THEN** `default:drafts/old-spec` is removed before workspace-level patterns are evaluated
+
+    #### Scenario: Workspace-level exclude removes spec after workspace include
+
+    - **GIVEN** `default` workspace declares `contextIncludeSpecs: ['*']` and `contextExcludeSpecs: ['internal/*']`
+    - **AND** `default` is active and `default:internal/notes` was added by the workspace include (step 3)
+    - **WHEN** `CompileContext.execute` applies step 4 (workspace-level exclude)
+    - **THEN** `default:internal/notes` is removed from the context set
+
+    #### Scenario: dependsOn traversal adds specs beyond include set
+
+    - **GIVEN** `change.specIds: ['default:auth/login']`
+    - **AND** `auth/login` metadata declares `dependsOn: ['auth/jwt']`
+    - **AND** `auth/jwt` was not matched by any include pattern
+    - **WHEN** `CompileContext.execute` applies step 5 with `followDeps: true`
+    - **THEN** `auth/jwt` is added to the context set
+
+    #### Scenario: dependsOn spec not removed by exclude
+
+    - **GIVEN** `contextExcludeSpecs: ['default:auth/*']`
+    - **AND** `auth/jwt` is added via `dependsOn` traversal (step 5)
+    - **WHEN** `CompileContext.execute` is called
+    - **THEN** `auth/jwt` is not excluded — `dependsOn` traversal specs are immune to exclude rules
+
+    #### Scenario: Spec appears only once even if matched multiple times
+
+    - **GIVEN** `contextIncludeSpecs: ['auth/login', 'auth/*']`
+    - **WHEN** `CompileContext.execute` is called
+    - **THEN** `auth/login` appears exactly once in the context, at the position of the first matching pattern
+
+- op: modified
+  description: 'Update staleness warning scenarios to reference metadata'
+  selector:
+    type: section
+    matches: 'Requirement: Staleness warning'
+  content: |
+    #### Scenario: Stale metadata emits warning
+
+    - **GIVEN** `auth/jwt` metadata has `contentHashes.spec.md: 'sha256:old'`
+    - **AND** the current `spec.md` hashes to `sha256:new`
+    - **WHEN** `CompileContext.execute` adds `auth/jwt` via `dependsOn` traversal
+    - **THEN** the result `warnings` includes a staleness warning for `auth/jwt`
+
+    #### Scenario: Fresh metadata emits no staleness warning
+
+    - **GIVEN** all `contentHashes` in metadata match the current file hashes
+    - **WHEN** `CompileContext.execute` is called
+    - **THEN** no staleness warnings are emitted
+
+- op: modified
+  description: 'Update dependsOn resolution order scenarios to reference metadata'
+  selector:
+    type: section
+    matches: 'Requirement: dependsOn resolution order'
+  content: |
+    #### Scenario: Missing metadata during dependsOn traversal emits warning
+
+    - **GIVEN** `change.specIds` includes `auth/login`
+    - **AND** `auth/login` has no metadata
+    - **WHEN** `CompileContext.execute` is called with `followDeps: true`
+    - **THEN** `result.warnings` includes a `missing-metadata` warning for `auth/login`
+
+    #### Scenario: Fallback to content extraction when metadata absent in dependsOn traversal
+
+    - **GIVEN** the schema declares `metadataExtraction.dependsOn`
+    - **AND** a spec in the `dependsOn` traversal has no metadata
+    - **AND** the spec's artifact content contains extractable dependency references
+    - **WHEN** `CompileContext.execute` is called with `followDeps: true`
+    - **THEN** dependencies are extracted from the spec content via the `metadataExtraction` engine
+    - **AND** a `missing-metadata` warning is still emitted
+
+    #### Scenario: Manifest specDependsOn used as primary source for dependencies
+
+    - **GIVEN** `change.specDependsOn` has an entry for `auth/login` with `['auth/shared']`
+    - **AND** `auth/login` metadata declares `dependsOn: ['auth/jwt']`
+    - **WHEN** `CompileContext.execute` is called with `followDeps: true`
+    - **THEN** `auth/shared` is used as the dependency (from manifest), not `auth/jwt` (from metadata)

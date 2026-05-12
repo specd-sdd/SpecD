@@ -1,0 +1,4 @@
+releases:
+  core:storage: patch
+  core:init-project: patch
+  core:archive-repository-port: patch

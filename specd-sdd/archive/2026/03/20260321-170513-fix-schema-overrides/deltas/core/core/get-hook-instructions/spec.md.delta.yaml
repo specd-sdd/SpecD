@@ -1,0 +1,29 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Ports and constructor'
+  content: |
+    `GetHookInstructions` receives at construction time: `ChangeRepository`, `SchemaProvider`, and `TemplateExpander`.
+
+    ```typescript
+    class GetHookInstructions {
+      constructor(
+        changes: ChangeRepository,
+        schemaProvider: SchemaProvider,
+        expander: TemplateExpander,
+      )
+    }
+    ```
+
+    `SchemaProvider` returns the fully-resolved schema with plugins and overrides applied — all workflow hooks (including those added via `schemaOverrides`) are already present in the schema's workflow steps. All dependencies are injected at kernel composition time.
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Instruction collection'
+  content: |
+    For the matched step and phase, `GetHookInstructions` MUST collect `instruction:` hooks from `workflow[step].hooks[phase]` — only entries with `type: 'instruction'`, in declaration order.
+
+    `run:` entries (type `'run'`) MUST be skipped — they are not instruction text.
+
+    All hooks — whether from the base schema, plugins, or overrides — are already merged into the schema's workflow steps by `ResolveSchema`. There is no separate project-level hook collection.

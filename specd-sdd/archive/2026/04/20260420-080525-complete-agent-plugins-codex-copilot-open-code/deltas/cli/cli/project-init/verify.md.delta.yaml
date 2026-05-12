@@ -1,0 +1,17 @@
+- op: added
+  description: 'Add verification for Open Code presence in wizard known plugin list.'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Interactive mode'
+  content: |
+    ### Requirement: Known plugin options
+
+    #### Scenario: Wizard includes Open Code in known options
+
+    - **GIVEN** interactive mode is active
+    - **WHEN** the plugin selection options are rendered
+    - **THEN** `@specd/plugin-agent-opencode` is listed as a selectable plugin option

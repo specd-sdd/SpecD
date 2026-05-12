@@ -1,0 +1,21 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Resolves schema before processing'
+  content: |
+    The use case MUST obtain the project's schema via `SchemaProvider.get()` before processing any specs. If the schema cannot be resolved (returns `null`), the use case MUST throw `SchemaNotFoundError`.
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Construction dependencies'
+  content: |
+    `GetProjectContext` depends on the following ports injected via constructor:
+
+    - `specs` (`ReadonlyMap<string, SpecRepository>`) — per-workspace spec repositories
+    - `schemaProvider` (`SchemaProvider`) — lazy, caching provider for the fully-resolved schema (replaces `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths`)
+    - `files` (`FileReader`) — for reading context entry files from disk
+    - `parsers` (`ArtifactParserRegistry`) — for parsing spec artifacts when metadata is stale
+    - `hasher` (`ContentHasher`) — for comparing content hashes against metadata
+
+    All dependencies are injected at construction time. The schema is resolved lazily on first access.

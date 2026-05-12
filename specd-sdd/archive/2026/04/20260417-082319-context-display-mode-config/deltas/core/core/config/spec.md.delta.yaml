@@ -1,0 +1,65 @@
+- op: modified
+  description: 'Replace lazy/full contextMode with list/summary/full/hybrid.'
+  selector:
+    type: section
+    matches: 'Requirement: Context mode'
+  content: |
+    `specd.yaml` MUST accept an optional top-level `contextMode` field that controls how context commands render specs in compiled context output.
+
+    Accepted values:
+
+    - `'list'` — render collected specs as spec IDs and source metadata only, without descriptions or full content
+    - `'summary'` (default) — render collected specs as a catalogue with spec ID, title, and description, without full content
+    - `'full'` — render all collected specs with full content
+    - `'hybrid'` — render direct change specs in full when the caller includes them, and render all other collected specs as summaries
+
+    The legacy `'lazy'` value is removed. It MUST NOT be accepted as an alias or fallback for `hybrid`.
+
+    `contextMode` is project-level only — it MUST NOT appear inside workspace entries. If declared inside a workspace, startup validation MUST reject it as an unknown field.
+
+    When omitted, `contextMode` defaults to `'summary'`.
+
+- op: modified
+  description: 'Update contextMode startup validation.'
+  selector:
+    type: section
+    matches: 'Requirement: Startup validation'
+  content: |
+    At startup, specd MUST validate the resolved configuration before constructing use cases. Validation MUST reject:
+
+    - missing required `schema`
+    - missing required `workspaces.default`
+    - unsupported storage adapters
+    - invalid path values
+    - invalid `contextIncludeSpecs` or `contextExcludeSpecs` pattern syntax
+    - `contextMode` values other than `'list'`, `'summary'`, `'full'`, or `'hybrid'`
+    - `contextMode: lazy`
+    - `contextMode` inside a workspace entry
+    - non-boolean `graph.respectGitignore`
+
+    Validation errors MUST surface as `ConfigValidationError`.
+
+- op: modified
+  description: 'Align constraints with new contextMode domain.'
+  selector:
+    type: section
+    matches: 'Constraints'
+  content: |
+    - specd.yaml is the single source of truth for project configuration
+    - One schema reference per project — all workspaces share the same schema, with optional per-workspace schema overrides
+    - adapter is required in every specs, schemas, and storage section; adapter-specific fields are nested under the adapter key
+    - storage section is required and must contain both changes and archive sub-keys
+    - All relative paths resolve from the specd.yaml directory; storage paths (fs.path in changes and archive) must remain within the repo root
+    - Project-level contextIncludeSpecs defaults to \['default:\*']; project-level contextExcludeSpecs defaults to \[]
+    - Workspace-level contextIncludeSpecs defaults to \['\*'] (all specs in that workspace); workspace-level contextExcludeSpecs defaults to \[]
+    - contextMode is optional; defaults to 'summary'; must be one of 'list', 'summary', 'full', or 'hybrid' — any other value is a startup validation error
+    - contextMode is project-level only; it MUST NOT appear inside workspace entries
+    - llmOptimizedContext is optional; defaults to false; must be a boolean — any other type is a startup validation error
+    - context is optional; each entry is an object with exactly one key: either file or instruction — no other shapes are valid
+    - context file paths are resolved relative to the specd.yaml directory; absolute paths are accepted
+    - approvals is optional; when present it must contain at least one of spec or signoff; each is an object with required enabled boolean and optional actor string
+    - skills is optional; when present it must be an object (the manifest body); specd does not validate skill content beyond YAML structure
+    - plugins is optional; each entry must contain a package string pointing to a resolvable npm package, with optional config of any shape; specd validates structure but not plugin-specific config semantics
+    - graph is optional per workspace; when present, graph.respectGitignore must be boolean and graph.excludePaths must be an array of strings
+    - graph.excludePaths replaces built-in defaults entirely when specified; it does not merge with them
+    - graph.respectGitignore defaults to true; when true, .gitignore has absolute priority and cannot be overridden by excludePaths

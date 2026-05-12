@@ -1,0 +1,23 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Approval invalidation on content change'
+  content: |
+    #### Scenario: Approval invalidation resets only drifted artifacts and downstream
+
+    - **GIVEN** a change with an active spec approval
+    - **AND** the DAG is: proposal → specs → verify, proposal → design, specs + design → tasks
+    - **AND** only `design.md` has changed since approval (hash mismatch)
+    - **WHEN** `ValidateArtifacts.execute` detects the hash mismatch
+    - **THEN** `change.invalidate('artifact-change', actor, ['design'])` is called
+    - **AND** `design` and `tasks` are reset (design + its downstream)
+    - **AND** `proposal`, `specs`, and `verify` remain `complete`
+
+    #### Scenario: Multiple artifacts drift — all drifted IDs collected in single call
+
+    - **GIVEN** a change with an active spec approval
+    - **AND** both `specs` and `design` have changed since approval
+    - **WHEN** `ValidateArtifacts.execute` detects the mismatches
+    - **THEN** a single `change.invalidate('artifact-change', actor, ['specs', 'design'])` is called
+    - **AND** `specs`, `verify`, `design`, and `tasks` are reset
+    - **AND** `proposal` remains `complete`

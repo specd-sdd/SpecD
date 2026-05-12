@@ -1,0 +1,42 @@
+- op: modified
+  description: 'Turn the standalone database-schema spec into a deprecation shim'
+  selector:
+    type: section
+    matches: '^Purpose$'
+  content: |
+    This spec previously described the Ladybug-specific physical schema for the code graph. That backend-specific schema now belongs to `code-graph:code-graph/ladybug-graph-store`, while storage-agnostic behavior belongs to `code-graph:code-graph/graph-store`.
+
+    This spec remains only as a transition marker so existing references can be removed deliberately rather than silently losing context.
+
+- op: modified
+  description: 'Replace concrete schema requirements with a deprecation requirement'
+  selector:
+    type: section
+    matches: '^Requirements$'
+  content: |
+    ### Requirement: Spec retirement
+
+    Ladybug-specific schema requirements SHALL be defined by `code-graph:code-graph/ladybug-graph-store`, not by this standalone spec.
+
+    Storage-agnostic code, specs, and commands MUST depend on `code-graph:code-graph/graph-store` rather than this spec.
+
+    This spec introduces no new runtime requirements of its own and exists only to support the migration away from a backend-specific standalone schema spec.
+
+- op: modified
+  description: 'Constrain the deprecated spec to migration-only use'
+  selector:
+    type: section
+    matches: '^Constraints$'
+  content: |
+    - This spec is deprecated and scheduled for removal once remaining references are updated
+    - New storage-agnostic specs MUST NOT depend on this spec
+    - Ladybug-specific schema requirements belong in `code-graph:code-graph/ladybug-graph-store`
+
+- op: modified
+  description: 'Point remaining readers at the replacement spec'
+  selector:
+    type: section
+    matches: '^Spec Dependencies$'
+  content: |
+    - [`specs/code-graph/ladybug-graph-store/spec.md`](../ladybug-graph-store/spec.md) — replacement owner of Ladybug-specific schema requirements
+    - [`specs/code-graph/graph-store/spec.md`](../graph-store/spec.md) — abstract graph-store contract

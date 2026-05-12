@@ -1,0 +1,35 @@
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Build context entry from metadata'
+  content: |
+    #### Scenario: Full mode defaults to Description + Rules + Constraints
+    - **GIVEN** a spec with fresh metadata
+    - **AND** effective context mode is `full`
+    - **WHEN** `GetSpecContext.execute` is called without section filters
+    - **THEN** the entry includes Title, Description, Rules, and Constraints
+
+    #### Scenario: Header persistence in full mode
+    - **GIVEN** effective context mode is `full`
+    - **WHEN** `GetSpecContext.execute` is called with `sections: ['rules']`
+    - **THEN** the entry includes Title, Description, and Rules
+    - **AND** Constraints and Scenarios are omitted
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Section filtering'
+  content: |
+    #### Scenario: Only requested sections included in full mode
+    - **GIVEN** a spec with fresh metadata
+    - **AND** effective context mode is `full`
+    - **WHEN** `execute({ ..., sections: ['rules'] })` is called
+    - **THEN** the entry includes Title, Description (persistence), and Rules
+    - **AND** Constraints and Scenarios are omitted
+
+    #### Scenario: Empty sections array defaults to Description + Rules + Constraints
+    - **GIVEN** effective context mode is `full`
+    - **WHEN** `execute({ ..., sections: [] })` is called
+    - **THEN** the entry includes Title, Description, Rules, and Constraints
+    - **AND** Scenarios are omitted unless explicitly requested

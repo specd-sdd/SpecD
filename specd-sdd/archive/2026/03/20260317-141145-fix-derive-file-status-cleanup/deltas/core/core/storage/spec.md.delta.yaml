@@ -1,0 +1,13 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Artifact status derivation'
+  content: |
+    Artifact status (`missing`, `in-progress`, `complete`, `skipped`) must be derived at load time — it must not be stored directly in the manifest. The manifest stores only `validatedHash` per artifact. `FsChangeRepository` must compute status using this precedence:
+
+    1. `validatedHash === "__skipped__"` → `skipped` (only valid for `optional: true` artifacts)
+    2. File absent (and no sentinel) → `missing`
+    3. File present and cleaned hash matches `validatedHash` → `complete`
+    4. File present but hash differs or `validatedHash` is `null` → `in-progress`
+
+    "Cleaned hash" means: read the file content, apply the artifact type's `preHashCleanup` rules in order (the same rules `ValidateArtifacts` applies before computing `validatedHash`), then compute SHA-256 of the result. `FsChangeRepository` must have access to the schema's artifact types at load time so that it can retrieve the `preHashCleanup` array for each artifact type. If no `preHashCleanup` rules are defined for an artifact type, the raw content is hashed directly.

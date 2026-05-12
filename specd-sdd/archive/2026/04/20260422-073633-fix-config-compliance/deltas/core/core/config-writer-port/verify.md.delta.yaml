@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'No verify changes needed — the AddPlugin requirement is updated in spec.md delta but existing scenarios already cover the core behavior. New scenarios are covered in the config spec verify delta.'

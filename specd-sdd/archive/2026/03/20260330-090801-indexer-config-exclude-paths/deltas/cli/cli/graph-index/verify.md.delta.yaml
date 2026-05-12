@@ -1,0 +1,60 @@
+- op: added
+  description: 'Add scenarios for --exclude-path flag and graph config fields'
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Indexing behaviour'
+    after:
+      type: section
+      matches: 'Scenario: Process exits explicitly'
+  content: |
+    #### Scenario: --exclude-path merges on top of config excludePaths
+
+    - **GIVEN** workspace config has `graph.excludePaths: ["dist/"]`
+    - **AND** the command is run with `--exclude-path "fixtures/"`
+    - **WHEN** indexing runs
+    - **THEN** the effective exclusion list is `["dist/", "fixtures/"]`
+    - **AND** `specd.yaml` is not modified
+
+    #### Scenario: multiple --exclude-path flags are accumulated
+
+    - **GIVEN** the command is run with `--exclude-path "*.gen.ts" --exclude-path "fixtures/" --exclude-path "tmp/"`
+    - **WHEN** indexing runs
+    - **THEN** all three patterns are applied as additional exclusions
+
+    #### Scenario: --exclude-path without config excludePaths merges with built-in defaults
+
+    - **GIVEN** workspace config has no `graph.excludePaths`
+    - **AND** the command is run with `--exclude-path "fixtures/"`
+    - **WHEN** indexing runs
+    - **THEN** the effective exclusion list is the built-in defaults plus `fixtures/`
+
+    #### Scenario: graph.respectGitignore false respected from config
+
+    - **GIVEN** workspace config has `graph.respectGitignore: false`
+    - **WHEN** `specd graph index` is run
+    - **THEN** `.gitignore` files are not loaded during file discovery for that workspace
+
+- op: added
+  description: 'Add scenarios for CLI reference documentation requirement'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Error cases'
+  content: |
+    ### Requirement: CLI reference documentation
+
+    #### Scenario: graph section present in CLI reference
+
+    - **WHEN** `docs/cli/cli-reference.md` is inspected
+    - **THEN** a `## graph` section exists covering `index`, `search`, `hotspots`, `stats`, and `impact`
+
+    #### Scenario: graph index flags documented
+
+    - **WHEN** the `### graph index` subsection is read
+    - **THEN** `--exclude-path`, `--workspace`, `--force`, and `--format` are documented with descriptions
+    - **AND** the `graph.excludePaths` and `graph.respectGitignore` config fields are explained
+    - **AND** an example shows negation syntax (e.g. `!.specd/metadata/`)

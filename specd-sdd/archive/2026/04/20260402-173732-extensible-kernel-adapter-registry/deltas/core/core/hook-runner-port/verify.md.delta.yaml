@@ -1,0 +1,18 @@
+- op: added
+  description: 'Verify HookRunner stays limited to shell hooks'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Hook type distinction$'
+  content: |
+    ### Requirement: HookRunner is shell-only
+
+    #### Scenario: Explicit external hooks are not passed to HookRunner
+
+    - **GIVEN** a workflow step contains an explicit external hook entry
+    - **WHEN** hook execution is wired for that step
+    - **THEN** the entry is dispatched through the external hook runner abstraction
+    - **AND** `HookRunner.run()` is used only for shell `run:` hooks

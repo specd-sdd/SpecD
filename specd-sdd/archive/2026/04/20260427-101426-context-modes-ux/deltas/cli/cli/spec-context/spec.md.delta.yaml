@@ -1,0 +1,21 @@
+added:
+  - position:
+      parent: '### Requirement: Output'
+    content: |
+      #### Scenario: Header persistence in full mode
+      In `full` mode, the **Title** and **Description** MUST always be included in the output, even when specific section filters (`--rules`, etc.) are active.
+modified:
+  - selector: '### Requirement: Output'
+    content: |
+      In `text` mode (default), each spec entry in the output is introduced by a header:
+
+      ```
+      ### Spec: <workspace>:<capability-path>
+      Mode: full
+      ```
+
+      Full-mode entries include the rendered metadata content. Title and Description are always included. If no section flags are passed, render Description, Rules, and Constraints. If section flags are passed, render Title, Description, and only the requested sections.
+
+      When `--follow-deps` is passed, each dependency appears as a subsequent `### Spec:` block after the root using `full` mode.
+
+      In `json` or `toon` mode, the output includes `specs` and `warnings`. The root spec is always `specs[0]`; dependencies follow in traversal order.

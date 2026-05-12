@@ -1,0 +1,11 @@
+- op: removed
+  selector: { type: section, matches: 'Scenario: Installs to .claude/skills/' }
+- op: added
+  position:
+    parent: { type: section, matches: 'Requirement: Install location' }
+  content: |
+    #### Scenario: Installs to .claude/skills/
+
+    - **GIVEN** a `SpecdConfig` with `projectRoot`
+    - **WHEN** install is called with that configuration
+    - **THEN** files are written to `{projectRoot}/.claude/skills/`

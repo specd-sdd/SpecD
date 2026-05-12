@@ -1,0 +1,616 @@
+{
+  "name": "serialize-change-mutations",
+  "createdAt": "2026-04-02T13:40:08.272Z",
+  "description": "serialize ChangeRepository mutations to prevent concurrent lost updates",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "core:core/change-repository-port",
+    "core:core/validate-artifacts",
+    "core:core/edit-change",
+    "core:core/draft-change",
+    "core:core/restore-change",
+    "core:core/discard-change",
+    "core:core/approve-spec",
+    "core:core/approve-signoff",
+    "core:core/skip-artifact",
+    "core:core/transition-change",
+    "core:core/update-spec-deps",
+    "core:core/archive-change"
+  ],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "validatedHash": "sha256:cf7e76d05e5a6a7231aedb9bf94e59a4c66990fe8bab0b3055751179e52998b1"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "files": [
+        {
+          "key": "core:core/change-repository-port",
+          "filename": "deltas/core/core/change-repository-port/spec.md.delta.yaml",
+          "validatedHash": "sha256:16288833d09cb1df385679740cd1742ca4f25e3823f85d17cf9c165cc26d57be"
+        },
+        {
+          "key": "core:core/validate-artifacts",
+          "filename": "deltas/core/core/validate-artifacts/spec.md.delta.yaml",
+          "validatedHash": "sha256:7675e4d59e93f478d3d519e305f6f534b715d689400ec9a1381b6e214566a875"
+        },
+        {
+          "key": "core:core/edit-change",
+          "filename": "deltas/core/core/edit-change/spec.md.delta.yaml",
+          "validatedHash": "sha256:b817e42cdba1715a643c116e43b47827866a57f6270352d5b9de1f6e731021fa"
+        },
+        {
+          "key": "core:core/draft-change",
+          "filename": "deltas/core/core/draft-change/spec.md.delta.yaml",
+          "validatedHash": "sha256:733412e39714bbd72ea20a20625ffcea4deaecf139c1d9a0d65881884b014b1a"
+        },
+        {
+          "key": "core:core/restore-change",
+          "filename": "deltas/core/core/restore-change/spec.md.delta.yaml",
+          "validatedHash": "sha256:e5a081672c91f12ee3a6f723aa38815b61187214b765a105d4b7088f4f0eecbb"
+        },
+        {
+          "key": "core:core/discard-change",
+          "filename": "deltas/core/core/discard-change/spec.md.delta.yaml",
+          "validatedHash": "sha256:838ff3fde4e9f823ce2c2ca18a6689c1bfde8f67b8507d5e69d41e21da2cd4bf"
+        },
+        {
+          "key": "core:core/approve-spec",
+          "filename": "deltas/core/core/approve-spec/spec.md.delta.yaml",
+          "validatedHash": "sha256:9b45babe410f88dba387dd3d20f1d70b4c141bafb20afa239a99579fd240a83b"
+        },
+        {
+          "key": "core:core/approve-signoff",
+          "filename": "deltas/core/core/approve-signoff/spec.md.delta.yaml",
+          "validatedHash": "sha256:6361c131dc761fc74141bc539647be6ab8c115b9eab020a48967f5884133d94d"
+        },
+        {
+          "key": "core:core/skip-artifact",
+          "filename": "deltas/core/core/skip-artifact/spec.md.delta.yaml",
+          "validatedHash": "sha256:ef5e211197254d5ece691c03f709f74626c30153a8d988621d935f29a222ebb3"
+        },
+        {
+          "key": "core:core/transition-change",
+          "filename": "deltas/core/core/transition-change/spec.md.delta.yaml",
+          "validatedHash": "sha256:9d45157dd11a14b4e4376fa205c1d3e7dbdcca85b6f628003e543e0e80db025d"
+        },
+        {
+          "key": "core:core/update-spec-deps",
+          "filename": "deltas/core/core/update-spec-deps/spec.md.delta.yaml",
+          "validatedHash": "sha256:84ab7c27ebb61e1ba33262a79a89da7d2969a55d2e1568d74151738178390459"
+        },
+        {
+          "key": "core:core/archive-change",
+          "filename": "deltas/core/core/archive-change/spec.md.delta.yaml",
+          "validatedHash": "sha256:d46098ae58612d6ade4454b961f84318b70d1902c947a85fc3695ffa2f081d7b"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "files": [
+        {
+          "key": "core:core/change-repository-port",
+          "filename": "deltas/core/core/change-repository-port/verify.md.delta.yaml",
+          "validatedHash": "sha256:0bed67f040993181436e2045361f20de312f14a8121c1cf4f5a2eac170a392b8"
+        },
+        {
+          "key": "core:core/validate-artifacts",
+          "filename": "deltas/core/core/validate-artifacts/verify.md.delta.yaml",
+          "validatedHash": "sha256:bee6fa8da4f8d8493f7af766e7ba44718066938cbec7bb00f8641386936f8115"
+        },
+        {
+          "key": "core:core/edit-change",
+          "filename": "deltas/core/core/edit-change/verify.md.delta.yaml",
+          "validatedHash": "sha256:5a4ce9201fe4d9ab4b55f632cfce4df89286e499ccbae6735b256bee76c3dac0"
+        },
+        {
+          "key": "core:core/draft-change",
+          "filename": "deltas/core/core/draft-change/verify.md.delta.yaml",
+          "validatedHash": "sha256:d2fa58954bfb070aa196bb5b3c0cc362ed6d82a209420aee58cfc10470e43e8d"
+        },
+        {
+          "key": "core:core/restore-change",
+          "filename": "deltas/core/core/restore-change/verify.md.delta.yaml",
+          "validatedHash": "sha256:d43aba4e6dd61b2679e0697435caf2ddb908de77743fe59bbda86495112470cd"
+        },
+        {
+          "key": "core:core/discard-change",
+          "filename": "deltas/core/core/discard-change/verify.md.delta.yaml",
+          "validatedHash": "sha256:0368499333bc0412e5a4240bc0b4c48869dbb81a623046d70688e94a4ee7c91a"
+        },
+        {
+          "key": "core:core/approve-spec",
+          "filename": "deltas/core/core/approve-spec/verify.md.delta.yaml",
+          "validatedHash": "sha256:16e61e2789a553695bb22dc96f359270b4fc55a3e9de61977690e481e93a3377"
+        },
+        {
+          "key": "core:core/approve-signoff",
+          "filename": "deltas/core/core/approve-signoff/verify.md.delta.yaml",
+          "validatedHash": "sha256:b79a914b40569ddcba953d2f7d9214d21d8164c783c993b1bb60e38cc77d53a2"
+        },
+        {
+          "key": "core:core/skip-artifact",
+          "filename": "deltas/core/core/skip-artifact/verify.md.delta.yaml",
+          "validatedHash": "sha256:9c1f791fd6bd46cfe806f73fdb7a35633a02a73857780279b09023805af5a31c"
+        },
+        {
+          "key": "core:core/transition-change",
+          "filename": "deltas/core/core/transition-change/verify.md.delta.yaml",
+          "validatedHash": "sha256:bf972d013e3d713c312bbb8700cbabdb79aca44bae2fb33c9ce07dbfce65d7ba"
+        },
+        {
+          "key": "core:core/update-spec-deps",
+          "filename": "deltas/core/core/update-spec-deps/verify.md.delta.yaml",
+          "validatedHash": "sha256:6ff5530b92a62e90aa8091b602ad88e60dc83ef60b70fa4d13d3eaafd1578da3"
+        },
+        {
+          "key": "core:core/archive-change",
+          "filename": "deltas/core/core/archive-change/verify.md.delta.yaml",
+          "validatedHash": "sha256:e58a2849bfd18d6dc243f16e7cea4d2ca19159a7d7afd0e600ca887e90ebc77e"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "validatedHash": "sha256:c71ad484528b5b157451c3b377512b0698a5bc16fc3fb9b9a988ae268b504d79"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "validatedHash": "sha256:51b2d4ee8cdbd35857b687f7ec5badc1749d75f6a7785281495b83ff96469e5e"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-04-02T13:40:08.272Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "specIds": ["core:core/change-repository-port", "core:core/validate-artifacts"],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-02T13:40:08.281Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/change-repository-port"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/validate-artifacts"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/change-repository-port"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/validate-artifacts"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-02T13:48:00.886Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-02T13:54:01.544Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change"
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-02T13:54:01.544Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:core/edit-change"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/draft-change"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/restore-change"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/discard-change"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/approve-spec"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/approve-signoff"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/skip-artifact"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/transition-change"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/update-spec-deps"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/archive-change"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/edit-change"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/draft-change"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/restore-change"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/discard-change"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/approve-spec"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/approve-signoff"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/skip-artifact"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/transition-change"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/update-spec-deps"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/archive-change"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-02T15:46:53.502Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-02T15:48:49.881Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-02T15:50:27.486Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-02T16:31:15.705Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-02T16:31:15.705Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-02T16:31:15.705Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:core/change"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/change"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-02T16:33:05.764Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change"
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-02T16:33:05.764Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [],
+      "filesRemoved": [
+        {
+          "type": "specs",
+          "key": "core:core/change"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/change"
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-02T16:33:34.166Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-02T16:33:35.544Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-02T16:33:53.804Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-02T16:33:53.804Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-02T16:33:53.804Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:core/change"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/change"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-02T16:34:34.152Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "cause": "spec-change"
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-02T16:34:34.152Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [],
+      "filesRemoved": [
+        {
+          "type": "specs",
+          "key": "core:core/change"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/change"
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-02T16:34:42.335Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-02T16:34:43.255Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-02T16:40:45.068Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-02T16:42:51.419Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-02T16:43:06.293Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-02T16:46:26.441Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-04-02T16:46:26.717Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "m***a@g***.com"
+  }
+}

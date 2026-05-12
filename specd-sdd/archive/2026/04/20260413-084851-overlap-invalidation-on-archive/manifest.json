@@ -1,0 +1,422 @@
+{
+  "name": "overlap-invalidation-on-archive",
+  "createdAt": "2026-04-13T08:48:51.019Z",
+  "description": "When archiving with --allow-overlap, overlapping changes are invalidated with a new spec-overlap-conflict cause, rolled back to designing with a message identifying the archived change and overlapping specs. ReviewSummary.reason and change status output are extended to surface this cause.",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "core:core/change",
+    "core:core/archive-change",
+    "core:core/get-status",
+    "core:core/spec-overlap",
+    "cli:cli/change-archive",
+    "cli:cli/change-status"
+  ],
+  "specDependsOn": {
+    "core:core/archive-change": [
+      "core:core/change",
+      "core:core/schema-format",
+      "core:core/delta-format",
+      "core:core/validate-artifacts",
+      "core:core/storage",
+      "core:core/run-step-hooks",
+      "core:core/hook-execution-model",
+      "core:core/template-variables",
+      "core:core/spec-metadata",
+      "core:core/content-extraction",
+      "default:_global/architecture",
+      "core:core/workspace",
+      "core:core/spec-id-format",
+      "core:core/spec-overlap"
+    ],
+    "core:core/get-status": [
+      "core:core/change",
+      "core:core/kernel",
+      "core:core/transition-change",
+      "core:core/schema-format",
+      "core:core/config"
+    ],
+    "cli:cli/change-archive": [
+      "cli:cli/entrypoint",
+      "core:core/change",
+      "core:core/archive-change",
+      "core:core/hook-execution-model"
+    ],
+    "cli:cli/change-status": ["cli:cli/entrypoint", "core:core/change", "core:core/get-status"],
+    "core:core/change": [
+      "core:core/change-manifest",
+      "core:core/workflow-model",
+      "core:core/spec-metadata",
+      "core:core/spec-id-format",
+      "default:_global/architecture"
+    ]
+  },
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:77476213528c71898138b960ecd86ecd7a4a25bdbc6764242bf0c5b74ba7c09b"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:core/change",
+          "filename": "deltas/core/core/change/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:d734474df3f3687d729100d48cc1f0a9ed783c41c233ea0ccd470a848e807ae1"
+        },
+        {
+          "key": "core:core/archive-change",
+          "filename": "deltas/core/core/archive-change/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:b8f10985f678a7438936f432c4f98ab229c5e478254c4b10e0af42a282263fd0"
+        },
+        {
+          "key": "core:core/get-status",
+          "filename": "deltas/core/core/get-status/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:78c74756d704723fe7dc170748a55d44702630e8effffacf4679a50b45e7a783"
+        },
+        {
+          "key": "core:core/spec-overlap",
+          "filename": "deltas/core/core/spec-overlap/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:a678db9272e530a3ced1aa37d0e04bd058f4dcd5722bc1ccec5baa4c39ab54d0"
+        },
+        {
+          "key": "cli:cli/change-archive",
+          "filename": "deltas/cli/cli/change-archive/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:72a16b89ebf93be60805af4c4d43534e92428edd94ed8270d2a36227410c272e"
+        },
+        {
+          "key": "cli:cli/change-status",
+          "filename": "deltas/cli/cli/change-status/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:b22032e857132d8d75bda867faedf043c95e3060a4bf1a19bb2032a41d0b69c7"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:core/change",
+          "filename": "deltas/core/core/change/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:96f0e942f150383bde3253e0b8702126758f6c98b3ae030089fbb42fdb017abd"
+        },
+        {
+          "key": "core:core/archive-change",
+          "filename": "deltas/core/core/archive-change/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:5c0b338e4449e0b719331325091633aaa6c6ef84110c525420f5b3c6f66f5dfc"
+        },
+        {
+          "key": "core:core/get-status",
+          "filename": "deltas/core/core/get-status/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:16c900bd9319ccbb0dcb22df7218488271272c49180b03ee6873b86383860047"
+        },
+        {
+          "key": "core:core/spec-overlap",
+          "filename": "deltas/core/core/spec-overlap/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:5dab793fc146dd08db09f50d89325ed5030008b1af6973deb42bcc191789a5dd"
+        },
+        {
+          "key": "cli:cli/change-archive",
+          "filename": "deltas/cli/cli/change-archive/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:609b550e19db3cac371bc231a9625dc64a81d869fb109429d85725272ba82ab7"
+        },
+        {
+          "key": "cli:cli/change-status",
+          "filename": "deltas/cli/cli/change-status/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:5434f741512f8fb72d167182cd8bf9ef011f80db3aa251b775e375d881656a55"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:cd2f021c83afd17b318965d3befff5808721a0b7493013f4d97686c74b3ff3fb"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:8b280c96d23f9c86c27095bd1506f88bf7ddc9667a2d92bb01dc3b1ec8eeda0e"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-04-13T08:48:51.019Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "specIds": [
+        "core:core/change",
+        "core:core/archive-change",
+        "core:core/get-status",
+        "core:core/spec-overlap",
+        "cli:cli/change-archive",
+        "cli:cli/change-status"
+      ],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-13T08:48:51.028Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/change"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/archive-change"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/get-status"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/spec-overlap"
+        },
+        {
+          "type": "specs",
+          "key": "cli:cli/change-archive"
+        },
+        {
+          "type": "specs",
+          "key": "cli:cli/change-status"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/change"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/archive-change"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/get-status"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/spec-overlap"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/change-archive"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/change-status"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-13T08:59:52.604Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-13T09:54:54.660Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:cli/change-status, core:core/get-status]; verify [cli:cli/change-status, core:core/get-status]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["cli:cli/change-status", "core:core/get-status"]
+        },
+        {
+          "type": "verify",
+          "files": ["cli:cli/change-status", "core:core/get-status"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-13T15:15:39.837Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-13T16:44:48.800Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-04-14T06:55:31.309Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: design [design]",
+      "affectedArtifacts": [
+        {
+          "type": "design",
+          "files": ["design"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-14T06:55:31.309Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-14T07:11:31.027Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-14T07:13:06.801Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-14T07:15:42.106Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-14T07:17:55.306Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-14T07:18:28.957Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-14T07:23:59.304Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-04-14T07:23:59.507Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "m***a@g***.com"
+  }
+}

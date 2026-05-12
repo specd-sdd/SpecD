@@ -1,0 +1,3 @@
+releases:
+  cli:cli/change-edit-description: patch
+  core:core/change-edit-description: patch

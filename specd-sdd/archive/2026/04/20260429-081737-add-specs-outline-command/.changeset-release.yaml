@@ -1,0 +1,3 @@
+releases:
+  core:core/get-spec-outline: minor
+  cli:cli/spec-outline: minor

@@ -1,0 +1,13 @@
+releases:
+  core:core/change: patch
+  core:core/change-manifest: patch
+  core:core/config: minor
+  core:core/config-loader: minor
+  core:core/actor-resolver-port: patch
+  core:core/actor-resolver: minor
+  core:core/actor-provider: minor
+  core:core/actor-resolver-privacy: minor
+  core:core/actor-resolver-git: patch
+  core:core/actor-resolver-hg: patch
+  core:core/actor-resolver-svn: patch
+  core:core/actor-resolver-null: patch

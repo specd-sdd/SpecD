@@ -1,0 +1,42 @@
+- op: modified
+  description: 'Prefer canonical plural group for archive action'
+  selector:
+    type: section
+    matches: '^Purpose$'
+  content: |
+    Once a change is fully approved, its spec deltas need to be promoted into the permanent spec tree so they become the source of truth. `specd changes archive <name>` is the canonical form and finalises a change by merging its deltas into the permanent spec directories and moving the change to the archive.
+
+    `specd change archive <name>` remains supported as an alias.
+
+- op: modified
+  description: 'Update signature to canonical plural with alias'
+  selector:
+    type: section
+    matches: '^Requirement: Command signature$'
+  content: |
+    ```
+    specd changes archive <name> [--skip-hooks <phases>] [--allow-overlap] [--format text|json|toon]
+    ```
+
+    Alias:
+
+    ```
+    specd change archive <name> [--skip-hooks <phases>] [--allow-overlap] [--format text|json|toon]
+    ```
+
+    - `<name>` — required positional; the name of the change to archive
+    - `--skip-hooks <phases>` — optional; comma-separated list of archive hook phases to skip. Valid values: `pre`, `post`, `all`. When `all` is specified, all hook execution is skipped. When omitted, both phases execute.
+    - `--allow-overlap` — optional flag; permits archiving despite spec overlap with other active changes
+    - `--format text|json|toon` — optional; output format, defaults to `text`
+
+- op: modified
+  description: 'Add naming policy dependency'
+  selector:
+    type: section
+    matches: '^Spec Dependencies$'
+  content: |
+    - [`cli:cli/entrypoint`](../../cli/entrypoint/spec.md) — config discovery, exit codes, output conventions
+    - [`core:core/change`](../../core/change/spec.md) — archivable state, archive semantics
+    - [`core:core/archive-change`](../../core/archive-change/spec.md) — archive hook phase selectors and hook delegation
+    - [`core:core/hook-execution-model`](../../core/hook-execution-model/spec.md) — `--skip-hooks` manual-control pattern
+    - [`cli:cli/command-resource-naming`](../command-resource-naming/spec.md) — canonical plural naming and singular alias policy

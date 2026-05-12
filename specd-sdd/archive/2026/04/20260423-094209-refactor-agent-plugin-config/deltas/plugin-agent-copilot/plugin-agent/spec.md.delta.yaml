@@ -1,0 +1,40 @@
+- op: modified
+  description: 'Update Factory export to accept PluginLoaderOptions'
+  selector:
+    type: section
+    matches: 'Requirement: Factory export'
+  content: |
+    The package MUST export `create(options: PluginLoaderOptions): AgentPlugin` as default or named export.
+
+    The factory function MUST read `specd-plugin.json` at the infrastructure boundary to obtain `name` and `version`. It MUST search for the manifest in its own directory first, then the parent directory as fallback. The `type` field MUST remain hardcoded as `'agent'`.
+
+- op: modified
+  description: 'Update Plugin runtime contract and Install location to use SpecdConfig'
+  selector:
+    type: section
+    matches: 'Requirement: Plugin runtime contract'
+  content: |
+    The implementation MUST return a valid `AgentPlugin` that:
+
+    - has `type: 'agent'` (hardcoded for type safety)
+    - has `name` and `version` sourced from `specd-plugin.json` via the factory — not hardcoded in the class
+    - implements `install(config, options)` and `uninstall(config, options)` with real filesystem behavior, using the provided `SpecdConfig`
+    - uses a stable frontmatter model for generated skill files
+
+- op: modified
+  description: 'Update Install location to use projectRoot from config'
+  selector:
+    type: section
+    matches: 'Requirement: Install location'
+  content: |
+    Project-level skill installation MUST target `.github/skills/` under the `projectRoot` provided in `SpecdConfig`.
+
+- op: modified
+  description: 'Add core:core/config dependency'
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`core:core/config`](../../core/core/config/spec.md) — defines SpecdConfig type
+    - [`plugin-manager:agent-plugin-type`](../plugin-manager/agent-plugin-type/spec.md) — plugin interface
+    - [`skills:skill-templates-source`](../skills/skill-templates-source/spec.md) — frontmatter injection responsibility and template source contract

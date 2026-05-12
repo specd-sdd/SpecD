@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'No spec changes needed - this change only modifies code implementation, not requirements'

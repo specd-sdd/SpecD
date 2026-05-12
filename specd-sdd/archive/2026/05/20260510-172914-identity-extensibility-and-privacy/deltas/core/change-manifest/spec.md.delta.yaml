@@ -1,0 +1,20 @@
+- op: modified
+  description: 'Update the field definition for history events'
+  selector:
+    type: list-item
+    matches: 'history — append-only array'
+  content: |
+    history — append-only array of typed events. Each event contains common fields: `type`, `at`, and `by`. The `by` field is an `ActorIdentity` object (defined in `core:change`) which includes `name`, `email`, and optional `provider`, `providerId`, and `metadata`.
+
+- op: modified
+  description: 'Update dependencies'
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [core:change](../change/spec.md) — change event model and lifecycle derivation
+    - [core:change-layout](../change-layout/spec.md) — expected artifact paths
+    - [core:storage](../storage/spec.md) — repository writes
+    - [core:spec-metadata](../spec-metadata/spec.md) — metadata files
+    - [core:spec-id-format](../spec-id-format/spec.md) — identifiers
+    - [core:workspace](../workspace/spec.md) — workspace semantics

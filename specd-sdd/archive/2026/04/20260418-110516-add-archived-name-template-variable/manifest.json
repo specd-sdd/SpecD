@@ -1,0 +1,252 @@
+{
+  "name": "add-archived-name-template-variable",
+  "createdAt": "2026-04-18T11:05:16.186Z",
+  "description": "Formalize change.archivedName as an officially supported template variable for archived-change flows (post-archive hooks, changeset generation). Updates run-step-hooks and template-variables specs to document the variable contract.",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": ["core:core/run-step-hooks", "core:core/template-variables"],
+  "specDependsOn": {
+    "core:core/run-step-hooks": [
+      "core:core/hook-execution-model",
+      "core:core/hook-runner-port",
+      "core:core/external-hook-runner-port",
+      "core:core/schema-format",
+      "core:core/config",
+      "core:core/change",
+      "core:core/template-variables",
+      "core:core/archive-repository-port"
+    ],
+    "core:core/template-variables": [
+      "core:core/hook-runner-port",
+      "core:core/hook-execution-model",
+      "core:core/get-hook-instructions",
+      "core:core/get-artifact-instruction",
+      "core:core/run-step-hooks",
+      "core:core/archive-change"
+    ]
+  },
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:cd7317d80f2176161ffd1eebfa297119933104181afb5b7a5484f99bb1248b32"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:core/run-step-hooks",
+          "filename": "deltas/core/core/run-step-hooks/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:f52b02b308c1196e9c7af66e2e068b5d1f18b61c05baca4fbe2fda38d52583bc"
+        },
+        {
+          "key": "core:core/template-variables",
+          "filename": "deltas/core/core/template-variables/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:1ccd5aedf921911a15d8733874bcd585d2db54d4b1abd4325f61714159dd57da"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:core/run-step-hooks",
+          "filename": "deltas/core/core/run-step-hooks/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:e927705e1e851da0f706e176c21b4c43f961f8f3404d1bc78394ac10f12aeaf2"
+        },
+        {
+          "key": "core:core/template-variables",
+          "filename": "deltas/core/core/template-variables/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:5e0da3279baf53e381629bfe1e87713f59f929f4e210f637d2030edf3e3f5c35"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:12bb4d17ede5406e34b119f5e1df9867f983b73c425a2bb75c8e09a83a96dad9"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:93680597f108500be3ac3d713cf044e05324c9bc5ed92299c52077aa458b458d"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-04-18T11:05:16.186Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "specIds": ["core:core/run-step-hooks", "core:core/template-variables"],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-04-18T11:05:16.202Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/run-step-hooks"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/template-variables"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/run-step-hooks"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/template-variables"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-18T11:08:52.515Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-18T12:20:01.152Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-18T12:23:23.329Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-18T12:23:28.826Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-18T12:25:28.715Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-18T12:25:36.412Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "description-updated",
+      "at": "2026-04-18T12:28:18.687Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "description": "Formalize change.archivedName as an officially supported template variable for archived-change flows (post-archive hooks, changeset generation). Updates run-step-hooks and template-variables specs to document the variable contract."
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-04-18T12:28:49.315Z",
+      "by": {
+        "name": "M***a",
+        "email": "m***a@g***.com"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-04-18T12:28:49.393Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "m***a@g***.com"
+  }
+}

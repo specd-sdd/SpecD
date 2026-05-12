@@ -1,0 +1,29 @@
+# Delta: cli:change-context (Verification)
+
+- op: added
+  description: 'Add missing behaviour verification.'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: Behaviour
+
+    #### Scenario: CLI forwards traversal and fingerprint options to CompileContext
+
+    - **WHEN** `specd change context` is run with flags such as `--include-change-specs`, `--follow-deps`, `--depth`, or `--fingerprint`
+    - **THEN** the command forwards those options into the `CompileContext` request
+
+- op: added
+  description: 'Extend the existing step-availability warning requirement.'
+  position:
+    after:
+      type: section
+      matches: 'Requirement: Step availability warning'
+  content: |
+    #### Scenario: Blocking artifacts come from CompileContext output
+
+    - **GIVEN** `CompileContext` returns `stepAvailable: false` and `blockingArtifacts: ['tasks']`
+    - **WHEN** `specd change context my-change implementing` is run
+    - **THEN** stderr names `tasks` as the blocking artifact
+    - **AND** the CLI does not recompute a different blocking set locally

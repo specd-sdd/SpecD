@@ -1,0 +1,42 @@
+- op: added
+  description: 'Add scenarios for excludePaths and respectGitignore in WorkspaceIndexTarget'
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: WorkspaceIndexTarget'
+    after:
+      type: section
+      matches: 'Scenario: Single-workspace indexing isolation'
+  content: |
+    #### Scenario: graph config fields flow from SpecdWorkspaceConfig to WorkspaceIndexTarget
+
+    - **GIVEN** `SpecdWorkspaceConfig.graph.excludePaths` is `[".specd/*", "!.specd/metadata/"]`
+    - **AND** `SpecdWorkspaceConfig.graph.respectGitignore` is `false`
+    - **WHEN** `buildWorkspaceTargets()` constructs the `WorkspaceIndexTarget`
+    - **THEN** `WorkspaceIndexTarget.excludePaths` is `[".specd/*", "!.specd/metadata/"]`
+    - **AND** `WorkspaceIndexTarget.respectGitignore` is `false`
+
+    #### Scenario: absent graph config produces no fields on WorkspaceIndexTarget
+
+    - **GIVEN** `SpecdWorkspaceConfig.graph` is `undefined`
+    - **WHEN** `buildWorkspaceTargets()` constructs the `WorkspaceIndexTarget`
+    - **THEN** `WorkspaceIndexTarget.excludePaths` is `undefined`
+    - **AND** `WorkspaceIndexTarget.respectGitignore` is `undefined`
+
+- op: added
+  description: 'Add scenario for respectGitignore: false in gitignore handling'
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: .gitignore handling for codeRoot'
+    after:
+      type: section
+      matches: 'Scenario: Hierarchical gitignore loading'
+  content: |
+    #### Scenario: respectGitignore false disables gitignore loading
+
+    - **GIVEN** a workspace with a `.gitignore` containing `*.log`
+    - **AND** `WorkspaceIndexTarget.respectGitignore` is `false`
+    - **WHEN** file discovery runs for that workspace
+    - **THEN** `.log` files are not excluded by gitignore rules
+    - **AND** no `.gitignore` file is read during the walk

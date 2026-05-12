@@ -1,0 +1,59 @@
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Context display modes'
+  content: |
+    #### Scenario: Full mode defaults to Description + Rules + Constraints
+    - **GIVEN** a spec is rendered in `full` mode
+    - **WHEN** the `sections` input is absent or empty
+    - **THEN** the emitted entry includes Title, Description, Rules, and Constraints
+
+    #### Scenario: Section flags override full mode defaults
+    - **GIVEN** a spec is rendered in `full` mode
+    - **WHEN** the `sections` input is `['scenarios']`
+    - **THEN** the emitted entry includes Title, Description (header persistence), and Scenarios only
+
+    #### Scenario: Header persistence in full mode
+    - **GIVEN** a spec is rendered in `full` mode
+    - **WHEN** any `sections` filter is applied
+    - **THEN** Title and Description are still included in the entry fields
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Context display modes'
+  content: |
+    #### Scenario: Summary mode is the default when contextMode is omitted
+    - **GIVEN** `contextMode` is not declared in config
+    - **WHEN** `CompileContext.execute` is called
+    - **THEN** collected specs are emitted in summary mode unless another mode is explicitly requested
+
+    #### Scenario: List mode emits list entries only
+    - **GIVEN** `contextMode: "list"`
+    - **WHEN** `CompileContext.execute` is called
+    - **THEN** every emitted spec entry has `mode: "list"`
+
+    #### Scenario: Summary mode emits summary entries only
+    - **GIVEN** `contextMode: "summary"`
+    - **WHEN** `CompileContext.execute` is called
+    - **THEN** every emitted spec entry has `mode: "summary"`
+
+    #### Scenario: Full mode emits full entries only
+    - **GIVEN** `contextMode: "full"`
+    - **WHEN** `CompileContext.execute` is called
+    - **THEN** every emitted spec entry has `mode: "full"`
+    - **AND** each emitted entry contains structured content (Title, Description, etc.)
+
+    #### Scenario: Hybrid mode renders direct change specs in full
+    - **GIVEN** `contextMode: "hybrid"`
+    - **AND** `includeChangeSpecs: true`
+    - **AND** a spec is in `change.specIds`
+    - **WHEN** `CompileContext.execute` is called
+    - **THEN** that spec is emitted in `full` mode with Description, Rules, and Constraints by default
+
+    #### Scenario: Hybrid mode renders non-direct specs as summary
+    - **GIVEN** `contextMode: "hybrid"`
+    - **AND** a spec is collected from include patterns or traversal and is not a direct included change spec
+    - **WHEN** `CompileContext.execute` is called
+    - **THEN** that spec is emitted in summary mode

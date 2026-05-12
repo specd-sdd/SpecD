@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'No changes needed - bug is in implementation (apply-delta.ts), not in spec definition'

@@ -1,0 +1,17 @@
+- op: added
+  description: 'Add scenario for initialization with SpecdConfig'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: SpecdPlugin interface'
+  content: |
+    ### Requirement: PluginContext
+
+    #### Scenario: Initialization with SpecdConfig
+
+    - **GIVEN** a valid `SpecdConfig` is resolved
+    - **WHEN** `plugin.init()` is called with a `PluginContext` containing that config
+    - **THEN** the plugin has access to all project configuration fields

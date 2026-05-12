@@ -1,0 +1,17 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Array entry identity'
+    children:
+      - type: section
+        matches: 'Scenario: Same id in different arrays is valid'
+  content: |
+    #### Scenario: Same id in different arrays is valid
+
+    - **WHEN** `workflow[0].hooks.pre` has `id: run-tests` and `workflow[1].rules.pre` also has `id: run-tests`
+    - **THEN** the schema loads without error — rules use per-array uniqueness, not global
+
+    #### Scenario: Duplicate hook IDs across workflow steps rejected
+
+    - **WHEN** `workflow[0].hooks.pre` has `id: run-lint` and `workflow[1].hooks.post` also has `id: run-lint`
+    - **THEN** `SchemaRegistry.resolve()` must throw a `SchemaValidationError` mentioning the duplicate hook ID

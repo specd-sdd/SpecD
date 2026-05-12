@@ -1,0 +1,112 @@
+# Delta: core:change (Verification)
+
+- op: modified
+  description: 'Update Lifecycle requirements scenarios.'
+  selector:
+    type: section
+    matches: 'Requirement: Lifecycle'
+  content: |
+    #### Scenario: Valid transition — drafting to designing
+
+    - **WHEN** a Change in `drafting` state is transitioned to `designing`
+    - **THEN** the `LifecycleEngine` confirms the transition is valid
+    - **AND** a `transitioned` event with `from: 'drafting'` and `to: 'designing'` is appended
+
+    #### Scenario: Valid transition — verifying back to implementing for implementation-only failure
+
+    - **GIVEN** a Change in `verifying` state
+    - **AND** the current artifacts still describe the intended behavior
+    - **AND** the required fix fits within the already-defined tasks
+    - **WHEN** the change is transitioned back to `implementing`
+    - **THEN** a `transitioned` event with `from: 'verifying'` and `to: 'implementing'` is appended
+    - **AND** no approval invalidation is triggered
+
+    #### Scenario: Verification requiring new tasks returns to designing
+
+    - **GIVEN** a Change in `verifying` state
+    - **AND** the required fix would introduce tasks not already defined
+    - **WHEN** verification routes the change out of `verifying`
+    - **THEN** the change transitions to `designing`, not `implementing`
+
+    #### Scenario: archivable can return to designing
+
+    - **GIVEN** a Change in `archivable` state
+    - **WHEN** it is transitioned to `designing`
+    - **THEN** the transition succeeds
+
+    #### Scenario: Designing to designing does not downgrade artifacts or approvals
+
+    - **GIVEN** a Change already in `designing` state with validated artifacts and an active spec approval
+    - **WHEN** the change is transitioned to `designing` again
+    - **THEN** no `invalidated` event is appended
+    - **AND** no artifact files are downgraded to `pending-review`
+    - **AND** the active spec approval remains valid
+    - **AND** a `transitioned` event with `from: 'designing'` and `to: 'designing'` is appended
+
+- op: modified
+  description: 'Remove status-related scenarios from core:change as they are now handled by LifecycleEngine.'
+  selector:
+    type: section
+    matches: 'Requirement: Artifacts'
+  content: |
+    #### Scenario: File state is persisted explicitly
+
+    - **GIVEN** an artifact file stored in the manifest with `state: 'pending-review'`
+    - **WHEN** the Change is loaded
+    - **THEN** the file state is `pending-review`
+    - **AND** it is not recomputed from `validatedHash` alone
+
+    #### Scenario: Artifact aggregates to drifted-pending-review when any file drifted
+
+    - **GIVEN** an artifact with two files
+    - **AND** one file is `complete`
+    - **AND** one file is `drifted-pending-review`
+    - **WHEN** the artifact aggregate state is computed
+    - **THEN** the artifact state is `drifted-pending-review`
+
+    #### Scenario: Returning to designing downgrades files to pending-review
+
+    - **GIVEN** a change with validated artifacts
+    - **AND** one file is already `drifted-pending-review`
+    - **WHEN** the change returns to `designing`
+    - **THEN** every other file becomes `pending-review`
+    - **AND** the drifted file remains `drifted-pending-review`
+
+    #### Scenario: markComplete sets file and artifact state to complete
+
+    - **GIVEN** an artifact file in `in-progress`
+    - **WHEN** `markComplete(key, hash)` is called through validation
+    - **THEN** the file state becomes `complete`
+    - **AND** the parent artifact state is recomputed
+
+- op: added
+  description: 'Add verification coverage for artifact sync and lifecycle interpretation authority requirements.'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: Artifact sync
+
+    #### Scenario: syncArtifacts appends artifacts-synced when schema artifact set changes
+
+    - **GIVEN** the schema artifact set changes for an existing Change
+    - **WHEN** artifact sync reconciles the artifact map
+    - **THEN** an `artifacts-synced` event is appended describing the added and removed files and artifact types
+
+- op: added
+  description: 'Add the verify requirement for lifecycle interpretation authority.'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: Lifecycle interpretation authority
+
+    #### Scenario: Dependency-aware lifecycle interpretation is external to Change
+
+    - **GIVEN** an artifact appears persisted as `complete`
+    - **AND** an upstream dependency requires review under the active schema DAG
+    - **WHEN** lifecycle interpretation is requested
+    - **THEN** the `Change` entity remains the source of persisted facts only
+    - **AND** `LifecycleEngine` is responsible for deriving the dependency-aware lifecycle meaning

@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'Array entry ID uniqueness validation requirements already correctly defined in existing spec'

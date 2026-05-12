@@ -1,0 +1,11 @@
+- op: modified
+  description: Verify that the final lifecycle mutation persists through mutate.
+  selector:
+    type: section
+    matches: 'Requirement: Persistence'
+  content: |
+    #### Scenario: Change is saved after successful transition through serialized mutation
+
+    - **WHEN** `TransitionChange.execute` completes successfully
+    - **THEN** `ChangeRepository.mutate(input.name, fn)` was called for the final persisted mutation
+    - **AND** the callback applied any redesign invalidation, validation clearing, and lifecycle transition on the fresh persisted `Change`

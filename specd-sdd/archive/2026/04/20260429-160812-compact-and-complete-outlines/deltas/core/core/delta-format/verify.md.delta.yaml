@@ -1,0 +1,55 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: ArtifactParser port'
+  content: |
+    #### Scenario: nodeTypes returns format-specific vocabulary
+
+    - **WHEN** `nodeTypes()` is called on the markdown parser
+    - **THEN** it returns descriptors including `section` (identified by `heading`), `paragraph`, `list`, `list-item`, and `code-block`
+
+    #### Scenario: nodeTypes returns JSON vocabulary
+
+    - **WHEN** `nodeTypes()` is called on the JSON parser
+    - **THEN** it returns descriptors including `property` (identified by `key`), `object`, `array`, and `array-item`
+
+    #### Scenario: deltaInstructions returns format-specific selector guidance
+
+    - **WHEN** `deltaInstructions()` is called on the markdown adapter
+    - **THEN** it returns a string describing the selector fields (`type`, `heading`, `parent`), the semantics of `content` for `modified` and `added`, the delta file location pattern, and a concrete YAML example mapping an AST section node to a delta entry
+
+    #### Scenario: deltaInstructions returns format-specific value guidance for JSON
+
+    - **WHEN** `deltaInstructions()` is called on the JSON adapter
+    - **THEN** it returns a string describing `type: property`, `key`, `value`, `index`, `where`, and includes a concrete example using `op: modified` with a `value` field
+
+    #### Scenario: default outline mode is compact
+
+    - **WHEN** `outline(ast)` is used in default mode for markdown, json, yaml, and plaintext
+    - **THEN** it returns only the compact historical subset for each parser
+
+    #### Scenario: full mode includes all selector-addressable families
+
+    - **WHEN** full outline mode is requested
+    - **THEN** all selector-addressable node families for the format are represented
+
+    #### Scenario: hints are returned as root-level placeholders
+
+    - **WHEN** hints mode is requested
+    - **THEN** selector hints are returned as a root-level type-keyed object with placeholder values
+    - **AND** hints are not duplicated in each outline entry
+
+    #### Scenario: apply rejects on unresolved selector
+
+    - **WHEN** a delta entry has a selector that matches no node in the AST
+    - **THEN** `apply` must throw `DeltaApplicationError` without modifying the AST
+
+    #### Scenario: apply rejects on ambiguous selector
+
+    - **WHEN** a delta entry has a selector that matches more than one node and a single match is expected
+    - **THEN** `apply` must throw `DeltaApplicationError` without modifying the AST
+
+    #### Scenario: serialize round-trips YAML comments
+
+    - **WHEN** a YAML artifact containing inline comments is parsed and serialised without modification
+    - **THEN** the serialised output preserves all comments

@@ -1,0 +1,2 @@
+- op: no-op
+  description: "The current port contract already permits async repository-backed path resolution; this change reuses that capability through the extraction pipeline without changing the port's spec.md requirements yet."

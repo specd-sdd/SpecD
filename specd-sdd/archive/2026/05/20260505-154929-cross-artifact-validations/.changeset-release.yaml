@@ -1,0 +1,4 @@
+releases:
+  core:schema-format: minor
+  core:validate-artifacts: minor
+  core:validate-specs: patch

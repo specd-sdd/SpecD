@@ -1,0 +1,46 @@
+# Delta: core:core/get-artifact-instruction verify — add template scenarios
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Instruction resolution'
+    after:
+      type: section
+      matches: 'Scenario: rules.pre from extending schema'
+  content: |
+    #### Scenario: Template content resolved and returned
+
+    - **GIVEN** an artifact with `template: "templates/design.md"` pointing to a file containing `# Design: {{change.name}}`
+    - **AND** a change named `add-auth`
+    - **WHEN** `GetArtifactInstruction.execute` is called for this artifact
+    - **THEN** `template` is `"# Design: add-auth"` (variables expanded)
+
+    #### Scenario: No template returns null
+
+    - **GIVEN** an artifact with no `template` field declared
+    - **WHEN** `GetArtifactInstruction.execute` is called
+    - **THEN** `template` is `null`
+
+    #### Scenario: Template and delta both present
+
+    - **GIVEN** an artifact with `delta: true` and `template: "templates/spec.md"`
+    - **AND** `change.specIds` includes both an existing spec and a new spec
+    - **WHEN** `GetArtifactInstruction.execute` is called
+    - **THEN** `template` contains the resolved template content
+    - **AND** `delta.outlines` contains an entry for the existing spec but not the new spec
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Result shape'
+    after:
+      type: section
+      matches: 'Scenario: Rules-only artifact has null instruction'
+  content: |
+    #### Scenario: Result includes template field
+
+    - **GIVEN** an artifact with `template: "templates/tasks.md"`
+    - **WHEN** `GetArtifactInstruction.execute` is called
+    - **THEN** the result includes a `template` field with the resolved file content

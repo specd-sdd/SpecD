@@ -1,0 +1,15 @@
+- op: modified
+  description: 'Update purpose to reference metadata via port instead of .specd-metadata.yaml'
+  selector:
+    type: section
+    matches: 'Purpose'
+  content: |
+    Agents and scripts that produce metadata externally need a safe way to persist it without bypassing validation or conflict detection. The `specd spec write-metadata` command writes metadata for a given spec, accepting YAML content from stdin or a file and persisting it through the `SaveSpecMetadata` use case for conflict detection and atomic writes.
+
+- op: modified
+  description: 'Update text output to reference metadata instead of .specd-metadata.yaml'
+  selector:
+    type: section
+    matches: 'Requirement: Text output'
+  content: |
+    On success, text format outputs: `wrote metadata for <workspace:path>`

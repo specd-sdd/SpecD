@@ -1,0 +1,9 @@
+- op: modified
+  selector:
+    type: section
+    matches: '^Scenario: Output includes all workspace details$'
+  content: |
+    #### Scenario: Output includes all workspace details
+    - **GIVEN** a project with multiple workspaces
+    - **WHEN** `specd project status` is executed
+    - **THEN** each workspace shows name, prefix, ownership, isExternal status, and codeRoot path

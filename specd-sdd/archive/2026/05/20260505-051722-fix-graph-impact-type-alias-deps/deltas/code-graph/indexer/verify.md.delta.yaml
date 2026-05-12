@@ -1,0 +1,91 @@
+- op: modified
+  description: 'Verify fingerprint-aware incremental indexing.'
+  selector:
+    type: section
+    matches: '^Requirement: Incremental indexing$'
+  content: |
+    #### Scenario: Unchanged files skipped when fingerprint matches
+
+    - **GIVEN** a store containing 10 files with current content hashes
+    - **AND** the persisted graph fingerprint matches the fingerprint for the current run
+    - **AND** none of the files on disk have changed
+    - **WHEN** `IndexCodeGraph.execute()` is called
+    - **THEN** `filesSkipped` is 10 and `filesIndexed` is 0
+    - **AND** no language adapter extraction is invoked
+
+    #### Scenario: Fingerprint mismatch escalates unchanged files to full rebuild
+
+    - **GIVEN** a store containing indexed files with matching content hashes
+    - **AND** the persisted graph fingerprint differs from the fingerprint for the current run
+    - **WHEN** `IndexCodeGraph.execute()` is called
+    - **THEN** the run behaves as a full rebuild instead of skipping unchanged files
+    - **AND** every discovered file is re-extracted
+    - **AND** `fullRebuildReason` explains that the code-graph version or resolved workspace configuration changed
+
+    #### Scenario: Deleted file removal remains scoped to indexed workspaces
+
+    - **GIVEN** a store containing files from workspaces `core`, `cli`, and `code-graph`
+    - **AND** the persisted graph fingerprint matches the fingerprint for the current run
+    - **WHEN** `IndexCodeGraph.execute()` is called with only workspace `core`
+    - **THEN** only files with workspace `core` are considered for deletion
+    - **AND** files from `cli` and `code-graph` remain untouched in the store
+
+    #### Scenario: Changed files removed from store before bulk load
+
+    - **GIVEN** a store containing `core:src/utils.ts` with hash `abc`
+    - **AND** `src/utils.ts` on disk now has hash `def`
+    - **AND** the persisted graph fingerprint matches the fingerprint for the current run
+    - **WHEN** `IndexCodeGraph.execute()` is called
+    - **THEN** `core:src/utils.ts` is removed from the store before bulk load
+    - **AND** the re-extracted data is inserted via `bulkLoad()`
+
+- op: modified
+  description: 'Verify config-relative path derivation during discovery.'
+  selector:
+    type: section
+    matches: '^Requirement: Multi-workspace file discovery$'
+  content: |
+    #### Scenario: node_modules excluded
+
+    - **GIVEN** a workspace with `node_modules/lodash/index.js`
+    - **WHEN** file discovery runs
+    - **THEN** `node_modules/lodash/index.js` is not in the discovered files
+
+    #### Scenario: Paths prefixed with workspace name and config-relative path
+
+    - **GIVEN** the active `specd.yaml` lives at `/project/specd.yaml`
+    - **AND** a workspace named `core` with codeRoot `/project/packages/core`
+    - **AND** a file at `/project/packages/core/src/index.ts`
+    - **WHEN** the indexer processes this workspace
+    - **THEN** `FileNode.path` is `core:src/index.ts`
+    - **AND** `FileNode.configRelativePath` is `packages/core/src/index.ts`
+    - **AND** `FileNode.workspace` is `core`
+
+    #### Scenario: Config-relative path normalizes absolute parent traversal
+
+    - **GIVEN** the active `specd.yaml` lives at `/project/apps/web/specd.yaml`
+    - **AND** a workspace named `core` with codeRoot `/project/packages/core`
+    - **AND** a file at `/project/packages/core/src/index.ts`
+    - **WHEN** the indexer processes this workspace
+    - **THEN** `FileNode.configRelativePath` is `../../packages/core/src/index.ts`
+    - **AND** it has forward slashes and no leading `./`
+
+- op: modified
+  description: 'Verify index results expose fingerprint metadata and rebuild reasons.'
+  selector:
+    type: section
+    matches: '^Requirement: Index result$'
+  content: |
+    #### Scenario: Normal incremental result has null fullRebuildReason
+
+    - **GIVEN** the persisted graph fingerprint matches the fingerprint for the current run
+    - **WHEN** indexing completes successfully
+    - **THEN** `IndexResult.graphFingerprint` equals the fingerprint persisted for that run
+    - **AND** `IndexResult.fullRebuildReason` is `null`
+
+    #### Scenario: Fingerprint mismatch result records rebuild reason
+
+    - **GIVEN** the persisted graph fingerprint differs from the fingerprint for the current run
+    - **WHEN** indexing completes successfully after escalating to a full rebuild
+    - **THEN** `IndexResult.graphFingerprint` equals the new persisted fingerprint
+    - **AND** `IndexResult.fullRebuildReason` is a human-readable explanation of the mismatch

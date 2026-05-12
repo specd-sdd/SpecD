@@ -1,0 +1,27 @@
+- op: modified
+  description: 'Update YAML validation requirement to JSON'
+  selector:
+    type: section
+    matches: 'Requirement: YAML validation'
+  content: |
+    ### Requirement: JSON validation
+
+    The command reads content from `--input` file or stdin. Before passing to `SaveSpecMetadata`, it validates the content is valid JSON by calling `JSON.parse()`. If parsing fails, the command writes `error: invalid JSON: <message>` to stderr and exits with code 1.
+
+- op: modified
+  description: 'Update error message for invalid input'
+  selector:
+    type: section
+    matches: 'Requirement: Error — invalid YAML'
+  content: |
+    ### Requirement: Error — invalid JSON
+
+    If the input content is not valid JSON (syntax error), the command writes `error: invalid JSON: <parse error message>` to stderr and exits with code 1.
+
+- op: modified
+  description: 'Update content source to reference JSON'
+  selector:
+    type: section
+    matches: 'Requirement: Content source'
+  content: |
+    Content is read from `--input <file>` when provided, otherwise from stdin. The content must be a valid JSON string representing a metadata object.

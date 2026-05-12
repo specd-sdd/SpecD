@@ -1,0 +1,14 @@
+added:
+  - position:
+      parent: '### Requirement: Build context entry from metadata'
+    content: |
+      #### Scenario: Header persistence in full mode
+      In `full` mode, the **Title** and **Description** MUST always be included in the entry, regardless of whether a `sections` filter is active.
+modified:
+  - selector: '### Requirement: Section filtering'
+    content: |
+      When `input.sections` is provided and non-empty, the entry MUST include the listed section types (`'rules'`, `'constraints'`, `'scenarios'`) for full-mode output.
+
+      **Title and Description fields MUST NOT be filtered out in full-mode output.** They remain part of the entry envelope to provide context for the filtered sections.
+
+      Section filters MUST have no effect in `list` or `summary` modes.

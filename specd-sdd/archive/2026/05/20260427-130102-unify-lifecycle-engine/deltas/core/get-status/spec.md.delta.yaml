@@ -1,0 +1,94 @@
+# Delta: core:get-status
+
+- op: modified
+  description: 'Inject LifecycleEngine as the authority for derived lifecycle interpretation.'
+  selector:
+    type: section
+    matches: 'Requirement: Constructor dependencies'
+  content: |
+    `GetStatus` MUST accept the following constructor arguments:
+
+    - `changes: ChangeRepository` — for loading changes by name
+    - `schemaProvider: SchemaProvider` — for obtaining the fully-resolved active schema
+    - `lifecycle: LifecycleEngine` — for deriving effective artifact status, blockers, routing, and next-action guidance from the change plus active schema
+    - `approvals: { readonly spec: boolean; readonly signoff: boolean }` — whether approval gates are active
+
+    It MUST delegate to `ChangeRepository.get(name)` to load the change. `SchemaProvider` replaces the previous `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths` triple, providing the fully-resolved schema with plugins and overrides applied.
+
+- op: modified
+  description: 'Preserve the one-entry-per-artifact contract while moving effective status derivation to LifecycleEngine.'
+  selector:
+    type: section
+    matches: 'Requirement: Reports effective status for every artifact'
+  content: |
+    The `artifactStatuses` array MUST contain exactly one entry per artifact in the change's artifact map. It MUST NOT omit artifacts and MUST NOT include entries for artifacts that do not exist on the change.
+
+    `GetStatus` MUST derive each entry's `effectiveStatus` through `LifecycleEngine` so the reported value reflects recursive dependency blocking, workflow requirements, and approval-gate semantics from the active schema rather than only persisted aggregate artifact state.
+
+- op: modified
+  description: 'Preserve lifecycle review semantics while clarifying that GetStatus may obtain them through LifecycleEngine.'
+  selector:
+    type: section
+    matches: 'Requirement: Returns lifecycle context'
+  content: |
+    `GetStatus` MUST compute a `ReviewSummary` that determines whether the change requires artifact review and why.
+
+    The review check MUST follow this priority order:
+
+    1. **If any artifact file is in `drifted-pending-review` state:** `required` is `true`, `reason` is `'artifact-drift'`, `route` is `'designing'`.
+    2. **Else if any artifact file is in `pending-review` state and there are unhandled `spec-overlap-conflict` invalidations:** `required` is `true`, `reason` is `'spec-overlap-conflict'`, `route` is `'designing'`.
+    3. **Else if any artifact file is in `pending-review` state:** `required` is `true`, `reason` is `'artifact-review-required'`, `route` is `'designing'`.
+    4. **Else:** `required` is `false`, `reason` is `null`, `route` is `null`.
+
+    `GetStatus` MAY compute this summary directly from the loaded change facts or obtain it from `LifecycleEngine`, but the outward-facing result MUST reflect the same authoritative lifecycle interpretation used by transition and validation flows.
+
+    **Unhandled overlap collection:** To determine unhandled `spec-overlap-conflict` invalidations, `GetStatus` MUST scan `change.history` in reverse (newest to oldest) collecting `invalidated` events with `cause: 'spec-overlap-conflict'`. The scan MUST stop at the first `transitioned` event whose `to` field is not `'designing'` — this indicates the change moved forward from a prior invalidation and those earlier overlaps were already handled. If no such boundary event is found, the scan includes all matching events back to the beginning of history.
+
+    `ReviewSummary.reason` type MUST be extended to: `'artifact-drift' | 'artifact-review-required' | 'spec-overlap-conflict' | null`.
+
+    When `reason` is `'spec-overlap-conflict'`, `ReviewSummary` MUST additionally include:
+
+    - `overlapDetail` — an array of `OverlapEntry` objects, one per unhandled `spec-overlap-conflict` invalidation event, each containing:
+      - `archivedChangeName` — the name of the archived change that caused the overlap (extracted from the `invalidated.message`)
+      - `overlappingSpecIds` — readonly array of spec IDs that overlapped (extracted from the `invalidated.message`)
+        The array is ordered newest-first (matching the reverse scan order). This preserves the full picture when multiple changes were archived with overlapping specs before the current change was able to address any of them.
+
+    When `reason` is not `'spec-overlap-conflict'`, `overlapDetail` MUST be an empty array.
+
+- op: modified
+  description: 'Preserve blocker rules while allowing LifecycleEngine to supply the derived blocker set.'
+  selector:
+    type: section
+    matches: 'Requirement: Identifies blockers'
+  content: |
+    `GetStatus` MUST identify explicit blockers that prevent lifecycle progression.
+
+    Blockers MUST be collected for:
+
+    - **Artifact Drift**: code `'ARTIFACT_DRIFT'` if `review.reason` is `'artifact-drift'`.
+    - **Review Required**: code `'REVIEW_REQUIRED'` if `review.reason` is `'artifact-review-required'`.
+    - **Overlap Conflict**: code `'OVERLAP_CONFLICT'` if `review.reason` is `'spec-overlap-conflict'`.
+    - **Missing Artifacts**: code `'MISSING_ARTIFACT'` for each artifact in the current state's `requires` list that is in `missing` or `in-progress` state.
+
+    `GetStatus` MAY assemble these blockers directly or obtain them from `LifecycleEngine`, but the blocker set MUST be derived from the same authoritative lifecycle interpretation used for effective statuses and transition validation.
+
+- op: modified
+  description: 'Update constraints to remove Change-owned effective status interpretation.'
+  selector:
+    type: section
+    matches: 'Constraints'
+  content: |
+    - The use case does not modify the change — it is a read-only query
+    - Artifact content is not loaded; only status metadata is returned
+    - The effective status computation may be delegated to `LifecycleEngine`; it is not an entity-owned concern of `Change`
+    - The `lifecycle` computation adds zero additional I/O beyond schema resolution — `VALID_TRANSITIONS` is a static lookup, while derived lifecycle interpretation is computed in memory from the loaded change, schema, and approval config
+    - `changePath` is obtained from `ChangeRepository.changePath(change)` which the repository already exposes
+
+- op: added
+  description: 'Add LifecycleEngine to spec dependencies.'
+  position:
+    parent:
+      type: section
+      matches: 'Spec Dependencies'
+  content: |
+    - [`core:lifecycle-engine`](../lifecycle-engine/spec.md) — authoritative schema-aware lifecycle interpretation reused by status, validation, and transition flows

@@ -1,0 +1,18 @@
+- op: modified
+  description: 'Remove YamlSerializer dependency — metadata is now JSON'
+  selector:
+    type: section
+    matches: 'Requirement: Constructor dependencies'
+  content: |
+    The use case receives:
+    - `specRepos: ReadonlyMap<string, SpecRepository>` — workspace-keyed spec repositories
+
+    The `YamlSerializer` dependency is no longer needed — metadata content is JSON, parsed with `JSON.parse()`.
+
+- op: modified
+  description: 'Update content validation to use JSON.parse'
+  selector:
+    type: section
+    matches: 'Requirement: Content validation before write'
+  content: |
+    Before writing, the use case parses the input `content` string with `JSON.parse()`. If parsing fails or the result is not an object, a `MetadataValidationError` is thrown with `content must be a JSON object`. The parsed object is validated against `strictSpecMetadataSchema`. If validation fails, a `MetadataValidationError` is thrown listing the Zod issues. This validation uses the strict schema — the read path (`metadata()`) uses the lenient schema.

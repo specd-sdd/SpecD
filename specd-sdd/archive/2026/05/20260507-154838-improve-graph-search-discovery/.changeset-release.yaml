@@ -1,0 +1,3 @@
+releases:
+  code-graph:sqlite-graph-store: patch
+  code-graph:ladybug-graph-store: patch

@@ -1,0 +1,31 @@
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Approvals'
+  content: |
+    ### Requirement: Logging configuration
+
+    #### Scenario: Section present with all fields
+    - **GIVEN** a `specd.yaml` with `logging: { level: 'debug' }`
+    - **WHEN** the config is loaded
+    - **THEN** `config.logging.level` MUST be `'debug'`
+
+    #### Scenario: Section absent — defaults applied
+    - **GIVEN** a `specd.yaml` without a `logging` section
+    - **WHEN** the config is loaded
+    - **THEN** the logging configuration MUST use the default level `'info'`
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Startup validation'
+  content: |
+    #### Scenario: Invalid level string
+    - **GIVEN** `specd.yaml` with `logging: { level: 'verbose' }` (not a recognized level)
+    - **WHEN** config is validated at startup
+    - **THEN** validation MUST fail with a `ConfigValidationError`

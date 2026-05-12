@@ -1,0 +1,60 @@
+# Delta: cli:change-transition (Verification)
+
+- op: added
+  description: 'Add the verify requirement for progress output.'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: Progress output
+
+    #### Scenario: Text mode renders progress feedback
+
+    - **WHEN** `specd change transition my-change designing` is run in text mode
+    - **THEN** lifecycle progress feedback may be rendered to stdout while the transition runs
+
+- op: added
+  description: 'Add the verify requirement for post-hook failure warning.'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: Post-hook failure warning
+
+    #### Scenario: Hook failure exits with error instead of post-transition warning
+
+    - **GIVEN** a hook fails during transition execution
+    - **WHEN** the command runs
+    - **THEN** it exits with code 1 and prints an `error:` message instead of a separate post-hook warning state
+
+- op: added
+  description: 'Add the verify requirement for unsatisfied requires error.'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: Unsatisfied requires error
+
+    #### Scenario: Requires blocker is surfaced to the user
+
+    - **GIVEN** a required artifact is incomplete
+    - **WHEN** `specd change transition my-change ready` is run
+    - **THEN** the command exits with code 1 and surfaces the requires blocker
+
+- op: added
+  description: 'Extend the existing invalid-transition requirement with repair-guide coverage.'
+  position:
+    after:
+      type: section
+      matches: 'Requirement: Invalid transition error'
+  content: |
+    #### Scenario: Repair guide uses blocker and next-action data from core
+
+    - **GIVEN** `TransitionChange` fails
+    - **AND** a follow-up `GetStatus` call returns blocker codes and a next action
+    - **WHEN** `specd change transition my-change <step>` is run in text mode
+    - **THEN** the repair guide shows those blocker codes and that next action
+    - **AND** the CLI does not invent an alternative repair route

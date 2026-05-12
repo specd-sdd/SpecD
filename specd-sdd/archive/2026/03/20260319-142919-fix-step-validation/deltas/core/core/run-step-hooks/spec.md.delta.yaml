@@ -1,0 +1,15 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Step resolution'
+  content: |
+    `RunStepHooks` validates that `step` is a valid `ChangeState` (a lifecycle state defined by the domain, which includes `archiving`). If it is not, it MUST throw `StepNotValidError`.
+
+    If the step is a valid lifecycle state, `RunStepHooks` looks up the workflow step entry via `schema.workflowStep(step)`. If no matching entry exists (the schema does not declare hooks for this step), the use case returns `{ hooks: [], success: true, failedHook: null }` — no error is thrown.
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Works for any step'
+  content: |
+    `RunStepHooks` MUST work for any valid `ChangeState`, including `archiving`. While `ArchiveChange` delegates hook execution to `RunStepHooks`, `RunStepHooks` can also be called independently — for example, to run a pre-archive check without performing the full archive, or to retry a failed post-archive hook.
