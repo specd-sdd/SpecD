@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.resolve(__dirname, '..', '..', '..')
+const ARCHIVE_DIR_CANDIDATES = ['specd-sdd/archive', '.specd/archive']
 
 const WORKSPACE_PACKAGE_MAP = {
   'core': '@specd/core',
@@ -39,8 +40,25 @@ async function findIndexFile(archiveDir) {
   return null
 }
 
+async function resolveArchiveDir() {
+  for (const relPath of ARCHIVE_DIR_CANDIDATES) {
+    const candidate = path.join(ROOT, relPath)
+    try {
+      const stat = await fs.stat(candidate)
+      if (!stat.isDirectory()) {
+        continue
+      }
+      return candidate
+    } catch {
+      continue
+    }
+  }
+
+  return path.join(ROOT, ARCHIVE_DIR_CANDIDATES[0])
+}
+
 async function getArchivedChangeInfo(changeName) {
-  const archiveDir = path.join(ROOT, '.specd', 'archive')
+  const archiveDir = await resolveArchiveDir()
   const indexPath = await findIndexFile(archiveDir)
 
   if (!indexPath) {
@@ -70,7 +88,8 @@ async function getArchivedChangeInfo(changeName) {
 }
 
 async function getChangeDescription(archivePath) {
-  const manifestPath = path.join(ROOT, '.specd', 'archive', archivePath, 'manifest.json')
+  const archiveDir = await resolveArchiveDir()
+  const manifestPath = path.join(archiveDir, archivePath, 'manifest.json')
 
   try {
     const content = await fs.readFile(manifestPath, 'utf-8')
@@ -82,7 +101,8 @@ async function getChangeDescription(archivePath) {
 }
 
 async function getReleaseInfoFromManifest(archivePath) {
-  const manifestPath = path.join(ROOT, '.specd', 'archive', archivePath, 'manifest.json')
+  const archiveDir = await resolveArchiveDir()
+  const manifestPath = path.join(archiveDir, archivePath, 'manifest.json')
 
   try {
     const content = await fs.readFile(manifestPath, 'utf-8')
@@ -105,10 +125,9 @@ async function getReleaseInfoFromManifest(archivePath) {
 }
 
 async function getReleaseInfoFromYaml(archivePath) {
+  const archiveDir = await resolveArchiveDir()
   const releaseFilePath = path.join(
-    ROOT,
-    '.specd',
-    'archive',
+    archiveDir,
     archivePath,
     '.changeset-release.yaml',
   )
@@ -154,7 +173,8 @@ async function getReleaseInfoFromYaml(archivePath) {
 }
 
 async function analyzeChangeContent(archivePath) {
-  const changeDir = path.join(ROOT, '.specd', 'archive', archivePath)
+  const archiveDir = await resolveArchiveDir()
+  const changeDir = path.join(archiveDir, archivePath)
   let hasBreakingChange = false
   let hasFeature = false
 
