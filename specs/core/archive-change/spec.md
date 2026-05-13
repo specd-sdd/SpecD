@@ -8,7 +8,7 @@ Once a change has completed its full lifecycle, its spec modifications need to b
 
 ### Requirement: Ports and constructor
 
-`ArchiveChange` receives at construction time: `ChangeRepository`, a map of `SpecRepository` instances (one per configured workspace), `ArchiveRepository`, `RunStepHooks`, `VcsAdapter`, `ArtifactParserRegistry`, `SchemaProvider`, `SaveSpecMetadata`, `YamlSerializer`, and `ActorResolver`.
+`ArchiveChange` receives at construction time: `ChangeRepository`, a map of `SpecRepository` instances (one per configured workspace), `ArchiveRepository`, `RunStepHooks`, `ActorResolver`, `ArtifactParserRegistry`, `ExtractorTransformRegistry`, `SchemaProvider`, `GenerateSpecMetadata`, `SaveSpecMetadata`, and `SpecWorkspaceRoute[]`.
 
 ```typescript
 class ArchiveChange {
@@ -19,10 +19,11 @@ class ArchiveChange {
     runStepHooks: RunStepHooks,
     actor: ActorResolver,
     parsers: ArtifactParserRegistry,
+    extractorTransforms: ExtractorTransformRegistry,
     schemaProvider: SchemaProvider,
     generateMetadata: GenerateSpecMetadata,
     saveMetadata: SaveSpecMetadata,
-    yaml: YamlSerializer,
+    workspaceRoutes: readonly SpecWorkspaceRoute[],
   )
 }
 ```
@@ -34,6 +35,10 @@ Hook execution is delegated to `RunStepHooks` — `ArchiveChange` does not recei
 `specs` is keyed by workspace name. A change may touch specs in multiple workspaces (e.g. `default` and `billing`); `ArchiveChange` looks up the `SpecRepository` for each spec ID's workspace before reading the base spec or writing the merged result. The bootstrap layer constructs and passes all workspace repositories.
 
 `ArtifactParserRegistry` is a map from format name (`'markdown'`, `'json'`, `'yaml'`, `'plaintext'`) to the corresponding `ArtifactParser` adapter. `ArchiveChange` uses it to look up the correct adapter when applying delta files to base artifacts. The bootstrap layer constructs it and injects it here — `ArchiveChange` does not instantiate parsers directly.
+
+`ExtractorTransformRegistry` is the shared runtime registry for metadata extraction transforms. `ArchiveChange` uses it during the pre-publication metadata-consistency pass that runs `extractMetadata(...)` over the prepared merged artifact content before canonical publication.
+
+`SpecWorkspaceRoute[]` provides the workspace-routing metadata needed to build transform contexts for extraction operations that resolve spec references across workspace boundaries. `ArchiveChange` receives those routes at construction time so its pre-publication extraction pass uses the same routing model as other metadata-extraction callers.
 
 `ChangeRepository` is used both for loading and persisting the change being archived and for listing all active changes during the overlap check.
 
@@ -135,15 +140,22 @@ If any tracked artifact cannot be loaded, any required base artifact is unavaila
 
 ### Requirement: Staged archive commit and failed-attempt visibility
 
-After the archive plan has been prepared successfully, `ArchiveChange` MUST delegate the permanent archive persistence as a staged commit through storage behavior instead of interleaving merge work and permanent spec writes in the same loop.
+After the archive plan has been prepared successfully, `ArchiveChange` MUST delegate permanent archive persistence through a staged publication model instead of interleaving merge work and permanent spec writes in the same loop.
 
-If archive fails before that staged commit completes successfully, the failure MUST leave no externally visible partial archive result:
+The guarantee is per-spec, not a fake all-spec transaction for the whole batch:
 
-- no permanent spec artifact write is visible in the project spec tree
-- the change remains pending archive from an external workflow perspective
-- no alternate artifact-path interpretation is introduced by partial repo side effects
+- For each spec being archived, canonical publication MUST be atomic at the spec level when the storage adapter supports staged publication in the target filesystem.
+- The per-spec publication unit MUST include the merged canonical spec artifacts plus the final `spec-lock.json` for that spec.
+- If publication fails for one spec, that spec MUST NOT be left partially written in canonical storage.
+- `ArchiveChange` does not need to promise that an entire multi-spec archive publishes all specs as one indivisible filesystem transaction.
 
-Diagnostic history and debug logging MAY record the failed attempt, but a failed pre-commit archive attempt MUST NOT be treated as a successful or partially completed archive.
+If final publication from staging to canonical storage fails for a spec:
+
+- the staged output for that spec MUST NOT be deleted automatically
+- the failure MUST surface clearly so the user can inspect the staged material and complete the move manually if needed
+- the canonical spec tree MUST not contain a partially written version of that spec, whether for ordinary spec artifacts or for `spec-lock.json`
+
+Diagnostic history and debug logging MAY record the failed attempt, but a failed archive publication MUST NOT be treated as a successful archive.
 
 ### Requirement: Archive debug logging
 
@@ -178,15 +190,15 @@ When the base markdown uses mixed style markers for the same construct (for exam
 
 ### Requirement: Archive repository call
 
-After syncing all specs, `ArchiveChange` must resolve the actor via `ActorResolver.identity()` before calling `archiveRepository.archive()`. If `identity()` throws (e.g. no VCS config), the archive proceeds without an actor.
+After syncing all specs, `ArchiveChange` MUST resolve the actor via `ActorResolver.identity()` before calling `archiveRepository.archive()`. If `identity()` throws or cannot provide an actor, the archive MUST fail; there is no anonymous fallback archive path.
 
-`ArchiveChange` must then call `archiveRepository.archive(change, { actor })` when an actor is available, or `archiveRepository.archive(change, {})` when it is not. The `ArchiveRepository` port is responsible for constructing the `ArchivedChange` record — the use case never builds it directly, because `archivedAt` can only be set by the operation that performs the archive, and `archivedName` is an infrastructure naming concern.
+When actor resolution succeeds, `ArchiveChange` MUST call `archiveRepository.archive(change, { actor })`. The `ArchiveRepository` port is responsible for constructing the `ArchivedChange` record — the use case never builds it directly, because `archivedAt` can only be set by the operation that performs the archive, and `archivedName` is an infrastructure naming concern.
 
 The port's contract requires:
 
 - `archivedName` — the full timestamped directory name: `YYYYMMDD-HHmmss-<name>` where the timestamp is derived from `change.createdAt` (zero-padded), never from wall-clock time at execution
 - `archivedAt` — the timestamp when the archive operation completes, set by the repository
-- `archivedBy` (optional) — the git identity of the actor who performed the archive; absent if git identity was unavailable
+- `archivedBy` — the git identity of the actor who performed the archive
 - `artifacts` — artifact metadata tracked by the repository
 
 The `FsArchiveRepository` implementation additionally moves the change directory from its current location (`changes/` or `drafts/`) to the archive directory using the configured pattern, then appends an entry to `index.jsonl`. The use case has no knowledge of these implementation details.
@@ -205,7 +217,66 @@ When `'all'` or `'post'` is in `skipHookPhases`, post-archive hook execution is 
 
 ### Requirement: Spec metadata generation
 
-After merging deltas and archiving the change, the archive process generates metadata for each spec in the change's `specIds`. For each spec, it runs `GenerateSpecMetadata` to extract metadata deterministically, merges manifest `specDependsOn` entries (highest priority), serializes the result as JSON via `JSON.stringify(metadata, null, 2)`, and writes via `SaveSpecMetadata` with `force: true`. Failures are recorded in `staleMetadataSpecPaths` but do not abort the archive.
+`metadata.json` remains a derived archive-time projection, but sidecar consistency MUST be determined before canonical publication begins for each spec.
+
+For each modified spec, `ArchiveChange` MUST:
+
+1. Determine the final persisted `dependsOn` set for the archive attempt.
+2. Determine the final `spec-lock.json` content that would be published for that spec.
+3. Run `extractMetadata(...)` against the already-prepared merged artifact content in memory.
+4. If `metadataExtraction.dependsOn` is present, compare it against the final persisted `dependsOn` set being sealed for that spec.
+5. Abort publication for that spec if the extracted and final persisted `dependsOn` values do not match.
+6. After canonical publication succeeds, run `GenerateSpecMetadata` against the canonical persisted spec and persist `metadata.json`.
+
+`metadata.json.dependsOn` remains a supported read surface for existing consumers, but at archive time its value MUST be aligned with the sidecar-owned persisted dependency set:
+
+- If `change.specDependsOn` has an entry for the spec, that value MUST be treated as the final persisted `dependsOn` set for this archive.
+- If `metadataExtraction.dependsOn` is present, it MUST match that final persisted `dependsOn` set or the archive MUST fail for that spec.
+- This mismatch rule applies both when a canonical `spec-lock.json` already exists and when the archive is creating `spec-lock.json` for the first time.
+- If `metadataExtraction.dependsOn` is omitted, archive MUST still persist `metadata.json.dependsOn` from the final persisted dependency set rather than treating extraction as the only source.
+- Outside archive, legacy specs without sidecar MAY still remain on extraction-backed metadata flows until opportunistic backfill succeeds.
+
+Metadata generation failures that are unrelated to sidecar consistency (for example missing extracted title or invalid generated metadata structure) do not abort the archive; the spec path is reported in `staleMetadataSpecPaths`.
+
+Sidecar consistency failures are different: if the archive cannot determine a valid final persisted dependency set, or if extracted `dependsOn` contradicts the value being sealed for the spec, the archive MUST fail before canonical publication for that spec begins.
+
+### Requirement: spec-lock sidecar persistence
+
+`ArchiveChange` MUST persist a `spec-lock.json` sidecar alongside the canonical `scope: spec` artifacts for each modified spec, using the dedicated `SpecRepository` sidecar API.
+
+The sidecar MUST use this structure:
+
+```json
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["core:storage", "core:auth"]
+}
+```
+
+Sidecar rules:
+
+- `schema.name` and `schema.version` record the schema identity for the persisted spec.
+- `dependsOn` records the persisted dependency set for that spec.
+- `spec-lock.json` is part of the same staged spec-publication unit as the merged canonical spec artifacts for that spec.
+- The final sidecar content MUST be determined before canonical publication begins, so publication can stage and publish the merged spec artifacts plus `spec-lock.json` together.
+- Once a sidecar exists for a spec, its `schema` object is immutable and MUST remain the original recorded schema identity for that spec.
+- On later re-archives of the same spec, `dependsOn` MUST be refreshed from the final `change.specDependsOn` value for that archive attempt; it is not a set union and it is not preserved as historical baggage.
+- If no sidecar exists yet for the spec, archive MUST create one as part of the successful archive.
+
+### Requirement: Opportunistic sidecar backfill
+
+When archiving or regenerating metadata for a persisted spec that does not yet have `spec-lock.json`, the system MAY create the sidecar opportunistically, but only after verifying that the canonical spec is structurally valid under the current schema.
+
+Backfill rules:
+
+- Structural compatibility MUST be checked before any sidecar is created.
+- If the compatibility check fails, the system MUST NOT create `spec-lock.json` implicitly for that spec.
+- If the compatibility check fails, legacy `metadata.json` generation MAY still continue; only sidecar creation is blocked.
+- If the compatibility check passes, the backfilled sidecar MUST copy `dependsOn` from the current persisted dependency view and MUST record the current project schema identity as the initial `schema` object.
+- Backfill is opportunistic; this feature does not require a dedicated whole-repository migration command.
 
 ### Requirement: Result shape
 
@@ -213,7 +284,7 @@ After merging deltas and archiving the change, the archive process generates met
 
 - `archivedChange` — the `ArchivedChange` record that was persisted
 - `postHookFailures` — array of hook commands that failed post-archive, empty on full success
-- `staleMetadataSpecPaths` — array of spec paths where `.specd-metadata.yaml` generation failed during this archive (e.g. extraction produced no required fields); empty when all metadata was generated successfully
+- `staleMetadataSpecPaths` — array of spec paths where `metadata.json` generation failed during this archive (e.g. extraction produced no required fields); empty when all metadata was generated successfully
 - `invalidatedChanges` — array of objects describing changes that were invalidated due to spec overlap, each containing:
   - `name` — the invalidated change's name
   - `specIds` — readonly array of overlapping spec IDs that triggered the invalidation

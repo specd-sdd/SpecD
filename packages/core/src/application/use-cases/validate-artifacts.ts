@@ -25,20 +25,13 @@ import { evaluateCrossArtifactRule } from '../../domain/services/cross-artifact-
 import { inferFormat } from '../../domain/services/format-inference.js'
 import { LifecycleEngine } from '../../domain/services/lifecycle-engine.js'
 import { type ContentHasher } from '../ports/content-hasher.js'
-import {
-  extractMetadata,
-  type ExtractedMetadata,
-  type SubtreeRenderer,
-} from '../../domain/services/extract-metadata.js'
+import { type ExtractedMetadata } from '../../domain/services/extract-metadata.js'
 import { type SelectorNode } from '../../domain/services/selector-matching.js'
 import * as path from 'node:path'
-import { createExtractorTransformContext } from './_shared/extractor-transform-context.js'
-import {
-  createSpecReferenceResolver,
-  type SpecWorkspaceRoute,
-} from './_shared/spec-reference-resolver.js'
+import { type SpecWorkspaceRoute } from './_shared/spec-reference-resolver.js'
 import { Logger } from '../logger.js'
 import { type ReadyArtifactParticipant } from './_shared/cross-artifact-participant-state.js'
+import { extractMetadataFromSpecArtifacts } from './_shared/extract-metadata-from-spec-artifacts.js'
 
 /** Input for the {@link ValidateArtifacts} use case. */
 export interface ValidateArtifactsInput {
@@ -229,17 +222,6 @@ export class ValidateArtifacts {
         ? await specRepo.get(SpecPath.parse(capabilityPath))
         : null
     const specExists = existingSpec !== null
-    let resolveSpecReference: ReturnType<typeof createSpecReferenceResolver> | undefined = undefined
-    try {
-      resolveSpecReference = createSpecReferenceResolver({
-        originWorkspace: workspace,
-        originSpecPath: SpecPath.parse(capabilityPath),
-        repositories: this._specs,
-        workspaceRoutes: this._workspaceRoutes,
-      })
-    } catch {
-      resolveSpecReference = undefined
-    }
     const crossRules = schema.crossArtifactValidations()
 
     // --- Required artifacts check (skipped when artifactId is provided) ---
@@ -507,43 +489,29 @@ export class ValidateArtifacts {
 
           if (hasExtractionRules && parser !== undefined) {
             try {
-              const astsByArtifact = new Map<string, { root: SelectorNode }>()
-              const renderers = new Map<string, SubtreeRenderer>()
-              const transformContexts = new Map<
-                string,
-                ReturnType<typeof createExtractorTransformContext>
-              >()
-              const ast = parser.parse(validationContent)
-              astsByArtifact.set(artifactType.id, ast)
-              renderers.set(artifactType.id, parser as SubtreeRenderer)
-              transformContexts.set(
-                artifactType.id,
-                createExtractorTransformContext(
-                  input.specPath.split(':')[0] ?? 'default',
-                  input.specPath.includes(':')
-                    ? input.specPath.slice(input.specPath.indexOf(':') + 1)
-                    : input.specPath,
-                  artifactType.id,
-                  path.basename(expectedFilename),
+              const extracted = await extractMetadataFromSpecArtifacts({
+                effectiveSpecSchema: schema,
+                workspace,
+                specPath: SpecPath.parse(capabilityPath),
+                artifacts: [
                   {
-                    ...(resolveSpecReference !== undefined ? { resolveSpecReference } : {}),
+                    artifactId: artifactType.id,
+                    filename: path.basename(expectedFilename),
+                    format: artifactType.format,
+                    content: validationContent,
                   },
-                ),
-              )
-
-              const extracted = await extractMetadata(
-                extraction,
-                astsByArtifact,
-                renderers,
-                this._extractorTransforms,
-                transformContexts,
-                artifactType.id,
-              )
-              extractedMetadataForArtifact = extracted
+                ],
+                parsers: this._parsers,
+                extractorTransforms: this._extractorTransforms,
+                repositories: this._specs,
+                workspaceRoutes: this._workspaceRoutes,
+                targetArtifactId: artifactType.id,
+              })
+              extractedMetadataForArtifact = extracted.metadata
 
               const { permissiveSpecMetadataSchema } =
                 await import('../../domain/services/parse-metadata.js')
-              const validationResult = permissiveSpecMetadataSchema.safeParse(extracted)
+              const validationResult = permissiveSpecMetadataSchema.safeParse(extracted.metadata)
               if (!validationResult.success) {
                 failures.push({
                   artifactId: artifactType.id,

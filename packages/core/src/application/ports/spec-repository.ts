@@ -2,6 +2,7 @@ import { type Spec } from '../../domain/entities/spec.js'
 import { type SpecPath } from '../../domain/value-objects/spec-path.js'
 import { type SpecArtifact } from '../../domain/value-objects/spec-artifact.js'
 import { type SpecMetadata } from '../../domain/services/parse-metadata.js'
+import { type SpecLockData } from '../../domain/services/parse-spec-lock.js'
 import { Repository, type RepositoryConfig } from './repository.js'
 
 export { type RepositoryConfig as SpecRepositoryConfig }
@@ -18,6 +19,14 @@ export interface SpecSearchResult {
   readonly spec: Spec
   readonly score: number
   readonly matches: readonly SpecSearchMatch[]
+}
+
+/** Input bundle for atomic publication of one spec's canonical artifacts. */
+export interface SpecPublication {
+  /** Final artifact files that should become canonical for the spec. */
+  readonly artifacts: readonly SpecArtifact[]
+  /** Optional final `spec-lock.json` content staged with the canonical spec publication. */
+  readonly specLock?: SpecLockData
 }
 
 /**
@@ -90,6 +99,20 @@ export abstract class SpecRepository extends Repository {
   abstract save(spec: Spec, artifact: SpecArtifact, options?: { force?: boolean }): Promise<void>
 
   /**
+   * Publishes the canonical artifact set for one spec as a single storage commit.
+   *
+   * Implementations SHOULD guarantee that a failed publication does not leave
+   * partially-updated canonical artifact files visible for that spec.
+   *
+   * @param spec - The spec whose canonical artifacts are being published
+   * @param publication - Final artifact bundle to publish
+   * @returns When publication completes successfully
+   * @throws {ReadOnlyWorkspaceError} When the workspace is read-only
+   * @throws {SpecPublicationError} When publication fails after staging output
+   */
+  abstract publish(spec: Spec, publication: SpecPublication): Promise<void>
+
+  /**
    * Deletes the entire spec directory and all its artifact files.
    *
    * @param spec - The spec to delete
@@ -109,14 +132,14 @@ export abstract class SpecRepository extends Repository {
   abstract metadata(spec: Spec): Promise<SpecMetadata | null>
 
   /**
-   * Persists raw YAML metadata content for a spec.
+   * Persists raw JSON metadata content for a spec.
    *
    * Creates the metadata directory if it does not exist. When `originalHash`
    * is provided and `force` is not `true`, the current file on disk is hashed
    * and compared — a mismatch causes `ArtifactConflictError`.
    *
    * @param spec - The spec to write metadata for
-   * @param content - Raw YAML string to persist
+   * @param content - Raw JSON string to persist
    * @param options - Save options
    * @param options.force - Skip conflict detection when `true`
    * @param options.originalHash - Expected hash of the current file on disk
@@ -126,6 +149,36 @@ export abstract class SpecRepository extends Repository {
     spec: Spec,
     content: string,
     options?: { force?: boolean; originalHash?: string },
+  ): Promise<void>
+
+  /**
+   * Returns the parsed spec lock sidecar for the given spec, or `null` if no sidecar exists.
+   *
+   * The returned object includes an `originalHash` field (SHA-256 of the raw
+   * file content) for use in conflict detection when saving.
+   *
+   * @param spec - The spec whose sidecar to load
+   * @returns Parsed sidecar with `originalHash`, or `null` if absent
+   */
+  abstract readSpecLock(spec: Spec): Promise<SpecLockData | null>
+
+  /**
+   * Persists `spec-lock.json` content for a spec.
+   *
+   * When `content.originalHash` is provided and `force` is not `true`, the
+   * current file on disk is hashed and compared — a mismatch causes
+   * `ArtifactConflictError`.
+   *
+   * @param spec - The spec to write sidecar for
+   * @param content - Parsed sidecar content to persist
+   * @param options - Save options
+   * @param options.force - Skip conflict detection when `true`
+   * @throws {ArtifactConflictError} On hash mismatch when `force` is not set
+   */
+  abstract saveSpecLock(
+    spec: Spec,
+    content: SpecLockData,
+    options?: { force?: boolean },
   ): Promise<void>
 
   /**

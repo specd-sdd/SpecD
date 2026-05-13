@@ -1,6 +1,6 @@
 {
   "title": "Spec Metadata",
-  "description": "Tooling and AI agents need a compact, machine-readable summary of each spec — its dependencies, content hashes, rules, and scenarios — without parsing the full artifact files every time. Each spec has a corresponding `metadata.yaml` file stored under `.specd/metadata/<specPath>/`, separate from the spec's content artifacts. It is generated deterministically by core at archive time using the schema's `metadataExtraction` engine and is not part of the schema artifact system; content hashes enable staleness detection so consumers know when to regenerate.",
+  "description": "Tooling and AI agents need a compact, machine-readable summary of each spec — its dependencies, content hashes, rules, and scenarios — without parsing the full artifact files every time. Each spec has a corresponding `metadata.json` file stored under `.specd/metadata/<workspace>/<capability-path>/`, separate from the spec's content artifacts. It is generated deterministically by core at archive time using the schema's `metadataExtraction` engine and is not part of the schema artifact system; content hashes enable staleness detection so consumers know when to regenerate.",
   "dependsOn": [
     "core:config",
     "core:change",
@@ -9,13 +9,19 @@
     "core:spec-repository-port"
   ],
   "context": [
-    "Tooling and AI agents need a compact, machine-readable summary of each spec — its dependencies, content hashes, rules, and scenarios — without parsing the full artifact files every time. Each spec has a corresponding `metadata.yaml` file stored under `.specd/metadata/<specPath>/`, separate from the spec's content artifacts. It is generated deterministically by core at archive time using the schema's `metadataExtraction` engine and is not part of the schema artifact system; content hashes enable staleness detection so consumers know when to regenerate."
+    "Tooling and AI agents need a compact, machine-readable summary of each spec — its dependencies, content hashes, rules, and scenarios — without parsing the full artifact files every time. Each spec has a corresponding `metadata.json` file stored under `.specd/metadata/<workspace>/<capability-path>/`, separate from the spec's content artifacts. It is generated deterministically by core at archive time using the schema's `metadataExtraction` engine and is not part of the schema artifact system; content hashes enable staleness detection so consumers know when to regenerate."
   ],
   "rules": [
     {
       "requirement": "File location and naming",
       "rules": [
         "`metadata.json` lives under the `.specd/metadata/` directory, organized by workspace then capability path:\n\n```\n.specd/metadata/core/config/\n└── metadata.json\n\n.specd/metadata/skills/get-skill/\n└── metadata.json\n\n.specd/metadata/plugin-manager/agent-plugin-type/\n└── metadata.json\n```\n\nThe path structure is: `.specd/metadata/<workspace>/<capability-path>/metadata.json`, where:\n\n- `<workspace>` is the workspace name from `specd.yaml`\n- `<capability-path>` is the spec's capability path (with prefix segments if workspace has a prefix)\n\nThe metadata root path is configured per workspace via `specs.fs.metadataPath` in `specd.yaml`. When not set, the composition layer auto-derives it from the VCS root of the workspace's specs path: `createVcsAdapter(specs.path).rootDir()` + `/.specd/metadata/`. This works across heterogeneous VCS setups (git, hg, svn). When `NullVcsAdapter` is returned (specs path is not inside any VCS), the fallback is `.specd/metadata/` relative to the specs root parent directory. The `FsSpecRepository` adapter receives the resolved path as config — it does not perform VCS detection itself.\n\nThe file's absence is not an error — a spec with no `metadata.json` is treated as having no declared dependencies and no recorded content hash."
+      ]
+    },
+    {
+      "requirement": "Sidecar separation",
+      "rules": [
+        "`metadata.json` and `spec-lock.json` are distinct persisted artifacts with different responsibilities.\n\n- `metadata.json` lives under the configured metadata root and remains the compact machine-readable summary consumed by context and tooling.\n- `spec-lock.json` lives alongside the canonical persisted `scope: spec` artifacts for the spec and owns the durable archived values for schema identity and persisted `dependsOn`.\n- A missing `metadata.json` remains non-fatal.\n- A missing `spec-lock.json` on a legacy spec is tolerated until opportunistic backfill creates it."
       ]
     },
     {
@@ -27,7 +33,7 @@
     {
       "requirement": "Write-time structural validation",
       "rules": [
-        "The `SaveSpecMetadata` use case validates the YAML content against the `strictSpecMetadataSchema` Zod schema before writing. The content must be a YAML mapping (not empty, not a scalar). `title` and `description` are required; other fields are optional but when present must conform to their declared types and formats:\n\n- `title` (required) must be a non-empty string\n- `description` (required) must be a non-empty string\n- `keywords` must be an array of non-empty lowercase strings\n- `dependsOn` must be an array of strings, each matching a valid spec ID pattern (`capabilityPath` or `workspace:capabilityPath` where workspace matches `/^[a-z][a-z0-9-]*$/` and capability path segments match `/^[a-z0-9_][a-z0-9_-]*$/`)\n- `contentHashes` (required) must be a non-empty record of filename to hash string, where each hash matches `sha256:<64 hex chars>`\n- `rules` must be an array of objects with `requirement` (non-empty string) and `rules` (non-empty array of non-empty strings)\n- `constraints` must be a non-empty array of non-empty strings\n- `scenarios` must be an array of objects with `requirement` (non-empty string), `name` (non-empty string), `when` (non-empty array of strings), `then` (non-empty array of strings), and `given` (optional array of strings)\n\nIf validation fails, `SaveSpecMetadata` throws a `MetadataValidationError` (a domain error extending `SpecdError`) with the Zod issues formatted as a human-readable message. The file is not written.\n\nUnknown top-level keys are allowed (`.passthrough()`) to support forward-compatible extensions."
+        "The `SaveSpecMetadata` use case validates JSON content against the `strictSpecMetadataSchema` Zod schema before writing. The content must be a JSON object. `title` and `description` are required; other fields are optional but when present must conform to their declared types and formats:\n\n- `title` (required) must be a non-empty string\n- `description` (required) must be a non-empty string\n- `keywords` must be an array of non-empty lowercase strings\n- `dependsOn` must be an array of strings, each matching a valid spec ID pattern (`capabilityPath` or `workspace:capabilityPath` where workspace matches `/^[a-z][a-z0-9-]*$/` and capability path segments match `/^[a-z0-9_][a-z0-9_-]*$/`)\n- `contentHashes` (required) must be a non-empty record of filename to hash string, where each hash matches `sha256:<64 hex chars>`\n- `rules` must be an array of objects with `requirement` (non-empty string) and `rules` (non-empty array of non-empty strings)\n- `constraints` must be a non-empty array of non-empty strings\n- `scenarios` must be an array of objects with `requirement` (non-empty string), `name` (non-empty string), `when` (non-empty array of strings), `then` (non-empty array of strings), and `given` (optional array of strings)\n\nIf validation fails, `SaveSpecMetadata` throws a `MetadataValidationError` (a domain error extending `SpecdError`) with the Zod issues formatted as a human-readable message. The file is not written.\n\nUnknown top-level keys are allowed (`.passthrough()`) to support forward-compatible extensions."
       ]
     },
     {
@@ -39,7 +45,7 @@
     {
       "requirement": "Deterministic generation at archive time",
       "rules": [
-        "`metadata.yaml` is generated deterministically by core as part of the `ArchiveChange` use case. After merging deltas and syncing specs, `ArchiveChange` generates metadata for each modified spec:\n\n1. Load the spec's `requiredSpecArtifacts` from the workspace's `SpecRepository`\n2. Parse each artifact via its `ArtifactParser` to obtain an AST\n3. Run `extractMetadata()` with the schema's `metadataExtraction` declarations to extract `title`, `description`, `dependsOn`, `keywords`, `rules`, `constraints`, and `scenarios`\n4. If `change.specDependsOn` has an entry for the spec, use it as `dependsOn` instead of the extracted value (manifest dependencies take priority)\n5. Compute `contentHashes` by hashing each `requiredSpecArtifacts` file\n6. Write the result via `SaveSpecMetadata`\n\nIf extraction produces no `title` or `description` (e.g. the spec has no `# Title` heading or `## Overview` section), the corresponding fields are omitted and `SaveSpecMetadata` will reject the write — the spec must conform to the schema's extraction declarations.\n\nAfter generation, the metadata is stable until the spec is modified again by a subsequent change. The LLM may improve metadata at any point (e.g. refining `description` or `keywords`) by calling `SaveSpecMetadata` directly — the deterministic baseline ensures metadata always exists after archive."
+        "`metadata.json` is generated deterministically by core as part of the `ArchiveChange` use case, but sidecar consistency is checked before canonical publication begins for each spec.\n\nArchive-time flow for a modified spec:\n\n1. Prepare the merged canonical artifact content for the spec in memory.\n2. Determine the final persisted `dependsOn` set for the archive attempt.\n3. Run `extractMetadata()` over the prepared merged content to validate archive-time consistency for fields such as `dependsOn`.\n4. Determine the final `spec-lock.json` content to publish for that spec.\n5. Publish the canonical spec artifacts plus `spec-lock.json` together as one staged spec publication unit.\n6. After publication succeeds, run `GenerateSpecMetadata` against the canonical persisted spec.\n7. Compute `contentHashes` for the required persisted spec artifacts and persist `metadata.json`.\n\nThe archive-owned persisted dependency rules are:\n\n- If `change.specDependsOn` has an entry for the spec, that value is the final persisted `dependsOn` set for the archive attempt.\n- If `metadataExtraction.dependsOn` returns a value during the pre-publication extraction pass, the extracted value MUST match the final persisted `dependsOn` set being sealed for that spec or archive fails.\n- This mismatch rule applies both when a canonical `spec-lock.json` already exists and when the archive is creating `spec-lock.json` for the first time.\n- If `metadataExtraction.dependsOn` is omitted, `metadata.json.dependsOn` MUST still be written from the final persisted dependency set.\n- Outside archive, a legacy spec with no sidecar MAY still remain on extraction-backed metadata flows until opportunistic backfill succeeds.\n\n`metadata.json.dependsOn` remains a supported consumer surface, but for persisted specs it is a projection of the archive-owned sidecar state rather than an independent source of truth."
       ]
     },
     {
@@ -57,17 +63,17 @@
     {
       "requirement": "Version control",
       "rules": [
-        "`metadata.yaml` files under `.specd/metadata/` must be committed to version control alongside the project. The `.specd/metadata/` directory must not be added to `.gitignore`."
+        "`metadata.json` files under `.specd/metadata/` must be committed to version control alongside the project. The `.specd/metadata/` directory must not be added to `.gitignore`."
       ]
     }
   ],
   "constraints": [
-    "metadata.yaml is not a schema artifact — it is never listed in requiredSpecArtifacts, never validated by ValidateArtifacts, and never tracked in the change manifest's artifacts array",
+    "metadata.json is not a schema artifact — it is never listed in requiredSpecArtifacts, never validated by ValidateArtifacts, and never tracked in the change manifest's artifacts array",
     "Its absence is not an error at any point — all reads of metadata treat a missing file as empty",
     "dependsOn paths must not form cycles; if a cycle is detected during traversal, specd breaks the cycle and emits a warning",
     "Staleness warnings are advisory only — they do not block any operation",
     "The LLM must not include the spec itself in its own dependsOn list",
-    "SaveSpecMetadata must validate content against specMetadataSchema before writing — structurally invalid content is rejected with MetadataValidationError",
+    "SaveSpecMetadata must validate content against strictSpecMetadataSchema before writing — structurally invalid content is rejected with MetadataValidationError",
     "SaveSpecMetadata must check for dependsOn overwrite before writing — changed dependsOn without force is rejected with DependsOnOverwriteError",
     "Reading metadata (parseMetadata) remains lenient — it returns {} on invalid input so that downstream operations are never blocked by a malformed file on disk",
     "Metadata is accessed exclusively via SpecRepository.metadata() and SpecRepository.saveMetadata() — never via the generic artifact() / save() methods"
@@ -355,10 +361,10 @@
     {
       "requirement": "Deterministic generation at archive time",
       "name": "Metadata generated after archive",
-      "given": ["a change modifies the spec core/change"],
+      "given": ["a change modifies the spec core:change"],
       "when": ["ArchiveChange completes the delta merge and spec sync"],
       "then": [
-        "core generates metadata for core/change using the schema's metadataExtraction engine",
+        "core generates metadata for core:change using the schema's metadata extraction engine",
         "AND the file contains title, description, dependsOn, contentHashes, and any rules, constraints, scenarios extracted from the spec content"
       ]
     },
@@ -373,17 +379,71 @@
     },
     {
       "requirement": "Deterministic generation at archive time",
-      "name": "LLM may improve metadata after generation",
-      "given": ["a spec has deterministically generated metadata"],
-      "when": ["the LLM calls SaveSpecMetadata with an improved description"],
-      "then": ["the metadata is overwritten — the LLM is free to improve any field"]
+      "name": "Pre-publication extraction checks final persisted dependsOn",
+      "given": ["archive has prepared the merged canonical content for a modified spec"],
+      "when": ["archive determines the final persisted dependsOn set for that spec"],
+      "then": [
+        "it runs extractMetadata() against the prepared content before canonical publication begins"
+      ]
+    },
+    {
+      "requirement": "Deterministic generation at archive time",
+      "name": "Omitted extraction falls back to the final persisted dependency set",
+      "given": [
+        "a persisted spec is being archived",
+        "AND the schema omits metadataExtraction.dependsOn for that spec"
+      ],
+      "when": ["archive regenerates metadata"],
+      "then": ["metadata.json.dependsOn is written from the final persisted dependency set"]
+    },
+    {
+      "requirement": "Deterministic generation at archive time",
+      "name": "Legacy spec may still derive metadata dependsOn from extraction",
+      "given": ["a persisted legacy spec has no spec-lock.json", "AND extraction yields dependsOn"],
+      "when": [
+        "a non-archive metadata flow regenerates metadata before opportunistic backfill succeeds"
+      ],
+      "then": [
+        "metadata.json.dependsOn may still be derived from extraction until sidecar backfill succeeds"
+      ]
+    },
+    {
+      "requirement": "Deterministic generation at archive time",
+      "name": "Mismatched extracted dependsOn blocks archive even on first sidecar creation",
+      "given": [
+        "archive is sealing the final persisted dependency state for a modified spec",
+        "AND the spec may or may not already have a canonical spec-lock.json",
+        "AND extraction yields a different dependsOn value"
+      ],
+      "when": ["archive performs the pre-publication consistency check"],
+      "then": ["archive fails for that spec before canonical publication begins"]
     },
     {
       "requirement": "Deterministic generation at archive time",
       "name": "Generation failure does not block archive",
       "given": ["extraction produces no title for a spec"],
       "when": ["SaveSpecMetadata rejects the write"],
-      "then": ["the archive is not aborted — the spec path is reported in staleMetadataSpecPaths"]
+      "then": [
+        "the archive is not aborted",
+        "AND the spec path is reported in staleMetadataSpecPaths"
+      ]
+    },
+    {
+      "requirement": "Sidecar separation",
+      "name": "Metadata and sidecar live in different storage locations",
+      "given": ["a persisted spec has both metadata.json and spec-lock.json"],
+      "when": ["their storage locations are inspected"],
+      "then": [
+        "metadata.json lives under the configured metadata root",
+        "AND spec-lock.json lives alongside the canonical persisted scope: spec artifacts"
+      ]
+    },
+    {
+      "requirement": "Sidecar separation",
+      "name": "Legacy spec may have metadata without sidecar",
+      "given": ["a legacy persisted spec predates spec-lock.json"],
+      "when": ["tooling reads its metadata state"],
+      "then": ["missing spec-lock.json is tolerated until opportunistic backfill creates it"]
     },
     {
       "requirement": "Staleness detection",
@@ -465,8 +525,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:b4d11aebc63d7a4248c991db388836978a6a3e4e58b6c4ec5746dfcf5958ed17",
-    "verify.md": "sha256:a79b9b4498b705d3e171d975700f5d74098b7c56b898ffc9ab3367837ff1446b"
+    "spec.md": "sha256:c6da5eb05951cf29855f2b86cbc4eb48f5de06ca53ce7245bca5fa5523a2350d",
+    "verify.md": "sha256:dae84db4d3ef8bc5369ad7223121ce873001a33ee34325427d5ece1ecb48d841"
   },
   "generatedBy": "core"
 }

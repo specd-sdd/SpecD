@@ -1,0 +1,51 @@
+- op: added
+  description: 'Verify dependency seeding on added specs'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Addition is idempotent$'
+  content: |
+    ### Requirement: Seed specDependsOn for added specs
+
+    #### Scenario: Existing sidecar seeds new spec entry
+
+    - **GIVEN** a persisted spec being added to the change already has `spec-lock.json`
+    - **WHEN** `EditChange.execute` adds that spec to the change
+    - **THEN** the seeded `change.specDependsOn` entry comes from `spec-lock.json.dependsOn`
+
+    #### Scenario: Legacy metadata seeds when sidecar is absent
+
+    - **GIVEN** a persisted spec being added has no `spec-lock.json`
+    - **AND** `metadata.json.dependsOn` exists for that spec
+    - **WHEN** `EditChange.execute` adds that spec
+    - **THEN** the seeded `change.specDependsOn` entry comes from `metadata.json.dependsOn`
+
+    #### Scenario: Existing in-change dependency snapshot is not overwritten
+
+    - **GIVEN** a spec is already present in the change
+    - **AND** `change.specDependsOn` already contains an entry for it
+    - **WHEN** later scope edits run
+    - **THEN** `EditChange` does not overwrite that existing dependency snapshot automatically
+- op: modified
+  description: 'Verify spec repositories are used for seeding as well as existence checks'
+  selector:
+    type: section
+    matches: '^Requirement: Dependencies$'
+  content: |
+    #### Scenario: Uses ChangeRepository port
+
+    - **WHEN** `EditChange` is instantiated
+    - **THEN** it requires a `ChangeRepository` port in its constructor
+
+    #### Scenario: Uses ActorResolver port
+
+    - **WHEN** `EditChange` is instantiated
+    - **THEN** it requires an `ActorResolver` port in its constructor
+
+    #### Scenario: Uses spec repositories map for existence checks and dependency seeding
+
+    - **WHEN** `EditChange` is instantiated
+    - **THEN** it requires a `ReadonlyMap<string, SpecRepository>` for spec existence checks and persisted dependency seeding

@@ -1,0 +1,77 @@
+- op: modified
+  description: 'Verify metadata dependsOn projection from archive-sealed sidecar-owned state'
+  selector:
+    type: section
+    matches: '^Requirement: Deterministic generation at archive time$'
+  content: |
+    #### Scenario: Metadata generated after archive
+
+    - **GIVEN** a change modifies the spec `core:change`
+    - **WHEN** `ArchiveChange` completes the delta merge and spec sync
+    - **THEN** core generates metadata for `core:change` using the schema's metadata extraction engine
+    - **AND** the file contains title, description, `dependsOn`, `contentHashes`, and any rules, constraints, scenarios extracted from the spec content
+
+    #### Scenario: Manifest dependsOn takes priority over extracted
+
+    - **GIVEN** a change has `specDependsOn` entries for a spec
+    - **WHEN** metadata is generated for that spec
+    - **THEN** `dependsOn` in the written metadata comes from `change.specDependsOn`, not from the extraction engine
+
+    #### Scenario: Pre-publication extraction checks final persisted dependsOn
+
+    - **GIVEN** archive has prepared the merged canonical content for a modified spec
+    - **WHEN** archive determines the final persisted `dependsOn` set for that spec
+    - **THEN** it runs `extractMetadata()` against the prepared content before canonical publication begins
+
+    #### Scenario: Omitted extraction falls back to the final persisted dependency set
+
+    - **GIVEN** a persisted spec is being archived
+    - **AND** the schema omits `metadataExtraction.dependsOn` for that spec
+    - **WHEN** archive regenerates metadata
+    - **THEN** `metadata.json.dependsOn` is written from the final persisted dependency set
+
+    #### Scenario: Legacy spec may still derive metadata dependsOn from extraction
+
+    - **GIVEN** a persisted legacy spec has no `spec-lock.json`
+    - **AND** extraction yields `dependsOn`
+    - **WHEN** a non-archive metadata flow regenerates metadata before opportunistic backfill succeeds
+    - **THEN** `metadata.json.dependsOn` may still be derived from extraction until sidecar backfill succeeds
+
+    #### Scenario: Mismatched extracted dependsOn blocks archive even on first sidecar creation
+
+    - **GIVEN** archive is sealing the final persisted dependency state for a modified spec
+    - **AND** the spec may or may not already have a canonical `spec-lock.json`
+    - **AND** extraction yields a different `dependsOn` value
+    - **WHEN** archive performs the pre-publication consistency check
+    - **THEN** archive fails for that spec before canonical publication begins
+
+    #### Scenario: Generation failure does not block archive
+
+    - **GIVEN** extraction produces no title for a spec
+    - **WHEN** `SaveSpecMetadata` rejects the write
+    - **THEN** the archive is not aborted
+    - **AND** the spec path is reported in `staleMetadataSpecPaths`
+- op: added
+  description: 'Verify separation between metadata and sidecar locations'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Deterministic generation at archive time$'
+  content: |
+    ### Requirement: Sidecar separation
+
+    #### Scenario: Metadata and sidecar live in different storage locations
+
+    - **GIVEN** a persisted spec has both `metadata.json` and `spec-lock.json`
+    - **WHEN** their storage locations are inspected
+    - **THEN** `metadata.json` lives under the configured metadata root
+    - **AND** `spec-lock.json` lives alongside the canonical persisted `scope: spec` artifacts
+
+    #### Scenario: Legacy spec may have metadata without sidecar
+
+    - **GIVEN** a legacy persisted spec predates `spec-lock.json`
+    - **WHEN** tooling reads its metadata state
+    - **THEN** missing `spec-lock.json` is tolerated until opportunistic backfill creates it

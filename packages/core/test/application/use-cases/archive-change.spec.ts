@@ -9,8 +9,11 @@ import { DeltaApplicationError } from '../../../src/domain/errors/delta-applicat
 import { SpecOverlapError } from '../../../src/domain/errors/spec-overlap-error.js'
 import { Change, type ChangeEvent } from '../../../src/domain/entities/change.js'
 import { ArchivedChange } from '../../../src/domain/entities/archived-change.js'
+import { Spec } from '../../../src/domain/entities/spec.js'
 import { SpecArtifact } from '../../../src/domain/value-objects/spec-artifact.js'
+import { SpecPath } from '../../../src/domain/value-objects/spec-path.js'
 import { ArchiveRepository } from '../../../src/application/ports/archive-repository.js'
+import { SpecPublicationError } from '../../../src/domain/errors/spec-publication-error.js'
 import { ChangeArtifact } from '../../../src/domain/entities/change-artifact.js'
 import { ArtifactFile } from '../../../src/domain/value-objects/artifact-file.js'
 import { type GenerateSpecMetadata } from '../../../src/application/use-cases/generate-spec-metadata.js'
@@ -300,7 +303,10 @@ describe('ArchiveChange', () => {
     it('returns archivedChange, empty postHookFailures, and staleMetadataSpecPaths on success', async () => {
       const artifactType = makeArtifactType('spec', { delta: false, scope: 'spec' })
       const schema = makeSchema([artifactType])
-      const specRepo = makeSpecRepository()
+      const specRepo = makeSpecRepository({
+        specs: [new Spec('default', SpecPath.parse('auth/oauth'), ['spec.md'])],
+        artifacts: { 'auth/oauth/spec.md': '# Spec' },
+      })
 
       const successChange = makeArchivableChange('my-change', { specIds: ['default:auth/oauth'] })
       successChange.setArtifact(
@@ -342,16 +348,477 @@ describe('ArchiveChange', () => {
       expect(result.postHookFailures).toEqual([])
       expect(result.staleMetadataSpecPaths).toContain('default:auth/oauth')
     })
+
+    it('writes spec-lock.json on first archive using final persisted dependsOn', async () => {
+      const artifactType = makeArtifactType('spec', { delta: false, scope: 'spec' })
+      const schema = makeSchema([artifactType])
+      const specRepo = makeSpecRepository({
+        specs: [new Spec('default', SpecPath.parse('auth/oauth'), ['spec.md'])],
+        artifacts: { 'auth/oauth/spec.md': '# Spec' },
+      })
+      const generateMetadata = {
+        execute: vi.fn().mockResolvedValue({
+          hasExtraction: true,
+          metadata: {
+            title: 'OAuth',
+            description: 'desc',
+            contentHashes: { 'spec.md': 'sha256:' + 'a'.repeat(64) },
+          },
+        }),
+      } as unknown as GenerateSpecMetadata
+      const saveMetadata = makeSaveMetadata()
+
+      const change = makeArchivableChange('my-change', { specIds: ['default:auth/oauth'] })
+      change.setSpecDependsOn('default:auth/oauth', ['core:storage'])
+      change.setArtifact(
+        new ChangeArtifact({
+          type: 'spec',
+          files: new Map([
+            [
+              'default:auth/oauth',
+              new ArtifactFile({
+                key: 'default:auth/oauth',
+                filename: 'specs/default/auth/oauth/spec.md',
+                status: 'complete',
+                validatedHash: 'abc123',
+              }),
+            ],
+          ]),
+        }),
+      )
+      const changeRepo = Object.assign(makeChangeRepository([change]), {
+        async artifact() {
+          return new SpecArtifact('spec.md', '# Spec')
+        },
+      })
+
+      const uc = new ArchiveChange(
+        changeRepo,
+        new Map([['default', specRepo]]),
+        makeArchiveRepository(),
+        makeRunStepHooks(),
+        makeActorResolver(),
+        makeParsers(),
+        makeSchemaProvider(schema),
+        generateMetadata,
+        saveMetadata,
+      )
+
+      await uc.execute({ name: 'my-change' })
+
+      expect(JSON.parse(specRepo.saved.get('spec-lock.json')!)).toEqual({
+        schema: { name: 'test-schema', version: 1 },
+        dependsOn: ['core:storage'],
+      })
+    })
+
+    it('preserves existing sidecar schema and refreshes dependsOn on re-archive', async () => {
+      const artifactType = makeArtifactType('spec', { delta: false, scope: 'spec' })
+      const schema = makeSchema([artifactType])
+      const specRepo = makeSpecRepository({
+        specs: [new Spec('default', SpecPath.parse('auth/oauth'), ['spec.md'])],
+        artifacts: {
+          'auth/oauth/spec.md': '# Spec',
+          'auth/oauth/spec-lock.json': JSON.stringify({
+            schema: { name: 'schema-std', version: 1 },
+            dependsOn: ['core:old'],
+          }),
+        },
+      })
+      const generateMetadata = {
+        execute: vi.fn().mockResolvedValue({
+          hasExtraction: true,
+          metadata: {
+            title: 'OAuth',
+            description: 'desc',
+            contentHashes: { 'spec.md': 'sha256:' + 'a'.repeat(64) },
+          },
+        }),
+      } as unknown as GenerateSpecMetadata
+
+      const change = makeArchivableChange('my-change', { specIds: ['default:auth/oauth'] })
+      change.setSpecDependsOn('default:auth/oauth', ['core:new'])
+      change.setArtifact(
+        new ChangeArtifact({
+          type: 'spec',
+          files: new Map([
+            [
+              'default:auth/oauth',
+              new ArtifactFile({
+                key: 'default:auth/oauth',
+                filename: 'specs/default/auth/oauth/spec.md',
+                status: 'complete',
+                validatedHash: 'abc123',
+              }),
+            ],
+          ]),
+        }),
+      )
+      const changeRepo = Object.assign(makeChangeRepository([change]), {
+        async artifact() {
+          return new SpecArtifact('spec.md', '# Spec')
+        },
+      })
+
+      const uc = new ArchiveChange(
+        changeRepo,
+        new Map([['default', specRepo]]),
+        makeArchiveRepository(),
+        makeRunStepHooks(),
+        makeActorResolver(),
+        makeParsers(),
+        makeSchemaProvider(schema),
+        generateMetadata,
+        makeSaveMetadata(),
+      )
+
+      await uc.execute({ name: 'my-change' })
+
+      expect(JSON.parse(specRepo.saved.get('spec-lock.json')!)).toEqual({
+        schema: { name: 'schema-std', version: 1 },
+        dependsOn: ['core:new'],
+      })
+    })
+
+    it('fails archive when extracted dependsOn mismatches final persisted deps', async () => {
+      const artifactType = makeArtifactType('spec', { delta: false, scope: 'spec' })
+      const schema = makeSchema({
+        artifacts: [artifactType],
+        metadataExtraction: {
+          dependsOn: {
+            artifact: 'spec',
+            extractor: {
+              selector: { type: 'section', matches: '^Spec Dependencies$' },
+              extract: 'content',
+              capture: '(core:[a-z-]+)',
+            },
+          },
+        },
+      })
+      const specRepo = makeSpecRepository({
+        specs: [new Spec('default', SpecPath.parse('auth/oauth'), ['spec.md'])],
+        artifacts: { 'auth/oauth/spec.md': '# Spec' },
+      })
+      const markdownParser = makeParser({
+        parse: () => ({
+          root: {
+            type: 'document',
+            children: [
+              {
+                type: 'section',
+                label: 'Spec Dependencies',
+                children: [{ type: 'paragraph', value: '- core:extracted' }],
+              },
+            ],
+          },
+        }),
+        renderSubtree: (node) =>
+          (node.value as string | undefined) ??
+          (node.children ?? [])
+            .map((child) => ((child as { value?: unknown }).value as string | undefined) ?? '')
+            .join('\n'),
+      })
+      const generateMetadata = {
+        execute: vi.fn().mockResolvedValue({
+          hasExtraction: true,
+          metadata: {
+            title: 'OAuth',
+            description: 'desc',
+            dependsOn: ['core:extracted'],
+            contentHashes: { 'spec.md': 'sha256:' + 'a'.repeat(64) },
+          },
+        }),
+      } as unknown as GenerateSpecMetadata
+      const saveMetadata = makeSaveMetadata()
+
+      const change = makeArchivableChange('my-change', { specIds: ['default:auth/oauth'] })
+      change.setSpecDependsOn('default:auth/oauth', ['core:manifest'])
+      change.setArtifact(
+        new ChangeArtifact({
+          type: 'spec',
+          files: new Map([
+            [
+              'default:auth/oauth',
+              new ArtifactFile({
+                key: 'default:auth/oauth',
+                filename: 'specs/default/auth/oauth/spec.md',
+                status: 'complete',
+                validatedHash: 'abc123',
+              }),
+            ],
+          ]),
+        }),
+      )
+      const changeRepo = Object.assign(makeChangeRepository([change]), {
+        async artifact() {
+          return new SpecArtifact('spec.md', '# Spec')
+        },
+      })
+
+      const uc = new ArchiveChange(
+        changeRepo,
+        new Map([['default', specRepo]]),
+        makeArchiveRepository(),
+        makeRunStepHooks(),
+        makeActorResolver(),
+        makeParsers(markdownParser),
+        makeSchemaProvider(schema),
+        generateMetadata,
+        saveMetadata,
+      )
+
+      await expect(uc.execute({ name: 'my-change' })).rejects.toThrow(
+        /Extracted dependsOn mismatch/,
+      )
+      expect((saveMetadata.execute as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(0)
+    })
+
+    it('falls back to spec-lock dependsOn when extraction omits dependsOn', async () => {
+      const artifactType = makeArtifactType('spec', { delta: false, scope: 'spec' })
+      const schema = makeSchema([artifactType])
+      const specRepo = makeSpecRepository({
+        specs: [new Spec('default', SpecPath.parse('auth/oauth'), ['spec.md'])],
+        artifacts: {
+          'auth/oauth/spec.md': '# Spec',
+          'auth/oauth/spec-lock.json': JSON.stringify({
+            schema: { name: 'schema-std', version: 1 },
+            dependsOn: ['core:canonical'],
+          }),
+        },
+      })
+      const generateMetadata = {
+        execute: vi.fn().mockResolvedValue({
+          hasExtraction: true,
+          metadata: {
+            title: 'OAuth',
+            description: 'desc',
+            contentHashes: { 'spec.md': 'sha256:' + 'a'.repeat(64) },
+          },
+        }),
+      } as unknown as GenerateSpecMetadata
+      const saveMetadata = makeSaveMetadata()
+      const change = makeArchivableChange('my-change', { specIds: ['default:auth/oauth'] })
+      change.setArtifact(
+        new ChangeArtifact({
+          type: 'spec',
+          files: new Map([
+            [
+              'default:auth/oauth',
+              new ArtifactFile({
+                key: 'default:auth/oauth',
+                filename: 'specs/default/auth/oauth/spec.md',
+                status: 'complete',
+                validatedHash: 'abc123',
+              }),
+            ],
+          ]),
+        }),
+      )
+      const changeRepo = Object.assign(makeChangeRepository([change]), {
+        async artifact() {
+          return new SpecArtifact('spec.md', '# Spec')
+        },
+      })
+
+      const uc = new ArchiveChange(
+        changeRepo,
+        new Map([['default', specRepo]]),
+        makeArchiveRepository(),
+        makeRunStepHooks(),
+        makeActorResolver(),
+        makeParsers(),
+        makeSchemaProvider(schema),
+        generateMetadata,
+        saveMetadata,
+      )
+
+      await uc.execute({ name: 'my-change' })
+
+      expect((saveMetadata.execute as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(1)
+      const savedContent = (saveMetadata.execute as ReturnType<typeof vi.fn>).mock.calls[0]?.[0]
+        ?.content as string
+      expect(JSON.parse(savedContent) as unknown).toMatchObject({
+        title: 'OAuth',
+        description: 'desc',
+        dependsOn: ['core:canonical'],
+      })
+    })
+
+    it('skips opportunistic sidecar backfill when a legacy spec is not structurally compatible', async () => {
+      const artifactType = makeArtifactType('spec', {
+        delta: false,
+        scope: 'spec',
+        format: 'markdown',
+      })
+      const schema = makeSchema([artifactType])
+      const specRepo = makeSpecRepository({
+        specs: [new Spec('default', SpecPath.parse('auth/oauth'), ['spec.md'])],
+        artifacts: {
+          'auth/oauth/spec.md': '# Spec',
+          'auth/oauth/.specd-metadata.yaml': JSON.stringify({
+            title: 'OAuth',
+            description: 'desc',
+            dependsOn: ['core:legacy'],
+            contentHashes: { 'spec.md': 'sha256:' + 'a'.repeat(64) },
+          }),
+        },
+      })
+      const generateMetadata = {
+        execute: vi.fn().mockResolvedValue({
+          hasExtraction: true,
+          metadata: {
+            title: 'OAuth',
+            description: 'desc',
+            dependsOn: ['core:legacy'],
+            contentHashes: { 'spec.md': 'sha256:' + 'a'.repeat(64) },
+          },
+        }),
+      } as unknown as GenerateSpecMetadata
+      const saveMetadata = makeSaveMetadata()
+      const parser = makeParser({
+        parse: () => {
+          throw new Error('invalid canonical spec')
+        },
+      })
+      const change = makeArchivableChange('my-change', { specIds: ['default:auth/oauth'] })
+      change.setArtifact(
+        new ChangeArtifact({
+          type: 'spec',
+          files: new Map([
+            [
+              'default:auth/oauth',
+              new ArtifactFile({
+                key: 'default:auth/oauth',
+                filename: 'specs/default/auth/oauth/spec.md',
+                status: 'complete',
+                validatedHash: 'abc123',
+              }),
+            ],
+          ]),
+        }),
+      )
+      const changeRepo = Object.assign(makeChangeRepository([change]), {
+        async artifact() {
+          return new SpecArtifact('spec.md', '# Spec')
+        },
+      })
+
+      const uc = new ArchiveChange(
+        changeRepo,
+        new Map([['default', specRepo]]),
+        makeArchiveRepository(),
+        makeRunStepHooks(),
+        makeActorResolver(),
+        makeParsers(parser),
+        makeSchemaProvider(schema),
+        generateMetadata,
+        saveMetadata,
+      )
+
+      await expect(uc.execute({ name: 'my-change' })).resolves.toBeDefined()
+      expect(specRepo.saved.has('spec-lock.json')).toBe(false)
+      expect((saveMetadata.execute as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(1)
+    })
+
+    it('fails before archive when actor identity cannot be resolved', async () => {
+      const archiveRepo = makeArchiveRepository()
+      const archiveSpy = vi.spyOn(archiveRepo, 'archive')
+      const change = makeArchivableChange('my-change')
+      const uc = new ArchiveChange(
+        makeChangeRepository([change]),
+        new Map(),
+        archiveRepo,
+        makeRunStepHooks(),
+        makeActorResolver({
+          async identity(): Promise<typeof testActor> {
+            throw new Error('missing actor identity')
+          },
+        }),
+        makeParsers(),
+        makeSchemaProvider(makeSchema()),
+        makeGenerateMetadata(),
+        makeSaveMetadata(),
+      )
+
+      await expect(uc.execute({ name: 'my-change' })).rejects.toThrow('missing actor identity')
+      expect(archiveSpy).not.toHaveBeenCalled()
+    })
+
+    it('preserves staged publication output and records archive-failed when spec publish fails', async () => {
+      const artifactType = makeArtifactType('spec', { delta: false, scope: 'spec' })
+      const schema = makeSchema([artifactType])
+      const archiveRepo = makeArchiveRepository()
+      const archiveSpy = vi.spyOn(archiveRepo, 'archive')
+      const specRepo = makeSpecRepository({
+        specs: [new Spec('default', SpecPath.parse('auth/oauth'), ['spec.md'])],
+        artifacts: { 'auth/oauth/spec.md': '# Old' },
+        async publish(): Promise<void> {
+          throw new SpecPublicationError(
+            'default:auth/oauth',
+            '/tmp/specd-staging/auth-oauth',
+            'rename failed',
+          )
+        },
+      })
+
+      const change = makeArchivableChange('my-change', { specIds: ['default:auth/oauth'] })
+      change.setArtifact(
+        new ChangeArtifact({
+          type: 'spec',
+          files: new Map([
+            [
+              'default:auth/oauth',
+              new ArtifactFile({
+                key: 'default:auth/oauth',
+                filename: 'specs/default/auth/oauth/spec.md',
+                status: 'complete',
+                validatedHash: 'abc123',
+              }),
+            ],
+          ]),
+        }),
+      )
+      const repo = Object.assign(makeChangeRepository([change]), {
+        async artifact() {
+          return new SpecArtifact('spec.md', '# New')
+        },
+      })
+
+      const uc = new ArchiveChange(
+        repo,
+        new Map([['default', specRepo]]),
+        archiveRepo,
+        makeRunStepHooks(),
+        makeActorResolver(),
+        makeParsers(),
+        makeSchemaProvider(schema),
+        makeGenerateMetadata(),
+        makeSaveMetadata(),
+      )
+
+      await expect(uc.execute({ name: 'my-change' })).rejects.toThrow(
+        '/tmp/specd-staging/auth-oauth',
+      )
+      expect(archiveSpy).not.toHaveBeenCalled()
+
+      const persisted = await repo.get('my-change')
+      const lastEvent = persisted?.history.at(-1)
+      expect(lastEvent?.type).toBe('archive-failed')
+      if (lastEvent?.type === 'archive-failed') {
+        expect(lastEvent.step).toBe('commit')
+        expect(lastEvent.commitStarted).toBe(true)
+      }
+    })
   })
 
   describe('given a pre-archive run hook is configured', () => {
     it('runs the hook before writing spec files', async () => {
       const callOrder: string[] = []
       const specRepo = makeSpecRepository()
-      const origSave = specRepo.save.bind(specRepo)
-      specRepo.save = async (...args) => {
-        callOrder.push('save')
-        return origSave(...args)
+      const origPublish = specRepo.publish.bind(specRepo)
+      specRepo.publish = async (...args) => {
+        callOrder.push('publish')
+        return origPublish(...args)
       }
 
       const artifactType = makeArtifactType('spec', { delta: false, scope: 'spec' })
@@ -403,7 +870,7 @@ describe('ArchiveChange', () => {
       await uc.execute({ name: 'my-change' })
 
       expect(callOrder[0]).toBe('pnpm test')
-      expect(callOrder[1]).toBe('save')
+      expect(callOrder[1]).toBe('publish')
     })
 
     it('throws HookFailedError and does not write spec files when the hook fails', async () => {

@@ -93,6 +93,12 @@
       ]
     },
     {
+      "requirement": "spec-lock sidecar read and write",
+      "rules": [
+        "`SpecRepository` MUST expose dedicated methods for the persisted `spec-lock.json` sidecar.\n\n`readSpecLock(spec)` MUST load the sidecar for the given spec and return the parsed content as `SpecLockData`, or `null` if no sidecar exists. When loaded from storage, the returned object MUST include an `originalHash` property to enable conflict detection on subsequent writes.\n\n`saveSpecLock(spec, content, options?)` MUST first check `this.ownership()`. If the ownership is `readOnly`, the method MUST throw `ReadOnlyWorkspaceError` before any filesystem operation or conflict detection.\n\nIf the ownership is `owned` or `shared`, `saveSpecLock` proceeds normally: it MUST persist the sidecar content for the given spec, preserve conflict detection semantics equivalent to `saveMetadata`, and skip conflict detection only when `options.force` is `true`.\n\n`spec-lock` access is a dedicated repository contract. Callers MUST NOT rely on the normal `artifact()` / `save()` API as a substitute for sidecar persistence."
+      ]
+    },
+    {
       "requirement": "search returns specs matching a text query",
       "rules": [
         "`search(query, options?)` MUST accept a text query string and return an array of `SpecSearchResult` objects for specs within this workspace whose content matches the query. The search MUST cover spec artifact content (at minimum `spec.md` and `verify.md`).\n\n`SpecSearchResult` MUST contain:\n\n- `spec` — the `Spec` metadata object (same type as returned by `get()`)\n- `score` — a relevance score (number, higher is more relevant)\n- `matches` — an array of `SpecSearchMatch` objects, each containing:\n  - `filename` — the artifact filename where the match was found (e.g. `\"spec.md\"`)\n  - `line` — the 1-based line number of the best match within that file\n  - `snippet` — a short text excerpt around the match (max 120 characters)\n\nThe `options` parameter MAY include:\n\n- `limit` — maximum number of results to return (default: implementation-defined)\n\nResults MUST be sorted by `score` descending. The implementation MAY use case-insensitive matching. When no specs match, an empty array MUST be returned (not an error).\n\nThis method is the port-level search primitive — it performs a content scan within a single workspace. Cross-workspace orchestration is handled by a use case."
@@ -101,7 +107,7 @@
     {
       "requirement": "Abstract class with abstract methods",
       "rules": [
-        "`SpecRepository` MUST be defined as an `abstract class`, not an `interface`. All storage operations (`get`, `list`, `artifact`, `save`, `delete`, `resolveFromPath`, `metadata`, `saveMetadata`, `search`) MUST be declared as `abstract` methods. This follows the architecture spec requirement that ports with shared construction are abstract classes."
+        "`SpecRepository` MUST be defined as an `abstract class`, not an `interface`. All storage operations (`get`, `list`, `artifact`, `save`, `delete`, `resolveFromPath`, `metadata`, `saveMetadata`, `readSpecLock`, `saveSpecLock`, `search`) MUST be declared as `abstract` methods. This follows the architecture spec requirement that ports with shared construction are abstract classes."
       ]
     }
   ],
@@ -156,6 +162,44 @@
       ],
       "when": ["saveMetadata(spec, content, { force: true }) is called"],
       "then": ["the file is written without error"]
+    },
+    {
+      "requirement": "spec-lock sidecar read and write",
+      "name": "Sidecar exists",
+      "given": ["a spec with a persisted spec-lock.json"],
+      "when": ["readSpecLock(spec) is called"],
+      "then": [
+        "the repository returns the parsed SpecLockData",
+        "AND the returned object includes originalHash"
+      ]
+    },
+    {
+      "requirement": "spec-lock sidecar read and write",
+      "name": "Sidecar does not exist",
+      "given": ["a spec with no persisted spec-lock.json"],
+      "when": ["readSpecLock(spec) is called"],
+      "then": ["null is returned"]
+    },
+    {
+      "requirement": "spec-lock sidecar read and write",
+      "name": "Read-only workspace rejects saveSpecLock",
+      "given": ["a SpecRepository bound to a workspace with readOnly ownership"],
+      "when": ["saveSpecLock(spec, content) is called"],
+      "then": ["ReadOnlyWorkspaceError is thrown", "AND no sidecar file is written"]
+    },
+    {
+      "requirement": "spec-lock sidecar read and write",
+      "name": "Conflict detected on saveSpecLock",
+      "given": ["a persisted sidecar with a different hash than content.originalHash"],
+      "when": ["saveSpecLock(spec, content) is called without force"],
+      "then": ["ArtifactConflictError is thrown"]
+    },
+    {
+      "requirement": "spec-lock sidecar read and write",
+      "name": "Force saveSpecLock bypasses conflict detection",
+      "given": ["a persisted sidecar whose current hash differs from content.originalHash"],
+      "when": ["saveSpecLock(spec, content, { force: true }) is called"],
+      "then": ["the sidecar is overwritten without error"]
     },
     {
       "requirement": "Abstract class with abstract methods",
@@ -402,8 +446,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:fb1b4d0100cda117afdff3315158941a20addc57617da573b363b11b6a95dbb2",
-    "verify.md": "sha256:d367a05087b2fde57e4509ffd6ef460759156cbf0a6978512be707bdfe70a0a0"
+    "spec.md": "sha256:0eaca38e8840a02705bb793d1685bfc898dc8c7f5a178ab0e4a9f51ee0acc13e",
+    "verify.md": "sha256:19915ff6f2928b8879500ce6f3b70bd9f1480206a0186d50cebc6286122b6885"
   },
   "generatedBy": "core"
 }

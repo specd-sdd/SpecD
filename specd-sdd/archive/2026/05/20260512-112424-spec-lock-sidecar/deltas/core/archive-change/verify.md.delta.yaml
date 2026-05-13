@@ -1,0 +1,155 @@
+- op: modified
+  description: 'Verify ArchiveChange constructor wiring includes extractor runtime dependencies'
+  selector:
+    type: section
+    matches: '^Requirement: Ports and constructor$'
+  content: |
+    #### Scenario: All dependencies injected via constructor
+
+    - **WHEN** `ArchiveChange` is instantiated
+    - **THEN** all required repositories, services, and registries are provided through the constructor rather than created internally
+
+    #### Scenario: ArchiveChange is constructed with extractor runtime wiring
+
+    - **GIVEN** the archive workflow is composed for runtime use
+    - **WHEN** `ArchiveChange` is instantiated
+    - **THEN** the constructor receives `ArtifactParserRegistry`
+    - **AND** the constructor receives `ExtractorTransformRegistry`
+    - **AND** the constructor receives `SpecWorkspaceRoute[]`
+    - **AND** those dependencies are used for the pre-publication metadata extraction pass over prepared merged artifacts
+
+- op: modified
+  description: 'Align metadata generation scenarios with pre-publication consistency and sidecar authority'
+  selector:
+    type: section
+    matches: '^Requirement: Spec metadata generation$'
+  content: |
+    #### Scenario: Pre-publication extraction validates the final persisted dependsOn set
+
+    - **GIVEN** a change with specIds ["default:auth/login"] is archived
+    - **AND** archive has already prepared the merged artifact content for `default:auth/login`
+    - **WHEN** `ArchiveChange` determines the final persisted `dependsOn` set for that spec
+    - **THEN** it runs `extractMetadata(...)` against the prepared merged content before canonical publication begins
+
+    #### Scenario: Mismatch fails even on first sidecar creation
+
+    - **GIVEN** a change has `specDependsOn: { "default:auth/login": ["default:auth/shared"] }`
+    - **AND** `default:auth/login` has no canonical `spec-lock.json` yet
+    - **AND** the spec's extracted `dependsOn` from the prepared merged content resolves to a different value
+    - **WHEN** `ArchiveChange.execute` attempts to seal the final persisted dependency set for `default:auth/login`
+    - **THEN** the archive fails for that spec before canonical publication begins
+
+    #### Scenario: Missing extraction still writes metadata dependsOn from the final persisted dependency set
+
+    - **GIVEN** a modified spec is being archived
+    - **AND** the schema has no `metadataExtraction.dependsOn` rule
+    - **AND** the change has a final `specDependsOn` value for that spec
+    - **WHEN** archive generates metadata after canonical publication
+    - **THEN** `metadata.json.dependsOn` is written from the final persisted dependency set
+
+    #### Scenario: Legacy spec without sidecar may keep extracted metadata dependsOn
+
+    - **GIVEN** a modified legacy spec has no `spec-lock.json`
+    - **AND** the schema's metadata extraction yields `dependsOn`
+    - **WHEN** a non-archive metadata flow regenerates metadata before opportunistic backfill succeeds
+    - **THEN** `metadata.json.dependsOn` may still be written from the extracted value until sidecar backfill succeeds
+
+    #### Scenario: Metadata is generated after successful publication
+
+    - **GIVEN** a change with specIds ["default:auth/login"] is archived successfully for a spec
+    - **WHEN** the archive process runs post-publication metadata generation
+    - **THEN** `SaveSpecMetadata` is called with JSON-serialized content for that spec
+
+    #### Scenario: Metadata generation failure does not abort archive
+
+    - **GIVEN** a spec has no `# Title` heading and the schema's metadata extraction for `title` matches nothing
+    - **WHEN** `ArchiveChange.execute` runs metadata generation for that spec
+    - **THEN** the archive is not rolled back
+    - **AND** the spec path appears in `staleMetadataSpecPaths`
+- op: added
+  description: 'Verify opportunistic legacy backfill including legacy metadata continuity'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: spec-lock sidecar persistence$'
+  content: |
+    ### Requirement: Opportunistic sidecar backfill
+
+    #### Scenario: Compatible legacy spec receives sidecar during opportunistic backfill
+
+    - **GIVEN** a persisted legacy spec has no `spec-lock.json`
+    - **AND** the canonical spec passes structural validation under the current schema
+    - **WHEN** archive or metadata regeneration performs opportunistic backfill
+    - **THEN** `spec-lock.json` is created
+    - **AND** its `dependsOn` comes from the current persisted dependency view
+    - **AND** its `schema` records the current project schema identity
+
+    #### Scenario: Incompatible legacy spec is left on legacy path
+
+    - **GIVEN** a persisted legacy spec has no `spec-lock.json`
+    - **AND** the canonical spec fails structural validation under the current schema
+    - **WHEN** opportunistic backfill is attempted
+    - **THEN** no sidecar is created implicitly
+    - **AND** legacy `metadata.json` generation may still continue
+- op: modified
+  description: 'Replace anonymous actor fallback with hard archive failure'
+  selector:
+    type: section
+    matches: '^Requirement: Archive repository call$'
+  content: |
+    #### Scenario: Calls archiveRepository.archive with actor
+
+    - **GIVEN** `ActorResolver.identity()` returns a valid actor
+    - **WHEN** `ArchiveChange.execute` completes the delta merge step
+    - **THEN** it calls `archiveRepository.archive(change, { actor })` with the resolved actor
+
+    #### Scenario: Missing actor identity aborts archive
+
+    - **GIVEN** `ActorResolver.identity()` throws or cannot provide an actor
+    - **WHEN** `ArchiveChange.execute` attempts to archive the change
+    - **THEN** the archive fails
+    - **AND** `archiveRepository.archive()` is not called
+
+    #### Scenario: ArchivedChange constructed by repository, not use case
+
+    - **WHEN** `ArchiveChange.execute` succeeds
+    - **THEN** the returned `archivedChange` is constructed by the repository
+    - **AND** the use case does not directly construct the `ArchivedChange` record
+- op: modified
+  description: 'Narrow staged publication guarantee to per-spec atomicity including spec-lock'
+  selector:
+    type: section
+    matches: '^Requirement: Staged archive commit and failed-attempt visibility$'
+  content: |
+    #### Scenario: Pre-publication failure leaves no canonical spec writes
+
+    - **GIVEN** archive execution has started
+    - **AND** a failure occurs before staged publication to canonical storage begins
+    - **WHEN** `ArchiveChange.execute` aborts
+    - **THEN** no canonical spec repository shows a partially synced artifact
+
+    #### Scenario: Publication unit includes spec-lock sidecar
+
+    - **GIVEN** archive has prepared merged canonical artifacts for a spec
+    - **AND** archive has determined the final `spec-lock.json` content for that spec
+    - **WHEN** staged publication is built
+    - **THEN** the publication unit includes both the merged canonical spec artifacts and `spec-lock.json`
+
+    #### Scenario: Publication failure preserves staged output for manual recovery
+
+    - **GIVEN** staged archive output has been prepared for a spec
+    - **AND** final publication from staging to canonical storage fails for that spec
+    - **WHEN** `ArchiveChange.execute` reports the failure
+    - **THEN** the canonical spec tree does not contain a partially written version of that spec
+    - **AND** the staged output is not deleted automatically
+    - **AND** the reported failure indicates that the staged material can be moved manually
+
+    #### Scenario: Multi-spec archive is not required to be one filesystem transaction
+
+    - **GIVEN** a change archives more than one spec
+    - **WHEN** the archive contract is evaluated
+    - **THEN** the spec guarantees atomic publication per spec
+    - **AND** it does not promise one indivisible filesystem transaction for the whole batch

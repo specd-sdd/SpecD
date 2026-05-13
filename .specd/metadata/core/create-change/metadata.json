@@ -37,6 +37,12 @@
       ]
     },
     {
+      "requirement": "Initial specDependsOn seeding",
+      "rules": [
+        "When `CreateChange.execute` is called with spec IDs that already exist in a configured spec repository, the newly constructed `Change` MUST seed `change.specDependsOn` for each such spec before persistence.\n\nSeeding rules:\n\n- If a canonical `spec-lock.json` exists for the spec, its `dependsOn` value MUST be used.\n- Otherwise, if legacy `metadata.json.dependsOn` exists for the spec, that value MUST be used.\n- Otherwise, the seeded value is an empty array.\n- Specs that do not yet exist in the repository do not require a seeded dependency entry at creation time.\n\nThis ensures a change created against existing specs starts from the current persisted dependency set instead of leaving `specDependsOn` absent by default."
+      ]
+    },
+    {
       "requirement": "Persistence and scaffolding",
       "rules": [
         "After construction, the use case MUST persist the change via `ChangeRepository.save`. After saving, it MUST call `ChangeRepository.scaffold(change, specExists)` to create the artifact directory structure. The `specExists` callback checks the `SpecRepository` map for each spec ID's workspace. Finally, the use case returns an object containing the newly created `Change` instance and the `changePath` (obtained via `ChangeRepository.changePath(change)`).\n\nThe return type is `{ change: Change; changePath: string }`."
@@ -45,7 +51,7 @@
     {
       "requirement": "Dependencies",
       "rules": [
-        "`CreateChange` depends on the following ports injected via constructor:\n\n- `ChangeRepository` — for existence checks, persistence, and scaffolding\n- `ActorResolver` — for resolving the current actor identity\n- `specs: ReadonlyMap<string, SpecRepository>` — spec repositories keyed by workspace name, used for the `specExists` check during scaffolding"
+        "`CreateChange` depends on the following ports injected via constructor:\n\n- `ChangeRepository` — for existence checks, persistence, and scaffolding\n- `ActorResolver` — for resolving the current actor identity\n- `specs: ReadonlyMap<string, SpecRepository>` — spec repositories keyed by workspace name, used for the `specExists` check during scaffolding and for reading persisted dependency state when seeding `change.specDependsOn`"
       ]
     }
   ],
@@ -104,6 +110,35 @@
       "name": "Initial state is drafting",
       "when": ["CreateChange.execute returns a change"],
       "then": ["change.state === 'drafting'"]
+    },
+    {
+      "requirement": "Initial specDependsOn seeding",
+      "name": "Existing sidecar seeds dependencies at creation time",
+      "given": [
+        "CreateChange.execute is called with a spec that already exists in a repository",
+        "AND that spec already has spec-lock.json"
+      ],
+      "when": ["the change is constructed"],
+      "then": ["the change seeds specDependsOn for that spec from spec-lock.json.dependsOn"]
+    },
+    {
+      "requirement": "Initial specDependsOn seeding",
+      "name": "Legacy metadata seeds when sidecar is absent",
+      "given": [
+        "CreateChange.execute is called with a persisted spec that has no sidecar",
+        "AND metadata.json.dependsOn exists for that spec"
+      ],
+      "when": ["the change is constructed"],
+      "then": ["the change seeds specDependsOn from metadata.json.dependsOn"]
+    },
+    {
+      "requirement": "Initial specDependsOn seeding",
+      "name": "New spec starts without seeded dependency entry",
+      "given": [
+        "CreateChange.execute is called with a spec ID that does not yet exist in the repository"
+      ],
+      "when": ["the change is constructed"],
+      "then": ["no seeded dependency entry is required for that spec at creation time"]
     },
     {
       "requirement": "Input contract",
@@ -166,14 +201,16 @@
     },
     {
       "requirement": "Dependencies",
-      "name": "Uses spec repositories map",
+      "name": "Uses spec repositories map for existence checks and dependency seeding",
       "when": ["CreateChange is instantiated"],
-      "then": ["it requires a ReadonlyMap<string, SpecRepository> for spec existence checks"]
+      "then": [
+        "it requires a ReadonlyMap<string, SpecRepository> for spec existence checks and persisted dependency seeding"
+      ]
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:d094b46e0c39a1a840cd8f4582a0c467df0815ccfdcc18a26989c4b59f25ced9",
-    "verify.md": "sha256:e8b9ee97e0ab4efe4c2b5d630957f54cf90ef80acff5f7428c890b30b2cdb2f7"
+    "spec.md": "sha256:4f4c450800b50249402c952ba7dc2906e4499ac1193a38ec9b6acb9779b7ac47",
+    "verify.md": "sha256:7dff719332bfdb75be063a8157ded5849781714d7de6e2ef157c1173726c6efe"
   },
   "generatedBy": "core"
 }

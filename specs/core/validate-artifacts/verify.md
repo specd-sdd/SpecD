@@ -438,7 +438,16 @@
 #### Scenario: ValidateArtifacts is constructed with LifecycleEngine
 
 - **WHEN** `ValidateArtifacts` is assembled
-- **THEN** it receives `LifecycleEngine` alongside its existing repositories, parser registry, actor resolver, and hasher
+- **THEN** the constructor receives a `LifecycleEngine` dependency
+
+#### Scenario: ValidateArtifacts is constructed with extractor runtime wiring
+
+- **GIVEN** the validation workflow is composed for runtime use
+- **WHEN** `ValidateArtifacts` is instantiated
+- **THEN** the constructor receives `ArtifactParserRegistry`
+- **AND** the constructor receives `ExtractorTransformRegistry`
+- **AND** the constructor receives `SpecWorkspaceRoute[]`
+- **AND** those dependencies are used when validating extracted metadata from merged artifact content
 
 ### Requirement: Input
 
@@ -518,3 +527,18 @@
 - **AND** the configured transform receives those values but cannot normalize them
 - **WHEN** `ValidateArtifacts.execute` completes dependency extraction
 - **THEN** validation fails for the artifact instead of treating `dependsOn` as absent
+
+### Requirement: In-change dependsOn persistence
+
+#### Scenario: Successful extraction updates change dependency snapshot
+
+- **GIVEN** a validated `scope: spec` artifact yields canonical `dependsOn` values from metadata extraction
+- **WHEN** `ValidateArtifacts.execute` completes successfully
+- **THEN** `change.setSpecDependsOn(specId, deps)` is called with that extracted value
+
+#### Scenario: Divergence from canonical sidecar does not fail validation
+
+- **GIVEN** the canonical persisted spec already has `spec-lock.json`
+- **AND** the current change is intentionally editing dependencies for that spec
+- **WHEN** `ValidateArtifacts.execute` validates the in-progress artifact successfully
+- **THEN** validation passes without comparing the in-change value against the canonical sidecar as a hard error

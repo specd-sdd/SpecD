@@ -1,15 +1,15 @@
 {
   "title": "SaveSpecMetadata",
-  "description": "Writing metadata to disk without validation risks corrupting the spec's machine-readable summary, and silently overwriting curated `dependsOn` entries can discard human-verified dependency decisions. `SaveSpecMetadata` guards against both: it validates incoming YAML content against the strict schema, protects curated `dependsOn` from silent overwrite, delegates conflict detection to the repository layer, and persists the metadata via `SpecRepository.saveMetadata()`. It is invoked by `ArchiveChange` during deterministic metadata generation and may also be called directly by tooling (e.g. the LLM refining metadata).",
+  "description": "Writing metadata to disk without validation risks corrupting the spec's machine-readable summary, and silently overwriting curated `dependsOn` entries can discard human-verified dependency decisions. `SaveSpecMetadata` guards against both: it validates incoming JSON content against the strict schema, protects curated `dependsOn` from silent overwrite, delegates conflict detection to the repository layer, and persists the metadata via `SpecRepository.saveMetadata()`. It is invoked by `ArchiveChange` during deterministic metadata generation and may also be called directly by tooling (e.g. the LLM refining metadata).",
   "dependsOn": ["core:spec-metadata", "default:_global/architecture"],
   "context": [
-    "Writing metadata to disk without validation risks corrupting the spec's machine-readable summary, and silently overwriting curated `dependsOn` entries can discard human-verified dependency decisions. `SaveSpecMetadata` guards against both: it validates incoming YAML content against the strict schema, protects curated `dependsOn` from silent overwrite, delegates conflict detection to the repository layer, and persists the metadata via `SpecRepository.saveMetadata()`. It is invoked by `ArchiveChange` during deterministic metadata generation and may also be called directly by tooling (e.g. the LLM refining metadata)."
+    "Writing metadata to disk without validation risks corrupting the spec's machine-readable summary, and silently overwriting curated `dependsOn` entries can discard human-verified dependency decisions. `SaveSpecMetadata` guards against both: it validates incoming JSON content against the strict schema, protects curated `dependsOn` from silent overwrite, delegates conflict detection to the repository layer, and persists the metadata via `SpecRepository.saveMetadata()`. It is invoked by `ArchiveChange` during deterministic metadata generation and may also be called directly by tooling (e.g. the LLM refining metadata)."
   ],
   "rules": [
     {
       "requirement": "Input contract",
       "rules": [
-        "`SaveSpecMetadata.execute()` accepts a `SaveSpecMetadataInput` with the following fields:\n\n- `workspace` (string, required) — the workspace name (e.g. `'default'`, `'billing'`)\n- `specPath` (SpecPath, required) — the spec path within the workspace (e.g. `'auth/oauth'`)\n- `content` (string, required) — raw YAML string to write as metadata\n- `force` (boolean, optional) — when `true`, skip conflict detection and `dependsOn` overwrite protection"
+        "`SaveSpecMetadata.execute()` accepts a `SaveSpecMetadataInput` with the following fields:\n\n- `workspace` (string, required) — the workspace name (e.g. `'default'`, `'billing'`)\n- `specPath` (SpecPath, required) — the spec path within the workspace (e.g. `'auth/oauth'`)\n- `content` (string, required) — raw JSON string to write as metadata\n- `force` (boolean, optional) — when `true`, skip conflict detection and `dependsOn` overwrite protection"
       ]
     },
     {
@@ -49,9 +49,15 @@
       ]
     },
     {
+      "requirement": "Sidecar ownership boundary",
+      "rules": [
+        "`SaveSpecMetadata` MUST persist `metadata.json` only. It MUST NOT create, modify, or delete `spec-lock.json`.\n\nFor persisted specs whose durable dependency state is owned by `spec-lock.json`:\n\n- `SaveSpecMetadata` MAY still write `metadata.json.dependsOn` when the caller provides valid content.\n- `SaveSpecMetadata` does not decide whether `metadata.json.dependsOn` is authoritative for archive-time persistence.\n- Archive-time consistency between metadata and sidecar is enforced by `ArchiveChange`, not by `SaveSpecMetadata`.\n\nThis keeps metadata writes focused on validation and optimistic concurrency while leaving durable dependency authority to the archive pipeline."
+      ]
+    },
+    {
       "requirement": "Artifact persistence",
       "rules": [
-        "After all validations pass, the use case MUST delegate to `SpecRepository.saveMetadata()` with the raw YAML content, the `originalHash` (if captured), and `{ force: true }` when `force` is set, or with an empty options object otherwise."
+        "After all validations pass, the use case MUST delegate to `SpecRepository.saveMetadata()` with the raw JSON content, the `originalHash` (if captured), and `{ force: true }` when `force` is set, or with an empty options object otherwise."
       ]
     },
     {
@@ -105,14 +111,14 @@
     {
       "requirement": "Content validation before write",
       "name": "Missing required fields rejected by strict schema",
-      "given": ["valid YAML mapping content that omits title"],
+      "given": ["valid JSON object content that omits title"],
       "when": ["execute() is called"],
       "then": ["MetadataValidationError is thrown with a message referencing the missing field"]
     },
     {
       "requirement": "Content validation before write",
       "name": "Invalid field types rejected by strict schema",
-      "given": ["YAML content where keywords is a string instead of an array"],
+      "given": ["JSON content where keywords is a string instead of an array"],
       "when": ["execute() is called"],
       "then": [
         "MetadataValidationError is thrown with a message referencing the field and type mismatch"
@@ -121,7 +127,7 @@
     {
       "requirement": "Content validation before write",
       "name": "Unknown top-level keys are allowed",
-      "given": ["valid YAML content with all required fields plus an extra key customField: value"],
+      "given": ["valid JSON content with all required fields plus an extra key customField: value"],
       "when": ["execute() is called"],
       "then": ["the write succeeds and the extra key is preserved"]
     },
@@ -217,10 +223,33 @@
       "then": ["the write succeeds"]
     },
     {
+      "requirement": "Sidecar ownership boundary",
+      "name": "SaveSpecMetadata writes metadata without touching sidecar",
+      "given": ["a persisted spec already has spec-lock.json"],
+      "when": ["SaveSpecMetadata.execute succeeds"],
+      "then": [
+        "metadata.json is written",
+        "AND spec-lock.json is not created, modified, or deleted by SaveSpecMetadata"
+      ]
+    },
+    {
+      "requirement": "Sidecar ownership boundary",
+      "name": "Sidecar mismatch handling remains an archive concern",
+      "given": [
+        "a caller provides metadata.json.dependsOn",
+        "AND archive-time sidecar consistency would need to be checked"
+      ],
+      "when": ["SaveSpecMetadata.execute runs outside archive"],
+      "then": [
+        "the use case performs its normal validation and overwrite checks only",
+        "AND sidecar consistency is not enforced there"
+      ]
+    },
+    {
       "requirement": "Artifact persistence",
       "name": "Metadata is saved via saveMetadata",
       "when": ["execute() succeeds"],
-      "then": ["SpecRepository.saveMetadata() is called with the raw YAML content"]
+      "then": ["SpecRepository.saveMetadata() is called with the raw JSON content"]
     },
     {
       "requirement": "Constructor dependencies",
@@ -231,8 +260,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:c6082a00730db3dc01eb71f260d956cb327051d6731a2d6199a851a64be6e7f6",
-    "verify.md": "sha256:8478bf08bcdb2fe267e41857d9cf43bff0114d09d796dfc04c49cdd77c2ee1b4"
+    "spec.md": "sha256:831f6860271f56c56e9b7375f0c2827633e8a27cbd9f774c54a69fc7f4799028",
+    "verify.md": "sha256:131145b21a64e6c214c60333afcb69979390a291fc7f98b1b7380a8490e05d22"
   },
   "generatedBy": "core"
 }

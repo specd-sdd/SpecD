@@ -272,6 +272,8 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
           workspaceRoutes,
         ),
         new SaveSpecMetadata(i.specs),
+        i.registry.extractorTransforms,
+        workspaceRoutes,
       ),
       validate: new ValidateArtifacts(
         i.changes,

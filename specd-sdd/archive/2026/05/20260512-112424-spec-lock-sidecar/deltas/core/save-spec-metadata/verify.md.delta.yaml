@@ -1,0 +1,74 @@
+- op: modified
+  description: 'Normalize SaveSpecMetadata verification to JSON terminology'
+  selector:
+    type: section
+    matches: '^Requirement: Content validation before write$'
+  content: |
+    #### Scenario: Non-object JSON is rejected
+
+    - **GIVEN** a valid spec exists
+    - **WHEN** `SaveSpecMetadata` is called with `content: '"just a string"'`
+    - **THEN** it throws `MetadataValidationError` with message containing `content must be a JSON object`
+
+    #### Scenario: Invalid JSON content is rejected
+
+    - **GIVEN** a valid spec exists
+    - **WHEN** `SaveSpecMetadata` is called with `content: "not json at all"`
+    - **THEN** it throws `MetadataValidationError` with message containing `content must be a JSON object`
+
+    #### Scenario: Missing required fields rejected by strict schema
+
+    - **GIVEN** valid JSON object content that omits `title`
+    - **WHEN** `execute()` is called
+    - **THEN** `MetadataValidationError` is thrown with a message referencing the missing field
+
+    #### Scenario: Invalid field types rejected by strict schema
+
+    - **GIVEN** JSON content where `keywords` is a string instead of an array
+    - **WHEN** `execute()` is called
+    - **THEN** `MetadataValidationError` is thrown with a message referencing the field and type mismatch
+
+    #### Scenario: Unknown top-level keys are allowed
+
+    - **GIVEN** valid JSON content with all required fields plus an extra key `customField: value`
+    - **WHEN** `execute()` is called
+    - **THEN** the write succeeds and the extra key is preserved
+- op: added
+  description: 'Verify SaveSpecMetadata leaves sidecar ownership to archive'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: dependsOn overwrite protection$'
+  content: |
+    ### Requirement: Sidecar ownership boundary
+
+    #### Scenario: SaveSpecMetadata writes metadata without touching sidecar
+
+    - **GIVEN** a persisted spec already has `spec-lock.json`
+    - **WHEN** `SaveSpecMetadata.execute` succeeds
+    - **THEN** `metadata.json` is written
+    - **AND** `spec-lock.json` is not created, modified, or deleted by `SaveSpecMetadata`
+
+    #### Scenario: Sidecar mismatch handling remains an archive concern
+
+    - **GIVEN** a caller provides `metadata.json.dependsOn`
+    - **AND** archive-time sidecar consistency would need to be checked
+    - **WHEN** `SaveSpecMetadata.execute` runs outside archive
+    - **THEN** the use case performs its normal validation and overwrite checks only
+    - **AND** sidecar consistency is not enforced there
+- op: modified
+  description: 'Normalize SaveSpecMetadata persistence verification to JSON terminology'
+  selector:
+    type: section
+    matches: '^Scenario: Metadata is saved via saveMetadata$'
+    parent:
+      type: section
+      matches: '^Requirement: Artifact persistence$'
+  content: |
+    #### Scenario: Metadata is saved via saveMetadata
+
+    - **WHEN** `execute()` succeeds
+    - **THEN** `SpecRepository.saveMetadata()` is called with the raw JSON content

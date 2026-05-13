@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Writing metadata to disk without validation risks corrupting the spec's machine-readable summary, and silently overwriting curated `dependsOn` entries can discard human-verified dependency decisions. `SaveSpecMetadata` guards against both: it validates incoming YAML content against the strict schema, protects curated `dependsOn` from silent overwrite, delegates conflict detection to the repository layer, and persists the metadata via `SpecRepository.saveMetadata()`. It is invoked by `ArchiveChange` during deterministic metadata generation and may also be called directly by tooling (e.g. the LLM refining metadata).
+Writing metadata to disk without validation risks corrupting the spec's machine-readable summary, and silently overwriting curated `dependsOn` entries can discard human-verified dependency decisions. `SaveSpecMetadata` guards against both: it validates incoming JSON content against the strict schema, protects curated `dependsOn` from silent overwrite, delegates conflict detection to the repository layer, and persists the metadata via `SpecRepository.saveMetadata()`. It is invoked by `ArchiveChange` during deterministic metadata generation and may also be called directly by tooling (e.g. the LLM refining metadata).
 
 ## Requirements
 
@@ -12,7 +12,7 @@ Writing metadata to disk without validation risks corrupting the spec's machine-
 
 - `workspace` (string, required) — the workspace name (e.g. `'default'`, `'billing'`)
 - `specPath` (SpecPath, required) — the spec path within the workspace (e.g. `'auth/oauth'`)
-- `content` (string, required) — raw YAML string to write as metadata
+- `content` (string, required) — raw JSON string to write as metadata
 - `force` (boolean, optional) — when `true`, skip conflict detection and `dependsOn` overwrite protection
 
 ### Requirement: Output contract
@@ -49,9 +49,21 @@ When `force` is not set and existing metadata exists on disk, the use case MUST 
 
 When `force` is set, this check MUST be skipped entirely.
 
+### Requirement: Sidecar ownership boundary
+
+`SaveSpecMetadata` MUST persist `metadata.json` only. It MUST NOT create, modify, or delete `spec-lock.json`.
+
+For persisted specs whose durable dependency state is owned by `spec-lock.json`:
+
+- `SaveSpecMetadata` MAY still write `metadata.json.dependsOn` when the caller provides valid content.
+- `SaveSpecMetadata` does not decide whether `metadata.json.dependsOn` is authoritative for archive-time persistence.
+- Archive-time consistency between metadata and sidecar is enforced by `ArchiveChange`, not by `SaveSpecMetadata`.
+
+This keeps metadata writes focused on validation and optimistic concurrency while leaving durable dependency authority to the archive pipeline.
+
 ### Requirement: Artifact persistence
 
-After all validations pass, the use case MUST delegate to `SpecRepository.saveMetadata()` with the raw YAML content, the `originalHash` (if captured), and `{ force: true }` when `force` is set, or with an empty options object otherwise.
+After all validations pass, the use case MUST delegate to `SpecRepository.saveMetadata()` with the raw JSON content, the `originalHash` (if captured), and `{ force: true }` when `force` is set, or with an empty options object otherwise.
 
 ### Requirement: Constructor dependencies
 
@@ -66,10 +78,10 @@ The `YamlSerializer` dependency is no longer needed — metadata content is JSON
 - Content validation uses `strictSpecMetadataSchema` (write-time), not the lenient `specMetadataSchema` (read-time) — this ensures metadata on disk always meets the strict schema requirements
 - The existing metadata is parsed with `specMetadataSchema` (lenient) for the `dependsOn` check, because on-disk metadata may predate strict schema requirements
 - The use case does not handle `ArtifactConflictError` — it propagates from the repository layer to the caller
-- Validation order is: content schema validation, workspace resolution, spec existence, conflict detection / dependsOn check, then persist
+- Validation order is: content schema validation, workspace resolution, spec existence, conflict detection / `dependsOn` check, then persist
 - Metadata is persisted via `SpecRepository.saveMetadata()`, not via the generic `save()` method
 
 ## Spec Dependencies
 
-- [`core:spec-metadata`](../spec-metadata/spec.md) — defines the `.specd-metadata.yaml` format, the strict and lenient schemas, and the `dependsOn` overwrite protection rules
+- [`core:spec-metadata`](../spec-metadata/spec.md) — defines the `metadata.json` format, the strict and lenient schemas, and the `dependsOn` overwrite protection rules
 - [`default:_global/architecture`](../../_global/architecture/spec.md) — use case layer conventions and dependency injection rules

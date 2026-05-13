@@ -20,7 +20,7 @@
     {
       "requirement": "Ports and constructor",
       "rules": [
-        "`ValidateArtifacts` receives at construction time: `ChangeRepository`, a map of `SpecRepository` instances (one per configured workspace), `SchemaProvider`, `ArtifactParserRegistry`, `ActorResolver`, `ContentHasher`, and `LifecycleEngine`.\n\n```typescript\nclass ValidateArtifacts {\n  constructor(\n    changes: ChangeRepository,\n    specs: ReadonlyMap<string, SpecRepository>,\n    schemaProvider: SchemaProvider,\n    parsers: ArtifactParserRegistry,\n    actor: ActorResolver,\n    hasher: ContentHasher,\n    lifecycle: LifecycleEngine,\n  )\n}\n```\n\n`SchemaProvider` is a lazy, caching port that returns the fully-resolved schema (with plugins and overrides applied). It replaces the previous `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths` triple. All are injected at kernel composition time, not passed per invocation.\n\n`ActorResolver` supplies the identity recorded on approval invalidation events. `ContentHasher` is used both for approval drift detection and for the cleaned hashes persisted when validation succeeds. `LifecycleEngine` is used only for schema-aware dependency interpretation; structural validation, delta preview, metadata extraction, and artifact completion remain owned by `ValidateArtifacts`."
+        "`ValidateArtifacts` receives at construction time: `ChangeRepository`, a map of `SpecRepository` instances (one per configured workspace), `SchemaProvider`, `ArtifactParserRegistry`, `ExtractorTransformRegistry`, `ActorResolver`, `ContentHasher`, `LifecycleEngine`, and `SpecWorkspaceRoute[]`.\n\n```typescript\nclass ValidateArtifacts {\n  constructor(\n    changes: ChangeRepository,\n    specs: ReadonlyMap<string, SpecRepository>,\n    schemaProvider: SchemaProvider,\n    parsers: ArtifactParserRegistry,\n    extractorTransforms: ExtractorTransformRegistry,\n    actor: ActorResolver,\n    hasher: ContentHasher,\n    lifecycle: LifecycleEngine,\n    workspaceRoutes: readonly SpecWorkspaceRoute[],\n  )\n}\n```\n\n`SchemaProvider` is a lazy, caching port that returns the fully-resolved schema (with plugins and overrides applied). It replaces the previous `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths` triple. All are injected at kernel composition time, not passed per invocation.\n\n`ArtifactParserRegistry` resolves the parser used to validate concrete artifact content. `ExtractorTransformRegistry` is the shared runtime registry for metadata extraction transforms; `ValidateArtifacts` uses it when validating extracted metadata from merged spec content. `SpecWorkspaceRoute[]` provides the workspace-routing metadata needed to build extraction contexts for transforms that resolve spec references.\n\n`ActorResolver` supplies the identity recorded on approval invalidation events. `ContentHasher` is used both for approval drift detection and for the cleaned hashes persisted when validation succeeds. `LifecycleEngine` is used only for schema-aware dependency interpretation; structural validation, delta preview, metadata extraction, and artifact completion remain owned by `ValidateArtifacts`."
       ]
     },
     {
@@ -129,6 +129,12 @@
       "requirement": "MetadataExtraction validation failures are validation failures",
       "rules": [
         "If metadataExtraction validation fails, `ValidateArtifacts` MUST record the failure in `result.failures` with the artifact ID. The artifact is NOT marked complete."
+      ]
+    },
+    {
+      "requirement": "In-change dependsOn persistence",
+      "rules": [
+        "When validation of a `scope: spec` artifact succeeds and metadata extraction yields a valid `dependsOn` value, `ValidateArtifacts` MUST persist that value into `change.specDependsOn` for the spec.\n\nValidation rules for this update:\n\n- The extracted value becomes the in-change dependency snapshot used by later workflow steps.\n- If transform execution for extracted `dependsOn` fails, validation fails and the dependency snapshot is not updated.\n- `ValidateArtifacts` MUST NOT fail solely because the current in-change `dependsOn` value differs from the canonical persisted `spec-lock.json` for that spec.\n- Hard consistency checks between archive output and canonical sidecar state are reserved for `ArchiveChange`."
       ]
     }
   ],
@@ -736,8 +742,18 @@
       "requirement": "Ports and constructor",
       "name": "ValidateArtifacts is constructed with LifecycleEngine",
       "when": ["ValidateArtifacts is assembled"],
+      "then": ["the constructor receives a LifecycleEngine dependency"]
+    },
+    {
+      "requirement": "Ports and constructor",
+      "name": "ValidateArtifacts is constructed with extractor runtime wiring",
+      "given": ["the validation workflow is composed for runtime use"],
+      "when": ["ValidateArtifacts is instantiated"],
       "then": [
-        "it receives LifecycleEngine alongside its existing repositories, parser registry, actor resolver, and hasher"
+        "the constructor receives ArtifactParserRegistry",
+        "AND the constructor receives ExtractorTransformRegistry",
+        "AND the constructor receives SpecWorkspaceRoute[]",
+        "AND those dependencies are used when validating extracted metadata from merged artifact content"
       ]
     },
     {
@@ -841,11 +857,32 @@
       ],
       "when": ["ValidateArtifacts.execute completes dependency extraction"],
       "then": ["validation fails for the artifact instead of treating dependsOn as absent"]
+    },
+    {
+      "requirement": "In-change dependsOn persistence",
+      "name": "Successful extraction updates change dependency snapshot",
+      "given": [
+        "a validated scope: spec artifact yields canonical dependsOn values from metadata extraction"
+      ],
+      "when": ["ValidateArtifacts.execute completes successfully"],
+      "then": ["change.setSpecDependsOn(specId, deps) is called with that extracted value"]
+    },
+    {
+      "requirement": "In-change dependsOn persistence",
+      "name": "Divergence from canonical sidecar does not fail validation",
+      "given": [
+        "the canonical persisted spec already has spec-lock.json",
+        "AND the current change is intentionally editing dependencies for that spec"
+      ],
+      "when": ["ValidateArtifacts.execute validates the in-progress artifact successfully"],
+      "then": [
+        "validation passes without comparing the in-change value against the canonical sidecar as a hard error"
+      ]
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:b377ec3b5b645da4d1d3c7c599d188677f695982c22e19ca71c184a49fe5bcbb",
-    "verify.md": "sha256:cbd4084c4024e3bf565b6b974a52eacd4bd7db558d81cd62e62e3c413ad0f16e"
+    "spec.md": "sha256:0e8b5f776d2ccd14163435458b481dfe77faefb53bce6c6756bda79d51accbd1",
+    "verify.md": "sha256:eb4c2639f00af4a1c2e5fbfebbd0e401ae8e55295520a7fdafbee8e936ee64b9"
   },
   "generatedBy": "core"
 }

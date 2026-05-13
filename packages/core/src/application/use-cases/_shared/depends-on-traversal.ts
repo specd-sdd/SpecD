@@ -6,16 +6,15 @@ import { Spec } from '../../../domain/entities/spec.js'
 import { parseSpecId } from '../../../domain/services/parse-spec-id.js'
 import { inferFormat } from '../../../domain/services/format-inference.js'
 import { SpecPath } from '../../../domain/value-objects/spec-path.js'
-import {
-  extractMetadata,
-  type ExtractorTransformRegistry,
-  type SubtreeRenderer,
-} from '../../../domain/services/extract-metadata.js'
-import { type SelectorNode } from '../../../domain/services/selector-matching.js'
+import { type ExtractorTransformRegistry } from '../../../domain/services/extract-metadata.js'
 import { type ContextWarning } from './context-warning.js'
 import { type ResolvedSpec } from './spec-pattern-matching.js'
-import { createExtractorTransformContext } from './extractor-transform-context.js'
-import { createSpecReferenceResolver, type SpecWorkspaceRoute } from './spec-reference-resolver.js'
+import { type SpecWorkspaceRoute } from './spec-reference-resolver.js'
+import {
+  extractMetadataFromSpecArtifacts,
+  type MetadataArtifactInput,
+} from './extract-metadata-from-spec-artifacts.js'
+import { Schema } from '../../../domain/value-objects/schema.js'
 
 /**
  * Optional fallback configuration for extracting `dependsOn` from spec content
@@ -155,15 +154,7 @@ async function extractDependsOnFromContent(
   repositories: ReadonlyMap<string, SpecRepository>,
   fallback: DependsOnFallback,
 ): Promise<string[] | undefined> {
-  const astsByArtifact = new Map<string, { root: SelectorNode }>()
-  const renderers = new Map<string, SubtreeRenderer>()
-  const transformContexts = new Map<string, ReturnType<typeof createExtractorTransformContext>>()
-  const resolveSpecReference = createSpecReferenceResolver({
-    originWorkspace: spec.workspace,
-    originSpecPath: spec.name,
-    repositories,
-    workspaceRoutes: fallback.workspaceRoutes,
-  })
+  const artifacts: MetadataArtifactInput[] = []
 
   for (const artifactType of fallback.schemaArtifacts) {
     if (artifactType.scope !== 'spec') continue
@@ -175,31 +166,32 @@ async function extractDependsOnFromContent(
     const artifactFile = await specRepo.artifact(spec, filename)
     if (artifactFile === null) continue
 
-    const ast = parser.parse(artifactFile.content)
-    astsByArtifact.set(artifactType.id, ast)
-    renderers.set(artifactType.id, parser as SubtreeRenderer)
-    transformContexts.set(
-      artifactType.id,
-      createExtractorTransformContext(
-        spec.workspace,
-        spec.name.toString(),
-        artifactType.id,
-        filename,
-        {
-          resolveSpecReference,
-        },
-      ),
-    )
+    artifacts.push({
+      artifactId: artifactType.id,
+      filename,
+      format,
+      content: artifactFile.content,
+    })
   }
 
-  if (astsByArtifact.size === 0) return undefined
+  if (artifacts.length === 0) return undefined
 
-  const extracted = await extractMetadata(
-    fallback.extraction,
-    astsByArtifact,
-    renderers,
-    fallback.extractorTransforms,
-    transformContexts,
-  )
-  return extracted.dependsOn
+  const extracted = await extractMetadataFromSpecArtifacts({
+    effectiveSpecSchema: new Schema(
+      'schema',
+      'depends-on-fallback',
+      1,
+      fallback.schemaArtifacts,
+      [],
+      fallback.extraction,
+    ),
+    workspace: spec.workspace,
+    specPath: spec.name,
+    artifacts,
+    parsers: fallback.parsers,
+    extractorTransforms: fallback.extractorTransforms ?? new Map(),
+    repositories,
+    workspaceRoutes: fallback.workspaceRoutes,
+  })
+  return extracted.metadata.dependsOn
 }

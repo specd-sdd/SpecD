@@ -49,6 +49,12 @@
       ]
     },
     {
+      "requirement": "Seed specDependsOn for added specs",
+      "rules": [
+        "When `EditChange.execute` effectively adds a spec ID that was not already present in the change, it MUST seed `change.specDependsOn` for that spec before returning the updated change.\n\nSeeding rules:\n\n- Seeding applies only to spec IDs newly entering the change scope.\n- If a canonical `spec-lock.json` exists for the spec, its `dependsOn` value MUST be used.\n- Otherwise, if legacy `metadata.json.dependsOn` exists for the spec, that value MUST be used.\n- Otherwise, the seeded value is an empty array.\n- If the spec already has an entry in `change.specDependsOn`, `EditChange` MUST NOT overwrite it just because the scope was edited again later.\n\nThis seeding establishes the baseline dependency snapshot for the change so later artifact validation and archive do not start from an empty dependency set for existing specs."
+      ]
+    },
+    {
       "requirement": "No-op when specIds unchanged after processing",
       "rules": [
         "If the resulting `specIds` list is identical (same length, same order) to the change's current `specIds`, the use case MUST return the unchanged change with `invalidated: false` without persisting."
@@ -75,7 +81,7 @@
     {
       "requirement": "Dependencies",
       "rules": [
-        "`EditChange` depends on the following ports injected via constructor:\n\n- `ChangeRepository` — for loading, persisting, scaffolding, and unscaffolding changes\n- `ActorResolver` — for resolving the current actor identity\n- `specs: ReadonlyMap<string, SpecRepository>` — spec repositories keyed by workspace name, used for the `specExists` check during scaffolding"
+        "`EditChange` depends on the following ports injected via constructor:\n\n- `ChangeRepository` — for loading, persisting, scaffolding, and unscaffolding changes\n- `ActorResolver` — for resolving the current actor identity\n- `specs: ReadonlyMap<string, SpecRepository>` — spec repositories keyed by workspace name, used for the `specExists` check during scaffolding and for reading persisted dependency state when seeding `change.specDependsOn`"
       ]
     }
   ],
@@ -161,6 +167,33 @@
       "given": ["a change with specIds: ['auth/login']"],
       "when": ["execute is called with addSpecIds: ['auth/login']"],
       "then": ["specIds remains ['auth/login']", "AND invalidated is false"]
+    },
+    {
+      "requirement": "Seed specDependsOn for added specs",
+      "name": "Existing sidecar seeds new spec entry",
+      "given": ["a persisted spec being added to the change already has spec-lock.json"],
+      "when": ["EditChange.execute adds that spec to the change"],
+      "then": ["the seeded change.specDependsOn entry comes from spec-lock.json.dependsOn"]
+    },
+    {
+      "requirement": "Seed specDependsOn for added specs",
+      "name": "Legacy metadata seeds when sidecar is absent",
+      "given": [
+        "a persisted spec being added has no spec-lock.json",
+        "AND metadata.json.dependsOn exists for that spec"
+      ],
+      "when": ["EditChange.execute adds that spec"],
+      "then": ["the seeded change.specDependsOn entry comes from metadata.json.dependsOn"]
+    },
+    {
+      "requirement": "Seed specDependsOn for added specs",
+      "name": "Existing in-change dependency snapshot is not overwritten",
+      "given": [
+        "a spec is already present in the change",
+        "AND change.specDependsOn already contains an entry for it"
+      ],
+      "when": ["later scope edits run"],
+      "then": ["EditChange does not overwrite that existing dependency snapshot automatically"]
     },
     {
       "requirement": "No-op when specIds unchanged after processing",
@@ -272,14 +305,16 @@
     },
     {
       "requirement": "Dependencies",
-      "name": "Uses spec repositories map",
+      "name": "Uses spec repositories map for existence checks and dependency seeding",
       "when": ["EditChange is instantiated"],
-      "then": ["it requires a ReadonlyMap<string, SpecRepository> for spec existence checks"]
+      "then": [
+        "it requires a ReadonlyMap<string, SpecRepository> for spec existence checks and persisted dependency seeding"
+      ]
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:ddc50de90dbea2c6a5e78eb21e34fdc9b52a62ccecddfc4e2629f3f9e6238c1f",
-    "verify.md": "sha256:29b3ae611f31825a49a50db6463a78ae3bc08e1dfdc524cb6b9d17923eddeb97"
+    "spec.md": "sha256:b37b308ae00463fdc3971168fcfb6d2774dfc54d616b362e83198951f22ed33f",
+    "verify.md": "sha256:9d35ad4ebc6823724ee57d87f34c739dfdc300c33a0a2d4c9843ce29eea65844"
   },
   "generatedBy": "core"
 }

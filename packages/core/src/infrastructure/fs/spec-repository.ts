@@ -1,14 +1,18 @@
 import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
+import { randomUUID } from 'node:crypto'
 import { Spec } from '../../domain/entities/spec.js'
 import { SpecPath } from '../../domain/value-objects/spec-path.js'
 import { SpecArtifact } from '../../domain/value-objects/spec-artifact.js'
 import { ArtifactConflictError } from '../../domain/errors/artifact-conflict-error.js'
 import { ReadOnlyWorkspaceError } from '../../domain/errors/read-only-workspace-error.js'
+import { SpecPublicationError } from '../../domain/errors/spec-publication-error.js'
 import { specMetadataSchema, type SpecMetadata } from '../../domain/services/parse-metadata.js'
+import { parseSpecLock, type SpecLockData } from '../../domain/services/parse-spec-lock.js'
 import {
   SpecRepository,
   type SpecRepositoryConfig,
+  type SpecPublication,
   type ResolveFromPathResult,
   type SpecSearchResult,
   type SpecSearchMatch,
@@ -18,6 +22,8 @@ import { isEnoent } from './is-enoent.js'
 import { normalizeRelativePath, resolveConfinedPath } from './path-confinement.js'
 import { writeFileAtomic } from './write-atomic.js'
 import { sha256 } from './hash.js'
+
+const SPEC_LOCK_FILENAME = 'spec-lock.json'
 
 /**
  * Configuration for `FsSpecRepository`.
@@ -214,6 +220,88 @@ export class FsSpecRepository extends SpecRepository {
   }
 
   /**
+   * Publishes the canonical artifact set for one spec through a staged directory swap.
+   *
+   * The current spec directory is copied into a staging directory, the new
+   * artifact set is written there, and the canonical directory is swapped only
+   * after all staged writes succeed. If the final swap fails, the canonical
+   * directory is restored and the staging directory is preserved for manual
+   * recovery.
+   *
+   * @param spec - The spec whose canonical artifacts are being published
+   * @param publication - Final artifact bundle for the spec
+   * @returns When publication completes successfully
+   * @throws {ReadOnlyWorkspaceError} When the workspace is read-only
+   * @throws {SpecPublicationError} When staged publication or final swap fails
+   */
+  override async publish(spec: Spec, publication: SpecPublication): Promise<void> {
+    if (this.ownership() === 'readOnly') {
+      throw new ReadOnlyWorkspaceError(
+        `Cannot write to spec "${this.workspace()}:${spec.name.toString()}" — workspace "${this.workspace()}" is readOnly.`,
+      )
+    }
+
+    const specDir = this._specDir(spec.name)
+    const parentDir = path.dirname(specDir)
+    const dirName = path.basename(specDir)
+    const stagingDir = path.join(parentDir, `${dirName}.staging-${randomUUID()}`)
+    const backupDir = path.join(parentDir, `${dirName}.backup-${randomUUID()}`)
+    const specId = `${this.workspace()}:${spec.name.toString()}`
+    const specDirExists = await pathExists(specDir)
+
+    await fs.mkdir(parentDir, { recursive: true })
+    if (specDirExists) {
+      await fs.cp(specDir, stagingDir, { recursive: true })
+    } else {
+      await fs.mkdir(stagingDir, { recursive: true })
+    }
+
+    try {
+      for (const artifact of publication.artifacts) {
+        const filePath = resolveConfinedPath(
+          stagingDir,
+          artifact.filename,
+          allowedSpecArtifactFilenames(spec),
+        )
+        await fs.mkdir(path.dirname(filePath), { recursive: true })
+        await writeFileAtomic(filePath, artifact.content)
+      }
+
+      if (publication.specLock !== undefined) {
+        const specLockPath = this._specLockFilePathInDir(stagingDir)
+        const { originalHash, ...persisted } = publication.specLock
+        void originalHash
+        await fs.mkdir(path.dirname(specLockPath), { recursive: true })
+        await writeFileAtomic(specLockPath, JSON.stringify(persisted, null, 2) + '\n')
+      }
+    } catch (error) {
+      throw new SpecPublicationError(specId, stagingDir, errorMessage(error))
+    }
+
+    try {
+      if (specDirExists) {
+        await fs.rename(specDir, backupDir)
+      }
+
+      try {
+        await fs.rename(stagingDir, specDir)
+      } catch (error) {
+        if (specDirExists) {
+          await fs.rename(backupDir, specDir).catch(() => {})
+        }
+        throw new SpecPublicationError(specId, stagingDir, errorMessage(error))
+      }
+
+      if (specDirExists) {
+        await fs.rm(backupDir, { recursive: true, force: true })
+      }
+    } catch (error) {
+      if (error instanceof SpecPublicationError) throw error
+      throw new SpecPublicationError(specId, stagingDir, errorMessage(error))
+    }
+  }
+
+  /**
    * Deletes the entire spec directory and all its artifact files.
    *
    * No-ops silently if the directory does not exist.
@@ -264,13 +352,13 @@ export class FsSpecRepository extends SpecRepository {
   }
 
   /**
-   * Persists raw YAML metadata content for a spec.
+   * Persists raw JSON metadata content for a spec.
    *
    * Writes to `<metadataPath>/<specFsPath>/metadata.json`. Creates the
    * directory if needed. Supports conflict detection via `originalHash`.
    *
    * @param spec - The spec to write metadata for
-   * @param content - Raw YAML string to persist
+   * @param content - Raw JSON string to persist
    * @param options - Save options with optional conflict detection
    * @param options.force - Skip conflict detection when `true`
    * @param options.originalHash - Expected hash of the current file on disk
@@ -310,6 +398,76 @@ export class FsSpecRepository extends SpecRepository {
     }
 
     await writeFileAtomic(filePath, content)
+  }
+
+  /**
+   * Returns the parsed `spec-lock.json` sidecar for the given spec, or `null`
+   * when no sidecar exists.
+   *
+   * @param spec - The spec whose sidecar to load
+   * @returns Parsed sidecar with `originalHash`, or `null` if absent
+   */
+  override async readSpecLock(spec: Spec): Promise<SpecLockData | null> {
+    const filePath = this._specLockFilePath(spec.name)
+
+    let content: string
+    try {
+      content = await fs.readFile(filePath, 'utf8')
+    } catch (err) {
+      if (isEnoent(err)) return null
+      throw err
+    }
+
+    return { ...parseSpecLock(content), originalHash: sha256(content) }
+  }
+
+  /**
+   * Persists `spec-lock.json` for the given spec.
+   *
+   * Supports the same optimistic conflict detection model as `saveMetadata()`
+   * by honoring `content.originalHash` unless `force` is enabled.
+   *
+   * @param spec - The spec whose sidecar should be written
+   * @param content - Parsed sidecar payload to persist
+   * @param options - Save options
+   * @param options.force - Skip conflict detection when `true`
+   */
+  override async saveSpecLock(
+    spec: Spec,
+    content: SpecLockData,
+    options?: { force?: boolean },
+  ): Promise<void> {
+    if (this.ownership() === 'readOnly') {
+      throw new ReadOnlyWorkspaceError(
+        `Cannot write to spec "${this.workspace()}:${spec.name.toString()}" — workspace "${this.workspace()}" is readOnly.`,
+      )
+    }
+
+    const filePath = this._specLockFilePath(spec.name)
+    const dir = path.dirname(filePath)
+    await fs.mkdir(dir, { recursive: true })
+
+    if (content.originalHash !== undefined && options?.force !== true) {
+      let currentContent: string
+      try {
+        currentContent = await fs.readFile(filePath, 'utf8')
+      } catch (err) {
+        if (isEnoent(err)) {
+          currentContent = ''
+        } else {
+          throw err
+        }
+      }
+
+      const currentHash = sha256(currentContent)
+      if (currentHash !== content.originalHash) {
+        throw new ArtifactConflictError(SPEC_LOCK_FILENAME, JSON.stringify(content), currentContent)
+      }
+    }
+
+    const { originalHash, ...persisted } = content
+    void originalHash
+    await writeFileAtomic(filePath, JSON.stringify(persisted, null, 2) + '\n')
   }
 
   /**
@@ -509,6 +667,26 @@ export class FsSpecRepository extends SpecRepository {
   }
 
   /**
+   * Returns the absolute path to `spec-lock.json` for the given spec name.
+   *
+   * @param name - Logical spec path
+   * @returns Absolute sidecar path inside the canonical spec directory
+   */
+  private _specLockFilePath(name: SpecPath): string {
+    return this._specLockFilePathInDir(this._specDir(name))
+  }
+
+  /**
+   * Returns the absolute path to `spec-lock.json` for the given spec root.
+   *
+   * @param specDir - Concrete spec directory root to target
+   * @returns Absolute sidecar path
+   */
+  private _specLockFilePathInDir(specDir: string): string {
+    return path.join(specDir, SPEC_LOCK_FILENAME)
+  }
+
+  /**
    * Recursively walks a directory tree, collecting `Spec` entries for every
    * leaf directory that contains at least one file.
    *
@@ -562,6 +740,31 @@ export class FsSpecRepository extends SpecRepository {
       await this._walk(path.join(dir, subdir), root, results)
     }
   }
+}
+
+/**
+ * Returns whether the given path currently exists.
+ *
+ * @param targetPath - Absolute filesystem path to probe
+ * @returns `true` when the path exists
+ */
+async function pathExists(targetPath: string): Promise<boolean> {
+  try {
+    await fs.access(targetPath)
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Normalizes an unknown error value into a display-safe message.
+ *
+ * @param error - Unknown thrown value
+ * @returns Human-readable message
+ */
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
 }
 
 /**

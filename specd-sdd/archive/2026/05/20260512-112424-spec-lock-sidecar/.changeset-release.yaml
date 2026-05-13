@@ -1,0 +1,9 @@
+releases:
+  core:archive-change: patch
+  core:spec-metadata: patch
+  core:save-spec-metadata: patch
+  core:validate-artifacts: patch
+  core:change-manifest: patch
+  core:edit-change: patch
+  core:create-change: patch
+  core:spec-repository-port: patch

@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { Spec } from '../../../../src/domain/entities/spec.js'
 import { SpecArtifact } from '../../../../src/domain/value-objects/spec-artifact.js'
 import { SpecPath } from '../../../../src/domain/value-objects/spec-path.js'
+import { type SpecLockData } from '../../../../src/domain/services/parse-spec-lock.js'
 import {
+  type SpecPublication,
   type ResolveFromPathResult,
   type SpecSearchResult,
   SpecRepository,
@@ -46,6 +48,8 @@ class FakeSpecRepository extends SpecRepository {
     _options?: { force?: boolean },
   ): Promise<void> {}
 
+  override async publish(_spec: Spec, _publication: SpecPublication): Promise<void> {}
+
   override async delete(_spec: Spec): Promise<void> {}
 
   override async metadata(
@@ -58,6 +62,16 @@ class FakeSpecRepository extends SpecRepository {
     _spec: Spec,
     _content: string,
     _options?: { force?: boolean; originalHash?: string },
+  ): Promise<void> {}
+
+  override async readSpecLock(_spec: Spec): Promise<SpecLockData | null> {
+    return null
+  }
+
+  override async saveSpecLock(
+    _spec: Spec,
+    _content: SpecLockData,
+    _options?: { force?: boolean },
   ): Promise<void> {}
 
   override async resolveFromPath(

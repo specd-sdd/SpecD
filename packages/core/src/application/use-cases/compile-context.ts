@@ -9,6 +9,7 @@ import { type ArtifactParserRegistry } from '../ports/artifact-parser.js'
 import { type ExtractorTransformRegistry } from '../../domain/services/content-extraction.js'
 import { Spec } from '../../domain/entities/spec.js'
 import { SpecPath } from '../../domain/value-objects/spec-path.js'
+import { Schema } from '../../domain/value-objects/schema.js'
 import { inferFormat } from '../../domain/services/format-inference.js'
 import { parseSpecId } from '../../domain/services/parse-spec-id.js'
 import { LifecycleEngine } from '../../domain/services/lifecycle-engine.js'
@@ -16,17 +17,12 @@ import { checkMetadataFreshness } from './_shared/metadata-freshness.js'
 import { type ContentHasher } from '../ports/content-hasher.js'
 import { type PreviewSpec } from './preview-spec.js'
 import { type ContextWarning } from './_shared/context-warning.js'
-import { extractMetadata, type SubtreeRenderer } from '../../domain/services/extract-metadata.js'
-import { type SelectorNode } from '../../domain/services/selector-matching.js'
 import { listMatchingSpecs, type ResolvedSpec } from './_shared/spec-pattern-matching.js'
 import { traverseDependsOn, type DependsOnFallback } from './_shared/depends-on-traversal.js'
 import { compileContextFingerprint } from './_shared/compile-context-fingerprint.js'
-import { createExtractorTransformContext } from './_shared/extractor-transform-context.js'
-import {
-  createSpecReferenceResolver,
-  type SpecWorkspaceRoute,
-} from './_shared/spec-reference-resolver.js'
+import { type SpecWorkspaceRoute } from './_shared/spec-reference-resolver.js'
 import { Logger } from '../logger.js'
+import { extractMetadataFromSpecArtifacts } from './_shared/extract-metadata-from-spec-artifacts.js'
 
 const CONTEXT_SOURCE_PRIORITY: Record<ContextSpecSource, number> = {
   includePattern: 0,
@@ -595,8 +591,8 @@ export class CompileContext {
           const extraction = schema.metadataExtraction()
           if (extraction !== undefined) {
             content = await this._renderExtractedSectionsFromFiles(
+              schema,
               mergedFiles,
-              extraction,
               workspace,
               capPath,
               sectionsFilter,
@@ -630,8 +626,8 @@ export class CompileContext {
             const extraction = schema.metadataExtraction()
             if (extraction !== undefined) {
               content = await this._renderExtractedSectionsFromFiles(
+                schema,
                 displayFiles,
-                extraction,
                 workspace,
                 capPath,
                 sectionsFilter,
@@ -880,55 +876,32 @@ export class CompileContext {
   /**
    * Parses a file set and extracts section-filtered metadata content from it.
    *
+   * @param schema - Effective schema used to extract metadata from the files
    * @param files - Ordered source files to extract from
-   * @param extraction - Schema metadata extraction declarations
    * @param workspace - Workspace owning the spec
    * @param specPath - Capability path for transform context
    * @param sectionsFilter - Optional selected sections
    * @returns Rendered section content
    */
   private async _renderExtractedSectionsFromFiles(
+    schema: Schema,
     files: readonly SpecContentFile[],
-    extraction: import('../../domain/value-objects/metadata-extraction.js').MetadataExtraction,
     workspace: string,
     specPath: string,
     sectionsFilter: ReadonlyArray<SpecSection> | undefined,
   ): Promise<string> {
-    const astsByArtifact = new Map<string, { root: SelectorNode }>()
-    const renderers = new Map<string, SubtreeRenderer>()
-    const transformContexts = new Map<string, ReturnType<typeof createExtractorTransformContext>>()
-    const originSpecPath = SpecPath.parse(specPath)
-    const resolveSpecReference = createSpecReferenceResolver({
-      originWorkspace: workspace,
-      originSpecPath,
+    const extracted = await extractMetadataFromSpecArtifacts({
+      effectiveSpecSchema: schema,
+      workspace,
+      specPath: SpecPath.parse(specPath),
+      artifacts: files,
+      parsers: this._parsers,
+      extractorTransforms: this._extractorTransforms,
       repositories: this._specs,
       workspaceRoutes: this._workspaceRoutes,
     })
 
-    for (const file of files) {
-      const parser = this._parsers.get(file.format)
-      if (parser === undefined) continue
-
-      const ast = parser.parse(file.content)
-      astsByArtifact.set(file.artifactId, ast)
-      renderers.set(file.artifactId, parser as SubtreeRenderer)
-      transformContexts.set(
-        file.artifactId,
-        createExtractorTransformContext(workspace, specPath, file.artifactId, file.filename, {
-          resolveSpecReference,
-        }),
-      )
-    }
-
-    const extracted = await extractMetadata(
-      extraction,
-      astsByArtifact,
-      renderers,
-      this._extractorTransforms,
-      transformContexts,
-    )
-
-    return this._renderFromMetadata(extracted, sectionsFilter)
+    return this._renderFromMetadata(extracted.metadata, sectionsFilter)
   }
 
   /**
@@ -954,47 +927,26 @@ export class CompileContext {
           artifactType.format ?? inferFormat(artifactType.output.split('/').pop()!) ?? 'plaintext',
       }))
     const files = await this._loadBaseSpecFiles(specRepo, spec, descriptors)
-    const astsByArtifact = new Map<string, { root: SelectorNode }>()
-    const renderers = new Map<string, SubtreeRenderer>()
-    const transformContexts = new Map<string, ReturnType<typeof createExtractorTransformContext>>()
-    const resolveSpecReference = createSpecReferenceResolver({
-      originWorkspace: spec.workspace,
-      originSpecPath: spec.name,
+    if (files.length === 0) return undefined
+
+    const extracted = await extractMetadataFromSpecArtifacts({
+      effectiveSpecSchema: new Schema(
+        'schema',
+        'depends-on-fallback',
+        1,
+        fallback.schemaArtifacts,
+        [],
+        fallback.extraction,
+      ),
+      workspace: spec.workspace,
+      specPath: spec.name,
+      artifacts: files,
+      parsers: this._parsers,
+      extractorTransforms: this._extractorTransforms,
       repositories: this._specs,
       workspaceRoutes: fallback.workspaceRoutes,
     })
-
-    for (const file of files) {
-      const parser = this._parsers.get(file.format)
-      if (parser === undefined) continue
-
-      const ast = parser.parse(file.content)
-      astsByArtifact.set(file.artifactId, ast)
-      renderers.set(file.artifactId, parser as SubtreeRenderer)
-      transformContexts.set(
-        file.artifactId,
-        createExtractorTransformContext(
-          spec.workspace,
-          spec.name.toString(),
-          file.artifactId,
-          file.filename,
-          {
-            resolveSpecReference,
-          },
-        ),
-      )
-    }
-
-    if (astsByArtifact.size === 0) return undefined
-
-    const extracted = await extractMetadata(
-      fallback.extraction,
-      astsByArtifact,
-      renderers,
-      this._extractorTransforms,
-      transformContexts,
-    )
-    return extracted.dependsOn
+    return extracted.metadata.dependsOn
   }
 
   /**

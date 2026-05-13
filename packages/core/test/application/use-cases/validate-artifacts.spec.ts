@@ -2240,6 +2240,117 @@ describe('ValidateArtifacts', () => {
       ])
     })
 
+    it('tolerates divergence from canonical spec-lock while updating in-change specDependsOn', async () => {
+      const schema = makeSchema({
+        artifacts: [
+          makeArtifactType('specs', {
+            scope: 'spec',
+            output: 'spec.md',
+            format: 'markdown',
+          }),
+        ],
+        metadataExtraction: {
+          dependsOn: {
+            artifact: 'specs',
+            extractor: {
+              selector: { type: 'section', matches: '^Spec Dependencies$' },
+              extract: 'content',
+              capture: '\\[.*?\\]\\(([^)]+)\\)',
+              transform: { name: 'resolveSpecPath' },
+            },
+          },
+        },
+      })
+
+      const specsArtifact = new ChangeArtifact({
+        type: 'specs',
+        files: new Map([
+          [
+            'default:auth/login',
+            new ArtifactFile({
+              key: 'default:auth/login',
+              filename: 'specs/default/auth/login/spec.md',
+              status: 'in-progress',
+            }),
+          ],
+        ]),
+      })
+      const change = makeChangeWithArtifacts('c', [specsArtifact], {
+        specIds: ['default:auth/login'],
+      })
+
+      const repo = makeChangeRepository([change])
+      Object.assign(repo, {
+        async artifact(_change: Change, filename: string): Promise<SpecArtifact | null> {
+          if (filename !== 'specs/default/auth/login/spec.md') return null
+          return new SpecArtifact(
+            'specs/default/auth/login/spec.md',
+            '# Auth Login\n\n## Spec Dependencies\n\n- [Shared](../shared/spec.md)\n',
+          )
+        },
+      })
+
+      const specRepo = makeSpecRepository({
+        specs: [
+          new Spec('default', SpecPath.parse('auth/login'), ['spec.md']),
+          new Spec('default', SpecPath.parse('auth/shared'), ['spec.md']),
+        ],
+        artifacts: {
+          'auth/login/spec-lock.json': JSON.stringify({
+            schema: { name: 'schema-std', version: 1 },
+            dependsOn: ['core:old-canonical'],
+          }),
+        },
+        resolveFromPath: async (inputPath) => {
+          if (inputPath !== '../shared/spec.md') return null
+          return {
+            specPath: SpecPath.parse('auth/shared'),
+            specId: 'default:auth/shared',
+          }
+        },
+      })
+
+      const markdownParser = makeParser({
+        parse: () => ({
+          root: {
+            type: 'document',
+            children: [
+              {
+                type: 'section',
+                label: 'Spec Dependencies',
+                children: [{ type: 'paragraph', value: '- [Shared](../shared/spec.md)' }],
+              },
+            ],
+          },
+        }),
+        renderSubtree: (node) =>
+          (node.value as string | undefined) ??
+          (node.children ?? [])
+            .map((child) => ((child as { value?: unknown }).value as string | undefined) ?? '')
+            .join('\n'),
+      })
+
+      const uc = new ValidateArtifacts(
+        repo,
+        new Map([['default', specRepo]]),
+        makeSchemaProvider(schema),
+        makeParsers(markdownParser),
+        makeActorResolver(),
+        makeContentHasher(),
+        createBuiltinExtractorTransforms(),
+      )
+
+      const result = await uc.execute({
+        name: 'c',
+        specPath: 'default:auth/login',
+      })
+
+      expect(result.passed).toBe(true)
+      expect(repo.store.get('c')?.specDependsOn.get('default:auth/login')).toEqual([
+        'default:auth/shared',
+      ])
+    })
+
     it('fails validation instead of silently dropping found dependsOn values when the transform rejects them', async () => {
       const extractorTransforms = new Map([
         [

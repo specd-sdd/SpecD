@@ -1,8 +1,10 @@
 import { CreateChange } from '../../application/use-cases/create-change.js'
+import * as path from 'node:path'
 import { type SpecdConfig, isSpecdConfig } from '../../application/specd-config.js'
 import { getDefaultWorkspace } from '../get-default-workspace.js'
 import { createChangeRepository } from '../change-repository.js'
 import { createVcsActorResolver } from '../actor-resolver.js'
+import { createSpecRepository } from '../spec-repository.js'
 
 /**
  * Domain context for a `ChangeRepository` bound to a single workspace.
@@ -64,7 +66,8 @@ export function createCreateChange(
   if (isSpecdConfig(configOrContext)) {
     const config = configOrContext
     const ws = getDefaultWorkspace(config)
-    return createCreateChange(
+    const changeRepo = createChangeRepository(
+      'fs',
       {
         workspace: ws.name,
         ownership: ws.ownership,
@@ -77,8 +80,38 @@ export function createCreateChange(
         discardedPath: config.storage.discardedPath,
       },
     )
+    const specRepos = new Map(
+      config.workspaces.map((workspace) => [
+        workspace.name,
+        createSpecRepository(
+          'fs',
+          {
+            workspace: workspace.name,
+            ownership: workspace.ownership,
+            isExternal: workspace.isExternal,
+            configPath: config.configPath,
+          },
+          {
+            specsPath: workspace.specsPath,
+            metadataPath: path.join(workspace.specsPath, '..', '.specd', 'metadata'),
+            ...(workspace.prefix !== undefined ? { prefix: workspace.prefix } : {}),
+          },
+        ),
+      ]),
+    )
+    const actor = createVcsActorResolver()
+    return new CreateChange(changeRepo, specRepos, actor)
   }
   const changeRepo = createChangeRepository('fs', configOrContext, options!)
+  const specRepos = new Map([
+    [
+      configOrContext.workspace,
+      createSpecRepository('fs', configOrContext, {
+        specsPath: path.join(options!.changesPath, '..', '..', 'specs'),
+        metadataPath: path.join(options!.changesPath, '..', '.specd', 'metadata'),
+      }),
+    ],
+  ])
   const actor = createVcsActorResolver()
-  return new CreateChange(changeRepo, new Map(), actor)
+  return new CreateChange(changeRepo, specRepos, actor)
 }

@@ -223,5 +223,7 @@ export function createArchiveChange(
     schemaProvider,
     generateMetadata,
     saveMetadata,
+    createBuiltinExtractorTransforms(),
+    opts.workspaceRoutes ?? [],
   )
 }

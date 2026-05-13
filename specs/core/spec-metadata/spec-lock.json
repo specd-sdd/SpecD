@@ -1,0 +1,13 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "core:config",
+    "core:change",
+    "core:schema-format",
+    "core:content-extraction",
+    "core:spec-repository-port"
+  ]
+}

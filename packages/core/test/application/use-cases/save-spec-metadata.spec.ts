@@ -234,6 +234,21 @@ describe('SaveSpecMetadata — dependsOn overwrite protection', () => {
     expect(result).not.toBeNull()
   })
 
+  it('does not write spec-lock.json', async () => {
+    const { uc, repo } = makeUseCase([spec], {
+      'auth/login/.specd-metadata.yaml': VALID_BASE,
+      'auth/login/spec-lock.json': JSON.stringify({
+        schema: { name: 'schema-std', version: 1 },
+        dependsOn: ['core:config'],
+      }),
+    })
+    const incoming = JSON.stringify({ ...VALID_BASE_OBJ, dependsOn: ['core:config'] })
+
+    await uc.execute({ workspace: 'default', specPath, content: incoming })
+
+    expect(repo.saved.has('spec-lock.json')).toBe(false)
+  })
+
   it('includes removed and added entries in error message', async () => {
     const { uc } = makeUseCase([spec], {
       'auth/login/.specd-metadata.yaml': existingMetadata,

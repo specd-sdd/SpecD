@@ -81,6 +81,28 @@
 - **THEN** `specIds` remains `['auth/login']`
 - **AND** `invalidated` is `false`
 
+### Requirement: Seed specDependsOn for added specs
+
+#### Scenario: Existing sidecar seeds new spec entry
+
+- **GIVEN** a persisted spec being added to the change already has `spec-lock.json`
+- **WHEN** `EditChange.execute` adds that spec to the change
+- **THEN** the seeded `change.specDependsOn` entry comes from `spec-lock.json.dependsOn`
+
+#### Scenario: Legacy metadata seeds when sidecar is absent
+
+- **GIVEN** a persisted spec being added has no `spec-lock.json`
+- **AND** `metadata.json.dependsOn` exists for that spec
+- **WHEN** `EditChange.execute` adds that spec
+- **THEN** the seeded `change.specDependsOn` entry comes from `metadata.json.dependsOn`
+
+#### Scenario: Existing in-change dependency snapshot is not overwritten
+
+- **GIVEN** a spec is already present in the change
+- **AND** `change.specDependsOn` already contains an entry for it
+- **WHEN** later scope edits run
+- **THEN** `EditChange` does not overwrite that existing dependency snapshot automatically
+
 ### Requirement: No-op when specIds unchanged after processing
 
 #### Scenario: Remove and re-add the same spec
@@ -164,7 +186,7 @@
 - **WHEN** `EditChange` is instantiated
 - **THEN** it requires an `ActorResolver` port in its constructor
 
-#### Scenario: Uses spec repositories map
+#### Scenario: Uses spec repositories map for existence checks and dependency seeding
 
 - **WHEN** `EditChange` is instantiated
-- **THEN** it requires a `ReadonlyMap<string, SpecRepository>` for spec existence checks
+- **THEN** it requires a `ReadonlyMap<string, SpecRepository>` for spec existence checks and persisted dependency seeding

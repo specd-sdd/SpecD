@@ -74,6 +74,18 @@ Relative resolution MUST be pure computation (no I/O). Absolute resolution MAY r
 
 If the ownership is `owned` or `shared`, `saveMetadata` proceeds normally: it MUST write the metadata content for the given spec. The `content` parameter is a JSON string. If `originalHash` is set on the content and does not match the current file hash on disk, the save MUST be rejected by throwing `ArtifactConflictError`. When `options.force` is `true`, the conflict check MUST be skipped. If the metadata directory does not exist, it MUST be created. This method replaces the previous pattern of `save(spec, new SpecArtifact('.specd-metadata.yaml', content))` for metadata writes.
 
+### Requirement: spec-lock sidecar read and write
+
+`SpecRepository` MUST expose dedicated methods for the persisted `spec-lock.json` sidecar.
+
+`readSpecLock(spec)` MUST load the sidecar for the given spec and return the parsed content as `SpecLockData`, or `null` if no sidecar exists. When loaded from storage, the returned object MUST include an `originalHash` property to enable conflict detection on subsequent writes.
+
+`saveSpecLock(spec, content, options?)` MUST first check `this.ownership()`. If the ownership is `readOnly`, the method MUST throw `ReadOnlyWorkspaceError` before any filesystem operation or conflict detection.
+
+If the ownership is `owned` or `shared`, `saveSpecLock` proceeds normally: it MUST persist the sidecar content for the given spec, preserve conflict detection semantics equivalent to `saveMetadata`, and skip conflict detection only when `options.force` is `true`.
+
+`spec-lock` access is a dedicated repository contract. Callers MUST NOT rely on the normal `artifact()` / `save()` API as a substitute for sidecar persistence.
+
 ### Requirement: search returns specs matching a text query
 
 `search(query, options?)` MUST accept a text query string and return an array of `SpecSearchResult` objects for specs within this workspace whose content matches the query. The search MUST cover spec artifact content (at minimum `spec.md` and `verify.md`).
@@ -97,7 +109,7 @@ This method is the port-level search primitive — it performs a content scan wi
 
 ### Requirement: Abstract class with abstract methods
 
-`SpecRepository` MUST be defined as an `abstract class`, not an `interface`. All storage operations (`get`, `list`, `artifact`, `save`, `delete`, `resolveFromPath`, `metadata`, `saveMetadata`, `search`) MUST be declared as `abstract` methods. This follows the architecture spec requirement that ports with shared construction are abstract classes.
+`SpecRepository` MUST be defined as an `abstract class`, not an `interface`. All storage operations (`get`, `list`, `artifact`, `save`, `delete`, `resolveFromPath`, `metadata`, `saveMetadata`, `readSpecLock`, `saveSpecLock`, `search`) MUST be declared as `abstract` methods. This follows the architecture spec requirement that ports with shared construction are abstract classes.
 
 ## Constraints
 

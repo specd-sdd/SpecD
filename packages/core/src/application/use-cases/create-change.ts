@@ -5,6 +5,7 @@ import { type ActorResolver } from '../ports/actor-resolver.js'
 import { ChangeAlreadyExistsError } from '../errors/change-already-exists-error.js'
 import { parseSpecId } from '../../domain/services/parse-spec-id.js'
 import { SpecPath } from '../../domain/value-objects/spec-path.js'
+import { loadPersistedSpecDependsOn } from './_shared/load-persisted-spec-depends-on.js'
 
 /** Result returned by the {@link CreateChange} use case. */
 export interface CreateChangeResult {
@@ -82,12 +83,21 @@ export class CreateChange {
       schemaVersion: input.schemaVersion,
     }
 
+    const specDependsOn = new Map<string, readonly string[]>()
+    for (const specId of input.specIds) {
+      const persisted = await loadPersistedSpecDependsOn(this._specs, specId)
+      if (persisted.source !== 'empty') {
+        specDependsOn.set(specId, persisted.dependsOn)
+      }
+    }
+
     const change = new Change({
       name: input.name,
       createdAt: now,
       ...(input.description !== undefined ? { description: input.description } : {}),
       specIds: [...input.specIds],
       history: [created],
+      specDependsOn,
     })
 
     await this._changes.save(change)

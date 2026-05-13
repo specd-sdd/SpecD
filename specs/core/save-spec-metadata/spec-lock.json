@@ -1,0 +1,7 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["core:spec-metadata", "default:_global/architecture"]
+}

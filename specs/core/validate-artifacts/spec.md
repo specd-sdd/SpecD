@@ -8,7 +8,7 @@ Artifacts must be structurally valid and conflict-free before a change can progr
 
 ### Requirement: Ports and constructor
 
-`ValidateArtifacts` receives at construction time: `ChangeRepository`, a map of `SpecRepository` instances (one per configured workspace), `SchemaProvider`, `ArtifactParserRegistry`, `ActorResolver`, `ContentHasher`, and `LifecycleEngine`.
+`ValidateArtifacts` receives at construction time: `ChangeRepository`, a map of `SpecRepository` instances (one per configured workspace), `SchemaProvider`, `ArtifactParserRegistry`, `ExtractorTransformRegistry`, `ActorResolver`, `ContentHasher`, `LifecycleEngine`, and `SpecWorkspaceRoute[]`.
 
 ```typescript
 class ValidateArtifacts {
@@ -17,14 +17,18 @@ class ValidateArtifacts {
     specs: ReadonlyMap<string, SpecRepository>,
     schemaProvider: SchemaProvider,
     parsers: ArtifactParserRegistry,
+    extractorTransforms: ExtractorTransformRegistry,
     actor: ActorResolver,
     hasher: ContentHasher,
     lifecycle: LifecycleEngine,
+    workspaceRoutes: readonly SpecWorkspaceRoute[],
   )
 }
 ```
 
 `SchemaProvider` is a lazy, caching port that returns the fully-resolved schema (with plugins and overrides applied). It replaces the previous `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths` triple. All are injected at kernel composition time, not passed per invocation.
+
+`ArtifactParserRegistry` resolves the parser used to validate concrete artifact content. `ExtractorTransformRegistry` is the shared runtime registry for metadata extraction transforms; `ValidateArtifacts` uses it when validating extracted metadata from merged spec content. `SpecWorkspaceRoute[]` provides the workspace-routing metadata needed to build extraction contexts for transforms that resolve spec references.
 
 `ActorResolver` supplies the identity recorded on approval invalidation events. `ContentHasher` is used both for approval drift detection and for the cleaned hashes persisted when validation succeeds. `LifecycleEngine` is used only for schema-aware dependency interpretation; structural validation, delta preview, metadata extraction, and artifact completion remain owned by `ValidateArtifacts`.
 
@@ -249,6 +253,17 @@ The mutation MUST still persist partial progress when some artifacts fail. Valid
 ### Requirement: MetadataExtraction validation failures are validation failures
 
 If metadataExtraction validation fails, `ValidateArtifacts` MUST record the failure in `result.failures` with the artifact ID. The artifact is NOT marked complete.
+
+### Requirement: In-change dependsOn persistence
+
+When validation of a `scope: spec` artifact succeeds and metadata extraction yields a valid `dependsOn` value, `ValidateArtifacts` MUST persist that value into `change.specDependsOn` for the spec.
+
+Validation rules for this update:
+
+- The extracted value becomes the in-change dependency snapshot used by later workflow steps.
+- If transform execution for extracted `dependsOn` fails, validation fails and the dependency snapshot is not updated.
+- `ValidateArtifacts` MUST NOT fail solely because the current in-change `dependsOn` value differs from the canonical persisted `spec-lock.json` for that spec.
+- Hard consistency checks between archive output and canonical sidecar state are reserved for `ArchiveChange`.
 
 ## Constraints
 

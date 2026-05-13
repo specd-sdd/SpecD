@@ -50,6 +50,28 @@
 - **WHEN** `CreateChange.execute` returns a change
 - **THEN** `change.state === 'drafting'`
 
+### Requirement: Initial specDependsOn seeding
+
+#### Scenario: Existing sidecar seeds dependencies at creation time
+
+- **GIVEN** `CreateChange.execute` is called with a spec that already exists in a repository
+- **AND** that spec already has `spec-lock.json`
+- **WHEN** the change is constructed
+- **THEN** the change seeds `specDependsOn` for that spec from `spec-lock.json.dependsOn`
+
+#### Scenario: Legacy metadata seeds when sidecar is absent
+
+- **GIVEN** `CreateChange.execute` is called with a persisted spec that has no sidecar
+- **AND** `metadata.json.dependsOn` exists for that spec
+- **WHEN** the change is constructed
+- **THEN** the change seeds `specDependsOn` from `metadata.json.dependsOn`
+
+#### Scenario: New spec starts without seeded dependency entry
+
+- **GIVEN** `CreateChange.execute` is called with a spec ID that does not yet exist in the repository
+- **WHEN** the change is constructed
+- **THEN** no seeded dependency entry is required for that spec at creation time
+
 ### Requirement: Input contract
 
 #### Scenario: execute accepts CreateChangeInput
@@ -101,7 +123,7 @@
 - **WHEN** `CreateChange` is instantiated
 - **THEN** it requires an `ActorResolver` port in its constructor
 
-#### Scenario: Uses spec repositories map
+#### Scenario: Uses spec repositories map for existence checks and dependency seeding
 
 - **WHEN** `CreateChange` is instantiated
-- **THEN** it requires a `ReadonlyMap<string, SpecRepository>` for spec existence checks
+- **THEN** it requires a `ReadonlyMap<string, SpecRepository>` for spec existence checks and persisted dependency seeding

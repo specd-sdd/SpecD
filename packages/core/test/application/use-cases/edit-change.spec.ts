@@ -2,7 +2,14 @@ import { describe, it, expect, vi } from 'vitest'
 import { EditChange } from '../../../src/application/use-cases/edit-change.js'
 import { ChangeNotFoundError } from '../../../src/application/errors/change-not-found-error.js'
 import { SpecNotInChangeError } from '../../../src/application/errors/spec-not-in-change-error.js'
-import { makeChangeRepository, makeActorResolver, makeChange } from './helpers.js'
+import { Spec } from '../../../src/domain/entities/spec.js'
+import { SpecPath } from '../../../src/domain/value-objects/spec-path.js'
+import {
+  makeChangeRepository,
+  makeActorResolver,
+  makeChange,
+  makeSpecRepository,
+} from './helpers.js'
 
 describe('EditChange', () => {
   describe('adding spec IDs', () => {
@@ -37,6 +44,57 @@ describe('EditChange', () => {
       await uc.execute({ name: 'my-change', addSpecIds: ['billing/pay'] })
 
       expect(unscaffoldSpy).not.toHaveBeenCalled()
+    })
+
+    it('seeds new spec deps from sidecar when adding an existing spec', async () => {
+      const change = makeChange('my-change', { specIds: ['auth/login'] })
+      const repo = makeChangeRepository([change])
+      const specRepo = makeSpecRepository({
+        specs: [new Spec('default', SpecPath.parse('billing/pay'), ['spec.md'])],
+        artifacts: {
+          'billing/pay/spec-lock.json': JSON.stringify({
+            schema: { name: 'schema-std', version: 1 },
+            dependsOn: ['core:storage'],
+          }),
+        },
+      })
+      const uc = new EditChange(repo, new Map([['default', specRepo]]), makeActorResolver())
+
+      const result = await uc.execute({ name: 'my-change', addSpecIds: ['billing/pay'] })
+
+      expect(result.change.specDependsOn.get('billing/pay')).toEqual(['core:storage'])
+    })
+
+    it('falls back to metadata when sidecar is absent', async () => {
+      const change = makeChange('my-change', { specIds: ['auth/login'] })
+      const repo = makeChangeRepository([change])
+      const specRepo = makeSpecRepository({
+        specs: [new Spec('default', SpecPath.parse('billing/pay'), ['spec.md'])],
+        artifacts: {
+          'billing/pay/.specd-metadata.yaml': JSON.stringify({
+            dependsOn: ['core:change-manifest'],
+          }),
+        },
+      })
+      const uc = new EditChange(repo, new Map([['default', specRepo]]), makeActorResolver())
+
+      const result = await uc.execute({ name: 'my-change', addSpecIds: ['billing/pay'] })
+
+      expect(result.change.specDependsOn.get('billing/pay')).toEqual(['core:change-manifest'])
+    })
+
+    it('does not overwrite an existing in-change dependency snapshot', async () => {
+      const change = makeChange('my-change', { specIds: ['auth/login', 'billing/pay'] })
+      change.setSpecDependsOn('billing/pay', ['core:existing'])
+      const repo = makeChangeRepository([change])
+      const specRepo = makeSpecRepository({
+        specs: [new Spec('default', SpecPath.parse('core/config'), ['spec.md'])],
+      })
+      const uc = new EditChange(repo, new Map([['default', specRepo]]), makeActorResolver())
+
+      const result = await uc.execute({ name: 'my-change', addSpecIds: ['billing/pay'] })
+
+      expect(result.change.specDependsOn.get('billing/pay')).toEqual(['core:existing'])
     })
   })
 

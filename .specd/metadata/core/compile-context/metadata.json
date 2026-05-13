@@ -13,7 +13,6 @@
     "core:get-artifact-instruction",
     "core:get-hook-instructions",
     "core:preview-spec",
-    "core:lifecycle-engine",
     "core:lifecycle-engine"
   ],
   "context": [

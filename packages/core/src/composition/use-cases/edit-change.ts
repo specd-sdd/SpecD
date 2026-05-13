@@ -1,8 +1,10 @@
 import { EditChange } from '../../application/use-cases/edit-change.js'
+import * as path from 'node:path'
 import { type SpecdConfig, isSpecdConfig } from '../../application/specd-config.js'
 import { getDefaultWorkspace } from '../get-default-workspace.js'
 import { createChangeRepository } from '../change-repository.js'
 import { createVcsActorResolver } from '../actor-resolver.js'
+import { createSpecRepository } from '../spec-repository.js'
 
 /** Domain context for `createEditChange(context, options)`. */
 export interface EditChangeContext {
@@ -51,7 +53,8 @@ export function createEditChange(
   if (isSpecdConfig(configOrContext)) {
     const config = configOrContext
     const ws = getDefaultWorkspace(config)
-    return createEditChange(
+    const changeRepo = createChangeRepository(
+      'fs',
       {
         workspace: ws.name,
         ownership: ws.ownership,
@@ -64,6 +67,27 @@ export function createEditChange(
         discardedPath: config.storage.discardedPath,
       },
     )
+    const specRepos = new Map(
+      config.workspaces.map((workspace) => [
+        workspace.name,
+        createSpecRepository(
+          'fs',
+          {
+            workspace: workspace.name,
+            ownership: workspace.ownership,
+            isExternal: workspace.isExternal,
+            configPath: config.configPath,
+          },
+          {
+            specsPath: workspace.specsPath,
+            metadataPath: path.join(workspace.specsPath, '..', '.specd', 'metadata'),
+            ...(workspace.prefix !== undefined ? { prefix: workspace.prefix } : {}),
+          },
+        ),
+      ]),
+    )
+    const actor = createVcsActorResolver()
+    return new EditChange(changeRepo, specRepos, actor)
   }
   const opts = options!
   const changeRepo = createChangeRepository('fs', configOrContext, {
@@ -71,6 +95,15 @@ export function createEditChange(
     draftsPath: opts.draftsPath,
     discardedPath: opts.discardedPath,
   })
+  const specRepos = new Map([
+    [
+      configOrContext.workspace,
+      createSpecRepository('fs', configOrContext, {
+        specsPath: path.join(opts.changesPath, '..', '..', 'specs'),
+        metadataPath: path.join(opts.changesPath, '..', '.specd', 'metadata'),
+      }),
+    ],
+  ])
   const actor = createVcsActorResolver()
-  return new EditChange(changeRepo, new Map(), actor)
+  return new EditChange(changeRepo, specRepos, actor)
 }

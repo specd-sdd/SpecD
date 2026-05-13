@@ -1,0 +1,23 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "core:change",
+    "core:schema-format",
+    "core:delta-format",
+    "core:validate-artifacts",
+    "core:storage",
+    "core:run-step-hooks",
+    "core:hook-execution-model",
+    "core:template-variables",
+    "core:spec-metadata",
+    "core:content-extraction",
+    "default:_global/architecture",
+    "core:workspace",
+    "core:spec-id-format",
+    "core:spec-overlap",
+    "default:_global/logging"
+  ]
+}

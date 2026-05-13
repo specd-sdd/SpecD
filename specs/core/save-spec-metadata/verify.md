@@ -33,19 +33,19 @@
 
 #### Scenario: Missing required fields rejected by strict schema
 
-- **GIVEN** valid YAML mapping content that omits `title`
+- **GIVEN** valid JSON object content that omits `title`
 - **WHEN** `execute()` is called
 - **THEN** `MetadataValidationError` is thrown with a message referencing the missing field
 
 #### Scenario: Invalid field types rejected by strict schema
 
-- **GIVEN** YAML content where `keywords` is a string instead of an array
+- **GIVEN** JSON content where `keywords` is a string instead of an array
 - **WHEN** `execute()` is called
 - **THEN** `MetadataValidationError` is thrown with a message referencing the field and type mismatch
 
 #### Scenario: Unknown top-level keys are allowed
 
-- **GIVEN** valid YAML content with all required fields plus an extra key `customField: value`
+- **GIVEN** valid JSON content with all required fields plus an extra key `customField: value`
 - **WHEN** `execute()` is called
 - **THEN** the write succeeds and the extra key is preserved
 
@@ -123,12 +123,29 @@
 - **WHEN** `execute()` is called with `force: true`
 - **THEN** the write succeeds
 
+### Requirement: Sidecar ownership boundary
+
+#### Scenario: SaveSpecMetadata writes metadata without touching sidecar
+
+- **GIVEN** a persisted spec already has `spec-lock.json`
+- **WHEN** `SaveSpecMetadata.execute` succeeds
+- **THEN** `metadata.json` is written
+- **AND** `spec-lock.json` is not created, modified, or deleted by `SaveSpecMetadata`
+
+#### Scenario: Sidecar mismatch handling remains an archive concern
+
+- **GIVEN** a caller provides `metadata.json.dependsOn`
+- **AND** archive-time sidecar consistency would need to be checked
+- **WHEN** `SaveSpecMetadata.execute` runs outside archive
+- **THEN** the use case performs its normal validation and overwrite checks only
+- **AND** sidecar consistency is not enforced there
+
 ### Requirement: Artifact persistence
 
 #### Scenario: Metadata is saved via saveMetadata
 
 - **WHEN** `execute()` succeeds
-- **THEN** `SpecRepository.saveMetadata()` is called with the raw YAML content
+- **THEN** `SpecRepository.saveMetadata()` is called with the raw JSON content
 
 ### Requirement: Constructor dependencies
 

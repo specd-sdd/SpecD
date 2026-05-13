@@ -1,0 +1,14 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "core:change",
+    "core:change-layout",
+    "core:storage",
+    "core:spec-metadata",
+    "core:spec-id-format",
+    "core:workspace"
+  ]
+}

@@ -1,9 +1,4 @@
-import {
-  extractMetadata,
-  type ExtractorTransformRegistry,
-  type SubtreeRenderer,
-} from '../../domain/services/extract-metadata.js'
-import { type SelectorNode } from '../../domain/services/selector-matching.js'
+import { type ExtractorTransformRegistry } from '../../domain/services/extract-metadata.js'
 import { type SpecRepository } from '../ports/spec-repository.js'
 import { type SchemaProvider } from '../ports/schema-provider.js'
 import { type ArtifactParserRegistry } from '../ports/artifact-parser.js'
@@ -14,11 +9,11 @@ import { type SpecMetadata } from '../../domain/services/parse-metadata.js'
 import { SpecPath } from '../../domain/value-objects/spec-path.js'
 import { inferFormat } from '../../domain/services/format-inference.js'
 import { parseSpecId } from '../../domain/services/parse-spec-id.js'
-import { createExtractorTransformContext } from './_shared/extractor-transform-context.js'
+import { type SpecWorkspaceRoute } from './_shared/spec-reference-resolver.js'
 import {
-  createSpecReferenceResolver,
-  type SpecWorkspaceRoute,
-} from './_shared/spec-reference-resolver.js'
+  extractMetadataFromSpecArtifacts,
+  type MetadataArtifactInput,
+} from './_shared/extract-metadata-from-spec-artifacts.js'
 
 /** Input for the {@link GenerateSpecMetadata} use case. */
 export interface GenerateSpecMetadataInput {
@@ -107,17 +102,7 @@ export class GenerateSpecMetadata {
       throw new SpecNotFoundError(input.specId)
     }
 
-    // Load and parse spec-scoped artifacts
-    const astsByArtifact = new Map<string, { root: SelectorNode }>()
-    const renderers = new Map<string, SubtreeRenderer>()
-    const contentsByFilename = new Map<string, string>()
-    const transformContexts = new Map<string, ReturnType<typeof createExtractorTransformContext>>()
-    const resolveSpecReference = createSpecReferenceResolver({
-      originWorkspace: workspace,
-      originSpecPath: specPath,
-      repositories: this._specs,
-      workspaceRoutes: this._workspaceRoutes,
-    })
+    const artifacts: MetadataArtifactInput[] = []
 
     for (const artifactType of schema.artifacts()) {
       if (artifactType.scope !== 'spec') continue
@@ -130,37 +115,30 @@ export class GenerateSpecMetadata {
       const artifact = await specRepo.artifact(spec, filename)
       if (artifact === null) continue
 
-      contentsByFilename.set(filename, artifact.content)
-
-      const ast = parser.parse(artifact.content)
-      astsByArtifact.set(artifactType.id, ast)
-      renderers.set(artifactType.id, parser as SubtreeRenderer)
-      transformContexts.set(
-        artifactType.id,
-        createExtractorTransformContext(workspace, capPath, artifactType.id, filename, {
-          resolveSpecReference,
-        }),
-      )
+      artifacts.push({
+        artifactId: artifactType.id,
+        filename,
+        format,
+        content: artifact.content,
+      })
     }
 
-    const extracted = await extractMetadata(
-      extraction,
-      astsByArtifact,
-      renderers,
-      this._extractorTransforms,
-      transformContexts,
-    )
-
-    // Compute content hashes
-    const contentHashes: Record<string, string> = {}
-    for (const [filename, content] of contentsByFilename) {
-      contentHashes[filename] = this._hasher.hash(content)
-    }
+    const extracted = await extractMetadataFromSpecArtifacts({
+      effectiveSpecSchema: schema,
+      workspace,
+      specPath,
+      artifacts,
+      parsers: this._parsers,
+      extractorTransforms: this._extractorTransforms,
+      repositories: this._specs,
+      workspaceRoutes: this._workspaceRoutes,
+      hasher: this._hasher,
+    })
 
     // Assemble final metadata
     const metadata: SpecMetadata = {
-      ...extracted,
-      contentHashes,
+      ...extracted.metadata,
+      contentHashes: extracted.contentHashes,
       generatedBy: 'core',
     }
 

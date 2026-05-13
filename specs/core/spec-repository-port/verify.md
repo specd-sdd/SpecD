@@ -34,6 +34,40 @@
 - **WHEN** `saveMetadata(spec, content, { force: true })` is called
 - **THEN** the file is written without error
 
+### Requirement: spec-lock sidecar read and write
+
+#### Scenario: Sidecar exists
+
+- **GIVEN** a spec with a persisted `spec-lock.json`
+- **WHEN** `readSpecLock(spec)` is called
+- **THEN** the repository returns the parsed `SpecLockData`
+- **AND** the returned object includes `originalHash`
+
+#### Scenario: Sidecar does not exist
+
+- **GIVEN** a spec with no persisted `spec-lock.json`
+- **WHEN** `readSpecLock(spec)` is called
+- **THEN** `null` is returned
+
+#### Scenario: Read-only workspace rejects saveSpecLock
+
+- **GIVEN** a `SpecRepository` bound to a workspace with `readOnly` ownership
+- **WHEN** `saveSpecLock(spec, content)` is called
+- **THEN** `ReadOnlyWorkspaceError` is thrown
+- **AND** no sidecar file is written
+
+#### Scenario: Conflict detected on saveSpecLock
+
+- **GIVEN** a persisted sidecar with a different hash than `content.originalHash`
+- **WHEN** `saveSpecLock(spec, content)` is called without `force`
+- **THEN** `ArtifactConflictError` is thrown
+
+#### Scenario: Force saveSpecLock bypasses conflict detection
+
+- **GIVEN** a persisted sidecar whose current hash differs from `content.originalHash`
+- **WHEN** `saveSpecLock(spec, content, { force: true })` is called
+- **THEN** the sidecar is overwritten without error
+
 ### Requirement: Abstract class with abstract methods
 
 #### Scenario: Port is an abstract class with abstract storage methods

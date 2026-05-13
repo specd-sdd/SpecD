@@ -10,6 +10,7 @@ import { type ArchiveRepository } from '../ports/archive-repository.js'
 import { type ActorResolver } from '../ports/actor-resolver.js'
 import { type ArtifactParserRegistry } from '../ports/artifact-parser.js'
 import { type SchemaProvider } from '../ports/schema-provider.js'
+import { type ExtractorTransformRegistry } from '../../domain/services/extract-metadata.js'
 import { type ArchivedChange } from '../../domain/entities/archived-change.js'
 import { type ActorIdentity, type Change } from '../../domain/entities/change.js'
 import { SYSTEM_ACTOR } from '../../domain/entities/change.js'
@@ -25,6 +26,13 @@ import { type GenerateSpecMetadata } from './generate-spec-metadata.js'
 import { type SaveSpecMetadata } from './save-spec-metadata.js'
 import { type RunStepHooks } from './run-step-hooks.js'
 import { Logger } from '../logger.js'
+import { type SpecLockData } from '../../domain/services/parse-spec-lock.js'
+import { DependsOnOverwriteError } from '../../domain/errors/depends-on-overwrite-error.js'
+import {
+  extractMetadataFromSpecArtifacts,
+  type MetadataArtifactInput,
+} from './_shared/extract-metadata-from-spec-artifacts.js'
+import { type SpecWorkspaceRoute } from './_shared/spec-reference-resolver.js'
 
 /** Selectors for granular hook-phase skipping during archiving. */
 export type ArchiveHookPhaseSelector = 'pre' | 'post' | 'all'
@@ -77,9 +85,11 @@ export interface ArchiveChangeResult {
 /** Prepared permanent write for one archived spec artifact. */
 interface PreparedArchiveWrite {
   readonly specId: string
+  readonly artifactId: string
   readonly spec: Spec
   readonly specRepo: SpecRepository
   readonly outputFilename: string
+  readonly format: string
   readonly content: string
 }
 
@@ -112,6 +122,8 @@ export class ArchiveChange {
   private readonly _schemaProvider: SchemaProvider
   private readonly _generateMetadata: GenerateSpecMetadata
   private readonly _saveMetadata: SaveSpecMetadata
+  private readonly _extractorTransforms: ExtractorTransformRegistry
+  private readonly _workspaceRoutes: readonly SpecWorkspaceRoute[]
 
   /**
    * Creates a new `ArchiveChange` use case instance.
@@ -125,6 +137,8 @@ export class ArchiveChange {
    * @param schemaProvider - Provider for the fully-resolved schema
    * @param generateMetadata - Use case for deterministic metadata extraction
    * @param saveMetadata - Use case for writing metadata
+   * @param extractorTransforms - Shared extractor transform registry for pre-publication extraction
+   * @param workspaceRoutes - Workspace routing metadata for cross-workspace spec reference resolution
    */
   constructor(
     changes: ChangeRepository,
@@ -136,6 +150,8 @@ export class ArchiveChange {
     schemaProvider: SchemaProvider,
     generateMetadata: GenerateSpecMetadata,
     saveMetadata: SaveSpecMetadata,
+    extractorTransforms: ExtractorTransformRegistry = new Map(),
+    workspaceRoutes: readonly SpecWorkspaceRoute[] = [],
   ) {
     this._changes = changes
     this._specs = specs
@@ -146,6 +162,8 @@ export class ArchiveChange {
     this._schemaProvider = schemaProvider
     this._generateMetadata = generateMetadata
     this._saveMetadata = saveMetadata
+    this._extractorTransforms = extractorTransforms
+    this._workspaceRoutes = workspaceRoutes
   }
 
   /**
@@ -278,22 +296,133 @@ export class ArchiveChange {
     let preparedPlan: PreparedArchivePlan
     try {
       preparedPlan = await this._prepareArchivePlan(change, schema)
+      Logger.debug('ArchiveChange prepared archive plan', {
+        change: change.name,
+        writeCount: preparedPlan.writes.length,
+        staleSpecCount: preparedPlan.staleSpecIds.length,
+      })
     } catch (error) {
       await this._recordArchiveFailure(input.name, 'prepare', error, archivingActor, false)
       throw error
     }
 
+    const postPublicationStates = new Map<
+      string,
+      {
+        readonly workspace: string
+        readonly specPath: SpecPath
+        readonly finalDependsOn: readonly string[]
+        readonly sidecarActive: boolean
+      }
+    >()
+
     try {
-      for (const write of preparedPlan.writes) {
-        await write.specRepo.save(
-          write.spec,
-          new SpecArtifact(write.outputFilename, write.content),
-          { force: true },
+      for (const publication of groupArchiveWritesBySpec(preparedPlan.writes)) {
+        const firstWrite = publication[0]
+        if (firstWrite === undefined) continue
+        const { workspace, capPath } = parseSpecId(firstWrite.specId)
+        const extractionArtifacts = await this._buildFinalSpecArtifactsForExtraction(
+          firstWrite.specRepo,
+          firstWrite.spec,
+          schema,
+          publication,
         )
+        const preExtracted = await extractMetadataFromSpecArtifacts({
+          effectiveSpecSchema: schema,
+          workspace,
+          specPath: firstWrite.spec.name,
+          artifacts: extractionArtifacts,
+          parsers: this._parsers,
+          extractorTransforms: this._extractorTransforms,
+          repositories: this._specs,
+          workspaceRoutes: this._workspaceRoutes,
+        })
+        const existingSpecLock = await firstWrite.specRepo.readSpecLock(firstWrite.spec)
+        const metadata = await firstWrite.specRepo.metadata(firstWrite.spec)
+        const canCreateSidecar =
+          existingSpecLock !== null ||
+          this._isStructurallyCompatiblePreparedArtifacts(extractionArtifacts)
+        const finalDependsOn = this._resolvePersistedDependsOn({
+          manifestDeps: change.specDependsOn.get(firstWrite.specId),
+          extractedDeps: preExtracted.metadata.dependsOn,
+          existingSpecLock,
+          metadataDeps: metadata?.dependsOn,
+        })
+
+        if (
+          canCreateSidecar &&
+          preExtracted.metadata.dependsOn !== undefined &&
+          !DependsOnOverwriteError.areSame(preExtracted.metadata.dependsOn, finalDependsOn)
+        ) {
+          throw new Error(
+            `Extracted dependsOn mismatch for '${firstWrite.specId}': extracted=${JSON.stringify(preExtracted.metadata.dependsOn)} persisted=${JSON.stringify(finalDependsOn)}`,
+          )
+        }
+
+        const publicationSpecLock = canCreateSidecar
+          ? this._buildPublicationSpecLock(existingSpecLock, schema, finalDependsOn)
+          : undefined
+
+        Logger.debug('ArchiveChange starting staged spec publication', {
+          change: change.name,
+          specId: firstWrite.specId,
+          artifactCount: publication.length,
+        })
+        await firstWrite.specRepo.publish(firstWrite.spec, {
+          artifacts: publication.map(
+            (write) => new SpecArtifact(write.outputFilename, write.content),
+          ),
+          ...(publicationSpecLock !== undefined ? { specLock: publicationSpecLock } : {}),
+        })
+        Logger.debug('ArchiveChange completed staged spec publication', {
+          change: change.name,
+          specId: firstWrite.specId,
+          artifactCount: publication.length,
+        })
+        postPublicationStates.set(firstWrite.specId, {
+          workspace,
+          specPath: SpecPath.parse(capPath),
+          finalDependsOn,
+          sidecarActive: publicationSpecLock !== undefined,
+        })
       }
     } catch (error) {
       await this._recordArchiveFailure(input.name, 'commit', error, archivingActor, true)
       throw error
+    }
+
+    // --- Spec metadata generation + sidecar reconciliation ---
+    const failedMetadataSpecPaths: string[] = []
+
+    for (const specId of preparedPlan.staleSpecIds) {
+      try {
+        const publishedState = postPublicationStates.get(specId)
+        if (publishedState === undefined) continue
+        const specRepo = this._specs.get(publishedState.workspace)
+        if (specRepo === undefined) continue
+
+        const result = await this._generateMetadata.execute({ specId })
+        if (!result.hasExtraction || Object.keys(result.metadata).length === 0) {
+          failedMetadataSpecPaths.push(specId)
+          continue
+        }
+
+        const metadataDependsOn =
+          publishedState.sidecarActive || result.metadata.dependsOn === undefined
+            ? publishedState.finalDependsOn
+            : result.metadata.dependsOn
+
+        await this._saveMetadata.execute({
+          workspace: publishedState.workspace,
+          specPath: publishedState.specPath,
+          content:
+            JSON.stringify({ ...result.metadata, dependsOn: [...metadataDependsOn] }, null, 2) +
+            '\n',
+          force: true,
+        })
+      } catch {
+        failedMetadataSpecPaths.push(specId)
+      }
     }
 
     // --- Archive ---
@@ -322,37 +451,6 @@ export class ArchiveChange {
         if (!hook.success) {
           postHookFailures.push(hook.command)
         }
-      }
-    }
-
-    // --- Spec metadata generation ---
-    const failedMetadataSpecPaths: string[] = []
-
-    for (const specId of preparedPlan.staleSpecIds) {
-      try {
-        const result = await this._generateMetadata.execute({ specId })
-        if (!result.hasExtraction || Object.keys(result.metadata).length === 0) {
-          failedMetadataSpecPaths.push(specId)
-          continue
-        }
-
-        // Merge manifest dependsOn (highest priority)
-        const manifestDeps = change.specDependsOn.get(specId)
-        const metadata =
-          manifestDeps !== undefined
-            ? { ...result.metadata, dependsOn: [...manifestDeps] }
-            : result.metadata
-
-        const jsonContent = JSON.stringify(metadata, null, 2) + '\n'
-        const { workspace, capPath } = parseSpecId(specId)
-        await this._saveMetadata.execute({
-          workspace,
-          specPath: SpecPath.parse(capPath),
-          content: jsonContent,
-          force: true,
-        })
-      } catch {
-        failedMetadataSpecPaths.push(specId)
       }
     }
 
@@ -454,17 +552,21 @@ export class ArchiveChange {
           )
           writes.push({
             specId,
+            artifactId: artifactType.id,
             spec,
             specRepo,
             outputFilename: outputBasename,
+            format,
             content: formatParser.serialize(mergedResult.ast),
           })
         } else {
           writes.push({
             specId,
+            artifactId: artifactType.id,
             spec,
             specRepo,
             outputFilename: outputBasename,
+            format: artifactType.format ?? inferFormat(outputBasename) ?? 'plaintext',
             content: trackedArtifact.content,
           })
         }
@@ -514,6 +616,140 @@ export class ArchiveChange {
       // The active change may already have been moved or be otherwise unavailable.
     }
   }
+
+  /**
+   * Resolves the final persisted dependency set for one archived spec.
+   *
+   * Precedence is: manifest snapshot, existing sidecar, existing metadata,
+   * and finally freshly extracted dependencies.
+   *
+   * @param args - Candidate dependency sources for the spec
+   * @param args.manifestDeps - Dependency snapshot already stored on the change
+   * @param args.extractedDeps - Dependencies extracted from the final merged artifacts
+   * @param args.existingSpecLock - Existing canonical sidecar, when present
+   * @param args.metadataDeps - Dependencies currently stored in canonical metadata
+   * @returns Final dependency set to persist
+   */
+  private _resolvePersistedDependsOn(args: {
+    readonly manifestDeps: readonly string[] | undefined
+    readonly extractedDeps: readonly string[] | undefined
+    readonly existingSpecLock: SpecLockData | null
+    readonly metadataDeps: readonly string[] | undefined
+  }): readonly string[] {
+    if (args.manifestDeps !== undefined) {
+      return [...args.manifestDeps]
+    }
+    if (args.existingSpecLock !== null) {
+      return [...args.existingSpecLock.dependsOn]
+    }
+    if (args.metadataDeps !== undefined) {
+      return [...args.metadataDeps]
+    }
+    if (args.extractedDeps !== undefined) {
+      return [...args.extractedDeps]
+    }
+    return []
+  }
+
+  /**
+   * Builds the final spec-scoped artifact set used for pre-publication extraction.
+   *
+   * Publication writes override canonical artifacts; untouched artifacts fall
+   * back to the current canonical spec content.
+   *
+   * @param specRepo - Repository owning the target spec
+   * @param spec - Spec being archived
+   * @param schema - Effective schema for the spec
+   * @param publication - Canonical writes prepared for this publication unit
+   * @returns Final artifact contents for extraction
+   */
+  private async _buildFinalSpecArtifactsForExtraction(
+    specRepo: SpecRepository,
+    spec: Spec,
+    schema: Schema,
+    publication: readonly PreparedArchiveWrite[],
+  ): Promise<readonly MetadataArtifactInput[]> {
+    const writesByFilename = new Map(publication.map((write) => [write.outputFilename, write]))
+    const artifacts: MetadataArtifactInput[] = []
+
+    for (const artifactType of schema.artifacts()) {
+      if (artifactType.scope !== 'spec') continue
+
+      const outputFilename = path.basename(artifactType.output)
+      const stagedWrite = writesByFilename.get(outputFilename)
+      const content =
+        stagedWrite?.content ?? (await specRepo.artifact(spec, outputFilename))?.content ?? null
+      if (content === null) continue
+
+      artifacts.push({
+        artifactId: artifactType.id,
+        filename: outputFilename,
+        content,
+        format: artifactType.format ?? inferFormat(outputFilename) ?? 'plaintext',
+      })
+    }
+
+    return artifacts
+  }
+
+  /**
+   * Checks whether the prepared canonical artifact set parses cleanly.
+   *
+   * This guards opportunistic sidecar creation for legacy specs before any
+   * canonical publication occurs.
+   *
+   * @param artifacts - Final artifact contents prepared for publication
+   * @returns `true` when every artifact parses under its declared format
+   */
+  private _isStructurallyCompatiblePreparedArtifacts(
+    artifacts: readonly MetadataArtifactInput[],
+  ): boolean {
+    try {
+      for (const artifact of artifacts) {
+        const format = artifact.format ?? inferFormat(artifact.filename) ?? 'plaintext'
+        const parser = this._parsers.get(format)
+        if (parser === undefined) {
+          throw new ParserNotRegisteredError(format, `artifact '${artifact.artifactId}'`)
+        }
+        parser.parse(artifact.content)
+      }
+    } catch {
+      return false
+    }
+    return true
+  }
+
+  /**
+   * Builds the spec-lock payload that will be staged with one spec publication.
+   *
+   * Existing locks retain their original schema identity; new locks capture the
+   * current schema identity for the first archive.
+   *
+   * @param existingSpecLock - Existing sidecar, when present
+   * @param schema - Effective schema driving this archive
+   * @param dependsOn - Final dependency set to persist
+   * @returns Sidecar payload to stage with publication
+   */
+  private _buildPublicationSpecLock(
+    existingSpecLock: SpecLockData | null,
+    schema: Schema,
+    dependsOn: readonly string[],
+  ): SpecLockData {
+    if (existingSpecLock !== null) {
+      return {
+        schema: existingSpecLock.schema,
+        dependsOn: [...dependsOn],
+        ...(existingSpecLock.originalHash !== undefined
+          ? { originalHash: existingSpecLock.originalHash }
+          : {}),
+      }
+    }
+
+    return {
+      schema: { name: schema.name(), version: schema.version() },
+      dependsOn: [...dependsOn],
+    }
+  }
 }
 
 /**
@@ -547,4 +783,30 @@ function resolveTrackedArchiveFilename(
     return expectedFilename
   }
   return trackedFile.filename
+}
+
+/**
+ * Groups prepared archive writes by target spec publication unit.
+ *
+ * Each returned array contains the canonical artifact files that must become
+ * visible together for one spec.
+ *
+ * @param writes - Flat prepared archive writes
+ * @returns Publication groups in encounter order
+ */
+function groupArchiveWritesBySpec(
+  writes: readonly PreparedArchiveWrite[],
+): readonly (readonly PreparedArchiveWrite[])[] {
+  const grouped = new Map<string, PreparedArchiveWrite[]>()
+
+  for (const write of writes) {
+    const existing = grouped.get(write.specId)
+    if (existing === undefined) {
+      grouped.set(write.specId, [write])
+      continue
+    }
+    existing.push(write)
+  }
+
+  return [...grouped.values()]
 }

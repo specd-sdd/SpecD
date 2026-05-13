@@ -39,6 +39,19 @@ The newly constructed `Change` MUST have a history containing exactly one event 
 
 The `Change` entity MUST be constructed with `name`, `createdAt`, `specIds`, and `history` from the input and the created event. The `description` field MUST be included only when provided in the input.
 
+### Requirement: Initial specDependsOn seeding
+
+When `CreateChange.execute` is called with spec IDs that already exist in a configured spec repository, the newly constructed `Change` MUST seed `change.specDependsOn` for each such spec before persistence.
+
+Seeding rules:
+
+- If a canonical `spec-lock.json` exists for the spec, its `dependsOn` value MUST be used.
+- Otherwise, if legacy `metadata.json.dependsOn` exists for the spec, that value MUST be used.
+- Otherwise, the seeded value is an empty array.
+- Specs that do not yet exist in the repository do not require a seeded dependency entry at creation time.
+
+This ensures a change created against existing specs starts from the current persisted dependency set instead of leaving `specDependsOn` absent by default.
+
 ### Requirement: Persistence and scaffolding
 
 After construction, the use case MUST persist the change via `ChangeRepository.save`. After saving, it MUST call `ChangeRepository.scaffold(change, specExists)` to create the artifact directory structure. The `specExists` callback checks the `SpecRepository` map for each spec ID's workspace. Finally, the use case returns an object containing the newly created `Change` instance and the `changePath` (obtained via `ChangeRepository.changePath(change)`).
@@ -51,7 +64,7 @@ The return type is `{ change: Change; changePath: string }`.
 
 - `ChangeRepository` — for existence checks, persistence, and scaffolding
 - `ActorResolver` — for resolving the current actor identity
-- `specs: ReadonlyMap<string, SpecRepository>` — spec repositories keyed by workspace name, used for the `specExists` check during scaffolding
+- `specs: ReadonlyMap<string, SpecRepository>` — spec repositories keyed by workspace name, used for the `specExists` check during scaffolding and for reading persisted dependency state when seeding `change.specDependsOn`
 
 ## Constraints
 

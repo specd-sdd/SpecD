@@ -15,11 +15,13 @@ import { type CrossArtifactValidationRule } from '../../../src/domain/value-obje
 import { type WorkflowStep } from '../../../src/domain/value-objects/workflow-step.js'
 import { ChangeRepository } from '../../../src/application/ports/change-repository.js'
 import {
+  type SpecPublication,
   SpecRepository,
   type ResolveFromPathResult,
   type SpecSearchResult,
 } from '../../../src/application/ports/spec-repository.js'
 import { type SpecMetadata } from '../../../src/domain/services/parse-metadata.js'
+import { type SpecLockData } from '../../../src/domain/services/parse-spec-lock.js'
 import { ArchiveRepository } from '../../../src/application/ports/archive-repository.js'
 import { type SchemaRegistry } from '../../../src/application/ports/schema-registry.js'
 import { type SchemaProvider } from '../../../src/application/ports/schema-provider.js'
@@ -381,6 +383,9 @@ class StubSpecRepository extends SpecRepository {
   private readonly _saveFn:
     | ((spec: Spec, artifact: SpecArtifact, options?: { force?: boolean }) => Promise<void>)
     | undefined
+  private readonly _publishFn:
+    | ((spec: Spec, publication: SpecPublication) => Promise<void>)
+    | undefined
   private readonly _deleteFn: ((spec: Spec) => Promise<void>) | undefined
   private readonly _resolveFromPathFn:
     | ((inputPath: string, from?: SpecPath) => Promise<ResolveFromPathResult | null>)
@@ -391,6 +396,7 @@ class StubSpecRepository extends SpecRepository {
     specs?: Spec[]
     artifacts?: Record<string, string | null>
     save?: (spec: Spec, artifact: SpecArtifact, options?: { force?: boolean }) => Promise<void>
+    publish?: (spec: Spec, publication: SpecPublication) => Promise<void>
     delete?: (spec: Spec) => Promise<void>
     resolveFromPath?: (inputPath: string, from?: SpecPath) => Promise<ResolveFromPathResult | null>
     ownership?: 'owned' | 'shared' | 'readOnly'
@@ -405,6 +411,7 @@ class StubSpecRepository extends SpecRepository {
     this._specs = opts.specs ?? []
     this._artifacts = opts.artifacts ?? {}
     this._saveFn = opts.save
+    this._publishFn = opts.publish
     this._deleteFn = opts.delete
     this._resolveFromPathFn = opts.resolveFromPath
   }
@@ -438,13 +445,27 @@ class StubSpecRepository extends SpecRepository {
     if (this._saveFn) return this._saveFn(spec, artifact, options)
   }
 
+  override async publish(spec: Spec, publication: SpecPublication): Promise<void> {
+    for (const artifact of publication.artifacts) {
+      this.saved.set(artifact.filename, artifact.content)
+    }
+    if (publication.specLock !== undefined) {
+      this.saved.set(`${spec.name.toString()}/spec-lock.json`, JSON.stringify(publication.specLock))
+      this.saved.set('spec-lock.json', JSON.stringify(publication.specLock))
+    }
+    if (this._publishFn !== undefined) {
+      return this._publishFn(spec, publication)
+    }
+  }
+
   override async delete(spec: Spec): Promise<void> {
     if (this._deleteFn) return this._deleteFn(spec)
   }
 
   override async metadata(spec: Spec): Promise<SpecMetadata | null> {
-    const key = `${spec.name.toString()}/.specd-metadata.yaml`
-    const content = this._artifacts[key]
+    const jsonKey = `${spec.name.toString()}/metadata.json`
+    const legacyKey = `${spec.name.toString()}/.specd-metadata.yaml`
+    const content = this._artifacts[jsonKey] ?? this._artifacts[legacyKey]
     if (content === undefined || content === null) return null
     const parsed = JSON.parse(content)
     if (parsed === null || parsed === undefined || typeof parsed !== 'object') return null
@@ -456,7 +477,23 @@ class StubSpecRepository extends SpecRepository {
     content: string,
     _options?: { force?: boolean; originalHash?: string },
   ): Promise<void> {
+    this.saved.set('metadata.json', content)
     this.saved.set('.specd-metadata.yaml', content)
+  }
+
+  override async readSpecLock(spec: Spec): Promise<SpecLockData | null> {
+    const key = `${spec.name.toString()}/spec-lock.json`
+    const content = this._artifacts[key]
+    if (content === undefined || content === null) return null
+    return JSON.parse(content) as SpecLockData
+  }
+
+  override async saveSpecLock(
+    _spec: Spec,
+    content: SpecLockData,
+    _options?: { force?: boolean },
+  ): Promise<void> {
+    this.saved.set('spec-lock.json', JSON.stringify(content))
   }
 
   override async resolveFromPath(
@@ -483,6 +520,7 @@ export function makeSpecRepository(
         specs?: Spec[]
         artifacts?: Record<string, string | null>
         save?: (spec: Spec, artifact: SpecArtifact, options?: { force?: boolean }) => Promise<void>
+        publish?: (spec: Spec, publication: SpecPublication) => Promise<void>
         delete?: (spec: Spec) => Promise<void>
         resolveFromPath?: (
           inputPath: string,

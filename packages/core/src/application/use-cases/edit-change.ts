@@ -6,6 +6,7 @@ import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
 import { SpecNotInChangeError } from '../errors/spec-not-in-change-error.js'
 import { parseSpecId } from '../../domain/services/parse-spec-id.js'
 import { SpecPath } from '../../domain/value-objects/spec-path.js'
+import { loadPersistedSpecDependsOn } from './_shared/load-persisted-spec-depends-on.js'
 
 /** Input for the {@link EditChange} use case. */
 export interface EditChangeInput {
@@ -82,9 +83,10 @@ export class EditChange {
 
     const actor = await this._actor.identity()
 
-    const persisted = await this._changes.mutate(input.name, (freshChange) => {
+    const persisted = await this._changes.mutate(input.name, async (freshChange) => {
       let specIdsChanged = false
       let removedSpecIds: string[] = []
+      let addedSpecIds: string[] = []
 
       if (hasSpecChanges) {
         const specIds = [...freshChange.specIds]
@@ -108,6 +110,7 @@ export class EditChange {
         }
 
         const currentSpecIds = freshChange.specIds
+        addedSpecIds = specIds.filter((id) => !currentSpecIds.includes(id))
         specIdsChanged =
           specIds.length !== currentSpecIds.length ||
           specIds.some((id, i) => id !== currentSpecIds[i])
@@ -115,6 +118,11 @@ export class EditChange {
         if (specIdsChanged) {
           removedSpecIds = currentSpecIds.filter((id) => !specIds.includes(id))
           freshChange.updateSpecIds(specIds, actor)
+          for (const specId of addedSpecIds) {
+            if (freshChange.specDependsOn.get(specId) !== undefined) continue
+            const persistedDeps = await loadPersistedSpecDependsOn(this._specs, specId)
+            freshChange.setSpecDependsOn(specId, persistedDeps.dependsOn)
+          }
         }
       }
 

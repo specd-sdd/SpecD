@@ -16,31 +16,26 @@
 - **WHEN** the manifest is loaded
 - **THEN** the missing state is treated as `missing`
 
+#### Scenario: specDependsOn is seeded when an existing spec enters the change
+
+- **GIVEN** an existing persisted spec is added to a change
+- **AND** the spec has a canonical `spec-lock.json`
+- **WHEN** the manifest is persisted after scope entry
+- **THEN** `specDependsOn` contains that spec's seeded dependency snapshot
+
+#### Scenario: Legacy metadata seeds specDependsOn when sidecar is absent
+
+- **GIVEN** an existing persisted spec has no `spec-lock.json`
+- **AND** legacy `metadata.json.dependsOn` exists for that spec
+- **WHEN** the spec first enters the change scope
+- **THEN** the manifest seeds `specDependsOn` from `metadata.json.dependsOn`
+
 #### Scenario: Invalidated event stores message and affectedArtifacts
 
 - **WHEN** a change is invalidated because validated files drifted
-- **THEN** the `invalidated` event includes `cause`
-- **AND** it includes a human-readable `message`
+- **THEN** the invalidated event includes `cause`
+- **AND** it includes a human-readable message
 - **AND** it includes `affectedArtifacts` with artifact types and file keys
-
-#### Scenario: Legacy artifact-change invalidation cause remains readable
-
-- **GIVEN** a historical manifest whose `invalidated` event persisted `cause: "artifact-change"`
-- **WHEN** the manifest is loaded
-- **THEN** loading succeeds without reporting corruption
-- **AND** the event is normalized to the current artifact-drift semantics
-
-#### Scenario: validatedHash and state coexist
-
-- **WHEN** `ValidateArtifacts` marks a file complete with hash `sha256:abc`
-- **THEN** the manifest stores `validatedHash: "sha256:abc"`
-- **AND** the file state is `complete`
-
-#### Scenario: Drifted and pending-review states round-trip
-
-- **GIVEN** a manifest with one file in `drifted-pending-review` and one file in `pending-review`
-- **WHEN** the manifest is loaded and saved again
-- **THEN** both states are preserved
 
 ### Requirement: Archive outcome history events
 

@@ -9,6 +9,7 @@ import { SpecArtifact } from '../../../src/domain/value-objects/spec-artifact.js
 import { ArtifactConflictError } from '../../../src/domain/errors/artifact-conflict-error.js'
 import { FsSpecRepository } from '../../../src/infrastructure/fs/spec-repository.js'
 import { sha256 } from '../../../src/infrastructure/fs/hash.js'
+import { type SpecLockData } from '../../../src/domain/services/parse-spec-lock.js'
 
 // ---- Setup / teardown helpers ----
 
@@ -306,6 +307,41 @@ describe('FsSpecRepository', () => {
       const artifact = new SpecArtifact('spec.md', 'content', sha256('something else'))
 
       await expect(ctx.repo.save(spec, artifact)).rejects.toBeInstanceOf(ArtifactConflictError)
+    })
+  })
+
+  describe('publish', () => {
+    it('publishes multiple canonical artifacts through one staged swap', async () => {
+      await writeSpecFile(ctx, 'auth/login', 'spec.md', '# Old')
+      await writeSpecFile(ctx, 'auth/login', 'verify.md', 'old verify')
+      const spec = makeSpec(ctx, 'auth/login', ['spec.md', 'verify.md'])
+
+      await ctx.repo.publish(spec, {
+        artifacts: [
+          new SpecArtifact('spec.md', '# New'),
+          new SpecArtifact('verify.md', 'new verify'),
+        ],
+      })
+
+      await expect(readSpecFile(ctx, 'auth/login', 'spec.md')).resolves.toBe('# New')
+      await expect(readSpecFile(ctx, 'auth/login', 'verify.md')).resolves.toBe('new verify')
+    })
+
+    it('preserves canonical files when staged publication fails', async () => {
+      await writeSpecFile(ctx, 'auth/login', 'spec.md', '# Stable')
+      const spec = makeSpec(ctx, 'auth/login', ['spec.md'])
+
+      await expect(
+        ctx.repo.publish(spec, {
+          artifacts: [new SpecArtifact('../escape.md', '# Broken')],
+        }),
+      ).rejects.toThrow('manual recovery')
+
+      await expect(readSpecFile(ctx, 'auth/login', 'spec.md')).resolves.toBe('# Stable')
+
+      const parentDir = path.join(ctx.specsPath, 'auth')
+      const entries = await fs.readdir(parentDir)
+      expect(entries.some((entry) => entry.startsWith('login.staging-'))).toBe(true)
     })
   })
 
@@ -666,6 +702,19 @@ describe('FsSpecRepository', () => {
       )
     })
 
+    it('saveSpecLock() throws ReadOnlyWorkspaceError', async () => {
+      const { ReadOnlyWorkspaceError } =
+        await import('../../../src/domain/errors/read-only-workspace-error.js')
+      const spec = makeSpec(roCtx, 'auth/tokens', ['spec.md'])
+
+      await expect(
+        roCtx.repo.saveSpecLock(spec, {
+          schema: { name: 'schema-std', version: 1 },
+          dependsOn: ['core:storage'],
+        }),
+      ).rejects.toThrow(ReadOnlyWorkspaceError)
+    })
+
     it('get() still works on readOnly workspace', async () => {
       const specPath = SpecPath.parse('auth/tokens')
       const result = await roCtx.repo.get(specPath)
@@ -770,6 +819,104 @@ describe('FsSpecRepository', () => {
       expect(exists).toBe(true)
 
       await fs.rm(tmpDir, { recursive: true, force: true })
+    })
+  })
+
+  describe('spec-lock sidecar', () => {
+    function makeSpecLockData(
+      overrides: Partial<SpecLockData> = {},
+      originalHash?: string,
+    ): SpecLockData {
+      return {
+        schema: { name: 'schema-std', version: 1 },
+        dependsOn: ['core:storage'],
+        ...overrides,
+        ...(originalHash !== undefined ? { originalHash } : {}),
+      }
+    }
+
+    it('readSpecLock() returns null when absent', async () => {
+      const spec = makeSpec(ctx, 'auth/login', ['spec.md'])
+
+      await expect(ctx.repo.readSpecLock(spec)).resolves.toBeNull()
+    })
+
+    it('saveSpecLock() persists and readSpecLock() parses content', async () => {
+      const spec = makeSpec(ctx, 'auth/login', ['spec.md'])
+
+      await ctx.repo.saveSpecLock(
+        spec,
+        makeSpecLockData({ dependsOn: ['core:storage', 'default:_global/architecture'] }),
+      )
+
+      const result = await ctx.repo.readSpecLock(spec)
+      expect(result).not.toBeNull()
+      expect(result!.schema).toEqual({ name: 'schema-std', version: 1 })
+      expect(result!.dependsOn).toEqual(['core:storage', 'default:_global/architecture'])
+      expect(result!.originalHash).toBeDefined()
+    })
+
+    it('saveSpecLock() enforces conflict detection', async () => {
+      const spec = makeSpec(ctx, 'auth/login', ['spec.md'])
+
+      await ctx.repo.saveSpecLock(spec, makeSpecLockData())
+      const original = await ctx.repo.readSpecLock(spec)
+      expect(original).not.toBeNull()
+
+      await writeSpecFile(
+        ctx,
+        'auth/login',
+        'spec-lock.json',
+        JSON.stringify(
+          {
+            schema: { name: 'schema-std', version: 1 },
+            dependsOn: ['core:changed'],
+          },
+          null,
+          2,
+        ) + '\n',
+      )
+
+      await expect(
+        ctx.repo.saveSpecLock(
+          spec,
+          makeSpecLockData({ dependsOn: ['core:storage', 'core:auth'] }, original!.originalHash),
+        ),
+      ).rejects.toBeInstanceOf(ArtifactConflictError)
+    })
+
+    it('saveSpecLock() force overwrites on hash mismatch', async () => {
+      const spec = makeSpec(ctx, 'auth/login', ['spec.md'])
+
+      await ctx.repo.saveSpecLock(spec, makeSpecLockData())
+      await writeSpecFile(
+        ctx,
+        'auth/login',
+        'spec-lock.json',
+        JSON.stringify(
+          {
+            schema: { name: 'schema-std', version: 1 },
+            dependsOn: ['core:changed'],
+          },
+          null,
+          2,
+        ) + '\n',
+      )
+
+      await ctx.repo.saveSpecLock(
+        spec,
+        makeSpecLockData({ dependsOn: ['core:storage', 'core:auth'] }, sha256('stale')),
+        { force: true },
+      )
+
+      const result = await ctx.repo.readSpecLock(spec)
+      expect(result!.dependsOn).toEqual(['core:storage', 'core:auth'])
+    })
+
+    it('artifact() rejects spec-lock.json through the normal artifact API', async () => {
+      const spec = makeSpec(ctx, 'auth/login', ['spec.md'])
+
+      await expect(ctx.repo.artifact(spec, 'spec-lock.json')).rejects.toThrow()
     })
   })
 

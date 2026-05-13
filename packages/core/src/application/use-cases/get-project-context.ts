@@ -16,15 +16,13 @@ import {
 } from './compile-context.js'
 import { shiftHeadings } from '../../domain/services/shift-headings.js'
 import { type ContentHasher } from '../ports/content-hasher.js'
-import { extractMetadata, type SubtreeRenderer } from '../../domain/services/extract-metadata.js'
-import { type SelectorNode } from '../../domain/services/selector-matching.js'
 import { listMatchingSpecs, type ResolvedSpec } from './_shared/spec-pattern-matching.js'
 import { traverseDependsOn, type DependsOnFallback } from './_shared/depends-on-traversal.js'
-import { createExtractorTransformContext } from './_shared/extractor-transform-context.js'
+import { type SpecWorkspaceRoute } from './_shared/spec-reference-resolver.js'
 import {
-  createSpecReferenceResolver,
-  type SpecWorkspaceRoute,
-} from './_shared/spec-reference-resolver.js'
+  extractMetadataFromSpecArtifacts,
+  type MetadataArtifactInput,
+} from './_shared/extract-metadata-from-spec-artifacts.js'
 
 /** Input for the {@link GetProjectContext} use case. */
 export interface GetProjectContextInput {
@@ -338,15 +336,7 @@ export class GetProjectContext {
     extraction: import('../../domain/value-objects/metadata-extraction.js').MetadataExtraction,
     sectionsFilter: ReadonlyArray<import('./compile-context.js').SpecSection> | undefined,
   ): Promise<string[]> {
-    const astsByArtifact = new Map<string, { root: SelectorNode }>()
-    const renderers = new Map<string, SubtreeRenderer>()
-    const transformContexts = new Map<string, ReturnType<typeof createExtractorTransformContext>>()
-    const resolveSpecReference = createSpecReferenceResolver({
-      originWorkspace: spec.workspace,
-      originSpecPath: spec.name,
-      repositories: this._specs,
-      workspaceRoutes: this._workspaceRoutes,
-    })
+    const artifacts: MetadataArtifactInput[] = []
 
     for (const artifactType of schema.artifacts()) {
       if (artifactType.scope !== 'spec') continue
@@ -358,36 +348,30 @@ export class GetProjectContext {
       const artifactFile = await specRepo.artifact(spec, filename)
       if (artifactFile === null) continue
 
-      const ast = parser.parse(artifactFile.content)
-      astsByArtifact.set(artifactType.id, ast)
-      renderers.set(artifactType.id, parser as SubtreeRenderer)
-      transformContexts.set(
-        artifactType.id,
-        createExtractorTransformContext(
-          spec.workspace,
-          spec.name.toString(),
-          artifactType.id,
-          filename,
-          {
-            resolveSpecReference,
-          },
-        ),
-      )
+      artifacts.push({
+        artifactId: artifactType.id,
+        filename,
+        format,
+        content: artifactFile.content,
+      })
     }
 
-    const extracted = await extractMetadata(
-      extraction,
-      astsByArtifact,
-      renderers,
-      this._extractorTransforms,
-      transformContexts,
-    )
+    const extracted = await extractMetadataFromSpecArtifacts({
+      effectiveSpecSchema: schema,
+      workspace: spec.workspace,
+      specPath: spec.name,
+      artifacts,
+      parsers: this._parsers,
+      extractorTransforms: this._extractorTransforms,
+      repositories: this._specs,
+      workspaceRoutes: this._workspaceRoutes,
+    })
     const metaParts: string[] = []
 
     // Description is always included in full mode as part of the content string
     // if it exists (header persistence).
-    if (extracted.description !== undefined) {
-      metaParts.push(`**Description:** ${extracted.description}`)
+    if (extracted.metadata.description !== undefined) {
+      metaParts.push(`**Description:** ${extracted.metadata.description}`)
     }
 
     // If no sections are provided, default to Rules + Constraints.
@@ -396,17 +380,19 @@ export class GetProjectContext {
         ? (['rules', 'constraints'] as const)
         : sectionsFilter
 
-    if (effectiveSections.includes('rules') && extracted.rules?.length) {
-      const rulesText = extracted.rules
+    if (effectiveSections.includes('rules') && extracted.metadata.rules?.length) {
+      const rulesText = extracted.metadata.rules
         .map((r) => `##### ${r.requirement}\n${r.rules.map((rule) => `- ${rule}`).join('\n')}`)
         .join('\n\n')
       metaParts.push(`#### Rules\n\n${rulesText}`)
     }
-    if (effectiveSections.includes('constraints') && extracted.constraints?.length) {
-      metaParts.push(`#### Constraints\n\n${extracted.constraints.map((c) => `- ${c}`).join('\n')}`)
+    if (effectiveSections.includes('constraints') && extracted.metadata.constraints?.length) {
+      metaParts.push(
+        `#### Constraints\n\n${extracted.metadata.constraints.map((c) => `- ${c}`).join('\n')}`,
+      )
     }
-    if (effectiveSections.includes('scenarios') && extracted.scenarios?.length) {
-      const scenariosText = extracted.scenarios
+    if (effectiveSections.includes('scenarios') && extracted.metadata.scenarios?.length) {
+      const scenariosText = extracted.metadata.scenarios
         .map((s) => {
           const lines: string[] = [`##### Scenario: ${s.name}`, `*Requirement: ${s.requirement}*`]
           if (s.given?.length) lines.push(`**Given:** ${s.given.join('; ')}`)

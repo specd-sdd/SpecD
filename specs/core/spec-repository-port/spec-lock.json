@@ -1,0 +1,17 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "core:repository-port",
+    "default:_global/architecture",
+    "core:change",
+    "core:storage",
+    "core:workspace",
+    "core:spec-id-format",
+    "core:spec-metadata",
+    "core:search-specs",
+    "default:_global/logging"
+  ]
+}

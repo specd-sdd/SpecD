@@ -43,6 +43,20 @@ If any spec ID in `removeSpecIds` is not present in the change's current `specId
 
 If a spec ID in `addSpecIds` already exists in the change's `specIds` (after removals), it MUST be silently skipped — no duplicate is added and no error is thrown.
 
+### Requirement: Seed specDependsOn for added specs
+
+When `EditChange.execute` effectively adds a spec ID that was not already present in the change, it MUST seed `change.specDependsOn` for that spec before returning the updated change.
+
+Seeding rules:
+
+- Seeding applies only to spec IDs newly entering the change scope.
+- If a canonical `spec-lock.json` exists for the spec, its `dependsOn` value MUST be used.
+- Otherwise, if legacy `metadata.json.dependsOn` exists for the spec, that value MUST be used.
+- Otherwise, the seeded value is an empty array.
+- If the spec already has an entry in `change.specDependsOn`, `EditChange` MUST NOT overwrite it just because the scope was edited again later.
+
+This seeding establishes the baseline dependency snapshot for the change so later artifact validation and archive do not start from an empty dependency set for existing specs.
+
 ### Requirement: No-op when specIds unchanged after processing
 
 If the resulting `specIds` list is identical (same length, same order) to the change's current `specIds`, the use case MUST return the unchanged change with `invalidated: false` without persisting.
@@ -84,7 +98,7 @@ is silently skipped.
 
 - `ChangeRepository` — for loading, persisting, scaffolding, and unscaffolding changes
 - `ActorResolver` — for resolving the current actor identity
-- `specs: ReadonlyMap<string, SpecRepository>` — spec repositories keyed by workspace name, used for the `specExists` check during scaffolding
+- `specs: ReadonlyMap<string, SpecRepository>` — spec repositories keyed by workspace name, used for the `specExists` check during scaffolding and for reading persisted dependency state when seeding `change.specDependsOn`
 
 ## Constraints
 

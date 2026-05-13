@@ -20,6 +20,9 @@ Each change is persisted as a `manifest.json` file inside its change directory. 
     "version": 2,
   },
   "specIds": ["default:auth/login", "default:auth/register"],
+  "specDependsOn": {
+    "default:auth/login": ["default:auth/shared"],
+  },
   "artifacts": [
     {
       "type": "proposal",
@@ -35,58 +38,8 @@ Each change is persisted as a `manifest.json` file inside its change directory. 
         },
       ],
     },
-    {
-      "type": "specs",
-      "optional": false,
-      "requires": ["proposal"],
-      "state": "drifted-pending-review",
-      "files": [
-        {
-          "key": "default:auth/login",
-          "filename": "specs/default/auth/login/spec.md",
-          "state": "complete",
-          "validatedHash": "sha256:def456...",
-        },
-        {
-          "key": "default:auth/register",
-          "filename": "specs/default/auth/register/spec.md",
-          "state": "drifted-pending-review",
-          "validatedHash": "sha256:ghi789...",
-        },
-      ],
-    },
-    {
-      "type": "design",
-      "optional": true,
-      "requires": ["proposal"],
-      "state": "skipped",
-      "files": [
-        {
-          "key": "design",
-          "filename": "design.md",
-          "state": "skipped",
-          "validatedHash": "__skipped__",
-        },
-      ],
-    },
   ],
-  "history": [
-    {
-      "type": "created",
-      "at": "2024-03-15T10:00:00.000Z",
-      "by": { "name": "Alice", "email": "alice@example.com" },
-      "specIds": ["default:auth/login", "default:auth/register"],
-      "schemaName": "@specd/schema-std",
-      "schemaVersion": 2,
-    },
-    {
-      "type": "transitioned",
-      "at": "2024-03-15T10:01:00.000Z",
-      "by": { "name": "Alice", "email": "alice@example.com" },
-      "from": "drafting",
-      "to": "designing",
-    },
-  ],
+  "history": [],
 }
 ```
 
@@ -97,55 +50,13 @@ Field definitions:
 - **`schema`** — `name` (string) and `version` (integer) of the schema active at creation; written once, never updated
 - **`workspaces`** — optional; accepted on load for backward compatibility with older manifests but no longer written on save. Active workspaces are derived at runtime from `specIds` via `parseSpecId()`
 - **`specIds`** — current snapshot of spec IDs; mutable
-- **`specDependsOn`** (optional) — a record keyed by spec ID, each value being an array of spec ID strings representing that spec's declared dependencies. Captured at authoring time to ensure dependencies are tracked even before metadata is generated. Omitted from the manifest when empty.
+- **`specDependsOn`** (optional) — a record keyed by spec ID, each value being an array of spec ID strings representing that spec's current in-change declared dependencies. For existing persisted specs, the entry MUST be seeded when the spec first enters the change scope from `spec-lock.json`, then legacy `metadata.json.dependsOn`, then an empty set when neither exists. These entries are archive-time inputs to sidecar and metadata generation, not the long-term archived record.
 - **`artifacts`** — array of artifact descriptors. Each artifact has `type`, `optional`, `requires`, `state`, and a `files` array of `ManifestArtifactFile` entries. Each file entry has `key`, `filename`, `state`, and `validatedHash`.
 - **`state`** on both artifacts and files uses the `ArtifactStatus` domain values (`missing`, `in-progress`, `complete`, `skipped`, `pending-review`, `drifted-pending-review`). File state is the source of truth; artifact state is the persisted aggregate.
 - **`validatedHash`** remains persisted for drift detection and approval signatures. It is `null` when not validated, a SHA-256 string when validated, or `"__skipped__"` when explicitly skipped.
-- **`history`** — append-only array of typed events. The event types, their semantics, and the derivation rules (current state, active approval, draft status) are defined in [`specs/core/change/spec.md` — Requirement: History and event sourcing](../change/spec.md). This section defines only the JSON serialization of those events. The current lifecycle state is derived from the most recent `transitioned` event's `to` field.
+- **`history`** — append-only array of typed events. The event types, their semantics, and the derivation rules (current state, active approval, draft status) are defined in [`specs/core/change/spec.md` — Requirement: History and event sourcing](../change/spec.md). This section defines only the JSON serialization of those events. The current lifecycle state is derived from the most recent `transitioned` event's `to` field. Each event contains common fields: `type`, `at`, and `by`. The `by` field is an `ActorIdentity` object (defined in `core:change`) which includes `name`, `email`, and optional `provider`, `providerId`, and `metadata`.
 
-  history — append-only array of typed events. Each event contains common fields: `type`, `at`, and `by`. The `by` field is an `ActorIdentity` object (defined in `core:change`) which includes `name`, `email`, and optional `provider`, `providerId`, and `metadata`.
-
-The JSON serialization of each event type is:
-
-```jsonc
-// state transition
-{ "type": "transitioned", "at": "...", "by": { "name": "...", "email": "..." }, "from": "drafting", "to": "designing" }
-
-// spec gate approved
-{ "type": "spec-approved", "at": "...", "by": { "name": "...", "email": "..." }, "reason": "LGTM", "artifactHashes": { "proposal:proposal": "sha256:...", "specs:default:auth/login": "sha256:..." } }
-
-// signoff gate passed
-{ "type": "signed-off", "at": "...", "by": { "name": "...", "email": "..." }, "reason": "Ship it", "artifactHashes": { "proposal:proposal": "sha256:...", "specs:default:auth/login": "sha256:..." } }
-
-// approval invalidated
-{
-  "type": "invalidated",
-  "at": "...",
-  "by": { "name": "...", "email": "..." },
-  "cause": "artifact-drift",
-  "message": "Invalidated because validated artifacts drifted",
-  "affectedArtifacts": [
-    { "type": "specs", "files": ["default:auth/login", "default:auth/register"] }
-  ]
-}
-
-// shelved to drafts/
-{ "type": "drafted", "at": "...", "by": { "name": "...", "email": "..." }, "reason": "parking for now" }
-
-// restored from drafts/
-{ "type": "restored", "at": "...", "by": { "name": "...", "email": "..." } }
-
-// optional artifact explicitly marked as not produced
-{ "type": "artifact-skipped", "at": "...", "by": { "name": "...", "email": "..." }, "artifactId": "design", "reason": "not needed for this change" }
-
-// artifact sync reconciled the artifact map against the schema
-{ "type": "artifacts-synced", "at": "...", "by": { "name": "specd", "email": "system@getspecd.dev" }, "typesAdded": ["tasks"], "typesRemoved": [], "filesAdded": [{ "type": "specs", "key": "default:auth/register" }], "filesRemoved": [] }
-
-// permanently abandoned
-{ "type": "discarded", "at": "...", "by": { "name": "...", "email": "..." }, "reason": "superseded", "supersededBy": ["new-auth-flow"] }
-```
-
-On read, the manifest loader MUST also accept legacy historical invalidation events that persisted `"cause": "artifact-change"`. That legacy value is a backward-compatible alias for `"artifact-drift"` and MUST be normalized to the current domain cause during deserialization instead of being treated as corruption.
+The JSON serialization of each event type is unchanged.
 
 ### Requirement: Archive outcome history events
 

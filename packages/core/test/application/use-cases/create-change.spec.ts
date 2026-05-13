@@ -1,7 +1,15 @@
 import { describe, it, expect } from 'vitest'
 import { CreateChange } from '../../../src/application/use-cases/create-change.js'
 import { ChangeAlreadyExistsError } from '../../../src/application/errors/change-already-exists-error.js'
-import { makeChangeRepository, makeActorResolver, makeChange, testActor } from './helpers.js'
+import { Spec } from '../../../src/domain/entities/spec.js'
+import { SpecPath } from '../../../src/domain/value-objects/spec-path.js'
+import {
+  makeChangeRepository,
+  makeActorResolver,
+  makeChange,
+  makeSpecRepository,
+  testActor,
+} from './helpers.js'
 
 describe('CreateChange', () => {
   describe('given no existing change with that name', () => {
@@ -99,6 +107,69 @@ describe('CreateChange', () => {
       })
 
       expect(result.change.specIds).toEqual(['auth/login'])
+    })
+
+    it('seeds specDependsOn from spec-lock when the spec already exists', async () => {
+      const repo = makeChangeRepository()
+      const specRepo = makeSpecRepository({
+        specs: [new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])],
+        artifacts: {
+          'auth/login/spec-lock.json': JSON.stringify({
+            schema: { name: 'schema-std', version: 1 },
+            dependsOn: ['core:storage'],
+          }),
+        },
+      })
+      const uc = new CreateChange(repo, new Map([['default', specRepo]]), makeActorResolver())
+
+      const result = await uc.execute({
+        name: 'seed-from-sidecar',
+        specIds: ['auth/login'],
+        schemaName: 'specd-std',
+        schemaVersion: 1,
+      })
+
+      expect(result.change.specDependsOn.get('auth/login')).toEqual(['core:storage'])
+    })
+
+    it('falls back to metadata dependsOn when sidecar is absent', async () => {
+      const repo = makeChangeRepository()
+      const specRepo = makeSpecRepository({
+        specs: [new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])],
+        artifacts: {
+          'auth/login/.specd-metadata.yaml': JSON.stringify({
+            dependsOn: ['core:storage', 'core:change'],
+          }),
+        },
+      })
+      const uc = new CreateChange(repo, new Map([['default', specRepo]]), makeActorResolver())
+
+      const result = await uc.execute({
+        name: 'seed-from-metadata',
+        specIds: ['auth/login'],
+        schemaName: 'specd-std',
+        schemaVersion: 1,
+      })
+
+      expect(result.change.specDependsOn.get('auth/login')).toEqual(['core:storage', 'core:change'])
+    })
+
+    it('does not seed a missing spec', async () => {
+      const repo = makeChangeRepository()
+      const uc = new CreateChange(
+        repo,
+        new Map([['default', makeSpecRepository({ specs: [] })]]),
+        makeActorResolver(),
+      )
+
+      const result = await uc.execute({
+        name: 'missing-spec',
+        specIds: ['auth/login'],
+        schemaName: 'specd-std',
+        schemaVersion: 1,
+      })
+
+      expect(result.change.specDependsOn.has('auth/login')).toBe(false)
     })
   })
 

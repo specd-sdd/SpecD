@@ -1,0 +1,18 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "core:change",
+    "core:change-layout",
+    "core:change-manifest",
+    "core:lifecycle-engine",
+    "core:schema-format",
+    "core:delta-format",
+    "core:selector-model",
+    "core:storage",
+    "default:_global/architecture",
+    "core:spec-id-format"
+  ]
+}
