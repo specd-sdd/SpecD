@@ -301,11 +301,21 @@
 - **WHEN** `ValidateArtifacts.execute` runs
 - **THEN** the relational rule is evaluated during that invocation
 
+#### Scenario: Completed counterpart is rehydrated for a later validation pass
+
+- **GIVEN** a cross-artifact rule references `specs` and `verify`
+- **AND** `specs` was validated successfully in an earlier invocation and is already `complete`
+- **AND** the current invocation validates `verify`
+- **AND** `verify` becomes locally valid in that invocation
+- **WHEN** `ValidateArtifacts.execute` evaluates the rule
+- **THEN** it reloads and rehydrates the `specs` participant from its expected artifact content
+- **AND** it evaluates the relational rule instead of deferring solely because `specs` was not parsed in the current invocation
+
 #### Scenario: Missing ready participant defers cross-artifact validation
 
 - **GIVEN** a cross-artifact rule references `specs` and `verify`
 - **AND** `verify` is locally valid
-- **AND** `specs` is missing or still locally invalid
+- **AND** `specs` is missing, still locally invalid, or cannot be rehydrated from complete state
 - **WHEN** `ValidateArtifacts.execute` runs
 - **THEN** the relational rule is deferred
 - **AND** the result includes a non-failing warning explaining why it was deferred

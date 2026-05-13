@@ -1,0 +1,47 @@
+- op: modified
+  description: Cover rehydration of completed cross-artifact participants and keep defer only for genuinely unavailable participants.
+  selector:
+    type: section
+    matches: '^Requirement: Cross-artifact structural validation$'
+  content: |
+    #### Scenario: Spec-scoped relation compares merged outputs
+
+    - **GIVEN** `specs` and `verify` are delta-capable `scope: spec` artifacts for the same spec
+    - **AND** both local validations pass
+    - **WHEN** `ValidateArtifacts.execute` evaluates a matching cross-artifact rule
+    - **THEN** it compares the merged/materialized outputs, not the raw delta YAML files
+
+    #### Scenario: Single-artifact validation still runs relevant cross-artifact rules
+
+    - **GIVEN** validation is invoked with `artifactId: verify`
+    - **AND** a cross-artifact rule references `verify` and `specs`
+    - **AND** both participants are locally valid and available
+    - **WHEN** `ValidateArtifacts.execute` runs
+    - **THEN** the relational rule is evaluated during that invocation
+
+    #### Scenario: Completed counterpart is rehydrated for a later validation pass
+
+    - **GIVEN** a cross-artifact rule references `specs` and `verify`
+    - **AND** `specs` was validated successfully in an earlier invocation and is already `complete`
+    - **AND** the current invocation validates `verify`
+    - **AND** `verify` becomes locally valid in that invocation
+    - **WHEN** `ValidateArtifacts.execute` evaluates the rule
+    - **THEN** it reloads and rehydrates the `specs` participant from its expected artifact content
+    - **AND** it evaluates the relational rule instead of deferring solely because `specs` was not parsed in the current invocation
+
+    #### Scenario: Missing ready participant defers cross-artifact validation
+
+    - **GIVEN** a cross-artifact rule references `specs` and `verify`
+    - **AND** `verify` is locally valid
+    - **AND** `specs` is missing, still locally invalid, or cannot be rehydrated from complete state
+    - **WHEN** `ValidateArtifacts.execute` runs
+    - **THEN** the relational rule is deferred
+    - **AND** the result includes a non-failing warning explaining why it was deferred
+
+    #### Scenario: Ordered subset preserves relative order
+
+    - **GIVEN** a cross-artifact rule with `kind: subset` and `options.ordering: strict`
+    - **AND** participant `A` yields keys `[a, c]`
+    - **AND** participant `B` yields keys `[a, b, c]`
+    - **WHEN** `ValidateArtifacts.execute` evaluates the rule
+    - **THEN** the rule passes because `A` appears as an order-preserving subsequence of `B`

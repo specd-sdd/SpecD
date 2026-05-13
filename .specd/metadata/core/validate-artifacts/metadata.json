@@ -98,7 +98,7 @@
     {
       "requirement": "Cross-artifact structural validation",
       "rules": [
-        "After local artifact validation succeeds, `ValidateArtifacts` MUST evaluate any applicable `crossArtifactValidations` declared by the schema.\n\nApplicability rules:\n\n- only rules whose `scope` matches the artifact scope being validated are eligible\n- only rules whose participants all belong to the same target spec and the same scope are eligible\n- when `artifactId` is provided, only cross-artifact rules that reference that artifact are eligible for evaluation in that invocation\n\nParticipant readiness rules:\n\n- a participant is ready only when its expected file exists, its local structural validation has already passed, and its parsed artifact output is available\n- for `scope: spec`, the parsed artifact output MUST be the merged/materialized artifact preview produced by delta application or direct-file validation\n- for `scope: change`, the parsed artifact output MUST come from the direct change artifact file\n\nEvaluation rules:\n\n1. Resolve each participant's `selector` against its artifact AST.\n2. If the participant declares `keySelector`, resolve it relative to each node matched by the main `selector`; otherwise use the main selector matches directly as key-producing nodes.\n3. Extract comparable keys using `key.from`, then apply any `capture` and `strip` normalization declared by the schema.\n4. Evaluate the participant key collections using `relation.kind`, `relation.between`, and any operator-specific `relation.options`.\n\nRelation semantics:\n\n- `all-equal` compares all aliases named in `between`\n- `subset` is directional: `between: [A, B]` means all keys from `A` MUST appear in `B`\n- `superset` is directional: `between: [A, B]` means all keys from `B` MUST appear in `A`\n- `relation.options.ordering: ignore` performs unordered comparison\n- `relation.options.ordering: strict` performs ordered comparison; for `subset` and `superset`, strict ordering means relative-order preservation rather than exact positional alignment\n\nIf every participant required by a rule is ready, `ValidateArtifacts` MUST evaluate the rule and record any mismatch as a validation failure for the participating artifact set.\n\nIf one or more required participants are not ready yet, `ValidateArtifacts` MUST defer that cross-artifact rule for the current invocation and MUST surface a non-failing validation output entry explaining that the rule was not evaluated because all participants were not yet available as locally valid parsed outputs."
+        "After local artifact validation succeeds, `ValidateArtifacts` MUST evaluate any applicable `crossArtifactValidations` declared by the schema.\n\nApplicability rules:\n\n- only rules whose `scope` matches the artifact scope being validated are eligible\n- only rules whose participants all belong to the same target spec and the same scope are eligible\n- when `artifactId` is provided, only cross-artifact rules that reference that artifact are eligible for evaluation in that invocation\n\nParticipant readiness rules:\n\n- a participant is ready only when its expected file exists, its local structural validation has already passed, and its parsed artifact output is available\n- for `scope: spec`, the parsed artifact output MUST be the merged/materialized artifact preview produced by delta application or direct-file validation\n- for `scope: change`, the parsed artifact output MUST come from the direct change artifact file\n- when a participant is not being structurally validated in the current invocation, `ValidateArtifacts` MUST rehydrate it from the expected artifact content if that participant is already in `complete` state and the rule being evaluated requires it\n- rehydration MUST reconstruct the same parsed/materialized output shape that the participant would have contributed if it had been validated in the current invocation\n- `ValidateArtifacts` MUST NOT defer a rule solely because a required participant was validated in an earlier invocation, provided that participant can be rehydrated from its current complete artifact state\n\nEvaluation rules:\n\n1. Resolve each participant's `selector` against its artifact AST.\n2. If the participant declares `keySelector`, resolve it relative to each node matched by the main `selector`; otherwise use the main selector matches directly as key-producing nodes.\n3. Extract comparable keys using `key.from`, then apply any `capture` and `strip` normalization declared by the schema.\n4. Evaluate the participant key collections using `relation.kind`, `relation.between`, and any operator-specific `relation.options`.\n\nRelation semantics:\n\n- `all-equal` compares all aliases named in `between`\n- `subset` is directional: `between: [A, B]` means all keys from `A` MUST appear in `B`\n- `superset` is directional: `between: [A, B]` means all keys from `B` MUST appear in `A`\n- `relation.options.ordering: ignore` performs unordered comparison\n- `relation.options.ordering: strict` performs ordered comparison; for `subset` and `superset`, strict ordering means relative-order preservation rather than exact positional alignment\n\nIf every participant required by a rule is ready, `ValidateArtifacts` MUST evaluate the rule and record any mismatch as a validation failure for the participating artifact set.\n\nIf one or more required participants are not ready yet, `ValidateArtifacts` MUST defer that cross-artifact rule for the current invocation and MUST surface a non-failing validation output entry explaining that the rule was not evaluated because all participants were not yet available as locally valid parsed outputs. Participants that are missing, not yet locally valid, or not rehydratable from complete state remain not ready for this purpose."
       ]
     },
     {
@@ -571,11 +571,26 @@
     },
     {
       "requirement": "Cross-artifact structural validation",
+      "name": "Completed counterpart is rehydrated for a later validation pass",
+      "given": [
+        "a cross-artifact rule references specs and verify",
+        "AND specs was validated successfully in an earlier invocation and is already complete",
+        "AND the current invocation validates verify",
+        "AND verify becomes locally valid in that invocation"
+      ],
+      "when": ["ValidateArtifacts.execute evaluates the rule"],
+      "then": [
+        "it reloads and rehydrates the specs participant from its expected artifact content",
+        "AND it evaluates the relational rule instead of deferring solely because specs was not parsed in the current invocation"
+      ]
+    },
+    {
+      "requirement": "Cross-artifact structural validation",
       "name": "Missing ready participant defers cross-artifact validation",
       "given": [
         "a cross-artifact rule references specs and verify",
         "AND verify is locally valid",
-        "AND specs is missing or still locally invalid"
+        "AND specs is missing, still locally invalid, or cannot be rehydrated from complete state"
       ],
       "when": ["ValidateArtifacts.execute runs"],
       "then": [
@@ -881,8 +896,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:0e8b5f776d2ccd14163435458b481dfe77faefb53bce6c6756bda79d51accbd1",
-    "verify.md": "sha256:eb4c2639f00af4a1c2e5fbfebbd0e401ae8e55295520a7fdafbee8e936ee64b9"
+    "spec.md": "sha256:5823a0082b7d8b29d5dc1d12b2c1f577d3c8af5d43ad96e325f0b9d2c3f05302",
+    "verify.md": "sha256:d09780f4fcc9a58de159f4786f015075fd48796931fcd9170553b417ff4d6a99"
   },
   "generatedBy": "core"
 }

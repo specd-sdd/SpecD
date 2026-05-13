@@ -30,7 +30,10 @@ import { type SelectorNode } from '../../domain/services/selector-matching.js'
 import * as path from 'node:path'
 import { type SpecWorkspaceRoute } from './_shared/spec-reference-resolver.js'
 import { Logger } from '../logger.js'
-import { type ReadyArtifactParticipant } from './_shared/cross-artifact-participant-state.js'
+import {
+  type ReadyArtifactParticipant,
+  rehydrateReadyArtifactParticipant,
+} from './_shared/cross-artifact-participant-state.js'
 import { extractMetadataFromSpecArtifacts } from './_shared/extract-metadata-from-spec-artifacts.js'
 
 /** Input for the {@link ValidateArtifacts} use case. */
@@ -560,6 +563,11 @@ export class ValidateArtifacts {
       }
     }
 
+    const artifactIdScope =
+      input.artifactId !== undefined
+        ? schema.artifacts().find((a) => a.id === input.artifactId)?.scope
+        : undefined
+
     for (const rule of crossRules) {
       if (
         input.artifactId !== undefined &&
@@ -567,10 +575,47 @@ export class ValidateArtifacts {
       ) {
         continue
       }
+      if (rule.scope === 'spec' && artifactIdScope === 'change') continue
+      if (rule.scope === 'change' && artifactIdScope === 'spec') continue
+
       const participantInputs = new Map()
       let deferred = false
       for (const participant of rule.participants) {
-        const ready = readyParticipants.get(participant.artifact)
+        let ready = readyParticipants.get(participant.artifact)
+
+        if (ready === undefined) {
+          const participantArtifactType = schema
+            .artifacts()
+            .find((a) => a.id === participant.artifact)
+          if (participantArtifactType !== undefined) {
+            const participantFileKey =
+              participantArtifactType.scope === 'change'
+                ? participantArtifactType.id
+                : input.specPath
+
+            const changeArtifact = change.getArtifact(participant.artifact)
+            const trackedFile = changeArtifact?.getFile(participantFileKey)
+            if (trackedFile?.status === 'complete') {
+              const rehydrated = await rehydrateReadyArtifactParticipant({
+                change,
+                artifactType: participantArtifactType,
+                fileKey: participantFileKey,
+                workspace,
+                capabilityPath,
+                specExists,
+                changes: this._changes,
+                specs: this._specs,
+                parsers: this._parsers,
+                schema,
+              })
+              if (rehydrated !== null) {
+                ready = rehydrated
+                readyParticipants.set(participant.artifact, rehydrated)
+              }
+            }
+          }
+        }
+
         if (ready === undefined || ready.scope !== rule.scope) {
           deferred = true
           break

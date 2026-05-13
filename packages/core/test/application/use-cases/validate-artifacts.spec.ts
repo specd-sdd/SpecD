@@ -2740,5 +2740,726 @@ describe('ValidateArtifacts', () => {
         ),
       ).toBe(true)
     })
+
+    describe('participant rehydration', () => {
+      function makeCrossRuleSchema(opts: { delta?: boolean } = {}) {
+        const specsType = makeArtifactType('specs', {
+          scope: 'spec',
+          output: 'spec.md',
+          ...(opts.delta === true ? { delta: true } : {}),
+        })
+        const verifyType = makeArtifactType('verify', {
+          scope: 'spec',
+          output: 'verify.md',
+          ...(opts.delta === true ? { delta: true } : {}),
+        })
+        return makeSchema({
+          artifacts: [specsType, verifyType],
+          crossArtifactValidations: [
+            {
+              id: 'mirrored-requirements',
+              scope: 'spec',
+              participants: [
+                {
+                  artifact: 'specs',
+                  as: 'specRequirements',
+                  selector: { type: 'section', matches: '^Requirement:' },
+                  key: { from: 'label', strip: '^Requirement:\\s*' },
+                },
+                {
+                  artifact: 'verify',
+                  as: 'verifyRequirements',
+                  selector: { type: 'section', matches: '^Requirement:' },
+                  key: { from: 'label', strip: '^Requirement:\\s*' },
+                },
+              ],
+              relation: {
+                kind: 'all-equal',
+                between: ['specRequirements', 'verifyRequirements'],
+                options: { ordering: 'ignore' },
+              },
+            },
+          ],
+        })
+      }
+
+      function makeRequirementParser() {
+        return makeParser({
+          parse(content: string): ArtifactAST {
+            const children = content
+              .split('\n')
+              .map((line) => line.trim())
+              .filter((line) => line.startsWith('Requirement:'))
+              .map((line) => ({ type: 'section', label: line }) satisfies ArtifactNode)
+            return { root: { type: 'document', children } }
+          },
+        })
+      }
+
+      it('rehydrates completed specs participant when validating verify in a later invocation', async () => {
+        const schema = makeCrossRuleSchema()
+        const key = 'default:auth'
+        const specsFilename = 'specs/default/auth/spec.md'
+        const verifyFilename = 'specs/default/auth/verify.md'
+
+        const specsArtifact = new ChangeArtifact({
+          type: 'specs',
+          files: new Map([
+            [
+              key,
+              new ArtifactFile({
+                key,
+                filename: specsFilename,
+                status: 'complete',
+                validatedHash: sha256('Requirement: A\nRequirement: B'),
+              }),
+            ],
+          ]),
+        })
+        const verifyArtifact = new ChangeArtifact({
+          type: 'verify',
+          files: new Map([
+            [key, new ArtifactFile({ key, filename: verifyFilename, status: 'in-progress' })],
+          ]),
+        })
+        const change = makeChangeWithArtifacts('c', [specsArtifact, verifyArtifact], {
+          specIds: [key],
+        })
+        const repo = makeChangeRepository([change])
+        const files = new Map<string, string>([
+          [specsFilename, 'Requirement: A\nRequirement: B'],
+          [verifyFilename, 'Requirement: B\nRequirement: A'],
+        ])
+        Object.assign(repo, {
+          async artifact(_change: Change, filename: string): Promise<SpecArtifact | null> {
+            const c = files.get(filename)
+            return c !== undefined ? new SpecArtifact(filename, c) : null
+          },
+        })
+
+        const parser = makeRequirementParser()
+        const uc = new ValidateArtifacts(
+          repo,
+          new Map([['default', makeSpecRepository()]]),
+          makeSchemaProvider(schema),
+          makeParsers(parser, makeParser()),
+          makeActorResolver(),
+          makeContentHasher(),
+        )
+
+        const result = await uc.execute({
+          name: 'c',
+          specPath: key,
+          artifactId: 'verify',
+        })
+
+        expect(result.passed).toBe(true)
+        expect(
+          result.warnings.some((w) =>
+            w.description.includes("Deferred cross-artifact rule 'mirrored-requirements'"),
+          ),
+        ).toBe(false)
+        expect(result.failures.some((f) => f.description.includes('Cross-artifact rule'))).toBe(
+          false,
+        )
+      })
+
+      it('still defers when counterpart artifact is genuinely missing', async () => {
+        const schema = makeCrossRuleSchema()
+        const key = 'default:auth'
+        const verifyFilename = 'specs/default/auth/verify.md'
+
+        const verifyArtifact = new ChangeArtifact({
+          type: 'verify',
+          files: new Map([
+            [key, new ArtifactFile({ key, filename: verifyFilename, status: 'in-progress' })],
+          ]),
+        })
+        const change = makeChangeWithArtifacts('c', [verifyArtifact], { specIds: [key] })
+        const repo = makeChangeRepository([change])
+        Object.assign(repo, {
+          async artifact(_change: Change, filename: string): Promise<SpecArtifact | null> {
+            return filename === verifyFilename ? new SpecArtifact(filename, 'Requirement: A') : null
+          },
+        })
+
+        const uc = new ValidateArtifacts(
+          repo,
+          new Map([['default', makeSpecRepository()]]),
+          makeSchemaProvider(schema),
+          makeParsers(makeRequirementParser(), makeParser()),
+          makeActorResolver(),
+          makeContentHasher(),
+        )
+
+        const result = await uc.execute({
+          name: 'c',
+          specPath: key,
+          artifactId: 'verify',
+        })
+
+        expect(
+          result.warnings.some((w) =>
+            w.description.includes("Deferred cross-artifact rule 'mirrored-requirements'"),
+          ),
+        ).toBe(true)
+      })
+
+      it('defers when counterpart exists but is not complete', async () => {
+        const schema = makeCrossRuleSchema()
+        const key = 'default:auth'
+        const specsFilename = 'specs/default/auth/spec.md'
+        const verifyFilename = 'specs/default/auth/verify.md'
+
+        const specsArtifact = new ChangeArtifact({
+          type: 'specs',
+          files: new Map([
+            [key, new ArtifactFile({ key, filename: specsFilename, status: 'in-progress' })],
+          ]),
+        })
+        const verifyArtifact = new ChangeArtifact({
+          type: 'verify',
+          files: new Map([
+            [key, new ArtifactFile({ key, filename: verifyFilename, status: 'in-progress' })],
+          ]),
+        })
+        const change = makeChangeWithArtifacts('c', [specsArtifact, verifyArtifact], {
+          specIds: [key],
+        })
+        const repo = makeChangeRepository([change])
+        const files = new Map<string, string>([
+          [specsFilename, 'Requirement: A'],
+          [verifyFilename, 'Requirement: A'],
+        ])
+        Object.assign(repo, {
+          async artifact(_change: Change, filename: string): Promise<SpecArtifact | null> {
+            const c = files.get(filename)
+            return c !== undefined ? new SpecArtifact(filename, c) : null
+          },
+        })
+
+        const uc = new ValidateArtifacts(
+          repo,
+          new Map([['default', makeSpecRepository()]]),
+          makeSchemaProvider(schema),
+          makeParsers(makeRequirementParser(), makeParser()),
+          makeActorResolver(),
+          makeContentHasher(),
+        )
+
+        const result = await uc.execute({
+          name: 'c',
+          specPath: key,
+          artifactId: 'verify',
+        })
+
+        expect(
+          result.warnings.some((w) =>
+            w.description.includes("Deferred cross-artifact rule 'mirrored-requirements'"),
+          ),
+        ).toBe(true)
+      })
+
+      it('defers when complete counterpart file content cannot be loaded', async () => {
+        const schema = makeCrossRuleSchema()
+        const key = 'default:auth'
+        const specsFilename = 'specs/default/auth/spec.md'
+        const verifyFilename = 'specs/default/auth/verify.md'
+
+        const specsArtifact = new ChangeArtifact({
+          type: 'specs',
+          files: new Map([
+            [
+              key,
+              new ArtifactFile({
+                key,
+                filename: specsFilename,
+                status: 'complete',
+                validatedHash: sha256('Requirement: A'),
+              }),
+            ],
+          ]),
+        })
+        const verifyArtifact = new ChangeArtifact({
+          type: 'verify',
+          files: new Map([
+            [key, new ArtifactFile({ key, filename: verifyFilename, status: 'in-progress' })],
+          ]),
+        })
+        const change = makeChangeWithArtifacts('c', [specsArtifact, verifyArtifact], {
+          specIds: [key],
+        })
+        const repo = makeChangeRepository([change])
+        Object.assign(repo, {
+          async artifact(_change: Change, filename: string): Promise<SpecArtifact | null> {
+            return filename === verifyFilename ? new SpecArtifact(filename, 'Requirement: A') : null
+          },
+        })
+
+        const uc = new ValidateArtifacts(
+          repo,
+          new Map([['default', makeSpecRepository()]]),
+          makeSchemaProvider(schema),
+          makeParsers(makeRequirementParser(), makeParser()),
+          makeActorResolver(),
+          makeContentHasher(),
+        )
+
+        const result = await uc.execute({
+          name: 'c',
+          specPath: key,
+          artifactId: 'verify',
+        })
+
+        expect(
+          result.warnings.some((w) =>
+            w.description.includes("Deferred cross-artifact rule 'mirrored-requirements'"),
+          ),
+        ).toBe(true)
+      })
+
+      it('caches rehydrated participant for multiple rules in the same invocation', async () => {
+        const specsType = makeArtifactType('specs', { scope: 'spec', output: 'spec.md' })
+        const verifyType = makeArtifactType('verify', { scope: 'spec', output: 'verify.md' })
+        const schema = makeSchema({
+          artifacts: [specsType, verifyType],
+          crossArtifactValidations: [
+            {
+              id: 'rule-a',
+              scope: 'spec',
+              participants: [
+                {
+                  artifact: 'specs',
+                  as: 'specKeys',
+                  selector: { type: 'section', matches: '^Requirement:' },
+                  key: { from: 'label', strip: '^Requirement:\\s*' },
+                },
+                {
+                  artifact: 'verify',
+                  as: 'verifyKeys',
+                  selector: { type: 'section', matches: '^Requirement:' },
+                  key: { from: 'label', strip: '^Requirement:\\s*' },
+                },
+              ],
+              relation: {
+                kind: 'all-equal',
+                between: ['specKeys', 'verifyKeys'],
+                options: { ordering: 'ignore' },
+              },
+            },
+            {
+              id: 'rule-b',
+              scope: 'spec',
+              participants: [
+                {
+                  artifact: 'specs',
+                  as: 'specKeys',
+                  selector: { type: 'section', matches: '^Requirement:' },
+                  key: { from: 'label', strip: '^Requirement:\\s*' },
+                },
+                {
+                  artifact: 'verify',
+                  as: 'verifyKeys',
+                  selector: { type: 'section', matches: '^Requirement:' },
+                  key: { from: 'label', strip: '^Requirement:\\s*' },
+                },
+              ],
+              relation: {
+                kind: 'all-equal',
+                between: ['specKeys', 'verifyKeys'],
+                options: { ordering: 'ignore' },
+              },
+            },
+          ],
+        })
+
+        const key = 'default:auth'
+        const specsFilename = 'specs/default/auth/spec.md'
+        const verifyFilename = 'specs/default/auth/verify.md'
+
+        const specsArtifact = new ChangeArtifact({
+          type: 'specs',
+          files: new Map([
+            [
+              key,
+              new ArtifactFile({
+                key,
+                filename: specsFilename,
+                status: 'complete',
+                validatedHash: sha256('Requirement: A'),
+              }),
+            ],
+          ]),
+        })
+        const verifyArtifact = new ChangeArtifact({
+          type: 'verify',
+          files: new Map([
+            [key, new ArtifactFile({ key, filename: verifyFilename, status: 'in-progress' })],
+          ]),
+        })
+        const change = makeChangeWithArtifacts('c', [specsArtifact, verifyArtifact], {
+          specIds: [key],
+        })
+        let specsLoadCount = 0
+        const repo = makeChangeRepository([change])
+        const files = new Map<string, string>([
+          [specsFilename, 'Requirement: A'],
+          [verifyFilename, 'Requirement: A'],
+        ])
+        Object.assign(repo, {
+          async artifact(_change: Change, filename: string): Promise<SpecArtifact | null> {
+            if (filename === specsFilename) specsLoadCount++
+            const c = files.get(filename)
+            return c !== undefined ? new SpecArtifact(filename, c) : null
+          },
+        })
+
+        const parser = makeRequirementParser()
+        const uc = new ValidateArtifacts(
+          repo,
+          new Map([['default', makeSpecRepository()]]),
+          makeSchemaProvider(schema),
+          makeParsers(parser, makeParser()),
+          makeActorResolver(),
+          makeContentHasher(),
+        )
+
+        const result = await uc.execute({
+          name: 'c',
+          specPath: key,
+          artifactId: 'verify',
+        })
+
+        expect(result.passed).toBe(true)
+        expect(result.warnings.some((w) => w.description.includes('Deferred cross-artifact'))).toBe(
+          false,
+        )
+        expect(specsLoadCount).toBe(1)
+      })
+
+      it('rehydrates delta-backed participant from merged output', async () => {
+        const schema = makeCrossRuleSchema({ delta: true })
+        const key = 'default:auth'
+        const specsFilename = 'deltas/default/auth/spec.md.delta.yaml'
+        const verifyFilename = 'deltas/default/auth/verify.md.delta.yaml'
+
+        const specsArtifact = new ChangeArtifact({
+          type: 'specs',
+          files: new Map([
+            [
+              key,
+              new ArtifactFile({
+                key,
+                filename: specsFilename,
+                status: 'complete',
+                validatedHash: sha256('- op: modified'),
+              }),
+            ],
+          ]),
+        })
+        const verifyArtifact = new ChangeArtifact({
+          type: 'verify',
+          files: new Map([
+            [key, new ArtifactFile({ key, filename: verifyFilename, status: 'in-progress' })],
+          ]),
+        })
+        const change = makeChangeWithArtifacts('c', [specsArtifact, verifyArtifact], {
+          specIds: [key],
+        })
+        const repo = makeChangeRepository([change])
+
+        const baseSpecContent = 'Requirement: A'
+        const baseVerifyContent = 'Requirement: A\nRequirement: B'
+        const deltaContent = '- op: modified'
+        const files = new Map<string, string>([
+          [specsFilename, deltaContent],
+          [verifyFilename, deltaContent],
+        ])
+        Object.assign(repo, {
+          async artifact(_change: Change, filename: string): Promise<SpecArtifact | null> {
+            const c = files.get(filename)
+            return c !== undefined ? new SpecArtifact(filename, c) : null
+          },
+        })
+
+        const specRepo = makeSpecRepository({
+          specs: [new Spec('default', SpecPath.parse('auth'), [])],
+          artifacts: {
+            'auth/spec.md': baseSpecContent,
+            'auth/verify.md': baseVerifyContent,
+          },
+        })
+
+        const parser = makeRequirementParser()
+        const yamlParser = makeParser({
+          parseDelta: () => [{ op: 'modified' }],
+        })
+
+        const uc = new ValidateArtifacts(
+          repo,
+          new Map([['default', specRepo]]),
+          makeSchemaProvider(schema),
+          makeParsers(parser, yamlParser),
+          makeActorResolver(),
+          makeContentHasher(),
+        )
+
+        const result = await uc.execute({
+          name: 'c',
+          specPath: key,
+          artifactId: 'verify',
+        })
+
+        expect(result.passed).toBe(true)
+        expect(
+          result.warnings.some((w) =>
+            w.description.includes("Deferred cross-artifact rule 'mirrored-requirements'"),
+          ),
+        ).toBe(false)
+      })
+
+      it('rehydrates direct-file participant without delta', async () => {
+        const schema = makeCrossRuleSchema()
+        const key = 'default:auth'
+        const specsFilename = 'specs/default/auth/spec.md'
+        const verifyFilename = 'specs/default/auth/verify.md'
+
+        const specsArtifact = new ChangeArtifact({
+          type: 'specs',
+          files: new Map([
+            [
+              key,
+              new ArtifactFile({
+                key,
+                filename: specsFilename,
+                status: 'complete',
+                validatedHash: sha256('Requirement: A\nRequirement: B'),
+              }),
+            ],
+          ]),
+        })
+        const verifyArtifact = new ChangeArtifact({
+          type: 'verify',
+          files: new Map([
+            [key, new ArtifactFile({ key, filename: verifyFilename, status: 'in-progress' })],
+          ]),
+        })
+        const change = makeChangeWithArtifacts('c', [specsArtifact, verifyArtifact], {
+          specIds: [key],
+        })
+        const repo = makeChangeRepository([change])
+        const files = new Map<string, string>([
+          [specsFilename, 'Requirement: A\nRequirement: B'],
+          [verifyFilename, 'Requirement: A\nRequirement: B'],
+        ])
+        Object.assign(repo, {
+          async artifact(_change: Change, filename: string): Promise<SpecArtifact | null> {
+            const c = files.get(filename)
+            return c !== undefined ? new SpecArtifact(filename, c) : null
+          },
+        })
+
+        const parser = makeRequirementParser()
+        const uc = new ValidateArtifacts(
+          repo,
+          new Map([['default', makeSpecRepository()]]),
+          makeSchemaProvider(schema),
+          makeParsers(parser, makeParser()),
+          makeActorResolver(),
+          makeContentHasher(),
+        )
+
+        const result = await uc.execute({
+          name: 'c',
+          specPath: key,
+          artifactId: 'verify',
+        })
+
+        expect(result.passed).toBe(true)
+        expect(result.warnings.some((w) => w.description.includes('Deferred cross-artifact'))).toBe(
+          false,
+        )
+      })
+
+      it('evaluates cross-rule with mismatch after rehydration', async () => {
+        const schema = makeCrossRuleSchema()
+        const key = 'default:auth'
+        const specsFilename = 'specs/default/auth/spec.md'
+        const verifyFilename = 'specs/default/auth/verify.md'
+
+        const specsArtifact = new ChangeArtifact({
+          type: 'specs',
+          files: new Map([
+            [
+              key,
+              new ArtifactFile({
+                key,
+                filename: specsFilename,
+                status: 'complete',
+                validatedHash: sha256('Requirement: A'),
+              }),
+            ],
+          ]),
+        })
+        const verifyArtifact = new ChangeArtifact({
+          type: 'verify',
+          files: new Map([
+            [key, new ArtifactFile({ key, filename: verifyFilename, status: 'in-progress' })],
+          ]),
+        })
+        const change = makeChangeWithArtifacts('c', [specsArtifact, verifyArtifact], {
+          specIds: [key],
+        })
+        const repo = makeChangeRepository([change])
+        const files = new Map<string, string>([
+          [specsFilename, 'Requirement: A'],
+          [verifyFilename, 'Requirement: B'],
+        ])
+        Object.assign(repo, {
+          async artifact(_change: Change, filename: string): Promise<SpecArtifact | null> {
+            const c = files.get(filename)
+            return c !== undefined ? new SpecArtifact(filename, c) : null
+          },
+        })
+
+        const parser = makeRequirementParser()
+        const uc = new ValidateArtifacts(
+          repo,
+          new Map([['default', makeSpecRepository()]]),
+          makeSchemaProvider(schema),
+          makeParsers(parser, makeParser()),
+          makeActorResolver(),
+          makeContentHasher(),
+        )
+
+        const result = await uc.execute({
+          name: 'c',
+          specPath: key,
+          artifactId: 'verify',
+        })
+
+        expect(result.passed).toBe(false)
+        expect(
+          result.failures.some(
+            (f) =>
+              f.description.includes('Cross-artifact rule') &&
+              f.description.includes('mirrored-requirements'),
+          ),
+        ).toBe(true)
+        expect(result.warnings.some((w) => w.description.includes('Deferred cross-artifact'))).toBe(
+          false,
+        )
+      })
+
+      it('only rehydrates participants for rules referencing the validated artifact', async () => {
+        const specsType = makeArtifactType('specs', { scope: 'spec', output: 'spec.md' })
+        const verifyType = makeArtifactType('verify', { scope: 'spec', output: 'verify.md' })
+        const designType = makeArtifactType('design', { scope: 'change', output: 'design.md' })
+        const schema = makeSchema({
+          artifacts: [specsType, verifyType, designType],
+          crossArtifactValidations: [
+            {
+              id: 'spec-verify-parity',
+              scope: 'spec',
+              participants: [
+                {
+                  artifact: 'specs',
+                  as: 'specKeys',
+                  selector: { type: 'section', matches: '^Requirement:' },
+                  key: { from: 'label', strip: '^Requirement:\\s*' },
+                },
+                {
+                  artifact: 'verify',
+                  as: 'verifyKeys',
+                  selector: { type: 'section', matches: '^Requirement:' },
+                  key: { from: 'label', strip: '^Requirement:\\s*' },
+                },
+              ],
+              relation: {
+                kind: 'all-equal',
+                between: ['specKeys', 'verifyKeys'],
+                options: { ordering: 'ignore' },
+              },
+            },
+          ],
+        })
+
+        const key = 'default:auth'
+        const specsFilename = 'specs/default/auth/spec.md'
+        const verifyFilename = 'specs/default/auth/verify.md'
+
+        const specsArtifact = new ChangeArtifact({
+          type: 'specs',
+          files: new Map([
+            [
+              key,
+              new ArtifactFile({
+                key,
+                filename: specsFilename,
+                status: 'complete',
+                validatedHash: sha256('Requirement: A'),
+              }),
+            ],
+          ]),
+        })
+        const verifyArtifact = new ChangeArtifact({
+          type: 'verify',
+          files: new Map([
+            [key, new ArtifactFile({ key, filename: verifyFilename, status: 'in-progress' })],
+          ]),
+        })
+        const designArtifact = new ChangeArtifact({
+          type: 'design',
+          files: new Map([
+            [
+              'design',
+              new ArtifactFile({
+                key: 'design',
+                filename: 'design.md',
+                status: 'in-progress',
+              }),
+            ],
+          ]),
+        })
+        const change = makeChangeWithArtifacts(
+          'c',
+          [specsArtifact, verifyArtifact, designArtifact],
+          { specIds: [key] },
+        )
+        const repo = makeChangeRepository([change])
+        const files = new Map<string, string>([
+          [specsFilename, 'Requirement: A'],
+          [verifyFilename, 'Requirement: A'],
+          ['design.md', '# Design'],
+        ])
+        Object.assign(repo, {
+          async artifact(_change: Change, filename: string): Promise<SpecArtifact | null> {
+            const c = files.get(filename)
+            return c !== undefined ? new SpecArtifact(filename, c) : null
+          },
+        })
+
+        const parser = makeRequirementParser()
+        const uc = new ValidateArtifacts(
+          repo,
+          new Map([['default', makeSpecRepository()]]),
+          makeSchemaProvider(schema),
+          makeParsers(parser, makeParser()),
+          makeActorResolver(),
+          makeContentHasher(),
+        )
+
+        const result = await uc.execute({
+          name: 'c',
+          specPath: key,
+          artifactId: 'verify',
+        })
+
+        expect(result.passed).toBe(true)
+        expect(result.warnings.some((w) => w.description.includes('Deferred cross-artifact'))).toBe(
+          false,
+        )
+      })
+    })
   })
 })

@@ -185,6 +185,9 @@ Participant readiness rules:
 - a participant is ready only when its expected file exists, its local structural validation has already passed, and its parsed artifact output is available
 - for `scope: spec`, the parsed artifact output MUST be the merged/materialized artifact preview produced by delta application or direct-file validation
 - for `scope: change`, the parsed artifact output MUST come from the direct change artifact file
+- when a participant is not being structurally validated in the current invocation, `ValidateArtifacts` MUST rehydrate it from the expected artifact content if that participant is already in `complete` state and the rule being evaluated requires it
+- rehydration MUST reconstruct the same parsed/materialized output shape that the participant would have contributed if it had been validated in the current invocation
+- `ValidateArtifacts` MUST NOT defer a rule solely because a required participant was validated in an earlier invocation, provided that participant can be rehydrated from its current complete artifact state
 
 Evaluation rules:
 
@@ -203,7 +206,7 @@ Relation semantics:
 
 If every participant required by a rule is ready, `ValidateArtifacts` MUST evaluate the rule and record any mismatch as a validation failure for the participating artifact set.
 
-If one or more required participants are not ready yet, `ValidateArtifacts` MUST defer that cross-artifact rule for the current invocation and MUST surface a non-failing validation output entry explaining that the rule was not evaluated because all participants were not yet available as locally valid parsed outputs.
+If one or more required participants are not ready yet, `ValidateArtifacts` MUST defer that cross-artifact rule for the current invocation and MUST surface a non-failing validation output entry explaining that the rule was not evaluated because all participants were not yet available as locally valid parsed outputs. Participants that are missing, not yet locally valid, or not rehydratable from complete state remain not ready for this purpose.
 
 ### Requirement: MetadataExtraction validation
 
