@@ -425,6 +425,39 @@
 - **THEN** the spec guarantees atomic publication per spec
 - **AND** it does not promise one indivisible filesystem transaction for the whole batch
 
+### Requirement: spec-lock sidecar persistence
+
+#### Scenario: First archive creates spec-lock sidecar with schema and dependsOn
+
+- **GIVEN** a spec has no existing `spec-lock.json`
+- **AND** archive has determined `change.specDependsOn` for that spec
+- **WHEN** `ArchiveChange.execute` archives the spec
+- **THEN** `spec-lock.json` is persisted with `schema.name` and `schema.version` from the active schema
+- **AND** `dependsOn` is set to the final `change.specDependsOn` value
+
+#### Scenario: Re-archive preserves immutable schema and refreshes dependsOn
+
+- **GIVEN** a spec already has `spec-lock.json` with `schema: { name: "schema-std", version: 1 }`
+- **AND** the current archive changes `specDependsOn` for that spec
+- **WHEN** `ArchiveChange.execute` archives the spec
+- **THEN** `spec-lock.json` retains the original `schema` object unchanged
+- **AND** `dependsOn` is replaced with the new `change.specDependsOn` value
+
+#### Scenario: Mismatch between extracted dependsOn and persisted sidecar fails archive
+
+- **GIVEN** a spec has an existing `spec-lock.json` with `dependsOn`
+- **AND** metadata extraction produces a `dependsOn` value that differs from `change.specDependsOn`
+- **WHEN** `ArchiveChange.execute` validates consistency
+- **THEN** archive fails with a mismatch error
+- **AND** no metadata is saved
+
+#### Scenario: Sidecar dependsOn used as fallback when extraction omits dependsOn
+
+- **GIVEN** a spec has an existing `spec-lock.json` with `dependsOn: ["core:canonical"]`
+- **AND** metadata extraction succeeds but does not produce a `dependsOn` value
+- **WHEN** `ArchiveChange.execute` generates metadata
+- **THEN** the metadata `dependsOn` falls back to the sidecar's `dependsOn` value
+
 ### Requirement: Archive debug logging
 
 #### Scenario: Archive emits debug diagnostics for tracked selection and commit phases
