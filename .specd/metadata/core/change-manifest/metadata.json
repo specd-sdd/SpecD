@@ -16,7 +16,7 @@
     {
       "requirement": "Manifest structure",
       "rules": [
-        "Each change is persisted as a `manifest.json` file inside its change directory. Its top-level structure is:\n\n```jsonc\n// manifest.json\n{\n  \"name\": \"add-auth-flow\",\n  \"createdAt\": \"2024-03-15T10:00:00.000Z\",\n  \"schema\": {\n    \"name\": \"@specd/schema-std\",\n    \"version\": 2,\n  },\n  \"specIds\": [\"default:auth/login\", \"default:auth/register\"],\n  \"specDependsOn\": {\n    \"default:auth/login\": [\"default:auth/shared\"],\n  },\n  \"artifacts\": [\n    {\n      \"type\": \"proposal\",\n      \"optional\": false,\n      \"requires\": [],\n      \"state\": \"complete\",\n      \"files\": [\n        {\n          \"key\": \"proposal\",\n          \"filename\": \"proposal.md\",\n          \"state\": \"complete\",\n          \"validatedHash\": \"sha256:abc123...\",\n        },\n      ],\n    },\n  ],\n  \"history\": [],\n}\n```\n\nField definitions:\n\n- **`name`** — the change slug; immutable after creation\n- **`createdAt`** — ISO 8601 timestamp; immutable after creation; source of truth for the directory prefix\n- **`schema`** — `name` (string) and `version` (integer) of the schema active at creation; written once, never updated\n- **`workspaces`** — optional; accepted on load for backward compatibility with older manifests but no longer written on save. Active workspaces are derived at runtime from `specIds` via `parseSpecId()`\n- **`specIds`** — current snapshot of spec IDs; mutable\n- **`specDependsOn`** (optional) — a record keyed by spec ID, each value being an array of spec ID strings representing that spec's current in-change declared dependencies. For existing persisted specs, the entry MUST be seeded when the spec first enters the change scope from `spec-lock.json`, then legacy `metadata.json.dependsOn`, then an empty set when neither exists. These entries are archive-time inputs to sidecar and metadata generation, not the long-term archived record.\n- **`artifacts`** — array of artifact descriptors. Each artifact has `type`, `optional`, `requires`, `state`, and a `files` array of `ManifestArtifactFile` entries. Each file entry has `key`, `filename`, `state`, and `validatedHash`.\n- **`state`** on both artifacts and files uses the `ArtifactStatus` domain values (`missing`, `in-progress`, `complete`, `skipped`, `pending-review`, `drifted-pending-review`). File state is the source of truth; artifact state is the persisted aggregate.\n- **`validatedHash`** remains persisted for drift detection and approval signatures. It is `null` when not validated, a SHA-256 string when validated, or `\"__skipped__\"` when explicitly skipped.\n- **`history`** — append-only array of typed events. The event types, their semantics, and the derivation rules (current state, active approval, draft status) are defined in [`specs/core/change/spec.md` — Requirement: History and event sourcing](../change/spec.md). This section defines only the JSON serialization of those events. The current lifecycle state is derived from the most recent `transitioned` event's `to` field. Each event contains common fields: `type`, `at`, and `by`. The `by` field is an `ActorIdentity` object (defined in `core:change`) which includes `name`, `email`, and optional `provider`, `providerId`, and `metadata`.\n\nThe JSON serialization of each event type is unchanged."
+        "Each change is persisted as a manifest.json file inside its change directory. It contains:\n\n```jsonc\n{\n  \"name\": \"add-oauth-login\",\n  \"createdAt\": \"2026-05-15T10:00:00.000Z\",\n  \"schema\": { \"name\": \"schema-std\", \"version\": 1 },\n  \"specIds\": [\"core:change\"],\n  \"invalidationPolicy\": \"downstream\",\n  \"artifacts\": [\n    {\n      \"type\": \"proposal\",\n      \"optional\": false,\n      \"requires\": [],\n      \"state\": \"complete\",\n      \"files\": [\n        {\n          \"key\": \"proposal\",\n          \"filename\": \"proposal.md\",\n          \"state\": \"complete\",\n          \"validatedHash\": \"sha256:...\",\n          \"hasDrift\": false\n        }\n      ]\n    }\n  ],\n  \"history\": []\n}\n```\n\nField definitions:\n\n- `name` — the change slug; immutable after creation\n- `createdAt` — ISO 8601 timestamp; immutable after creation; source of truth for the directory prefix\n- `schema` — name (string) and version (integer) of the schema active at creation; written once, never updated\n- `workspaces` — optional; accepted on load for backward compatibility with older manifests but no longer written on save. Active workspaces are derived at runtime from specIds via parseSpecId()\n- `specIds` — current snapshot of spec IDs; mutable\n- `invalidationPolicy` — the change's persisted invalidation policy (`none`, `surgical`, `downstream`, `global`)\n- `specDependsOn` (optional) — a record keyed by spec ID, each value being an array of spec ID strings representing that spec's current in-change declared dependencies. For existing persisted specs, the entry MUST be seeded when the spec first enters the change scope from spec-lock.json, then legacy metadata.json.dependsOn, then an empty set when neither exists. These entries are archive-time inputs to sidecar and metadata generation, not the long-term archived record.\n- `artifacts` — array of artifact descriptors. Each artifact has type, optional, requires, state, and a files array of ManifestArtifactFile entries. Each file entry has key, filename, state, validatedHash, and hasDrift.\n- state on both artifacts and files uses the ArtifactStatus domain values (missing, in-progress, complete, skipped, pending-review, drifted-pending-review). File state is the source of truth; artifact state is the persisted aggregate.\n- validatedHash remains persisted as the last successfully validated baseline only. It is null when not validated, a SHA-256 string when validated, or \"**skipped**\" when explicitly skipped. It MUST NOT be interpreted as proof that the file still exists or is still complete on disk.\n- hasDrift is persisted per file and indicates whether the file's current state differs from the validated baseline\n- `history` — append-only array of typed events. The event types, their semantics, and the derivation rules (current state, active approval, draft status) are defined in [specs/core/change/spec.md — Requirement: History and event sourcing](../change/spec.md). This section defines only the JSON serialization of those events. The current lifecycle state is derived from the most recent transitioned event's to field. Each event contains common fields: type, at, and by. The by field is an ActorIdentity object (defined in core:change) which includes name, email, and optional provider, providerId, and metadata.\n\nThe JSON serialization of each event type is unchanged."
       ]
     },
     {
@@ -52,7 +52,9 @@
   ],
   "constraints": [
     "Artifact and file state are stored explicitly in the manifest; callers must not reconstruct steady-state status solely from validatedHash",
-    "validatedHash has three valid values: null (not yet validated), a SHA-256 string (validated), or \"__skipped__\" (optional artifact explicitly not produced)",
+    "File presence and canonical file state MUST be checked before any interpretation of validatedHash",
+    "validatedHash has three valid values: null (not yet validated), a SHA-256 string (validated), or \"skipped\" (optional artifact explicitly not produced)",
+    "hasDrift is persisted per file and records whether the current file state differs from the validated baseline",
     "If an older manifest is encountered without a state field on an artifact or file, loading defaults that missing state to missing",
     "If an older manifest is encountered with an invalidated event whose cause is \"artifact-change\", loading must accept it and normalize it to the current artifact-drift semantics",
     "The manifest has no top-level state field; the current lifecycle state is always derived from the history array at load time",
@@ -104,6 +106,25 @@
         "the invalidated event includes cause",
         "AND it includes a human-readable message",
         "AND it includes affectedArtifacts with artifact types and file keys"
+      ]
+    },
+    {
+      "requirement": "Manifest structure",
+      "name": "Manifest persists invalidationPolicy and hasDrift per file",
+      "when": ["a change with invalidationPolicy: 'surgical' and one drift-visible file is saved"],
+      "then": [
+        "the serialized manifest includes invalidationPolicy",
+        "AND the file entry includes hasDrift"
+      ]
+    },
+    {
+      "requirement": "Manifest structure",
+      "name": "Validated hash is not treated as proof of current presence",
+      "given": ["a file entry with a non-null validatedHash", "AND canonical file state missing"],
+      "when": ["the manifest is loaded"],
+      "then": [
+        "the file remains missing",
+        "AND validatedHash is interpreted only as the last validated baseline"
       ]
     },
     {
@@ -226,8 +247,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:71364a3b10ea32c83efdaa7eaad6dec10fa0e759a31c7e44d2344d322b5ec3e9",
-    "verify.md": "sha256:d5b04b416a3f0d26d71aa912dce746d6411d694804b33421504f3d648349ad1b"
+    "spec.md": "sha256:3c8e619f7ccc45e54f3360204358397495c11d972e3085d8f6f5ea4ea9984d80",
+    "verify.md": "sha256:4eb9f35886d187866cf582d21605381dd88d2e1d53467b2c0262752bb60b693f"
   },
   "generatedBy": "core"
 }

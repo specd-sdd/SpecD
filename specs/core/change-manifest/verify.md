@@ -37,6 +37,20 @@
 - **AND** it includes a human-readable message
 - **AND** it includes `affectedArtifacts` with artifact types and file keys
 
+#### Scenario: Manifest persists invalidationPolicy and hasDrift per file
+
+- **WHEN** a change with `invalidationPolicy: 'surgical'` and one drift-visible file is saved
+- **THEN** the serialized manifest includes `invalidationPolicy`
+- **AND** the file entry includes `hasDrift`
+
+#### Scenario: Validated hash is not treated as proof of current presence
+
+- **GIVEN** a file entry with a non-null `validatedHash`
+- **AND** canonical file state `missing`
+- **WHEN** the manifest is loaded
+- **THEN** the file remains `missing`
+- **AND** `validatedHash` is interpreted only as the last validated baseline
+
 ### Requirement: Archive outcome history events
 
 #### Scenario: Failed archive attempt appends archive-failed event

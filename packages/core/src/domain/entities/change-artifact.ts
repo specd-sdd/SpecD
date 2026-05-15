@@ -205,6 +205,14 @@ export class ChangeArtifact {
 
   /**
    * Recomputes the aggregate artifact status from the tracked file states.
+   * Public so that callers that mutate individual files can recompute after.
+   */
+  recomputeStatus(): void {
+    this._recomputeStatus()
+  }
+
+  /**
+   * Recomputes the aggregate artifact status from the tracked file states.
    *
    * `drifted-pending-review` takes precedence over `pending-review`, followed
    * by `pending-parent-artifact-review`, and then the steady-state aggregation

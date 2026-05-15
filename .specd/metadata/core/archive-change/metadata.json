@@ -710,6 +710,52 @@
       ]
     },
     {
+      "requirement": "spec-lock sidecar persistence",
+      "name": "First archive creates spec-lock sidecar with schema and dependsOn",
+      "given": [
+        "a spec has no existing spec-lock.json",
+        "AND archive has determined change.specDependsOn for that spec"
+      ],
+      "when": ["ArchiveChange.execute archives the spec"],
+      "then": [
+        "spec-lock.json is persisted with schema.name and schema.version from the active schema",
+        "AND dependsOn is set to the final change.specDependsOn value"
+      ]
+    },
+    {
+      "requirement": "spec-lock sidecar persistence",
+      "name": "Re-archive preserves immutable schema and refreshes dependsOn",
+      "given": [
+        "a spec already has spec-lock.json with schema: { name: \"schema-std\", version: 1 }",
+        "AND the current archive changes specDependsOn for that spec"
+      ],
+      "when": ["ArchiveChange.execute archives the spec"],
+      "then": [
+        "spec-lock.json retains the original schema object unchanged",
+        "AND dependsOn is replaced with the new change.specDependsOn value"
+      ]
+    },
+    {
+      "requirement": "spec-lock sidecar persistence",
+      "name": "Mismatch between extracted dependsOn and persisted sidecar fails archive",
+      "given": [
+        "a spec has an existing spec-lock.json with dependsOn",
+        "AND metadata extraction produces a dependsOn value that differs from change.specDependsOn"
+      ],
+      "when": ["ArchiveChange.execute validates consistency"],
+      "then": ["archive fails with a mismatch error", "AND no metadata is saved"]
+    },
+    {
+      "requirement": "spec-lock sidecar persistence",
+      "name": "Sidecar dependsOn used as fallback when extraction omits dependsOn",
+      "given": [
+        "a spec has an existing spec-lock.json with dependsOn: [\"core:canonical\"]",
+        "AND metadata extraction succeeds but does not produce a dependsOn value"
+      ],
+      "when": ["ArchiveChange.execute generates metadata"],
+      "then": ["the metadata dependsOn falls back to the sidecar's dependsOn value"]
+    },
+    {
       "requirement": "Archive debug logging",
       "name": "Archive emits debug diagnostics for tracked selection and commit phases",
       "when": ["ArchiveChange.execute runs with debug logging enabled"],
@@ -756,7 +802,7 @@
   ],
   "contentHashes": {
     "spec.md": "sha256:eea87e56c47c538a49855a68a8954aca234585b0a824e5327ed278956f0681c7",
-    "verify.md": "sha256:169d36b880383899f167b6c06042e6f5e5f6bb489bd4c24edd2fd8c8e65fa396"
+    "verify.md": "sha256:3a462d1e86fdb214f9882102618353c67b76d7703915b03f3c79e263187bc87b"
   },
   "generatedBy": "core"
 }

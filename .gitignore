@@ -19,6 +19,7 @@ apps/public-web/.generated/
 .opencode/
 .gemini/
 .github/
+skills-lock.json
 
 # Environment
 .env

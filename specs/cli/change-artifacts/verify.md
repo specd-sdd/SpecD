@@ -33,6 +33,21 @@
 - **WHEN** `specd change artifacts <name>` is run
 - **THEN** rows are grouped and emitted in schema-declared order
 
+### Requirement: Drift-aware artifact listing
+
+#### Scenario: Text output shows complete-with-drift for file rows
+
+- **GIVEN** an artifact file with canonical state `complete` and `hasDrift: true`
+- **WHEN** `specd change artifacts <name>` is run in text mode
+- **THEN** the file-state column shows `complete-with-drift`
+
+#### Scenario: JSON output exposes hasDrift and displayStatus
+
+- **GIVEN** one listed artifact file is drift-visible
+- **WHEN** `specd change artifacts <name> --format json` is run
+- **THEN** the row includes `hasDrift`
+- **AND** it includes `displayStatus`
+
 ### Requirement: Error cases
 
 #### Scenario: Change not found

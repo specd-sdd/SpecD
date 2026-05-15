@@ -918,6 +918,13 @@ export class FsChangeRepository extends ChangeRepository {
         if (rawFile.validatedHash === null && (status === 'missing' || status === 'in-progress')) {
           status = await this._deriveFileStatus(resolvedRawFile, dir, raw.optional, cleanup)
         }
+        if (
+          rawFile.validatedHash !== null &&
+          rawFile.validatedHash !== SKIPPED_SENTINEL &&
+          status === 'missing'
+        ) {
+          status = await this._deriveFileStatus(resolvedRawFile, dir, raw.optional, cleanup)
+        }
 
         filesMap.set(
           rawFile.key,
@@ -926,6 +933,7 @@ export class FsChangeRepository extends ChangeRepository {
             filename: resolvedFilename,
             status,
             ...(rawFile.validatedHash !== null ? { validatedHash: rawFile.validatedHash } : {}),
+            ...(rawFile.hasDrift === true ? { hasDrift: true } : {}),
           }),
         )
       }
@@ -958,6 +966,9 @@ export class FsChangeRepository extends ChangeRepository {
       history,
       artifacts: artifactMap,
       ...(specDependsOn !== undefined ? { specDependsOn } : {}),
+      ...(manifest.invalidationPolicy !== undefined
+        ? { invalidationPolicy: manifest.invalidationPolicy }
+        : {}),
     })
 
     // Sync artifacts against schema to reconcile with current artifact types and specIds
@@ -987,6 +998,7 @@ export class FsChangeRepository extends ChangeRepository {
                   key: file.key,
                   filename: file.filename,
                   status: derivedStatus,
+                  ...(file.hasDrift ? { hasDrift: true } : {}),
                 }),
               )
             }
@@ -1004,20 +1016,32 @@ export class FsChangeRepository extends ChangeRepository {
     const driftedFilesByArtifact = new Map<string, Set<string>>()
     for (const [, artifact] of change.artifacts) {
       for (const [, file] of artifact.files) {
-        if (file.status !== 'complete') continue
         if (file.validatedHash === undefined || file.validatedHash === SKIPPED_SENTINEL) continue
-        const derivedStatus = await this._deriveFileStatus(
-          {
-            key: file.key,
-            filename: file.filename,
-            state: file.status,
-            validatedHash: file.validatedHash,
-          },
-          dir,
-          artifact.optional,
-          artifactTypeMap.get(artifact.type)?.preHashCleanup ?? [],
-        )
-        if (derivedStatus === 'in-progress' || derivedStatus === 'missing') {
+        if (
+          file.status === 'pending-review' ||
+          file.status === 'drifted-pending-review' ||
+          file.status === 'skipped'
+        ) {
+          continue
+        }
+        let drifted = false
+        if (file.status === 'complete') {
+          const derivedStatus = await this._deriveFileStatus(
+            {
+              key: file.key,
+              filename: file.filename,
+              state: file.status,
+              validatedHash: file.validatedHash,
+            },
+            dir,
+            artifact.optional,
+            artifactTypeMap.get(artifact.type)?.preHashCleanup ?? [],
+          )
+          drifted = derivedStatus !== 'complete'
+        } else {
+          drifted = true
+        }
+        if (drifted) {
           const keys = driftedFilesByArtifact.get(artifact.type) ?? new Set<string>()
           keys.add(file.key)
           driftedFilesByArtifact.set(artifact.type, keys)
@@ -1106,6 +1130,7 @@ function changeToManifest(change: Change): ChangeManifest {
     schema,
     specIds: [...change.specIds],
     ...(Object.keys(specDependsOn).length > 0 ? { specDependsOn } : {}),
+    invalidationPolicy: change.invalidationPolicy,
     artifacts: [...change.artifacts.values()].map(serializeArtifact),
     history: change.history.map(serializeEvent),
   }
@@ -1121,16 +1146,13 @@ function serializeArtifact(artifact: ChangeArtifact): ManifestArtifact {
   const files: ManifestArtifactFile[] = []
   for (const file of artifact.files.values()) {
     const state =
-      file.status === 'missing' && file.validatedHash === SKIPPED_SENTINEL
-        ? 'skipped'
-        : file.status === 'missing' && file.validatedHash !== undefined
-          ? 'complete'
-          : file.status
+      file.status === 'missing' && file.validatedHash === SKIPPED_SENTINEL ? 'skipped' : file.status
     files.push({
       key: file.key,
       filename: file.filename,
       state,
       validatedHash: file.validatedHash ?? null,
+      ...(file.hasDrift ? { hasDrift: true } : {}),
     })
   }
   return {

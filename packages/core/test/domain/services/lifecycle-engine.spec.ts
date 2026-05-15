@@ -206,4 +206,61 @@ describe('LifecycleEngine', () => {
     expect(withoutBypass.blockers.some((blocker) => blocker.code === 'OVERLAP_CONFLICT')).toBe(true)
     expect(withBypass.blockers.some((blocker) => blocker.code === 'OVERLAP_CONFLICT')).toBe(false)
   })
+
+  it('treats complete-with-drift as complete for lifecycle interpretation', () => {
+    const change = makeChange()
+    const driftedFile = new ArtifactFile({
+      key: 'proposal',
+      filename: 'proposal.md',
+      status: 'complete',
+      validatedHash: 'sha256:abc',
+    })
+    driftedFile.markDrifted()
+    change.setArtifact(
+      new ChangeArtifact({
+        type: 'proposal',
+        files: new Map([['proposal', driftedFile]]),
+      }),
+    )
+    change.setArtifact(makeArtifact('design', 'complete'))
+
+    const schema = makeSchema({
+      artifacts: [
+        makeArtifactType('proposal'),
+        makeArtifactType('design', { requires: ['proposal'] }),
+      ],
+    })
+
+    const verdict = new LifecycleEngine().evaluate(change, schema)
+    const proposal = verdict.artifacts.find((a) => a.type === 'proposal')
+    expect(proposal?.effectiveStatus).toBe('complete')
+    expect(proposal?.state).toBe('complete')
+    const driftBlockers = verdict.blockers.filter((b) => b.code === 'ARTIFACT_DRIFT')
+    expect(driftBlockers).toHaveLength(0)
+  })
+
+  it('uses canonical missing state even when hasDrift is true', () => {
+    const change = makeChange()
+    const missingDriftedFile = new ArtifactFile({
+      key: 'proposal',
+      filename: 'proposal.md',
+      status: 'missing',
+    })
+    missingDriftedFile.markDrifted()
+    change.setArtifact(
+      new ChangeArtifact({
+        type: 'proposal',
+        files: new Map([['proposal', missingDriftedFile]]),
+      }),
+    )
+
+    const schema = makeSchema({
+      artifacts: [makeArtifactType('proposal')],
+    })
+
+    const verdict = new LifecycleEngine().evaluate(change, schema)
+    const proposal = verdict.artifacts.find((a) => a.type === 'proposal')
+    expect(proposal?.state).toBe('missing')
+    expect(proposal?.effectiveStatus).toBe('missing')
+  })
 })

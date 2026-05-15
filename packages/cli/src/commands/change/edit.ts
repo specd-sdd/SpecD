@@ -20,6 +20,10 @@ export function registerChangeEdit(parent: Command): void {
     .option('--add-spec <id>', 'add a spec path (repeatable)', collect, [] as string[])
     .option('--remove-spec <id>', 'remove a spec path (repeatable)', collect, [] as string[])
     .option('--description <text>', 'set or replace the change description (informational)')
+    .option(
+      '--invalidation-policy <policy>',
+      'set the invalidation policy (none|surgical|downstream|global)',
+    )
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
     .addHelpText(
@@ -43,6 +47,7 @@ JSON/TOON output schema:
           addSpec: string[]
           removeSpec: string[]
           description?: string
+          invalidationPolicy?: string
           format: string
           config?: string
         },
@@ -51,11 +56,14 @@ JSON/TOON output schema:
           const { config, kernel } = await resolveCliContext({ configPath: opts.config })
 
           const hasChanges =
-            opts.addSpec.length > 0 || opts.removeSpec.length > 0 || opts.description !== undefined
+            opts.addSpec.length > 0 ||
+            opts.removeSpec.length > 0 ||
+            opts.description !== undefined ||
+            opts.invalidationPolicy !== undefined
 
           if (!hasChanges) {
             cliError(
-              'at least one of --add-spec, --remove-spec, or --description must be provided',
+              'at least one of --add-spec, --remove-spec, --description, or --invalidation-policy must be provided',
               opts.format,
             )
           }
@@ -89,6 +97,15 @@ JSON/TOON output schema:
             ...(addSpecIds !== undefined ? { addSpecIds } : {}),
             ...(removeSpecIds !== undefined ? { removeSpecIds } : {}),
             ...(opts.description !== undefined ? { description: opts.description } : {}),
+            ...(opts.invalidationPolicy !== undefined
+              ? {
+                  invalidationPolicy: opts.invalidationPolicy as
+                    | 'none'
+                    | 'surgical'
+                    | 'downstream'
+                    | 'global',
+                }
+              : {}),
           })
 
           if (invalidated) {

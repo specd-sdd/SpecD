@@ -1,0 +1,23 @@
+- op: added
+  description: 'Verify persistent invalidationPolicy edits.'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Input contract$'
+  content: |
+    ### Requirement: Invalidation policy edits
+
+    #### Scenario: Editing invalidationPolicy persists the new value
+
+    - **GIVEN** a change persisted with `invalidationPolicy: 'downstream'`
+    - **WHEN** `EditChange.execute` is called with `invalidationPolicy: 'none'`
+    - **THEN** the saved change uses `invalidationPolicy: 'none'`
+
+    #### Scenario: Editing invalidationPolicy does not invent drift
+
+    - **GIVEN** a file with `hasDrift: false`
+    - **WHEN** only `invalidationPolicy` is updated
+    - **THEN** `hasDrift` remains `false`

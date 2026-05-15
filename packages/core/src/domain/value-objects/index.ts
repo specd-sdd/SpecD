@@ -8,6 +8,12 @@ export { SpecPath } from './spec-path.js'
 export { SpecArtifact } from './spec-artifact.js'
 export { type ChangeState, VALID_TRANSITIONS, isValidTransition } from './change-state.js'
 export { type ArtifactStatus } from './artifact-status.js'
+export { type ArtifactDisplayStatus } from './artifact-display-status.js'
+export {
+  type InvalidationPolicy,
+  DEFAULT_INVALIDATION_POLICY,
+  isInvalidationPolicy,
+} from './invalidation-policy.js'
 export { type Selector, type DeltaPosition } from './selector.js'
 export {
   type ValidationCount,

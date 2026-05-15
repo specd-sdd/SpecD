@@ -1,0 +1,22 @@
+- op: added
+  description: 'Seed new changes with the project-level invalidationPolicy.'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Input contract$'
+  content: |
+    ### Requirement: Initial invalidation policy
+
+    CreateChange.execute SHALL accept the project-level default invalidation policy as input and persist it on the newly created change.
+
+    The persisted initial value MUST be one of:
+
+    - `none`
+    - `surgical`
+    - `downstream`
+    - `global`
+
+    This value becomes the change's default invalidation policy until a later EditChange operation overrides it.

@@ -85,6 +85,14 @@
 - **WHEN** `CreateChange.execute` is called with `specIds: ['auth/login', 'auth/register']`
 - **THEN** the created event contains `specIds: ['auth/login', 'auth/register']`
 
+### Requirement: Initial invalidation policy
+
+#### Scenario: New change persists the project default invalidationPolicy
+
+- **GIVEN** the project default invalidation policy is `downstream`
+- **WHEN** `CreateChange.execute` creates a new change
+- **THEN** the returned and persisted change uses `invalidationPolicy: 'downstream'`
+
 ### Requirement: Persistence and scaffolding
 
 #### Scenario: Change is saved to repository

@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'TransitionChange continues to consume canonical artifact/lifecycle state; no direct spec.md requirement changes are needed for the invalidation-policy redesign.'

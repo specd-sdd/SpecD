@@ -1,0 +1,195 @@
+{
+  "title": "InvalidateChange",
+  "description": "Changes need an explicit way to be invalidated for semantic review without pretending that every invalidation is physical drift. The system also needs one canonical place where policy-aware artifact reopening, approval rollback, focused target handling, and invalidation event recording are coordinated for manual invalidation.\n\nThis spec defines the `InvalidateChange` use case for explicit invalidation requests. It covers target normalization, policy resolution, approval guards, and the contract between the command surface and the `Change` entity's invalidation behavior.",
+  "dependsOn": [
+    "core:change",
+    "core:lifecycle-engine",
+    "core:config",
+    "default:_global/architecture"
+  ],
+  "context": [
+    "Changes need an explicit way to be invalidated for semantic review without pretending that every invalidation is physical drift. The system also needs one canonical place where policy-aware artifact reopening, approval rollback, focused target handling, and invalidation event recording are coordinated for manual invalidation.\n\nThis spec defines the `InvalidateChange` use case for explicit invalidation requests. It covers target normalization, policy resolution, approval guards, and the contract between the command surface and the `Change` entity's invalidation behavior."
+  ],
+  "rules": [
+    {
+      "requirement": "Input contract",
+      "rules": [
+        "`InvalidateChange.execute` MUST accept an input object with:\n\n- `name` — the target change name\n- `reason` — mandatory human-readable explanation recorded on the invalidated event\n- `policyOverride` — optional one-off invalidation policy override\n- `targets` — optional repeated normalized targets\n- `force` — optional confirmation flag for destructive approval/signoff rollback\n\nTargets use one canonical shape:\n\n- `<artifactId>` — the whole artifact\n- `<artifactId>@<specId>` — one spec-scoped artifact file"
+      ]
+    },
+    {
+      "requirement": "Effective policy resolution",
+      "rules": [
+        "The use case MUST resolve one effective invalidation policy for the execution:\n\n- `policyOverride`, when provided\n- otherwise the change's persisted `invalidationPolicy`\n\nThe use case MUST NOT maintain a separate manual-default policy dimension."
+      ]
+    },
+    {
+      "requirement": "Policy-dependent target rules",
+      "rules": [
+        "After resolving the effective policy, the use case MUST validate command shape against it:\n\n- `surgical` and `downstream` REQUIRE at least one target\n- `none` and `global` MUST reject any target as invalid input\n\nThis validation happens before any mutation or approval guard handling."
+      ]
+    },
+    {
+      "requirement": "Target normalization and validation",
+      "rules": [
+        "When targets are allowed, the use case MUST:\n\n1. Normalize every requested target\n2. Validate artifact existence and scope compatibility\n3. Deduplicate the normalized target set\n4. Fail the whole command if any target is invalid\n\nValidation errors MUST accumulate across the entire requested target set. The use case MUST report every invalid target combination it finds instead of stopping at the first error.\n\nFor scope compatibility:\n\n- `<artifactId>@<specId>` is only valid for `scope: spec` artifacts\n- `<artifactId>` against a `scope: spec` artifact targets all files for that artifact across specs in the change\n- `<artifactId>` against a `scope: change` artifact targets that single change-scoped file"
+      ]
+    },
+    {
+      "requirement": "Approval guard",
+      "rules": [
+        "If the loaded change currently has an active spec approval or signoff, the use case MUST stop by default and require explicit confirmation via `force=true` before executing the invalidation.\n\nWithout `force=true`, the use case MUST fail without mutating the change."
+      ]
+    },
+    {
+      "requirement": "Change-level invalidation is unconditional",
+      "rules": [
+        "When execution proceeds past validation and approval guards, the use case MUST invalidate the change and return it to `designing` regardless of the effective invalidation policy.\n\nThe invalidation policy governs only artifact/file-state consequences, not whether the change-level invalidation occurs."
+      ]
+    },
+    {
+      "requirement": "Manual invalidation cause",
+      "rules": [
+        "Manual invalidation executed through this use case MUST record the domain invalidation cause `artifact-review-required`.\n\nThe caller supplies only the human-readable `reason` string; it is recorded on the invalidated event message."
+      ]
+    },
+    {
+      "requirement": "Policy-aware artifact effects",
+      "rules": [
+        "After change-level invalidation is accepted, artifact/file-state behavior MUST follow the effective policy:\n\n- `none` — no artifact/file state is invalidated\n- `surgical` — only the normalized target set is invalidated\n- `downstream` — the normalized target set and all of its DAG descendants are invalidated\n- `global` — every artifact/file in the change is invalidated\n\nThe final affected set MUST be deduplicated before mutation and reporting."
+      ]
+    },
+    {
+      "requirement": "Manual invalidation does not invent drift",
+      "rules": [
+        "Manual invalidation MUST NOT set, clear, or infer `hasDrift`.\n\n`hasDrift` changes only when physical file state is compared to the validated baseline and found equal or unequal."
+      ]
+    },
+    {
+      "requirement": "Idempotence on already reopened targets",
+      "rules": [
+        "If a targeted artifact/file is already in `pending-review` or `drifted-pending-review`, invalidation leaves that state unchanged and continues normally.\n\nAlready reopened targets are not command errors."
+      ]
+    },
+    {
+      "requirement": "Output contract",
+      "rules": [
+        "On success, the use case MUST return:\n\n- the updated `Change`\n- the effective invalidation policy\n- the final deduplicated affected artifact/file set after policy expansion\n\nThis affected set is the authoritative result for human-facing reporting."
+      ]
+    }
+  ],
+  "constraints": [
+    "InvalidateChange MUST NOT perform filesystem drift detection itself.",
+    "The use case MUST delegate lifecycle rollback and policy-aware invalidation to the Change entity rather than re-implementing entity rules externally.",
+    "Target validation failures happen before approval/signoff confirmation handling."
+  ],
+  "scenarios": [
+    {
+      "requirement": "Input contract",
+      "name": "Targets accept artifact and artifact-at-spec forms",
+      "when": ["InvalidateChange.execute is called with targets: ['design', 'specs@core:change']"],
+      "then": [
+        "the use case accepts both target forms in one request",
+        "AND it preserves them for later normalization and validation"
+      ]
+    },
+    {
+      "requirement": "Effective policy resolution",
+      "name": "Explicit override wins over persisted policy",
+      "given": ["a change persisted with invalidationPolicy: 'downstream'"],
+      "when": ["InvalidateChange.execute is called with policyOverride: 'surgical'"],
+      "then": ["the effective invalidation policy is surgical"]
+    },
+    {
+      "requirement": "Policy-dependent target rules",
+      "name": "Target required for downstream execution",
+      "when": [
+        "InvalidateChange.execute is called with effective policy downstream and no targets"
+      ],
+      "then": ["execution fails before mutating the change"]
+    },
+    {
+      "requirement": "Policy-dependent target rules",
+      "name": "Target forbidden for global execution",
+      "when": ["InvalidateChange.execute is called with effective policy global and any target"],
+      "then": ["execution fails before mutating the change"]
+    },
+    {
+      "requirement": "Target normalization and validation",
+      "name": "Invalid target set reports every problem before aborting",
+      "given": [
+        "a request containing an unknown artifact target and a scope: change artifact targeted as <artifactId>@<specId>"
+      ],
+      "when": ["InvalidateChange.execute normalizes the request"],
+      "then": [
+        "the failure reports both invalid target combinations",
+        "AND the change is not mutated"
+      ]
+    },
+    {
+      "requirement": "Approval guard",
+      "name": "Active approval blocks execution until forced",
+      "given": ["a change with an active spec approval"],
+      "when": ["InvalidateChange.execute is called without force: true"],
+      "then": ["execution fails without mutating the change"]
+    },
+    {
+      "requirement": "Change-level invalidation is unconditional",
+      "name": "Policy none still returns the change to designing",
+      "given": ["a change outside designing"],
+      "when": ["InvalidateChange.execute succeeds with effective policy none"],
+      "then": ["the change is invalidated", "AND it returns to designing"]
+    },
+    {
+      "requirement": "Manual invalidation cause",
+      "name": "Manual invalidation records artifact-review-required",
+      "when": ["InvalidateChange.execute succeeds"],
+      "then": [
+        "the appended invalidated event uses cause artifact-review-required",
+        "AND the event message contains the supplied human-readable reason"
+      ]
+    },
+    {
+      "requirement": "Policy-aware artifact effects",
+      "name": "Downstream policy expands from the normalized target set",
+      "given": ["a change whose artifact DAG has descendants below target specs@core:change"],
+      "when": ["InvalidateChange.execute succeeds with effective policy downstream"],
+      "then": [
+        "the final affected set includes the normalized target file",
+        "AND it includes every DAG descendant reached from that target"
+      ]
+    },
+    {
+      "requirement": "Manual invalidation does not invent drift",
+      "name": "Manual invalidation leaves hasDrift unchanged",
+      "given": ["a targeted file with hasDrift: false"],
+      "when": ["manual invalidation succeeds"],
+      "then": ["hasDrift remains false"]
+    },
+    {
+      "requirement": "Idempotence on already reopened targets",
+      "name": "Reopened targets remain valid inputs",
+      "given": ["a targeted file already in pending-review"],
+      "when": ["InvalidateChange.execute succeeds"],
+      "then": [
+        "the file remains in a reopened state",
+        "AND the operation does not fail because of that prior state"
+      ]
+    },
+    {
+      "requirement": "Output contract",
+      "name": "Success returns the deduplicated final affected set",
+      "given": ["two requested targets converge on one downstream file"],
+      "when": ["InvalidateChange.execute succeeds"],
+      "then": [
+        "the returned affected set includes that file only once",
+        "AND it also returns the effective invalidation policy and updated change"
+      ]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:f9f797f7f567450a57d31aaa5437e0fefc7fa59ef84d48c386bb91e9f2bafad9",
+    "verify.md": "sha256:5b8cb0c194bc4b97bae5827f3c85afc115ac6ffea6ed4e53be96d38ac8ab64b6"
+  },
+  "generatedBy": "core"
+}

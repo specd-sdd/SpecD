@@ -64,6 +64,22 @@ In `json` or `toon` mode, the output is (encoded in the respective format):
 Artifacts are listed in schema-declared order, with per-file entries within each
 artifact.
 
+### Requirement: Drift-aware artifact listing
+
+Human-facing artifact listings SHALL expose drift-aware display state rather than forcing users to infer drift from canonical state plus hashes.
+
+For text output:
+
+- the displayed file-state column SHALL use the display-state projection (`complete-with-drift` when canonical state is `complete` and `hasDrift=true`)
+- canonical `missing` remains `missing` even if `hasDrift=true`
+
+For json/toon output, each per-file entry SHALL additionally expose:
+
+- `hasDrift`
+- `displayStatus`
+
+When an artifact has multiple files, any artifact-level summary row SHALL derive its display state from the file-level display states rather than recomputing independently.
+
 ### Requirement: Error cases
 
 - If the change does not exist, exits with code 1.

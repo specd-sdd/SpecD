@@ -1,0 +1,26 @@
+- op: added
+  description: 'Add drift-aware display fields to GetStatus output.'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Returns the change and its artifact statuses$'
+  content: |
+    ### Requirement: Drift-aware display status
+
+    GetStatus SHALL preserve canonical persisted state in `state` / `effectiveStatus`, but it SHALL additionally provide human-facing display-state projections for artifact files and aggregated artifacts.
+
+    Each ArtifactFileStatus MUST include:
+
+    - `hasDrift` — whether the current file state differs from the validated baseline
+    - `displayStatus` — a human-facing projection derived from canonical state plus `hasDrift`
+
+    Each ArtifactStatusEntry MUST include:
+
+    - `displayStatus` — the aggregated human-facing projection for the artifact
+
+    `displayStatus` for files SHALL render `complete-with-drift` only when canonical state is `complete` and `hasDrift=true`.
+
+    `displayStatus` for aggregated artifacts SHALL be derived from file-level display states, using precedence that keeps real workflow states stronger than display-only drift projections.

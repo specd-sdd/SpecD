@@ -51,6 +51,7 @@ Bootstrap mode is intended for initial indexing and exploratory graph queries. I
 | `plugins`             | object  | no       | —               | Installed plugins grouped by type.                                                                                   |
 | `schemaPlugins`       | array   | no       | `[]`            | Schema plugin references loaded and merged into the active schema.                                                   |
 | `schemaOverrides`     | object  | no       | —               | Inline schema override operations applied after plugins. See [`schemaOverrides`](#schemaoverrides).                  |
+| `invalidationPolicy`  | string  | no       | `'downstream'`  | Default policy for automatic and manual artifact invalidation. See [`invalidationPolicy`](#invalidationpolicy).      |
 
 ## Environment overrides
 
@@ -470,6 +471,25 @@ schemaOverrides:
 ```
 
 Hook entries in `schemaOverrides` require an `id` field — this is how append/prepend/remove identify individual hooks within a step's array. The `id` must be unique within the `pre` or `post` array it belongs to.
+
+## invalidationPolicy
+
+`invalidationPolicy` controls how artifact invalidation propagates when a change's files drift from their validated baseline or when manual invalidation is triggered. The policy is persisted on each change at creation time (inheriting this project default) and can be overridden per-change with `specd changes edit --invalidation-policy` or per-execution with `specd changes invalidate --policy`.
+
+```yaml
+invalidationPolicy: downstream # default
+```
+
+| Policy       | Automatic drift invalidation                                                              | Manual `change invalidate`                                                                 |
+| ------------ | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `none`       | No artifacts are reopened. Drift is recorded (`hasDrift: true`) but states are preserved. | Change transitions to `designing` but no artifacts are reopened. `--target` is disallowed. |
+| `surgical`   | Only the specific files that drifted are reopened.                                        | Only explicitly targeted files are reopened. Requires `--target`.                          |
+| `downstream` | Drifted files plus their DAG descendants are reopened. This is the default.               | Targets plus all DAG descendants are reopened. Requires `--target`.                        |
+| `global`     | All artifacts in the change are reopened.                                                 | All artifacts are reopened. `--target` is disallowed.                                      |
+
+When `invalidationPolicy` is omitted from `specd.yaml`, new changes default to `downstream` — the same behaviour as before this field was introduced.
+
+Display status reflects drift even under `none`: files show `complete-with-drift` in `changes status` and `changes artifacts` output while remaining canonically `complete`.
 
 ## Validation
 

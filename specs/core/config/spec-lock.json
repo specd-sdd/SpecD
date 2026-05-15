@@ -1,0 +1,15 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "core:schema-format",
+    "core:schema-merge",
+    "default:_global/architecture",
+    "core:storage",
+    "core:spec-metadata",
+    "core:workspace",
+    "default:_global/logging"
+  ]
+}

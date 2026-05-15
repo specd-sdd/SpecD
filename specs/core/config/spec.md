@@ -79,6 +79,19 @@ There is no implicit multi-level fallback — the prefix determines exactly wher
 
 **Error types:** both `ConfigValidationError` (malformed `specd.yaml`) and `SchemaNotFoundError` / `SchemaValidationError` (resolution failures) are domain errors defined in `@specd/core` and extend `SpecdError`. They are distinct types with distinct messages and exit codes — config errors indicate a problem with `specd.yaml` itself; schema errors indicate a problem with the referenced schema.
 
+### Requirement: Invalidation policy configuration
+
+`specd.yaml` MAY declare a root-level `invalidationPolicy` field controlling how artifact/file invalidation propagates when a change is invalidated.
+
+Allowed values are:
+
+- `none`
+- `surgical`
+- `downstream`
+- `global`
+
+The configured value is the project default used to seed new changes and to resolve effective invalidation policy when a change has not been overridden later.
+
 ### Requirement: Workspaces
 
 `specd.yaml` must declare at least one workspace under the `workspaces` key. Each workspace defines where its specs live, where the implementation code lives, where its local schemas are stored, and the ownership relationship the project has with those specs.

@@ -1,0 +1,20 @@
+- op: added
+  description: 'Clarify that display-only drift projections do not affect effective-status computation.'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Effective artifact status computation$'
+  content: |
+    ### Requirement: Canonical-state-only lifecycle interpretation
+
+    LifecycleEngine SHALL interpret only canonical artifact/file workflow states when deriving effective status, blockers, review routing, and transition eligibility.
+
+    Display-only projections such as `complete-with-drift` and diagnostic fields such as `hasDrift` MUST NOT be treated as additional lifecycle states.
+
+    Consequently:
+
+    - when policy `none` leaves a file canonically `complete` but drift-visible in status rendering, LifecycleEngine still treats it as `complete`
+    - when canonical state becomes `missing`, `pending-review`, or `drifted-pending-review`, LifecycleEngine uses those canonical states normally

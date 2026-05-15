@@ -51,6 +51,12 @@
       ]
     },
     {
+      "requirement": "Invalidation policy configuration",
+      "rules": [
+        "`specd.yaml` MAY declare a root-level `invalidationPolicy` field controlling how artifact/file invalidation propagates when a change is invalidated.\n\nAllowed values are:\n\n- `none`\n- `surgical`\n- `downstream`\n- `global`\n\nThe configured value is the project default used to seed new changes and to resolve effective invalidation policy when a change has not been overridden later."
+      ]
+    },
+    {
       "requirement": "Workspaces",
       "rules": [
         "`specd.yaml` must declare at least one workspace under the `workspaces` key. Each workspace defines where its specs live, where the implementation code lives, where its local schemas are stored, and the ownership relationship the project has with those specs.\n\n`default` is a reserved workspace name that identifies the local project workspace. Every config must contain a `default` workspace. `specd init` creates it automatically if no `workspaces` section is present.\n\n```yaml\nworkspaces:\n  default: # required — the local project workspace\n    prefix: _global # optional — logical path prefix for all specs in this workspace\n    specs: # where this workspace's spec files live (required)\n      adapter: fs # storage adapter (required; only \"fs\" in v1)\n      fs:\n        path: specs/_global\n        metadataPath: .specd/metadata # optional — where metadata.yaml files live\n    schemas: # where named local schemas live (optional)\n      adapter: fs\n      fs:\n        path: .specd/schemas # default: .specd/schemas (relative to specd.yaml)\n    codeRoot: ./ # where implementation code lives (default: project root)\n    ownership: owned # owned | shared | readOnly (default: owned)\n\n  billing: # additional workspace\n    specs:\n      adapter: fs\n      fs:\n        path: ../billing/specd/specs\n    schemas:\n      adapter: fs\n      fs:\n        path: ../billing/dev/schemas\n    codeRoot: ../billing # required for non-default workspaces — no default\n    ownership: readOnly # default for non-default workspaces\n```\n\n**`specs`** (required) — declares where this workspace's spec files live. Has its own `adapter` and adapter-specific config block. Only `\"fs\"` is supported in v1.\n\n**`specs.fs.path`** (required for `fs` adapter) — directory where spec files live. Relative paths are resolved from the directory containing `specd.yaml`. May point outside the project repo root, in which case `RepositoryConfig.isExternal` is set to `true` by the application layer.\n\n**`specs.fs.metadataPath`** (optional for `fs` adapter) — directory where `metadata.yaml` files live, mirroring the spec capability path structure. Relative paths are resolved from the directory containing `specd.yaml`. When absent, the config loader auto-derives the path from the VCS root of `specs.fs.path` + `/.specd/metadata/`. When the specs path is not inside any VCS, the fallback is `.specd/metadata/` relative to the specs path parent directory.\n\n**`schemas`** (optional) — declares where named local schemas for this workspace are stored. Has its own `adapter` and adapter-specific config block, independent of `specs`. Used when the `schema` field references `#workspace:name` or a bare/hash-prefixed name targeting this workspace.\n\n- For the `default` workspace, if omitted, defaults to `adapter: fs` with `fs.path: .specd/schemas`.\n- For non-`default` workspaces, if omitted, the workspace has no local schemas — any schema reference targeting it (e.g. `#billing:name`) will produce a `SchemaNotFoundError`.\n\n**`codeRoot`** — directory where the implementation code for this workspace lives. Used by `CompileContext` to tell the agent where to write code.\n\n- For the `default` workspace, defaults to the project root (directory containing `specd.yaml`).\n- For non-`default` workspaces, `codeRoot` is required — there is no default.\n\n**`ownership`** — the project's relationship to this workspace's specs.\n\n- `owned` — the project owns these specs and can create, modify, and archive changes against them. Default for the `default` workspace.\n- `shared` — specs can be modified, but external teams may also modify them.\n- `readOnly` — specs are imported for context only; changes cannot target them. Default for non-`default` workspaces.\n\n**Workspace-specific context filtering:** Each workspace may optionally declare `context.includeSpecs` and `context.excludeSpecs` arrays to filter which specs appear in compiled context for changes touching that workspace's specs. These follow the same glob-like pattern syntax as the project-level `context.includeSpecs` / `context.excludeSpecs` and are combined (intersected) with the project-level filters."
@@ -335,6 +341,18 @@
       "then": [
         "SchemaRegistry.resolve() is not called; the command runs regardless of whether the schema is valid or even declared"
       ]
+    },
+    {
+      "requirement": "Invalidation policy configuration",
+      "name": "Root invalidationPolicy accepts the four canonical values",
+      "when": ["specd.yaml declares invalidationPolicy as none, surgical, downstream, or global"],
+      "then": ["config loading accepts the value"]
+    },
+    {
+      "requirement": "Invalidation policy configuration",
+      "name": "Unknown invalidationPolicy is rejected",
+      "when": ["specd.yaml declares an unknown invalidationPolicy"],
+      "then": ["config loading fails with a validation error"]
     },
     {
       "requirement": "Workspaces",
@@ -1086,8 +1104,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:b6dfc1faa9104b3f09c65de3bb70524c8a63671b3f37f13729226f7339ec8363",
-    "verify.md": "sha256:c017871d61b1ad0044fd6904cd619615ca8269c08c0793f258776050cc685755"
+    "spec.md": "sha256:baa7dd51b68c51158a4364cf3ad50e7ab860c8b42640d71a923776322747e4f7",
+    "verify.md": "sha256:9dfab22792788ae118f17c7fc67c863dc82ab89fc6e78569f27f1acde2dcde8a"
   },
   "generatedBy": "core"
 }

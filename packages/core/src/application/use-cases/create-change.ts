@@ -3,6 +3,7 @@ import { type ChangeRepository } from '../ports/change-repository.js'
 import { type SpecRepository } from '../ports/spec-repository.js'
 import { type ActorResolver } from '../ports/actor-resolver.js'
 import { ChangeAlreadyExistsError } from '../errors/change-already-exists-error.js'
+import { type InvalidationPolicy } from '../../domain/value-objects/invalidation-policy.js'
 import { parseSpecId } from '../../domain/services/parse-spec-id.js'
 import { SpecPath } from '../../domain/value-objects/spec-path.js'
 import { loadPersistedSpecDependsOn } from './_shared/load-persisted-spec-depends-on.js'
@@ -27,6 +28,8 @@ export interface CreateChangeInput {
   readonly schemaName: string
   /** The schema version number from the active configuration. */
   readonly schemaVersion: number
+  /** Invalidation policy to seed on the new change. Defaults to `'downstream'`. */
+  readonly invalidationPolicy?: InvalidationPolicy
 }
 
 /**
@@ -98,6 +101,9 @@ export class CreateChange {
       specIds: [...input.specIds],
       history: [created],
       specDependsOn,
+      ...(input.invalidationPolicy !== undefined
+        ? { invalidationPolicy: input.invalidationPolicy }
+        : {}),
     })
 
     await this._changes.save(change)

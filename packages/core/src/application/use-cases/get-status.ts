@@ -1,6 +1,7 @@
 import * as path from 'node:path'
 import { type Change } from '../../domain/entities/change.js'
 import { type ArtifactStatus } from '../../domain/value-objects/artifact-status.js'
+import { type ArtifactDisplayStatus } from '../../domain/value-objects/artifact-display-status.js'
 import { type ArtifactType } from '../../domain/value-objects/artifact-type.js'
 import { type ChangeState, VALID_TRANSITIONS } from '../../domain/value-objects/change-state.js'
 import { type ChangeRepository } from '../ports/change-repository.js'
@@ -28,6 +29,36 @@ export interface ArtifactFileStatus {
   readonly state: ArtifactStatus
   /** Last validated hash for this file, when present. */
   readonly validatedHash?: string
+  /** Whether the file's current state differs from its validated baseline. */
+  readonly hasDrift: boolean
+  /** Human-facing display status (may be `'complete-with-drift'`). */
+  readonly displayStatus: ArtifactDisplayStatus
+}
+
+/** Display-state aggregation precedence for artifact-level status. */
+const DISPLAY_STATUS_PRECEDENCE: readonly ArtifactDisplayStatus[] = [
+  'drifted-pending-review',
+  'pending-review',
+  'in-progress',
+  'missing',
+  'complete-with-drift',
+  'complete',
+]
+
+/**
+ * Derives the aggregate display status for an artifact from its file-level
+ * display statuses, using a fixed precedence ordering.
+ *
+ * @param files - File status entries to aggregate
+ * @returns The highest-precedence display status across all files
+ */
+function aggregateDisplayStatus(files: readonly ArtifactFileStatus[]): ArtifactDisplayStatus {
+  if (files.length === 0) return 'missing'
+  if (files.every((f) => f.displayStatus === 'skipped')) return 'skipped'
+  for (const candidate of DISPLAY_STATUS_PRECEDENCE) {
+    if (files.some((f) => f.displayStatus === candidate)) return candidate
+  }
+  return files[0]!.displayStatus
 }
 
 /** Status of a single artifact with file detail and dependency-aware effective status. */
@@ -38,6 +69,8 @@ export interface ArtifactStatusEntry {
   readonly state: ArtifactStatus
   /** Effective status after cascading through required dependencies. */
   readonly effectiveStatus: ArtifactStatus
+  /** Human-facing aggregated display status derived from file display states. */
+  readonly displayStatus: ArtifactDisplayStatus
   /** Per-file status details. */
   readonly files: ArtifactFileStatus[]
 }
@@ -236,11 +269,14 @@ export class GetStatus {
           filename: file.filename,
           state: file.status,
           ...(file.validatedHash !== undefined ? { validatedHash: file.validatedHash } : {}),
+          hasDrift: file.hasDrift,
+          displayStatus: file.displayStatus(),
         }))
         artifactStatuses.push({
           type,
           state: artifact.status,
           effectiveStatus: artifactStatusByType.get(type)?.effectiveStatus ?? artifact.status,
+          displayStatus: aggregateDisplayStatus(files),
           files,
         })
       }
@@ -270,11 +306,14 @@ export class GetStatus {
           filename: file.filename,
           state: file.status,
           ...(file.validatedHash !== undefined ? { validatedHash: file.validatedHash } : {}),
+          hasDrift: file.hasDrift,
+          displayStatus: file.displayStatus(),
         }))
         artifactStatuses.push({
           type,
           state: artifact.status,
           effectiveStatus: artifact.status,
+          displayStatus: aggregateDisplayStatus(files),
           files,
         })
       }

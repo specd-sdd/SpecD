@@ -367,18 +367,15 @@ describe('Change', () => {
 
       expect(tasks.getFile('tasks')?.validatedHash).toBe('sha256:t')
       expect(tasks.status).toBe('drifted-pending-review')
-      // All other artifacts require review once the change returns to designing
-      expect(proposal.getFile('proposal')?.validatedHash).toBe('sha256:p')
-      expect(proposal.status).toBe('pending-review')
-      expect(specs.getFile('specs')?.validatedHash).toBe('sha256:s')
-      expect(specs.status).toBe('pending-review')
-      expect(verify.getFile('verify')?.validatedHash).toBe('sha256:v')
-      expect(verify.status).toBe('pending-review')
-      expect(design.getFile('design')?.validatedHash).toBe('sha256:d')
-      expect(design.status).toBe('pending-review')
+      expect(tasks.getFile('tasks')?.hasDrift).toBe(true)
+      // tasks has no descendants, so with downstream policy only tasks is reopened
+      expect(proposal.status).toBe('complete')
+      expect(specs.status).toBe('complete')
+      expect(verify.status).toBe('complete')
+      expect(design.status).toBe('complete')
     })
 
-    it('with drift payload marks all non-drifted artifacts pending-review', () => {
+    it('with drift payload marks drifted and downstream artifacts pending-review via downstream policy', () => {
       // DAG: proposal → specs → verify, proposal → design, specs + design → tasks
       const c = makeChange()
       const proposal = new ChangeArtifact({
@@ -429,9 +426,9 @@ describe('Change', () => {
       expect(verify.status).toBe('pending-review')
       expect(tasks.getFile('tasks')?.validatedHash).toBe('sha256:t')
       expect(tasks.status).toBe('pending-review')
-      expect(proposal.status).toBe('pending-review')
+      expect(proposal.status).toBe('complete')
       expect(proposal.getFile('proposal')?.validatedHash).toBe('sha256:p')
-      expect(design.status).toBe('pending-review')
+      expect(design.status).toBe('complete')
       expect(design.getFile('design')?.validatedHash).toBe('sha256:d')
     })
 
@@ -454,6 +451,160 @@ describe('Change', () => {
       const transitioned = [...c.history].reverse().find((e) => e.type === 'transitioned')
       expect(transitioned?.type === 'transitioned' && transitioned.from).toBe('implementing')
       expect(transitioned?.type === 'transitioned' && transitioned.to).toBe('designing')
+    })
+  })
+
+  describe('invalidationPolicy', () => {
+    it('defaults to downstream', () => {
+      const c = makeChange()
+      expect(c.invalidationPolicy).toBe('downstream')
+    })
+
+    it('accepts an explicit policy via constructor', () => {
+      const c = new Change({
+        name: 'test',
+        createdAt: new Date('2024-01-15'),
+        specIds: [],
+        history: [
+          {
+            type: 'created',
+            at: new Date('2024-01-15'),
+            by: actor,
+            specIds: [],
+            schemaName: '@specd/schema-std',
+            schemaVersion: 1,
+          },
+        ],
+        artifacts: new Map(),
+        invalidationPolicy: 'surgical',
+      })
+      expect(c.invalidationPolicy).toBe('surgical')
+    })
+
+    function makeChangeWithChain(): Change {
+      const c = makeChange()
+      c.transition('designing', actor)
+      c.transition('ready', actor)
+      c.transition('implementing', actor)
+      const proposal = new ChangeArtifact({
+        type: 'proposal',
+        requires: [],
+        files: new Map([
+          ['proposal', new ArtifactFile({ key: 'proposal', filename: 'proposal.md' })],
+        ]),
+      })
+      proposal.markComplete('proposal', 'sha256:p')
+      const design = new ChangeArtifact({
+        type: 'design',
+        requires: ['proposal'],
+        files: new Map([['design', new ArtifactFile({ key: 'design', filename: 'design.md' })]]),
+      })
+      design.markComplete('design', 'sha256:d')
+      const tasks = new ChangeArtifact({
+        type: 'tasks',
+        requires: ['design'],
+        files: new Map([['tasks', new ArtifactFile({ key: 'tasks', filename: 'tasks.md' })]]),
+      })
+      tasks.markComplete('tasks', 'sha256:t')
+      c.setArtifact(proposal)
+      c.setArtifact(design)
+      c.setArtifact(tasks)
+      return c
+    }
+
+    it('policy none does not reopen any artifacts but sets hasDrift', () => {
+      const c = makeChangeWithChain()
+      const result = c.invalidate(
+        'artifact-drift',
+        actor,
+        'drift',
+        [{ type: 'design', files: ['design'] }],
+        'none',
+      )
+      expect(c.state).toBe('designing')
+      expect(c.getArtifact('proposal')?.status).toBe('complete')
+      expect(c.getArtifact('design')?.status).toBe('complete')
+      expect(c.getArtifact('tasks')?.status).toBe('complete')
+      expect(c.getArtifact('design')?.getFile('design')?.hasDrift).toBe(true)
+      expect(result).toHaveLength(1)
+      expect(result[0]).toEqual({ type: 'design', files: ['design'] })
+    })
+
+    it('policy surgical reopens only targeted files', () => {
+      const c = makeChangeWithChain()
+      const result = c.invalidate(
+        'artifact-drift',
+        actor,
+        'drift',
+        [{ type: 'design', files: ['design'] }],
+        'surgical',
+      )
+      expect(c.state).toBe('designing')
+      expect(c.getArtifact('proposal')?.status).toBe('complete')
+      expect(c.getArtifact('design')?.status).toBe('drifted-pending-review')
+      expect(c.getArtifact('design')?.getFile('design')?.hasDrift).toBe(true)
+      expect(c.getArtifact('tasks')?.status).toBe('complete')
+      expect(result).toHaveLength(1)
+      expect(result[0]).toEqual({ type: 'design', files: ['design'] })
+    })
+
+    it('policy global reopens all artifacts', () => {
+      const c = makeChangeWithChain()
+      const result = c.invalidate(
+        'artifact-drift',
+        actor,
+        'drift',
+        [{ type: 'design', files: ['design'] }],
+        'global',
+      )
+      expect(c.state).toBe('designing')
+      expect(c.getArtifact('proposal')?.status).toBe('pending-review')
+      expect(c.getArtifact('design')?.status).toBe('drifted-pending-review')
+      expect(c.getArtifact('design')?.getFile('design')?.hasDrift).toBe(true)
+      expect(c.getArtifact('tasks')?.status).toBe('pending-review')
+      expect(result).toHaveLength(3)
+      const types = result.map((e) => e.type).sort()
+      expect(types).toEqual(['design', 'proposal', 'tasks'])
+    })
+
+    it('policy downstream reopens targets and DAG descendants', () => {
+      const c = makeChangeWithChain()
+      const result = c.invalidate(
+        'artifact-drift',
+        actor,
+        'drift',
+        [{ type: 'design', files: ['design'] }],
+        'downstream',
+      )
+      expect(c.state).toBe('designing')
+      expect(c.getArtifact('proposal')?.status).toBe('complete')
+      expect(c.getArtifact('design')?.status).toBe('drifted-pending-review')
+      expect(c.getArtifact('design')?.getFile('design')?.hasDrift).toBe(true)
+      expect(c.getArtifact('tasks')?.status).toBe('pending-review')
+      expect(result).toHaveLength(2)
+      const types = result.map((e) => e.type).sort()
+      expect(types).toEqual(['design', 'tasks'])
+    })
+
+    it('respects stored policy when no override is passed', () => {
+      const c = makeChangeWithChain()
+      c.invalidationPolicy = 'surgical'
+      c.invalidate('artifact-drift', actor, 'drift', [{ type: 'design', files: ['design'] }])
+      expect(c.getArtifact('tasks')?.status).toBe('complete')
+      expect(c.getArtifact('design')?.status).toBe('drifted-pending-review')
+    })
+
+    it('cause other than artifact-drift does not set hasDrift', () => {
+      const c = makeChangeWithChain()
+      c.invalidate(
+        'artifact-review-required',
+        actor,
+        'manual review',
+        [{ type: 'design', files: ['design'] }],
+        'surgical',
+      )
+      expect(c.getArtifact('design')?.getFile('design')?.hasDrift).toBe(false)
+      expect(c.getArtifact('design')?.status).toBe('pending-review')
     })
   })
 

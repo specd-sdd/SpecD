@@ -1,0 +1,14 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "core:change",
+    "core:run-step-hooks",
+    "core:hook-execution-model",
+    "core:workflow-model",
+    "default:_global/architecture",
+    "core:lifecycle-engine"
+  ]
+}

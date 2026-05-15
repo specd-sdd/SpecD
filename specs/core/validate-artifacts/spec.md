@@ -81,11 +81,28 @@ A single invalidation call is made per `execute` invocation even if multiple fil
 
 That invalidation rolls the change back to `designing`, preserves `drifted-pending-review` on the drifted files, and downgrades the remaining files to `pending-review` as part of the redesign pass.
 
+### Requirement: Policy-aware drift materialization
+
+When ValidateArtifacts compares the current file state to the validated baseline, it SHALL treat any mismatch as drift evidence for that file. This includes changed content and file absence.
+
+For drift handling, ValidateArtifacts SHALL:
+
+1. collect the focused set of mismatching files grouped by artifact type
+2. preserve canonical `missing` when a file is absent rather than forcing a drift-derived canonical state
+3. call `Change.invalidate()` exactly once per execution with cause `artifact-drift` and the focused grouped payload
+4. rely on the `Change` entity to apply the effective invalidation policy and materialize `hasDrift=true` for the affected files
+
+Under policy `none`, ValidateArtifacts SHALL still detect and report mismatch, but artifact/file reopening is not materialized beyond canonical file-state rules such as `missing`.
+
 ### Requirement: Per-file validation
 
-If the expected artifact file does not exist in the change directory and the artifact is not optional, validation MUST record a failure before skipping. Only optional artifacts may be silently skipped when their expected file is missing.
+If the expected artifact file does not exist in the change directory and the artifact is required, validation SHALL treat the canonical file state as `missing`.
 
-For spec-scoped artifacts, the expected file is determined by `Requirement: Expected file path validation`. A file at the non-expected location MUST NOT satisfy this check.
+File presence and canonical file state MUST be established before any interpretation of `validatedHash`.
+
+A missing file MAY still imply `hasDrift=true` because the current file state no longer matches the validated baseline, but it MUST NOT surface as `complete-with-drift` because the canonical state is no longer `complete`.
+
+For spec-scoped artifacts, the expected file is determined by Requirement: Expected file path validation.
 
 ### Requirement: Expected file path validation
 
@@ -270,15 +287,16 @@ Validation rules for this update:
 
 ## Constraints
 
-- `ValidateArtifacts` is the **only** code path that may call `Artifact.markComplete(hash)` — enforced by convention and test coverage
-- The merged spec is never written to `SpecRepository` during validate — only during `ArchiveChange`
-- `change.invalidate('artifact-change', actor)` is called at most once per `execute` invocation, even if multiple artifacts have changed
-- `deltaValidations` evaluate rules against the normalized YAML AST of the delta file; `validations` evaluate rules against the normalized artifact AST; both use the same rule evaluation algorithm
-- `validations` run against the merged artifact content (or direct content for non-delta artifacts)
-- `preHashCleanup` substitutions are applied only for hash computation, never to the actual file content on disk
-- A missing `deltaValidations[]` is not an error — the step is skipped
-- A missing `validations[]` is not an error — the step is skipped
-- A missing expected delta file for an existing spec with a `delta: true` artifact is a validation failure; direct files under `specs/...` are valid only for new specs or non-delta artifacts
+- ValidateArtifacts is the only code path that may call Artifact.markComplete(hash) — enforced by convention and test coverage
+- The merged spec is never written to SpecRepository during validate — only during ArchiveChange
+- ValidateArtifacts calls change.invalidate('artifact-drift', actor, ...) at most once per execute invocation, even if multiple files have drifted
+- The drift invalidation payload is focused to the concrete mismatching artifact/files rather than an implicit global artifact set
+- deltaValidations evaluate rules against the normalized YAML AST of the delta file; validations evaluate rules against the normalized artifact AST; both use the same rule evaluation algorithm
+- validations run against the merged artifact content (or direct content for non-delta artifacts)
+- preHashCleanup substitutions are applied only for hash computation, never to the actual file content on disk
+- A missing deltaValidations\[] is not an error — the step is skipped
+- A missing validations\[] is not an error — the step is skipped
+- A missing expected delta file for an existing spec with a delta: true artifact is a validation failure; direct files under specs/... are valid only for new specs or non-delta artifacts
 
 ## Spec Dependencies
 

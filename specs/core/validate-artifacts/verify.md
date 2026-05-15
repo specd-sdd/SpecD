@@ -108,6 +108,23 @@
 - **WHEN** `ValidateArtifacts.execute` detects the mismatch
 - **THEN** the same grouped invalidation behavior is applied
 
+### Requirement: Policy-aware drift materialization
+
+#### Scenario: One invalidate call carries the focused drift payload
+
+- **GIVEN** one file under `specs` and one file under `verify` mismatch their validated baselines
+- **WHEN** `ValidateArtifacts.execute` runs
+- **THEN** it calls `Change.invalidate()` exactly once
+- **AND** the grouped payload identifies only those mismatching files
+
+#### Scenario: Policy none preserves complete while still marking drift
+
+- **GIVEN** a complete file still exists on disk but its content hash changed
+- **AND** the change's effective invalidation policy is `none`
+- **WHEN** `ValidateArtifacts.execute` runs
+- **THEN** the file remains canonically `complete`
+- **AND** `hasDrift` becomes `true`
+
 ### Requirement: Per-file validation
 
 #### Scenario: Missing expected non-optional file fails validation
@@ -117,6 +134,7 @@
 - **WHEN** `ValidateArtifacts.execute` validates the artifact
 - **THEN** `result.passed` is `false`
 - **AND** the file is not marked complete
+- **AND** the canonical file state is `missing`
 
 #### Scenario: Non-expected file does not satisfy the expected path
 
@@ -125,6 +143,13 @@
 - **WHEN** `ValidateArtifacts.execute` validates the artifact
 - **THEN** validation still reports the expected delta file as missing
 - **AND** the direct file is ignored for that artifact
+
+#### Scenario: Missing file can still carry hasDrift without rendering complete-with-drift
+
+- **GIVEN** a file was previously validated and is now absent on disk
+- **WHEN** `ValidateArtifacts.execute` compares current state to the validated baseline
+- **THEN** `hasDrift` may remain `true`
+- **AND** the file is not treated as `complete-with-drift`
 
 ### Requirement: Expected file path validation
 

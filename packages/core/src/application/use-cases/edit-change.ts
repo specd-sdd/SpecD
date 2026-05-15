@@ -4,6 +4,7 @@ import { type SpecRepository } from '../ports/spec-repository.js'
 import { type ActorResolver } from '../ports/actor-resolver.js'
 import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
 import { SpecNotInChangeError } from '../errors/spec-not-in-change-error.js'
+import { type InvalidationPolicy } from '../../domain/value-objects/invalidation-policy.js'
 import { parseSpecId } from '../../domain/services/parse-spec-id.js'
 import { SpecPath } from '../../domain/value-objects/spec-path.js'
 import { loadPersistedSpecDependsOn } from './_shared/load-persisted-spec-depends-on.js'
@@ -18,6 +19,8 @@ export interface EditChangeInput {
   readonly removeSpecIds?: string[]
   /** New description for the change. */
   readonly description?: string
+  /** Updated invalidation policy for the change. */
+  readonly invalidationPolicy?: InvalidationPolicy
 }
 
 /** Result returned by the {@link EditChange} use case. */
@@ -73,11 +76,12 @@ export class EditChange {
     }
 
     const hasDescriptionChange = input.description !== undefined
+    const hasPolicyChange = input.invalidationPolicy !== undefined
     const hasSpecChanges =
       (input.addSpecIds !== undefined && input.addSpecIds.length > 0) ||
       (input.removeSpecIds !== undefined && input.removeSpecIds.length > 0)
 
-    if (!hasDescriptionChange && !hasSpecChanges) {
+    if (!hasDescriptionChange && !hasSpecChanges && !hasPolicyChange) {
       return { change, invalidated: false }
     }
 
@@ -128,6 +132,10 @@ export class EditChange {
 
       if (hasDescriptionChange) {
         freshChange.updateDescription(input.description ?? '', actor)
+      }
+
+      if (hasPolicyChange && input.invalidationPolicy !== undefined) {
+        freshChange.invalidationPolicy = input.invalidationPolicy
       }
 
       return { change: freshChange, invalidated: specIdsChanged, removedSpecIds }

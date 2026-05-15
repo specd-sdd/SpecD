@@ -24,6 +24,12 @@
       ]
     },
     {
+      "requirement": "Canonical-state-only lifecycle interpretation",
+      "rules": [
+        "LifecycleEngine SHALL interpret only canonical artifact/file workflow states when deriving effective status, blockers, review routing, and transition eligibility.\n\nDisplay-only projections such as `complete-with-drift` and diagnostic fields such as `hasDrift` MUST NOT be treated as additional lifecycle states.\n\nConsequently:\n\n- when policy `none` leaves a file canonically `complete` but drift-visible in status rendering, LifecycleEngine still treats it as `complete`\n- when canonical state becomes `missing`, `pending-review`, or `drifted-pending-review`, LifecycleEngine uses those canonical states normally"
+      ]
+    },
+    {
       "requirement": "Machine-readable blockers",
       "rules": [
         "For every condition that prevents a transition or marks an artifact as incomplete, the engine MUST provide a structured `Blocker` object containing:\n\n- `code`: A unique machine-readable identifier.\n- `message`: A human-readable description.\n- `isSkippable`: Boolean indicating if the blocker can be bypassed via a CLI flag or configuration.\n- `bypassFlag`: (Optional) The name of the flag that bypasses this blocker (e.g., `--allow-overlap`).\n- `affectedArtifacts` (optional): Detail identifying the specific artifact IDs and files.\n\nIf a blocker is skippable and the corresponding bypass is active in the engine's input, the engine SHALL treat the condition as a warning rather than a transition blocker.\n\n**Mandatory Blocker Codes:**\n\n- `MISSING_ARTIFACT`: A required artifact is completely absent (state: `missing`).\n- `INCOMPLETE_ARTIFACT`: An artifact exists but has not been validated (state: `in-progress`).\n- `ARTIFACT_DRIFT`: An artifact has changed on disk since its last validation (state: `drifted-pending-review`).\n- `REVIEW_REQUIRED`: An artifact was invalidated or downgraded and requires review (state: `pending-review`).\n- `PENDING_PARENT_REVIEW`: An artifact is blocked because one of its upstream dependencies requires review.\n- `INCOMPLETE_TASKS`: An artifact contains unfinished checklist items (e.g., `- [ ]`).\n- `OVERLAP_CONFLICT`: The change scope overlaps with specs modified by a recently archived change.\n- `INVALID_TRANSITION`: The requested transition is not permitted by the lifecycle state machine.\n- `APPROVAL_REQUIRED`: The transition is gated by a required human approval (spec approval or sign-off).\n\nFor file-level blockers (drift, review, parent review), the `affectedArtifacts` field MUST contain a grouped list identifying the specific artifact IDs and the exact filenames/paths that triggered the blocker."
@@ -73,6 +79,23 @@
         "the returned verdict reports Spec B with effective status pending-parent-artifact-review",
         "AND the blockers identify Spec A as the cause"
       ]
+    },
+    {
+      "requirement": "Canonical-state-only lifecycle interpretation",
+      "name": "Complete-with-drift does not create a new blocker state",
+      "given": [
+        "a file that is canonically complete",
+        "AND status rendering would project it as complete-with-drift"
+      ],
+      "when": ["LifecycleEngine derives effective artifact status"],
+      "then": ["it treats the file as complete"]
+    },
+    {
+      "requirement": "Canonical-state-only lifecycle interpretation",
+      "name": "Missing still blocks through canonical state",
+      "given": ["a file with canonical state missing", "AND hasDrift is also true"],
+      "when": ["LifecycleEngine derives effective artifact status"],
+      "then": ["it uses missing as the blocking state"]
     },
     {
       "requirement": "Machine-readable blockers",
@@ -127,8 +150,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:c4ba300cf60927961bb133b375b60875d512487ee48e80ebc66d4fe9e47e3a97",
-    "verify.md": "sha256:3bf7661c44cfe78112207d6d8de2d7f5e9196ed1520d5eb0ba651e8a6685186d"
+    "spec.md": "sha256:9c95aaba9fd94edb8eb59282e484858059120ec5daa9789c503462e22f9fff90",
+    "verify.md": "sha256:148e5119665283b556c99c359d0122c1ceb1e5aabf19d2d295d0bc074d9ff156"
   },
   "generatedBy": "core"
 }

@@ -13,6 +13,12 @@
       ]
     },
     {
+      "requirement": "Initial invalidation policy",
+      "rules": [
+        "CreateChange.execute SHALL accept the project-level default invalidation policy as input and persist it on the newly created change.\n\nThe persisted initial value MUST be one of:\n\n- `none`\n- `surgical`\n- `downstream`\n- `global`\n\nThis value becomes the change's default invalidation policy until a later EditChange operation overrides it."
+      ]
+    },
+    {
       "requirement": "Name uniqueness enforcement",
       "rules": [
         "The use case MUST query the `ChangeRepository` for an existing change with the given name before creating a new one. If a change with that name already exists, the use case MUST throw `ChangeAlreadyExistsError`."
@@ -156,6 +162,13 @@
       "then": ["the created event contains specIds: ['auth/login', 'auth/register']"]
     },
     {
+      "requirement": "Initial invalidation policy",
+      "name": "New change persists the project default invalidationPolicy",
+      "given": ["the project default invalidation policy is downstream"],
+      "when": ["CreateChange.execute creates a new change"],
+      "then": ["the returned and persisted change uses invalidationPolicy: 'downstream'"]
+    },
+    {
       "requirement": "Persistence and scaffolding",
       "name": "Change is saved to repository",
       "when": ["CreateChange.execute completes successfully"],
@@ -209,8 +222,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:4f4c450800b50249402c952ba7dc2906e4499ac1193a38ec9b6acb9779b7ac47",
-    "verify.md": "sha256:7dff719332bfdb75be063a8157ded5849781714d7de6e2ef157c1173726c6efe"
+    "spec.md": "sha256:1780b0a4e8275fe8d47027f9af922cbfda33a47f8c5ecc40374b923940c2e7d2",
+    "verify.md": "sha256:a8aa41806413409cf71825e3792a5cf6c2669353d49c49b58a6eeab3b632e51e"
   },
   "generatedBy": "core"
 }

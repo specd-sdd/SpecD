@@ -8,6 +8,7 @@
 
 import { z } from 'zod'
 import { type ArtifactStatus } from '../../domain/value-objects/artifact-status.js'
+import { type InvalidationPolicy } from '../../domain/value-objects/invalidation-policy.js'
 
 /** Actor identity as stored in the manifest JSON. */
 export interface ManifestActorIdentity {
@@ -39,6 +40,8 @@ export interface ManifestArtifactFile {
    * - `"sha256:..."` — validated
    */
   readonly validatedHash: string | null
+  /** Whether the file's current state differs from its validated baseline. Defaults to `false`. */
+  readonly hasDrift?: boolean
 }
 
 /** A single artifact descriptor as stored in the manifest `artifacts` array. */
@@ -273,6 +276,7 @@ export const manifestArtifactFileSchema = z.object({
   filename: z.string(),
   state: artifactStatusSchema.optional(),
   validatedHash: z.string().nullable(),
+  hasDrift: z.boolean().optional(),
 })
 
 export const manifestArtifactSchema = z.object({
@@ -304,6 +308,7 @@ export const changeManifestSchema = z.object({
   workspaces: z.array(z.string()).optional(),
   specIds: z.array(z.string()),
   specDependsOn: z.record(z.string(), z.array(z.string())).optional(),
+  invalidationPolicy: z.enum(['none', 'surgical', 'downstream', 'global']).optional(),
   artifacts: z.array(manifestArtifactSchema),
   history: z.array(rawChangeEventSchema),
 })
@@ -352,6 +357,8 @@ export interface ChangeManifest {
    * `metadata.json` is generated. Omitted from the manifest when empty.
    */
   readonly specDependsOn?: Record<string, string[]>
+  /** Invalidation policy for this change. Defaults to `'downstream'` when absent. */
+  readonly invalidationPolicy?: InvalidationPolicy
   /** Artifact descriptors including their validation hashes. */
   readonly artifacts: ManifestArtifact[]
   /** Append-only event history. */

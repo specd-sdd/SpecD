@@ -40,6 +40,7 @@ Create a new change and place it in the active changes directory.
 | --------------------------- | ------------------------------------------------------------------------------------------------ |
 | `--spec <id>`               | Associate a spec with this change. Repeatable — pass multiple `--spec` flags for multiple specs. |
 | `--description <text>`      | Short description of the change's intent.                                                        |
+| `--invalidation-policy <p>` | Set the invalidation policy (`none\|surgical\|downstream\|global`). Defaults to `downstream`.    |
 | `--format text\|json\|toon` | Output format.                                                                                   |
 | `--config <path>`           | Config file path.                                                                                |
 
@@ -86,8 +87,10 @@ Artifact and file states:
 - `complete`
 - `skipped`
 - `pending-review`
-- `drifted-pending-review`
+- `drifted-pending-review` (validated content changed on disk)
 - `pending-parent-artifact-review` (blocked by upstream review)
+
+The text output renders a **display status** column that extends canonical state with `complete-with-drift` — shown when a file is canonically `complete` but its drift flag is set (meaning the baseline was validated, then the file changed, and it was re-validated against the new content). A `[drift]` indicator appears next to files that have drifted from their validated baseline.
 
 | Option                      | Description       |
 | --------------------------- | ----------------- |
@@ -161,13 +164,14 @@ specd changes edit <name> [options]
 
 Edit the spec scope or description of an existing change. At least one of the options below is required.
 
-| Option                      | Description                    |
-| --------------------------- | ------------------------------ |
-| `--add-spec <id>`           | Add a spec to the change.      |
-| `--remove-spec <id>`        | Remove a spec from the change. |
-| `--description <text>`      | Update the change description. |
-| `--format text\|json\|toon` | Output format.                 |
-| `--config <path>`           | Config file path.              |
+| Option                      | Description                                                            |
+| --------------------------- | ---------------------------------------------------------------------- |
+| `--add-spec <id>`           | Add a spec to the change.                                              |
+| `--remove-spec <id>`        | Remove a spec from the change.                                         |
+| `--description <text>`      | Update the change description.                                         |
+| `--invalidation-policy <p>` | Change the invalidation policy (`none\|surgical\|downstream\|global`). |
+| `--format text\|json\|toon` | Output format.                                                         |
+| `--config <path>`           | Config file path.                                                      |
 
 ### change validate
 
@@ -282,7 +286,9 @@ If `--fingerprint <hash>` matches the current compiled fingerprint, `text` mode 
 specd changes artifacts <name> [options]
 ```
 
-Show the artifact files table for a change with columns: `ID`, `FILENAME`, `STATUS`, `EXISTS`. Useful for a quick check on what has been produced and whether files are present on disk.
+Show the artifact files table for a change with columns: `ID`, `STATUS`, `EXISTS`. Useful for a quick check on what has been produced and whether files are present on disk.
+
+The `STATUS` column shows the **display status** — a human-facing state that extends canonical artifact state with `complete-with-drift` for files that are canonically complete but have drifted from their validated baseline. A `[drift]` indicator appears next to files whose drift flag is set.
 
 `changes artifacts` emits one row per tracked file. Structured output includes:
 
@@ -312,6 +318,49 @@ Mark an optional artifact as intentionally skipped. A skipped artifact is treate
 | `--reason <text>`           | Reason for skipping. |
 | `--format text\|json\|toon` | Output format.       |
 | `--config <path>`           | Config file path.    |
+
+### change invalidate
+
+```
+specd changes invalidate <name> --reason <text> [options]
+```
+
+Invalidate a change and return it to `designing`, optionally targeting specific artifacts for review. This is the manual invalidation entry point — it records an `invalidated` history event, transitions the change back to `designing` (if not already there), and reopens targeted artifacts for review.
+
+The **invalidation policy** controls how artifact reopening propagates:
+
+| Policy       | Behaviour                                                               |
+| ------------ | ----------------------------------------------------------------------- |
+| `none`       | No artifacts are reopened. The change transitions to `designing` only.  |
+| `surgical`   | Only the explicitly targeted files are reopened.                        |
+| `downstream` | Targets plus all DAG descendants are reopened. This is the **default**. |
+| `global`     | Every artifact in the change is reopened.                               |
+
+Targets are specified with `--target <artifactId>` or `--target <artifactId>@<specId>` for spec-scoped artifacts. The `@specId` syntax is only valid for artifacts with `scope: spec`.
+
+When a change has an active spec approval or signoff, invalidation is blocked unless `--force` is passed. This prevents accidentally invalidating an approved change.
+
+Text output shows the change name, state, effective policy, and an `affected:` section listing each reopened file grouped by artifact with its expansion label (`downstream`, `global`).
+
+| Option                      | Description                                                                                                    |
+| --------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `--reason <text>`           | Mandatory explanation for the invalidation.                                                                    |
+| `--target <target>`         | Target an artifact or artifact file (repeatable). Use `artifactId` or `artifactId@specId`.                     |
+| `--policy <policy>`         | Override the change's persisted invalidation policy for this execution (`none\|surgical\|downstream\|global`). |
+| `--force`                   | Bypass the approval/signoff guard.                                                                             |
+| `--format text\|json\|toon` | Output format.                                                                                                 |
+| `--config <path>`           | Config file path.                                                                                              |
+
+```bash
+# Invalidate specific artifacts with downstream propagation
+specd changes invalidate my-change --reason "Revisit design after API change" --target design
+
+# Invalidate a spec-scoped artifact file
+specd changes invalidate my-change --reason "Update specs" --target specs@auth/login
+
+# Override policy to surgical (only targeted files)
+specd changes invalidate my-change --reason "Minor fix" --target tasks --policy surgical
+```
 
 ### change deps
 

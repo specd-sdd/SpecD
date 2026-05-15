@@ -8,21 +8,15 @@ The Change entity's state must survive process restarts and be recoverable from 
 
 ### Requirement: Manifest structure
 
-Each change is persisted as a `manifest.json` file inside its change directory. Its top-level structure is:
+Each change is persisted as a manifest.json file inside its change directory. It contains:
 
 ```jsonc
-// manifest.json
 {
-  "name": "add-auth-flow",
-  "createdAt": "2024-03-15T10:00:00.000Z",
-  "schema": {
-    "name": "@specd/schema-std",
-    "version": 2,
-  },
-  "specIds": ["default:auth/login", "default:auth/register"],
-  "specDependsOn": {
-    "default:auth/login": ["default:auth/shared"],
-  },
+  "name": "add-oauth-login",
+  "createdAt": "2026-05-15T10:00:00.000Z",
+  "schema": { "name": "schema-std", "version": 1 },
+  "specIds": ["core:change"],
+  "invalidationPolicy": "downstream",
   "artifacts": [
     {
       "type": "proposal",
@@ -34,7 +28,8 @@ Each change is persisted as a `manifest.json` file inside its change directory. 
           "key": "proposal",
           "filename": "proposal.md",
           "state": "complete",
-          "validatedHash": "sha256:abc123...",
+          "validatedHash": "sha256:...",
+          "hasDrift": false,
         },
       ],
     },
@@ -45,16 +40,18 @@ Each change is persisted as a `manifest.json` file inside its change directory. 
 
 Field definitions:
 
-- **`name`** — the change slug; immutable after creation
-- **`createdAt`** — ISO 8601 timestamp; immutable after creation; source of truth for the directory prefix
-- **`schema`** — `name` (string) and `version` (integer) of the schema active at creation; written once, never updated
-- **`workspaces`** — optional; accepted on load for backward compatibility with older manifests but no longer written on save. Active workspaces are derived at runtime from `specIds` via `parseSpecId()`
-- **`specIds`** — current snapshot of spec IDs; mutable
-- **`specDependsOn`** (optional) — a record keyed by spec ID, each value being an array of spec ID strings representing that spec's current in-change declared dependencies. For existing persisted specs, the entry MUST be seeded when the spec first enters the change scope from `spec-lock.json`, then legacy `metadata.json.dependsOn`, then an empty set when neither exists. These entries are archive-time inputs to sidecar and metadata generation, not the long-term archived record.
-- **`artifacts`** — array of artifact descriptors. Each artifact has `type`, `optional`, `requires`, `state`, and a `files` array of `ManifestArtifactFile` entries. Each file entry has `key`, `filename`, `state`, and `validatedHash`.
-- **`state`** on both artifacts and files uses the `ArtifactStatus` domain values (`missing`, `in-progress`, `complete`, `skipped`, `pending-review`, `drifted-pending-review`). File state is the source of truth; artifact state is the persisted aggregate.
-- **`validatedHash`** remains persisted for drift detection and approval signatures. It is `null` when not validated, a SHA-256 string when validated, or `"__skipped__"` when explicitly skipped.
-- **`history`** — append-only array of typed events. The event types, their semantics, and the derivation rules (current state, active approval, draft status) are defined in [`specs/core/change/spec.md` — Requirement: History and event sourcing](../change/spec.md). This section defines only the JSON serialization of those events. The current lifecycle state is derived from the most recent `transitioned` event's `to` field. Each event contains common fields: `type`, `at`, and `by`. The `by` field is an `ActorIdentity` object (defined in `core:change`) which includes `name`, `email`, and optional `provider`, `providerId`, and `metadata`.
+- `name` — the change slug; immutable after creation
+- `createdAt` — ISO 8601 timestamp; immutable after creation; source of truth for the directory prefix
+- `schema` — name (string) and version (integer) of the schema active at creation; written once, never updated
+- `workspaces` — optional; accepted on load for backward compatibility with older manifests but no longer written on save. Active workspaces are derived at runtime from specIds via parseSpecId()
+- `specIds` — current snapshot of spec IDs; mutable
+- `invalidationPolicy` — the change's persisted invalidation policy (`none`, `surgical`, `downstream`, `global`)
+- `specDependsOn` (optional) — a record keyed by spec ID, each value being an array of spec ID strings representing that spec's current in-change declared dependencies. For existing persisted specs, the entry MUST be seeded when the spec first enters the change scope from spec-lock.json, then legacy metadata.json.dependsOn, then an empty set when neither exists. These entries are archive-time inputs to sidecar and metadata generation, not the long-term archived record.
+- `artifacts` — array of artifact descriptors. Each artifact has type, optional, requires, state, and a files array of ManifestArtifactFile entries. Each file entry has key, filename, state, validatedHash, and hasDrift.
+- state on both artifacts and files uses the ArtifactStatus domain values (missing, in-progress, complete, skipped, pending-review, drifted-pending-review). File state is the source of truth; artifact state is the persisted aggregate.
+- validatedHash remains persisted as the last successfully validated baseline only. It is null when not validated, a SHA-256 string when validated, or "**skipped**" when explicitly skipped. It MUST NOT be interpreted as proof that the file still exists or is still complete on disk.
+- hasDrift is persisted per file and indicates whether the file's current state differs from the validated baseline
+- `history` — append-only array of typed events. The event types, their semantics, and the derivation rules (current state, active approval, draft status) are defined in [specs/core/change/spec.md — Requirement: History and event sourcing](../change/spec.md). This section defines only the JSON serialization of those events. The current lifecycle state is derived from the most recent transitioned event's to field. Each event contains common fields: type, at, and by. The by field is an ActorIdentity object (defined in core:change) which includes name, email, and optional provider, providerId, and metadata.
 
 The JSON serialization of each event type is unchanged.
 
@@ -104,13 +101,15 @@ The manifest must be written atomically — by writing to a temporary file and t
 
 ## Constraints
 
-- Artifact and file `state` are stored explicitly in the manifest; callers must not reconstruct steady-state status solely from `validatedHash`
-- `validatedHash` has three valid values: `null` (not yet validated), a SHA-256 string (validated), or `"__skipped__"` (optional artifact explicitly not produced)
-- If an older manifest is encountered without a `state` field on an artifact or file, loading defaults that missing state to `missing`
-- If an older manifest is encountered with an `invalidated` event whose `cause` is `"artifact-change"`, loading must accept it and normalize it to the current artifact-drift semantics
-- The manifest has no top-level `state` field; the current lifecycle state is always derived from the `history` array at load time
-- The `history` array is append-only — existing events must never be modified or removed by any operation
-- The `schema` field is written once at creation and must never be updated by subsequent operations
+- Artifact and file state are stored explicitly in the manifest; callers must not reconstruct steady-state status solely from validatedHash
+- File presence and canonical file state MUST be checked before any interpretation of validatedHash
+- validatedHash has three valid values: null (not yet validated), a SHA-256 string (validated), or "**skipped**" (optional artifact explicitly not produced)
+- hasDrift is persisted per file and records whether the current file state differs from the validated baseline
+- If an older manifest is encountered without a state field on an artifact or file, loading defaults that missing state to missing
+- If an older manifest is encountered with an invalidated event whose cause is "artifact-change", loading must accept it and normalize it to the current artifact-drift semantics
+- The manifest has no top-level state field; the current lifecycle state is always derived from the history array at load time
+- The history array is append-only — existing events must never be modified or removed by any operation
+- The schema field is written once at creation and must never be updated by subsequent operations
 
 ## Spec Dependencies
 

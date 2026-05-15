@@ -1,0 +1,185 @@
+{
+  "title": "Change Invalidate",
+  "description": "Users need an explicit CLI command to reopen a change for semantic review without pretending that every invalidation is physical drift. The command must make the lifecycle consequence obvious, validate targeting and policy combinations before mutating anything, and clearly report the final affected artifact/file set.\n\nThis spec defines `specd changes invalidate <name>` as the manual invalidation surface. It covers command arguments, policy-dependent targeting rules, approval guards, and reporting.",
+  "dependsOn": [
+    "cli:entrypoint",
+    "core:invalidate-change",
+    "core:get-status",
+    "default:_global/docs"
+  ],
+  "context": [
+    "Users need an explicit CLI command to reopen a change for semantic review without pretending that every invalidation is physical drift. The command must make the lifecycle consequence obvious, validate targeting and policy combinations before mutating anything, and clearly report the final affected artifact/file set.\n\nThis spec defines `specd changes invalidate <name>` as the manual invalidation surface. It covers command arguments, policy-dependent targeting rules, approval guards, and reporting."
+  ],
+  "rules": [
+    {
+      "requirement": "Command signature",
+      "rules": [
+        "The canonical command is:\n\n```text\nspecd changes invalidate <name> --reason <text> [--policy <policy>] [--target <target> ...] [--force]\n```\n\nWhere:\n\n- `<name>` is the required change name\n- `--reason <text>` is mandatory\n- `--policy <policy>` is optional and overrides the change's persisted `invalidationPolicy` for this execution only\n- `--target <target>` is optional or required depending on the effective policy and MAY be repeated\n- `--force` confirms invalidation when active approval or signoff would be removed"
+      ]
+    },
+    {
+      "requirement": "Effective policy resolution",
+      "rules": [
+        "The command MUST first resolve the effective invalidation policy:\n\n- explicit `--policy`, when present\n- otherwise the change's persisted `invalidationPolicy`\n\nThe command MUST use that effective policy for all later validation and execution behavior."
+      ]
+    },
+    {
+      "requirement": "Target syntax",
+      "rules": [
+        "`--target` is the only targeting surface.\n\nSupported forms:\n\n- `<artifactId>`\n- `<artifactId>@<specId>`\n\nSemantics:\n\n- `<artifactId>` targets the whole artifact\n- for `scope: spec` artifacts, `<artifactId>` means all files for that artifact across specs in the change\n- `<artifactId>@<specId>` targets a single file of a `scope: spec` artifact\n- `<artifactId>@<specId>` against a `scope: change` artifact is invalid"
+      ]
+    },
+    {
+      "requirement": "Policy-dependent target requirements",
+      "rules": [
+        "After resolving the effective policy:\n\n- `surgical` and `downstream` REQUIRE at least one `--target`\n- `none` and `global` MUST reject any `--target`\n\nThe command MUST validate these rules before any mutation or approval confirmation."
+      ]
+    },
+    {
+      "requirement": "Target normalization and validation",
+      "rules": [
+        "When targets are permitted, the command MUST:\n\n1. Normalize all requested targets\n2. Validate all of them against artifact scope and change membership\n3. Deduplicate the normalized target set\n4. Fail atomically if any target is invalid\n\nValidation errors MUST accumulate across the full requested set and report every invalid target combination found."
+      ]
+    },
+    {
+      "requirement": "Approval guard",
+      "rules": [
+        "If the change currently has an active spec approval or signoff, the command MUST stop by default and require `--force`.\n\nWithout `--force`, no mutation occurs.\n\nThe warning MUST state that:\n\n- the change will return to `designing`\n- the active approval/signoff will be invalidated\n\nThis guard applies even when the effective policy is `none`."
+      ]
+    },
+    {
+      "requirement": "Change-level invalidation",
+      "rules": [
+        "Once validation and approval guards pass, the command always invalidates the change and returns it to `designing`.\n\nThe effective invalidation policy controls only artifact/file-state consequences, not whether the change itself is invalidated."
+      ]
+    },
+    {
+      "requirement": "none semantics",
+      "rules": [
+        "When the effective policy is `none`, the command invalidates the change but performs no artifact/file-state invalidation.\n\nThe command output MUST say explicitly that:\n\n- the change was invalidated and returned to `designing`\n- no artifacts were invalidated because the effective policy is `none`"
+      ]
+    },
+    {
+      "requirement": "Reporting",
+      "rules": [
+        "The command MUST report:\n\n- the effective invalidation policy\n- the final affected artifact/file set after normalization, deduplication, and policy expansion\n\nThe final affected set MUST:\n\n- list each artifact/file at most once\n- be grouped by artifact\n- be emitted in linear DAG-forest traversal order:\n  - exhaust one root branch first\n  - then continue with the next remaining root\n  - never re-list entries already shown through a previous branch\n\nWhen an entry appears because of downstream/global expansion rather than direct targeting, the output MUST label that fact clearly."
+      ]
+    },
+    {
+      "requirement": "Error handling",
+      "rules": [
+        "The command exits with code `1` for invalid user/domain input, including:\n\n- missing required `--reason`\n- missing `--target` for effective `surgical` or `downstream`\n- forbidden `--target` for effective `none` or `global`\n- malformed or scope-incompatible targets\n- missing `--force` when approvals/signoff are active"
+      ]
+    }
+  ],
+  "constraints": [
+    "The command MUST NOT expose artifact-drift as a manual cause.",
+    "The command is a CLI adapter over the manual invalidation use case; it MUST NOT re-implement policy semantics independently.",
+    "The command MUST report the final affected set, not the raw pre-normalized user input."
+  ],
+  "scenarios": [
+    {
+      "requirement": "Command signature",
+      "name": "Missing reason is rejected",
+      "when": ["specd changes invalidate <name> is run without --reason"],
+      "then": ["the command exits with code 1", "AND it prints a usage or validation error"]
+    },
+    {
+      "requirement": "Effective policy resolution",
+      "name": "CLI override becomes the effective policy",
+      "given": ["a change persisted with invalidationPolicy: downstream"],
+      "when": [
+        "specd changes invalidate <name> --reason \"review\" --policy surgical --target specs"
+      ],
+      "then": ["execution uses effective policy surgical"]
+    },
+    {
+      "requirement": "Target syntax",
+      "name": "Scope-incompatible artifact-at-spec target is rejected",
+      "when": [
+        "specd changes invalidate <name> --reason \"review\" --policy surgical --target design@core:change"
+      ],
+      "then": [
+        "the command exits with code 1",
+        "AND the error explains that the target form is invalid for a scope: change artifact"
+      ]
+    },
+    {
+      "requirement": "Policy-dependent target requirements",
+      "name": "Downstream requires at least one target",
+      "when": ["specd changes invalidate <name> --reason \"review\" --policy downstream"],
+      "then": ["the command exits with code 1"]
+    },
+    {
+      "requirement": "Policy-dependent target requirements",
+      "name": "Global rejects explicit targets",
+      "when": [
+        "specd changes invalidate <name> --reason \"review\" --policy global --target specs"
+      ],
+      "then": ["the command exits with code 1"]
+    },
+    {
+      "requirement": "Target normalization and validation",
+      "name": "All invalid targets are reported together",
+      "when": [
+        "the command is run with multiple malformed, unknown, or scope-incompatible targets"
+      ],
+      "then": [
+        "the command reports every invalid target combination it found",
+        "AND no mutation occurs"
+      ]
+    },
+    {
+      "requirement": "Approval guard",
+      "name": "Active approval requires force even under policy none",
+      "given": ["the change currently has an active approval"],
+      "when": [
+        "specd changes invalidate <name> --reason \"review\" --policy none is run without --force"
+      ],
+      "then": [
+        "the command exits with code 1",
+        "AND the warning says the change would return to designing and invalidate the approval"
+      ]
+    },
+    {
+      "requirement": "Change-level invalidation",
+      "name": "Successful command always returns the change to designing",
+      "when": ["specd changes invalidate <name> --reason \"review\" succeeds"],
+      "then": ["the change is invalidated", "AND it returns to designing"]
+    },
+    {
+      "requirement": "none semantics",
+      "name": "Policy none reports no artifact invalidation",
+      "when": ["specd changes invalidate <name> --reason \"review\" --policy none succeeds"],
+      "then": [
+        "output says the change returned to designing",
+        "AND it says no artifacts were invalidated because the effective policy is none"
+      ]
+    },
+    {
+      "requirement": "Reporting",
+      "name": "Downstream output reports only the final affected set",
+      "given": [
+        "repeated targets normalize to one set and downstream expansion reaches additional files"
+      ],
+      "when": ["the command succeeds"],
+      "then": [
+        "output reports the effective policy",
+        "AND it lists each affected artifact/file at most once",
+        "AND downstream-expanded entries are clearly labeled"
+      ]
+    },
+    {
+      "requirement": "Error handling",
+      "name": "Missing force is treated as command failure",
+      "given": ["an active signoff on the change"],
+      "when": ["the command is run without --force"],
+      "then": ["it exits with code 1"]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:df85fa051d4d10455304d1f1b4f66ad0fa4884dbc0c4b8d58d606cee051232a3",
+    "verify.md": "sha256:f79b8709d14fc19c7bb7e4570738e54d0c6f5386d0ffd38b4dccb267b4ffa63e"
+  },
+  "generatedBy": "core"
+}

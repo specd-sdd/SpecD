@@ -10,9 +10,9 @@ Unifying lifecycle validation, artifact status, and repair diagnostics into a si
 
 The `LifecycleEngine` SHALL be the sole authority for interpreting a change's state within a project's workflow. It MUST unify three validation dimensions:
 
-1.  **Protocol Validation**: Enforcing the valid state transition graph.
-2.  **Artifact Validation**: Verifying structural completion of required artifacts.
-3.  **Content Validation**: Checking internal task completion within artifacts.
+1. **Protocol Validation**: Enforcing the valid state transition graph.
+2. **Artifact Validation**: Verifying structural completion of required artifacts.
+3. **Content Validation**: Checking internal task completion within artifacts.
 
 ### Requirement: Effective artifact status computation
 
@@ -30,6 +30,17 @@ The engine exists specifically because the entity does not know the schema artif
 - In any other case, the effective status matches the aggregated persisted state (`missing`, `in-progress`, `complete`, `skipped`).
 
 The engine MUST detect recursive blocks: if Spec B depends on Spec A, and Spec A is `pending-review`, Spec B's effective status becomes `pending-parent-artifact-review`.
+
+### Requirement: Canonical-state-only lifecycle interpretation
+
+LifecycleEngine SHALL interpret only canonical artifact/file workflow states when deriving effective status, blockers, review routing, and transition eligibility.
+
+Display-only projections such as `complete-with-drift` and diagnostic fields such as `hasDrift` MUST NOT be treated as additional lifecycle states.
+
+Consequently:
+
+- when policy `none` leaves a file canonically `complete` but drift-visible in status rendering, LifecycleEngine still treats it as `complete`
+- when canonical state becomes `missing`, `pending-review`, or `drifted-pending-review`, LifecycleEngine uses those canonical states normally
 
 ### Requirement: Machine-readable blockers
 

@@ -1311,7 +1311,7 @@ describe('FsChangeRepository', () => {
       const loaded = await repo.get('c2')
 
       expect(loaded?.state).toBe('designing')
-      expect(loaded?.getArtifact('proposal')?.status).toBe('pending-review')
+      expect(loaded?.getArtifact('proposal')?.status).toBe('complete')
       expect(loaded?.getArtifact('proposal')?.getFile('proposal')?.validatedHash).toBe(proposalHash)
       expect(loaded?.getArtifact('design')?.getFile('design')?.validatedHash).toBe(designHash)
       expect(loaded?.getArtifact('design')?.status).toBe('drifted-pending-review')
@@ -1470,6 +1470,391 @@ describe('FsChangeRepository', () => {
       await ctx.repo.unscaffold(change, ['default:'])
 
       await expect(fs.access(dir)).resolves.toBeUndefined()
+    })
+  })
+
+  describe('invalidationPolicy round-trip', () => {
+    it('persists default downstream when not set', async () => {
+      const change = makeChange('c1')
+      await ctx.repo.save(change)
+
+      const loaded = await ctx.repo.get('c1')
+      expect(loaded?.invalidationPolicy).toBe('downstream')
+    })
+
+    it('persists explicit surgical policy', async () => {
+      const change = new Change({
+        name: 'c1',
+        createdAt: new Date('2024-01-15T10:00:00.000Z'),
+        specIds: ['auth/login'],
+        history: [
+          {
+            type: 'created',
+            at: new Date('2024-01-15T10:00:00.000Z'),
+            by: actor,
+            specIds: ['auth/login'],
+            schemaName: '@specd/schema-std',
+            schemaVersion: 1,
+          },
+        ],
+        artifacts: new Map(),
+        invalidationPolicy: 'surgical',
+      })
+      await ctx.repo.save(change)
+
+      const loaded = await ctx.repo.get('c1')
+      expect(loaded?.invalidationPolicy).toBe('surgical')
+    })
+
+    it('persists none policy', async () => {
+      const change = new Change({
+        name: 'c1',
+        createdAt: new Date('2024-01-15T10:00:00.000Z'),
+        specIds: ['auth/login'],
+        history: [
+          {
+            type: 'created',
+            at: new Date('2024-01-15T10:00:00.000Z'),
+            by: actor,
+            specIds: ['auth/login'],
+            schemaName: '@specd/schema-std',
+            schemaVersion: 1,
+          },
+        ],
+        artifacts: new Map(),
+        invalidationPolicy: 'none',
+      })
+      await ctx.repo.save(change)
+
+      const loaded = await ctx.repo.get('c1')
+      expect(loaded?.invalidationPolicy).toBe('none')
+    })
+
+    it('persists global policy', async () => {
+      const change = new Change({
+        name: 'c1',
+        createdAt: new Date('2024-01-15T10:00:00.000Z'),
+        specIds: ['auth/login'],
+        history: [
+          {
+            type: 'created',
+            at: new Date('2024-01-15T10:00:00.000Z'),
+            by: actor,
+            specIds: ['auth/login'],
+            schemaName: '@specd/schema-std',
+            schemaVersion: 1,
+          },
+        ],
+        artifacts: new Map(),
+        invalidationPolicy: 'global',
+      })
+      await ctx.repo.save(change)
+
+      const loaded = await ctx.repo.get('c1')
+      expect(loaded?.invalidationPolicy).toBe('global')
+    })
+  })
+
+  describe('hasDrift round-trip', () => {
+    it('persists hasDrift true on a file', async () => {
+      const change = makeChange('c1')
+      change.setArtifact(
+        new ChangeArtifact({
+          type: 'proposal',
+          requires: [],
+          files: new Map([
+            [
+              'proposal',
+              new ArtifactFile({
+                key: 'proposal',
+                filename: 'proposal.md',
+                status: 'drifted-pending-review',
+                validatedHash: 'sha256:abc',
+                hasDrift: true,
+              }),
+            ],
+          ]),
+        }),
+      )
+      await ctx.repo.save(change)
+
+      const loaded = await ctx.repo.get('c1')
+      const file = loaded?.getArtifact('proposal')?.getFile('proposal')
+      expect(file?.hasDrift).toBe(true)
+      expect(file?.status).toBe('drifted-pending-review')
+    })
+
+    it('omits hasDrift from manifest when false', async () => {
+      const change = makeChange('c1')
+      change.setArtifact(
+        new ChangeArtifact({
+          type: 'proposal',
+          requires: [],
+          files: new Map([
+            [
+              'proposal',
+              new ArtifactFile({
+                key: 'proposal',
+                filename: 'proposal.md',
+                status: 'complete',
+                validatedHash: 'sha256:abc',
+              }),
+            ],
+          ]),
+        }),
+      )
+      await ctx.repo.save(change)
+
+      const dir = path.join(ctx.changesPath, '20240115-100000-c1')
+      const raw = JSON.parse(await fs.readFile(path.join(dir, 'manifest.json'), 'utf8'))
+      const proposalFile = raw.artifacts[0].files[0]
+      expect(proposalFile.hasDrift).toBeUndefined()
+    })
+  })
+
+  describe('load-time drift by policy', () => {
+    function makeRepoWithChain(basePath: string): FsChangeRepository {
+      return new FsChangeRepository({
+        workspace: 'default',
+        ownership: 'owned',
+        isExternal: false,
+        configPath: '/test',
+        changesPath: path.join(basePath, 'changes'),
+        draftsPath: path.join(basePath, 'drafts'),
+        discardedPath: path.join(basePath, 'discarded'),
+        artifactTypes: [
+          new ArtifactType({
+            id: 'proposal',
+            scope: 'change',
+            output: 'proposal.md',
+            requires: [],
+            validations: [],
+            deltaValidations: [],
+            preHashCleanup: [],
+          }),
+          new ArtifactType({
+            id: 'design',
+            scope: 'change',
+            output: 'design.md',
+            requires: ['proposal'],
+            validations: [],
+            deltaValidations: [],
+            preHashCleanup: [],
+          }),
+          new ArtifactType({
+            id: 'tasks',
+            scope: 'change',
+            output: 'tasks.md',
+            requires: ['design'],
+            validations: [],
+            deltaValidations: [],
+            preHashCleanup: [],
+          }),
+        ],
+      })
+    }
+
+    it('none policy: state does not roll back on drift', async () => {
+      const content = '# Proposal\n'
+      const hash = sha256(content)
+      const at = new Date('2024-01-15T10:00:00.000Z')
+      const change = new Change({
+        name: 'c1',
+        createdAt: at,
+        specIds: ['auth/login'],
+        history: [
+          {
+            type: 'created',
+            at,
+            by: actor,
+            specIds: ['auth/login'],
+            schemaName: '@specd/schema-std',
+            schemaVersion: 1,
+          },
+          { type: 'transitioned', from: 'drafting', to: 'designing', at, by: actor },
+          { type: 'transitioned', from: 'designing', to: 'ready', at, by: actor },
+          { type: 'transitioned', from: 'ready', to: 'implementing', at, by: actor },
+        ],
+        artifacts: new Map([
+          [
+            'proposal',
+            new ChangeArtifact({
+              type: 'proposal',
+              requires: [],
+              files: new Map([
+                [
+                  'proposal',
+                  new ArtifactFile({
+                    key: 'proposal',
+                    filename: 'proposal.md',
+                    validatedHash: hash,
+                    status: 'complete',
+                  }),
+                ],
+              ]),
+            }),
+          ],
+        ]),
+        invalidationPolicy: 'none',
+      })
+      const repo = makeRepoWithChain(ctx.tmpDir)
+      await repo.save(change)
+
+      const dir = path.join(ctx.changesPath, '20240115-100000-c1')
+      await fs.writeFile(path.join(dir, 'proposal.md'), 'MODIFIED', 'utf8')
+
+      const loaded = await repo.get('c1')
+      expect(loaded?.state).toBe('designing')
+      expect(loaded?.getArtifact('proposal')?.status).toBe('complete')
+      expect(loaded?.getArtifact('proposal')?.getFile('proposal')?.hasDrift).toBe(true)
+    })
+
+    it('surgical policy: only drifted file is reopened', async () => {
+      const proposalContent = '# Proposal\n'
+      const designContent = '# Design\n'
+      const proposalHash = sha256(proposalContent)
+      const designHash = sha256(designContent)
+      const at = new Date('2024-01-15T10:00:00.000Z')
+      const change = new Change({
+        name: 'c2',
+        createdAt: at,
+        specIds: ['auth/login'],
+        history: [
+          {
+            type: 'created',
+            at,
+            by: actor,
+            specIds: ['auth/login'],
+            schemaName: '@specd/schema-std',
+            schemaVersion: 1,
+          },
+          { type: 'transitioned', from: 'drafting', to: 'designing', at, by: actor },
+          { type: 'transitioned', from: 'designing', to: 'ready', at, by: actor },
+          { type: 'transitioned', from: 'ready', to: 'implementing', at, by: actor },
+        ],
+        artifacts: new Map([
+          [
+            'proposal',
+            new ChangeArtifact({
+              type: 'proposal',
+              requires: [],
+              files: new Map([
+                [
+                  'proposal',
+                  new ArtifactFile({
+                    key: 'proposal',
+                    filename: 'proposal.md',
+                    validatedHash: proposalHash,
+                  }),
+                ],
+              ]),
+            }),
+          ],
+          [
+            'design',
+            new ChangeArtifact({
+              type: 'design',
+              requires: ['proposal'],
+              files: new Map([
+                [
+                  'design',
+                  new ArtifactFile({
+                    key: 'design',
+                    filename: 'design.md',
+                    validatedHash: designHash,
+                  }),
+                ],
+              ]),
+            }),
+          ],
+        ]),
+        invalidationPolicy: 'surgical',
+      })
+      const repo = makeRepoWithChain(ctx.tmpDir)
+      await repo.save(change)
+
+      const dir = path.join(ctx.changesPath, '20240115-100000-c2')
+      await fs.writeFile(path.join(dir, 'proposal.md'), proposalContent, 'utf8')
+      await fs.writeFile(path.join(dir, 'design.md'), 'MODIFIED', 'utf8')
+
+      const loaded = await repo.get('c2')
+      expect(loaded?.state).toBe('designing')
+      expect(loaded?.getArtifact('proposal')?.status).toBe('complete')
+      expect(loaded?.getArtifact('design')?.status).toBe('drifted-pending-review')
+    })
+
+    it('global policy: all artifacts are reopened on drift', async () => {
+      const proposalContent = '# Proposal\n'
+      const designContent = '# Design\n'
+      const proposalHash = sha256(proposalContent)
+      const designHash = sha256(designContent)
+      const at = new Date('2024-01-15T10:00:00.000Z')
+      const change = new Change({
+        name: 'c3',
+        createdAt: at,
+        specIds: ['auth/login'],
+        history: [
+          {
+            type: 'created',
+            at,
+            by: actor,
+            specIds: ['auth/login'],
+            schemaName: '@specd/schema-std',
+            schemaVersion: 1,
+          },
+          { type: 'transitioned', from: 'drafting', to: 'designing', at, by: actor },
+          { type: 'transitioned', from: 'designing', to: 'ready', at, by: actor },
+          { type: 'transitioned', from: 'ready', to: 'implementing', at, by: actor },
+        ],
+        artifacts: new Map([
+          [
+            'proposal',
+            new ChangeArtifact({
+              type: 'proposal',
+              requires: [],
+              files: new Map([
+                [
+                  'proposal',
+                  new ArtifactFile({
+                    key: 'proposal',
+                    filename: 'proposal.md',
+                    validatedHash: proposalHash,
+                  }),
+                ],
+              ]),
+            }),
+          ],
+          [
+            'design',
+            new ChangeArtifact({
+              type: 'design',
+              requires: ['proposal'],
+              files: new Map([
+                [
+                  'design',
+                  new ArtifactFile({
+                    key: 'design',
+                    filename: 'design.md',
+                    validatedHash: designHash,
+                  }),
+                ],
+              ]),
+            }),
+          ],
+        ]),
+        invalidationPolicy: 'global',
+      })
+      const repo = makeRepoWithChain(ctx.tmpDir)
+      await repo.save(change)
+
+      const dir = path.join(ctx.changesPath, '20240115-100000-c3')
+      await fs.writeFile(path.join(dir, 'proposal.md'), proposalContent, 'utf8')
+      await fs.writeFile(path.join(dir, 'design.md'), 'MODIFIED', 'utf8')
+
+      const loaded = await repo.get('c3')
+      expect(loaded?.state).toBe('designing')
+      expect(loaded?.getArtifact('proposal')?.status).toBe('pending-review')
+      expect(loaded?.getArtifact('design')?.status).toBe('drifted-pending-review')
     })
   })
 })

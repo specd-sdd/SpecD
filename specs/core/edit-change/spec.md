@@ -15,6 +15,16 @@ As a change evolves, its spec scope often needs to grow or shrink — but modify
 - `removeSpecIds` (optional, string array) — spec IDs to remove from the change's `specIds`
 - `description` (optional, string) — new description for the change
 
+### Requirement: Invalidation policy edits
+
+EditChange.execute SHALL accept an optional `invalidationPolicy` field that updates the change's persisted invalidation policy.
+
+Allowed values are `none`, `surgical`, `downstream`, and `global`.
+
+Updating only `invalidationPolicy` is a persistence-worthy change even when specIds and description remain unchanged.
+
+Changing `invalidationPolicy` SHALL NOT itself invent drift or rewrite artifact/file canonical states. It updates the policy used by later invalidation operations.
+
 ### Requirement: Change lookup
 
 The use case MUST throw `ChangeNotFoundError` when no change with the given name exists.

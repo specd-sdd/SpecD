@@ -43,6 +43,22 @@
 - **THEN** the result includes a `blockers` array
 - **AND** it contains at least one entry with `code: 'ARTIFACT_DRIFT'`
 
+### Requirement: Drift-aware display status
+
+#### Scenario: Complete plus drift renders complete-with-drift
+
+- **GIVEN** an artifact file with canonical state `complete` and `hasDrift: true`
+- **WHEN** `GetStatus` builds the read model
+- **THEN** the file status includes `displayStatus: 'complete-with-drift'`
+- **AND** canonical state remains `complete`
+
+#### Scenario: Aggregated artifact display status prefers real workflow states
+
+- **GIVEN** one artifact file is `pending-review`
+- **AND** another file is display-visible as `complete-with-drift`
+- **WHEN** `GetStatus` aggregates artifact display state
+- **THEN** the artifact `displayStatus` is `pending-review`
+
 ### Requirement: Throws ChangeNotFoundError for unknown changes
 
 #### Scenario: Change does not exist

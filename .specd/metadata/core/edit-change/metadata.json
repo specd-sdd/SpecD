@@ -13,6 +13,12 @@
       ]
     },
     {
+      "requirement": "Invalidation policy edits",
+      "rules": [
+        "EditChange.execute SHALL accept an optional `invalidationPolicy` field that updates the change's persisted invalidation policy.\n\nAllowed values are `none`, `surgical`, `downstream`, and `global`.\n\nUpdating only `invalidationPolicy` is a persistence-worthy change even when specIds and description remain unchanged.\n\nChanging `invalidationPolicy` SHALL NOT itself invent drift or rewrite artifact/file canonical states. It updates the policy used by later invalidation operations."
+      ]
+    },
+    {
       "requirement": "Change lookup",
       "rules": [
         "The use case MUST throw `ChangeNotFoundError` when no change with the given name exists.\n\nSnapshot reads via `ChangeRepository.get(name)` MAY be used for read-only early returns, but any effective update to an existing persisted change's `specIds` MUST be performed through `ChangeRepository.mutate(name, fn)` so the mutation runs against fresh persisted state."
@@ -284,6 +290,20 @@
       ]
     },
     {
+      "requirement": "Invalidation policy edits",
+      "name": "Editing invalidationPolicy persists the new value",
+      "given": ["a change persisted with invalidationPolicy: 'downstream'"],
+      "when": ["EditChange.execute is called with invalidationPolicy: 'none'"],
+      "then": ["the saved change uses invalidationPolicy: 'none'"]
+    },
+    {
+      "requirement": "Invalidation policy edits",
+      "name": "Editing invalidationPolicy does not invent drift",
+      "given": ["a file with hasDrift: false"],
+      "when": ["only invalidationPolicy is updated"],
+      "then": ["hasDrift remains false"]
+    },
+    {
       "requirement": "Output contract",
       "name": "execute returns EditChangeResult",
       "when": ["EditChange.execute completes"],
@@ -313,8 +333,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:b37b308ae00463fdc3971168fcfb6d2774dfc54d616b362e83198951f22ed33f",
-    "verify.md": "sha256:9d35ad4ebc6823724ee57d87f34c739dfdc300c33a0a2d4c9843ce29eea65844"
+    "spec.md": "sha256:b1d60a6c003564800895efafd8a82d09994ba15b137fd9f3766c27a03d35812f",
+    "verify.md": "sha256:d16d12c29fa4fcf08d09c4deb6b844b04cbe39ab0270b026441c401292206743"
   },
   "generatedBy": "core"
 }

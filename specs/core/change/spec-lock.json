@@ -1,0 +1,15 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "core:change-manifest",
+    "core:workflow-model",
+    "core:spec-metadata",
+    "core:spec-id-format",
+    "default:_global/architecture",
+    "core:lifecycle-engine",
+    "default:_global/logging"
+  ]
+}

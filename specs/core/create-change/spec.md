@@ -16,6 +16,19 @@ Every spec workflow begins with a named change, so the system needs a single ent
 - `schemaName` (string, required) — the active schema name from configuration
 - `schemaVersion` (number, required) — the active schema version from configuration
 
+### Requirement: Initial invalidation policy
+
+CreateChange.execute SHALL accept the project-level default invalidation policy as input and persist it on the newly created change.
+
+The persisted initial value MUST be one of:
+
+- `none`
+- `surgical`
+- `downstream`
+- `global`
+
+This value becomes the change's default invalidation policy until a later EditChange operation overrides it.
+
 ### Requirement: Name uniqueness enforcement
 
 The use case MUST query the `ChangeRepository` for an existing change with the given name before creating a new one. If a change with that name already exists, the use case MUST throw `ChangeAlreadyExistsError`.

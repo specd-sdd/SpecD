@@ -147,10 +147,13 @@ JSON/TOON output schema:
           lines.push('')
           lines.push('artifacts (details):')
           for (const a of artifactStatuses) {
-            lines.push(`  ${a.type}  ${a.state}  (effective: ${a.effectiveStatus})`)
+            lines.push(`  ${a.type}  ${a.displayStatus}  (effective: ${a.effectiveStatus})`)
             for (const file of a.files) {
               const hash = file.validatedHash !== undefined ? `  ${file.validatedHash}` : ''
-              lines.push(`    - ${file.key}  ${file.state}  ${file.filename}${hash}`)
+              const drift = file.hasDrift ? '  [drift]' : ''
+              lines.push(
+                `    - ${file.key}  ${file.displayStatus}  ${file.filename}${hash}${drift}`,
+              )
             }
           }
 
@@ -185,11 +188,14 @@ JSON/TOON output schema:
               artifacts: artifactStatuses.map((a) => ({
                 type: a.type,
                 state: a.state,
+                displayStatus: a.displayStatus,
                 effectiveStatus: a.effectiveStatus,
                 files: a.files.map((file) => ({
                   key: file.key,
                   filename: file.filename,
                   state: file.state,
+                  displayStatus: file.displayStatus,
+                  hasDrift: file.hasDrift,
                   ...(file.validatedHash !== undefined
                     ? { validatedHash: file.validatedHash }
                     : {}),

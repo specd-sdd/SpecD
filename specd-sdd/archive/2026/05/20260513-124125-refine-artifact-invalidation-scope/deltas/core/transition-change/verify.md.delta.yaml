@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'TransitionChange verify coverage remains unchanged because this change does not modify transition-change spec requirements directly.'

@@ -73,6 +73,23 @@ Each review file entry inside `affectedArtifacts` MUST contain:
 
 `GetStatus` MUST resolve `review.affectedArtifacts` against the current artifact file entries so agent-facing consumers can inspect the actual file directly. The outward-facing review summary MUST prioritize `filename` and `path`; consumers must not need to understand manifest-internal file keys in order to locate the affected artifact.
 
+### Requirement: Drift-aware display status
+
+GetStatus SHALL preserve canonical persisted state in `state` / `effectiveStatus`, but it SHALL additionally provide human-facing display-state projections for artifact files and aggregated artifacts.
+
+Each ArtifactFileStatus MUST include:
+
+- `hasDrift` — whether the current file state differs from the validated baseline
+- `displayStatus` — a human-facing projection derived from canonical state plus `hasDrift`
+
+Each ArtifactStatusEntry MUST include:
+
+- `displayStatus` — the aggregated human-facing projection for the artifact
+
+`displayStatus` for files SHALL render `complete-with-drift` only when canonical state is `complete` and `hasDrift=true`.
+
+`displayStatus` for aggregated artifacts SHALL be derived from file-level display states, using precedence that keeps real workflow states stronger than display-only drift projections.
+
 ### Requirement: Throws ChangeNotFoundError for unknown changes
 
 If no change with the given name exists in the repository, `execute()` MUST throw a `ChangeNotFoundError` with code `CHANGE_NOT_FOUND`. It MUST NOT return `null`.

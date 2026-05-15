@@ -1,0 +1,12 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "core:change",
+    "core:lifecycle-engine",
+    "core:config",
+    "default:_global/architecture"
+  ]
+}

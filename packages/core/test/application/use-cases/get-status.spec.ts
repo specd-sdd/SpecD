@@ -707,4 +707,80 @@ describe('GetStatus', () => {
       })
     })
   })
+
+  describe('drift-aware display status', () => {
+    it('renders complete-with-drift for a complete file with hasDrift true', async () => {
+      const change = makeChange('drift-display')
+      change.transition('designing', testActor)
+      const file = new ArtifactFile({
+        key: 'proposal',
+        filename: 'proposal.md',
+        status: 'complete',
+        validatedHash: 'sha256:abc',
+      })
+      file.markDrifted()
+      change.setArtifact(
+        new ChangeArtifact({
+          type: 'proposal',
+          requires: [],
+          files: new Map([['proposal', file]]),
+        }),
+      )
+
+      const repo = makeChangeRepository([change])
+      const uc = makeGetStatus(repo)
+
+      const result = await uc.execute({ name: 'drift-display' })
+
+      const artifact = result.artifactStatuses.find((a) => a.type === 'proposal')
+      if (artifact === undefined) {
+        throw new Error('expected proposal artifact status')
+      }
+      const fileStatus = artifact.files[0]
+      if (fileStatus === undefined) {
+        throw new Error('expected proposal file status')
+      }
+      expect(fileStatus.hasDrift).toBe(true)
+      expect(fileStatus.displayStatus).toBe('complete-with-drift')
+      expect(fileStatus.state).toBe('complete')
+    })
+
+    it('aggregates artifact display status preferring real workflow states', async () => {
+      const change = makeChange('drift-aggregate')
+      change.transition('designing', testActor)
+      const driftedFile = new ArtifactFile({
+        key: 'specs:auth/login',
+        filename: 'auth/login/spec.md',
+        status: 'complete',
+        validatedHash: 'sha256:abc',
+      })
+      driftedFile.markDrifted()
+      change.setArtifact(
+        new ChangeArtifact({
+          type: 'specs',
+          requires: ['proposal'],
+          files: new Map([
+            ['specs:auth/login', driftedFile],
+            [
+              'specs:auth/session',
+              new ArtifactFile({
+                key: 'specs:auth/session',
+                filename: 'auth/session/spec.md',
+                status: 'pending-review',
+              }),
+            ],
+          ]),
+        }),
+      )
+
+      const repo = makeChangeRepository([change])
+      const uc = makeGetStatus(repo)
+
+      const result = await uc.execute({ name: 'drift-aggregate' })
+
+      const artifact = result.artifactStatuses.find((a) => a.type === 'specs')
+      expect(artifact).toBeDefined()
+      expect(artifact!.displayStatus).toBe('pending-review')
+    })
+  })
 })

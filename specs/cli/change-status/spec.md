@@ -168,6 +168,18 @@ In `json` or `toon` mode, the output is:
 - When `review.reason` is `'spec-overlap-conflict'`: an array of `{ archivedChangeName, overlappingSpecIds }` entries ordered newest-first
 - For all other reasons: an empty array `[]`
 
+### Requirement: Display-state rendering
+
+Human-facing status output SHALL render artifact/file display states rather than forcing users to infer drift from raw canonical state plus hashes.
+
+Specifically:
+
+- canonical `complete` plus `hasDrift=true` SHALL render as `complete-with-drift`
+- canonical `missing` remains `missing` even if `hasDrift=true`
+- canonical review states (`pending-review`, `drifted-pending-review`, `pending-parent-artifact-review`) remain visually stronger than drift-only display projections
+
+JSON/toon output SHALL include both canonical state and display-state fields when returned by GetStatus; text output SHALL prioritize the display state for human readability.
+
 ### Requirement: Schema version warning
 
 If the change's recorded `schemaName`/`schemaVersion` differs from the currently active schema, the command prints a warning to stderr:

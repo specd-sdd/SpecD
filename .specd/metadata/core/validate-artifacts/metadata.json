@@ -54,9 +54,15 @@
       ]
     },
     {
+      "requirement": "Policy-aware drift materialization",
+      "rules": [
+        "When ValidateArtifacts compares the current file state to the validated baseline, it SHALL treat any mismatch as drift evidence for that file. This includes changed content and file absence.\n\nFor drift handling, ValidateArtifacts SHALL:\n\n1. collect the focused set of mismatching files grouped by artifact type\n2. preserve canonical `missing` when a file is absent rather than forcing a drift-derived canonical state\n3. call `Change.invalidate()` exactly once per execution with cause `artifact-drift` and the focused grouped payload\n4. rely on the `Change` entity to apply the effective invalidation policy and materialize `hasDrift=true` for the affected files\n\nUnder policy `none`, ValidateArtifacts SHALL still detect and report mismatch, but artifact/file reopening is not materialized beyond canonical file-state rules such as `missing`."
+      ]
+    },
+    {
       "requirement": "Per-file validation",
       "rules": [
-        "If the expected artifact file does not exist in the change directory and the artifact is not optional, validation MUST record a failure before skipping. Only optional artifacts may be silently skipped when their expected file is missing.\n\nFor spec-scoped artifacts, the expected file is determined by `Requirement: Expected file path validation`. A file at the non-expected location MUST NOT satisfy this check."
+        "If the expected artifact file does not exist in the change directory and the artifact is required, validation SHALL treat the canonical file state as `missing`.\n\nFile presence and canonical file state MUST be established before any interpretation of `validatedHash`.\n\nA missing file MAY still imply `hasDrift=true` because the current file state no longer matches the validated baseline, but it MUST NOT surface as `complete-with-drift` because the canonical state is no longer `complete`.\n\nFor spec-scoped artifacts, the expected file is determined by Requirement: Expected file path validation."
       ]
     },
     {
@@ -141,7 +147,8 @@
   "constraints": [
     "ValidateArtifacts is the only code path that may call Artifact.markComplete(hash) — enforced by convention and test coverage",
     "The merged spec is never written to SpecRepository during validate — only during ArchiveChange",
-    "change.invalidate('artifact-change', actor) is called at most once per execute invocation, even if multiple artifacts have changed",
+    "ValidateArtifacts calls change.invalidate('artifact-drift', actor, ...) at most once per execute invocation, even if multiple files have drifted",
+    "The drift invalidation payload is focused to the concrete mismatching artifact/files rather than an implicit global artifact set",
     "deltaValidations evaluate rules against the normalized YAML AST of the delta file; validations evaluate rules against the normalized artifact AST; both use the same rule evaluation algorithm",
     "validations run against the merged artifact content (or direct content for non-delta artifacts)",
     "preHashCleanup substitutions are applied only for hash computation, never to the actual file content on disk",
@@ -300,6 +307,28 @@
       "then": ["the same grouped invalidation behavior is applied"]
     },
     {
+      "requirement": "Policy-aware drift materialization",
+      "name": "One invalidate call carries the focused drift payload",
+      "given": [
+        "one file under specs and one file under verify mismatch their validated baselines"
+      ],
+      "when": ["ValidateArtifacts.execute runs"],
+      "then": [
+        "it calls Change.invalidate() exactly once",
+        "AND the grouped payload identifies only those mismatching files"
+      ]
+    },
+    {
+      "requirement": "Policy-aware drift materialization",
+      "name": "Policy none preserves complete while still marking drift",
+      "given": [
+        "a complete file still exists on disk but its content hash changed",
+        "AND the change's effective invalidation policy is none"
+      ],
+      "when": ["ValidateArtifacts.execute runs"],
+      "then": ["the file remains canonically complete", "AND hasDrift becomes true"]
+    },
+    {
       "requirement": "Per-file validation",
       "name": "Missing expected non-optional file fails validation",
       "given": [
@@ -307,7 +336,11 @@
         "AND that file does not exist in the change directory"
       ],
       "when": ["ValidateArtifacts.execute validates the artifact"],
-      "then": ["result.passed is false", "AND the file is not marked complete"]
+      "then": [
+        "result.passed is false",
+        "AND the file is not marked complete",
+        "AND the canonical file state is missing"
+      ]
     },
     {
       "requirement": "Per-file validation",
@@ -321,6 +354,13 @@
         "validation still reports the expected delta file as missing",
         "AND the direct file is ignored for that artifact"
       ]
+    },
+    {
+      "requirement": "Per-file validation",
+      "name": "Missing file can still carry hasDrift without rendering complete-with-drift",
+      "given": ["a file was previously validated and is now absent on disk"],
+      "when": ["ValidateArtifacts.execute compares current state to the validated baseline"],
+      "then": ["hasDrift may remain true", "AND the file is not treated as complete-with-drift"]
     },
     {
       "requirement": "Expected file path validation",
@@ -896,8 +936,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:5823a0082b7d8b29d5dc1d12b2c1f577d3c8af5d43ad96e325f0b9d2c3f05302",
-    "verify.md": "sha256:d09780f4fcc9a58de159f4786f015075fd48796931fcd9170553b417ff4d6a99"
+    "spec.md": "sha256:b6d1404a385bda23ec4c8715427160a683f6094b82133004f441de85451b6577",
+    "verify.md": "sha256:88d01286f33cfba511a026ec2f196a87be72a51be7dfabb43ea07314434b4cec"
   },
   "generatedBy": "core"
 }

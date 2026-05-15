@@ -1,0 +1,56 @@
+- op: added
+  description: 'Verify focused drift payloads and policy-aware materialization.'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Approval invalidation on content change$'
+  content: |
+    ### Requirement: Policy-aware drift materialization
+
+    #### Scenario: One invalidate call carries the focused drift payload
+
+    - **GIVEN** one file under `specs` and one file under `verify` mismatch their validated baselines
+    - **WHEN** `ValidateArtifacts.execute` runs
+    - **THEN** it calls `Change.invalidate()` exactly once
+    - **AND** the grouped payload identifies only those mismatching files
+
+    #### Scenario: Policy none preserves complete while still marking drift
+
+    - **GIVEN** a complete file still exists on disk but its content hash changed
+    - **AND** the change's effective invalidation policy is `none`
+    - **WHEN** `ValidateArtifacts.execute` runs
+    - **THEN** the file remains canonically `complete`
+    - **AND** `hasDrift` becomes `true`
+
+- op: modified
+  description: 'Cover missing-before-hash semantics in per-file validation.'
+  selector:
+    type: section
+    matches: '^Requirement: Per-file validation$'
+  content: |
+    #### Scenario: Missing expected non-optional file fails validation
+
+    - **GIVEN** a non-optional spec-scoped artifact has expected filename `deltas/core/core/config/spec.md.delta.yaml`
+    - **AND** that file does not exist in the change directory
+    - **WHEN** `ValidateArtifacts.execute` validates the artifact
+    - **THEN** `result.passed` is `false`
+    - **AND** the file is not marked complete
+    - **AND** the canonical file state is `missing`
+
+    #### Scenario: Non-expected file does not satisfy the expected path
+
+    - **GIVEN** a non-optional spec-scoped artifact has expected filename `deltas/core/core/config/spec.md.delta.yaml`
+    - **AND** a direct file exists at `specs/core/core/config/spec.md`
+    - **WHEN** `ValidateArtifacts.execute` validates the artifact
+    - **THEN** validation still reports the expected delta file as missing
+    - **AND** the direct file is ignored for that artifact
+
+    #### Scenario: Missing file can still carry hasDrift without rendering complete-with-drift
+
+    - **GIVEN** a file was previously validated and is now absent on disk
+    - **WHEN** `ValidateArtifacts.execute` compares current state to the validated baseline
+    - **THEN** `hasDrift` may remain `true`
+    - **AND** the file is not treated as `complete-with-drift`

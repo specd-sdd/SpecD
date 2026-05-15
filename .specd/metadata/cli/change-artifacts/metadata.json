@@ -19,6 +19,12 @@
       ]
     },
     {
+      "requirement": "Drift-aware artifact listing",
+      "rules": [
+        "Human-facing artifact listings SHALL expose drift-aware display state rather than forcing users to infer drift from canonical state plus hashes.\n\nFor text output:\n\n- the displayed file-state column SHALL use the display-state projection (`complete-with-drift` when canonical state is `complete` and `hasDrift=true`)\n- canonical `missing` remains `missing` even if `hasDrift=true`\n\nFor json/toon output, each per-file entry SHALL additionally expose:\n\n- `hasDrift`\n- `displayStatus`\n\nWhen an artifact has multiple files, any artifact-level summary row SHALL derive its display state from the file-level display states rather than recomputing independently."
+      ]
+    },
+    {
       "requirement": "Error cases",
       "rules": ["- If the change does not exist, exits with code 1."]
     }
@@ -67,6 +73,20 @@
       "then": ["rows are grouped and emitted in schema-declared order"]
     },
     {
+      "requirement": "Drift-aware artifact listing",
+      "name": "Text output shows complete-with-drift for file rows",
+      "given": ["an artifact file with canonical state complete and hasDrift: true"],
+      "when": ["specd change artifacts <name> is run in text mode"],
+      "then": ["the file-state column shows complete-with-drift"]
+    },
+    {
+      "requirement": "Drift-aware artifact listing",
+      "name": "JSON output exposes hasDrift and displayStatus",
+      "given": ["one listed artifact file is drift-visible"],
+      "when": ["specd change artifacts <name> --format json is run"],
+      "then": ["the row includes hasDrift", "AND it includes displayStatus"]
+    },
+    {
       "requirement": "Error cases",
       "name": "Change not found",
       "when": ["specd change artifacts nonexistent is run"],
@@ -74,8 +94,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:08e8aedcc4005e6adf4c66f547bf7f596fa58f1e58965a2891c620be134f16f3",
-    "verify.md": "sha256:daf454ae8c7d681d876adf9e2ee4028fd04f362da5c89af0b52a084b96414dd8"
+    "spec.md": "sha256:464e8716d6dfd2730b43819dbe998121ff65987b4a378d62ea88a49c9a2ea0d1",
+    "verify.md": "sha256:c6b9b826a36f44c80a53dbf6d363f19500231a495edf303295f18be67ff3c1b6"
   },
   "generatedBy": "core"
 }

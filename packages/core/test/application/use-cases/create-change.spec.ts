@@ -204,4 +204,35 @@ describe('CreateChange', () => {
       ).rejects.toMatchObject({ code: 'CHANGE_ALREADY_EXISTS' })
     })
   })
+
+  describe('invalidationPolicy', () => {
+    it('seeds the change with an explicit invalidation policy', async () => {
+      const repo = makeChangeRepository()
+      const uc = new CreateChange(repo, new Map(), makeActorResolver())
+
+      const result = await uc.execute({
+        name: 'with-policy',
+        specIds: [],
+        schemaName: 'specd-std',
+        schemaVersion: 1,
+        invalidationPolicy: 'surgical',
+      })
+
+      expect(result.change.invalidationPolicy).toBe('surgical')
+    })
+
+    it('defaults to downstream when no policy is provided', async () => {
+      const repo = makeChangeRepository()
+      const uc = new CreateChange(repo, new Map(), makeActorResolver())
+
+      const result = await uc.execute({
+        name: 'no-policy',
+        specIds: [],
+        schemaName: 'specd-std',
+        schemaVersion: 1,
+      })
+
+      expect(result.change.invalidationPolicy).toBe('downstream')
+    })
+  })
 })

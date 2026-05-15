@@ -56,6 +56,21 @@
 - **THEN** the command prints those blocker codes and messages
 - **AND** it does not substitute a locally recomputed explanation
 
+### Requirement: Display-state rendering
+
+#### Scenario: Text output prefers complete-with-drift over raw complete
+
+- **GIVEN** a file with canonical state `complete` and `hasDrift: true`
+- **WHEN** `specd changes status <name>` is rendered in text mode
+- **THEN** the user sees `complete-with-drift`
+
+#### Scenario: JSON output includes canonical and display state
+
+- **GIVEN** a drift-visible file in the status result
+- **WHEN** `specd changes status <name> --format json` is run
+- **THEN** the serialized row includes canonical state
+- **AND** it includes the display-state projection
+
 ### Requirement: Schema version warning
 
 #### Scenario: Schema mismatch

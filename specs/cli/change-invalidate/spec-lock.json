@@ -1,0 +1,12 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "cli:entrypoint",
+    "core:invalidate-change",
+    "core:get-status",
+    "default:_global/docs"
+  ]
+}

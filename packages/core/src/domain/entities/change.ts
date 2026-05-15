@@ -6,6 +6,10 @@ import { HistoricalImplementationGuardError } from '../errors/historical-impleme
 import { ChangeArtifact } from './change-artifact.js'
 import { ArtifactFile } from '../value-objects/artifact-file.js'
 import { type ArtifactType } from '../value-objects/artifact-type.js'
+import {
+  type InvalidationPolicy,
+  DEFAULT_INVALIDATION_POLICY,
+} from '../value-objects/invalidation-policy.js'
 import { parseSpecId } from '../services/parse-spec-id.js'
 import { expectedArtifactFilename } from '../services/artifact-filename.js'
 
@@ -194,6 +198,8 @@ export interface ChangeProps {
   readonly artifacts?: Map<string, ChangeArtifact>
   /** Per-spec declared dependencies, keyed by spec ID. */
   readonly specDependsOn?: ReadonlyMap<string, readonly string[]>
+  /** Invalidation policy for this change. Defaults to `'downstream'`. */
+  readonly invalidationPolicy?: InvalidationPolicy
 }
 
 /**
@@ -213,6 +219,7 @@ export class Change {
   private _history: ChangeEvent[]
   private _artifacts: Map<string, ChangeArtifact>
   private _specDependsOn: Map<string, string[]>
+  private _invalidationPolicy: InvalidationPolicy
 
   /**
    * Creates a new `Change` from the given properties.
@@ -238,6 +245,7 @@ export class Change {
         this._specDependsOn.set(key, [...deps])
       }
     }
+    this._invalidationPolicy = props.invalidationPolicy ?? DEFAULT_INVALIDATION_POLICY
   }
 
   /** Unique slug name identifying this change. */
@@ -368,6 +376,16 @@ export class Change {
     return new Map(this._specDependsOn)
   }
 
+  /** The invalidation policy persisted on this change. */
+  get invalidationPolicy(): InvalidationPolicy {
+    return this._invalidationPolicy
+  }
+
+  /** Updates the persisted invalidation policy. Does NOT trigger invalidation. */
+  set invalidationPolicy(policy: InvalidationPolicy) {
+    this._invalidationPolicy = policy
+  }
+
   /**
    * Sets (replaces) the declared dependencies for a single spec.
    *
@@ -414,13 +432,22 @@ export class Change {
    * Records an invalidation, appending an `invalidated` event followed by a
    * `transitioned` event rolling back to `designing`.
    *
-   * Called when specIds or artifact content changes and supersedes any active
-   * spec approval or signoff.
+   * Policy semantics:
+   * - `none`: no artifact states are reopened; drift is informational only
+   * - `surgical`: only the targeted files are reopened
+   * - `downstream`: targets + all DAG descendants are reopened
+   * - `global`: every artifact/file in the change is reopened
+   *
+   * For `artifact-drift`, `hasDrift` is materialized on focused files before
+   * policy-driven reopening. Manual invalidation (`artifact-review-required`)
+   * never touches drift flags.
    *
    * @param cause - The reason for invalidation
    * @param actor - Identity of the actor triggering the change
    * @param message - Human-readable invalidation summary
    * @param affectedArtifacts - Artifact/file payload that triggered the invalidation
+   * @param invalidationPolicyOverride - Override the persisted policy for this execution
+   * @returns The final deduplicated affected set after policy expansion
    */
   invalidate(
     cause: InvalidatedEvent['cause'],
@@ -432,36 +459,186 @@ export class Change {
         files: [...artifact.files.keys()],
       }),
     ),
-  ): void {
+    invalidationPolicyOverride?: InvalidationPolicy,
+  ): readonly InvalidatedArtifactEntry[] {
+    const effectivePolicy = this._resolveInvalidationPolicy(invalidationPolicyOverride)
+    const expanded = this._expandAffectedArtifacts(affectedArtifacts, effectivePolicy)
+
     const from = this.state
     const now = new Date()
     this._history.push({
       type: 'invalidated',
       cause,
       message,
-      affectedArtifacts,
+      affectedArtifacts: expanded,
       at: now,
       by: actor,
     })
-    // Only push a transition event when we are not already in 'designing'.
     if (from !== 'designing') {
       this._history.push({ type: 'transitioned', from, to: 'designing', at: now, by: actor })
     }
 
-    const affectedMap = new Map<string, readonly string[]>(
-      affectedArtifacts.map((artifact) => [artifact.type, [...artifact.files]]),
-    )
-
     if (cause === 'artifact-drift') {
-      for (const [type, keys] of affectedMap) {
-        this._artifacts.get(type)?.markDriftedPendingReview(keys)
+      for (const entry of affectedArtifacts) {
+        const artifact = this._artifacts.get(entry.type)
+        if (artifact === undefined) continue
+        for (const key of entry.files) {
+          const file = artifact.getFile(key)
+          if (file !== undefined) file.markDrifted()
+        }
       }
     }
 
-    for (const [typeId, artifact] of this._artifacts) {
-      if (affectedMap.has(typeId) && cause === 'artifact-drift') continue
-      artifact.markPendingReview()
+    const expandedMap = new Map<string, readonly string[]>(
+      expanded.map((e) => [e.type, [...e.files]]),
+    )
+
+    if (effectivePolicy === 'none') return expanded
+
+    if (effectivePolicy === 'surgical') {
+      for (const [typeId, keys] of expandedMap) {
+        const artifact = this._artifacts.get(typeId)
+        if (artifact === undefined) continue
+        const driftKeys =
+          cause === 'artifact-drift'
+            ? (affectedArtifacts.find((a) => a.type === typeId)?.files ?? [])
+            : []
+        const driftSet = new Set(driftKeys)
+        for (const key of keys) {
+          if (driftSet.has(key)) {
+            artifact.getFile(key)?.markDriftedPendingReview()
+          } else {
+            artifact.getFile(key)?.markPendingReview()
+          }
+        }
+        artifact.recomputeStatus()
+      }
+      return expanded
     }
+
+    for (const [typeId, keys] of expandedMap) {
+      const artifact = this._artifacts.get(typeId)
+      if (artifact === undefined) continue
+      const driftKeys =
+        cause === 'artifact-drift'
+          ? (affectedArtifacts.find((a) => a.type === typeId)?.files ?? [])
+          : []
+      if (driftKeys.length > 0) {
+        artifact.markDriftedPendingReview(driftKeys)
+        const remaining = keys.filter((k) => !driftKeys.includes(k))
+        if (remaining.length > 0) {
+          for (const key of remaining) {
+            artifact.getFile(key)?.markPendingReview()
+          }
+          artifact.recomputeStatus()
+        }
+      } else {
+        artifact.markPendingReview()
+      }
+    }
+
+    return expanded
+  }
+
+  /**
+   * Resolves the effective invalidation policy, preferring an explicit override.
+   *
+   * @param override - Caller-supplied policy override
+   * @returns The effective policy
+   */
+  private _resolveInvalidationPolicy(override?: InvalidationPolicy): InvalidationPolicy {
+    return override ?? this._invalidationPolicy
+  }
+
+  /**
+   * Expands the base affected set according to the invalidation policy.
+   *
+   * @param base - The initially targeted artifact/file entries
+   * @param policy - The effective invalidation policy
+   * @returns The expanded affected set
+   */
+  private _expandAffectedArtifacts(
+    base: readonly InvalidatedArtifactEntry[],
+    policy: InvalidationPolicy,
+  ): readonly InvalidatedArtifactEntry[] {
+    if (policy === 'none' || policy === 'surgical') {
+      const seen = new Map<string, Set<string>>()
+      for (const entry of base) {
+        let set = seen.get(entry.type)
+        if (set === undefined) {
+          set = new Set<string>()
+          seen.set(entry.type, set)
+        }
+        for (const f of entry.files) set.add(f)
+      }
+      return [...seen.entries()].map(([type, files]) => ({ type, files: [...files] }))
+    }
+
+    if (policy === 'global') {
+      return [...this._artifacts.values()].map((artifact) => ({
+        type: artifact.type,
+        files: [...artifact.files.keys()],
+      }))
+    }
+
+    // downstream: targets + DAG descendants
+    const baseTypes = new Set(base.map((e) => e.type))
+    const descendants = this._findDagDescendants(baseTypes)
+
+    const seen = new Map<string, Set<string>>()
+    for (const entry of base) {
+      let set = seen.get(entry.type)
+      if (set === undefined) {
+        set = new Set<string>()
+        seen.set(entry.type, set)
+      }
+      for (const f of entry.files) set.add(f)
+    }
+    for (const typeId of descendants) {
+      if (!seen.has(typeId)) {
+        const artifact = this._artifacts.get(typeId)
+        if (artifact !== undefined) {
+          seen.set(typeId, new Set(artifact.files.keys()))
+        }
+      }
+    }
+
+    return [...seen.entries()].map(([type, files]) => ({ type, files: [...files] }))
+  }
+
+  /**
+   * Performs a BFS from `roots` over the artifact DAG to discover all descendants.
+   *
+   * @param roots - Starting artifact type IDs
+   * @returns Descendant type IDs (excludes the roots themselves)
+   */
+  private _findDagDescendants(roots: Set<string>): string[] {
+    const children = new Map<string, Set<string>>()
+    for (const [typeId, artifact] of this._artifacts) {
+      for (const dep of artifact.requires) {
+        let set = children.get(dep)
+        if (set === undefined) {
+          set = new Set<string>()
+          children.set(dep, set)
+        }
+        set.add(typeId)
+      }
+    }
+
+    const visited = new Set<string>()
+    const queue = [...roots]
+    while (queue.length > 0) {
+      const current = queue.pop()!
+      const kids = children.get(current)
+      if (kids === undefined) continue
+      for (const kid of kids) {
+        if (!visited.has(kid) && !roots.has(kid)) {
+          visited.add(kid)
+          queue.push(kid)
+        }
+      }
+    }
+    return [...visited]
   }
 
   /**

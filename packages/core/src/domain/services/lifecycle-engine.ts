@@ -415,7 +415,8 @@ export class LifecycleEngine {
       return [
         {
           code: 'ARTIFACT_DRIFT',
-          message: 'Validated artifact content drifted from disk',
+          message:
+            'Validated artifact content drifted from disk and requires semantic consistency review',
           isSkippable: false,
           affectedArtifacts: review.affectedArtifacts,
         },
@@ -426,7 +427,7 @@ export class LifecycleEngine {
       return [
         {
           code: 'REVIEW_REQUIRED',
-          message: 'Artifacts require review before proceeding',
+          message: 'Artifacts require semantic consistency review before proceeding',
           isSkippable: false,
           affectedArtifacts: review.affectedArtifacts,
         },
@@ -576,7 +577,7 @@ export class LifecycleEngine {
       return [
         {
           code: 'REVIEW_REQUIRED',
-          message: `Required artifact '${artifactId}' requires review`,
+          message: `Required artifact '${artifactId}' requires semantic consistency review`,
           isSkippable: false,
           ...(affectedArtifacts !== undefined ? { affectedArtifacts } : {}),
         },
@@ -587,7 +588,7 @@ export class LifecycleEngine {
       return [
         {
           code: 'ARTIFACT_DRIFT',
-          message: `Required artifact '${artifactId}' drifted since validation`,
+          message: `Required artifact '${artifactId}' drifted since validation and requires semantic consistency review`,
           isSkippable: false,
           ...(affectedArtifacts !== undefined ? { affectedArtifacts } : {}),
         },

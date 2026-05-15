@@ -17,6 +17,10 @@ export function registerChangeCreate(parent: Command): void {
     .description('Create a new change to track a unit of work through the specd lifecycle.')
     .option('--spec <id>', 'spec path (repeatable)', collect, [] as string[])
     .option('--description <text>', 'change description (informational)')
+    .option(
+      '--invalidation-policy <policy>',
+      'set the invalidation policy (none|surgical|downstream|global)',
+    )
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
     .addHelpText(
@@ -29,7 +33,13 @@ JSON/TOON output schema:
     .action(
       async (
         name: string,
-        opts: { spec: string[]; description?: string; format: string; config?: string },
+        opts: {
+          spec: string[]
+          description?: string
+          invalidationPolicy?: string
+          format: string
+          config?: string
+        },
       ) => {
         try {
           const { config, kernel } = await resolveCliContext({ configPath: opts.config })
@@ -64,6 +74,13 @@ JSON/TOON output schema:
             specIds,
             schemaName: schema.name(),
             schemaVersion: schema.version(),
+            ...(config.invalidationPolicy !== undefined || opts.invalidationPolicy !== undefined
+              ? {
+                  invalidationPolicy:
+                    (opts.invalidationPolicy as 'none' | 'surgical' | 'downstream' | 'global') ??
+                    config.invalidationPolicy,
+                }
+              : {}),
           })
 
           // Check for spec overlap and warn

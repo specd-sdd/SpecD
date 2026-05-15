@@ -169,6 +169,7 @@ function cloneChange(change: Change): Change {
           filename: file.filename,
           status: file.status,
           ...(file.validatedHash !== undefined ? { validatedHash: file.validatedHash } : {}),
+          ...(file.hasDrift ? { hasDrift: true } : {}),
         }),
       )
     }
@@ -197,6 +198,7 @@ function cloneChange(change: Change): Change {
     history: change.history.map((event) => cloneChangeEvent(event)),
     artifacts,
     specDependsOn,
+    invalidationPolicy: change.invalidationPolicy,
   })
 }
 

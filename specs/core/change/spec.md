@@ -184,9 +184,7 @@ All events share common fields:
 
 - **`type`** — identifies the event kind
 - **`at`** — ISO 8601 timestamp
-- **`by`** — git identity (`name` + `email`) of the actor, mandatory on all events
-
-  by — the `ActorIdentity` of the person or system performing the operation, mandatory on all events
+- **`by`** — git identity (`name` + `email`) of the actor, mandatory on all events by — the `ActorIdentity` of the person or system performing the operation, mandatory on all events
 
 Event types:
 
@@ -281,35 +279,76 @@ This separation ensures the entity does not need schema knowledge in order to an
 - whether a requested transition must route through an approval boundary
 - which blocker or next action should be surfaced to callers
 
+### Requirement: Policy-aware invalidation
+
+`Change.invalidate()` SHALL remain the entity-owned authority for change-level invalidation and artifact/file-state consequences.
+
+It SHALL accept:
+
+- a domain invalidation cause
+- a human-readable message
+- a focused `affectedArtifacts` payload identifying the concrete artifact/file entries that triggered invalidation
+- an optional `invalidationPolicyOverride`
+
+The effective invalidation policy is resolved from the override when present, otherwise from the change's persisted `invalidationPolicy`.
+
+Regardless of policy, invalidation SHALL append an `invalidated` history event and return the change to `designing` when the change was previously in another lifecycle state.
+
+Artifact/file-state consequences follow the effective policy:
+
+- `none` — no artifact/file enters a reopened review state solely because of invalidation
+- `surgical` — only the normalized affected target set is reopened
+- `downstream` — the normalized affected target set and its DAG descendants are reopened
+- `global` — every artifact/file in the change is reopened
+
+The entity SHALL deduplicate the final affected set before applying reopened state transitions.
+
+### Requirement: Per-file drift tracking
+
+Each tracked artifact file SHALL persist a boolean `hasDrift` signal alongside its canonical workflow state and validated baseline hash.
+
+`hasDrift=true` means the file's current state does not match its validated baseline. This includes changed content and file absence.
+
+`hasDrift=false` means the file's current state matches the validated baseline.
+
+`Change.invalidate()` SHALL materialize `hasDrift=true` only when the invalidation cause is `artifact-drift`, and only for the focused artifact/file entries supplied in `affectedArtifacts`.
+
+Manual invalidation (`artifact-review-required`) SHALL NOT set or clear `hasDrift`.
+
+When a file is canonically `complete` and `hasDrift=true`, human-facing read models MAY render it as `complete-with-drift`.
+
+When a file is canonically `missing`, `missing` remains the canonical state even if `hasDrift=true`.
+
 ## Constraints
 
-- `name` and `createdAt` are set at creation and never changed
-- `workspaces` is a computed getter derived from `specIds` via `parseSpecId()` — it is not a declared or persisted field
-- `specIds` may be empty (empty specIds results in empty workspaces)
-- Current lifecycle state is derived from history (last `transitioned` event); no state snapshot is stored
-- Any modification to the spec list or any artifact content appends an `invalidated` event followed by a `transitioned` event back to `designing` — this may be triggered by use cases or automatically by `FsChangeRepository.get()` using `SYSTEM_ACTOR`
-- A `designing → designing` transition MUST NOT trigger approval invalidation or artifact downgrade — re-entering the same step is not a backward transition
-- `ChangeArtifact` contains a `files: Map<string, ArtifactFile>` — artifact status is aggregated from per-file statuses
-- `ArtifactFile` status is never stored directly — always derived from `validatedHash` and file presence
-- `validatedHash === "__skipped__"` is the sentinel for `skipped` status — only valid on `optional: true` artifacts
-- `skipped` is only valid for `optional: true` artifacts; attempting to skip a non-optional artifact throws an error
-- `skipped` satisfies the dependency in `requires` chains and workflow step availability checks — treated as resolved
-- On `invalidated` event: all file `validatedHash` values are cleared via `resetValidation()` — resets `complete` → `in-progress` and `skipped` → `missing` uniformly
-- On `verifying → implementing`: only artifacts in `implementing.requires` are reset
-- `ChangeArtifact.markComplete(key, hash)` may only be called from `ValidateArtifacts`
-- `ChangeArtifact.markSkipped()` marks ALL files and may only be called from the skip use case
-- `syncArtifacts(artifactTypes)` reconciles the artifact map against the schema; appends `artifacts-synced` event with `SYSTEM_ACTOR` when changes occur
-- `archivable` is the only state from which a change may be archived; attempting to archive from any other state throws `InvalidStateTransitionError`
-- Both approval gates default to `false` — teams opt in via `approvals` in `specd.yaml`
-- When `approvals.spec: true`, spec approval is required before `implementing`
-- When `approvals.signoff: true`, sign-off is always required before `archivable`, regardless of change content
-- Task completion gating is enforced generically by the workflow model — any step that requires an artifact with `taskCompletionCheck` is automatically gated (see [`core:workflow-model`](../workflow-model/spec.md))
-- `verifying → implementing` does not trigger approval invalidation
-- History events are never modified or deleted; invalidated approvals are identifiable by a subsequent `invalidated` event
-- Historical implementation detection is derived from append-only history by scanning for any `transitioned` event whose `to` field is `implementing`
+- name and createdAt are set at creation and never changed
+- workspaces is a computed getter derived from specIds via parseSpecId() — it is not a declared or persisted field
+- specIds may be empty (empty specIds results in empty workspaces)
+- Current lifecycle state is derived from history (last transitioned event); no state snapshot is stored
+- Any modification to the spec list or any artifact content appends an invalidated event followed by a transitioned event back to designing — this may be triggered by use cases or automatically by FsChangeRepository.get() using SYSTEM_ACTOR
+- A designing → designing transition MUST NOT trigger approval invalidation or artifact downgrade — re-entering the same step is not a backward transition
+- ChangeArtifact contains a files: Map\<string, ArtifactFile> — artifact status is aggregated from per-file statuses
+- ArtifactFile status is never inferred from validatedHash alone; canonical file state is determined from explicit state plus current file presence
+- validatedHash is the last successfully validated baseline only; it does not prove that the file still exists or is still complete on disk
+- hasDrift is persisted per file and reflects whether the current file state matches the validated baseline
+- skipped is only valid for optional: true artifacts; attempting to skip a non-optional artifact throws an error
+- skipped satisfies the dependency in requires chains and workflow step availability checks — treated as resolved
+- On invalidated event, artifact/file reopening is policy-driven rather than always global
+- On verifying → implementing: only artifacts in implementing.requires are reset
+- ChangeArtifact.markComplete(key, hash) may only be called from ValidateArtifacts
+- ChangeArtifact.markSkipped() marks ALL files and may only be called from the skip use case
+- syncArtifacts(artifactTypes) reconciles the artifact map against the schema; appends artifacts-synced event with SYSTEM_ACTOR when changes occur
+- archivable is the only state from which a change may be archived; attempting to archive from any other state throws InvalidStateTransitionError
+- Both approval gates default to false — teams opt in via approvals in specd.yaml
+- When approvals.spec: true, spec approval is required before implementing
+- When approvals.signoff: true, sign-off is always required before archivable, regardless of change content
+- Task completion gating is enforced generically by the workflow model — any step that requires an artifact with taskCompletionCheck is automatically gated (see [core:workflow-model](../workflow-model/spec.md))
+- verifying → implementing does not trigger approval invalidation
+- History events are never modified or deleted; invalidated approvals are identifiable by a subsequent invalidated event
+- Historical implementation detection is derived from append-only history by scanning for any transitioned event whose to field is implementing
 - Drafting or discarding after historical implementation requires an explicit force override because implementation may already exist and specs and code could otherwise be left out of sync
-- Discarding a change requires a `discarded` event with mandatory `reason` and `by`; it is irreversible
-- Schema-aware effective artifact status, recursive blocker resolution, and workflow-step availability are not entity-owned concerns; they are interpreted by `LifecycleEngine` from persisted change facts plus the active schema
+- Discarding a change requires a discarded event with mandatory reason and by; it is irreversible
+- Schema-aware effective artifact status, recursive blocker resolution, and workflow-step availability are not entity-owned concerns; they are interpreted by LifecycleEngine from persisted change facts plus the active schema
 
 ## Spec Dependencies
 

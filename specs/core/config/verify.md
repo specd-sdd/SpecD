@@ -138,6 +138,18 @@
 - **WHEN** `specd --help` or `specd init` is run
 - **THEN** `SchemaRegistry.resolve()` is not called; the command runs regardless of whether the schema is valid or even declared
 
+### Requirement: Invalidation policy configuration
+
+#### Scenario: Root invalidationPolicy accepts the four canonical values
+
+- **WHEN** `specd.yaml` declares `invalidationPolicy` as `none`, `surgical`, `downstream`, or `global`
+- **THEN** config loading accepts the value
+
+#### Scenario: Unknown invalidationPolicy is rejected
+
+- **WHEN** `specd.yaml` declares an unknown `invalidationPolicy`
+- **THEN** config loading fails with a validation error
+
 ### Requirement: Workspaces
 
 #### Scenario: Default workspace only (simple project)

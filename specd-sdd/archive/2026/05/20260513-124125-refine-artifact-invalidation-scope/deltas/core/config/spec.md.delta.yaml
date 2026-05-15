@@ -1,0 +1,22 @@
+- op: added
+  description: 'Add the project-level invalidationPolicy configuration field.'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Schema reference$'
+  content: |
+    ### Requirement: Invalidation policy configuration
+
+    `specd.yaml` MAY declare a root-level `invalidationPolicy` field controlling how artifact/file invalidation propagates when a change is invalidated.
+
+    Allowed values are:
+
+    - `none`
+    - `surgical`
+    - `downstream`
+    - `global`
+
+    The configured value is the project default used to seed new changes and to resolve effective invalidation policy when a change has not been overridden later.

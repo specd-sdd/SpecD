@@ -4,6 +4,7 @@ import { parse as parseYaml } from 'yaml'
 import { z } from 'zod'
 import { type ConfigLoader } from '../../application/ports/config-loader.js'
 import { isEnoent } from './is-enoent.js'
+import { isInvalidationPolicy } from '../../domain/value-objects/invalidation-policy.js'
 import {
   type SpecdConfig,
   type SpecdAdapterBinding,
@@ -278,6 +279,7 @@ const SpecdYamlZodSchema = z
     llmOptimizedContext: z.boolean().optional(),
     schemaPlugins: z.array(z.string()).optional(),
     schemaOverrides: SchemaOverridesZodSchema.optional(),
+    invalidationPolicy: z.enum(['none', 'surgical', 'downstream', 'global']).optional(),
     plugins: PluginsZodSchema.optional(),
   })
   .strict()
@@ -805,6 +807,9 @@ export class FsConfigLoader implements ConfigLoader {
         ? {
             schemaOverrides: data.schemaOverrides as SchemaOperations,
           }
+        : {}),
+      ...(data.invalidationPolicy !== undefined && isInvalidationPolicy(data.invalidationPolicy)
+        ? { invalidationPolicy: data.invalidationPolicy }
         : {}),
       ...(data.plugins !== undefined
         ? {

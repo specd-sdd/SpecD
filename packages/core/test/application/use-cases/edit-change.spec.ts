@@ -4,6 +4,8 @@ import { ChangeNotFoundError } from '../../../src/application/errors/change-not-
 import { SpecNotInChangeError } from '../../../src/application/errors/spec-not-in-change-error.js'
 import { Spec } from '../../../src/domain/entities/spec.js'
 import { SpecPath } from '../../../src/domain/value-objects/spec-path.js'
+import { ChangeArtifact } from '../../../src/domain/entities/change-artifact.js'
+import { ArtifactFile } from '../../../src/domain/value-objects/artifact-file.js'
 import {
   makeChangeRepository,
   makeActorResolver,
@@ -232,6 +234,68 @@ describe('EditChange', () => {
       const result = await uc.execute({ name: 'my-change', addSpecIds: ['auth/login'] })
 
       expect(result.invalidated).toBe(false)
+    })
+  })
+
+  describe('invalidationPolicy', () => {
+    it('updates the change invalidation policy', async () => {
+      const change = makeChange('my-change', { specIds: ['auth/login'] })
+      const repo = makeChangeRepository([change])
+      const uc = new EditChange(repo, new Map(), makeActorResolver())
+
+      const result = await uc.execute({
+        name: 'my-change',
+        invalidationPolicy: 'global',
+      })
+
+      expect(result.change.invalidationPolicy).toBe('global')
+      expect(result.invalidated).toBe(false)
+    })
+
+    it('preserves existing policy when not provided', async () => {
+      const change = makeChange('my-change', { specIds: ['auth/login'] })
+      change.invalidationPolicy = 'surgical'
+      const repo = makeChangeRepository([change])
+      const uc = new EditChange(repo, new Map(), makeActorResolver())
+
+      const result = await uc.execute({
+        name: 'my-change',
+        description: 'updated',
+      })
+
+      expect(result.change.invalidationPolicy).toBe('surgical')
+    })
+
+    it('does not invent drift when updating only the policy', async () => {
+      const change = makeChange('my-change', { specIds: ['auth/login'] })
+      change.setArtifact(
+        new ChangeArtifact({
+          type: 'proposal',
+          requires: [],
+          files: new Map([
+            [
+              'proposal',
+              new ArtifactFile({
+                key: 'proposal',
+                filename: 'proposal.md',
+                status: 'complete',
+                validatedHash: 'sha256:abc',
+              }),
+            ],
+          ]),
+        }),
+      )
+      const repo = makeChangeRepository([change])
+      const uc = new EditChange(repo, new Map(), makeActorResolver())
+
+      const result = await uc.execute({
+        name: 'my-change',
+        invalidationPolicy: 'none',
+      })
+
+      const file = result.change.getArtifact('proposal')?.getFile('proposal')
+      expect(file?.hasDrift).toBe(false)
+      expect(file?.status).toBe('complete')
     })
   })
 })

@@ -1,4 +1,5 @@
 import { type ArtifactStatus } from './artifact-status.js'
+import { type ArtifactDisplayStatus } from './artifact-display-status.js'
 
 /**
  * Construction properties for an {@link ArtifactFile}.
@@ -12,6 +13,8 @@ export interface ArtifactFileProps {
   readonly status?: ArtifactStatus
   /** SHA-256 hash recorded at last successful validation, if any. */
   readonly validatedHash?: string
+  /** Whether the file's current state differs from its validated baseline. Defaults to `false`. */
+  readonly hasDrift?: boolean
 }
 
 /** Sentinel hash stored in `validatedHash` when an optional artifact file is skipped. */
@@ -35,6 +38,7 @@ export class ArtifactFile {
   private readonly _filename: string
   private _status: ArtifactStatus
   private _validatedHash: string | undefined
+  private _hasDrift: boolean
 
   /**
    * Creates a new `ArtifactFile` from the given properties.
@@ -46,6 +50,7 @@ export class ArtifactFile {
     this._filename = props.filename
     this._status = props.status ?? 'missing'
     this._validatedHash = props.validatedHash
+    this._hasDrift = props.hasDrift ?? false
   }
 
   /** Identifier for this file within the artifact. */
@@ -68,9 +73,28 @@ export class ArtifactFile {
     return this._validatedHash
   }
 
+  /** Whether the file's current state differs from its validated baseline. */
+  get hasDrift(): boolean {
+    return this._hasDrift
+  }
+
   /** Whether this file has been successfully validated (`status === "complete"`). */
   get isComplete(): boolean {
     return this._status === 'complete'
+  }
+
+  /**
+   * Returns the human-facing display status.
+   *
+   * Returns `'complete-with-drift'` when the canonical status is `'complete'`
+   * and `hasDrift` is `true`. Otherwise returns the canonical status unchanged.
+   * Never returns `'complete-with-drift'` for missing files.
+   *
+   * @returns The display-oriented status string
+   */
+  displayStatus(): ArtifactDisplayStatus {
+    if (this._status === 'complete' && this._hasDrift) return 'complete-with-drift'
+    return this._status
   }
 
   /**
@@ -82,6 +106,7 @@ export class ArtifactFile {
   markComplete(hash: string): void {
     this._validatedHash = hash
     this._status = 'complete'
+    this._hasDrift = false
   }
 
   /**
@@ -128,5 +153,26 @@ export class ArtifactFile {
   markMissing(): void {
     if (this._status === 'drifted-pending-review') return
     this._status = 'missing'
+  }
+
+  /**
+   * Marks this file as drifted from its validated baseline.
+   *
+   * This is a diagnostic flag only — it does not change canonical status.
+   * Callers that need to reopen the file must use `markDriftedPendingReview()`
+   * or `markPendingReview()`.
+   */
+  markDrifted(): void {
+    this._hasDrift = true
+  }
+
+  /**
+   * Clears the drift flag without changing canonical status.
+   *
+   * Called automatically by `markComplete()` on successful validation.
+   * May also be called directly when the baseline is reconciled.
+   */
+  clearDrift(): void {
+    this._hasDrift = false
   }
 }

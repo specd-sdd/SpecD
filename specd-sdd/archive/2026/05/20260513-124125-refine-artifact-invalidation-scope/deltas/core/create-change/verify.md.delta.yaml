@@ -1,0 +1,17 @@
+- op: added
+  description: 'Verify seeding of the initial invalidationPolicy.'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Input contract$'
+  content: |
+    ### Requirement: Initial invalidation policy
+
+    #### Scenario: New change persists the project default invalidationPolicy
+
+    - **GIVEN** the project default invalidation policy is `downstream`
+    - **WHEN** `CreateChange.execute` creates a new change
+    - **THEN** the returned and persisted change uses `invalidationPolicy: 'downstream'`

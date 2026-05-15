@@ -19,6 +19,12 @@
       ]
     },
     {
+      "requirement": "Display-state rendering",
+      "rules": [
+        "Human-facing status output SHALL render artifact/file display states rather than forcing users to infer drift from raw canonical state plus hashes.\n\nSpecifically:\n\n- canonical `complete` plus `hasDrift=true` SHALL render as `complete-with-drift`\n- canonical `missing` remains `missing` even if `hasDrift=true`\n- canonical review states (`pending-review`, `drifted-pending-review`, `pending-parent-artifact-review`) remain visually stronger than drift-only display projections\n\nJSON/toon output SHALL include both canonical state and display-state fields when returned by GetStatus; text output SHALL prioritize the display state for human readability."
+      ]
+    },
+    {
       "requirement": "Schema version warning",
       "rules": [
         "If the change's recorded `schemaName`/`schemaVersion` differs from the currently active schema, the command prints a warning to stderr:\n\n```\nwarning: change was created with schema <recorded> but active schema is <current>\n```\n\nThe command still exits with code 0.\n\nThe CLI command MUST NOT resolve the schema independently. It SHALL compare `change.schemaName`/`change.schemaVersion` against `lifecycle.schemaInfo` from the `GetStatusResult`. If `lifecycle.schemaInfo` is `null` (schema resolution failed), the warning is skipped."
@@ -115,6 +121,23 @@
       ]
     },
     {
+      "requirement": "Display-state rendering",
+      "name": "Text output prefers complete-with-drift over raw complete",
+      "given": ["a file with canonical state complete and hasDrift: true"],
+      "when": ["specd changes status <name> is rendered in text mode"],
+      "then": ["the user sees complete-with-drift"]
+    },
+    {
+      "requirement": "Display-state rendering",
+      "name": "JSON output includes canonical and display state",
+      "given": ["a drift-visible file in the status result"],
+      "when": ["specd changes status <name> --format json is run"],
+      "then": [
+        "the serialized row includes canonical state",
+        "AND it includes the display-state projection"
+      ]
+    },
+    {
       "requirement": "Schema version warning",
       "name": "Schema mismatch",
       "given": ["the change was created with schema version 1 and the active schema is version 2"],
@@ -200,8 +223,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:90b6b99d67150463dc1259b53a5d0e6b66600c1f4c36c3649cf2893295c82113",
-    "verify.md": "sha256:4690a7a818183d5f6ecc0bbe32f189012cce520363de6798a60e0983f6d5387a"
+    "spec.md": "sha256:3741f1aca1ef25a560bd5b50acbf0b10c1041877cef7b09a50ff1072072e5b7f",
+    "verify.md": "sha256:d6912e4fbfc32ccc2e6367e55f1cd6852bcfb179aa1f4d7b0184fc28247e3df8"
   },
   "generatedBy": "core"
 }

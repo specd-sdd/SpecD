@@ -71,6 +71,8 @@ JSON/TOON output schema:
           id: string
           artifactState: string
           fileState: string
+          displayStatus: string
+          hasDrift: boolean
           filename: string
           path: string
           exists: boolean
@@ -91,6 +93,8 @@ JSON/TOON output schema:
               id: files.length > 1 ? `${a.type} [${file.key}]` : a.type,
               artifactState,
               fileState: file.state,
+              displayStatus: file.displayStatus,
+              hasDrift: file.hasDrift,
               filename: file.filename,
               path: `${changeDir}/${file.filename}`,
               exists,
@@ -105,6 +109,8 @@ JSON/TOON output schema:
               id: a.type,
               artifactState,
               fileState: artifactState,
+              displayStatus: a.displayStatus,
+              hasDrift: false,
               filename,
               path: `${changeDir}/${filename}`,
               exists: false,
@@ -130,6 +136,8 @@ JSON/TOON output schema:
                 id: `${a.type}.delta`,
                 artifactState,
                 fileState: deltaExists ? 'in-progress' : 'missing',
+                displayStatus: deltaExists ? 'in-progress' : 'missing',
+                hasDrift: false,
                 filename: deltaFilename,
                 path: `${changeDir}/deltas/${specId}/${deltaFilename}`,
                 exists: deltaExists,
@@ -141,18 +149,24 @@ JSON/TOON output schema:
         const fmt = parseFormat(opts.format)
         if (fmt === 'text') {
           const maxId = Math.max(vlen(''), ...artifactRows.map((r) => vlen(r.id)))
-          const maxArtifact = Math.max(vlen(''), ...artifactRows.map((r) => vlen(r.artifactState)))
-          const maxFile = Math.max(vlen(''), ...artifactRows.map((r) => vlen(r.fileState)))
+          const maxArtifactState = Math.max(
+            vlen(''),
+            ...artifactRows.map((r) => vlen(r.artifactState)),
+          )
+          const maxFileState = Math.max(vlen(''), ...artifactRows.map((r) => vlen(r.displayStatus)))
           const maxExists = vlen('no')
           const lines = artifactRows.map(
             (r) =>
               pad(r.id, maxId) +
               '  ' +
-              pad(r.artifactState, maxArtifact) +
+              pad(r.artifactState, maxArtifactState) +
               '  ' +
-              pad(r.fileState, maxFile) +
+              pad(r.displayStatus, maxFileState) +
               '  ' +
-              pad(r.exists ? 'yes' : 'no', maxExists),
+              pad(r.exists ? 'yes' : 'no', maxExists) +
+              '  ' +
+              r.path +
+              (r.hasDrift ? '  [drift]' : ''),
           )
           output(lines.join('\n'), 'text')
         } else {

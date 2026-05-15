@@ -26,6 +26,12 @@
       ]
     },
     {
+      "requirement": "Drift-aware display status",
+      "rules": [
+        "GetStatus SHALL preserve canonical persisted state in `state` / `effectiveStatus`, but it SHALL additionally provide human-facing display-state projections for artifact files and aggregated artifacts.\n\nEach ArtifactFileStatus MUST include:\n\n- `hasDrift` — whether the current file state differs from the validated baseline\n- `displayStatus` — a human-facing projection derived from canonical state plus `hasDrift`\n\nEach ArtifactStatusEntry MUST include:\n\n- `displayStatus` — the aggregated human-facing projection for the artifact\n\n`displayStatus` for files SHALL render `complete-with-drift` only when canonical state is `complete` and `hasDrift=true`.\n\n`displayStatus` for aggregated artifacts SHALL be derived from file-level display states, using precedence that keeps real workflow states stronger than display-only drift projections."
+      ]
+    },
+    {
       "requirement": "Throws ChangeNotFoundError for unknown changes",
       "rules": [
         "If no change with the given name exists in the repository, `execute()` MUST throw a `ChangeNotFoundError` with code `CHANGE_NOT_FOUND`. It MUST NOT return `null`."
@@ -120,6 +126,26 @@
         "the result includes a blockers array",
         "AND it contains at least one entry with code: 'ARTIFACT_DRIFT'"
       ]
+    },
+    {
+      "requirement": "Drift-aware display status",
+      "name": "Complete plus drift renders complete-with-drift",
+      "given": ["an artifact file with canonical state complete and hasDrift: true"],
+      "when": ["GetStatus builds the read model"],
+      "then": [
+        "the file status includes displayStatus: 'complete-with-drift'",
+        "AND canonical state remains complete"
+      ]
+    },
+    {
+      "requirement": "Drift-aware display status",
+      "name": "Aggregated artifact display status prefers real workflow states",
+      "given": [
+        "one artifact file is pending-review",
+        "AND another file is display-visible as complete-with-drift"
+      ],
+      "when": ["GetStatus aggregates artifact display state"],
+      "then": ["the artifact displayStatus is pending-review"]
     },
     {
       "requirement": "Throws ChangeNotFoundError for unknown changes",
@@ -298,8 +324,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:18922ef264a2265b451d50104e0ec41057e3c08be4cd8467629c43b053f50b1e",
-    "verify.md": "sha256:c3d9ee9a1ae1fc8660d9dbcee6e79b0b5617d251721efbeebdd8dcba5f824b62"
+    "spec.md": "sha256:6fd018455e28e77f9103714c8691942efc4bc40f041ca6bdd4564f434672d16b",
+    "verify.md": "sha256:a82c15e2b6461c280a8862a083e9aa83a055bff5fc0f987275d23905e9365e63"
   },
   "generatedBy": "core"
 }

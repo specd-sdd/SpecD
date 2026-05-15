@@ -1,0 +1,14 @@
+releases:
+  core:core/change: minor
+  core:core/validate-artifacts: minor
+  core:core/lifecycle-engine: patch
+  core:core/get-status: minor
+  cli:cli/change-status: minor
+  core:core/invalidate-change: patch
+  cli:cli/change-invalidate: patch
+  core:core/config: minor
+  core:core/change-manifest: minor
+  core:core/transition-change: patch
+  cli:cli/change-artifacts: minor
+  core:core/edit-change: minor
+  core:core/create-change: minor

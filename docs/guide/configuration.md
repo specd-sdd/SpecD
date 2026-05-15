@@ -432,6 +432,37 @@ Both approval records capture the approver's git identity, a reason, and a hash 
 
 ---
 
+## Invalidation policy
+
+When a change's validated artifacts drift from their baseline (files edited on disk after validation) or when you manually invalidate a change, SpecD reopens artifacts for review. The `invalidationPolicy` field controls how far that reopening propagates:
+
+```yaml
+invalidationPolicy: downstream # default
+```
+
+| Policy       | What gets reopened                                                                           |
+| ------------ | -------------------------------------------------------------------------------------------- |
+| `none`       | Nothing. Drift is tracked but artifacts stay `complete`. Status shows `complete-with-drift`. |
+| `surgical`   | Only the specific files that changed.                                                        |
+| `downstream` | Changed files plus all artifacts that depend on them in the DAG. This is the default.        |
+| `global`     | Every artifact in the change, regardless of which file triggered the invalidation.           |
+
+The project-level default is persisted on each change at creation time. You can change it per-change with:
+
+```bash
+specd changes edit my-change --invalidation-policy surgical
+```
+
+Or override it for a single manual invalidation:
+
+```bash
+specd changes invalidate my-change --reason "API changed" --target specs --policy surgical
+```
+
+Under `none`, drift is still visible — `changes status` and `changes artifacts` show `complete-with-drift` and a `[drift]` tag — but the lifecycle is not blocked and artifacts are not reopened. Use `none` when you want informational drift tracking without automatic reopening.
+
+---
+
 ## Schema overrides
 
 `schemaOverrides` lets you customise the active schema for your project without forking it or publishing a new package. Changes are applied inline, on top of whatever schema is declared in the `schema` field.

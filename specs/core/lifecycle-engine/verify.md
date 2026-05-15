@@ -23,6 +23,22 @@
 - **THEN** the returned verdict reports Spec B with effective status `pending-parent-artifact-review`
 - **AND** the blockers identify Spec A as the cause
 
+### Requirement: Canonical-state-only lifecycle interpretation
+
+#### Scenario: Complete-with-drift does not create a new blocker state
+
+- **GIVEN** a file that is canonically `complete`
+- **AND** status rendering would project it as `complete-with-drift`
+- **WHEN** LifecycleEngine derives effective artifact status
+- **THEN** it treats the file as `complete`
+
+#### Scenario: Missing still blocks through canonical state
+
+- **GIVEN** a file with canonical state `missing`
+- **AND** `hasDrift` is also `true`
+- **WHEN** LifecycleEngine derives effective artifact status
+- **THEN** it uses `missing` as the blocking state
+
 ### Requirement: Machine-readable blockers
 
 #### Scenario: Detailed affected artifacts for drift

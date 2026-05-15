@@ -167,6 +167,20 @@
 - **WHEN** `EditChange.execute` is called
 - **THEN** it accepts `EditChangeInput` with `name` (required), `addSpecIds` (optional), `removeSpecIds` (optional), `description` (optional)
 
+### Requirement: Invalidation policy edits
+
+#### Scenario: Editing invalidationPolicy persists the new value
+
+- **GIVEN** a change persisted with `invalidationPolicy: 'downstream'`
+- **WHEN** `EditChange.execute` is called with `invalidationPolicy: 'none'`
+- **THEN** the saved change uses `invalidationPolicy: 'none'`
+
+#### Scenario: Editing invalidationPolicy does not invent drift
+
+- **GIVEN** a file with `hasDrift: false`
+- **WHEN** only `invalidationPolicy` is updated
+- **THEN** `hasDrift` remains `false`
+
 ### Requirement: Output contract
 
 #### Scenario: execute returns EditChangeResult

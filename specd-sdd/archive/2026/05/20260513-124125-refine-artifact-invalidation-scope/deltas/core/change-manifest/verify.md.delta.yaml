@@ -1,0 +1,52 @@
+- op: modified
+  description: 'Extend manifest-structure verification with invalidationPolicy and hasDrift coverage.'
+  selector:
+    type: section
+    matches: '^Requirement: Manifest structure$'
+  content: |
+    #### Scenario: Manifest stores artifact and file state explicitly
+
+    - **WHEN** a change manifest is written
+    - **THEN** each persisted artifact entry includes `state`
+    - **AND** each persisted file entry includes `state`
+
+    #### Scenario: Missing state defaults to missing on load
+
+    - **GIVEN** a manifest entry without a `state` field
+    - **WHEN** the manifest is loaded
+    - **THEN** the missing state is treated as `missing`
+
+    #### Scenario: specDependsOn is seeded when an existing spec enters the change
+
+    - **GIVEN** an existing persisted spec is added to a change
+    - **AND** the spec has a canonical `spec-lock.json`
+    - **WHEN** the manifest is persisted after scope entry
+    - **THEN** `specDependsOn` contains that spec's seeded dependency snapshot
+
+    #### Scenario: Legacy metadata seeds specDependsOn when sidecar is absent
+
+    - **GIVEN** an existing persisted spec has no `spec-lock.json`
+    - **AND** legacy `metadata.json.dependsOn` exists for that spec
+    - **WHEN** the spec first enters the change scope
+    - **THEN** the manifest seeds `specDependsOn` from `metadata.json.dependsOn`
+
+    #### Scenario: Invalidated event stores message and affectedArtifacts
+
+    - **WHEN** a change is invalidated because validated files drifted
+    - **THEN** the invalidated event includes `cause`
+    - **AND** it includes a human-readable message
+    - **AND** it includes `affectedArtifacts` with artifact types and file keys
+
+    #### Scenario: Manifest persists invalidationPolicy and hasDrift per file
+
+    - **WHEN** a change with `invalidationPolicy: 'surgical'` and one drift-visible file is saved
+    - **THEN** the serialized manifest includes `invalidationPolicy`
+    - **AND** the file entry includes `hasDrift`
+
+    #### Scenario: Validated hash is not treated as proof of current presence
+
+    - **GIVEN** a file entry with a non-null `validatedHash`
+    - **AND** canonical file state `missing`
+    - **WHEN** the manifest is loaded
+    - **THEN** the file remains `missing`
+    - **AND** `validatedHash` is interpreted only as the last validated baseline

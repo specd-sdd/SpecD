@@ -1,0 +1,19 @@
+- op: added
+  description: 'Add persistent invalidationPolicy edits to EditChange.'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Input contract$'
+  content: |
+    ### Requirement: Invalidation policy edits
+
+    EditChange.execute SHALL accept an optional `invalidationPolicy` field that updates the change's persisted invalidation policy.
+
+    Allowed values are `none`, `surgical`, `downstream`, and `global`.
+
+    Updating only `invalidationPolicy` is a persistence-worthy change even when specIds and description remain unchanged.
+
+    Changing `invalidationPolicy` SHALL NOT itself invent drift or rewrite artifact/file canonical states. It updates the policy used by later invalidation operations.

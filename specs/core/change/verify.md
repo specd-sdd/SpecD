@@ -184,6 +184,37 @@
 - **THEN** the file state becomes `complete`
 - **AND** the parent artifact state is recomputed
 
+### Requirement: Policy-aware invalidation
+
+#### Scenario: Policy none keeps unaffected artifact states unchanged
+
+- **GIVEN** a change with complete artifact files and effective invalidation policy `none`
+- **WHEN** `Change.invalidate()` is called with cause `artifact-drift`
+- **THEN** only change-level invalidation and history are applied
+- **AND** no file is moved into a reopened review state solely because of that invalidation
+
+#### Scenario: Downstream invalidation reopens the target set and descendants
+
+- **GIVEN** a change with a DAG where `specs` has downstream descendants
+- **WHEN** `Change.invalidate()` is called with effective policy `downstream` and a focused target set under `specs`
+- **THEN** the focused target files are reopened
+- **AND** all DAG descendants of that target set are reopened
+
+### Requirement: Per-file drift tracking
+
+#### Scenario: Artifact-drift sets hasDrift on only the affected files
+
+- **GIVEN** two validated files in one artifact and only one mismatches the validated baseline
+- **WHEN** `Change.invalidate()` is called with cause `artifact-drift` and a focused payload naming only that file
+- **THEN** only that file gets `hasDrift: true`
+
+#### Scenario: Missing file remains missing even when drifted
+
+- **GIVEN** a previously validated file is now absent on disk
+- **WHEN** drift is materialized on the change
+- **THEN** the canonical file state remains `missing`
+- **AND** `hasDrift` may still be `true`
+
 ### Requirement: History and event sourcing
 
 #### Scenario: History is append-only

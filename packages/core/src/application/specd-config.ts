@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { type SchemaOperations } from '../domain/services/merge-schema-layers.js'
+import { type InvalidationPolicy } from '../domain/value-objects/invalidation-policy.js'
 
 /**
  * A project-level context entry from the `context` section of `specd.yaml`.
@@ -199,6 +200,8 @@ export interface SpecdConfig {
   readonly schemaPlugins?: readonly string[] | undefined
   /** Inline schema override operations from `specd.yaml`. */
   readonly schemaOverrides?: SchemaOperations | undefined
+  /** Default invalidation policy for new changes. Defaults to `'downstream'`. */
+  readonly invalidationPolicy?: InvalidationPolicy | undefined
   /** Declared plugins grouped by type (currently `agents`). */
   readonly plugins?:
     | {

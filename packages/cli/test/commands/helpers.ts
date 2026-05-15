@@ -138,6 +138,7 @@ export function makeMockKernel(overrides: Record<string, unknown> = {}): Kernel 
     runStepHooks: { execute: vi.fn() },
     getHookInstructions: { execute: vi.fn() },
     getArtifactInstruction: { execute: vi.fn() },
+    invalidate: { execute: vi.fn() },
     detectOverlap: {
       execute: vi.fn().mockResolvedValue({ hasOverlap: false, entries: [] }),
     },
