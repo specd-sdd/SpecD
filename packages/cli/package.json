@@ -17,7 +17,8 @@
     "dev": "tsup src/index.ts --format esm --watch",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "release:publish": "pnpm publish --access public"
+    "release:publish": "pnpm publish --access public",
+    "lint": "eslint ."
   },
   "dependencies": {
     "@clack/prompts": "^0.9.1",

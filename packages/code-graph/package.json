@@ -30,7 +30,8 @@
     "dev": "tsup src/index.ts --format esm --dts --watch",
     "typecheck": "tsc --noEmit",
     "test": "bash test/run-vitest.sh",
-    "release:publish": "pnpm publish --access public"
+    "release:publish": "pnpm publish --access public",
+    "lint": "eslint ."
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13"

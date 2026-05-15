@@ -20,7 +20,8 @@
     "build": "node --import tsx ../../dev/scripts/sync-plugin-manifests.ts packages/plugin-agent-codex && tsup src/index.ts --format esm --dts --clean",
     "dev": "tsup src/index.ts --format esm --dts --watch",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "lint": "eslint ."
   },
   "dependencies": {
     "@specd/core": "workspace:^",
