@@ -1,0 +1,12 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "core:config",
+    "core:composition",
+    "core:schema-merge",
+    "default:_global/architecture"
+  ]
+}

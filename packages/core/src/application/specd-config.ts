@@ -8,7 +8,26 @@ import { type InvalidationPolicy } from '../domain/value-objects/invalidation-po
  * Each entry is either an inline instruction or a file reference. The file
  * content is read and injected verbatim at context-compilation time.
  */
-export type SpecdContextEntry = { readonly file: string } | { readonly instruction: string }
+export type SpecdContextEntry =
+  | { readonly file: string }
+  | { readonly instruction: string }
+  | { readonly id: string; readonly file: string }
+  | { readonly id: string; readonly instruction: string }
+
+/** Structured removal instructions for an inheriting config layer. */
+export interface SpecdConfigRemoval {
+  readonly root?: string[]
+  readonly workspaces?: string[]
+  readonly storage?: string[]
+  readonly context?: Array<{
+    readonly id?: string
+    readonly file?: string
+    readonly instruction?: string
+  }>
+  readonly plugins?: {
+    readonly agents?: Array<{ readonly name: string }>
+  }
+}
 
 /** Supported display modes for compiled context specs. */
 export type SpecdContextMode = 'list' | 'summary' | 'full' | 'hybrid'

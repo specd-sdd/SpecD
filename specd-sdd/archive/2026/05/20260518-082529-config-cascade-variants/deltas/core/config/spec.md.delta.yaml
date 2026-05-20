@@ -1,0 +1,120 @@
+- op: modified
+  description: 'Replace single-file discovery semantics with layered cascade and closed-chain explicit mode'
+  selector:
+    type: section
+    matches: '^Requirement: Config file location and format$'
+  content: |
+    `specd.yaml` must be a valid YAML file. specd discovers and resolves configuration using the following strategy, in order:
+
+    1. **`--config` flag** — if the CLI is invoked with `--config path/to/file.yaml`, that file becomes the single explicit entrypoint. specd MUST resolve that file and only its own `extends` chain. Normal filename discovery MUST NOT add any additional layers on top of the explicit chain.
+    2. **Walk up from CWD, bounded by the git repo root** — specd walks up from the current working directory, checking each directory for discoverable config candidates. The walk stops at the **first directory containing any matching config files** (nearest to CWD) or at the git repo root (the nearest ancestor directory containing `.git/`), whichever comes first. If no discoverable config files are found before or at the repo root, specd exits with an error.
+    3. **CWD only, when not inside a git repo** — if no `.git/` ancestor exists, specd checks only the current working directory and stops there. It does not walk further up.
+
+    Within the selected directory, normal discovery MUST evaluate candidate files in this order:
+
+    1. `specd.yaml`
+    2. `specd.*.yaml` in ascending alphabetical order
+    3. `specd.local.yaml`
+    4. `specd.local.*.yaml` in ascending alphabetical order
+
+    A discovered file without `extends` becomes a standalone root from that point. A discovered file with `extends: true` MUST inherit from the previous active layer in the resolved chain. A discovered file with `extends: <path>` MUST only activate when that explicit base file is already part of the active chain being resolved; otherwise the discovered file is ignored during normal discovery.
+
+    The search never goes above the git repo root. This prevents accidentally picking up a config from a parent repository in nested or sibling monorepo layouts.
+
+    Some command families may explicitly define a bootstrap mode that intentionally operates without loading project config. When they do, this requirement still governs normal configured operation and the meaning of `--config` remains unchanged: it is always an explicit config file entrypoint, never a repository root selector.
+
+- op: modified
+  description: 'Define layered local config semantics, extends forms, and remove rules'
+  selector:
+    type: section
+    matches: '^Requirement: Local config override$'
+  content: |
+    Alongside `specd.yaml`, developers may place discoverable variant files to customize configuration without duplicating the entire shared config.
+
+    During normal discovery, later active layers merge on top of earlier active layers. Scalars use last-layer-wins semantics. Objects merge deeply by key. Arrays append by default unless an inherited entry is explicitly removed through the `remove` block.
+
+    `specd.local.yaml` remains backward-compatible:
+
+    - when it does not declare `extends`, it is a fully independent local config root and `specd.yaml` is not inherited
+    - when it declares `extends: true`, it inherits from the previous active layer and participates in the cascade
+
+    The `extends` field has exactly two valid forms:
+
+    - `extends: true` — inherit from the previous active layer in the resolved chain
+    - `extends: <path>` — inherit from one explicit config file, which MUST already belong to the same applicable chain
+
+    The `remove` field is only valid in configs that declare `extends`. A standalone config root MUST NOT declare `remove`.
+
+    `remove` uses structural targeting rather than document-wide selectors:
+
+    - `remove.root` removes optional top-level fields by field name
+    - `remove.<mapName>` removes named keys from keyed object maps such as `workspaces` and `storage`
+    - `remove.<arrayName>` removes inherited array entries by that array's defined identity keys
+
+    Required top-level fields such as `schema` MUST NOT be removable.
+
+    Discoverable local variants remain ordered by filename. For example, `specd.local.10-team.yaml`, `specd.local.20-machine.yaml`, and `specd.local.99-final.yaml` apply in exactly that order, with the last file having the highest precedence among active local layers.
+
+    `specd init` must add both `specd.local.yaml` and `specd.local.*.yaml` to the project's `.gitignore` so local variants are never committed by default.
+
+- op: added
+  description: 'Add explicit requirement for cascade identity keys and removal targets'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Local config override$'
+  content: |
+    ### Requirement: Cascade identity and removal model
+
+    Config inheritance MUST use local structural identity rules for removable collections.
+
+    The following identity rules apply in the first version:
+
+    - `context[]` supports an optional `id` field. When present, `id` is the preferred identity key for inherited removal.
+    - `plugins.agents[]` uses `name` as its identity key.
+    - keyed object maps such as `workspaces` and `storage` use their object keys as removal targets.
+
+    The system MUST NOT use arbitrary field-combination matching or AST-wide selector matching for config inheritance removal. Each removable array or map MUST define its own deterministic identity model.
+
+    A discovered layer with `extends: <path>` MUST only attach when that explicit base file is already active in the same chain. This allows files such as `specd.local.experimental.yaml` to remain discoverable by filename while staying inactive unless `specd.experimental.yaml` is already active or is selected explicitly with `--config`.
+
+- op: modified
+  description: 'Allow context entries to carry optional ids for stable inherited removal'
+  selector:
+    type: section
+    matches: '^Requirement: Project context instructions$'
+  content: |
+    `specd.yaml` MAY declare a `context` array to inject project-specific instructions before spec content.
+
+    Each entry MUST be one of:
+
+    - `{ instruction: string }`
+    - `{ file: string }`
+    - `{ id: string, instruction: string }`
+    - `{ id: string, file: string }`
+
+    `id` is optional but, when present, it provides a stable identity for inherited removal in layered config resolution.
+
+    File paths remain resolved relative to the directory containing the active config file unless they are already absolute.
+
+- op: modified
+  description: 'Add cascade-related validation obligations'
+  selector:
+    type: section
+    matches: '^Requirement: Startup validation$'
+  content: |
+    Config startup validation MUST reject invalid cascade instructions before any command proceeds.
+
+    Validation MUST fail with `ConfigValidationError` when:
+
+    - `remove` appears in a config that does not declare `extends`
+    - `extends` uses any value other than `true` or a string path
+    - `extends: <path>` points outside the applicable config chain
+    - `remove.root` attempts to delete a required field such as `schema`
+    - `remove.workspaces` or `remove.storage` names a key that does not exist in the inherited base
+    - array removal cannot resolve exactly one inherited target under that array's identity rules
+
+    These validation failures remain domain-level configuration errors and therefore MUST surface through the normal `SpecdError` / `ConfigValidationError` path.

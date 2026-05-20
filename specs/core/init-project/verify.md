@@ -40,6 +40,12 @@
 - **WHEN** `execute` is called with `force: true`
 - **THEN** the existing config is overwritten and a successful result is returned
 
+#### Scenario: Already initialised project propagates port error
+
+- **GIVEN** the port throws `AlreadyInitialisedError` when checking existence
+- **WHEN** `execute` is called
+- **THEN** `execute` propagates `AlreadyInitialisedError` from the port
+
 ### Requirement: Side effects performed by the port
 
 #### Scenario: Storage directories created
@@ -51,3 +57,4 @@
 
 - **WHEN** `execute` completes successfully
 - **THEN** `specd.local.yaml` is listed in the project's `.gitignore`
+- **AND** the `specd.local.*.yaml` local-variant pattern is also listed

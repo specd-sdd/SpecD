@@ -4,37 +4,49 @@
 
 ### Requirement: Config file location and format
 
-#### Scenario: Config found — nearest file used
+#### Scenario: Config found — nearest directory with candidates used
 
-- **WHEN** a `specd.yaml` exists somewhere between the CWD and the git repo root
-- **THEN** specd uses the nearest one (closest to CWD) and stops walking
+- **GIVEN** a repo where `/repo/app/specd.local.dev.yaml` exists and `/repo/specd.yaml` also exists
+- **WHEN** specd runs from `/repo/app/src`
+- **THEN** discovery resolves the candidate set from `/repo/app`
+- **AND** it does not continue walking to `/repo`
 
-#### Scenario: Monorepo — package config takes precedence
+#### Scenario: Monorepo — package config directory takes precedence
 
-- **WHEN** a monorepo has a `specd.yaml` at the root and another at `packages/billing/specd.yaml`, and the user runs specd from within `packages/billing/`
-- **THEN** specd uses `packages/billing/specd.yaml` and does not continue walking up to the root
+- **GIVEN** `/repo/specd.yaml` exists at the monorepo root
+- **AND** `/repo/packages/api/specd.yaml` exists inside one package
+- **WHEN** specd runs from `/repo/packages/api/src`
+- **THEN** discovery resolves the package directory candidate set
+- **AND** the root-level config directory is not consulted
 
 #### Scenario: Config not found inside repo
 
-- **WHEN** the user runs any specd command inside a git repository and no `specd.yaml` exists between the CWD and the repo root
-- **THEN** specd exits with an error explaining that `specd.yaml` was not found and pointing to `specd init`
+- **GIVEN** no discoverable config candidates exist between CWD and the git root
+- **WHEN** specd starts
+- **THEN** startup fails with a config validation error
 
 #### Scenario: Invoked outside a git repo
 
-- **WHEN** the user runs specd from a directory that is not inside any git repository
-- **THEN** specd checks only the current working directory for `specd.yaml` and exits with an error if not found there
+- **GIVEN** the current directory is not inside any git repository
+- **AND** the parent directory contains discoverable config candidates but the current directory does not
+- **WHEN** specd starts
+- **THEN** discovery checks only the current directory
+- **AND** startup fails because no local candidates exist there
 
-#### Scenario: Explicit config flag bypasses local override
+#### Scenario: Explicit config flag resolves only the selected chain
 
-- **WHEN** `specd --config /path/to/specd.yaml <command>` is invoked
-- **THEN** specd uses the specified file exactly as-is — discovery and `specd.local.yaml` lookup are both skipped
+- **GIVEN** `/repo/specd.local.dev.yaml` declares `extends: true`
+- **AND** `/repo/specd.local.zz-last.yaml` also exists
+- **WHEN** the CLI is invoked with `--config /repo/specd.local.dev.yaml`
+- **THEN** specd resolves `/repo/specd.local.dev.yaml` and its `extends` chain only
+- **AND** `/repo/specd.local.zz-last.yaml` is not added by discovery
 
 #### Scenario: Command-specific bootstrap mode does not redefine --config
 
-- **GIVEN** a command family defines a bootstrap mode that can operate without loading project config
-- **WHEN** the user passes `--config /path/to/specd.yaml`
-- **THEN** `--config` still means an explicit config file path override
-- **AND** bootstrap mode is not selected by reinterpreting `--config` as a repository root
+- **GIVEN** a command defines bootstrap mode in its own spec
+- **WHEN** the same command is invoked with `--config path/to/file.yaml`
+- **THEN** `--config` still means an explicit config entrypoint
+- **AND** bootstrap mode does not reinterpret it as a repository root selector
 
 ### Requirement: Privacy settings
 
@@ -71,25 +83,73 @@
 
 ### Requirement: Local config override
 
-#### Scenario: Local file takes full precedence
+#### Scenario: Local standalone file replaces shared config
 
-- **WHEN** `specd.local.yaml` exists alongside `specd.yaml`
-- **THEN** specd loads only `specd.local.yaml`; `specd.yaml` is ignored entirely
+- **GIVEN** `specd.yaml` exists
+- **AND** `specd.local.yaml` exists without `extends`
+- **WHEN** config is resolved in normal discovery
+- **THEN** `specd.local.yaml` becomes the active root
+- **AND** `specd.yaml` is not inherited
 
 #### Scenario: Local file absent
 
-- **WHEN** no `specd.local.yaml` exists alongside `specd.yaml`
+- **WHEN** no `specd.local.yaml` or local variant exists alongside `specd.yaml`
 - **THEN** specd loads `specd.yaml` as normal; no error is emitted
 
-#### Scenario: Local file not committed
+#### Scenario: Local file joins the cascade when extends is true
 
-- **WHEN** `specd init` is run
-- **THEN** `specd.local.yaml` is added to `.gitignore` if not already present
+- **GIVEN** `specd.yaml` exists
+- **AND** `specd.local.yaml` declares `extends: true`
+- **WHEN** config is resolved in normal discovery
+- **THEN** `specd.local.yaml` inherits from the previously active layer
+- **AND** only its overridden fields change
 
-#### Scenario: Local file must be valid standalone
+#### Scenario: Local file must be valid when standalone
 
-- **WHEN** `specd.local.yaml` is present but missing required fields (e.g. `schema`)
+- **WHEN** a standalone `specd.local.yaml` is present but missing required fields (e.g. `schema`)
 - **THEN** specd exits with a validation error — partial configs are not supported
+
+#### Scenario: Local named variants apply in filename order
+
+- **GIVEN** `specd.local.10-team.yaml`, `specd.local.20-machine.yaml`, and `specd.local.99-final.yaml` are all active layers
+- **WHEN** config is resolved in normal discovery
+- **THEN** they apply in ascending alphabetical order
+- **AND** `specd.local.99-final.yaml` has the highest effective precedence
+
+#### Scenario: Local variant patterns are gitignored
+
+- **WHEN** a project is initialised
+- **THEN** both `specd.local.yaml` and `specd.local.*.yaml` are present in `.gitignore`
+
+### Requirement: Cascade identity and removal model
+
+#### Scenario: Context entry removed by id
+
+- **GIVEN** a base config defines `context: [{ id: bootstrap, file: specd-bootstrap.md }]`
+- **AND** a later inheriting layer declares `remove: { context: [{ id: bootstrap }] }`
+- **WHEN** the cascade is resolved
+- **THEN** the inherited `bootstrap` context entry is removed
+
+#### Scenario: Plugin entry removed by name identity
+
+- **GIVEN** a base config defines `plugins.agents: [{ name: '@specd/plugin-agent-codex' }]`
+- **AND** a later inheriting layer removes that inherited agent entry
+- **WHEN** the cascade is resolved
+- **THEN** the loader matches the inherited agent by `name`
+
+#### Scenario: Workspace removed by name
+
+- **GIVEN** a base config defines `workspaces: { default: {...}, billing: {...} }`
+- **AND** a later inheriting layer declares `remove: { workspaces: [billing] }`
+- **WHEN** the cascade is resolved
+- **THEN** the `billing` workspace key is absent from the merged config
+
+#### Scenario: Explicit-base local variant is skipped until its base is active
+
+- **GIVEN** `specd.local.experimental.yaml` declares `extends: ./specd.experimental.yaml`
+- **AND** `specd.experimental.yaml` is not active in the current discovery chain
+- **WHEN** normal discovery runs
+- **THEN** `specd.local.experimental.yaml` is skipped
 
 ### Requirement: Schema reference
 
@@ -591,6 +651,38 @@
 - **WHEN** config is validated at startup
 - **THEN** validation MUST fail with a `ConfigValidationError`
 
+#### Scenario: remove without extends is rejected
+
+- **GIVEN** a config file declares `remove` but no `extends`
+- **WHEN** config is loaded
+- **THEN** startup fails with `ConfigValidationError`
+
+#### Scenario: Invalid extends value is rejected
+
+- **GIVEN** a config file declares `extends: { from: ./specd.yaml }`
+- **WHEN** config is loaded
+- **THEN** startup fails with `ConfigValidationError`
+
+#### Scenario: Required root field cannot be removed
+
+- **GIVEN** an inheriting config declares `remove: { root: [schema] }`
+- **WHEN** config is loaded
+- **THEN** startup fails with `ConfigValidationError`
+
+#### Scenario: Unknown workspace removal target is rejected
+
+- **GIVEN** an inheriting config declares `remove: { workspaces: [billing] }`
+- **AND** no inherited `billing` workspace exists
+- **WHEN** config is loaded
+- **THEN** startup fails with `ConfigValidationError`
+
+#### Scenario: Explicit extends outside the active chain is skipped
+
+- **GIVEN** a discovered config declares `extends: ./unrelated.yaml`
+- **AND** `unrelated.yaml` is not active in the discovery chain
+- **WHEN** config is loaded in discovery mode
+- **THEN** that candidate is skipped (no error)
+
 ### Requirement: Project context instructions
 
 #### Scenario: Context entries injected before spec content
@@ -604,6 +696,13 @@
 - **GIVEN** `specd.yaml` declares `context: [{ file: specd-bootstrap.md }]` and the file exists
 - **WHEN** `CompileContext` builds the compiled context
 - **THEN** the full content of `specd-bootstrap.md` is injected verbatim, before spec content
+
+#### Scenario: Context entry id is accepted for inherited removal
+
+- **GIVEN** `specd.yaml` declares `context: [{ id: bootstrap, file: specd-bootstrap.md }]`
+- **WHEN** config is loaded
+- **THEN** the entry is accepted as valid context
+- **AND** `bootstrap` is available as the inherited removal identity
 
 #### Scenario: Missing file emits a warning
 

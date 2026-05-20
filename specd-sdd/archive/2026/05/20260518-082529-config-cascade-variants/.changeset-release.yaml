@@ -1,0 +1,5 @@
+releases:
+  core:config: minor
+  core:config-loader: minor
+  core:init-project: patch
+  core:config-writer-port: patch

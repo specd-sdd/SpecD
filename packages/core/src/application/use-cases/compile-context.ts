@@ -49,7 +49,7 @@ interface SpecContentFile {
 export { type ContextWarning } from './_shared/context-warning.js'
 
 /** A single entry in the project-level `context:` list. */
-export type ContextEntry = { instruction: string } | { file: string }
+export type ContextEntry = { id?: string; instruction: string } | { id?: string; file: string }
 
 /** Per-workspace configuration for context spec selection. */
 export interface WorkspaceContextConfig {

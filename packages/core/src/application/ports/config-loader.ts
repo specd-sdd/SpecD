@@ -4,9 +4,10 @@ import { type SpecdConfig } from '../specd-config.js'
  * Port for loading and resolving the active `specd.yaml` configuration.
  *
  * Implementations live in `infrastructure/`:
- * - `FsConfigLoader` — discovers `specd.yaml` by walking up from a directory,
- *   honours `specd.local.yaml` overrides, and validates the parsed YAML before
- *   constructing a {@link SpecdConfig}.
+ * - `FsConfigLoader` — discovers config candidates by walking up from a
+ *   directory, resolves an active chain from `specd.yaml`, named variants
+ *   (`specd.*.yaml`), local variants (`specd.local.yaml`, `specd.local.*.yaml`),
+ *   and validates the merged result before constructing a {@link SpecdConfig}.
  *
  * Delivery mechanisms receive a `ConfigLoader` instance and call `load()` once
  * at startup, then pass the resulting `SpecdConfig` to `createKernel()` or
@@ -14,8 +15,13 @@ import { type SpecdConfig } from '../specd-config.js'
  *
  * Two modes:
  * - **Discovery mode** (`{ startDir }`) — walks up from `startDir`, bounded by
- *   the nearest git repository root, to find `specd.yaml` or `specd.local.yaml`.
- * - **Forced mode** (`{ configPath }`) — uses the specified file directly.
+ *   the nearest git repository root, collects discoverable candidates, and
+ *   resolves the active chain. A file without `extends` becomes a standalone
+ *   root; `extends: true` inherits from the previous active layer; `extends:
+ *   <path>` attaches only when the explicit base is already active.
+ * - **Forced mode** (`{ configPath }`) — treats the specified file as a single
+ *   explicit entrypoint and resolves only its own `extends` chain as a closed
+ *   set. Normal filename discovery does not add additional layers.
  */
 export interface ConfigLoader {
   /**
@@ -29,9 +35,9 @@ export interface ConfigLoader {
   /**
    * Resolves the path to the active config file without loading or parsing it.
    *
-   * - **Discovery mode**: runs the same directory walk as `load()` (honouring
-   *   `specd.local.yaml`, bounded by git root). Returns the found path, or
-   *   `null` if no file is found. Never throws.
+   * - **Discovery mode**: resolves the active chain's root config path by
+   *   walking up from `startDir` (bounded by git root). Returns the root path
+   *   of the resolved chain, or `null` if no candidates are found. Never throws.
    * - **Forced mode**: returns the resolved absolute path directly. Does not
    *   check whether the file exists. Never throws.
    * - **Adapters without a local file** (e.g. remote adapters): return `null`.

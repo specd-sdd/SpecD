@@ -31,7 +31,8 @@ export interface InitProjectResult {
 export interface ConfigWriter {
   /**
    * Creates a new `specd.yaml` in `projectRoot`, creates the required storage
-   * directories, and appends `specd.local.yaml` to `.gitignore`.
+   * directories, and appends both `specd.local.yaml` and the `specd.local.*.yaml`
+   * local-variant pattern to `.gitignore`.
    *
    * @param options - Initialisation options
    * @returns The path and metadata of the created config

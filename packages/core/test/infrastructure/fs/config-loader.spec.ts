@@ -4,6 +4,7 @@ import * as path from 'node:path'
 import { execSync } from 'node:child_process'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { FsConfigLoader } from '../../../src/infrastructure/fs/config-loader.js'
+import { ConfigValidationError } from '../../../src/domain/errors/config-validation-error.js'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -1410,6 +1411,1028 @@ storage:
 
       const loader = new FsConfigLoader({ configPath })
       await expect(loader.load()).rejects.toThrow(/workspaces\.default\.graph/)
+    })
+  })
+
+  // ---------------------------------------------------------------------------
+  // Requirement: Config cascade — extends, merge, removal, forced mode
+  // ---------------------------------------------------------------------------
+
+  describe('Requirement: Config cascade resolution', () => {
+    it('extends: true merges overlay onto base config', async () => {
+      await writeConfig(
+        minimalYaml(`
+contextIncludeSpecs:
+  - 'default:*'
+`),
+      )
+      await writeConfig(
+        `
+extends: true
+contextIncludeSpecs:
+  - 'default:arch/*'
+`.trim(),
+        'specd.local.yaml',
+      )
+
+      const loader = new FsConfigLoader({ startDir: tmpDir })
+      const config = await loader.load()
+
+      // Arrays are appended: both entries present
+      expect(config.contextIncludeSpecs).toEqual(['default:*', 'default:arch/*'])
+    })
+
+    it('extends: <path> attaches when base is in the active chain', async () => {
+      await writeConfig(minimalYaml())
+      await writeConfig(
+        `
+extends: specd.yaml
+contextIncludeSpecs:
+  - 'default:ci/*'
+`.trim(),
+        'specd.ci.yaml',
+      )
+
+      const loader = new FsConfigLoader({ startDir: tmpDir })
+      const config = await loader.load()
+
+      expect(config.contextIncludeSpecs).toEqual(['default:ci/*'])
+    })
+
+    it('extends: <path> is skipped when base is not in the active chain', async () => {
+      await writeConfig(minimalYaml())
+      // This variant extends a file that is NOT in the chain
+      await writeConfig(
+        `
+extends: specd.staging.yaml
+contextIncludeSpecs:
+  - 'default:staging/*'
+`.trim(),
+        'specd.production.yaml',
+      )
+
+      const loader = new FsConfigLoader({ startDir: tmpDir })
+      const config = await loader.load()
+
+      // Only specd.yaml is active; production overlay is skipped
+      expect(config.contextIncludeSpecs).toBeUndefined()
+    })
+
+    it('standalone overlay (no extends) discards all prior layers', async () => {
+      await writeConfig(
+        minimalYaml(`
+contextIncludeSpecs:
+  - 'default:*'
+`),
+      )
+      // No extends key — standalone root
+      await writeConfig(
+        minimalYaml(`
+contextIncludeSpecs:
+  - 'default:fresh/*'
+`),
+        'specd.local.yaml',
+      )
+
+      const loader = new FsConfigLoader({ startDir: tmpDir })
+      const config = await loader.load()
+
+      // Only the standalone local config matters
+      expect(config.contextIncludeSpecs).toEqual(['default:fresh/*'])
+    })
+
+    it('named variant specd.*.yaml is discovered in lexicographic order', async () => {
+      await writeConfig(minimalYaml())
+      await writeConfig(
+        `
+extends: true
+context:
+  - instruction: 'from ci'
+`.trim(),
+        'specd.ci.yaml',
+      )
+      await writeConfig(
+        `
+extends: true
+context:
+  - instruction: 'from staging'
+`.trim(),
+        'specd.staging.yaml',
+      )
+
+      const loader = new FsConfigLoader({ startDir: tmpDir })
+      const config = await loader.load()
+
+      // Both overlays attach; arrays are appended in order
+      expect(config.context).toHaveLength(2)
+      expect(config.context?.[0]).toEqual({ instruction: 'from ci' })
+      expect(config.context?.[1]).toEqual({ instruction: 'from staging' })
+    })
+
+    it('named local variant specd.local.*.yaml is discovered', async () => {
+      await writeConfig(minimalYaml())
+      await writeConfig(
+        `
+extends: true
+context:
+  - instruction: 'from local mono'
+`.trim(),
+        'specd.local.mono.yaml',
+      )
+
+      const loader = new FsConfigLoader({ startDir: tmpDir })
+      const config = await loader.load()
+
+      expect(config.context).toHaveLength(1)
+      expect(config.context?.[0]).toEqual({ instruction: 'from local mono' })
+    })
+  })
+
+  describe('Requirement: Layer merge semantics', () => {
+    it('deep-merges nested objects', async () => {
+      await writeConfig(
+        `
+schema: "@specd/schema-std"
+workspaces:
+  default:
+    specs:
+      adapter: fs
+      fs:
+        path: specs
+storage:
+  changes:
+    adapter: fs
+    fs:
+      path: .specd/changes
+  drafts:
+    adapter: fs
+    fs:
+      path: .specd/drafts
+  discarded:
+    adapter: fs
+    fs:
+      path: .specd/discarded
+  archive:
+    adapter: fs
+    fs:
+      path: .specd/archive
+approvals:
+  spec: false
+  signoff: false
+`.trim(),
+      )
+      await writeConfig(
+        `
+extends: true
+approvals:
+  spec: true
+`.trim(),
+        'specd.local.yaml',
+      )
+
+      const loader = new FsConfigLoader({ startDir: tmpDir })
+      const config = await loader.load()
+
+      // Object merged: spec overridden, signoff preserved
+      expect(config.approvals).toEqual({ spec: true, signoff: false })
+    })
+
+    it('scalar values are replaced by later layers', async () => {
+      await writeConfig(minimalYaml('contextMode: list'))
+      await writeConfig(
+        `
+extends: true
+contextMode: full
+`.trim(),
+        'specd.local.yaml',
+      )
+
+      const loader = new FsConfigLoader({ startDir: tmpDir })
+      const config = await loader.load()
+
+      expect(config.contextMode).toBe('full')
+    })
+  })
+
+  describe('Requirement: Cascade removal semantics', () => {
+    it('remove.root strips a top-level field', async () => {
+      await writeConfig(
+        minimalYaml(`
+contextIncludeSpecs:
+  - 'default:*'
+`),
+      )
+      await writeConfig(
+        `
+extends: true
+remove:
+  root:
+    - contextIncludeSpecs
+`.trim(),
+        'specd.local.yaml',
+      )
+
+      const loader = new FsConfigLoader({ startDir: tmpDir })
+      const config = await loader.load()
+
+      expect(config.contextIncludeSpecs).toBeUndefined()
+    })
+
+    it('remove.workspaces strips a named workspace', async () => {
+      await writeConfig(
+        `
+schema: "@specd/schema-std"
+workspaces:
+  default:
+    specs:
+      adapter: fs
+      fs:
+        path: specs
+  staging:
+    specs:
+      adapter: fs
+      fs:
+        path: staging/specs
+    codeRoot: staging
+storage:
+  changes:
+    adapter: fs
+    fs:
+      path: .specd/changes
+  drafts:
+    adapter: fs
+    fs:
+      path: .specd/drafts
+  discarded:
+    adapter: fs
+    fs:
+      path: .specd/discarded
+  archive:
+    adapter: fs
+    fs:
+      path: .specd/archive
+`.trim(),
+      )
+      await writeConfig(
+        `
+extends: true
+remove:
+  workspaces:
+    - staging
+`.trim(),
+        'specd.local.yaml',
+      )
+
+      const loader = new FsConfigLoader({ startDir: tmpDir })
+      const config = await loader.load()
+
+      expect(config.workspaces.map((w) => w.name)).toEqual(['default'])
+    })
+
+    it('remove.context strips entries by id', async () => {
+      await writeConfig(
+        minimalYaml(`
+context:
+  - id: ci-only
+    instruction: 'CI instruction'
+  - id: shared
+    instruction: 'Shared instruction'
+`),
+      )
+      await writeConfig(
+        `
+extends: true
+remove:
+  context:
+    - id: ci-only
+`.trim(),
+        'specd.local.yaml',
+      )
+
+      const loader = new FsConfigLoader({ startDir: tmpDir })
+      const config = await loader.load()
+
+      expect(config.context).toHaveLength(1)
+      expect(config.context?.[0]).toEqual({ id: 'shared', instruction: 'Shared instruction' })
+    })
+
+    it('remove.context strips entries by file', async () => {
+      await writeConfig(
+        minimalYaml(`
+context:
+  - file: CI_AGENTS.md
+  - file: AGENTS.md
+`),
+      )
+      await writeConfig(
+        `
+extends: true
+remove:
+  context:
+    - file: CI_AGENTS.md
+`.trim(),
+        'specd.local.yaml',
+      )
+
+      const loader = new FsConfigLoader({ startDir: tmpDir })
+      const config = await loader.load()
+
+      expect(config.context).toHaveLength(1)
+      expect(config.context?.[0]).toEqual({ file: 'AGENTS.md' })
+    })
+
+    it('remove.plugins.agents strips by name', async () => {
+      await writeConfig(
+        minimalYaml(`
+plugins:
+  agents:
+    - name: '@specd/plugin-agent-claude'
+    - name: '@specd/plugin-agent-copilot'
+`),
+      )
+      await writeConfig(
+        `
+extends: true
+remove:
+  plugins:
+    agents:
+      - name: '@specd/plugin-agent-copilot'
+`.trim(),
+        'specd.local.yaml',
+      )
+
+      const loader = new FsConfigLoader({ startDir: tmpDir })
+      const config = await loader.load()
+
+      expect(config.plugins?.agents).toHaveLength(1)
+      expect(config.plugins?.agents?.[0]?.name).toBe('@specd/plugin-agent-claude')
+    })
+
+    it('rejects remove without extends', async () => {
+      await writeConfig(minimalYaml())
+      await writeConfig(
+        `
+remove:
+  root:
+    - contextIncludeSpecs
+`.trim(),
+        'specd.local.yaml',
+      )
+
+      const loader = new FsConfigLoader({ startDir: tmpDir })
+      await expect(loader.load()).rejects.toThrow(/'remove' is only valid/)
+    })
+
+    it('rejects remove.root targeting schema', async () => {
+      await writeConfig(minimalYaml())
+      await writeConfig(
+        `
+extends: true
+remove:
+  root:
+    - schema
+`.trim(),
+        'specd.local.yaml',
+      )
+
+      const loader = new FsConfigLoader({ startDir: tmpDir })
+      await expect(loader.load()).rejects.toThrow(/cannot remove required field 'schema'/)
+    })
+
+    it('rejects remove.context with ambiguous match', async () => {
+      await writeConfig(
+        minimalYaml(`
+context:
+  - instruction: 'same text'
+  - instruction: 'same text'
+`),
+      )
+      await writeConfig(
+        `
+extends: true
+remove:
+  context:
+    - instruction: 'same text'
+`.trim(),
+        'specd.local.yaml',
+      )
+
+      const loader = new FsConfigLoader({ startDir: tmpDir })
+      await expect(loader.load()).rejects.toThrow(/ambiguous match/)
+    })
+
+    it('rejects remove.context with no matching entry', async () => {
+      await writeConfig(
+        minimalYaml(`
+context:
+  - instruction: 'keep this'
+`),
+      )
+      await writeConfig(
+        `
+extends: true
+remove:
+  context:
+    - instruction: 'does not exist'
+`.trim(),
+        'specd.local.yaml',
+      )
+
+      const loader = new FsConfigLoader({ startDir: tmpDir })
+      await expect(loader.load()).rejects.toThrow(/no matching entry/)
+    })
+  })
+
+  describe('Requirement: Forced mode cascade (closed chain)', () => {
+    it('forced mode loads a single file without extends', async () => {
+      const configPath = await writeConfig(minimalYaml())
+      const loader = new FsConfigLoader({ configPath })
+      const config = await loader.load()
+
+      expect(config.projectRoot).toBe(tmpDir)
+    })
+
+    it('forced mode resolves extends: true against specd.yaml in same dir', async () => {
+      await writeConfig(minimalYaml())
+      const overlayPath = await writeConfig(
+        `
+extends: true
+contextMode: full
+`.trim(),
+        'specd.local.yaml',
+      )
+
+      const loader = new FsConfigLoader({ configPath: overlayPath })
+      const config = await loader.load()
+
+      // Base merged from specd.yaml, overlay applied
+      expect(config.contextMode).toBe('full')
+    })
+
+    it('forced mode follows explicit extends chain', async () => {
+      await writeConfig(minimalYaml())
+      await writeConfig(
+        `
+extends: specd.yaml
+context:
+  - instruction: 'from ci'
+`.trim(),
+        'specd.ci.yaml',
+      )
+
+      const loader = new FsConfigLoader({ configPath: path.join(tmpDir, 'specd.ci.yaml') })
+      const config = await loader.load()
+
+      expect(config.context).toHaveLength(1)
+      expect(config.context?.[0]).toEqual({ instruction: 'from ci' })
+    })
+
+    it('forced mode walks extends: true backwards through candidates', async () => {
+      await writeConfig(
+        minimalYaml(`
+context:
+  - instruction: 'base'
+`),
+      )
+      await writeConfig(
+        `
+extends: true
+context:
+  - instruction: 'local'
+`.trim(),
+        'specd.local.yaml',
+      )
+      await writeConfig(
+        `
+extends: true
+context:
+  - instruction: 'otro'
+`.trim(),
+        'specd.local.otro.yaml',
+      )
+
+      const loader = new FsConfigLoader({ configPath: path.join(tmpDir, 'specd.local.otro.yaml') })
+      const config = await loader.load()
+
+      expect(config.context).toHaveLength(3)
+      expect((config.context?.[0] as { instruction: string }).instruction).toBe('base')
+      expect((config.context?.[1] as { instruction: string }).instruction).toBe('local')
+      expect((config.context?.[2] as { instruction: string }).instruction).toBe('otro')
+    })
+
+    it('forced mode with mixed explicit and extends: true chain', async () => {
+      await writeConfig(
+        minimalYaml(`
+context:
+  - instruction: 'base'
+`),
+      )
+      await writeConfig(
+        `
+extends: true
+context:
+  - instruction: 'local'
+`.trim(),
+        'specd.local.yaml',
+      )
+      await writeConfig(
+        `
+extends: specd.local.yaml
+context:
+  - instruction: 'otro'
+`.trim(),
+        'specd.local.otro.yaml',
+      )
+
+      const loader = new FsConfigLoader({ configPath: path.join(tmpDir, 'specd.local.otro.yaml') })
+      const config = await loader.load()
+
+      expect(config.context).toHaveLength(3)
+      expect((config.context?.[0] as { instruction: string }).instruction).toBe('base')
+      expect((config.context?.[1] as { instruction: string }).instruction).toBe('local')
+      expect((config.context?.[2] as { instruction: string }).instruction).toBe('otro')
+    })
+
+    it('forced mode throws when extends target does not exist', async () => {
+      await writeConfig(minimalYaml())
+      await writeConfig(
+        `
+extends: nonexistent.yaml
+context:
+  - instruction: 'test'
+`.trim(),
+        'specd.local.yaml',
+      )
+
+      const loader = new FsConfigLoader({ configPath: path.join(tmpDir, 'specd.local.yaml') })
+      await expect(loader.load()).rejects.toThrow(ConfigValidationError)
+      await expect(loader.load()).rejects.toThrow(/not found/)
+    })
+
+    it('forced mode throws when extends: true and no previous candidate exists', async () => {
+      const overlayPath = await writeConfig(
+        `
+extends: true
+context:
+  - instruction: 'test'
+`.trim(),
+        'specd.local.yaml',
+      )
+
+      const loader = new FsConfigLoader({ configPath: overlayPath })
+      await expect(loader.load()).rejects.toThrow(ConfigValidationError)
+    })
+
+    it('forced mode detects circular extends chain', async () => {
+      await writeConfig(minimalYaml())
+      await writeConfig(
+        `
+extends: specd.local.b.yaml
+context:
+  - instruction: 'a'
+`.trim(),
+        'specd.local.a.yaml',
+      )
+      await writeConfig(
+        `
+extends: specd.local.a.yaml
+context:
+  - instruction: 'b'
+`.trim(),
+        'specd.local.b.yaml',
+      )
+
+      const loader = new FsConfigLoader({ configPath: path.join(tmpDir, 'specd.local.a.yaml') })
+      await expect(loader.load()).rejects.toThrow(/circular extends chain/)
+    })
+  })
+
+  describe('Requirement: Invalidation policy configuration', () => {
+    it('accepts valid invalidationPolicy values', async () => {
+      for (const policy of ['none', 'surgical', 'downstream', 'global']) {
+        const configPath = await writeConfig(minimalYaml(`invalidationPolicy: ${policy}`))
+        const loader = new FsConfigLoader({ configPath })
+        const config = await loader.load()
+        expect(config.invalidationPolicy).toBe(policy)
+      }
+    })
+
+    it('rejects unknown invalidationPolicy value', async () => {
+      const configPath = await writeConfig(minimalYaml('invalidationPolicy: aggressive'))
+      const loader = new FsConfigLoader({ configPath })
+      await expect(loader.load()).rejects.toThrow(ConfigValidationError)
+    })
+  })
+
+  describe('Requirement: Workspaces — default required, non-default codeRoot required', () => {
+    it('throws ConfigValidationError when default workspace is missing', async () => {
+      const configPath = await writeConfig(
+        `
+schema: "@specd/schema-std"
+
+workspaces:
+  billing:
+    specs:
+      adapter: fs
+      fs:
+        path: specs
+    codeRoot: ../billing
+
+storage:
+  changes:
+    adapter: fs
+    fs:
+      path: .specd/changes
+  drafts:
+    adapter: fs
+    fs:
+      path: .specd/drafts
+  discarded:
+    adapter: fs
+    fs:
+      path: .specd/discarded
+  archive:
+    adapter: fs
+    fs:
+      path: .specd/archive
+`.trim(),
+      )
+
+      const loader = new FsConfigLoader({ configPath })
+      await expect(loader.load()).rejects.toThrow(/workspaces\.default.*required/)
+    })
+
+    it('throws ConfigValidationError when non-default workspace omits codeRoot', async () => {
+      const configPath = await writeConfig(
+        `
+schema: "@specd/schema-std"
+
+workspaces:
+  default:
+    specs:
+      adapter: fs
+      fs:
+        path: specs
+  billing:
+    specs:
+      adapter: fs
+      fs:
+        path: ../billing/specs
+
+storage:
+  changes:
+    adapter: fs
+    fs:
+      path: .specd/changes
+  drafts:
+    adapter: fs
+    fs:
+      path: .specd/drafts
+  discarded:
+    adapter: fs
+    fs:
+      path: .specd/discarded
+  archive:
+    adapter: fs
+    fs:
+      path: .specd/archive
+`.trim(),
+      )
+
+      const loader = new FsConfigLoader({ configPath })
+      await expect(loader.load()).rejects.toThrow(/workspaces\.billing\.codeRoot.*required/)
+    })
+  })
+
+  describe('Requirement: Workspace field defaults', () => {
+    it('defaults default workspace ownership to owned', async () => {
+      const configPath = await writeConfig(minimalYaml())
+      const loader = new FsConfigLoader({ configPath })
+      const config = await loader.load()
+
+      const ws = config.workspaces.find((w) => w.name === 'default')
+      expect(ws?.ownership).toBe('owned')
+    })
+
+    it('defaults non-default workspace ownership to readOnly', async () => {
+      const configPath = await writeConfig(
+        `
+schema: "@specd/schema-std"
+
+workspaces:
+  default:
+    specs:
+      adapter: fs
+      fs:
+        path: specs
+  billing:
+    specs:
+      adapter: fs
+      fs:
+        path: ../billing/specs
+    codeRoot: ../billing
+
+storage:
+  changes:
+    adapter: fs
+    fs:
+      path: .specd/changes
+  drafts:
+    adapter: fs
+    fs:
+      path: .specd/drafts
+  discarded:
+    adapter: fs
+    fs:
+      path: .specd/discarded
+  archive:
+    adapter: fs
+    fs:
+      path: .specd/archive
+`.trim(),
+      )
+      const loader = new FsConfigLoader({ configPath })
+      const config = await loader.load()
+
+      const ws = config.workspaces.find((w) => w.name === 'billing')
+      expect(ws?.ownership).toBe('readOnly')
+    })
+
+    it('defaults default workspace codeRoot to config directory', async () => {
+      const configPath = await writeConfig(minimalYaml())
+      const loader = new FsConfigLoader({ configPath })
+      const config = await loader.load()
+
+      const ws = config.workspaces.find((w) => w.name === 'default')
+      expect(ws?.codeRoot).toBe(tmpDir)
+    })
+
+    it('sets non-default workspace schemasPath to null when schemas omitted', async () => {
+      const configPath = await writeConfig(
+        `
+schema: "@specd/schema-std"
+
+workspaces:
+  default:
+    specs:
+      adapter: fs
+      fs:
+        path: specs
+  billing:
+    specs:
+      adapter: fs
+      fs:
+        path: ../billing/specs
+    codeRoot: ../billing
+
+storage:
+  changes:
+    adapter: fs
+    fs:
+      path: .specd/changes
+  drafts:
+    adapter: fs
+    fs:
+      path: .specd/drafts
+  discarded:
+    adapter: fs
+    fs:
+      path: .specd/discarded
+  archive:
+    adapter: fs
+    fs:
+      path: .specd/archive
+`.trim(),
+      )
+      const loader = new FsConfigLoader({ configPath })
+      const config = await loader.load()
+
+      const ws = config.workspaces.find((w) => w.name === 'billing')
+      expect(ws?.schemasPath).toBeNull()
+    })
+  })
+
+  describe('Requirement: isExternal inference for workspaces', () => {
+    it('sets isExternal false when specsPath is inside git root', async () => {
+      execSync('git init', { cwd: tmpDir })
+      const configPath = await writeConfig(minimalYaml())
+      const loader = new FsConfigLoader({ configPath })
+      const config = await loader.load()
+
+      const ws = config.workspaces.find((w) => w.name === 'default')
+      expect(ws?.isExternal).toBe(false)
+    })
+
+    it('sets isExternal true when specsPath is outside git root', async () => {
+      execSync('git init', { cwd: tmpDir })
+
+      const outsideDir = path.join(tmpDir, '..', `specd-external-${Date.now()}`)
+      await fs.mkdir(outsideDir, { recursive: true })
+      try {
+        const configPath = await writeConfig(
+          `
+schema: "@specd/schema-std"
+
+workspaces:
+  default:
+    specs:
+      adapter: fs
+      fs:
+        path: specs
+  ext:
+    specs:
+      adapter: fs
+      fs:
+        path: ${outsideDir}/specs
+    codeRoot: ${outsideDir}
+
+storage:
+  changes:
+    adapter: fs
+    fs:
+      path: .specd/changes
+  drafts:
+    adapter: fs
+    fs:
+      path: .specd/drafts
+  discarded:
+    adapter: fs
+    fs:
+      path: .specd/discarded
+  archive:
+    adapter: fs
+    fs:
+      path: .specd/archive
+`.trim(),
+        )
+
+        const loader = new FsConfigLoader({ configPath })
+        const config = await loader.load()
+
+        const extWs = config.workspaces.find((w) => w.name === 'ext')
+        expect(extWs?.isExternal).toBe(true)
+      } finally {
+        await fs.rm(outsideDir, { recursive: true, force: true })
+      }
+    })
+  })
+
+  describe('Requirement: Archive pattern preservation', () => {
+    it('preserves archivePattern from storage.archive.fs.pattern', async () => {
+      const configPath = await writeConfig(
+        minimalYaml().replace(
+          'path: .specd/archive',
+          "path: .specd/archive\n      pattern: '{{year}}/{{change.archivedName}}'",
+        ),
+      )
+
+      const loader = new FsConfigLoader({ configPath })
+      const config = await loader.load()
+
+      expect(config.storage.archivePattern).toBe('{{year}}/{{change.archivedName}}')
+    })
+  })
+
+  describe('Requirement: Cascade removal — workspace and storage non-existent keys', () => {
+    it('rejects remove.workspaces targeting a non-existent workspace', async () => {
+      await writeConfig(minimalYaml())
+      await writeConfig(
+        `
+extends: true
+remove:
+  workspaces:
+    - nonexistent
+`,
+        'specd.local.yaml',
+      )
+
+      const loader = new FsConfigLoader({ startDir: tmpDir })
+      await expect(loader.load()).rejects.toThrow(/remove\.workspaces.*not found/)
+    })
+
+    it('rejects remove.storage targeting a non-existent storage key', async () => {
+      await writeConfig(minimalYaml())
+      await writeConfig(
+        `
+extends: true
+remove:
+  storage:
+    - backups
+`,
+        'specd.local.yaml',
+      )
+
+      const loader = new FsConfigLoader({ startDir: tmpDir })
+      await expect(loader.load()).rejects.toThrow(/remove\.storage.*not found/)
+    })
+  })
+
+  describe('Requirement: Invalid extends type', () => {
+    it('rejects extends with an object value', async () => {
+      await writeConfig(
+        `
+extends:
+  from: specd.yaml
+schema: "@specd/schema-std"
+
+workspaces:
+  default:
+    specs:
+      adapter: fs
+      fs:
+        path: specs
+
+storage:
+  changes:
+    adapter: fs
+    fs:
+      path: .specd/changes
+  drafts:
+    adapter: fs
+    fs:
+      path: .specd/drafts
+  discarded:
+    adapter: fs
+    fs:
+      path: .specd/discarded
+  archive:
+    adapter: fs
+    fs:
+      path: .specd/archive
+`.trim(),
+        'specd.local.yaml',
+      )
+
+      const loader = new FsConfigLoader({ startDir: tmpDir })
+      await expect(loader.load()).rejects.toThrow(ConfigValidationError)
+    })
+
+    it('rejects extends with a numeric value', async () => {
+      await writeConfig(
+        `
+extends: 42
+schema: "@specd/schema-std"
+
+workspaces:
+  default:
+    specs:
+      adapter: fs
+      fs:
+        path: specs
+
+storage:
+  changes:
+    adapter: fs
+    fs:
+      path: .specd/changes
+  drafts:
+    adapter: fs
+    fs:
+      path: .specd/drafts
+  discarded:
+    adapter: fs
+    fs:
+      path: .specd/discarded
+  archive:
+    adapter: fs
+    fs:
+      path: .specd/archive
+`.trim(),
+        'specd.local.yaml',
+      )
+
+      const loader = new FsConfigLoader({ startDir: tmpDir })
+      await expect(loader.load()).rejects.toThrow(ConfigValidationError)
+    })
+  })
+
+  describe('Requirement: resolvePath returns root of active chain', () => {
+    it('returns specd.yaml as root when no overlays are active', async () => {
+      await writeConfig(minimalYaml())
+      const loader = new FsConfigLoader({ startDir: tmpDir })
+      const result = await loader.resolvePath()
+
+      expect(result).toBe(path.join(tmpDir, 'specd.yaml'))
+    })
+
+    it('returns specd.yaml as root when local overlay extends it', async () => {
+      await writeConfig(minimalYaml())
+      await writeConfig('extends: true', 'specd.local.yaml')
+
+      const loader = new FsConfigLoader({ startDir: tmpDir })
+      const result = await loader.resolvePath()
+
+      // Root is specd.yaml, not the overlay
+      expect(result).toBe(path.join(tmpDir, 'specd.yaml'))
+    })
+
+    it('returns standalone local file as root when it has no extends', async () => {
+      await writeConfig(minimalYaml(), 'specd.local.yaml')
+
+      const loader = new FsConfigLoader({ startDir: tmpDir })
+      const result = await loader.resolvePath()
+
+      expect(result).toBe(path.join(tmpDir, 'specd.local.yaml'))
     })
   })
 })

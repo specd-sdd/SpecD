@@ -6,47 +6,56 @@ consulted: '-'
 informed: '-'
 ---
 
-# ADR-0012: Configuration File Strategy — specd.yaml + specd.local.yaml
+# ADR-0012: Configuration File Strategy — Layered Config Cascade
 
 ## Context and Problem Statement
 
-SpecD needs project configuration (schema reference, storage paths, workspace overrides, workflow hooks). There are three plausible locations for this configuration, and the tension is between what must be shared (storage paths, schema, workflow) and what must not be (local path overrides, personal environment differences).
+SpecD needs project configuration (schema reference, storage paths, workspace overrides, workflow hooks). There is tension between what must be shared (storage paths, schema, workflow) and what must not be (local path overrides, personal environment differences), and between simplicity (one file) and flexibility (per-environment variants without forking the base config).
 
 ## Decision Drivers
 
 - Project configuration must be version-controlled so contributors can reproduce the exact setup by cloning.
-- Local overrides must be per-project, not per-machine-global — a developer can have different local configs for different projects.
-- No merge logic should be required in the implementation.
+- Local overrides must be per-project, not per-machine-global.
+- Named shared variants (CI, staging) should be composable without duplicating the entire base config.
+- Removals should allow stripping entries from inherited layers.
 
 ## Considered Options
 
-- **Single committed file only** — `specd.yaml` shared across all contributors, version-controlled alongside the project.
-- **Global user file** — `~/.specd/config.yaml`, machine-level, never committed, applies to every SpecD project on that machine.
-- **Committed file + gitignored local override** — `specd.yaml` committed as the shared source of truth, `specd.local.yaml` gitignored for per-developer overrides.
+- **Single committed file only** — `specd.yaml` shared across all contributors.
+- **Committed file + exclusive local override** — `specd.local.yaml` replaces `specd.yaml` entirely when present, no merge.
+- **Layered cascade** — ordered candidate files with `extends` and `remove` declarations, deep-merged into one validated config.
 
 ## Decision Outcome
 
-Chosen option: "Committed file + gitignored local override", because it satisfies both sharing and local override needs at the correct granularity without requiring merge logic.
+Chosen option: "Layered cascade", because it supports both shared and per-developer variants with explicit inheritance, avoids config duplication, and still keeps the base `specd.yaml` as the committed source of truth.
 
-Use two project-level files:
+File naming and discovery order within the config directory:
 
-- **`specd.yaml`** — committed, the project's source of truth. All contributors share it. Schema, storage, workspaces, hooks, plugins, and artifact rules live here.
-- **`specd.local.yaml`** — gitignored, project-scoped local override. When present, it replaces `specd.yaml` entirely (no merging). A developer who needs local path overrides, a different codeRoot, or a local schema copies `specd.yaml` and modifies it. `specd project init` adds `specd.local.yaml` to `.gitignore` automatically.
+1. `specd.yaml` — committed project root (always first active layer)
+2. `specd.*.yaml` — named shared variants, sorted lexicographically
+3. `specd.local.yaml` — personal local override
+4. `specd.local.*.yaml` — named local variants, sorted lexicographically
 
-A global user config (`~/.specd/`) is intentionally not part of v1. A global file would solve the "never committed" problem but at the wrong granularity: it would apply the same overrides to every project on the machine, making per-project local adjustments impossible without project-specific logic in a global file. A developer working on two coordinator repos with different external workspace paths would need to encode both in the same global file and somehow select the right one — defeating the purpose. If user-level preferences emerge (e.g. default model, preferred plugin, UI settings) they belong in a future `~/.specd/preferences.yaml` that is clearly distinct from project config. Mixing project concerns and user preferences in the same file creates ambiguity about what is shared and what is personal.
+Each file may declare `extends: true` (inherit from previous active layer), `extends: <path>` (inherit from a named base that is already active), or omit `extends` to become a standalone root that discards all prior layers. The active chain is built by walking candidates in discovery order and attaching or skipping based on extends resolution. Layers in the active chain are deep-merged (scalars replaced, objects merged recursively, arrays appended). A `remove` block on a layer strips entries from the accumulated merge before the next layer is applied.
+
+Forced mode (`--config path/to/file.yaml`) loads a closed chain starting from the specified file, following explicit extends links only within its directory.
+
+`specd project init` adds both `specd.local.yaml` and `specd.local.*.yaml` to `.gitignore` automatically.
+
+A global user config (`~/.specd/`) is intentionally not part of v1 for the reasons described in the original ADR. User-level preferences belong in a future `~/.specd/preferences.yaml`.
 
 ### Consequences
 
-- Good, because project configuration is always in version control — contributors can reproduce the exact setup by cloning.
-- Good, because local overrides are per-project, not per-machine-global — a developer can have different local configs for different projects.
-- Good, because no merge logic is needed — `specd.local.yaml` is authoritative when present; the implementation reads one file.
-- Good, because `specd --config path/to/specd.yaml` bypasses local override entirely — useful for CI and for testing the shared config without local interference.
-- Bad, because the `.gitignore` entry for `specd.local.yaml` must be maintained by `specd project init` and `specd update`; if it is missing, the local file could accidentally be committed.
-- Bad, because user-level preferences are deferred to a future ADR.
+- Good, because project configuration is always in version control.
+- Good, because named shared variants (CI, staging) compose on top of the base without duplication.
+- Good, because local overrides are per-project with explicit inheritance.
+- Good, because `--config` bypasses discovery entirely for CI and testing.
+- Bad, because the cascade model adds implementation complexity compared to a single-file approach.
+- Bad, because the `.gitignore` entries for `specd.local.yaml` and `specd.local.*.yaml` must be maintained.
 
 ### Confirmation
 
-`specd` validates `specd.yaml` (or `specd.local.yaml` when present) before executing any command. `specd project init` adds `specd.local.yaml` to `.gitignore` automatically.
+`specd` discovers, resolves, merges, and validates the cascade before executing any command. `specd project init` adds both gitignore entries automatically.
 
 ## More Information
 

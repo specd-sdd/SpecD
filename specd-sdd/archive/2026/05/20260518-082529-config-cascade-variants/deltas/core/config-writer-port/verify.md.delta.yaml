@@ -1,0 +1,16 @@
+- op: modified
+  description: 'Expand initProject verification for local variant gitignore pattern'
+  selector:
+    type: section
+    matches: '^Requirement: InitProject behaviour$'
+  content: |
+    #### Scenario: Fresh project is initialised
+
+    - **GIVEN** a directory with no existing `specd.yaml`
+    - **WHEN** `initProject` is called with valid options
+    - **THEN** a `specd.yaml` is created, storage directories are created, and both `specd.local.yaml` and `specd.local.*.yaml` are appended to `.gitignore`
+
+    #### Scenario: Result contains expected metadata
+
+    - **WHEN** `initProject` completes successfully
+    - **THEN** the returned `InitProjectResult` contains the absolute `configPath`, the `schemaRef` as written, and the created `workspaces` list

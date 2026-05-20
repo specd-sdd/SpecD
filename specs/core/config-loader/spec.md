@@ -31,15 +31,51 @@ The purpose of `resolvePath()` is to allow delivery mechanisms to probe for conf
 
 ### Requirement: Discovery mode
 
-When constructed with `{ startDir }`, the loader MUST walk up from `startDir` to locate a config file, bounded by the nearest git repository root. At each directory level the loader MUST check for `specd.local.yaml` first; if it exists, that file is used immediately and `specd.yaml` at the same level is not consulted. If neither file exists at a level, the search continues to the parent directory.
+When constructed with `{ startDir }`, the loader MUST walk up from `startDir` to locate the nearest directory containing discoverable config candidates, bounded by the nearest git repository root.
 
-The walk MUST stop at the git repository root — it SHALL NOT traverse above it. If no config file is found before or at the git root, `load()` MUST throw `ConfigValidationError`.
+Discoverable candidates within one directory are evaluated in this order:
 
-When `startDir` is not inside a git repository, the loader MUST check only the starting directory itself (both `specd.local.yaml` and `specd.yaml`, in that order) and SHALL NOT walk further up. If neither file exists, `load()` MUST throw `ConfigValidationError`.
+1. `specd.yaml`
+2. `specd.*.yaml` in ascending alphabetical order
+3. `specd.local.yaml`
+4. `specd.local.*.yaml` in ascending alphabetical order
+
+The loader MUST build an active chain from those candidates rather than selecting a single winning file.
+
+Candidate activation rules are:
+
+- a file with no `extends` becomes a standalone root from that point
+- a file with `extends: true` attaches to the previous active layer
+- a file with `extends: <path>` attaches only when the referenced base file is already active in the current chain; otherwise that candidate is skipped in normal discovery
+
+The walk MUST stop at the git repository root and SHALL NOT traverse above it. If no config candidates are found before or at the git root, `load()` MUST throw `ConfigValidationError`.
+
+When `startDir` is not inside a git repository, the loader MUST check only the starting directory and SHALL NOT walk further up. If no discoverable candidates exist there, `load()` MUST throw `ConfigValidationError`.
 
 ### Requirement: Forced mode
 
-When constructed with `{ configPath }`, the loader MUST resolve the path to an absolute path and use it directly. No `specd.local.yaml` lookup SHALL take place. If the file does not exist, `load()` MUST throw `ConfigValidationError`.
+When constructed with `{ configPath }`, the loader MUST resolve the path to an absolute path and treat that file as the single explicit entrypoint.
+
+If the selected file declares `extends`, the loader MUST resolve the file's full `extends` chain. No additional filename-discovered layers SHALL be added on top of that explicit chain.
+
+`extends: true` in forced mode MUST resolve to the previous candidate file in the directory's sorted candidate list, skipping any already-visited files. This allows forced mode to reconstruct the same layered chain that discovery mode would build, starting from the last link and walking backwards.
+
+If the entry file or any file in its `extends` chain does not exist, `load()` MUST throw `ConfigValidationError`. This applies to both explicit `extends: <path>` references and `extends: true`.
+
+### Requirement: Layer merge semantics
+
+After resolving the active config chain, the loader MUST merge layers in chain order from lowest to highest precedence.
+
+Merge rules are:
+
+- scalars: later active layer wins
+- objects: deep merge by key
+- arrays: append by default
+- `remove.root`: delete optional top-level fields from the accumulated config
+- `remove.<mapName>`: delete named keys from keyed object maps such as `workspaces` and `storage`
+- `remove.<arrayName>`: delete inherited array entries using that array's defined identity keys
+
+A standalone layer without `extends` resets the accumulated base from that point and discards any earlier inherited state outside the current chain.
 
 ### Requirement: Native environment file support
 
@@ -62,7 +98,7 @@ The loader MUST verify that `workspaces.default` exists in the parsed config. If
 
 All relative paths in the parsed config — `specs.fs.path`, `specs.fs.metadataPath`, `schemas.fs.path`, `codeRoot`, and all `storage.*.fs.path` values — MUST be resolved relative to the directory containing the active config file. The resolved `SpecdConfig.projectRoot` MUST be set to the config file's parent directory.
 
-When `specs.fs.metadataPath` is absent for a workspace, the loader MUST auto-derive it by resolving the VCS root of the workspace's `specs.fs.path` via `createVcsAdapter(specsPath).rootDir()` and joining `.specd/metadata/`. When the VCS adapter returns `NullVcsAdapter` (specs path is not inside any VCS), the loader MUST fall back to `.specd/metadata/` relative to the specs path parent directory.
+When `specs.fs.metadataPath` is explicitly declared, the loader MUST resolve it relative to the config directory. When `specs.fs.metadataPath` is absent, auto-derivation of `metadataPath` from the VCS root is a kernel composition responsibility (see `kernel-internals.ts`) and is not performed by `config-loader.load()`.
 
 ### Requirement: Storage path containment
 
@@ -103,7 +139,9 @@ Workspace qualifiers MUST match `/^[a-z][a-z0-9-]*$/`. Path segments MUST match 
 
 The loader MUST map `schemaPlugins` as an array of strings and `schemaOverrides` as a typed operations object preserving the five operation keys (`create`, `remove`, `set`, `append`, `prepend`).
 
-The loader MUST map raw `context` entries preserving their `{ file }` or `{ instruction }` shape.
+The loader MUST map raw `context` entries preserving their `{ file }`, `{ instruction }`, optional `id`, and layered removal semantics.
+
+The loader MUST preserve `plugins.agents` entries with `name` plus optional `config`, and MUST treat `name` as the array identity key for inherited removal.
 
 ### Requirement: Approvals default to false
 
@@ -111,16 +149,18 @@ When the `approvals` section is absent or individual approval gates (`spec`, `si
 
 ### Requirement: All errors are ConfigValidationError
 
-Every validation failure during `load()` — missing config file, invalid YAML, structural mismatch, missing required fields, path containment violations, invalid patterns — MUST be surfaced as a `ConfigValidationError`. No other error type SHALL be thrown for validation failures.
+Every validation failure during `load()` — missing config file, invalid YAML, structural mismatch, invalid cascade chain, invalid removal target, missing required fields, path containment violations, invalid patterns — MUST be surfaced as a `ConfigValidationError`.
+
+No generic YAML/runtime exception SHALL escape for configuration validation failures. Cascade-specific failures remain part of the normal `SpecdError` path.
 
 ## Constraints
 
 - `createConfigLoader` is the only public entry point for config loading — `FsConfigLoader` MUST NOT be exported from `@specd/core`
 - The factory returns a `ConfigLoader` port interface, not the concrete `FsConfigLoader` class
-- Discovery mode never reads `specd.yaml` when `specd.local.yaml` is present at the same directory level — the local file is used exclusively with no merging
-- Forced mode never performs `specd.local.yaml` lookup
-- Zod validation precedes all path resolution and domain construction
-- `projectRoot` is always the directory containing the active config file, not `startDir`
+- Discovery mode resolves a layered active chain rather than selecting `specd.local.yaml` as an exclusive winner
+- Forced mode resolves only the selected entrypoint plus its `extends` chain
+- Zod validation precedes all path resolution and domain construction for each parsed layer
+- `projectRoot` is always the directory containing the active root config file for the resolved chain, not `startDir`
 
 ## Spec Dependencies
 

@@ -17,7 +17,7 @@
     {
       "requirement": "Config file location and format",
       "rules": [
-        "`specd.yaml` must be a valid YAML file. specd discovers it using the following strategy, in order:\n\n1. **`--config` flag** — if the CLI is invoked with `--config path/to/specd.yaml`, that path is used directly; no discovery takes place.\n2. **Walk up from CWD, bounded by the git repo root** — specd walks up from the current working directory, checking each directory for `specd.yaml`. The walk stops at the **first match** (nearest to CWD) or at the git repo root (the nearest ancestor directory containing `.git/`), whichever comes first. If no `specd.yaml` is found before or at the repo root, specd exits with an error.\n3. **CWD only, when not inside a git repo** — if no `.git/` ancestor exists (e.g. the user is running specd from outside any repository, as in a coordinator script), specd checks only the current working directory and stops there. It does not walk further up.\n\nThe search never goes above the git repo root. This prevents accidentally picking up a `specd.yaml` from a parent repository in nested or sibling monorepo layouts. In a monorepo where each package has its own `specd.yaml`, the package-level file is used when running specd from within that package — the root-level file is not considered.\n\nSome command families may explicitly define a bootstrap mode that intentionally operates without loading project config. When they do, this requirement still governs normal configured operation and the meaning of `--config` remains unchanged: it is always an explicit config file path override, never a repository root selector.\n\nBootstrap mode, when defined by a command spec, is for setup and early repository exploration rather than the intended steady-state mode for configured projects. Such command specs MUST document when bootstrap mode is entered, how repository root is resolved, and how it differs from configured operation."
+        "`specd.yaml` must be a valid YAML file. specd discovers and resolves configuration using the following strategy, in order:\n\n1. **`--config` flag** — if the CLI is invoked with `--config path/to/file.yaml`, that file becomes the single explicit entrypoint. specd MUST resolve that file and only its own `extends` chain. Normal filename discovery MUST NOT add any additional layers on top of the explicit chain.\n2. **Walk up from CWD, bounded by the git repo root** — specd walks up from the current working directory, checking each directory for discoverable config candidates. The walk stops at the **first directory containing any matching config files** (nearest to CWD) or at the git repo root (the nearest ancestor directory containing `.git/`), whichever comes first. If no discoverable config files are found before or at the repo root, specd exits with an error.\n3. **CWD only, when not inside a git repo** — if no `.git/` ancestor exists, specd checks only the current working directory and stops there. It does not walk further up.\n\nWithin the selected directory, normal discovery MUST evaluate candidate files in this order:\n\n1. `specd.yaml`\n2. `specd.*.yaml` in ascending alphabetical order\n3. `specd.local.yaml`\n4. `specd.local.*.yaml` in ascending alphabetical order\n\nA discovered file without `extends` becomes a standalone root from that point. A discovered file with `extends: true` MUST inherit from the previous active layer in the resolved chain. A discovered file with `extends: <path>` MUST only activate when that explicit base file is already part of the active chain being resolved; otherwise the discovered file is ignored during normal discovery.\n\nThe search never goes above the git repo root. This prevents accidentally picking up a config from a parent repository in nested or sibling monorepo layouts.\n\nSome command families may explicitly define a bootstrap mode that intentionally operates without loading project config. When they do, this requirement still governs normal configured operation and the meaning of `--config` remains unchanged: it is always an explicit config file entrypoint, never a repository root selector."
       ]
     },
     {
@@ -41,7 +41,13 @@
     {
       "requirement": "Local config override",
       "rules": [
-        "Alongside `specd.yaml`, developers may place a `specd.local.yaml` file in the same directory to use a fully independent local configuration. When `specd.local.yaml` is present, specd uses it exclusively — `specd.yaml` is not read and no merging takes place. The local file is a complete, self-contained config that must be valid on its own.\n\nThe file is optional — its absence is normal. `specd init` must add `specd.local.yaml` to the project's `.gitignore` so it is never committed.\n\nThe typical workflow for local customisation is: copy `specd.yaml` to `specd.local.yaml`, then edit the copy. This keeps the mental model simple — there is always exactly one active config file.\n\nWhen the CLI is invoked with `--config path/to/specd.yaml`, that file is used exactly as specified — no `specd.local.yaml` lookup takes place. This allows testing with the shared config without the local override interfering."
+        "Alongside `specd.yaml`, developers may place discoverable variant files to customize configuration without duplicating the entire shared config.\n\nDuring normal discovery, later active layers merge on top of earlier active layers. Scalars use last-layer-wins semantics. Objects merge deeply by key. Arrays append by default unless an inherited entry is explicitly removed through the `remove` block.\n\n`specd.local.yaml` remains backward-compatible:\n\n- when it does not declare `extends`, it is a fully independent local config root and `specd.yaml` is not inherited\n- when it declares `extends: true`, it inherits from the previous active layer and participates in the cascade\n\nThe `extends` field has exactly two valid forms:\n\n- `extends: true` — inherit from the previous active layer in the resolved chain\n- `extends: <path>` — inherit from one explicit config file, which MUST already belong to the same applicable chain\n\nThe `remove` field is only valid in configs that declare `extends`. A standalone config root MUST NOT declare `remove`.\n\n`remove` uses structural targeting rather than document-wide selectors:\n\n- `remove.root` removes optional top-level fields by field name\n- `remove.<mapName>` removes named keys from keyed object maps such as `workspaces` and `storage`\n- `remove.<arrayName>` removes inherited array entries by that array's defined identity keys\n\nRequired top-level fields such as `schema` MUST NOT be removable.\n\nDiscoverable local variants remain ordered by filename. For example, `specd.local.10-team.yaml`, `specd.local.20-machine.yaml`, and `specd.local.99-final.yaml` apply in exactly that order, with the last file having the highest precedence among active local layers.\n\n`specd init` must add both `specd.local.yaml` and `specd.local.*.yaml` to the project's `.gitignore` so local variants are never committed by default."
+      ]
+    },
+    {
+      "requirement": "Cascade identity and removal model",
+      "rules": [
+        "Config inheritance MUST use local structural identity rules for removable collections.\n\nThe following identity rules apply in the first version:\n\n- `context[]` supports an optional `id` field. When present, `id` is the preferred identity key for inherited removal.\n- `plugins.agents[]` uses `name` as its identity key.\n- keyed object maps such as `workspaces` and `storage` use their object keys as removal targets.\n\nThe system MUST NOT use arbitrary field-combination matching or AST-wide selector matching for config inheritance removal. Each removable array or map MUST define its own deterministic identity model.\n\nA discovered layer with `extends: <path>` MUST only attach when that explicit base file is already active in the same chain. This allows files such as `specd.local.experimental.yaml` to remain discoverable by filename while staying inactive unless `specd.experimental.yaml` is already active or is selected explicitly with `--config`."
       ]
     },
     {
@@ -119,7 +125,7 @@
     {
       "requirement": "Project context instructions",
       "rules": [
-        "`specd.yaml` may include a top-level `context` field to inject additional freeform content into the compiled context alongside specs. Each entry is either an inline instruction string or a reference to an external file.\n\n```yaml\ncontext:\n  - file: specd-bootstrap.md # file path relative to specd.yaml\n  - file: AGENTS.md\n  - instruction: 'Always prefer editing existing files over creating new ones.'\n```\n\nEach item is an object with exactly one of the following keys:\n\n- **`instruction`** — a string injected verbatim as an additional context block.\n- **`file`** — the file at the given path is read at compile time and its content is injected verbatim. Paths are relative to the directory containing `specd.yaml`. Absolute paths are also accepted.\n\nThe `context` field is optional. If absent, no additional content is injected. Entries are prepended to the compiled context in declaration order, before any spec content.\n\nIf a referenced file does not exist at compile time, specd emits a warning identifying the missing file, skips that entry, and continues compilation normally.\n\nThere is no depth limit on file content — the full file is injected. Files are not parsed or transformed; markdown, plain text, and any other format are all treated as opaque strings."
+        "`specd.yaml` MAY declare a `context` array to inject project-specific instructions before spec content.\n\nEach entry MUST be one of:\n\n- `{ instruction: string }`\n- `{ file: string }`\n- `{ id: string, instruction: string }`\n- `{ id: string, file: string }`\n\n`id` is optional but, when present, it provides a stable identity for inherited removal in layered config resolution.\n\nFile paths remain resolved relative to the directory containing the active config file unless they are already absolute."
       ]
     },
     {
@@ -155,7 +161,7 @@
     {
       "requirement": "Startup validation",
       "rules": [
-        "Before constructing any use case, the config loader MUST validate the loaded config against the Zod schema. The following startup validation rules apply:\n\n- `schema` field is required — if missing, `ConfigValidationError` is thrown\n- `workspaces.default` is required — if missing, `ConfigValidationError` is thrown\n- Adapter values in storage and workspace configs MUST be recognised strings\n- `contextMode` MUST be one of `list`, `summary`, `full`, or `hybrid` — `lazy` is rejected\n- `contextMode` inside a workspace entry is rejected with the specific message: \"`contextMode` is not valid inside a workspace — it is a project-level setting\"\n- Pattern syntax in `contextIncludeSpecs` and `contextExcludeSpecs` MUST be valid (no mid-segment wildcards)\n- `plugins` section, if present, MUST conform to the validated structure\n- `artifactRules` is NOT accepted — if present, `ConfigValidationError` is thrown suggesting migration to `schemaOverrides`\n- `logging.level`, if present, MUST be one of the recognized level strings"
+        "Config startup validation MUST reject invalid cascade instructions before any command proceeds.\n\nValidation MUST fail with `ConfigValidationError` when:\n\n- `remove` appears in a config that does not declare `extends`\n- `extends` uses any value other than `true` or a string path\n- `extends: <path>` points outside the applicable config chain\n- `remove.root` attempts to delete a required field such as `schema`\n- `remove.workspaces` or `remove.storage` names a key that does not exist in the inherited base\n- array removal cannot resolve exactly one inherited target under that array's identity rules\n\nThese validation failures remain domain-level configuration errors and therefore MUST surface through the normal `SpecdError` / `ConfigValidationError` path."
       ]
     }
   ],
@@ -167,56 +173,70 @@
   "scenarios": [
     {
       "requirement": "Config file location and format",
-      "name": "Config found — nearest file used",
-      "when": ["a specd.yaml exists somewhere between the CWD and the git repo root"],
-      "then": ["specd uses the nearest one (closest to CWD) and stops walking"]
+      "name": "Config found — nearest directory with candidates used",
+      "given": [
+        "a repo where /repo/app/specd.local.dev.yaml exists and /repo/specd.yaml also exists"
+      ],
+      "when": ["specd runs from /repo/app/src"],
+      "then": [
+        "discovery resolves the candidate set from /repo/app",
+        "AND it does not continue walking to /repo"
+      ]
     },
     {
       "requirement": "Config file location and format",
-      "name": "Monorepo — package config takes precedence",
-      "when": [
-        "a monorepo has a specd.yaml at the root and another at packages/billing/specd.yaml, and the user runs specd from within packages/billing/"
+      "name": "Monorepo — package config directory takes precedence",
+      "given": [
+        "/repo/specd.yaml exists at the monorepo root",
+        "AND /repo/packages/api/specd.yaml exists inside one package"
       ],
+      "when": ["specd runs from /repo/packages/api/src"],
       "then": [
-        "specd uses packages/billing/specd.yaml and does not continue walking up to the root"
+        "discovery resolves the package directory candidate set",
+        "AND the root-level config directory is not consulted"
       ]
     },
     {
       "requirement": "Config file location and format",
       "name": "Config not found inside repo",
-      "when": [
-        "the user runs any specd command inside a git repository and no specd.yaml exists between the CWD and the repo root"
-      ],
-      "then": [
-        "specd exits with an error explaining that specd.yaml was not found and pointing to specd init"
-      ]
+      "given": ["no discoverable config candidates exist between CWD and the git root"],
+      "when": ["specd starts"],
+      "then": ["startup fails with a config validation error"]
     },
     {
       "requirement": "Config file location and format",
       "name": "Invoked outside a git repo",
-      "when": ["the user runs specd from a directory that is not inside any git repository"],
+      "given": [
+        "the current directory is not inside any git repository",
+        "AND the parent directory contains discoverable config candidates but the current directory does not"
+      ],
+      "when": ["specd starts"],
       "then": [
-        "specd checks only the current working directory for specd.yaml and exits with an error if not found there"
+        "discovery checks only the current directory",
+        "AND startup fails because no local candidates exist there"
       ]
     },
     {
       "requirement": "Config file location and format",
-      "name": "Explicit config flag bypasses local override",
-      "when": ["specd --config /path/to/specd.yaml <command> is invoked"],
+      "name": "Explicit config flag resolves only the selected chain",
+      "given": [
+        "/repo/specd.local.dev.yaml declares extends: true",
+        "AND /repo/specd.local.zz-last.yaml also exists"
+      ],
+      "when": ["the CLI is invoked with --config /repo/specd.local.dev.yaml"],
       "then": [
-        "specd uses the specified file exactly as-is — discovery and specd.local.yaml lookup are both skipped"
+        "specd resolves /repo/specd.local.dev.yaml and its extends chain only",
+        "AND /repo/specd.local.zz-last.yaml is not added by discovery"
       ]
     },
     {
       "requirement": "Config file location and format",
       "name": "Command-specific bootstrap mode does not redefine --config",
-      "given": [
-        "a command family defines a bootstrap mode that can operate without loading project config"
-      ],
-      "when": ["the user passes --config /path/to/specd.yaml"],
+      "given": ["a command defines bootstrap mode in its own spec"],
+      "when": ["the same command is invoked with --config path/to/file.yaml"],
       "then": [
-        "--config still means an explicit config file path override",
-        "AND bootstrap mode is not selected by reinterpreting --config as a repository root"
+        "--config still means an explicit config entrypoint",
+        "AND bootstrap mode does not reinterpret it as a repository root selector"
       ]
     },
     {
@@ -252,27 +272,92 @@
     },
     {
       "requirement": "Local config override",
-      "name": "Local file takes full precedence",
-      "when": ["specd.local.yaml exists alongside specd.yaml"],
-      "then": ["specd loads only specd.local.yaml; specd.yaml is ignored entirely"]
+      "name": "Local standalone file replaces shared config",
+      "given": ["specd.yaml exists", "AND specd.local.yaml exists without extends"],
+      "when": ["config is resolved in normal discovery"],
+      "then": ["specd.local.yaml becomes the active root", "AND specd.yaml is not inherited"]
     },
     {
       "requirement": "Local config override",
       "name": "Local file absent",
-      "when": ["no specd.local.yaml exists alongside specd.yaml"],
+      "when": ["no specd.local.yaml or local variant exists alongside specd.yaml"],
       "then": ["specd loads specd.yaml as normal; no error is emitted"]
     },
     {
       "requirement": "Local config override",
-      "name": "Local file not committed",
-      "when": ["specd init is run"],
-      "then": ["specd.local.yaml is added to .gitignore if not already present"]
+      "name": "Local file joins the cascade when extends is true",
+      "given": ["specd.yaml exists", "AND specd.local.yaml declares extends: true"],
+      "when": ["config is resolved in normal discovery"],
+      "then": [
+        "specd.local.yaml inherits from the previously active layer",
+        "AND only its overridden fields change"
+      ]
     },
     {
       "requirement": "Local config override",
-      "name": "Local file must be valid standalone",
-      "when": ["specd.local.yaml is present but missing required fields (e.g. schema)"],
+      "name": "Local file must be valid when standalone",
+      "when": [
+        "a standalone specd.local.yaml is present but missing required fields (e.g. schema)"
+      ],
       "then": ["specd exits with a validation error — partial configs are not supported"]
+    },
+    {
+      "requirement": "Local config override",
+      "name": "Local named variants apply in filename order",
+      "given": [
+        "specd.local.10-team.yaml, specd.local.20-machine.yaml, and specd.local.99-final.yaml are all active layers"
+      ],
+      "when": ["config is resolved in normal discovery"],
+      "then": [
+        "they apply in ascending alphabetical order",
+        "AND specd.local.99-final.yaml has the highest effective precedence"
+      ]
+    },
+    {
+      "requirement": "Local config override",
+      "name": "Local variant patterns are gitignored",
+      "when": ["a project is initialised"],
+      "then": ["both specd.local.yaml and specd.local.*.yaml are present in .gitignore"]
+    },
+    {
+      "requirement": "Cascade identity and removal model",
+      "name": "Context entry removed by id",
+      "given": [
+        "a base config defines context: [{ id: bootstrap, file: specd-bootstrap.md }]",
+        "AND a later inheriting layer declares remove: { context: [{ id: bootstrap }] }"
+      ],
+      "when": ["the cascade is resolved"],
+      "then": ["the inherited bootstrap context entry is removed"]
+    },
+    {
+      "requirement": "Cascade identity and removal model",
+      "name": "Plugin entry removed by name identity",
+      "given": [
+        "a base config defines plugins.agents: [{ name: '@specd/plugin-agent-codex' }]",
+        "AND a later inheriting layer removes that inherited agent entry"
+      ],
+      "when": ["the cascade is resolved"],
+      "then": ["the loader matches the inherited agent by name"]
+    },
+    {
+      "requirement": "Cascade identity and removal model",
+      "name": "Workspace removed by name",
+      "given": [
+        "a base config defines workspaces: { default: {...}, billing: {...} }",
+        "AND a later inheriting layer declares remove: { workspaces: [billing] }"
+      ],
+      "when": ["the cascade is resolved"],
+      "then": ["the billing workspace key is absent from the merged config"]
+    },
+    {
+      "requirement": "Cascade identity and removal model",
+      "name": "Explicit-base local variant is skipped until its base is active",
+      "given": [
+        "specd.local.experimental.yaml declares extends: ./specd.experimental.yaml",
+        "AND specd.experimental.yaml is not active in the current discovery chain"
+      ],
+      "when": ["normal discovery runs"],
+      "then": ["specd.local.experimental.yaml is skipped"]
     },
     {
       "requirement": "Schema reference",
@@ -972,6 +1057,47 @@
       "then": ["validation MUST fail with a ConfigValidationError"]
     },
     {
+      "requirement": "Startup validation",
+      "name": "remove without extends is rejected",
+      "given": ["a config file declares remove but no extends"],
+      "when": ["config is loaded"],
+      "then": ["startup fails with ConfigValidationError"]
+    },
+    {
+      "requirement": "Startup validation",
+      "name": "Invalid extends value is rejected",
+      "given": ["a config file declares extends: { from: ./specd.yaml }"],
+      "when": ["config is loaded"],
+      "then": ["startup fails with ConfigValidationError"]
+    },
+    {
+      "requirement": "Startup validation",
+      "name": "Required root field cannot be removed",
+      "given": ["an inheriting config declares remove: { root: [schema] }"],
+      "when": ["config is loaded"],
+      "then": ["startup fails with ConfigValidationError"]
+    },
+    {
+      "requirement": "Startup validation",
+      "name": "Unknown workspace removal target is rejected",
+      "given": [
+        "an inheriting config declares remove: { workspaces: [billing] }",
+        "AND no inherited billing workspace exists"
+      ],
+      "when": ["config is loaded"],
+      "then": ["startup fails with ConfigValidationError"]
+    },
+    {
+      "requirement": "Startup validation",
+      "name": "Explicit extends outside the active chain is skipped",
+      "given": [
+        "a discovered config declares extends: ./unrelated.yaml",
+        "AND unrelated.yaml is not active in the discovery chain"
+      ],
+      "when": ["config is loaded in discovery mode"],
+      "then": ["that candidate is skipped (no error)"]
+    },
+    {
       "requirement": "Project context instructions",
       "name": "Context entries injected before spec content",
       "given": [
@@ -986,6 +1112,16 @@
       "given": ["specd.yaml declares context: [{ file: specd-bootstrap.md }] and the file exists"],
       "when": ["CompileContext builds the compiled context"],
       "then": ["the full content of specd-bootstrap.md is injected verbatim, before spec content"]
+    },
+    {
+      "requirement": "Project context instructions",
+      "name": "Context entry id is accepted for inherited removal",
+      "given": ["specd.yaml declares context: [{ id: bootstrap, file: specd-bootstrap.md }]"],
+      "when": ["config is loaded"],
+      "then": [
+        "the entry is accepted as valid context",
+        "AND bootstrap is available as the inherited removal identity"
+      ]
     },
     {
       "requirement": "Project context instructions",
@@ -1104,8 +1240,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:baa7dd51b68c51158a4364cf3ad50e7ab860c8b42640d71a923776322747e4f7",
-    "verify.md": "sha256:9dfab22792788ae118f17c7fc67c863dc82ab89fc6e78569f27f1acde2dcde8a"
+    "spec.md": "sha256:7d47d84204a83392dc49619ffd8a1e46a12adb281776e8aa8aa6cabb2cd5949a",
+    "verify.md": "sha256:c72d51f18d471935f5804d8a211b124c22f5d5c7366b8776d977acd69957a33e"
   },
   "generatedBy": "core"
 }

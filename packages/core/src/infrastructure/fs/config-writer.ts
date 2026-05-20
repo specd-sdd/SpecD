@@ -22,7 +22,8 @@ import { writeFileAtomic } from './write-atomic.js'
 export class FsConfigWriter implements ConfigWriter {
   /**
    * Creates a new `specd.yaml` in `options.projectRoot`, creates the required
-   * storage directories, and appends `specd.local.yaml` to `.gitignore`.
+   * storage directories, and appends `specd.local.yaml` and `specd.local.*.yaml`
+   * to `.gitignore`.
    *
    * @param options - Initialisation options
    * @returns The path and metadata of the created config
@@ -72,7 +73,7 @@ export class FsConfigWriter implements ConfigWriter {
 
     // Append specd.local.yaml to .gitignore if not already present
     const gitignorePath = path.join(options.projectRoot, '.gitignore')
-    await appendToGitignore(gitignorePath, 'specd.local.yaml')
+    await appendGitignoreEntries(gitignorePath, ['specd.local.yaml', 'specd.local.*.yaml'])
 
     return {
       configPath,
@@ -246,12 +247,12 @@ async function fileExists(filePath: string): Promise<boolean> {
 }
 
 /**
- * Appends an entry to `.gitignore` if not already present.
+ * Appends entries to `.gitignore` if not already present.
  *
  * @param gitignorePath - Absolute path to the `.gitignore` file
- * @param entry - The line to append
+ * @param entries - The lines to append
  */
-async function appendToGitignore(gitignorePath: string, entry: string): Promise<void> {
+async function appendGitignoreEntries(gitignorePath: string, entries: string[]): Promise<void> {
   let existing = ''
   try {
     existing = await fs.readFile(gitignorePath, 'utf8')
@@ -260,11 +261,11 @@ async function appendToGitignore(gitignorePath: string, entry: string): Promise<
   }
 
   const lines = existing.split('\n')
-  if (!lines.some((line) => line.trim() === entry)) {
-    const newContent =
-      existing.endsWith('\n') || existing === ''
-        ? `${existing}${entry}\n`
-        : `${existing}\n${entry}\n`
-    await writeFileAtomic(gitignorePath, newContent)
-  }
+  const missing = entries.filter((entry) => !lines.some((line) => line.trim() === entry))
+  if (missing.length === 0) return
+
+  const suffix = missing.join('\n') + '\n'
+  const newContent =
+    existing.endsWith('\n') || existing === '' ? `${existing}${suffix}` : `${existing}\n${suffix}`
+  await writeFileAtomic(gitignorePath, newContent)
 }

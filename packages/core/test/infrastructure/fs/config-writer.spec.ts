@@ -62,11 +62,25 @@ describe('FsConfigWriter', () => {
       }
     })
 
-    it('appends specd.local.yaml to .gitignore', async () => {
+    it('appends both specd.local.yaml and specd.local.*.yaml to .gitignore', async () => {
       await writer.initProject(defaultOptions())
 
       const gitignore = await fs.readFile(path.join(tmpDir, '.gitignore'), 'utf8')
       expect(gitignore).toContain('specd.local.yaml')
+      expect(gitignore).toContain('specd.local.*.yaml')
+    })
+
+    it('does not duplicate gitignore entries across reruns', async () => {
+      await writer.initProject(defaultOptions())
+      await writer.initProject({ ...defaultOptions(), force: true })
+
+      const gitignore = await fs.readFile(path.join(tmpDir, '.gitignore'), 'utf8')
+      const localCount = gitignore.split('\n').filter((l) => l.trim() === 'specd.local.yaml').length
+      const globCount = gitignore
+        .split('\n')
+        .filter((l) => l.trim() === 'specd.local.*.yaml').length
+      expect(localCount).toBe(1)
+      expect(globCount).toBe(1)
     })
 
     it('does not create archive-local .gitignore during init', async () => {

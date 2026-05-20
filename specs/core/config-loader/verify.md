@@ -13,92 +13,94 @@
 
 ### Requirement: Path probe
 
-#### Scenario: Discovery mode returns found path
+#### Scenario: Discovery mode returns resolved chain root path
 
-- **GIVEN** `specd.yaml` exists at `/repo/specd.yaml`
-- **WHEN** `resolvePath()` is called with `{ startDir: '/repo/src' }`
-- **THEN** it returns `'/repo/specd.yaml'`
+- **GIVEN** discoverable config candidates exist in the active directory
+- **WHEN** `resolvePath()` is called in discovery mode
+- **THEN** it returns the absolute path of the active root config file for that resolved chain
 
 #### Scenario: Discovery mode returns null when no config found
 
-- **GIVEN** no `specd.yaml` or `specd.local.yaml` exists in or above `startDir` up to the git root
+- **GIVEN** no discoverable config candidates exist between `startDir` and the git root
 - **WHEN** `resolvePath()` is called
 - **THEN** it returns `null`
-- **AND** no error is thrown
 
-#### Scenario: Discovery mode prefers specd.local.yaml
+#### Scenario: Discovery mode can return a shared root even when later local layers will attach
 
-- **GIVEN** both `specd.local.yaml` and `specd.yaml` exist at `/repo/`
-- **WHEN** `resolvePath()` is called with `{ startDir: '/repo' }`
-- **THEN** it returns `'/repo/specd.local.yaml'`
+- **GIVEN** `specd.yaml` is the active root and later local layers also attach
+- **WHEN** `resolvePath()` is called
+- **THEN** it still returns the root config path rather than one of the later layers
 
 #### Scenario: Forced mode returns resolved absolute path without existence check
 
-- **GIVEN** `{ configPath: './custom/specd.yaml' }` is used and the file does NOT exist
-- **WHEN** `resolvePath()` is called
-- **THEN** it returns the resolved absolute path (e.g. `/cwd/custom/specd.yaml`)
-- **AND** no error is thrown
+- **WHEN** `resolvePath()` is called in forced mode with a relative `configPath`
+- **THEN** it returns the resolved absolute path
+- **AND** it does not check whether the file exists
 
 #### Scenario: resolvePath never throws
 
-- **GIVEN** any loader configuration
-- **WHEN** `resolvePath()` is called regardless of filesystem state
-- **THEN** no exception is thrown
+- **WHEN** `resolvePath()` is called in either mode
+- **THEN** it never throws
 
 ### Requirement: Discovery mode
 
 #### Scenario: Config found in startDir
 
-- **GIVEN** `specd.yaml` exists in `/repo/project/`
-- **WHEN** `load()` is called with `{ startDir: '/repo/project/' }`
-- **THEN** it returns a `SpecdConfig` with `projectRoot` equal to `/repo/project`
+- **GIVEN** the start directory contains discoverable config candidates
+- **WHEN** `load()` is called
+- **THEN** the loader resolves that directory's active chain
 
 #### Scenario: Config found in ancestor directory
 
-- **GIVEN** `specd.yaml` exists in `/repo/` (the git root) but not in `/repo/packages/foo/`
-- **WHEN** `load()` is called with `{ startDir: '/repo/packages/foo/' }`
-- **THEN** it returns a `SpecdConfig` with `projectRoot` equal to `/repo`
+- **GIVEN** the start directory has no discoverable candidates
+- **AND** the nearest ancestor directory before the git root does
+- **WHEN** `load()` is called
+- **THEN** the loader resolves the ancestor directory's active chain
 
-#### Scenario: Local config takes precedence over specd.yaml
+#### Scenario: Explicit-base variant is skipped when base is inactive
 
-- **GIVEN** both `specd.yaml` and `specd.local.yaml` exist in `/repo/`
-- **WHEN** `load()` is called with `{ startDir: '/repo/' }`
-- **THEN** the loader reads `specd.local.yaml` exclusively
-- **AND** `specd.yaml` is not read
+- **GIVEN** `specd.local.experimental.yaml` declares `extends: ./specd.experimental.yaml`
+- **AND** `specd.experimental.yaml` is not active in the current discovery chain
+- **WHEN** `load()` runs in discovery mode
+- **THEN** `specd.local.experimental.yaml` is skipped
 
-#### Scenario: Local config found at higher directory level
+#### Scenario: Standalone local file resets the chain
 
-- **GIVEN** `specd.local.yaml` exists in `/repo/` but only `specd.yaml` exists in `/repo/sub/`
-- **WHEN** `load()` is called with `{ startDir: '/repo/sub/' }`
-- **THEN** the loader uses `specd.yaml` in `/repo/sub/` (first match wins during walk)
+- **GIVEN** `specd.yaml` exists
+- **AND** `specd.local.yaml` exists without `extends`
+- **WHEN** `load()` runs in discovery mode
+- **THEN** `specd.local.yaml` becomes the active root
+- **AND** previously accumulated shared layers are not inherited further
 
 #### Scenario: Walk stops at git root
 
-- **GIVEN** `specd.yaml` exists in `/parent/` but the git root is `/parent/repo/`
-- **WHEN** `load()` is called with `{ startDir: '/parent/repo/src/' }`
-- **THEN** `load()` throws `ConfigValidationError` with a message about no config found
+- **GIVEN** no discoverable candidates exist between startDir and the git root
+- **WHEN** `load()` is called
+- **THEN** the walk stops at the git root
+- **AND** it does not inspect parent directories above that root
 
 #### Scenario: No git repo — checks only startDir
 
 - **GIVEN** `startDir` is not inside any git repository
-- **AND** `specd.yaml` exists in the parent of `startDir` but not in `startDir` itself
+- **AND** discoverable config candidates exist only in the parent directory
 - **WHEN** `load()` is called
 - **THEN** `load()` throws `ConfigValidationError`
 
 #### Scenario: No config file found
 
-- **GIVEN** no `specd.yaml` or `specd.local.yaml` exists in or above `startDir` up to the git root
+- **GIVEN** no discoverable config candidates exist in the applicable search area
 - **WHEN** `load()` is called
 - **THEN** `load()` throws `ConfigValidationError` with a message indicating no config was found
 
 ### Requirement: Forced mode
 
-#### Scenario: Forced path loads exact file
+#### Scenario: Forced path loads exact entrypoint chain
 
-- **GIVEN** `specd.yaml` and `specd.local.yaml` both exist in `/repo/`
-- **WHEN** `load()` is called with `{ configPath: '/repo/specd.yaml' }`
-- **THEN** the loader reads `/repo/specd.yaml`
-- **AND** `specd.local.yaml` is not consulted
+- **GIVEN** `specd.local.dev.yaml` declares `extends: true`
+- **AND** other discoverable local variants also exist in the same directory
+- **WHEN** `load()` is called with `{ configPath: '/repo/specd.local.dev.yaml' }`
+- **THEN** the loader resolves only `/repo/specd.local.dev.yaml` and its `extends` chain
+- **AND** the sibling variants are not added by discovery
 
 #### Scenario: Forced path resolves relative path
 
@@ -110,6 +112,56 @@
 - **GIVEN** the file at `configPath` does not exist
 - **WHEN** `load()` is called
 - **THEN** `load()` throws `ConfigValidationError` with a message about the file not being found
+
+#### Scenario: Forced mode extends target not found
+
+- **GIVEN** a file is loaded with `--config` and declares `extends: specd.yaml`
+- **AND** `specd.yaml` does not exist in the same directory
+- **WHEN** `load()` is called
+- **THEN** `load()` throws `ConfigValidationError` with a message about the file not being found
+
+#### Scenario: Forced mode extends true without base file
+
+- **GIVEN** a file is loaded with `--config` and declares `extends: true`
+- **AND** no previous candidate exists in the same directory
+- **WHEN** `load()` is called
+- **THEN** `load()` throws `ConfigValidationError`
+
+### Requirement: Layer merge semantics
+
+#### Scenario: Later scalar overrides earlier scalar
+
+- **GIVEN** two active layers define different values for the same scalar field
+- **WHEN** the chain is merged
+- **THEN** the later layer's scalar value wins
+
+#### Scenario: Object keys deep-merge by path
+
+- **GIVEN** a base layer defines `workspaces.default.codeRoot`
+- **AND** a later layer defines `workspaces.default.ownership`
+- **WHEN** the chain is merged
+- **THEN** both keys are present in the merged object
+
+#### Scenario: Inherited arrays append by default
+
+- **GIVEN** a base layer defines `context: [{ instruction: 'base' }]`
+- **AND** a later layer defines `context: [{ instruction: 'overlay' }]`
+- **WHEN** the chain is merged
+- **THEN** the merged config contains both context entries in chain order
+
+#### Scenario: Array removal deletes inherited context by id
+
+- **GIVEN** a base layer defines `context: [{ id: bootstrap, file: specd-bootstrap.md }]`
+- **AND** a later layer declares `remove: { context: [{ id: bootstrap }] }`
+- **WHEN** the chain is merged
+- **THEN** the inherited `bootstrap` context entry is absent from the final config
+
+#### Scenario: Standalone layer discards earlier inherited state
+
+- **GIVEN** earlier shared layers are active
+- **AND** a later discovered layer has no `extends`
+- **WHEN** the chain is resolved
+- **THEN** that standalone layer becomes the new root for subsequent layers
 
 ### Requirement: Native environment file support
 
@@ -178,15 +230,17 @@
 
 - **GIVEN** the config file is at `/repo/specd.yaml` with no `specs.fs.metadataPath`
 - **AND** the specs path is inside a git repo rooted at `/repo`
-- **WHEN** `load()` is called
+- **WHEN** kernel composition initializes the workspace
 - **THEN** the workspace's `metadataPath` is `/repo/.specd/metadata`
+- **NOTE** auto-derivation of absent `metadataPath` is a kernel composition responsibility (see `kernel-internals.ts`), not `config-loader.load()`. The loader only resolves explicit `metadataPath` values.
 
 #### Scenario: Absent metadataPath with NullVcsAdapter fallback
 
 - **GIVEN** the config has `specs.fs.path: /external/specs` with no `specs.fs.metadataPath`
 - **AND** `/external/specs` is not inside any VCS
-- **WHEN** `load()` is called
+- **WHEN** kernel composition initializes the workspace
 - **THEN** the workspace's `metadataPath` is `/external/.specd/metadata`
+- **NOTE** same as above — fallback derivation is kernel composition responsibility.
 
 ### Requirement: Storage path containment
 
@@ -319,6 +373,19 @@
 - **WHEN** `load()` is called
 - **THEN** the corresponding hook has `type: 'instruction'` and `text: 'Check coverage'`
 
+#### Scenario: Context entry with id is preserved
+
+- **GIVEN** the config declares `context: [{ id: bootstrap, file: specd-bootstrap.md }]`
+- **WHEN** `load()` is called
+- **THEN** the mapped context entry preserves both `id` and `file`
+
+#### Scenario: Agent plugin identity is name
+
+- **GIVEN** the config declares `plugins.agents: [{ name: '@specd/plugin-agent-codex', config: { commandsDir: '.codex/commands' } }]`
+- **WHEN** `load()` is called
+- **THEN** the mapped plugin entry preserves `name` and `config`
+- **AND** inherited removal resolves that entry by `name`
+
 ### Requirement: Approvals default to false
 
 #### Scenario: Approvals section absent
@@ -340,3 +407,9 @@
 - **GIVEN** any validation failure occurs during `load()`
 - **WHEN** the error is caught
 - **THEN** it is an instance of `ConfigValidationError`
+
+#### Scenario: Invalid cascade chain still uses ConfigValidationError
+
+- **GIVEN** an explicit `extends` target points outside the applicable chain
+- **WHEN** `load()` is called
+- **THEN** the thrown error is `ConfigValidationError`

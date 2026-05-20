@@ -33,7 +33,7 @@
     {
       "requirement": "InitProject behaviour",
       "rules": [
-        "The `initProject` method MUST:\n\n1. Create a `specd.yaml` file in `projectRoot` with the schema, workspace, and storage configuration\n2. Create the required storage directories (`.specd/changes/`, `.specd/drafts/`, `.specd/discarded/`, `.specd/archive/`)\n3. Append `specd.local.yaml` to `.gitignore` if not already present"
+        "The `initProject` method MUST:\n\n1. Create a `specd.yaml` file in `projectRoot` with the schema, workspace, and storage configuration\n2. Create the required storage directories (`.specd/changes/`, `.specd/drafts/`, `.specd/discarded/`, `.specd/archive/`)\n3. Append both `specd.local.yaml` and the `specd.local.*.yaml` local-variant pattern to `.gitignore` if not already present"
       ]
     },
     {
@@ -69,7 +69,7 @@
       "given": ["a directory with no existing specd.yaml"],
       "when": ["initProject is called with valid options"],
       "then": [
-        "a specd.yaml is created, storage directories are created, and specd.local.yaml is appended to .gitignore"
+        "a specd.yaml is created, storage directories are created, and both specd.local.yaml and specd.local.*.yaml are appended to .gitignore"
       ]
     },
     {
@@ -134,8 +134,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:b0bbe21d27c2967dd50bb954c9655463be2a9618059452670037ff26fe82a122",
-    "verify.md": "sha256:944fcdec151daac9bd2f9ea25bd3f08c691f0644e90188285a469b0d61ddb45e"
+    "spec.md": "sha256:c91f0505b79fbc85bf3fd4c883aa6fbb48034c8a2af7a80a6755cd7202861e62",
+    "verify.md": "sha256:f044cfa976b359c4ab2734bf2c3f84c68dd4da0eb3afb3dfeaf3f2318a9e31ae"
   },
   "generatedBy": "core"
 }

@@ -1514,6 +1514,39 @@ describe('CompileContext', () => {
       expect(result.projectContext[2]!.source).toBe('file')
       expect(result.projectContext[2]!.content).toContain('Bootstrap content')
     })
+
+    it('context entries with id are accepted without changing emitted content or ordering', async () => {
+      const change = makeChange('my-change')
+      const schema = makeSchema()
+
+      const fileReader: FileReader = {
+        read: async (path: string) => {
+          if (path === 'AGENTS.md') return 'AGENTS content'
+          return null
+        },
+      }
+
+      const { sut } = makeSut({ change, schema, fileReader })
+
+      const result = await sut.execute({
+        name: 'my-change',
+        step: 'designing',
+
+        config: {
+          context: [
+            { id: 'agents-file', file: 'AGENTS.md' },
+            { id: 'inline-note', instruction: 'Inline note.' },
+          ],
+        },
+      })
+
+      // Same output as without id — ordering and content unchanged
+      expect(result.projectContext).toHaveLength(2)
+      expect(result.projectContext[0]!.source).toBe('file')
+      expect(result.projectContext[0]!.content).toContain('AGENTS content')
+      expect(result.projectContext[1]!.source).toBe('instruction')
+      expect(result.projectContext[1]!.content).toContain('Inline note.')
+    })
   })
 
   describe('Requirement: Missing spec paths emit a warning', () => {

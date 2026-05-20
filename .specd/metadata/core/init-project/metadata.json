@@ -33,7 +33,7 @@
     {
       "requirement": "Side effects performed by the port",
       "rules": [
-        "The `ConfigWriter.initProject` implementation MUST:\n\n- Write `specd.yaml` with the provided schema reference, workspace, and specs path.\n- Create standard storage directories (`changes/`, `drafts/`, `discarded/`, `archive/`).\n- Append `specd.local.yaml` to `.gitignore`."
+        "The `ConfigWriter.initProject` implementation MUST:\n\n- Write `specd.yaml` with the provided schema reference, workspace, and specs path.\n- Create standard storage directories (`changes/`, `drafts/`, `discarded/`, `archive/`).\n- Append both `specd.local.yaml` and the `specd.local.*.yaml` local-variant pattern to `.gitignore`."
       ]
     }
   ],
@@ -83,6 +83,13 @@
       "then": ["the existing config is overwritten and a successful result is returned"]
     },
     {
+      "requirement": "Throws AlreadyInitialisedError when config exists",
+      "name": "Already initialised project propagates port error",
+      "given": ["the port throws AlreadyInitialisedError when checking existence"],
+      "when": ["execute is called"],
+      "then": ["execute propagates AlreadyInitialisedError from the port"]
+    },
+    {
       "requirement": "Side effects performed by the port",
       "name": "Storage directories created",
       "when": ["execute completes successfully"],
@@ -94,12 +101,15 @@
       "requirement": "Side effects performed by the port",
       "name": "Gitignore entries added",
       "when": ["execute completes successfully"],
-      "then": ["specd.local.yaml is listed in the project's .gitignore"]
+      "then": [
+        "specd.local.yaml is listed in the project's .gitignore",
+        "AND the specd.local.*.yaml local-variant pattern is also listed"
+      ]
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:499583bfd4d1205e78322ee42a694d2fcb5685249f8a5b5554659f536d77d350",
-    "verify.md": "sha256:3e4ddf7acb2bb3c7c17ac231f4ce373c0296e19e9c805c3974dba2d250e9e770"
+    "spec.md": "sha256:cf1b0bacea14a47932fe1edd20a5c1fce4b96f61b6aabbe8490f944706002862",
+    "verify.md": "sha256:11e6a8239bb496ab5fcd58342465a2cc3318d3bd44a03b60e8c3b8767a2928ef"
   },
   "generatedBy": "core"
 }

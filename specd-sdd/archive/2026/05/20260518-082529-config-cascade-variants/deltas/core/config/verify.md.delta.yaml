@@ -1,0 +1,268 @@
+- op: modified
+  description: 'Update discovery scenarios for layered and explicit closed-chain resolution'
+  selector:
+    type: section
+    matches: '^Requirement: Config file location and format$'
+  content: |
+    #### Scenario: Config found — nearest directory with candidates used
+
+    - **GIVEN** a repo where `/repo/app/specd.local.dev.yaml` exists and `/repo/specd.yaml` also exists
+    - **WHEN** specd runs from `/repo/app/src`
+    - **THEN** discovery resolves the candidate set from `/repo/app`
+    - **AND** it does not continue walking to `/repo`
+
+    #### Scenario: Monorepo — package config directory takes precedence
+
+    - **GIVEN** `/repo/specd.yaml` exists at the monorepo root
+    - **AND** `/repo/packages/api/specd.yaml` exists inside one package
+    - **WHEN** specd runs from `/repo/packages/api/src`
+    - **THEN** discovery resolves the package directory candidate set
+    - **AND** the root-level config directory is not consulted
+
+    #### Scenario: Config not found inside repo
+
+    - **GIVEN** no discoverable config candidates exist between CWD and the git root
+    - **WHEN** specd starts
+    - **THEN** startup fails with a config validation error
+
+    #### Scenario: Invoked outside a git repo
+
+    - **GIVEN** the current directory is not inside any git repository
+    - **AND** the parent directory contains discoverable config candidates but the current directory does not
+    - **WHEN** specd starts
+    - **THEN** discovery checks only the current directory
+    - **AND** startup fails because no local candidates exist there
+
+    #### Scenario: Explicit config flag resolves only the selected chain
+
+    - **GIVEN** `/repo/specd.local.dev.yaml` declares `extends: true`
+    - **AND** `/repo/specd.local.zz-last.yaml` also exists
+    - **WHEN** the CLI is invoked with `--config /repo/specd.local.dev.yaml`
+    - **THEN** specd resolves `/repo/specd.local.dev.yaml` and its `extends` chain only
+    - **AND** `/repo/specd.local.zz-last.yaml` is not added by discovery
+
+    #### Scenario: Command-specific bootstrap mode does not redefine --config
+
+    - **GIVEN** a command defines bootstrap mode in its own spec
+    - **WHEN** the same command is invoked with `--config path/to/file.yaml`
+    - **THEN** `--config` still means an explicit config entrypoint
+    - **AND** bootstrap mode does not reinterpret it as a repository root selector
+
+- op: modified
+  description: 'Extend local config override scenarios with cascade semantics'
+  selector:
+    type: section
+    matches: '^Requirement: Local config override$'
+  content: |
+    #### Scenario: Local standalone file replaces shared config
+
+    - **GIVEN** `specd.yaml` exists
+    - **AND** `specd.local.yaml` exists without `extends`
+    - **WHEN** config is resolved in normal discovery
+    - **THEN** `specd.local.yaml` becomes the active root
+    - **AND** `specd.yaml` is not inherited
+
+    #### Scenario: Local file absent
+
+    - **WHEN** no `specd.local.yaml` or local variant exists alongside `specd.yaml`
+    - **THEN** specd loads `specd.yaml` as normal; no error is emitted
+
+    #### Scenario: Local file joins the cascade when extends is true
+
+    - **GIVEN** `specd.yaml` exists
+    - **AND** `specd.local.yaml` declares `extends: true`
+    - **WHEN** config is resolved in normal discovery
+    - **THEN** `specd.local.yaml` inherits from the previously active layer
+    - **AND** only its overridden fields change
+
+    #### Scenario: Local file must be valid when standalone
+
+    - **WHEN** a standalone `specd.local.yaml` is present but missing required fields (e.g. `schema`)
+    - **THEN** specd exits with a validation error — partial configs are not supported
+
+    #### Scenario: Local named variants apply in filename order
+
+    - **GIVEN** `specd.local.10-team.yaml`, `specd.local.20-machine.yaml`, and `specd.local.99-final.yaml` are all active layers
+    - **WHEN** config is resolved in normal discovery
+    - **THEN** they apply in ascending alphabetical order
+    - **AND** `specd.local.99-final.yaml` has the highest effective precedence
+
+    #### Scenario: Local variant patterns are gitignored
+
+    - **WHEN** a project is initialised
+    - **THEN** both `specd.local.yaml` and `specd.local.*.yaml` are present in `.gitignore`
+
+- op: added
+  description: 'Add verification coverage for the new cascade identity requirement'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Local config override$'
+  content: |
+    ### Requirement: Cascade identity and removal model
+
+    #### Scenario: Context entry removed by id
+
+    - **GIVEN** a base config defines `context: [{ id: bootstrap, file: specd-bootstrap.md }]`
+    - **AND** a later inheriting layer declares `remove: { context: [{ id: bootstrap }] }`
+    - **WHEN** the cascade is resolved
+    - **THEN** the inherited `bootstrap` context entry is removed
+
+    #### Scenario: Plugin entry removed by name identity
+
+    - **GIVEN** a base config defines `plugins.agents: [{ name: '@specd/plugin-agent-codex' }]`
+    - **AND** a later inheriting layer removes that inherited agent entry
+    - **WHEN** the cascade is resolved
+    - **THEN** the loader matches the inherited agent by `name`
+
+    #### Scenario: Workspace removed by name
+
+    - **GIVEN** a base config defines `workspaces: { default: {...}, billing: {...} }`
+    - **AND** a later inheriting layer declares `remove: { workspaces: [billing] }`
+    - **WHEN** the cascade is resolved
+    - **THEN** the `billing` workspace key is absent from the merged config
+
+    #### Scenario: Explicit-base local variant is skipped until its base is active
+
+    - **GIVEN** `specd.local.experimental.yaml` declares `extends: ./specd.experimental.yaml`
+    - **AND** `specd.experimental.yaml` is not active in the current discovery chain
+    - **WHEN** normal discovery runs
+    - **THEN** `specd.local.experimental.yaml` is skipped
+
+- op: modified
+  description: 'Add id-aware context scenarios'
+  selector:
+    type: section
+    matches: '^Requirement: Project context instructions$'
+  content: |
+    #### Scenario: Context entries injected before spec content
+
+    - **GIVEN** `specd.yaml` declares `context: [{ instruction: "Always prefer editing existing files." }]`
+    - **WHEN** `CompileContext` builds the compiled context
+    - **THEN** the instruction appears before any spec content in the output
+
+    #### Scenario: File reference is read and injected verbatim
+
+    - **GIVEN** `specd.yaml` declares `context: [{ file: specd-bootstrap.md }]` and the file exists
+    - **WHEN** `CompileContext` builds the compiled context
+    - **THEN** the full content of `specd-bootstrap.md` is injected verbatim, before spec content
+
+    #### Scenario: Context entry id is accepted for inherited removal
+
+    - **GIVEN** `specd.yaml` declares `context: [{ id: bootstrap, file: specd-bootstrap.md }]`
+    - **WHEN** config is loaded
+    - **THEN** the entry is accepted as valid context
+    - **AND** `bootstrap` is available as the inherited removal identity
+
+    #### Scenario: Missing file emits a warning
+
+    - **GIVEN** `specd.yaml` declares `context: [{ file: does-not-exist.md }]`
+    - **WHEN** `CompileContext` builds the compiled context
+    - **THEN** a warning is emitted identifying the missing file, compilation proceeds normally, and the entry is absent from the output
+
+    #### Scenario: context absent — no effect
+
+    - **GIVEN** `specd.yaml` does not declare a `context` field
+    - **WHEN** `CompileContext` builds the compiled context
+    - **THEN** the output is identical to a config with `context: []` — no error, no warning
+
+    #### Scenario: Mixed inline and file entries preserve declaration order
+
+    - **GIVEN** `context: [{ file: AGENTS.md }, { instruction: "Inline note." }, { file: specd-bootstrap.md }]`
+    - **WHEN** `CompileContext` builds the compiled context
+    - **THEN** `AGENTS.md` content appears first, then `"Inline note."`, then `specd-bootstrap.md` content, before any spec content
+
+    #### Scenario: File path resolved relative to specd.yaml directory
+
+    - **GIVEN** `specd.yaml` is at `/project/specd.yaml` and declares `context: [{ file: docs/bootstrap.md }]`
+    - **WHEN** `CompileContext` resolves the file entry
+    - **THEN** it reads `/project/docs/bootstrap.md`
+
+    #### Scenario: Absolute file path accepted
+
+    - **GIVEN** `specd.yaml` declares `context: [{ file: /shared/instructions.md }]` and that file exists
+    - **WHEN** `CompileContext` resolves the file entry
+    - **THEN** it reads `/shared/instructions.md` directly, without resolving relative to the specd.yaml directory
+
+- op: modified
+  description: 'Extend startup validation scenarios with cascade-specific failures'
+  selector:
+    type: section
+    matches: '^Requirement: Startup validation$'
+  content: |
+    #### Scenario: Valid minimal config passes validation
+
+    - **GIVEN** a `specd.yaml` with only `schema: schema-std@1`
+    - **WHEN** config is validated at startup
+    - **THEN** validation passes with defaults applied
+
+    #### Scenario: Invalid contextMode value rejected
+
+    - **GIVEN** `specd.yaml` contains `contextMode: partial`
+    - **WHEN** config is validated at startup
+    - **THEN** validation fails with a `ConfigValidationError` identifying the invalid `contextMode` value
+
+    #### Scenario: Legacy lazy contextMode rejected
+
+    - **GIVEN** `specd.yaml` contains `contextMode: lazy`
+    - **WHEN** config is validated at startup
+    - **THEN** validation fails with a `ConfigValidationError` because lazy is no longer accepted
+
+    #### Scenario: contextMode in workspace entry rejected with specific message
+
+    - **GIVEN** `specd.yaml` contains a workspace with `contextMode: summary`
+    - **WHEN** config is validated at startup
+    - **THEN** validation fails with a `ConfigValidationError` with the message "`contextMode` is not valid inside a workspace — it is a project-level setting"
+
+    #### Scenario: artifactRules rejected at startup
+
+    - **GIVEN** `specd.yaml` contains `artifactRules: { specs: [...] }`
+    - **WHEN** config is validated at startup
+    - **THEN** validation fails with `ConfigValidationError` suggesting migration to `schemaOverrides`
+
+    #### Scenario: skills field rejected at startup
+
+    - **GIVEN** `specd.yaml` contains a `skills` field
+    - **WHEN** config is validated at startup
+    - **THEN** validation fails with `ConfigValidationError` explaining skills are managed via the plugin system
+
+    #### Scenario: Invalid level string
+
+    - **GIVEN** `specd.yaml` with `logging: { level: 'verbose' }` (not a recognized level)
+    - **WHEN** config is validated at startup
+    - **THEN** validation MUST fail with a `ConfigValidationError`
+
+    #### Scenario: remove without extends is rejected
+
+    - **GIVEN** a config file declares `remove` but no `extends`
+    - **WHEN** config is loaded
+    - **THEN** startup fails with `ConfigValidationError`
+
+    #### Scenario: Invalid extends value is rejected
+
+    - **GIVEN** a config file declares `extends: { from: ./specd.yaml }`
+    - **WHEN** config is loaded
+    - **THEN** startup fails with `ConfigValidationError`
+
+    #### Scenario: Required root field cannot be removed
+
+    - **GIVEN** an inheriting config declares `remove: { root: [schema] }`
+    - **WHEN** config is loaded
+    - **THEN** startup fails with `ConfigValidationError`
+
+    #### Scenario: Unknown workspace removal target is rejected
+
+    - **GIVEN** an inheriting config declares `remove: { workspaces: [billing] }`
+    - **AND** no inherited `billing` workspace exists
+    - **WHEN** config is loaded
+    - **THEN** startup fails with `ConfigValidationError`
+
+    #### Scenario: Explicit extends outside the active chain is skipped
+
+    - **GIVEN** a discovered config declares `extends: ./unrelated.yaml`
+    - **AND** `unrelated.yaml` is not active in the discovery chain
+    - **WHEN** config is loaded in discovery mode
+    - **THEN** that candidate is skipped (no error)

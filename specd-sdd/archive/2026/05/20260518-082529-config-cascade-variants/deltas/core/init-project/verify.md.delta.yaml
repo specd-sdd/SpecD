@@ -1,0 +1,40 @@
+- op: modified
+  description: 'Extend AlreadyInitialisedError propagation scenario'
+  selector:
+    type: section
+    matches: '^Requirement: Throws AlreadyInitialisedError when config exists$'
+  content: |
+    #### Scenario: Config already exists without force flag
+
+    - **GIVEN** `specd.yaml` already exists at `projectRoot`
+    - **WHEN** `execute` is called with `force` absent or `false`
+    - **THEN** an `AlreadyInitialisedError` is thrown
+
+    #### Scenario: Config already exists with force flag
+
+    - **GIVEN** `specd.yaml` already exists at `projectRoot`
+    - **WHEN** `execute` is called with `force: true`
+    - **THEN** the existing config is overwritten and a successful result is returned
+
+    #### Scenario: Already initialised project propagates port error
+
+    - **GIVEN** the port throws `AlreadyInitialisedError` when checking existence
+    - **WHEN** `execute` is called
+    - **THEN** `execute` propagates `AlreadyInitialisedError` from the port
+
+- op: modified
+  description: 'Expand gitignore verification for local variant pattern'
+  selector:
+    type: section
+    matches: '^Requirement: Side effects performed by the port$'
+  content: |
+    #### Scenario: Storage directories created
+
+    - **WHEN** `execute` completes successfully
+    - **THEN** the `changes/`, `drafts/`, `discarded/`, and `archive/` directories exist under the storage path
+
+    #### Scenario: Gitignore entries added
+
+    - **WHEN** `execute` completes successfully
+    - **THEN** `specd.local.yaml` is listed in the project's `.gitignore`
+    - **AND** the `specd.local.*.yaml` local-variant pattern is also listed

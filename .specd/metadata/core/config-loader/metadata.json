@@ -26,13 +26,19 @@
     {
       "requirement": "Discovery mode",
       "rules": [
-        "When constructed with `{ startDir }`, the loader MUST walk up from `startDir` to locate a config file, bounded by the nearest git repository root. At each directory level the loader MUST check for `specd.local.yaml` first; if it exists, that file is used immediately and `specd.yaml` at the same level is not consulted. If neither file exists at a level, the search continues to the parent directory.\n\nThe walk MUST stop at the git repository root — it SHALL NOT traverse above it. If no config file is found before or at the git root, `load()` MUST throw `ConfigValidationError`.\n\nWhen `startDir` is not inside a git repository, the loader MUST check only the starting directory itself (both `specd.local.yaml` and `specd.yaml`, in that order) and SHALL NOT walk further up. If neither file exists, `load()` MUST throw `ConfigValidationError`."
+        "When constructed with `{ startDir }`, the loader MUST walk up from `startDir` to locate the nearest directory containing discoverable config candidates, bounded by the nearest git repository root.\n\nDiscoverable candidates within one directory are evaluated in this order:\n\n1. `specd.yaml`\n2. `specd.*.yaml` in ascending alphabetical order\n3. `specd.local.yaml`\n4. `specd.local.*.yaml` in ascending alphabetical order\n\nThe loader MUST build an active chain from those candidates rather than selecting a single winning file.\n\nCandidate activation rules are:\n\n- a file with no `extends` becomes a standalone root from that point\n- a file with `extends: true` attaches to the previous active layer\n- a file with `extends: <path>` attaches only when the referenced base file is already active in the current chain; otherwise that candidate is skipped in normal discovery\n\nThe walk MUST stop at the git repository root and SHALL NOT traverse above it. If no config candidates are found before or at the git root, `load()` MUST throw `ConfigValidationError`.\n\nWhen `startDir` is not inside a git repository, the loader MUST check only the starting directory and SHALL NOT walk further up. If no discoverable candidates exist there, `load()` MUST throw `ConfigValidationError`."
       ]
     },
     {
       "requirement": "Forced mode",
       "rules": [
-        "When constructed with `{ configPath }`, the loader MUST resolve the path to an absolute path and use it directly. No `specd.local.yaml` lookup SHALL take place. If the file does not exist, `load()` MUST throw `ConfigValidationError`."
+        "When constructed with `{ configPath }`, the loader MUST resolve the path to an absolute path and treat that file as the single explicit entrypoint.\n\nIf the selected file declares `extends`, the loader MUST resolve the file's full `extends` chain. No additional filename-discovered layers SHALL be added on top of that explicit chain.\n\n`extends: true` in forced mode MUST resolve to the previous candidate file in the directory's sorted candidate list, skipping any already-visited files. This allows forced mode to reconstruct the same layered chain that discovery mode would build, starting from the last link and walking backwards.\n\nIf the entry file or any file in its `extends` chain does not exist, `load()` MUST throw `ConfigValidationError`. This applies to both explicit `extends: <path>` references and `extends: true`."
+      ]
+    },
+    {
+      "requirement": "Layer merge semantics",
+      "rules": [
+        "After resolving the active config chain, the loader MUST merge layers in chain order from lowest to highest precedence.\n\nMerge rules are:\n\n- scalars: later active layer wins\n- objects: deep merge by key\n- arrays: append by default\n- `remove.root`: delete optional top-level fields from the accumulated config\n- `remove.<mapName>`: delete named keys from keyed object maps such as `workspaces` and `storage`\n- `remove.<arrayName>`: delete inherited array entries using that array's defined identity keys\n\nA standalone layer without `extends` resets the accumulated base from that point and discards any earlier inherited state outside the current chain."
       ]
     },
     {
@@ -56,7 +62,7 @@
     {
       "requirement": "Path resolution relative to config directory",
       "rules": [
-        "All relative paths in the parsed config — `specs.fs.path`, `specs.fs.metadataPath`, `schemas.fs.path`, `codeRoot`, and all `storage.*.fs.path` values — MUST be resolved relative to the directory containing the active config file. The resolved `SpecdConfig.projectRoot` MUST be set to the config file's parent directory.\n\nWhen `specs.fs.metadataPath` is absent for a workspace, the loader MUST auto-derive it by resolving the VCS root of the workspace's `specs.fs.path` via `createVcsAdapter(specsPath).rootDir()` and joining `.specd/metadata/`. When the VCS adapter returns `NullVcsAdapter` (specs path is not inside any VCS), the loader MUST fall back to `.specd/metadata/` relative to the specs path parent directory."
+        "All relative paths in the parsed config — `specs.fs.path`, `specs.fs.metadataPath`, `schemas.fs.path`, `codeRoot`, and all `storage.*.fs.path` values — MUST be resolved relative to the directory containing the active config file. The resolved `SpecdConfig.projectRoot` MUST be set to the config file's parent directory.\n\nWhen `specs.fs.metadataPath` is explicitly declared, the loader MUST resolve it relative to the config directory. When `specs.fs.metadataPath` is absent, auto-derivation of `metadataPath` from the VCS root is a kernel composition responsibility (see `kernel-internals.ts`) and is not performed by `config-loader.load()`."
       ]
     },
     {
@@ -86,7 +92,7 @@
     {
       "requirement": "Workflow and context entry mapping",
       "rules": [
-        "The loader MUST map `schemaPlugins` as an array of strings and `schemaOverrides` as a typed operations object preserving the five operation keys (`create`, `remove`, `set`, `append`, `prepend`).\n\nThe loader MUST map raw `context` entries preserving their `{ file }` or `{ instruction }` shape."
+        "The loader MUST map `schemaPlugins` as an array of strings and `schemaOverrides` as a typed operations object preserving the five operation keys (`create`, `remove`, `set`, `append`, `prepend`).\n\nThe loader MUST map raw `context` entries preserving their `{ file }`, `{ instruction }`, optional `id`, and layered removal semantics.\n\nThe loader MUST preserve `plugins.agents` entries with `name` plus optional `config`, and MUST treat `name` as the array identity key for inherited removal."
       ]
     },
     {
@@ -98,17 +104,17 @@
     {
       "requirement": "All errors are ConfigValidationError",
       "rules": [
-        "Every validation failure during `load()` — missing config file, invalid YAML, structural mismatch, missing required fields, path containment violations, invalid patterns — MUST be surfaced as a `ConfigValidationError`. No other error type SHALL be thrown for validation failures."
+        "Every validation failure during `load()` — missing config file, invalid YAML, structural mismatch, invalid cascade chain, invalid removal target, missing required fields, path containment violations, invalid patterns — MUST be surfaced as a `ConfigValidationError`.\n\nNo generic YAML/runtime exception SHALL escape for configuration validation failures. Cascade-specific failures remain part of the normal `SpecdError` path."
       ]
     }
   ],
   "constraints": [
     "createConfigLoader is the only public entry point for config loading — FsConfigLoader MUST NOT be exported from @specd/core",
     "The factory returns a ConfigLoader port interface, not the concrete FsConfigLoader class",
-    "Discovery mode never reads specd.yaml when specd.local.yaml is present at the same directory level — the local file is used exclusively with no merging",
-    "Forced mode never performs specd.local.yaml lookup",
-    "Zod validation precedes all path resolution and domain construction",
-    "projectRoot is always the directory containing the active config file, not startDir"
+    "Discovery mode resolves a layered active chain rather than selecting specd.local.yaml as an exclusive winner",
+    "Forced mode resolves only the selected entrypoint plus its extends chain",
+    "Zod validation precedes all path resolution and domain construction for each parsed layer",
+    "projectRoot is always the directory containing the active root config file for the resolved chain, not startDir"
   ],
   "scenarios": [
     {
@@ -123,83 +129,95 @@
     },
     {
       "requirement": "Path probe",
-      "name": "Discovery mode returns found path",
-      "given": ["specd.yaml exists at /repo/specd.yaml"],
-      "when": ["resolvePath() is called with { startDir: '/repo/src' }"],
-      "then": ["it returns '/repo/specd.yaml'"]
+      "name": "Discovery mode returns resolved chain root path",
+      "given": ["discoverable config candidates exist in the active directory"],
+      "when": ["resolvePath() is called in discovery mode"],
+      "then": [
+        "it returns the absolute path of the active root config file for that resolved chain"
+      ]
     },
     {
       "requirement": "Path probe",
       "name": "Discovery mode returns null when no config found",
-      "given": ["no specd.yaml or specd.local.yaml exists in or above startDir up to the git root"],
+      "given": ["no discoverable config candidates exist between startDir and the git root"],
       "when": ["resolvePath() is called"],
-      "then": ["it returns null", "AND no error is thrown"]
+      "then": ["it returns null"]
     },
     {
       "requirement": "Path probe",
-      "name": "Discovery mode prefers specd.local.yaml",
-      "given": ["both specd.local.yaml and specd.yaml exist at /repo/"],
-      "when": ["resolvePath() is called with { startDir: '/repo' }"],
-      "then": ["it returns '/repo/specd.local.yaml'"]
+      "name": "Discovery mode can return a shared root even when later local layers will attach",
+      "given": ["specd.yaml is the active root and later local layers also attach"],
+      "when": ["resolvePath() is called"],
+      "then": ["it still returns the root config path rather than one of the later layers"]
     },
     {
       "requirement": "Path probe",
       "name": "Forced mode returns resolved absolute path without existence check",
-      "given": ["{ configPath: './custom/specd.yaml' } is used and the file does NOT exist"],
-      "when": ["resolvePath() is called"],
+      "when": ["resolvePath() is called in forced mode with a relative configPath"],
       "then": [
-        "it returns the resolved absolute path (e.g. /cwd/custom/specd.yaml)",
-        "AND no error is thrown"
+        "it returns the resolved absolute path",
+        "AND it does not check whether the file exists"
       ]
     },
     {
       "requirement": "Path probe",
       "name": "resolvePath never throws",
-      "given": ["any loader configuration"],
-      "when": ["resolvePath() is called regardless of filesystem state"],
-      "then": ["no exception is thrown"]
+      "when": ["resolvePath() is called in either mode"],
+      "then": ["it never throws"]
     },
     {
       "requirement": "Discovery mode",
       "name": "Config found in startDir",
-      "given": ["specd.yaml exists in /repo/project/"],
-      "when": ["load() is called with { startDir: '/repo/project/' }"],
-      "then": ["it returns a SpecdConfig with projectRoot equal to /repo/project"]
+      "given": ["the start directory contains discoverable config candidates"],
+      "when": ["load() is called"],
+      "then": ["the loader resolves that directory's active chain"]
     },
     {
       "requirement": "Discovery mode",
       "name": "Config found in ancestor directory",
-      "given": ["specd.yaml exists in /repo/ (the git root) but not in /repo/packages/foo/"],
-      "when": ["load() is called with { startDir: '/repo/packages/foo/' }"],
-      "then": ["it returns a SpecdConfig with projectRoot equal to /repo"]
+      "given": [
+        "the start directory has no discoverable candidates",
+        "AND the nearest ancestor directory before the git root does"
+      ],
+      "when": ["load() is called"],
+      "then": ["the loader resolves the ancestor directory's active chain"]
     },
     {
       "requirement": "Discovery mode",
-      "name": "Local config takes precedence over specd.yaml",
-      "given": ["both specd.yaml and specd.local.yaml exist in /repo/"],
-      "when": ["load() is called with { startDir: '/repo/' }"],
-      "then": ["the loader reads specd.local.yaml exclusively", "AND specd.yaml is not read"]
+      "name": "Explicit-base variant is skipped when base is inactive",
+      "given": [
+        "specd.local.experimental.yaml declares extends: ./specd.experimental.yaml",
+        "AND specd.experimental.yaml is not active in the current discovery chain"
+      ],
+      "when": ["load() runs in discovery mode"],
+      "then": ["specd.local.experimental.yaml is skipped"]
     },
     {
       "requirement": "Discovery mode",
-      "name": "Local config found at higher directory level",
-      "given": ["specd.local.yaml exists in /repo/ but only specd.yaml exists in /repo/sub/"],
-      "when": ["load() is called with { startDir: '/repo/sub/' }"],
-      "then": ["the loader uses specd.yaml in /repo/sub/ (first match wins during walk)"]
+      "name": "Standalone local file resets the chain",
+      "given": ["specd.yaml exists", "AND specd.local.yaml exists without extends"],
+      "when": ["load() runs in discovery mode"],
+      "then": [
+        "specd.local.yaml becomes the active root",
+        "AND previously accumulated shared layers are not inherited further"
+      ]
     },
     {
       "requirement": "Discovery mode",
       "name": "Walk stops at git root",
-      "given": ["specd.yaml exists in /parent/ but the git root is /parent/repo/"],
-      "when": ["load() is called with { startDir: '/parent/repo/src/' }"],
-      "then": ["load() throws ConfigValidationError with a message about no config found"]
+      "given": ["no discoverable candidates exist between startDir and the git root"],
+      "when": ["load() is called"],
+      "then": [
+        "the walk stops at the git root",
+        "AND it does not inspect parent directories above that root"
+      ]
     },
     {
       "requirement": "Discovery mode",
       "name": "No git repo — checks only startDir",
       "given": [
         "startDir is not inside any git repository",
-        "AND specd.yaml exists in the parent of startDir but not in startDir itself"
+        "AND discoverable config candidates exist only in the parent directory"
       ],
       "when": ["load() is called"],
       "then": ["load() throws ConfigValidationError"]
@@ -207,16 +225,22 @@
     {
       "requirement": "Discovery mode",
       "name": "No config file found",
-      "given": ["no specd.yaml or specd.local.yaml exists in or above startDir up to the git root"],
+      "given": ["no discoverable config candidates exist in the applicable search area"],
       "when": ["load() is called"],
       "then": ["load() throws ConfigValidationError with a message indicating no config was found"]
     },
     {
       "requirement": "Forced mode",
-      "name": "Forced path loads exact file",
-      "given": ["specd.yaml and specd.local.yaml both exist in /repo/"],
-      "when": ["load() is called with { configPath: '/repo/specd.yaml' }"],
-      "then": ["the loader reads /repo/specd.yaml", "AND specd.local.yaml is not consulted"]
+      "name": "Forced path loads exact entrypoint chain",
+      "given": [
+        "specd.local.dev.yaml declares extends: true",
+        "AND other discoverable local variants also exist in the same directory"
+      ],
+      "when": ["load() is called with { configPath: '/repo/specd.local.dev.yaml' }"],
+      "then": [
+        "the loader resolves only /repo/specd.local.dev.yaml and its extends chain",
+        "AND the sibling variants are not added by discovery"
+      ]
     },
     {
       "requirement": "Forced mode",
@@ -230,6 +254,70 @@
       "given": ["the file at configPath does not exist"],
       "when": ["load() is called"],
       "then": ["load() throws ConfigValidationError with a message about the file not being found"]
+    },
+    {
+      "requirement": "Forced mode",
+      "name": "Forced mode extends target not found",
+      "given": [
+        "a file is loaded with --config and declares extends: specd.yaml",
+        "AND specd.yaml does not exist in the same directory"
+      ],
+      "when": ["load() is called"],
+      "then": ["load() throws ConfigValidationError with a message about the file not being found"]
+    },
+    {
+      "requirement": "Forced mode",
+      "name": "Forced mode extends true without base file",
+      "given": [
+        "a file is loaded with --config and declares extends: true",
+        "AND no previous candidate exists in the same directory"
+      ],
+      "when": ["load() is called"],
+      "then": ["load() throws ConfigValidationError"]
+    },
+    {
+      "requirement": "Layer merge semantics",
+      "name": "Later scalar overrides earlier scalar",
+      "given": ["two active layers define different values for the same scalar field"],
+      "when": ["the chain is merged"],
+      "then": ["the later layer's scalar value wins"]
+    },
+    {
+      "requirement": "Layer merge semantics",
+      "name": "Object keys deep-merge by path",
+      "given": [
+        "a base layer defines workspaces.default.codeRoot",
+        "AND a later layer defines workspaces.default.ownership"
+      ],
+      "when": ["the chain is merged"],
+      "then": ["both keys are present in the merged object"]
+    },
+    {
+      "requirement": "Layer merge semantics",
+      "name": "Inherited arrays append by default",
+      "given": [
+        "a base layer defines context: [{ instruction: 'base' }]",
+        "AND a later layer defines context: [{ instruction: 'overlay' }]"
+      ],
+      "when": ["the chain is merged"],
+      "then": ["the merged config contains both context entries in chain order"]
+    },
+    {
+      "requirement": "Layer merge semantics",
+      "name": "Array removal deletes inherited context by id",
+      "given": [
+        "a base layer defines context: [{ id: bootstrap, file: specd-bootstrap.md }]",
+        "AND a later layer declares remove: { context: [{ id: bootstrap }] }"
+      ],
+      "when": ["the chain is merged"],
+      "then": ["the inherited bootstrap context entry is absent from the final config"]
+    },
+    {
+      "requirement": "Layer merge semantics",
+      "name": "Standalone layer discards earlier inherited state",
+      "given": ["earlier shared layers are active", "AND a later discovered layer has no extends"],
+      "when": ["the chain is resolved"],
+      "then": ["that standalone layer becomes the new root for subsequent layers"]
     },
     {
       "requirement": "Native environment file support",
@@ -309,7 +397,7 @@
         "the config file is at /repo/specd.yaml with no specs.fs.metadataPath",
         "AND the specs path is inside a git repo rooted at /repo"
       ],
-      "when": ["load() is called"],
+      "when": ["kernel composition initializes the workspace"],
       "then": ["the workspace's metadataPath is /repo/.specd/metadata"]
     },
     {
@@ -319,7 +407,7 @@
         "the config has specs.fs.path: /external/specs with no specs.fs.metadataPath",
         "AND /external/specs is not inside any VCS"
       ],
-      "when": ["load() is called"],
+      "when": ["kernel composition initializes the workspace"],
       "then": ["the workspace's metadataPath is /external/.specd/metadata"]
     },
     {
@@ -472,6 +560,25 @@
       "then": ["the corresponding hook has type: 'instruction' and text: 'Check coverage'"]
     },
     {
+      "requirement": "Workflow and context entry mapping",
+      "name": "Context entry with id is preserved",
+      "given": ["the config declares context: [{ id: bootstrap, file: specd-bootstrap.md }]"],
+      "when": ["load() is called"],
+      "then": ["the mapped context entry preserves both id and file"]
+    },
+    {
+      "requirement": "Workflow and context entry mapping",
+      "name": "Agent plugin identity is name",
+      "given": [
+        "the config declares plugins.agents: [{ name: '@specd/plugin-agent-codex', config: { commandsDir: '.codex/commands' } }]"
+      ],
+      "when": ["load() is called"],
+      "then": [
+        "the mapped plugin entry preserves name and config",
+        "AND inherited removal resolves that entry by name"
+      ]
+    },
+    {
       "requirement": "Approvals default to false",
       "name": "Approvals section absent",
       "given": ["the config omits the approvals section entirely"],
@@ -491,11 +598,18 @@
       "given": ["any validation failure occurs during load()"],
       "when": ["the error is caught"],
       "then": ["it is an instance of ConfigValidationError"]
+    },
+    {
+      "requirement": "All errors are ConfigValidationError",
+      "name": "Invalid cascade chain still uses ConfigValidationError",
+      "given": ["an explicit extends target points outside the applicable chain"],
+      "when": ["load() is called"],
+      "then": ["the thrown error is ConfigValidationError"]
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:bbe3002761dd994d56b80c6022f10ae70548737d8cf6628377e1cb4254e6a03b",
-    "verify.md": "sha256:442fc620e5cbdf8ee4e230d53905ac52a606e0d32ec7e4bf85c9cdb4ca4c2892"
+    "spec.md": "sha256:062cc4afc648e73f09062b4633e2af28924d34de3b7fda083ef86334fe3d2bd1",
+    "verify.md": "sha256:19290502deecaffcb98e4195767fddab469f054f62d5fa1c504aae4677819ca0"
   },
   "generatedBy": "core"
 }

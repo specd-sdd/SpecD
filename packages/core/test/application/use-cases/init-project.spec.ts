@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { InitProject } from '../../../src/application/use-cases/init-project.js'
 import { type ConfigWriter } from '../../../src/application/ports/config-writer.js'
+import { AlreadyInitialisedError } from '../../../src/application/errors/already-initialised-error.js'
 
 /** Creates a stub ConfigWriter with spied methods. */
 function makeConfigWriter(overrides: Partial<ConfigWriter> = {}) {
@@ -73,5 +74,20 @@ describe('InitProject', () => {
     })
 
     expect(initProject).toHaveBeenCalledWith(expect.objectContaining({ force: true }))
+  })
+
+  it('propagates AlreadyInitialisedError from the port', async () => {
+    const initProjectFn = vi.fn().mockRejectedValue(new AlreadyInitialisedError('/repo/specd.yaml'))
+    const { writer } = makeConfigWriter({ initProject: initProjectFn })
+    const uc = new InitProject(writer)
+
+    await expect(
+      uc.execute({
+        projectRoot: '/repo',
+        schemaRef: '@specd/schema-std',
+        workspaceId: 'default',
+        specsPath: 'specs/',
+      }),
+    ).rejects.toThrow(AlreadyInitialisedError)
   })
 })

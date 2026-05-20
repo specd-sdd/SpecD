@@ -10,7 +10,7 @@ This guide walks through the main configuration areas conceptually, with practic
 
 Run `specd project init` in your project root. SpecD creates a `specd.yaml` with sensible defaults for a single-repo project. You will then edit it to reflect your team's structure and policies.
 
-SpecD discovers its configuration file by walking up from the current working directory to the git repo root, checking for `specd.local.yaml` first, then `specd.yaml`. The walk stops at the first match.
+SpecD discovers its configuration by walking up from the current working directory to the git repo root, collecting all `specd.yaml`, `specd.*.yaml`, `specd.local.yaml`, and `specd.local.*.yaml` candidate files from the first directory that contains at least one. The candidates are resolved into an active chain, deep-merged, and validated as one config. See [Config cascade and local variants](#config-cascade-and-local-variants) below for details.
 
 ---
 
@@ -148,13 +148,130 @@ This keeps graph runtime state separate from lifecycle directories such as `chan
 
 ---
 
-## Local overrides
+## Config cascade and local variants
 
-Alongside `specd.yaml` you can create a `specd.local.yaml`. When this file is present, SpecD uses it exclusively and ignores `specd.yaml` entirely — it is not merged or layered on top. The local file must be a valid, self-contained configuration on its own.
+SpecD supports a layered config cascade. Multiple YAML files in the same directory are discovered, resolved into an active chain, deep-merged, and validated as one.
 
-`specd project init` adds `specd.local.yaml` to `.gitignore` automatically. It is for personal experimentation: trying a different schema branch, pointing at a local schema copy, or testing a configuration change without affecting the rest of the team.
+### File naming and discovery order
 
-Because it is a complete replacement, make a full copy of `specd.yaml` as a starting point when creating one.
+When SpecD searches for configuration, it looks for files in this order within the directory containing `specd.yaml`:
+
+1. `specd.yaml` — the committed project root (always the first active layer)
+2. `specd.*.yaml` — named shared variants (e.g. `specd.ci.yaml`, `specd.staging.yaml`), sorted lexicographically
+3. `specd.local.yaml` — personal local override
+4. `specd.local.*.yaml` — named local variants (e.g. `specd.local.mono.yaml`), sorted lexicographically
+
+Discovery walks up from the current working directory to the git root and stops at the first directory containing at least one candidate file. `specd.yaml` must exist for discovery to succeed.
+
+### Cascade resolution
+
+Each variant file may declare an `extends` key:
+
+| `extends` value | Behaviour                                                                                         |
+| --------------- | ------------------------------------------------------------------------------------------------- |
+| absent          | File becomes a **standalone root** — all previous layers are discarded and this file starts fresh |
+| `true`          | File inherits from the previous active layer (or from `specd.yaml` if it is the first overlay)    |
+| `<path>`        | File inherits from the named base file, but **only if that base is already in the active chain**  |
+
+Resolution builds an active chain starting from `specd.yaml`. Each subsequent candidate is either attached (extends a layer in the chain) or skipped (its base is not active). A file with no `extends` becomes a new standalone root — everything before it is discarded.
+
+### Forced mode (`--config`)
+
+Passing `--config path/to/file.yaml` loads that file as a self-contained closed chain. If the file declares `extends: true`, it resolves against `specd.yaml` in the same directory. If it declares `extends: <path>`, the chain follows explicit links until no file extends further.
+
+### Merge semantics
+
+Layers in the active chain are deep-merged in order:
+
+- **Scalars** — later values replace earlier ones
+- **Objects** — recursively merged
+- **Arrays** — later arrays **append** to earlier ones (no replacement)
+
+### Removals
+
+An overlay layer may declare a `remove` block to strip entries inherited from prior layers:
+
+```yaml
+extends: true
+remove:
+  root:
+    - contextExcludeSpecs
+  workspaces:
+    - staging
+  context:
+    - id: ci-only-instruction
+    - file: CI_AGENTS.md
+  plugins:
+    agents:
+      - name: '@specd/plugin-agent-copilot'
+```
+
+| Removal target   | Keyed by                       | Effect                                |
+| ---------------- | ------------------------------ | ------------------------------------- |
+| `root`           | field name                     | Removes the named top-level field     |
+| `workspaces`     | workspace name                 | Removes the named workspace           |
+| `storage`        | storage key                    | Removes a storage binding             |
+| `context`        | `id`, `file`, or `instruction` | Removes matching context entries      |
+| `plugins.agents` | `name`                         | Removes a matching plugin declaration |
+
+Removals are applied immediately after the layer that declares them is merged. A `remove` block without `extends` is an error.
+
+### Gitignored local files
+
+`specd project init` adds both `specd.local.yaml` and `specd.local.*.yaml` to `.gitignore` automatically. Local variants are for personal experimentation: trying a different schema branch, pointing at a local schema copy, or testing a configuration change without affecting the rest of the team.
+
+### Common patterns
+
+**Personal local override:**
+
+```yaml
+# specd.local.yaml
+extends: true
+schema: './my-local-schema'
+```
+
+**CI-specific variant:**
+
+```yaml
+# specd.ci.yaml
+extends: true
+context:
+  - instruction: 'Running in CI. Skip interactive prompts.'
+remove:
+  plugins:
+    agents:
+      - name: '@specd/plugin-agent-copilot'
+```
+
+**Standalone local config (fresh start, no inheritance):**
+
+```yaml
+# specd.local.yaml — no extends key
+schema: '@specd/schema-std'
+workspaces:
+  default:
+    specs:
+      adapter: fs
+      fs:
+        path: specs/
+storage:
+  changes:
+    adapter: fs
+    fs:
+      path: .specd/changes
+  drafts:
+    adapter: fs
+    fs:
+      path: .specd/drafts
+  discarded:
+    adapter: fs
+    fs:
+      path: .specd/discarded
+  archive:
+    adapter: fs
+    fs:
+      path: .specd/archive
+```
 
 ---
 

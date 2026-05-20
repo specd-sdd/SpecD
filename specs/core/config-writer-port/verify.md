@@ -16,7 +16,7 @@
 
 - **GIVEN** a directory with no existing `specd.yaml`
 - **WHEN** `initProject` is called with valid options
-- **THEN** a `specd.yaml` is created, storage directories are created, and `specd.local.yaml` is appended to `.gitignore`
+- **THEN** a `specd.yaml` is created, storage directories are created, and both `specd.local.yaml` and `specd.local.*.yaml` are appended to `.gitignore`
 
 #### Scenario: Result contains expected metadata
 

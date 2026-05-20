@@ -42,7 +42,7 @@ The `initProject` method MUST:
 
 1. Create a `specd.yaml` file in `projectRoot` with the schema, workspace, and storage configuration
 2. Create the required storage directories (`.specd/changes/`, `.specd/drafts/`, `.specd/discarded/`, `.specd/archive/`)
-3. Append `specd.local.yaml` to `.gitignore` if not already present
+3. Append both `specd.local.yaml` and the `specd.local.*.yaml` local-variant pattern to `.gitignore` if not already present
 
 ### Requirement: InitProject already-initialised guard
 

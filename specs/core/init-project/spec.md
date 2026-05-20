@@ -38,7 +38,7 @@ The `ConfigWriter.initProject` implementation MUST:
 
 - Write `specd.yaml` with the provided schema reference, workspace, and specs path.
 - Create standard storage directories (`changes/`, `drafts/`, `discarded/`, `archive/`).
-- Append `specd.local.yaml` to `.gitignore`.
+- Append both `specd.local.yaml` and the `specd.local.*.yaml` local-variant pattern to `.gitignore`.
 
 ## Constraints
 
