@@ -474,6 +474,7 @@ specd graph search "<query>" --specs --spec-content --format toon
 ```bash
 specd graph impact --symbol "<name>" --direction dependents --format toon
 specd graph impact --file "<workspace:path>" --direction dependents --format toon
+specd graph impact --spec "<workspace:capability>" --direction dependents --format toon
 specd graph impact --symbol "<name>" --direction dependencies --format toon
 specd graph impact --file <workspace:path1> --file <workspace:path2> --format toon
 ```

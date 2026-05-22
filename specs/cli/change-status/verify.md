@@ -56,6 +56,20 @@
 - **THEN** the command prints those blocker codes and messages
 - **AND** it does not substitute a locally recomputed explanation
 
+#### Scenario: JSON output includes hasTasks in artifactDag
+
+- **GIVEN** a change using a schema where one artifact has task capability
+- **WHEN** `specd change status <name> --format json` is run
+- **THEN** the `artifactDag` array entries include `hasTasks: true` for that artifact
+
+#### Scenario: JSON output state reflects drift-aware projection
+
+- **GIVEN** an artifact in `complete` canonical state
+- **AND** it has detected content drift (`hasDrift: true`)
+- **WHEN** `specd change status <name> --format json` is run
+- **THEN** the `state` field in `artifactDag` is reported as `complete-with-drift`
+- **AND** agents can detect drift without manually comparing hashes
+
 ### Requirement: Display-state rendering
 
 #### Scenario: Text output prefers complete-with-drift over raw complete
@@ -138,3 +152,60 @@
 - **GIVEN** `GetStatus` returns `review.required: true` with `reason: 'artifact-review-required'`
 - **WHEN** `specd change status <name>` is run
 - **THEN** no `overlap:` subsection appears in the review section
+
+### Requirement: Implementation section
+
+#### Scenario: Status renders tracked implementation files by review state
+
+- **GIVEN** `GetStatus` returns tracked implementation files in `open`, `resolved`, and `ignored` state
+- **WHEN** `specd change status <name> --implementation` is rendered
+- **THEN** the implementation section exposes those tracked-file review states
+
+#### Scenario: Status renders file-level and symbol-level confirmed links
+
+- **GIVEN** `GetStatus` returns confirmed implementation links
+- **AND** one link has symbol refinements while another is file-level only
+- **WHEN** `specd change status <name> --implementation` is rendered
+- **THEN** the implementation section shows both links
+- **AND** only the symbol-level link renders symbol refinements
+
+#### Scenario: Status may enrich symbol links with stale diagnostics
+
+- **GIVEN** `GetStatus` returns symbol-level implementation links
+- **AND** the CLI can query an indexed code graph
+- **WHEN** one target symbol is absent from the graph database
+- **AND** `specd change status <name> --implementation` is run
+- **THEN** the rendered implementation section marks that symbol-level link as stale
+- **AND** file-level links are not marked stale
+
+#### Scenario: Status retries composed member links against the same file
+
+- **GIVEN** `GetStatus` returns a symbol-level link with stored symbol `ArchiveChange.execute`
+- **AND** the code graph does not expose that exact stored string
+- **AND** the same file contains one graph symbol named `execute` with the expected kind
+- **WHEN** `specd change status <name> --implementation` is rendered
+- **THEN** the CLI resolves staleness using the same-file fallback on the rightmost member segment
+- **AND** the link is not reported as stale
+
+#### Scenario: Status keeps composed member links stale when fallback is ambiguous
+
+- **GIVEN** `GetStatus` returns a symbol-level link with stored symbol `X.Y`
+- **AND** the code graph does not expose that exact stored string
+- **AND** the same file contains multiple graph symbols named `Y`
+- **WHEN** `specd change status <name> --implementation` is rendered
+- **THEN** the CLI leaves the stored symbol marked stale
+- **AND** it does not guess which same-file symbol should satisfy the link
+
+#### Scenario: Status shows graph-state hint when stale diagnostics are unavailable
+
+- **GIVEN** `GetStatus` returns symbol-level implementation links
+- **AND** the code graph is not indexed or is known stale
+- **WHEN** `specd change status <name> --implementation` is rendered
+- **THEN** the implementation section still renders the raw links
+- **AND** it adds a graph-state hint instead of failing
+
+#### Scenario: Implementation section omitted by default
+
+- **GIVEN** `GetStatus` returns implementation tracking data
+- **WHEN** `specd change status <name>` is run without `--implementation`
+- **THEN** stdout omits the implementation section

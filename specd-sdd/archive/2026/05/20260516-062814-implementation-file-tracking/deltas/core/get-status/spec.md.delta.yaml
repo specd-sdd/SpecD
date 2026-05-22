@@ -1,0 +1,49 @@
+- op: added
+  description: 'Add implementation detector dependency'
+  position:
+    parent:
+      type: section
+      matches: 'Spec Dependencies'
+  content: |
+    - [`core:implementation-detector-port`](../implementation-detector-port/spec.md) — targeted autodetection before status projection
+
+- op: modified
+  description: 'Extend constructor dependencies with ImplementationDetector'
+  selector:
+    type: section
+    matches: 'Requirement: Constructor dependencies'
+  content: |
+    `GetStatus` MUST accept the following constructor arguments:
+
+    - `changes: ChangeRepository` — for loading changes by name
+    - `schemaProvider: SchemaProvider` — for obtaining the fully-resolved active schema
+    - `lifecycle: LifecycleEngine` — for deriving effective artifact status, blockers, routing, and next-action guidance from the change plus active schema
+    - `implementationDetector: ImplementationDetector` — for targeted implementation autodetection when implementation tracking is active
+    - `approvals: { readonly spec: boolean; readonly signoff: boolean }` — whether approval gates are active
+
+    It MUST delegate to `ChangeRepository.get(name)` to load the change. `SchemaProvider` replaces the previous `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths` triple, providing the fully-resolved schema with plugins and overrides applied.
+
+- op: added
+  description: 'Add implementation refresh and result projection'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Returns the change and its artifact statuses'
+  content: |
+    ### Requirement: Implementation autodetection on status load
+
+    When the change has entered `implementing` at least once in its history, `GetStatus` MUST trigger targeted implementation autodetection before finalizing the returned status view.
+
+    Detection updates the persisted tracked implementation state for that change, then `GetStatus` returns the refreshed tracked files and confirmed implementation links as part of the status result.
+
+    ### Requirement: Implementation status projection
+
+    `GetStatusResult` SHALL include implementation-tracking data for delivery layers.
+
+    That projection MUST include:
+
+    - tracked implementation files with review state
+    - confirmed implementation links, including file-level links and symbol-level refinements

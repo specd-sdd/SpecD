@@ -6,6 +6,10 @@ privacy:
 # Agent instructions prepended before spec content
 context:
   - instruction: |
+      GRAPH-FIRST PROTOCOL: You MUST use `specd graph` for all code exploration.
+      Generic grep/glob tools are only for non-code files or as a last resort.
+      Index the graph (`specd graph index`) if it is stale or missing.
+
       specd is a spec-driven development platform. TypeScript, pnpm monorepo,
       ESM only. Hexagonal architecture: domain (no I/O), application (ports),
       infrastructure (fs adapters). Rich entities enforce invariants; pure

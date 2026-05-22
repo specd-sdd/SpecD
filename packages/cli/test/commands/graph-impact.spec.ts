@@ -43,8 +43,10 @@ function setup() {
   const mockProvider = {
     analyzeImpact: vi.fn(),
     analyzeFileImpact: vi.fn(),
+    analyzeSpecImpact: vi.fn(),
     detectChanges: vi.fn(),
     findSymbols: vi.fn(),
+    getSpec: vi.fn(),
     getFile: vi.fn().mockResolvedValue({ path: 'src/auth.ts', workspace: 'core' }),
     findFilesByConfigRelativePath: vi
       .fn()
@@ -441,7 +443,7 @@ describe('graph impact', () => {
         /* ExitSentinel from process.exit(1) */
       }
 
-      expect(getStderr()).toContain('provide exactly one of --file or --symbol')
+      expect(getStderr()).toContain('provide exactly one of --file, --symbol, or --spec')
     })
 
     it('rejects when multiple selectors are provided', async () => {
@@ -463,7 +465,7 @@ describe('graph impact', () => {
         /* ExitSentinel from process.exit(1) */
       }
 
-      expect(getStderr()).toContain('provide exactly one of --file or --symbol')
+      expect(getStderr()).toContain('provide exactly one of --file, --symbol, or --spec')
     })
 
     it('rejects --config and --path together', async () => {
@@ -488,6 +490,101 @@ describe('graph impact', () => {
       }
 
       expect(getStderr()).toContain('--config and --path are mutually exclusive')
+    })
+  })
+
+  describe('--spec output', () => {
+    it('outputs impact for a spec selector', async () => {
+      const { mockProvider, getStdout } = setup()
+      mockProvider.getSpec.mockResolvedValue({
+        specId: 'core:change',
+        workspace: 'core',
+        path: 'change',
+        title: 'Change',
+        description: '',
+        content: '',
+      })
+      mockProvider.analyzeSpecImpact.mockResolvedValue({
+        target: 'core:change',
+        directDependents: 1,
+        indirectDependents: 0,
+        transitiveDependents: 0,
+        riskLevel: 'LOW',
+        affectedFiles: ['core:src/change.ts'],
+        affectedSymbols: [],
+        affectedProcesses: [],
+        affectedSpecs: ['core:get-status'],
+      })
+
+      await makeImpactProgram().parseAsync([
+        'node',
+        'specd',
+        'graph',
+        'impact',
+        '--spec',
+        'core:change',
+      ])
+
+      expect(mockProvider.analyzeSpecImpact).toHaveBeenCalledWith('core:change', 'upstream', 3)
+      const out = getStdout()
+      expect(out).toContain('Impact analysis for spec core:change')
+      expect(out).toContain('Affected specs:')
+      expect(out).toContain('core:get-status')
+    })
+
+    it('returns structured not_found output for unknown specs', async () => {
+      const { mockProvider, getStdout } = setup()
+      mockProvider.getSpec.mockResolvedValue(undefined)
+
+      await makeImpactProgram().parseAsync([
+        'node',
+        'specd',
+        'graph',
+        'impact',
+        '--spec',
+        'core:missing',
+        '--format',
+        'json',
+      ])
+
+      expect(JSON.parse(getStdout())).toEqual({
+        error: 'not_found',
+        spec: 'core:missing',
+      })
+    })
+
+    it('JSON output includes aggregate impact fields', async () => {
+      const { mockProvider, getStdout } = setup()
+      mockProvider.analyzeSpecImpact.mockResolvedValue({
+        target: 'core:change',
+        directDependents: 10,
+        indirectDependents: 5,
+        transitiveDependents: 15,
+        riskLevel: 'MEDIUM',
+        affectedFiles: ['f1.ts', 'f2.ts'],
+        affectedSymbols: [],
+        affectedProcesses: [],
+        symbols: [],
+      })
+      mockProvider.getSpec.mockResolvedValue({ specId: 'core:change' })
+
+      await makeImpactProgram().parseAsync([
+        'node',
+        'specd',
+        'graph',
+        'impact',
+        '--spec',
+        'core:change',
+        '--format',
+        'json',
+      ])
+
+      const result = JSON.parse(getStdout())
+      expect(result.riskLevel).toBe('MEDIUM')
+      expect(result.directDepsCount).toBe(10)
+      expect(result.indirectDepsCount).toBe(5)
+      expect(result.transitiveDepsCount).toBe(15)
+      expect(result.affectedFilesCount).toBe(2)
     })
   })
 

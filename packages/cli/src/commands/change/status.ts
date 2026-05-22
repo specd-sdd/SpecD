@@ -3,6 +3,7 @@ import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'
 import { type ArtifactStatusEntry, type ArtifactType } from '@specd/core'
+import { enrichImplementationTracking } from './_implementation-tracking.js'
 
 /**
  * Registers the `change status` subcommand on the given parent command.
@@ -17,6 +18,7 @@ export function registerChangeStatus(parent: Command): void {
       'Display the current state, artifact statuses, lifecycle transitions, and blockers for a named change.',
     )
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
+    .option('--implementation', 'show implementation tracking details')
     .option('--config <path>', 'path to specd.yaml')
     .addHelpText(
       'after',
@@ -49,217 +51,260 @@ JSON/TOON output schema:
   }
 `,
     )
-    .action(async (name: string, opts: { format: string; config?: string }) => {
-      try {
-        const { kernel } = await resolveCliContext({ configPath: opts.config })
-        const statusResult = await kernel.changes.status.execute({
-          name,
-        })
+    .action(
+      async (name: string, opts: { format: string; implementation?: boolean; config?: string }) => {
+        try {
+          const { config, kernel } = await resolveCliContext({ configPath: opts.config })
+          const statusResult = await kernel.changes.status.execute({
+            name,
+          })
 
-        const { change, artifactStatuses, lifecycle, review, blockers, nextAction } = statusResult
+          const { change, artifactStatuses, lifecycle, review, blockers, nextAction } = statusResult
+          const implementationTracking = opts.implementation
+            ? await enrichImplementationTracking(config, statusResult.implementationTracking)
+            : undefined
 
-        // Schema version warning
-        if (lifecycle.schemaInfo !== null) {
-          const recorded = `${change.schemaName}@${change.schemaVersion}`
-          const current = `${lifecycle.schemaInfo.name}@${lifecycle.schemaInfo.version}`
-          if (recorded !== current) {
-            process.stderr.write(
-              `warning: change was created with schema ${recorded} but active schema is ${current}\n`,
-            )
-          }
-        }
-
-        const fmt = parseFormat(opts.format)
-
-        if (fmt === 'text') {
-          const lines = [
-            `change:      ${change.name}`,
-            `state:       ${change.state}`,
-            `specs:       ${[...change.specIds].join(', ') || '(none)'}`,
-          ]
-          if (change.description !== undefined) {
-            lines.push(`description: ${change.description}`)
-          }
-          lines.push('')
-
-          // Artifact DAG Section
+          // Schema version warning
           if (lifecycle.schemaInfo !== null) {
-            lines.push('artifacts (DAG):')
-            lines.push(
-              '  [✓] complete  [ ] missing  [!] drifted  [~] needs review  [?] in-progress',
-            )
-            lines.push('')
-            lines.push(...renderDag(lifecycle.schemaInfo.artifacts, artifactStatuses))
-            lines.push('')
-          }
-
-          // Blockers Section
-          if (blockers.length > 0) {
-            lines.push('blockers:')
-            for (const b of blockers) {
-              lines.push(`  ! ${b.code}: ${b.message}`)
-            }
-            lines.push('')
-          }
-
-          // Next Action Section
-          lines.push('next action:')
-          lines.push(`  target:  ${nextAction.targetStep}`)
-          lines.push(`  command: ${nextAction.command ?? '(none)'}`)
-          lines.push(`  reason:  ${nextAction.reason}`)
-          lines.push('')
-
-          // Lifecycle Section
-          lines.push('lifecycle:')
-          if (lifecycle.availableTransitions.length > 0) {
-            lines.push(`  transitions:  ${lifecycle.availableTransitions.join(', ')}`)
-          }
-          if (lifecycle.nextArtifact !== null) {
-            lines.push(`  next artifact: ${lifecycle.nextArtifact}`)
-          }
-          const specGate = lifecycle.approvals.spec ? 'on' : 'off'
-          const signoffGate = lifecycle.approvals.signoff ? 'on' : 'off'
-          lines.push(`  approvals:     spec=${specGate}  signoff=${signoffGate}`)
-          lines.push(`  path:          ${lifecycle.changePath}`)
-
-          if (review?.required === true) {
-            lines.push('')
-            lines.push('review:')
-            lines.push(`  required: yes`)
-            lines.push(`  route:    ${review.route}`)
-            lines.push(`  reason:   ${review.reason}`)
-            if (review.reason === 'spec-overlap-conflict' && review.overlapDetail.length > 0) {
-              lines.push('  overlap:')
-              for (const entry of review.overlapDetail) {
-                lines.push(
-                  `    - archived: ${entry.archivedChangeName}, specs: ${entry.overlappingSpecIds.join(', ')}`,
-                )
-              }
-            }
-            for (const artifact of review.affectedArtifacts) {
-              lines.push(`  ${artifact.type}:`)
-              for (const file of artifact.files) {
-                lines.push(`    - ${file.path}`)
-              }
-            }
-          }
-
-          lines.push('')
-          lines.push('artifacts (details):')
-          for (const a of artifactStatuses) {
-            lines.push(`  ${a.type}  ${a.displayStatus}  (effective: ${a.effectiveStatus})`)
-            for (const file of a.files) {
-              const hash = file.validatedHash !== undefined ? `  ${file.validatedHash}` : ''
-              const drift = file.hasDrift ? '  [drift]' : ''
-              lines.push(
-                `    - ${file.key}  ${file.displayStatus}  ${file.filename}${hash}${drift}`,
+            const recorded = `${change.schemaName}@${change.schemaVersion}`
+            const current = `${lifecycle.schemaInfo.name}@${lifecycle.schemaInfo.version}`
+            if (recorded !== current) {
+              process.stderr.write(
+                `warning: change was created with schema ${recorded} but active schema is ${current}\n`,
               )
             }
           }
 
-          output(lines.join('\n'), 'text')
-        } else {
-          output(
-            {
-              name: change.name,
-              state: change.state,
-              specIds: [...change.specIds],
-              schema: { name: change.schemaName, version: change.schemaVersion },
-              ...(change.description !== undefined ? { description: change.description } : {}),
-              blockers: blockers.map((b) => ({ code: b.code, message: b.message })),
-              nextAction: {
-                targetStep: nextAction.targetStep,
-                actionType: nextAction.actionType,
-                reason: nextAction.reason,
-                command: nextAction.command,
-              },
-              artifactDag:
-                lifecycle.schemaInfo?.artifacts.map((a) => ({
-                  id: a.id,
-                  scope: a.scope,
-                  state:
-                    artifactStatuses.find((as) => as.type === a.id)?.effectiveStatus ?? 'missing',
-                  requires: a.requires ?? [],
-                  children:
-                    lifecycle.schemaInfo?.artifacts
-                      .filter((child) => child.requires.includes(a.id))
-                      .map((child) => child.id) ?? [],
-                })) ?? [],
-              artifacts: artifactStatuses.map((a) => ({
-                type: a.type,
-                state: a.state,
-                displayStatus: a.displayStatus,
-                effectiveStatus: a.effectiveStatus,
-                files: a.files.map((file) => ({
-                  key: file.key,
-                  filename: file.filename,
-                  state: file.state,
-                  displayStatus: file.displayStatus,
-                  hasDrift: file.hasDrift,
-                  ...(file.validatedHash !== undefined
-                    ? { validatedHash: file.validatedHash }
-                    : {}),
-                })),
-              })),
-              review: {
-                required: review?.required ?? false,
-                route: review?.route ?? null,
-                reason: review?.reason ?? null,
-                overlapDetail: review?.overlapDetail ?? [],
-                affectedArtifacts: (review?.affectedArtifacts ?? []).map((artifact) => ({
-                  type: artifact.type,
-                  files: artifact.files.map((file) => ({
+          const fmt = parseFormat(opts.format)
+
+          if (fmt === 'text') {
+            const lines = [
+              `change:      ${change.name}`,
+              `state:       ${change.state}`,
+              `specs:       ${[...change.specIds].join(', ') || '(none)'}`,
+            ]
+            if (change.description !== undefined) {
+              lines.push(`description: ${change.description}`)
+            }
+            lines.push('')
+
+            // Artifact DAG Section
+            if (lifecycle.schemaInfo !== null) {
+              lines.push('artifacts (DAG):')
+              lines.push(
+                '  [✓] complete  [ ] missing  [!] drifted  [~] needs review  [?] in-progress',
+              )
+              lines.push('')
+              lines.push(...renderDag(lifecycle.schemaInfo.artifacts, artifactStatuses))
+              lines.push('')
+            }
+
+            // Blockers Section
+            if (blockers.length > 0) {
+              lines.push('blockers:')
+              for (const b of blockers) {
+                lines.push(`  ! ${b.code}: ${b.message}`)
+              }
+              lines.push('')
+            }
+
+            // Next Action Section
+            lines.push('next action:')
+            lines.push(`  target:  ${nextAction.targetStep}`)
+            lines.push(`  command: ${nextAction.command ?? '(none)'}`)
+            lines.push(`  reason:  ${nextAction.reason}`)
+            lines.push('')
+
+            // Lifecycle Section
+            lines.push('lifecycle:')
+            if (lifecycle.availableTransitions.length > 0) {
+              lines.push(`  transitions:  ${lifecycle.availableTransitions.join(', ')}`)
+            }
+            if (lifecycle.nextArtifact !== null) {
+              lines.push(`  next artifact: ${lifecycle.nextArtifact}`)
+            }
+            const specGate = lifecycle.approvals.spec ? 'on' : 'off'
+            const signoffGate = lifecycle.approvals.signoff ? 'on' : 'off'
+            lines.push(`  approvals:     spec=${specGate}  signoff=${signoffGate}`)
+            lines.push(`  path:          ${lifecycle.changePath}`)
+
+            if (opts.implementation && implementationTracking !== undefined) {
+              lines.push('')
+              lines.push('implementation:')
+              lines.push(`  graph:         ${implementationTracking.graphHint.message}`)
+              for (const state of ['open', 'resolved', 'ignored'] as const) {
+                const files = implementationTracking.trackedFiles.filter(
+                  (entry) => entry.state === state,
+                )
+                lines.push(
+                  `  ${state}: ${files.length > 0 ? files.map((entry) => entry.file).join(', ') : '(none)'}`,
+                )
+              }
+              if (implementationTracking.links.length > 0) {
+                lines.push('  links:')
+                for (const link of implementationTracking.links) {
+                  const staleSuffix =
+                    link.staleSymbols.length > 0 ? `  [stale: ${link.staleSymbols.join(', ')}]` : ''
+                  const symbolSuffix =
+                    link.symbols !== undefined && link.symbols.length > 0
+                      ? `  symbols=${link.symbols.join(', ')}`
+                      : '  file-level'
+                  lines.push(`    - ${link.specId} -> ${link.file}${symbolSuffix}${staleSuffix}`)
+                }
+              } else {
+                lines.push('  links:         (none)')
+              }
+            }
+
+            if (review?.required === true) {
+              lines.push('')
+              lines.push('review:')
+              lines.push(`  required: yes`)
+              lines.push(`  route:    ${review.route}`)
+              lines.push(`  reason:   ${review.reason}`)
+              if (review.reason === 'spec-overlap-conflict' && review.overlapDetail.length > 0) {
+                lines.push('  overlap:')
+                for (const entry of review.overlapDetail) {
+                  lines.push(
+                    `    - archived: ${entry.archivedChangeName}, specs: ${entry.overlappingSpecIds.join(', ')}`,
+                  )
+                }
+              }
+              for (const artifact of review.affectedArtifacts) {
+                lines.push(`  ${artifact.type}:`)
+                for (const file of artifact.files) {
+                  lines.push(`    - ${file.path}`)
+                }
+              }
+            }
+
+            lines.push('')
+            lines.push('artifacts (details):')
+            for (const a of artifactStatuses) {
+              lines.push(`  ${a.type}  ${a.displayStatus}  (effective: ${a.effectiveStatus})`)
+              for (const file of a.files) {
+                const hash = file.validatedHash !== undefined ? `  ${file.validatedHash}` : ''
+                const drift = file.hasDrift ? '  [drift]' : ''
+                lines.push(
+                  `    - ${file.key}  ${file.displayStatus}  ${file.filename}${hash}${drift}`,
+                )
+              }
+            }
+
+            output(lines.join('\n'), 'text')
+          } else {
+            output(
+              {
+                name: change.name,
+                state: change.state,
+                specIds: [...change.specIds],
+                schema: { name: change.schemaName, version: change.schemaVersion },
+                ...(change.description !== undefined ? { description: change.description } : {}),
+                blockers: blockers.map((b) => ({ code: b.code, message: b.message })),
+                nextAction: {
+                  targetStep: nextAction.targetStep,
+                  actionType: nextAction.actionType,
+                  reason: nextAction.reason,
+                  command: nextAction.command,
+                },
+                artifactDag:
+                  lifecycle.schemaInfo?.artifacts.map((a) => ({
+                    id: a.id,
+                    scope: a.scope,
+                    state:
+                      artifactStatuses.find((as) => as.type === a.id)?.displayStatus ?? 'missing',
+                    requires: a.requires ?? [],
+                    hasTasks: a.hasTasks,
+                    children:
+                      lifecycle.schemaInfo?.artifacts
+                        .filter((child) => child.requires.includes(a.id))
+                        .map((child) => child.id) ?? [],
+                  })) ?? [],
+                artifacts: artifactStatuses.map((a) => ({
+                  type: a.type,
+                  state: a.state,
+                  displayStatus: a.displayStatus,
+                  effectiveStatus: a.effectiveStatus,
+                  files: a.files.map((file) => ({
                     key: file.key,
                     filename: file.filename,
-                    path: file.path,
+                    state: file.state,
+                    displayStatus: file.displayStatus,
+                    hasDrift: file.hasDrift,
+                    ...(file.validatedHash !== undefined
+                      ? { validatedHash: file.validatedHash }
+                      : {}),
                   })),
                 })),
+                review: {
+                  required: review?.required ?? false,
+                  route: review?.route ?? null,
+                  reason: review?.reason ?? null,
+                  overlapDetail: review?.overlapDetail ?? [],
+                  affectedArtifacts: (review?.affectedArtifacts ?? []).map((artifact) => ({
+                    type: artifact.type,
+                    files: artifact.files.map((file) => ({
+                      key: file.key,
+                      filename: file.filename,
+                      path: file.path,
+                    })),
+                  })),
+                },
+                lifecycle: {
+                  validTransitions: [...lifecycle.validTransitions],
+                  availableTransitions: [...lifecycle.availableTransitions],
+                  blockers: lifecycle.blockers.map((b) => ({
+                    transition: b.transition,
+                    reason: b.reason,
+                    blocking: [...b.blocking],
+                  })),
+                  approvals: lifecycle.approvals,
+                  nextArtifact: lifecycle.nextArtifact,
+                  changePath: lifecycle.changePath,
+                  schemaInfo:
+                    lifecycle.schemaInfo !== null
+                      ? { name: lifecycle.schemaInfo.name, version: lifecycle.schemaInfo.version }
+                      : null,
+                },
+                ...(opts.implementation && implementationTracking !== undefined
+                  ? {
+                      implementationTracking: {
+                        trackedFiles: implementationTracking.trackedFiles,
+                        links: implementationTracking.links,
+                        graphHint: implementationTracking.graphHint,
+                      },
+                    }
+                  : {}),
+                ...(lifecycle.schemaInfo !== null
+                  ? {
+                      schema: {
+                        name: lifecycle.schemaInfo.name,
+                        version: lifecycle.schemaInfo.version,
+                        artifactDag:
+                          lifecycle.schemaInfo.artifacts?.map((a) => ({
+                            id: a.id,
+                            scope: a.scope,
+                            optional: a.optional ?? false,
+                            requires: a.requires ?? [],
+                            hasTasks: a.hasTasks,
+                            output: a.output,
+                          })) ?? [],
+                      },
+                    }
+                  : {}),
+                approvalGates: {
+                  specEnabled: lifecycle.approvals.spec,
+                  signoffEnabled: lifecycle.approvals.signoff,
+                },
               },
-              lifecycle: {
-                validTransitions: [...lifecycle.validTransitions],
-                availableTransitions: [...lifecycle.availableTransitions],
-                blockers: lifecycle.blockers.map((b) => ({
-                  transition: b.transition,
-                  reason: b.reason,
-                  blocking: [...b.blocking],
-                })),
-                approvals: lifecycle.approvals,
-                nextArtifact: lifecycle.nextArtifact,
-                changePath: lifecycle.changePath,
-                schemaInfo:
-                  lifecycle.schemaInfo !== null
-                    ? { name: lifecycle.schemaInfo.name, version: lifecycle.schemaInfo.version }
-                    : null,
-              },
-              ...(lifecycle.schemaInfo !== null
-                ? {
-                    schema: {
-                      name: lifecycle.schemaInfo.name,
-                      version: lifecycle.schemaInfo.version,
-                      artifactDag:
-                        lifecycle.schemaInfo.artifacts?.map((a) => ({
-                          id: a.id,
-                          scope: a.scope,
-                          optional: a.optional ?? false,
-                          requires: a.requires ?? [],
-                          hasTasks: a.hasTasks,
-                          output: a.output,
-                        })) ?? [],
-                    },
-                  }
-                : {}),
-              approvalGates: {
-                specEnabled: lifecycle.approvals.spec,
-                signoffEnabled: lifecycle.approvals.signoff,
-              },
-            },
-            fmt,
-          )
+              fmt,
+            )
+          }
+        } catch (err) {
+          handleError(err, opts.format)
         }
-      } catch (err) {
-        handleError(err, opts.format)
-      }
-    })
+      },
+    )
 }
 
 /**

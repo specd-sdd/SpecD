@@ -888,6 +888,94 @@ export class LadybugGraphStore extends GraphStore {
   }
 
   /**
+   * Returns file coverage relations for a spec from the Ladybug backend.
+   * @param specId - Spec identifier.
+   * @returns File coverage relations.
+   */
+  async getCoveredFiles(specId: string): Promise<Relation[]> {
+    this.ensureOpen()
+    const rows = await execPrepared(
+      this.conn!,
+      `MATCH (s:Spec {specId: $specId})-[r:COVERS_FILE]->(f:File) RETURN f.path AS target, r.metadata_json AS metadata_json`,
+      { specId },
+    )
+    return rows.map((r) => ({
+      source: specId,
+      target: r['target'] as string,
+      type: RT.CoversFile as RelationType,
+      metadata: r['metadata_json']
+        ? (JSON.parse(r['metadata_json'] as string) as Record<string, unknown>)
+        : undefined,
+    }))
+  }
+
+  /**
+   * Returns specs that cover a given file from the Ladybug backend.
+   * @param filePath - Canonical file path.
+   * @returns File coverage relations keyed by spec.
+   */
+  async getCoveringSpecs(filePath: string): Promise<Relation[]> {
+    this.ensureOpen()
+    const rows = await execPrepared(
+      this.conn!,
+      `MATCH (s:Spec)-[r:COVERS_FILE]->(f:File {path: $filePath}) RETURN s.specId AS source, r.metadata_json AS metadata_json`,
+      { filePath },
+    )
+    return rows.map((r) => ({
+      source: r['source'] as string,
+      target: filePath,
+      type: RT.CoversFile as RelationType,
+      metadata: r['metadata_json']
+        ? (JSON.parse(r['metadata_json'] as string) as Record<string, unknown>)
+        : undefined,
+    }))
+  }
+
+  /**
+   * Returns symbol coverage relations for a spec from the Ladybug backend.
+   * @param specId - Spec identifier.
+   * @returns Symbol coverage relations.
+   */
+  async getCoveredSymbols(specId: string): Promise<Relation[]> {
+    this.ensureOpen()
+    const rows = await execPrepared(
+      this.conn!,
+      `MATCH (s:Spec {specId: $specId})-[r:COVERS_SYMBOL]->(sym:Symbol) RETURN sym.id AS target, r.metadata_json AS metadata_json`,
+      { specId },
+    )
+    return rows.map((r) => ({
+      source: specId,
+      target: r['target'] as string,
+      type: RT.CoversSymbol as RelationType,
+      metadata: r['metadata_json']
+        ? (JSON.parse(r['metadata_json'] as string) as Record<string, unknown>)
+        : undefined,
+    }))
+  }
+
+  /**
+   * Returns specs that cover a given symbol from the Ladybug backend.
+   * @param symbolId - Canonical symbol identifier.
+   * @returns Symbol coverage relations keyed by spec.
+   */
+  async getSymbolCoveringSpecs(symbolId: string): Promise<Relation[]> {
+    this.ensureOpen()
+    const rows = await execPrepared(
+      this.conn!,
+      `MATCH (s:Spec)-[r:COVERS_SYMBOL]->(sym:Symbol {id: $symbolId}) RETURN s.specId AS source, r.metadata_json AS metadata_json`,
+      { symbolId },
+    )
+    return rows.map((r) => ({
+      source: r['source'] as string,
+      target: symbolId,
+      type: RT.CoversSymbol as RelationType,
+      metadata: r['metadata_json']
+        ? (JSON.parse(r['metadata_json'] as string) as Record<string, unknown>)
+        : undefined,
+    }))
+  }
+
+  /**
    * Searches for symbols matching the given query criteria (kind, name, file path).
    * @param query - The symbol query with optional filters.
    * @returns An array of matching symbol nodes.
@@ -1245,7 +1333,8 @@ export class LadybugGraphStore extends GraphStore {
       'USES_TYPE',
       'EXPORTS',
       'DEPENDS_ON',
-      'COVERS',
+      'COVERS_FILE',
+      'COVERS_SYMBOL',
       'EXTENDS',
       'IMPLEMENTS',
       'OVERRIDES',
@@ -1288,82 +1377,92 @@ export class LadybugGraphStore extends GraphStore {
    * @param rel - The relation to create.
    */
   private async createRelation(conn: Connection, rel: Relation): Promise<void> {
+    const metadataJson = JSON.stringify(rel.metadata ?? {})
+    const params = { source: rel.source, target: rel.target, metadataJson }
+
     switch (rel.type) {
       case RT.Imports:
         await runPrepared(
           conn,
-          `MATCH (a:File {path: $source}), (b:File {path: $target}) CREATE (a)-[:IMPORTS]->(b)`,
-          { source: rel.source, target: rel.target },
+          `MATCH (a:File {path: $source}), (b:File {path: $target}) CREATE (a)-[:IMPORTS {metadata_json: $metadataJson}]->(b)`,
+          params,
         )
         break
       case RT.Defines:
         await runPrepared(
           conn,
-          `MATCH (a:File {path: $source}), (b:Symbol {id: $target}) CREATE (a)-[:DEFINES]->(b)`,
-          { source: rel.source, target: rel.target },
+          `MATCH (a:File {path: $source}), (b:Symbol {id: $target}) CREATE (a)-[:DEFINES {metadata_json: $metadataJson}]->(b)`,
+          params,
         )
         break
       case RT.Calls:
         await runPrepared(
           conn,
-          `MATCH (a:Symbol {id: $source}), (b:Symbol {id: $target}) CREATE (a)-[:CALLS]->(b)`,
-          { source: rel.source, target: rel.target },
+          `MATCH (a:Symbol {id: $source}), (b:Symbol {id: $target}) CREATE (a)-[:CALLS {metadata_json: $metadataJson}]->(b)`,
+          params,
         )
         break
       case RT.Constructs:
         await runPrepared(
           conn,
-          `MATCH (a:Symbol {id: $source}), (b:Symbol {id: $target}) CREATE (a)-[:CONSTRUCTS]->(b)`,
-          { source: rel.source, target: rel.target },
+          `MATCH (a:Symbol {id: $source}), (b:Symbol {id: $target}) CREATE (a)-[:CONSTRUCTS {metadata_json: $metadataJson}]->(b)`,
+          params,
         )
         break
       case RT.UsesType:
         await runPrepared(
           conn,
-          `MATCH (a:Symbol {id: $source}), (b:Symbol {id: $target}) CREATE (a)-[:USES_TYPE]->(b)`,
-          { source: rel.source, target: rel.target },
+          `MATCH (a:Symbol {id: $source}), (b:Symbol {id: $target}) CREATE (a)-[:USES_TYPE {metadata_json: $metadataJson}]->(b)`,
+          params,
         )
         break
       case RT.Exports:
         await runPrepared(
           conn,
-          `MATCH (a:File {path: $source}), (b:Symbol {id: $target}) CREATE (a)-[:EXPORTS]->(b)`,
-          { source: rel.source, target: rel.target },
+          `MATCH (a:File {path: $source}), (b:Symbol {id: $target}) CREATE (a)-[:EXPORTS {metadata_json: $metadataJson}]->(b)`,
+          params,
         )
         break
       case RT.DependsOn:
         await runPrepared(
           conn,
-          `MATCH (a:Spec {specId: $source}), (b:Spec {specId: $target}) CREATE (a)-[:DEPENDS_ON]->(b)`,
-          { source: rel.source, target: rel.target },
+          `MATCH (a:Spec {specId: $source}), (b:Spec {specId: $target}) CREATE (a)-[:DEPENDS_ON {metadata_json: $metadataJson}]->(b)`,
+          params,
         )
         break
-      case RT.Covers:
+      case RT.CoversFile:
         await runPrepared(
           conn,
-          `MATCH (a:Spec {specId: $source}), (b:File {path: $target}) CREATE (a)-[:COVERS]->(b)`,
-          { source: rel.source, target: rel.target },
+          `MATCH (a:Spec {specId: $source}), (b:File {path: $target}) CREATE (a)-[:COVERS_FILE {metadata_json: $metadataJson}]->(b)`,
+          params,
+        )
+        break
+      case RT.CoversSymbol:
+        await runPrepared(
+          conn,
+          `MATCH (a:Spec {specId: $source}), (b:Symbol {id: $target}) CREATE (a)-[:COVERS_SYMBOL {metadata_json: $metadataJson}]->(b)`,
+          params,
         )
         break
       case RT.Extends:
         await runPrepared(
           conn,
-          `MATCH (a:Symbol {id: $source}), (b:Symbol {id: $target}) CREATE (a)-[:EXTENDS]->(b)`,
-          { source: rel.source, target: rel.target },
+          `MATCH (a:Symbol {id: $source}), (b:Symbol {id: $target}) CREATE (a)-[:EXTENDS {metadata_json: $metadataJson}]->(b)`,
+          params,
         )
         break
       case RT.Implements:
         await runPrepared(
           conn,
-          `MATCH (a:Symbol {id: $source}), (b:Symbol {id: $target}) CREATE (a)-[:IMPLEMENTS]->(b)`,
-          { source: rel.source, target: rel.target },
+          `MATCH (a:Symbol {id: $source}), (b:Symbol {id: $target}) CREATE (a)-[:IMPLEMENTS {metadata_json: $metadataJson}]->(b)`,
+          params,
         )
         break
       case RT.Overrides:
         await runPrepared(
           conn,
-          `MATCH (a:Symbol {id: $source}), (b:Symbol {id: $target}) CREATE (a)-[:OVERRIDES]->(b)`,
-          { source: rel.source, target: rel.target },
+          `MATCH (a:Symbol {id: $source}), (b:Symbol {id: $target}) CREATE (a)-[:OVERRIDES {metadata_json: $metadataJson}]->(b)`,
+          params,
         )
         break
     }
@@ -1382,14 +1481,16 @@ export class LadybugGraphStore extends GraphStore {
     this.ensureOpen()
     const rows = await execPrepared(
       this.conn!,
-      `MATCH (source:Symbol)-[r:${relationType}]->(target:Symbol {id: $symbolId}) RETURN source.id AS source`,
+      `MATCH (source:Symbol)-[r:${relationType}]->(target:Symbol {id: $symbolId}) RETURN source.id AS source, r.metadata_json AS metadata_json`,
       { symbolId },
     )
     return rows.map((row) => ({
       source: row['source'] as string,
       target: symbolId,
       type: relationType,
-      metadata: undefined,
+      metadata: row['metadata_json']
+        ? (JSON.parse(row['metadata_json'] as string) as Record<string, unknown>)
+        : undefined,
     }))
   }
 
@@ -1406,14 +1507,16 @@ export class LadybugGraphStore extends GraphStore {
     this.ensureOpen()
     const rows = await execPrepared(
       this.conn!,
-      `MATCH (source:Symbol {id: $symbolId})-[r:${relationType}]->(target:Symbol) RETURN target.id AS target`,
+      `MATCH (source:Symbol {id: $symbolId})-[r:${relationType}]->(target:Symbol) RETURN target.id AS target, r.metadata_json AS metadata_json`,
       { symbolId },
     )
     return rows.map((row) => ({
       source: symbolId,
       target: row['target'] as string,
       type: relationType,
-      metadata: undefined,
+      metadata: row['metadata_json']
+        ? (JSON.parse(row['metadata_json'] as string) as Record<string, unknown>)
+        : undefined,
     }))
   }
 

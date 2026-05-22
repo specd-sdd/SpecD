@@ -62,6 +62,7 @@ Impact analysis MUST include hierarchy relations in addition to existing call/im
 - changing a type symbol MUST affect symbols connected through `EXTENDS` and `IMPLEMENTS` according to traversal direction
 - changing a method symbol MUST affect symbols connected through `OVERRIDES` according to traversal direction
 - hierarchy-derived affected symbols participate in depth counts, risk calculation, and affected-file aggregation the same way as other affected symbols
+- requirement-aware symbol coverage relations (`COVERS_SYMBOL`) MAY also contribute affected specs when the caller requests requirement-aware impact views through higher-level traversal entry points
 
 Risk level thresholds:
 
@@ -101,6 +102,29 @@ It:
 - **`riskLevel`** — the maximum risk level across all symbols in the file
 
 When symbols in the file participate in `EXTENDS`, `IMPLEMENTS`, or `OVERRIDES`, their hierarchy-derived impact MUST be reflected in the aggregate result.
+
+### Requirement: Spec impact
+
+`analyzeSpecImpact(store: GraphStore, specId: string, direction: 'upstream' | 'downstream' | 'both', maxDepth?: number): Promise<ImpactResult>` SHALL compute requirement-aware impact for one spec.
+
+It MUST treat the following relation families as first-class blast-radius inputs:
+
+- `DEPENDS_ON` for `Spec -> Spec`
+- `COVERS_FILE` for `Spec -> File`
+- `COVERS_SYMBOL` for `Spec -> Symbol`
+
+In upstream/dependents mode, spec impact reports:
+
+- specs that depend on the target spec
+- files covered by the target spec
+- symbols covered by the target spec
+
+In downstream/dependencies mode, spec impact reports:
+
+- specs the target spec depends on
+- files and symbols reached through those downstream spec relationships where the traversal depth includes them
+
+The result shape remains `ImpactResult`, but the affected file and affected symbol sets are allowed to originate from requirement-aware relations rather than only code-structure traversal.
 
 ### Requirement: Change detection
 

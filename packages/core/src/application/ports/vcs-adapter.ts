@@ -53,6 +53,26 @@ export interface VcsAdapter {
   ref(): Promise<string | null>
 
   /**
+   * Returns the revision that was active at or before a given timestamp.
+   *
+   * Returns `null` when VCS is unavailable or no historical revision matches.
+   *
+   * @param at - ISO-8601 timestamp string
+   * @returns Revision identifier active at that time, or `null`
+   */
+  refAt(at: string): Promise<string | null>
+
+  /**
+   * Returns repository-relative file paths modified since a baseline revision.
+   *
+   * Missing or empty results are represented as an empty array.
+   *
+   * @param baseRef - Baseline revision identifier
+   * @returns Repository-relative changed file paths
+   */
+  modifiedFiles(baseRef: string): Promise<readonly string[]>
+
+  /**
    * Returns the content of a file at a given revision.
    *
    * Returns `null` when the revision or file path does not exist.

@@ -15,7 +15,7 @@
     {
       "requirement": "Command signature",
       "rules": [
-        "```text\nspecd graph impact [--file <paths...>] [--symbol <name>] [--direction dependents|dependencies|upstream|downstream|both] [--depth <n>] [--config <path> | --path <path>] [--format text|json|toon]\n```\n\nExactly one of `--file` or `--symbol` must be provided.\n\n- `--file` — analyze impact of one or more files. Each path MAY be workspace-prefixed, config-relative, or absolute.\n- `--symbol` — analyze impact of a symbol by name. If multiple symbols match, all are analyzed and results listed\n- `--direction` — optional; analysis direction, defaults to `upstream`. Values:\n  - `dependents` — find symbols and files that depend on the target; alias of `upstream`\n  - `dependencies` — find symbols and files that the target depends on; alias of `downstream`\n  - `upstream` — compatibility value for `dependents`\n  - `downstream` — compatibility value for `dependencies`\n  - `both` — combined dependents and dependencies analysis\n- `--depth` — optional; maximum traversal depth, defaults to `3`. Must be a positive integer. Passed through to `analyzeImpact`/`analyzeFileImpact` as `maxDepth`\n- `--config <path>` — optional; explicit path to `specd.yaml`, matching the standard CLI meaning\n- `--path <path>` — optional; repo-root bootstrap mode\n- `--format text|json|toon` — optional; output format, defaults to `text`\n\nThe CLI SHALL normalize `dependents` to `upstream` and `dependencies` to `downstream` before calling `analyzeImpact()` or file-impact analysis. Invalid direction values SHALL fail with a CLI usage error before opening the graph provider.\n\nUser-facing documentation for this command MUST prefer the concrete aliases `dependents` and `dependencies` before the compatibility graph-theory terms `upstream` and `downstream`. Documentation MAY mention the compatibility values, but it MUST NOT describe `downstream` as dependents.\n\n`--config` and `--path` are mutually exclusive.\n\n`--path` and no-config fallback are bootstrap mechanisms for setup and early repository exploration, not the intended steady-state mode for configured projects."
+        "```text\nspecd graph impact [--file <paths...>] [--symbol <name>] [--spec <id>] [--direction dependents|dependencies|upstream|downstream|both] [--depth <n>] [--config <path> | --path <path>] [--format text|json|toon]\n```\n\nExactly one of `--file`, `--symbol`, or `--spec` must be provided.\n\n- `--file` — analyze impact of one or more files. Each path MAY be workspace-prefixed, config-relative, or absolute.\n- `--symbol` — analyze impact of a symbol by name. If multiple symbols match, all are analyzed and results listed\n- `--spec` — analyze impact of one spec by fully-qualified spec id\n- `--direction` — optional; analysis direction, defaults to `upstream`. Values:\n  - `dependents` — find symbols, files, and specs that depend on the target; alias of `upstream`\n  - `dependencies` — find symbols, files, and specs that the target depends on; alias of `downstream`\n  - `upstream` — compatibility value for `dependents`\n  - `downstream` — compatibility value for `dependencies`\n  - `both` — combined dependents and dependencies analysis\n- `--depth` — optional; maximum traversal depth, defaults to `3`. Must be a positive integer. Passed through to `analyzeImpact`, `analyzeFileImpact`, or `analyzeSpecImpact` as `maxDepth`\n- `--config <path>` — optional; explicit path to `specd.yaml`, matching the standard CLI meaning\n- `--path <path>` — optional; repo-root bootstrap mode\n- `--format text|json|toon` — optional; output format, defaults to `text`\n\nThe CLI SHALL normalize `dependents` to `upstream` and `dependencies` to `downstream` before calling graph impact analysis. Invalid direction values SHALL fail with a CLI usage error before opening the graph provider.\n\nUser-facing documentation for this command MUST prefer the concrete aliases `dependents` and `dependencies` before the compatibility graph-theory terms `upstream` and `downstream`. Documentation MAY mention the compatibility values, but it MUST NOT describe `downstream` as dependents.\n\n`--config` and `--path` are mutually exclusive.\n\n`--path` and no-config fallback are bootstrap mechanisms for setup and early repository exploration, not the intended steady-state mode for configured projects."
       ]
     },
     {
@@ -31,6 +31,12 @@
       ]
     },
     {
+      "requirement": "Spec impact analysis",
+      "rules": [
+        "When `--spec` is provided:\n\n1. Resolves graph context using explicit config, autodetected config, or bootstrap mode according to the graph CLI precedence rules\n2. Creates a `CodeGraphProvider` from the resolved graph context\n3. Opens the provider\n4. Calls `analyzeSpecImpact(specId, direction)`\n5. Outputs the resulting `ImpactResult`\n6. Closes the provider and exits\n\nSpec impact MUST reflect requirement-aware graph relations, not just code-structure traversal. At minimum it includes:\n\n- `DEPENDS_ON` between specs\n- `COVERS_FILE` between specs and files\n- `COVERS_SYMBOL` between specs and symbols"
+      ]
+    },
+    {
       "requirement": "Concurrent indexing guard",
       "rules": [
         "Before attempting to open the provider or execute graph-backed analysis, `graph impact` SHALL check the shared graph indexing lock used by `graph index`.\n\nIf indexing is currently in progress, the command SHALL fail fast with a short user-facing retry-later message indicating that the graph is being indexed and should be queried again in a few seconds.\n\nThis guard exists so the command does not surface backend lock failures opportunistically while another CLI process is rebuilding the graph."
@@ -39,13 +45,13 @@
     {
       "requirement": "Output format",
       "rules": [
-        "**File impact** in `text` mode:\n\n```text\nImpact analysis for src/auth.ts (depth=5)\n  Risk level:       HIGH\n  Direct deps:      6\n  Indirect deps:    3\n  Transitive deps:  1\n  Affected files:   8\n\nChanged symbols:\n  validate:10\n  AuthService:20\n\nAffected files:\n  src/login.ts: handleLogin:12 (d=1), validateSession:45 (d=1)\n  src/session.ts: createSession:8 (d=2)\n\nPer-symbol breakdown:\n  src/auth.ts:function:validate:10:0  risk=HIGH direct=4\n  src/auth.ts:class:AuthService:20:0  risk=MEDIUM direct=2\n```\n\nFor multiple files, text output SHALL show one aggregated summary plus a `Changed symbols:` block grouped by input file, an `Affected files:` block, and a `Per-file breakdown:` or equivalent structure that lets a human see which input files contributed to the overall result.\n\nWhen affected symbols are available, each file line shows the symbols grouped after a colon with depth indicators: `path: name:line (d=N), name:line (d=N)`. Files reached only via IMPORTS (file-level) are listed without symbols. The depth value `d=N` indicates the distance from the analysis target (1 = direct, 2 = indirect, 3+ = transitive).\n\nWhen `--direction` is omitted or set to `dependents` / `upstream`, human-facing documentation and help text SHOULD explain these counts as dependent counts. When `--direction dependencies` / `downstream` is used, documentation SHOULD explain that the same fields represent dependencies reached from the target.\n\nWhen `--depth` is not the default (3), the header line includes `(depth=N)` to show the configured depth.\n\n**Symbol impact** in `text` mode:\n\n```text\nImpact analysis for function createKernel (packages/core/src/composition/kernel.ts:147) (depth=5)\n  Risk level:       CRITICAL\n  Direct deps:      1\n  Indirect deps:    1\n  Transitive deps:  38\n  Affected files:   40\n\nAffected files:\n  packages/cli/src/kernel.ts: wireKernel:5 (d=1)\n  ...\n```\n\nWhen multiple symbols match, each analysis is listed sequentially.\n\nIn `json` or `toon` mode, the full result object is output as-is. The `AffectedSymbol` entries in JSON include the `depth` field."
+        "**File impact** in `text` mode:\n\n```text\nImpact analysis for src/auth.ts (depth=5)\n  Risk level:       HIGH\n  Direct deps:      6\n  Indirect deps:    3\n  Transitive deps:  1\n  Affected files:   8\n\nChanged symbols:\n  validate:10\n  AuthService:20\n\nAffected files:\n  src/login.ts: handleLogin:12 (d=1), validateSession:45 (d=1)\n  src/session.ts: createSession:8 (d=2)\n\nPer-symbol breakdown:\n  src/auth.ts:function:validate:10:0  risk=HIGH direct=4\n  src/auth.ts:class:AuthService:20:0  risk=MEDIUM direct=2\n```\n\nFor multiple files, text output SHALL show one aggregated summary plus a `Changed symbols:` block grouped by input file, an `Affected files:` block, and a `Per-file breakdown:` or equivalent structure that lets a human see which input files contributed to the overall result.\n\nWhen affected symbols are available, each file line shows the symbols grouped after a colon with depth indicators: `path: name:line (d=N), name:line (d=N)`. Files reached only via IMPORTS (file-level) are listed without symbols. The depth value `d=N` indicates the distance from the analysis target (1 = direct, 2 = indirect, 3+ = transitive).\n\nWhen `--direction` is omitted or set to `dependents` / `upstream`, human-facing documentation and help text SHOULD explain these counts as dependent counts. When `--direction dependencies` / `downstream` is used, documentation SHOULD explain that the same fields represent dependencies reached from the target.\n\nWhen `--depth` is not the default (3), the header line includes `(depth=N)` to show the configured depth.\n\n**Symbol impact** in `text` mode:\n\n```text\nImpact analysis for function createKernel (packages/core/src/composition/kernel.ts:147) (depth=5)\n  Risk level:       CRITICAL\n  Direct deps:      1\n  Indirect deps:    1\n  Transitive deps:  38\n  Affected files:   40\n\nAffected files:\n  packages/cli/src/kernel.ts: wireKernel:5 (d=1)\n  ...\n```\n\n**Spec impact** in `text` mode:\n\n```text\nImpact analysis for spec core:change (depth=3)\n  Risk level:       HIGH\n  Direct deps:      2\n  Indirect deps:    1\n  Transitive deps:  0\n  Affected files:   4\n```\n\nSpec impact output MUST surface files reached through `COVERS_FILE` and symbols reached through `COVERS_SYMBOL` in the same result structure used by other impact targets.\n\nWhen multiple symbols match, each analysis is listed sequentially.\n\nIn `json` or `toon` mode, the full result object is output as-is. The `AffectedSymbol` entries in JSON include the `depth` field.\n\nThe JSON output MUST include aggregate impact fields to support automated risk assessment:\n\n- `riskLevel`\n- `directDepsCount`\n- `indirectDepsCount`\n- `transitiveDepsCount`\n- `affectedFilesCount`"
       ]
     },
     {
       "requirement": "Error cases",
       "rules": [
-        "Exactly one of `--file` or `--symbol` must be provided. If none or more than one is given, the command exits with code 1 and prints `error: provide exactly one of --file or --symbol`.\n\nIf both `--config` and `--path` are passed, the command SHALL fail with a CLI error before attempting graph access.\n\nIf a `--file` input without a workspace prefix does not resolve by config-relative path, the command SHALL fail with a not-found error that includes the normalized config-relative path it searched.\n\nIf a `--file` input without a workspace prefix resolves to more than one canonical graph file, the command SHALL fail with an ambiguity error listing the matching workspace-prefixed paths rather than guessing a workspace.\n\nIf the shared graph indexing lock is present, the command SHALL exit with code 3 after printing a user-facing retry-later message.\n\nIf the provider cannot be opened, the command exits with code 3."
+        "Exactly one of `--file`, `--symbol`, or `--spec` must be provided. If none or more than one is given, the command exits with code 1 and prints `error: provide exactly one of --file, --symbol, or --spec`.\n\nIf both `--config` and `--path` are passed, the command SHALL fail with a CLI error before attempting graph access.\n\nIf a `--file` input without a workspace prefix does not resolve by config-relative path, the command SHALL fail with a not-found error that includes the normalized config-relative path it searched.\n\nIf a `--file` input without a workspace prefix resolves to more than one canonical graph file, the command SHALL fail with an ambiguity error listing the matching workspace-prefixed paths rather than guessing a workspace.\n\nIf `--spec` references no indexed spec node, the command SHALL fail with a not-found error that includes the requested spec id.\n\nIf the shared graph indexing lock is present, the command SHALL exit with code 3 after printing a user-facing retry-later message.\n\nIf the provider cannot be opened, the command exits with code 3."
       ]
     }
   ],
@@ -53,8 +59,8 @@
     "The CLI does not contain impact analysis logic — it delegates entirely to @specd/code-graph",
     "process.exit(0) is called explicitly after closing the provider",
     "Canonical graph file identities are workspace-prefixed, but user-facing --file inputs MAY be workspace-prefixed, config-relative, or absolute",
-    "--direction applies to both --file and --symbol",
-    "--depth applies to both selectors",
+    "--direction applies to --file, --symbol, and --spec",
+    "--depth applies to all selectors",
     "--depth must be a positive integer; invalid values exit with code 1",
     "Context resolution SHALL use the shared graph CLI model rather than command-local path semantics",
     "The command checks the shared graph indexing lock before opening the provider and fails fast while indexing is in progress"
@@ -94,6 +100,16 @@
       "then": [
         "the command exits with code 1",
         "AND stderr does not present --changes as a supported selector"
+      ]
+    },
+    {
+      "requirement": "Command signature",
+      "name": "Spec selector enters requirement impact mode",
+      "given": ["spec core:change is indexed in the graph"],
+      "when": ["specd graph impact --spec core:change is run"],
+      "then": [
+        "the command analyzes requirement impact for that spec",
+        "AND no file or symbol selector is required"
       ]
     },
     {
@@ -193,6 +209,32 @@
       ]
     },
     {
+      "requirement": "Spec impact analysis",
+      "name": "Downstream spec analysis shows covered files and symbols",
+      "given": [
+        "spec core:change covers file core:src/change.ts and symbol core:Change.transition"
+      ],
+      "when": ["specd graph impact --spec core:change --direction downstream is run"],
+      "then": ["stdout shows the covered file and covered symbol in the impacted result"]
+    },
+    {
+      "requirement": "Spec impact analysis",
+      "name": "Upstream spec analysis shows dependent specs",
+      "given": ["spec core:archive-change depends on core:spec-lock"],
+      "when": ["specd graph impact --spec core:spec-lock --direction upstream is run"],
+      "then": ["stdout shows core:archive-change as an impacted spec"]
+    },
+    {
+      "requirement": "Spec impact analysis",
+      "name": "Missing spec reports cleanly",
+      "given": ["spec missing:spec does not exist in the graph"],
+      "when": ["specd graph impact --spec missing:spec is run"],
+      "then": [
+        "stdout shows No spec found matching \"missing:spec\".",
+        "AND the process exits with code 0"
+      ]
+    },
+    {
       "requirement": "Concurrent indexing guard",
       "name": "Impact analysis fails fast while the indexing lock is present",
       "given": ["a graph index process currently holds the shared graph indexing lock"],
@@ -240,20 +282,29 @@
       "then": ["stdout is valid JSON containing symbol and impact objects"]
     },
     {
+      "requirement": "Output format",
+      "name": "JSON output includes aggregate impact fields",
+      "when": ["specd graph impact --file <path> --format json is run"],
+      "then": [
+        "stdout is valid JSON",
+        "AND it contains riskLevel, directDepsCount, indirectDepsCount, transitiveDepsCount, and affectedFilesCount"
+      ]
+    },
+    {
       "requirement": "Error cases",
       "name": "No selector provided",
-      "when": ["specd graph impact is run without --file or --symbol"],
+      "when": ["specd graph impact is run without --file, --symbol, or --spec"],
       "then": [
-        "stderr contains error: provide exactly one of --file or --symbol",
+        "stderr contains error: provide exactly one of --file, --symbol, or --spec",
         "AND the process exits with code 1"
       ]
     },
     {
       "requirement": "Error cases",
       "name": "Multiple selectors provided",
-      "when": ["specd graph impact --file core:src/auth.ts --symbol validate is run"],
+      "when": ["specd graph impact --file core:src/auth.ts --spec core:change is run"],
       "then": [
-        "stderr contains error: provide exactly one of --file or --symbol",
+        "stderr contains error: provide exactly one of --file, --symbol, or --spec",
         "AND the process exits with code 1"
       ]
     },
@@ -283,9 +334,43 @@
       ]
     }
   ],
+  "implementation": {
+    "files": [
+      {
+        "specId": "cli:graph-impact",
+        "file": "cli:src/commands/graph/build-workspace-targets.ts"
+      },
+      {
+        "specId": "cli:graph-impact",
+        "file": "cli:src/index.ts"
+      }
+    ],
+    "symbols": [
+      {
+        "specId": "cli:graph-impact",
+        "file": "cli:src/commands/graph/impact.ts",
+        "symbol": "registerGraphImpact"
+      },
+      {
+        "specId": "cli:graph-impact",
+        "file": "cli:src/commands/graph/impact.ts",
+        "symbol": "formatImpact"
+      },
+      {
+        "specId": "cli:graph-impact",
+        "file": "cli:src/commands/graph/impact.ts",
+        "symbol": "formatSpecImpact"
+      },
+      {
+        "specId": "cli:graph-impact",
+        "file": "cli:src/commands/graph/impact.ts",
+        "symbol": "parseImpactDirection"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:6281284de6b76ec67f8982a91a26e3e17134b9609d180c01b248affc3f98aa8d",
-    "verify.md": "sha256:a0eaba07b47fe7d782741eb1a59bd99ed6773fab16115ffc24c968aa48a286d9"
+    "spec.md": "sha256:4a554d54b648e17a386da942e6f1607b20d72497475e1e4a2992dc9e36bb8124",
+    "verify.md": "sha256:38236608efb3d62fe5c156b757a6177d8b5870355f029ed115c307fa98b61ee4"
   },
   "generatedBy": "core"
 }

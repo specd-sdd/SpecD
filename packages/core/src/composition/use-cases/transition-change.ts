@@ -15,6 +15,8 @@ import { NodeHookRunner } from '../../infrastructure/node/hook-runner.js'
 import { Logger } from '../../application/logger.js'
 import { TemplateExpander } from '../../application/template-expander.js'
 import { LifecycleEngine } from '../../domain/services/lifecycle-engine.js'
+import { createVcsAdapter } from '../vcs-adapter.js'
+import { VcsImplementationDetector } from '../../infrastructure/vcs/vcs-implementation-detector.js'
 
 /**
  * Domain context for a `ChangeRepository` bound to a single workspace.
@@ -159,10 +161,14 @@ export function createTransitionChange(
   const hooks = new NodeHookRunner(expander)
   const actor = createVcsActorResolver()
   const runStepHooks = new RunStepHooks(changeRepo, archiveRepo, hooks, new Map(), schemaProvider)
+  const implementationDetector = new VcsImplementationDetector(opts.projectRoot, async () =>
+    createVcsAdapter(opts.projectRoot),
+  )
   return new TransitionChange(
     changeRepo,
     actor,
     schemaProvider,
+    implementationDetector,
     runStepHooks,
     new LifecycleEngine(Logger.debug.bind(Logger)),
   )

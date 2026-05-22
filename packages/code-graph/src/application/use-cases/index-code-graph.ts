@@ -768,6 +768,7 @@ export class IndexCodeGraph {
         }
 
         for (const { spec } of discoveredSpecs) {
+          const discovered = discoveredSpecs.find((entry) => entry.spec.specId === spec.specId)
           try {
             const existing = existingSpecMap.get(spec.specId)
             if (existing && existing.contentHash === spec.contentHash) continue
@@ -785,6 +786,32 @@ export class IndexCodeGraph {
                     type: RelationType.DependsOn,
                   }),
                 )
+              }
+            }
+            for (const implementation of discovered?.implementation ?? []) {
+              if (implementation.symbols === undefined || implementation.symbols.length === 0) {
+                specRelations.push(
+                  createRelation({
+                    source: spec.specId,
+                    target: implementation.file,
+                    type: RelationType.CoversFile,
+                  }),
+                )
+                continue
+              }
+              for (const symbolName of implementation.symbols) {
+                const matchingSymbols = symbolIndex
+                  .findByFile(implementation.file)
+                  .filter((symbol) => symbol.name === symbolName)
+                for (const symbol of matchingSymbols) {
+                  specRelations.push(
+                    createRelation({
+                      source: spec.specId,
+                      target: symbol.id,
+                      type: RelationType.CoversSymbol,
+                    }),
+                  )
+                }
               }
             }
             allSpecs.push(spec)

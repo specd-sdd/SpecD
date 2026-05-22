@@ -1,0 +1,22 @@
+- op: modified
+  description: 'Persist explicit requirement-aware coverage relation families in SQLite'
+  selector:
+    type: section
+    matches: 'Requirement: Persisted relation storage'
+  content: |
+    The SQLite schema SHALL persist the relation families required by the abstract graph model:
+
+    - `IMPORTS`
+    - `DEFINES`
+    - `CALLS`
+    - `EXPORTS`
+    - `DEPENDS_ON`
+    - `COVERS_FILE`
+    - `COVERS_SYMBOL`
+    - `EXTENDS`
+    - `IMPLEMENTS`
+    - `OVERRIDES`
+
+    The adapter MAY represent relation storage with a single relation table, per-type tables, or another SQLite-appropriate layout, provided the observable `GraphStore` query semantics remain preserved.
+
+    `COVERS_SYMBOL` entries MUST preserve relation metadata so symbol-level implementation links can surface `stale` state consistently after reload.

@@ -200,6 +200,38 @@ export interface ChangeProps {
   readonly specDependsOn?: ReadonlyMap<string, readonly string[]>
   /** Invalidation policy for this change. Defaults to `'downstream'`. */
   readonly invalidationPolicy?: InvalidationPolicy
+  /** Tracked implementation files under review for the active change. */
+  readonly trackedImplementationFiles?: readonly TrackedImplementationFile[]
+  /** Confirmed implementation links for the active change. */
+  readonly implementationLinks?: readonly ImplementationLink[]
+}
+
+/** Explicit review states for tracked implementation files. */
+export type TrackedImplementationFileState = 'open' | 'resolved' | 'ignored'
+
+/** One tracked implementation file under review for a change. */
+export interface TrackedImplementationFile {
+  /** Raw project-relative file path. */
+  readonly file: string
+  /** Explicit review state for the tracked file. */
+  readonly state: TrackedImplementationFileState
+}
+
+/** One confirmed `spec + file` implementation link. */
+export interface ImplementationLink {
+  /** Canonical spec ID implemented by the linked file/symbols. */
+  readonly specId: string
+  /** Raw project-relative file path. */
+  readonly file: string
+  /**
+   * Whether the file-level link was explicitly created.
+   *
+   * `false` means the file-level presence exists only as the container for
+   * symbol-level refinements.
+   */
+  readonly fileLinkExplicit: boolean
+  /** Optional symbol-level refinements attached to this `spec + file` link. */
+  readonly symbols?: readonly string[]
 }
 
 /**
@@ -220,6 +252,8 @@ export class Change {
   private _artifacts: Map<string, ChangeArtifact>
   private _specDependsOn: Map<string, string[]>
   private _invalidationPolicy: InvalidationPolicy
+  private _trackedImplementationFiles: Map<string, TrackedImplementationFileState>
+  private _implementationLinks: Map<string, ImplementationLink>
 
   /**
    * Creates a new `Change` from the given properties.
@@ -246,6 +280,18 @@ export class Change {
       }
     }
     this._invalidationPolicy = props.invalidationPolicy ?? DEFAULT_INVALIDATION_POLICY
+    this._trackedImplementationFiles = new Map<string, TrackedImplementationFileState>()
+    if (props.trackedImplementationFiles !== undefined) {
+      for (const entry of props.trackedImplementationFiles) {
+        this._trackedImplementationFiles.set(entry.file, entry.state)
+      }
+    }
+    this._implementationLinks = new Map<string, ImplementationLink>()
+    if (props.implementationLinks !== undefined) {
+      for (const link of props.implementationLinks) {
+        this._setImplementationLink(link)
+      }
+    }
   }
 
   /** Unique slug name identifying this change. */
@@ -330,9 +376,20 @@ export class Change {
    * reached regardless of subsequent state transitions.
    */
   get hasEverReachedImplementing(): boolean {
-    return this._history.some(
-      (evt): evt is TransitionedEvent => evt.type === 'transitioned' && evt.to === 'implementing',
-    )
+    return this.getHistoricalImplementationAt() !== null
+  }
+
+  /** Tracked implementation files under review for the active change. */
+  get trackedImplementationFiles(): readonly TrackedImplementationFile[] {
+    return [...this._trackedImplementationFiles.entries()].map(([file, state]) => ({ file, state }))
+  }
+
+  /** Confirmed implementation links for the active change. */
+  get implementationLinks(): readonly ImplementationLink[] {
+    return [...this._implementationLinks.values()].map((link) => ({
+      ...link,
+      ...(link.symbols !== undefined ? { symbols: [...link.symbols] } : {}),
+    }))
   }
 
   /**
@@ -381,9 +438,121 @@ export class Change {
     return this._invalidationPolicy
   }
 
+  /**
+   * Returns when this change first entered `implementing`, or `null` when it
+   * has never done so.
+   *
+   * @returns The first `implementing` timestamp, or `null`
+   */
+  getHistoricalImplementationAt(): Date | null {
+    for (const evt of this._history) {
+      if (evt.type === 'transitioned' && evt.to === 'implementing') {
+        return new Date(evt.at.getTime())
+      }
+    }
+    return null
+  }
+
   /** Updates the persisted invalidation policy. Does NOT trigger invalidation. */
   set invalidationPolicy(policy: InvalidationPolicy) {
     this._invalidationPolicy = policy
+  }
+
+  /**
+   * Tracks or updates one raw implementation file under review.
+   *
+   * @param file - Raw project-relative file path
+   * @param state - Review state to persist
+   */
+  trackImplementationFile(file: string, state: TrackedImplementationFileState = 'open'): void {
+    this._assertImplementationFile(file)
+    this._trackedImplementationFiles.set(file, state)
+  }
+
+  /**
+   * Removes one tracked implementation file.
+   *
+   * @param file - Raw project-relative file path
+   */
+  untrackImplementationFile(file: string): void {
+    this._trackedImplementationFiles.delete(file)
+  }
+
+  /**
+   * Creates or enriches one confirmed implementation link.
+   *
+   * Re-adding the same `spec + file` set enriches the existing link rather than
+   * creating a duplicate peer entry.
+   *
+   * @param link - Link data to create or merge
+   */
+  addImplementationLink(link: ImplementationLink): void {
+    this._assertImplementationLink(link)
+    const key = implementationLinkKey(link.specId, link.file)
+    const existing = this._implementationLinks.get(key)
+    if (existing === undefined) {
+      this._setImplementationLink(link)
+      return
+    }
+
+    const mergedSymbols = new Set<string>(existing.symbols ?? [])
+    for (const symbol of link.symbols ?? []) {
+      mergedSymbols.add(symbol)
+    }
+
+    this._setImplementationLink({
+      specId: existing.specId,
+      file: existing.file,
+      fileLinkExplicit: existing.fileLinkExplicit || link.fileLinkExplicit,
+      ...(mergedSymbols.size > 0 ? { symbols: [...mergedSymbols] } : {}),
+    })
+  }
+
+  /**
+   * Removes an entire confirmed implementation link for one `spec + file` set.
+   *
+   * @param specId - Canonical spec ID
+   * @param file - Raw project-relative file path
+   */
+  removeImplementationLink(specId: string, file: string): void {
+    this._implementationLinks.delete(implementationLinkKey(specId, file))
+  }
+
+  /**
+   * Removes one symbol refinement from a confirmed implementation link.
+   *
+   * If the file-level presence only exists as the container for symbol-level
+   * links, removing the final symbol removes the whole `spec + file` set.
+   *
+   * @param specId - Canonical spec ID
+   * @param file - Raw project-relative file path
+   * @param symbol - Symbol identifier to remove
+   */
+  removeImplementationSymbol(specId: string, file: string, symbol: string): void {
+    const key = implementationLinkKey(specId, file)
+    const existing = this._implementationLinks.get(key)
+    if (existing === undefined || existing.symbols === undefined) return
+
+    const remaining = existing.symbols.filter((candidate) => candidate !== symbol)
+    if (remaining.length === 0) {
+      if (existing.fileLinkExplicit) {
+        this._setImplementationLink({
+          specId,
+          file,
+          fileLinkExplicit: true,
+        })
+      } else {
+        this._implementationLinks.delete(key)
+      }
+      return
+    }
+
+    this._setImplementationLink({
+      specId,
+      file,
+      fileLinkExplicit: existing.fileLinkExplicit,
+      symbols: remaining,
+    })
   }
 
   /**
@@ -406,6 +575,51 @@ export class Change {
    */
   removeSpecDependsOn(specId: string): void {
     this._specDependsOn.delete(specId)
+  }
+
+  /**
+   * Persists one implementation link after invariant checks and normalization.
+   *
+   * @param link - The link to persist
+   */
+  private _setImplementationLink(link: ImplementationLink): void {
+    this._assertImplementationLink(link)
+    this._implementationLinks.set(implementationLinkKey(link.specId, link.file), {
+      specId: link.specId,
+      file: link.file,
+      fileLinkExplicit: link.fileLinkExplicit,
+      ...(link.symbols !== undefined ? { symbols: [...new Set(link.symbols)] } : {}),
+    })
+  }
+
+  /**
+   * Validates one tracked implementation file path.
+   *
+   * @param file - Raw project-relative file path
+   * @throws {InvalidChangeError} When the file path is empty
+   */
+  private _assertImplementationFile(file: string): void {
+    if (file.trim().length === 0) {
+      throw new InvalidChangeError('tracked implementation file must not be empty')
+    }
+  }
+
+  /**
+   * Validates one implementation link shape before persistence.
+   *
+   * @param link - Link data to validate
+   * @throws {InvalidChangeError} When link invariants are violated
+   */
+  private _assertImplementationLink(link: ImplementationLink): void {
+    if (link.specId.trim().length === 0) {
+      throw new InvalidChangeError('implementation link specId must not be empty')
+    }
+    this._assertImplementationFile(link.file)
+    if (!link.fileLinkExplicit && (link.symbols === undefined || link.symbols.length === 0)) {
+      throw new InvalidChangeError(
+        'container-only implementation links require one or more symbols',
+      )
+    }
   }
 
   /** Whether this change is in `archivable` or `archiving` state and may be archived. */
@@ -1012,6 +1226,17 @@ export class Change {
     }
     return event
   }
+}
+
+/**
+ * Builds the stable map key for one confirmed implementation link.
+ *
+ * @param specId - Canonical spec ID
+ * @param file - Raw project-relative file path
+ * @returns Stable string key for the `spec + file` set
+ */
+function implementationLinkKey(specId: string, file: string): string {
+  return `${specId}\u0000${file}`
 }
 
 /**

@@ -33,7 +33,13 @@
     {
       "requirement": "Relation types",
       "rules": [
-        "Relations between nodes SHALL be represented as typed edges. Each relation has a `source`, `target`, and `type`. The following relation types are defined:\n\n| Type         | Source | Target | Meaning                                                               | Phase |\n| ------------ | ------ | ------ | --------------------------------------------------------------------- | ----- |\n| `IMPORTS`    | File   | File   | Source file imports from target file                                  | v1.5  |\n| `DEFINES`    | File   | Symbol | File contains the symbol's declaration                                | v2    |\n| `CALLS`      | Symbol | Symbol | Source symbol invokes target symbol                                   | v2    |\n| `CONSTRUCTS` | Symbol | Symbol | Source symbol constructs or instantiates target type                  | v2    |\n| `USES_TYPE`  | Symbol | Symbol | Source symbol references target type in a static signature or binding | v2    |\n| `EXPORTS`    | File   | Symbol | File exports the symbol as public API                                 | v2    |\n| `DEPENDS_ON` | Spec   | Spec   | Spec depends on target spec                                           | v1.5  |\n| `COVERS`     | Spec   | File   | Spec covers the target file                                           | v2+   |\n| `EXTENDS`    | Symbol | Symbol | Source type extends or inherits from target type                      | v2    |\n| `IMPLEMENTS` | Symbol | Symbol | Source type fulfills or implements target contract/type               | v2    |\n| `OVERRIDES`  | Symbol | Symbol | Source method overrides or concretely fulfills target one             | v2    |\n\nRelations are directional. `IMPORTS`, `DEFINES`, `CALLS`, `CONSTRUCTS`, `USES_TYPE`, `EXPORTS`, `DEPENDS_ON`, `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES` are populated by the indexer. `COVERS` is populated by spec-to-code mapping (deferred to v2+).\n\n`CONSTRUCTS` is distinct from `CALLS`: it records instantiation or constructor-like dependency, not an ordinary invocation. `USES_TYPE` is distinct from `CALLS`: it records static type dependency in signatures, annotations, fields, or deterministic binding declarations.\n\nThe hierarchy model for this iteration remains limited to `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES`. Language-specific constructs MAY be normalized into one of those relations when doing so preserves useful impact, hotspot, and code-understanding semantics. Constructs that cannot be normalized without materially distorting their meaning are omitted rather than introducing additional base relation types in this iteration."
+        "Relations between nodes SHALL be represented as typed edges. Each relation has a `source`, `target`, and `type`. The following relation types are defined:\n\n| Type            | Source | Target | Meaning                                                               | Phase |\n| --------------- | ------ | ------ | --------------------------------------------------------------------- | ----- |\n| `IMPORTS`       | File   | File   | Source file imports from target file                                  | v1.5  |\n| `DEFINES`       | File   | Symbol | File contains the symbol's declaration                                | v2    |\n| `CALLS`         | Symbol | Symbol | Source symbol invokes target symbol                                   | v2    |\n| `CONSTRUCTS`    | Symbol | Symbol | Source symbol constructs or instantiates target type                  | v2    |\n| `USES_TYPE`     | Symbol | Symbol | Source symbol references target type in a static signature or binding | v2    |\n| `EXPORTS`       | File   | Symbol | File exports the symbol as public API                                 | v2    |\n| `DEPENDS_ON`    | Spec   | Spec   | Spec depends on target spec                                           | v1.5  |\n| `COVERS_FILE`   | Spec   | File   | Spec has a file-level implementation link to the target file          | v2+   |\n| `COVERS_SYMBOL` | Spec   | Symbol | Spec has a symbol-level implementation link to the target symbol      | v2+   |\n| `EXTENDS`       | Symbol | Symbol | Source type extends or inherits from target type                      | v2    |\n| `IMPLEMENTS`    | Symbol | Symbol | Source type fulfills or implements target contract/type               | v2    |\n| `OVERRIDES`     | Symbol | Symbol | Source method overrides or concretely fulfills target one             | v2    |"
+      ]
+    },
+    {
+      "requirement": "Relation staleness",
+      "rules": [
+        "Relations MAY include a `stale` boolean flag in their `metadata`.\n\nFor implementation traceability, `stale` applies specifically to `COVERS_SYMBOL` relations whose target symbol is no longer detectable in the current graph index. It is not the generic marker for workspace-boundary or archive-materialization failures."
       ]
     },
     {
@@ -252,6 +258,49 @@
       ]
     },
     {
+      "requirement": "Relation types",
+      "name": "File-level implementation link becomes COVERS_FILE relation",
+      "given": ["a spec has a file-level archived implementation link to core:src/index.ts"],
+      "when": ["graph relations are built from archived traceability"],
+      "then": ["a COVERS_FILE relation connects the spec node to that file node"]
+    },
+    {
+      "requirement": "Relation types",
+      "name": "Symbol-level implementation link becomes COVERS_SYMBOL relation",
+      "given": ["a symbol-level archived implementation link exists for a symbol and spec"],
+      "when": ["graph relations are built from archived traceability"],
+      "then": ["a COVERS_SYMBOL relation connects the spec node to that symbol node"]
+    },
+    {
+      "requirement": "Relation staleness",
+      "name": "Missing symbol marks implementation relation as stale",
+      "given": [
+        "an archived symbol-level implementation link exists",
+        "AND the target symbol is no longer detectable in the current graph index"
+      ],
+      "when": ["graph relations are rebuilt"],
+      "then": [
+        "the implementation relation is retained",
+        "AND its COVERS_SYMBOL metadata marks it as stale: true"
+      ]
+    },
+    {
+      "requirement": "Relation staleness",
+      "name": "File-level implementation relation is never marked stale",
+      "given": ["an archived file-level implementation link exists for core:src/index.ts"],
+      "when": ["graph relations are rebuilt"],
+      "then": ["the COVERS_FILE relation is retained without stale metadata"]
+    },
+    {
+      "requirement": "Relation staleness",
+      "name": "Workspace-boundary materialization failure is not represented as stale",
+      "given": [
+        "an implementation link failed earlier archive-time materialization because of workspace-boundary validation"
+      ],
+      "when": ["graph relations are built from archived traceability"],
+      "then": ["no synthetic stale relation is created for that failure"]
+    },
+    {
       "requirement": "Relation value object",
       "name": "Relation equality by source, target, and type",
       "given": [
@@ -407,9 +456,23 @@
       "then": ["DuplicateSymbolIdError is thrown with both symbols' details"]
     }
   ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "code-graph:symbol-model",
+        "file": "code-graph:src/domain/value-objects/relation-type.ts",
+        "symbol": "RelationType"
+      },
+      {
+        "specId": "code-graph:symbol-model",
+        "file": "code-graph:src/domain/value-objects/relation-type.ts",
+        "symbol": "isRelationType"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:100d0d88756ebe3cc167851231c506670bfd72fcc2cbfab398dc64386eddfa57",
-    "verify.md": "sha256:5b7b49757a6063dbae768ac1ab13110485bc1138853fcd8ea82b0f45d3aab80d"
+    "spec.md": "sha256:473a60a46d61608866143f165408094d556f25c2be41cfaf63cc51b124dcfc3a",
+    "verify.md": "sha256:b1d67c72ff0d09d6b6ec76a433bad608e3d4002c178c7440ca5adc0f8403df51"
   },
   "generatedBy": "core"
 }

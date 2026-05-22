@@ -75,3 +75,11 @@
 
 - **WHEN** `createVcsAdapter(cwd)` resolves
 - **THEN** the returned object satisfies the `VcsAdapter` interface
+
+### Requirement: Factory returns modified-file-capable adapters
+
+#### Scenario: Returned adapter satisfies modifiedFiles contract
+
+- **GIVEN** `createVcsAdapter(cwd)` resolves to a concrete adapter
+- **WHEN** implementation detection later calls `modifiedFiles(baseRef)` on that adapter
+- **THEN** the adapter satisfies the full current `VcsAdapter` port contract

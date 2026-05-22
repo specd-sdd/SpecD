@@ -19,7 +19,7 @@
     {
       "requirement": "Minimum graph semantics",
       "rules": [
-        "Every `GraphStore` implementation SHALL support the code-graph package's minimum persisted semantics, regardless of its backend-specific physical schema or file layout.\n\nAt minimum, the abstract store contract MUST support:\n\n- file nodes carrying the `FileNode` data needed by indexing, traversal, and CLI queries, including both canonical workspace-prefixed paths and config-relative file paths\n- symbol nodes carrying the `SymbolNode` data needed by indexing, traversal, and CLI queries\n- spec nodes carrying the `SpecNode` data needed by spec indexing and search\n- persisted relations for the relation families used by the package: `IMPORTS`, `DEFINES`, `CALLS`, `CONSTRUCTS`, `USES_TYPE`, `EXPORTS`, `DEPENDS_ON`, `COVERS`, `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES`\n- store-level metadata sufficient to satisfy abstract statistics and derivation-freshness fields such as `lastIndexedAt`, `lastIndexedRef`, and the persisted graph fingerprint\n\n`COVERS` is the abstract relation family reserved for linking specs to code artifacts. A backend MAY leave it unpopulated until the package introduces the corresponding indexing and query behavior, but the relation family itself belongs to the abstract graph model rather than to any one backend.\n\nBackends MAY represent those concepts differently internally, but they MUST preserve the observable semantics exposed by the `GraphStore` API. Storage-agnostic consumers MUST rely on these abstract semantics rather than any backend-specific table, label, or index shape."
+        "Every `GraphStore` implementation SHALL support the code-graph package's minimum persisted semantics, regardless of its backend-specific physical schema or file layout.\n\nAt minimum, the abstract store contract MUST support:\n\n- file nodes carrying the `FileNode` data needed by indexing, traversal, and CLI queries, including both canonical workspace-prefixed paths and config-relative file paths\n- symbol nodes carrying the `SymbolNode` data needed by indexing, traversal, and CLI queries\n- spec nodes carrying the `SpecNode` data needed by spec indexing and search\n- persisted relations for the relation families used by the package: `IMPORTS`, `DEFINES`, `CALLS`, `CONSTRUCTS`, `USES_TYPE`, `EXPORTS`, `DEPENDS_ON`, `COVERS_FILE`, `COVERS_SYMBOL`, `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES`\n- store-level metadata sufficient to satisfy abstract statistics and derivation-freshness fields such as `lastIndexedAt`, `lastIndexedRef`, and the persisted graph fingerprint\n\n`COVERS_FILE` and `COVERS_SYMBOL` are the abstract relation families used for requirement-aware graph linkage. `COVERS_FILE` links a spec to a covered implementation file. `COVERS_SYMBOL` links a spec to a covered implementation symbol and MAY carry `metadata.stale` when the archived symbol-level link no longer resolves to a live indexed symbol.\n\nBackends MAY represent those concepts differently internally, but they MUST preserve the observable semantics exposed by the `GraphStore` API. Storage-agnostic consumers MUST rely on these abstract semantics rather than any backend-specific table, label, or index shape."
       ]
     },
     {
@@ -55,7 +55,7 @@
     {
       "requirement": "Query methods",
       "rules": [
-        "`GraphStore` SHALL provide the following query methods:\n\n- **`getFile(path: string): Promise<FileNode | undefined>`** — retrieve a file node by canonical workspace-prefixed path\n- **`findFilesByConfigRelativePath(path: string): Promise<FileNode[]>`** — retrieve all file nodes whose `configRelativePath` exactly matches the given normalized config-relative path\n- **`getSymbol(id: string): Promise<SymbolNode | undefined>`** — retrieve a symbol by id\n- **`getCallers(symbolId: string): Promise<Relation[]>`** — all incoming symbol dependency relations where `target` matches. At minimum this includes `CALLS`, `CONSTRUCTS`, and `USES_TYPE`.\n- **`getCallees(symbolId: string): Promise<Relation[]>`** — all outgoing symbol dependency relations where `source` matches. At minimum this includes `CALLS`, `CONSTRUCTS`, and `USES_TYPE`.\n- **`getImporters(filePath: string): Promise<Relation[]>`** — all `IMPORTS` relations where `target` matches\n- **`getImportees(filePath: string): Promise<Relation[]>`** — all `IMPORTS` relations where `source` matches\n- **`getExtenders(symbolId: string): Promise<Relation[]>`** — all `EXTENDS` relations where `target` matches\n- **`getExtendedTargets(symbolId: string): Promise<Relation[]>`** — all `EXTENDS` relations where `source` matches\n- **`getImplementors(symbolId: string): Promise<Relation[]>`** — all `IMPLEMENTS` relations where `target` matches\n- **`getImplementedTargets(symbolId: string): Promise<Relation[]>`** — all `IMPLEMENTS` relations where `source` matches\n- **`getOverriders(symbolId: string): Promise<Relation[]>`** — all `OVERRIDES` relations where `target` matches\n- **`getOverriddenTargets(symbolId: string): Promise<Relation[]>`** — all `OVERRIDES` relations where `source` matches\n- **`getSpec(specId: string): Promise<SpecNode | undefined>`** — retrieve a spec node by id\n- **`getSpecDependencies(specId: string): Promise<Relation[]>`** — all `DEPENDS_ON` relations where `source` matches\n- **`getSpecDependents(specId: string): Promise<Relation[]>`** — all `DEPENDS_ON` relations where `target` matches\n- **`findSymbols(query: SymbolQuery): Promise<SymbolNode[]>`** — search symbols by name pattern, kind, or file path\n\n`SymbolQuery` is a value object with optional fields: `name` (glob or regex), `kinds` (array of `SymbolKind` for filtering by one or more kinds), `filePath` (exact match or glob), `comment` (substring match for full-text search within symbol comments), `caseSensitive` (boolean, defaults to `false` — when `false`, `name` and `comment` matching is case insensitive)."
+        "`GraphStore` SHALL provide the following query methods:\n\n- **`getFile(path: string): Promise<FileNode | undefined>`** — retrieve a file node by canonical workspace-prefixed path\n- **`findFilesByConfigRelativePath(path: string): Promise<FileNode[]>`** — retrieve all file nodes whose `configRelativePath` exactly matches the given normalized config-relative path\n- **`getSymbol(id: string): Promise<SymbolNode | undefined>`** — retrieve a symbol by id\n- **`getCallers(symbolId: string): Promise<Relation[]>`** — all incoming symbol dependency relations where `target` matches. At minimum this includes `CALLS`, `CONSTRUCTS`, and `USES_TYPE`.\n- **`getCallees(symbolId: string): Promise<Relation[]>`** — all outgoing symbol dependency relations where `source` matches. At minimum this includes `CALLS`, `CONSTRUCTS`, and `USES_TYPE`.\n- **`getImporters(filePath: string): Promise<Relation[]>`** — all `IMPORTS` relations where `target` matches\n- **`getImportees(filePath: string): Promise<Relation[]>`** — all `IMPORTS` relations where `source` matches\n- **`getExtenders(symbolId: string): Promise<Relation[]>`** — all `EXTENDS` relations where `target` matches\n- **`getExtendedTargets(symbolId: string): Promise<Relation[]>`** — all `EXTENDS` relations where `source` matches\n- **`getImplementors(symbolId: string): Promise<Relation[]>`** — all `IMPLEMENTS` relations where `target` matches\n- **`getImplementedTargets(symbolId: string): Promise<Relation[]>`** — all `IMPLEMENTS` relations where `source` matches\n- **`getOverriders(symbolId: string): Promise<Relation[]>`** — all `OVERRIDES` relations where `target` matches\n- **`getOverriddenTargets(symbolId: string): Promise<Relation[]>`** — all `OVERRIDES` relations where `source` matches\n- **`getSpec(specId: string): Promise<SpecNode | undefined>`** — retrieve a spec node by id\n- **`getSpecDependencies(specId: string): Promise<Relation[]>`** — all `DEPENDS_ON` relations where `source` matches\n- **`getSpecDependents(specId: string): Promise<Relation[]>`** — all `DEPENDS_ON` relations where `target` matches\n- **`getCoveredFiles(specId: string): Promise<Relation[]>`** — all `COVERS_FILE` relations where `source` matches\n- **`getCoveringSpecsForFile(filePath: string): Promise<Relation[]>`** — all `COVERS_FILE` relations where `target` matches\n- **`getCoveredSymbols(specId: string): Promise<Relation[]>`** — all `COVERS_SYMBOL` relations where `source` matches\n- **`getCoveringSpecsForSymbol(symbolId: string): Promise<Relation[]>`** — all `COVERS_SYMBOL` relations where `target` matches\n- **`findSymbols(query: SymbolQuery): Promise<SymbolNode[]>`** — search symbols by name pattern, kind, or file path\n\n`SymbolQuery` is a value object with optional fields: `name` (glob or regex), `kinds` (array of `SymbolKind` for filtering by one or more kinds), `filePath` (exact match or glob), `comment` (substring match for full-text search within symbol comments), `caseSensitive` (boolean, defaults to `false` — when `false`, `name` and `comment` matching is case insensitive)."
       ]
     },
     {
@@ -148,6 +148,22 @@
       "then": [
         "the store can persist and later return lastIndexedAt, lastIndexedRef, and the graph fingerprint"
       ]
+    },
+    {
+      "requirement": "Minimum graph semantics",
+      "name": "Backend persists spec coverage relation families",
+      "when": ["a backend advertises conformance to GraphStore"],
+      "then": [
+        "its persisted relation model includes COVERS_FILE and COVERS_SYMBOL",
+        "AND these relations remain queryable through the abstract coverage methods"
+      ]
+    },
+    {
+      "requirement": "Minimum graph semantics",
+      "name": "Symbol coverage metadata survives round-trip",
+      "given": ["a COVERS_SYMBOL relation with metadata { \"stale\": true }"],
+      "when": ["it is persisted and loaded back through the abstract GraphStore"],
+      "then": ["the returned relation preserves that metadata without backend-specific decoding"]
     },
     {
       "requirement": "Store recreation",
@@ -316,6 +332,34 @@
       "then": ["all three dependency relations are returned"]
     },
     {
+      "requirement": "Query methods",
+      "name": "getCoveredFiles returns spec file coverage",
+      "given": ["spec core:change covers files core:src/change.ts and core:src/state.ts"],
+      "when": ["getCoveredFiles('core:change') is called"],
+      "then": ["both persisted COVERS_FILE relations are returned"]
+    },
+    {
+      "requirement": "Query methods",
+      "name": "getCoveringSpecsForFile returns specs covering a file",
+      "given": ["file core:src/change.ts is covered by specs core:change and core:change-manifest"],
+      "when": ["getCoveringSpecsForFile('core:src/change.ts') is called"],
+      "then": ["both COVERS_FILE relations are returned"]
+    },
+    {
+      "requirement": "Query methods",
+      "name": "getCoveredSymbols returns spec symbol coverage",
+      "given": ["spec core:change covers symbol core:Change.transition"],
+      "when": ["getCoveredSymbols('core:change') is called"],
+      "then": ["the persisted COVERS_SYMBOL relation is returned"]
+    },
+    {
+      "requirement": "Query methods",
+      "name": "getCoveringSpecsForSymbol returns specs covering a symbol",
+      "given": ["symbol core:Change.transition is covered by spec core:change"],
+      "when": ["getCoveringSpecsForSymbol('core:Change.transition') is called"],
+      "then": ["the persisted COVERS_SYMBOL relation is returned"]
+    },
+    {
       "requirement": "Graph statistics",
       "name": "Statistics include all expected fields",
       "when": ["getStatistics() is called on a populated store"],
@@ -368,9 +412,38 @@
       "then": ["12 SpecNode entries are returned"]
     }
   ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "code-graph:graph-store",
+        "file": "code-graph:src/domain/ports/graph-store.ts",
+        "symbol": "GraphStore"
+      },
+      {
+        "specId": "code-graph:graph-store",
+        "file": "code-graph:src/domain/ports/graph-store.ts",
+        "symbol": "GraphStore.getCoveredFiles"
+      },
+      {
+        "specId": "code-graph:graph-store",
+        "file": "code-graph:src/domain/ports/graph-store.ts",
+        "symbol": "GraphStore.getCoveringSpecs"
+      },
+      {
+        "specId": "code-graph:graph-store",
+        "file": "code-graph:src/domain/ports/graph-store.ts",
+        "symbol": "GraphStore.getCoveredSymbols"
+      },
+      {
+        "specId": "code-graph:graph-store",
+        "file": "code-graph:src/domain/ports/graph-store.ts",
+        "symbol": "GraphStore.getSymbolCoveringSpecs"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:60e0b001559f9c9d9e3b6d61762a7327b4ac59e66d309d190524193c330b651f",
-    "verify.md": "sha256:b9bb46799712b367484ec68a10fcb1519fb5ac206c45d99e36cf62b27c33999a"
+    "spec.md": "sha256:135678493df9cd5cba34a3589d6b93888fc0ad6cdd04cf5ed08c5c941c3c0969",
+    "verify.md": "sha256:6b0877d192124915b7ef03b9134544dfb2f0b0f15cd667c45fd1c1cebd02a290"
   },
   "generatedBy": "core"
 }

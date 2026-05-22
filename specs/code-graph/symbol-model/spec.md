@@ -64,25 +64,26 @@ No other values are permitted. Language adapters MUST map language-specific cons
 
 Relations between nodes SHALL be represented as typed edges. Each relation has a `source`, `target`, and `type`. The following relation types are defined:
 
-| Type         | Source | Target | Meaning                                                               | Phase |
-| ------------ | ------ | ------ | --------------------------------------------------------------------- | ----- |
-| `IMPORTS`    | File   | File   | Source file imports from target file                                  | v1.5  |
-| `DEFINES`    | File   | Symbol | File contains the symbol's declaration                                | v2    |
-| `CALLS`      | Symbol | Symbol | Source symbol invokes target symbol                                   | v2    |
-| `CONSTRUCTS` | Symbol | Symbol | Source symbol constructs or instantiates target type                  | v2    |
-| `USES_TYPE`  | Symbol | Symbol | Source symbol references target type in a static signature or binding | v2    |
-| `EXPORTS`    | File   | Symbol | File exports the symbol as public API                                 | v2    |
-| `DEPENDS_ON` | Spec   | Spec   | Spec depends on target spec                                           | v1.5  |
-| `COVERS`     | Spec   | File   | Spec covers the target file                                           | v2+   |
-| `EXTENDS`    | Symbol | Symbol | Source type extends or inherits from target type                      | v2    |
-| `IMPLEMENTS` | Symbol | Symbol | Source type fulfills or implements target contract/type               | v2    |
-| `OVERRIDES`  | Symbol | Symbol | Source method overrides or concretely fulfills target one             | v2    |
+| Type            | Source | Target | Meaning                                                               | Phase |
+| --------------- | ------ | ------ | --------------------------------------------------------------------- | ----- |
+| `IMPORTS`       | File   | File   | Source file imports from target file                                  | v1.5  |
+| `DEFINES`       | File   | Symbol | File contains the symbol's declaration                                | v2    |
+| `CALLS`         | Symbol | Symbol | Source symbol invokes target symbol                                   | v2    |
+| `CONSTRUCTS`    | Symbol | Symbol | Source symbol constructs or instantiates target type                  | v2    |
+| `USES_TYPE`     | Symbol | Symbol | Source symbol references target type in a static signature or binding | v2    |
+| `EXPORTS`       | File   | Symbol | File exports the symbol as public API                                 | v2    |
+| `DEPENDS_ON`    | Spec   | Spec   | Spec depends on target spec                                           | v1.5  |
+| `COVERS_FILE`   | Spec   | File   | Spec has a file-level implementation link to the target file          | v2+   |
+| `COVERS_SYMBOL` | Spec   | Symbol | Spec has a symbol-level implementation link to the target symbol      | v2+   |
+| `EXTENDS`       | Symbol | Symbol | Source type extends or inherits from target type                      | v2    |
+| `IMPLEMENTS`    | Symbol | Symbol | Source type fulfills or implements target contract/type               | v2    |
+| `OVERRIDES`     | Symbol | Symbol | Source method overrides or concretely fulfills target one             | v2    |
 
-Relations are directional. `IMPORTS`, `DEFINES`, `CALLS`, `CONSTRUCTS`, `USES_TYPE`, `EXPORTS`, `DEPENDS_ON`, `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES` are populated by the indexer. `COVERS` is populated by spec-to-code mapping (deferred to v2+).
+### Requirement: Relation staleness
 
-`CONSTRUCTS` is distinct from `CALLS`: it records instantiation or constructor-like dependency, not an ordinary invocation. `USES_TYPE` is distinct from `CALLS`: it records static type dependency in signatures, annotations, fields, or deterministic binding declarations.
+Relations MAY include a `stale` boolean flag in their `metadata`.
 
-The hierarchy model for this iteration remains limited to `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES`. Language-specific constructs MAY be normalized into one of those relations when doing so preserves useful impact, hotspot, and code-understanding semantics. Constructs that cannot be normalized without materially distorting their meaning are omitted rather than introducing additional base relation types in this iteration.
+For implementation traceability, `stale` applies specifically to `COVERS_SYMBOL` relations whose target symbol is no longer detectable in the current graph index. It is not the generic marker for workspace-boundary or archive-materialization failures.
 
 ### Requirement: Relation value object
 

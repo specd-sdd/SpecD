@@ -12,6 +12,7 @@ import { ArtifactConflictError } from '../../domain/errors/artifact-conflict-err
 import { CorruptedManifestError } from '../../domain/errors/corrupted-manifest-error.js'
 import { ChangeAlreadyExistsError } from '../../application/errors/change-already-exists-error.js'
 import { ChangeNotFoundError } from '../../application/errors/change-not-found-error.js'
+import { SchemaMismatchError } from '../../application/errors/schema-mismatch-error.js'
 import {
   ChangeRepository,
   type ChangeRepositoryConfig,
@@ -31,6 +32,8 @@ import {
   type ChangeManifest,
   type ManifestArtifact,
   type ManifestArtifactFile,
+  type ManifestImplementationLink,
+  type ManifestTrackedImplementationFile,
   type RawChangeEvent,
   changeManifestSchema,
 } from './manifest.js'
@@ -103,6 +106,7 @@ export class FsChangeRepository extends ChangeRepository {
   private readonly _draftsPath: string
   private readonly _discardedPath: string
   private readonly _locksPath: string
+  private readonly _activeSchema: { name: string; version: number } | undefined
   private _artifactTypes: readonly ArtifactType[]
   private readonly _resolveArtifactTypes: (() => Promise<readonly ArtifactType[]>) | undefined
   private readonly _resolveSpecExists: ((specId: string) => Promise<boolean>) | undefined
@@ -119,6 +123,7 @@ export class FsChangeRepository extends ChangeRepository {
     this._draftsPath = config.draftsPath
     this._discardedPath = config.discardedPath
     this._locksPath = path.join(config.configPath, 'tmp', 'change-locks')
+    this._activeSchema = config.activeSchema
     this._artifactTypes = config.artifactTypes ?? []
     this._resolveArtifactTypes = config.resolveArtifactTypes
     this._resolveSpecExists = config.resolveSpecExists
@@ -874,6 +879,18 @@ export class FsChangeRepository extends ChangeRepository {
     const specExistence = await this._buildSpecExistenceMap(manifest.specIds)
     let manifestNormalized = false
 
+    // Validate schema compatibility
+    if (this._activeSchema !== undefined) {
+      if (manifest.schema.name !== this._activeSchema.name) {
+        throw new SchemaMismatchError(manifest.name, manifest.schema.name, this._activeSchema.name)
+      }
+      if (manifest.schema.version !== this._activeSchema.version) {
+        Logger.warn(
+          `Change '${manifest.name}' was created with schema version ${manifest.schema.version} but the active schema version is ${this._activeSchema.version}.`,
+        )
+      }
+    }
+
     for (const raw of manifest.artifacts) {
       const artType = artifactTypeMap.get(raw.type)
       const filesMap = new Map<string, ArtifactFile>()
@@ -892,9 +909,12 @@ export class FsChangeRepository extends ChangeRepository {
               key: rawFile.key,
               ...(specExists !== undefined ? { specExists } : {}),
             })
+            // Refined normalization: only flip filename if the representation class matches
+            // (e.g. direct -> direct) or if it's not a spec-scoped artifact where intent
+            // preservation is required. Do NOT flip solely because validatedHash is null.
             resolvedFilename =
               artifactRepresentationClass(rawFile.filename) ===
-                artifactRepresentationClass(expectedFilename) || rawFile.validatedHash === null
+              artifactRepresentationClass(expectedFilename)
                 ? expectedFilename
                 : rawFile.filename
           }
@@ -963,6 +983,12 @@ export class FsChangeRepository extends ChangeRepository {
       createdAt: new Date(manifest.createdAt),
       ...(manifest.description !== undefined ? { description: manifest.description } : {}),
       specIds: manifest.specIds,
+      ...(manifest.trackedImplementationFiles !== undefined
+        ? { trackedImplementationFiles: manifest.trackedImplementationFiles }
+        : {}),
+      ...(manifest.implementationLinks !== undefined
+        ? { implementationLinks: manifest.implementationLinks }
+        : {}),
       history,
       artifacts: artifactMap,
       ...(specDependsOn !== undefined ? { specDependsOn } : {}),
@@ -1122,6 +1148,19 @@ function changeToManifest(change: Change): ChangeManifest {
   for (const [key, deps] of change.specDependsOn) {
     specDependsOn[key] = [...deps]
   }
+  const trackedImplementationFiles: ManifestTrackedImplementationFile[] =
+    change.trackedImplementationFiles.map((entry) => ({
+      file: entry.file,
+      state: entry.state,
+    }))
+  const implementationLinks: ManifestImplementationLink[] = change.implementationLinks.map(
+    (link) => ({
+      specId: link.specId,
+      file: link.file,
+      fileLinkExplicit: link.fileLinkExplicit,
+      ...(link.symbols !== undefined ? { symbols: [...link.symbols] } : {}),
+    }),
+  )
 
   return {
     name: change.name,
@@ -1131,6 +1170,8 @@ function changeToManifest(change: Change): ChangeManifest {
     specIds: [...change.specIds],
     ...(Object.keys(specDependsOn).length > 0 ? { specDependsOn } : {}),
     invalidationPolicy: change.invalidationPolicy,
+    ...(trackedImplementationFiles.length > 0 ? { trackedImplementationFiles } : {}),
+    ...(implementationLinks.length > 0 ? { implementationLinks } : {}),
     artifacts: [...change.artifacts.values()].map(serializeArtifact),
     history: change.history.map(serializeEvent),
   }

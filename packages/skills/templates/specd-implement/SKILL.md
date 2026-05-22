@@ -117,6 +117,7 @@ fresh status/context indicates the design may be stale:
 ```bash
 specd graph impact --symbol "<name>" --direction dependents --format toon
 specd graph impact --file "<workspace:path>" --direction dependents --format toon
+specd graph impact --spec "<workspace:capability>" --direction dependents --format toon
 ```
 
 Surface newly discovered HIGH or CRITICAL risk findings to the user before continuing.
@@ -132,6 +133,75 @@ Read ALL change artifacts from `<changePath>/`:
 Do not hardcode filenames — use the schema's artifact definitions.
 
 ### 6. Work through tasks
+
+Implementation tracking creates **confirmed links** between each spec and the code
+that implements it. Every spec in the change must end up linked to the files and
+symbols that realize its requirements. These links feed into downstream tooling
+(code graph, impact analysis, compliance checks).
+
+**What to link:**
+
+For each spec in the change, identify every file and symbol you create or modify that
+directly implements that spec's requirements. A link answers the question: _"which
+code makes this spec real?"_
+
+**Symbol-level vs file-level links:**
+
+- **Symbol-level** (preferred) — link a specific function, class, type, method, or
+  constant to the spec. Use when the implementation maps to named code constructs.
+
+  ```bash
+  specd changes implementation add <name> --spec <specId> --file <path> --symbol "<SymbolName>"
+  ```
+
+  You may pass `--symbol` multiple times to link several symbols in one call. Re-adding
+  the same `(specId, file)` with new symbols **merges** them into the existing link.
+
+- **File-level** — link an entire file to the spec without naming specific symbols.
+  Use only when no stable symbol exists (config files, templates, barrel exports,
+  documentation) or when the file as a whole is the unit of implementation.
+  ```bash
+  specd changes implementation add <name> --spec <specId> --file <path>
+  ```
+
+**When to link:**
+
+After finishing each task, before marking its checkbox done:
+
+1. Identify which spec(s) the task's code fulfills
+2. For each file touched, determine the concrete symbols introduced or modified
+3. Add implementation links: one `add` call per `(specId, file)` pair with `--symbol`
+   for each named construct
+4. If a file implements parts of multiple specs, add separate links per spec
+5. Mark the task checkbox done (`- [ ]` → `- [x]`) in the task-bearing artifact
+
+**Review and resolve:**
+
+```bash
+specd changes implementation list <name>     # current tracking state
+specd changes implementation review <name>   # + stale symbol diagnostics from code graph
+specd changes implementation resolve <name> --file <path1>,<path2> # mark files fully reviewed
+```
+
+- `list` shows all tracked files (grouped by state) and confirmed links.
+- `review` adds graph-based diagnostics: symbols that no longer exist in the code
+  are flagged as stale.
+- `resolve` marks one or more tracked files as fully reviewed. It supports a
+  comma-separated list of paths for efficient bulk resolution.
+- `ignore` is for files that do **not** belong to the change's implementation surface.
+  It also supports comma-separated lists. Files with active confirmed links **cannot**
+  be ignored.
+  ```bash
+  specd changes implementation ignore <name> --file <path1>,<path2>
+  ```
+
+**Security & Integrity Guard:** All implementation management commands (`add`, `resolve`,
+`ignore`) validate that the target files exist on disk before updating the manifest.
+
+**Out-of-scope guard:**
+
+If links target specs outside the change's scope, the archive will block. Surface
+these to the user immediately — do not silently add cross-scope links.
 
 #### 6a. Analyze task dependencies
 
@@ -173,8 +243,9 @@ then verify their work before starting the next wave.
 For each task in order:
 
 1. Implement the code
-2. **Immediately** mark it done (`- [ ]` → `- [x]`) in the task-bearing artifact
-3. Check if the code touches areas outside the change's specs — if so, surface to the user
+2. Update implementation tracking for the files touched by that task
+3. **Immediately** mark it done (`- [ ]` → `- [x]`) in the task-bearing artifact
+4. Check if the code touches areas outside the change's specs — if so, surface to the user
 
 #### 6d. Common rules (both modes)
 

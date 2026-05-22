@@ -62,6 +62,19 @@ specd changes hook-instruction <name> verifying --phase pre --format text
 
 **If in `done`**: skip directly to step 6a (transition to archivable path).
 
+Continue to step 2b.
+
+### 2b. Select verification mode
+
+Ask the user:
+
+> "What verification mode do you want?"
+>
+> - **Simple** — verify scenarios against implementation.
+> - **Full** — simple verification + compliance audit.
+
+Wait for the user's choice. Store it as `verificationMode` (simple or full).
+
 Continue to step 3.
 
 ### 3. Load verification context
@@ -143,11 +156,41 @@ specd changes hook-instruction <name> verifying --phase post --format text
 
 Follow guidance. If hooks fail, fix and re-run.
 
+### 5b. Compliance audit (full mode only)
+
+**Only if `verificationMode` is `full`:** run the compliance audit now, before any
+state transition or results display.
+
+Execute the `specd-compliance` skill for the current change: `/specd-compliance --change <name>`
+
+Obtain the audit results and store them. They will be presented together with the
+verification results in step 6.
+
+**If `verificationMode` is `simple`:** skip this step entirely.
+
+Continue to step 6.
+
 ### 6. Report results and transition
 
-Present findings to the user.
+Present verification findings to the user.
 
-**If any fail:**
+**If in `full` mode:** also present the audit results from step 5b alongside the
+verification findings. If the audit identified issues, ALWAYS ask the user what to do
+next. Provide these options:
+
+- 1. **"Update Specs"** — if audit identified spec-level issues or drift: `/specd-design <name>`
+- 2. **"Fix Implementation"** — if audit identified code or test gaps: `/specd-implement <name>`
+- 3. **"Both"** — run `/specd-design <name>` FIRST, then `/specd-implement <name>`
+- 4. **"Proceed"** — audit is clean or issues dismissed, continue with the standard workflow
+
+If there was no issues, ask only if they want to proceed to transition or review the results again. Provide these options:
+
+- 1. **"Proceed"** — continue with the standard workflow
+- 2. **"Review Results"** — review the verification findings again
+
+You MUST NOT proceed automatically; the user must explicitly choose.
+
+**If any scenarios fail:**
 
 First classify the failure:
 
@@ -233,31 +276,15 @@ specd changes hook-instruction <name> archivable --phase post --format text
 **Stop.**
 Do not invoke `/specd-archive` automatically; wait for explicit user confirmation.
 
-#### 7. Optional Change Audit
-
-After the verification process is complete (regardless of the outcome, but usually after a success or when discrepancies are suspected), you MUST ask the user:
-
-> "Would you like to perform a full compliance audit of this change?"
-
-**If the user agrees:**
-
-1. Execute the `specd-compliance` skill for the current change: `/specd-compliance --change <name>`
-2. Obtain the audit results and present them clearly to the user.
-3. Based on the findings, ALWAYS ask the user what to do next. Provide these options:
-   - **"Update Specs"**: If the audit identifies spec-level issues or drift, suggest `/specd-design <name>`.
-   - **"Fix Implementation"**: If the audit identifies code or test gaps, suggest `/specd-implement <name>`.
-   - **"Both"**: If both specs and code need updates, instruct the user to run `/specd-design <name>` FIRST (to establish the requirement), followed by `/specd-implement <name>`.
-   - **"Proceed"**: If the audit is clean or issues are dismissed, continue with the standard workflow.
-
-You MUST NOT proceed to any of these skills automatically; the user must explicitly choose the next action.
-
 ## Session tasks
 
 1. `Load state & hooks`
-2. `Load verification context`
-3. For each spec: `Verify: <specId>`
-4. `Report results & transition`
-5. `Audit Selection (Optional)`
+2. `Select verification mode (simple/full)`
+3. `Load verification context`
+4. For each spec: `Verify: <specId>`
+5. `Run exit hooks`
+   5b. `Compliance audit` (full mode only)
+6. `Report results & transition`
 
 ## Handling failed transitions
 
@@ -285,4 +312,4 @@ specd changes transition <name> designing --skip-hooks all
 - Run actual tests where applicable
 - Any time a fresh `changes status` shows `review: required: yes`, stop
   verification and redirect to `/specd-design <name>`
-- ALWAYS ask the user for the next action after an optional audit
+- ALWAYS ask the user for the next action when full-mode audit finds issues

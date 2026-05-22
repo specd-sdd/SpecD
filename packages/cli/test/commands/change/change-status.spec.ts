@@ -12,7 +12,12 @@ vi.mock('../../../src/helpers/cli-context.js', () => ({
   resolveCliContext: vi.fn(),
 }))
 
+vi.mock('../../../src/commands/change/_implementation-tracking.js', () => ({
+  enrichImplementationTracking: vi.fn(),
+}))
+
 import { resolveCliContext } from '../../../src/helpers/cli-context.js'
+import { enrichImplementationTracking } from '../../../src/commands/change/_implementation-tracking.js'
 import { registerChangeStatus } from '../../../src/commands/change/status.js'
 import { ChangeNotFoundError } from '@specd/core'
 
@@ -20,6 +25,14 @@ function setup() {
   const config = makeMockConfig()
   const kernel = makeMockKernel()
   vi.mocked(resolveCliContext).mockResolvedValue({ config, configFilePath: null, kernel })
+  vi.mocked(enrichImplementationTracking).mockResolvedValue({
+    trackedFiles: [],
+    links: [],
+    graphHint: {
+      status: 'fresh',
+      message: 'Code graph is fresh; stale symbol diagnostics are authoritative.',
+    },
+  })
   const stdout = captureStdout()
   const stderr = captureStderr()
   mockProcessExit()

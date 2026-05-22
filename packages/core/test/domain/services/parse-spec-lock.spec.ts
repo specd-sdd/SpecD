@@ -13,6 +13,7 @@ describe('parseSpecLock', () => {
     expect(result).toEqual({
       schema: { name: 'schema-std', version: 1 },
       dependsOn: ['core:storage', 'default:_global/architecture'],
+      implementation: [],
     })
   })
 
@@ -37,6 +38,7 @@ describe('specLockSchema', () => {
     const result = specLockSchema.safeParse({
       schema: { name: 'schema-std', version: 1 },
       dependsOn: ['core:storage'],
+      implementation: [],
       originalHash: 'sha256:' + 'a'.repeat(64),
     })
 
@@ -47,6 +49,7 @@ describe('specLockSchema', () => {
     const result = specLockSchema.safeParse({
       schema: { name: 'schema-std', version: -1 },
       dependsOn: ['core:storage'],
+      implementation: [],
     })
 
     expect(result.success).toBe(false)

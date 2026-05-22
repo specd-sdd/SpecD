@@ -17,156 +17,9 @@ specd change status <name> [--format text|json|toon]
 
 ### Requirement: Output format
 
-In `text` mode (default), the command prints a structured summary to stdout:
+In `json` or `toon` mode, the `artifactDag` array MUST include the `hasTasks` field for every entry.
 
-```
-change:      <name>
-state:       <state>
-specs:       <specId>, <specId>, ...
-description: <description>            ← only if set
-
-artifacts (DAG):                      ← ASCII tree rendering
-  [✓] complete  [ ] missing  [!] drifted  [~] needs review  [?] in-progress
-
-  [~] proposal [scope: change]
-  └─ [~] specs [scope: spec]
-     ├─ [~] verify [scope: spec]
-     │  └─ [~] design [scope: change]
-     │     └─ [!] tasks [scope: change] [hasTasks]
-
-blockers:                             ← High-visibility section for errors
-  ! <CODE>: <message>
-  ...
-
-next action:                          ← Direct recommendation
-  target:  <targetStep>
-  command: <command>
-  reason:  <reason>
-
-lifecycle:
-  transitions:  <available1>, <available2>, ...    ← only availableTransitions
-  next artifact: <artifactId>                      ← omitted when null
-  approvals:     spec=on|off  signoff=on|off
-  path:          <changePath>
-
-review:
-  required:  yes|no
-  route:     designing
-  reason:    artifact-drift|artifact-review-required|spec-overlap-conflict
-  overlap:                                         ← only when reason is spec-overlap-conflict
-    - archived: <name1>, specs: <specId1>, <specId2>
-    - archived: <name2>, specs: <specId3>
-  affected:
-    <artifact-type>:
-      - <absolute-path>
-      - <absolute-path>
-
-artifacts (details):                  ← Detailed file list
-  <type>  <state>
-    <file-key>  <file-state>  <filename>
-  ...
-```
-
-The `description:` line is omitted when no description is set on the change.
-
-The `artifacts (DAG):` section renders an ASCII tree of the artifact dependency hierarchy. Each node MUST include a status symbol from the legend, an explicit `[scope: change]` or `[scope: spec]` label, and an optional `[hasTasks]` label if the artifact has task capability enabled. The legend MUST be printed at the top of the DAG.
-
-The status symbols map to aggregate artifact states:
-
-- `[✓]` -> `complete` or `skipped`
-- `[ ]` -> `missing`
-- `[!]` -> `drifted-pending-review`
-- `[~]` -> `pending-review` or `pending-parent-artifact-review`
-- `[?]` -> `in-progress`
-
-The `blockers:` section is a high-visibility list of the `blockers` array returned by `GetStatus`. It lists every blocker code and its descriptive message. This section is omitted when there are no blockers.
-
-The `next action:` section presents the `nextAction` object from `GetStatus`. The `command:` line uses formatting that highlights the command for easy copy-pasting. This section is always present.
-
-The `lifecycle:` section is always present. The `transitions:` line shows only `availableTransitions` (transitions that would succeed now). It is omitted when the list is empty. The `next artifact:` line is omitted when `nextArtifact` is `null`.
-
-The `review:` section is omitted when `review.required` is `false`. When present, it summarizes why the change must return through design review. Within that section, affected files are rendered using their absolute paths so an operator or agent can jump directly to the file that needs review. If supplemental `key` data is present, it is secondary and must not replace the path-first rendering.
-
-When `review.reason` is `'spec-overlap-conflict'`, the review section additionally shows an `overlap:` subsection listing each unhandled overlap entry as a bullet with the archived change name and overlapping spec IDs. This subsection is omitted for all other reasons. Multiple entries (from multiple archived changes) are listed newest-first.
-
-The `artifacts (details):` section provides the granular file-level statuses. Each artifact line shows the artifact type ID and its persisted aggregate `state`. Under each artifact, the command prints every tracked file with its file key, persisted file `state`, and relative filename. Artifacts are listed in schema-declared order, with file rows in artifact order.
-
-In `json` or `toon` mode, the output is:
-
-```json
-{
-  "name": "...",
-  "state": "...",
-  "specIds": ["..."],
-  "schema": { "name": "...", "version": 1 },
-  "description": "...",
-  "blockers": [{ "code": "...", "message": "..." }],
-  "nextAction": {
-    "targetStep": "...",
-    "actionType": "...",
-    "reason": "...",
-    "command": "..."
-  },
-  "artifactDag": [
-    {
-      "id": "...",
-      "scope": "change|spec",
-      "hasTasks": true,
-      "state": "...",
-      "requires": ["..."],
-      "children": ["..."]
-    }
-  ],
-  "artifacts": [
-    {
-      "type": "...",
-      "state": "pending-review",
-      "effectiveStatus": "pending-review",
-      "files": [
-        {
-          "key": "...",
-          "filename": "...",
-          "state": "drifted-pending-review"
-        }
-      ]
-    }
-  ],
-  "review": {
-    "required": true,
-    "route": "designing",
-    "reason": "artifact-drift|artifact-review-required|spec-overlap-conflict",
-    "overlapDetail": [],
-    "affectedArtifacts": [
-      {
-        "type": "specs",
-        "files": [
-          {
-            "key": "core:change",
-            "filename": "deltas/core/core/change/spec.md.delta.yaml",
-            "path": "/abs/path/.specd/changes/<change>/deltas/core/core/change/spec.md.delta.yaml"
-          }
-        ]
-      }
-    ]
-  },
-  "lifecycle": {
-    "validTransitions": ["..."],
-    "availableTransitions": ["..."],
-    "blockers": [{ "transition": "...", "reason": "requires", "blocking": ["..."] }],
-    "approvals": { "spec": false, "signoff": false },
-    "nextArtifact": "...",
-    "changePath": "...",
-    "schemaInfo": { "name": "...", "version": 1 }
-  }
-}
-```
-
-`description` is omitted from the JSON object when not set. The `lifecycle` object is always present. `nextArtifact` is `null` (not omitted) when all artifacts are done.
-
-`overlapDetail` is always present in the JSON `review` object:
-
-- When `review.reason` is `'spec-overlap-conflict'`: an array of `{ archivedChangeName, overlappingSpecIds }` entries ordered newest-first
-- For all other reasons: an empty array `[]`
+The `state` field in the top-level `artifactDag` MUST reflect the drift-aware display state projection (e.g., `complete-with-drift`) rather than the raw canonical state, ensuring that agents can detect drift without manually comparing hashes.
 
 ### Requirement: Display-state rendering
 
@@ -217,12 +70,30 @@ schema:
 `hasTasks` is true when the artifact has `hasTasks: true` explicitly or has a `taskCompletionCheck` declaration.
 This allows design/implement skills to replace `schema show` calls.
 
+### Requirement: Implementation section
+
+When implementation tracking is active for a change, the status display SHALL include an `Implementation` section derived from the `GetStatus` result **ONLY if the `--implementation` flag is provided**.
+
+That section MUST expose:
+
+- tracked implementation files grouped or labeled by review state (`open`, `resolved`, `ignored`)
+- confirmed implementation links, showing file-level links and any symbol-level refinements
+- stale-link warnings for symbol-level links whose symbol is absent from the graph database
+
+The CLI section is based on the `GetStatus` projection. It MUST NOT recompute implementation tracking state independently, but it MAY enrich symbol-level links with stale diagnostics and graph-state hints by querying the code graph.
+
+When a symbol-level link contains a composed member identifier such as `X.Y`, `X#Y`, or `X::Y`, and the exact stored symbol string is not found in the graph, the CLI SHOULD retry stale resolution against the same file using the rightmost member segment plus the graph-reported symbol kind.
+
+This fallback is best-effort only. It MUST NOT rewrite the stored symbol string, MUST NOT mutate change state or archived sidecars, and MUST leave the symbol marked stale when multiple same-file matches make the fallback ambiguous.
+
 ## Constraints
 
 - The output includes all artifacts declared by the schema, not only those present on disk
 - `effectiveStatus` reflects dependency cascading — an artifact may be `in-progress` because a dependency is incomplete even if its own hash matches
-- The CLI command is a pure serializer — all lifecycle computation is performed by the `GetStatus` use case in `@specd/core`
-- The CLI command MUST NOT call `SchemaRegistry`, `config show`, or any other use case to compute lifecycle data — it serializes what `GetStatus` returns
+- The CLI command serializes lifecycle and implementation-tracking state returned by `GetStatus`; it does not recompute core state independently
+- The CLI command MAY enrich implementation output with stale symbol diagnostics and graph-state hints by querying the code graph
+- When applying stale-symbol enrichment, the CLI MAY use a same-file composed-member fallback for symbols containing `.`, `#`, or `::`, but MUST treat it as review-time enrichment only
+- The CLI command MUST NOT call `SchemaRegistry`, `config show`, or any other use case to compute lifecycle data — it serializes what `GetStatus` returns for lifecycle interpretation
 - Lifecycle semantics shown by the command (effective artifact status, blockers, available transitions, next artifact, review summary, next action) are projections of the `GetStatus` result, which is itself derived from `LifecycleEngine`; the CLI must not re-derive them independently
 
 ## Examples

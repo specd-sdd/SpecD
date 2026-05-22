@@ -58,6 +58,34 @@ export interface ManifestArtifact {
   readonly files: ManifestArtifactFile[]
 }
 
+/** Allowed review states for tracked implementation files. */
+export type ManifestTrackedImplementationFileState = 'open' | 'resolved' | 'ignored'
+
+/** A tracked implementation file entry persisted in `manifest.json`. */
+export interface ManifestTrackedImplementationFile {
+  /** Raw project-relative file path. */
+  readonly file: string
+  /** Explicit review state for the tracked file. */
+  readonly state: ManifestTrackedImplementationFileState
+}
+
+/** A confirmed implementation link persisted in `manifest.json`. */
+export interface ManifestImplementationLink {
+  /** Canonical spec ID owning the implementation link. */
+  readonly specId: string
+  /** Raw project-relative file path. */
+  readonly file: string
+  /**
+   * Whether the file-level link was explicitly created.
+   *
+   * `false` means the file-level presence exists only as the container for
+   * symbol-level refinements.
+   */
+  readonly fileLinkExplicit: boolean
+  /** Optional symbol-level refinements for the `specId + file` link. */
+  readonly symbols?: string[]
+}
+
 /** Raw JSON shape for artifact/file payloads attached to invalidation events. */
 export interface RawInvalidatedArtifactEntry {
   readonly type: string
@@ -287,6 +315,28 @@ export const manifestArtifactSchema = z.object({
   files: z.array(manifestArtifactFileSchema),
 })
 
+export const manifestTrackedImplementationFileSchema = z.object({
+  file: z.string(),
+  state: z.enum(['open', 'resolved', 'ignored']),
+})
+
+export const manifestImplementationLinkSchema = z
+  .object({
+    specId: z.string(),
+    file: z.string(),
+    fileLinkExplicit: z.boolean(),
+    symbols: z.array(z.string()).optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (!value.fileLinkExplicit && (value.symbols === undefined || value.symbols.length === 0)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['fileLinkExplicit'],
+        message: 'fileLinkExplicit=false requires one or more symbols',
+      })
+    }
+  })
+
 export const rawChangeEventSchema = z
   .object({
     type: z.string(),
@@ -309,6 +359,8 @@ export const changeManifestSchema = z.object({
   specIds: z.array(z.string()),
   specDependsOn: z.record(z.string(), z.array(z.string())).optional(),
   invalidationPolicy: z.enum(['none', 'surgical', 'downstream', 'global']).optional(),
+  trackedImplementationFiles: z.array(manifestTrackedImplementationFileSchema).optional(),
+  implementationLinks: z.array(manifestImplementationLinkSchema).optional(),
   artifacts: z.array(manifestArtifactSchema),
   history: z.array(rawChangeEventSchema),
 })
@@ -359,6 +411,10 @@ export interface ChangeManifest {
   readonly specDependsOn?: Record<string, string[]>
   /** Invalidation policy for this change. Defaults to `'downstream'` when absent. */
   readonly invalidationPolicy?: InvalidationPolicy
+  /** Optional tracked implementation files under review for the active change. */
+  readonly trackedImplementationFiles?: ManifestTrackedImplementationFile[]
+  /** Optional confirmed implementation links for the active change. */
+  readonly implementationLinks?: ManifestImplementationLink[]
   /** Artifact descriptors including their validation hashes. */
   readonly artifacts: ManifestArtifact[]
   /** Append-only event history. */

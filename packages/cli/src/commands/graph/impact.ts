@@ -10,6 +10,21 @@ import { resolveImpactFileSelectors } from './resolve-impact-file-selectors.js'
 /** Provider-supported graph impact traversal directions. */
 type ImpactDirection = 'upstream' | 'downstream' | 'both'
 
+/** Shared impact payload shape used by text formatters in this command. */
+type FormattedImpactResult = {
+  riskLevel: string
+  directDependents: number
+  indirectDependents: number
+  transitiveDependents: number
+  affectedFiles: readonly string[]
+  affectedSymbols?: readonly { name: string; filePath: string; line: number; depth: number }[]
+}
+
+/** Spec impact payload shape used by text formatters in this command. */
+type FormattedSpecImpactResult = FormattedImpactResult & {
+  affectedSpecs: readonly string[]
+}
+
 /**
  * Formats an impact result as text lines.
  * @param label - The label for the analysis target.
@@ -23,18 +38,7 @@ type ImpactDirection = 'upstream' | 'downstream' | 'both'
  * @param maxDepth - Maximum traversal depth used (default: 3). Non-default values shown in header.
  * @returns An array of formatted lines.
  */
-function formatImpact(
-  label: string,
-  result: {
-    riskLevel: string
-    directDependents: number
-    indirectDependents: number
-    transitiveDependents: number
-    affectedFiles: readonly string[]
-    affectedSymbols?: readonly { name: string; filePath: string; line: number; depth: number }[]
-  },
-  maxDepth = 3,
-): string[] {
+function formatImpact(label: string, result: FormattedImpactResult, maxDepth = 3): string[] {
   const depthSuffix = maxDepth !== 3 ? ` (depth=${String(maxDepth)})` : ''
   const lines = [
     `Impact analysis for ${label}${depthSuffix}`,
@@ -82,6 +86,33 @@ function formatImpact(
 }
 
 /**
+ * Formats a spec impact result as text lines.
+ *
+ * @param specId - The target spec identifier.
+ * @param result - The spec impact result to format.
+ * @param maxDepth - Maximum traversal depth used.
+ * @returns An array of formatted lines.
+ */
+function formatSpecImpact(
+  specId: string,
+  result: FormattedSpecImpactResult,
+  maxDepth = 3,
+): string[] {
+  const lines = formatImpact(`spec ${specId}`, result, maxDepth)
+  lines.splice(6, 0, `  Affected specs:   ${String(result.affectedSpecs.length)}`)
+
+  if (result.affectedSpecs.length > 0) {
+    lines.push('')
+    lines.push('Affected specs:')
+    for (const affectedSpec of result.affectedSpecs) {
+      lines.push(`  ${affectedSpec}`)
+    }
+  }
+
+  return lines
+}
+
+/**
  * Parses user-facing graph impact direction aliases into provider direction values.
  * @param raw - Raw direction option value.
  * @param format - Raw output format, used for structured CLI errors.
@@ -120,6 +151,7 @@ export function registerGraphImpact(parent: Command): void {
       'analyze impact of one or more files (workspace:path, config-relative, or absolute)',
     )
     .option('--symbol <name>', 'analyze impact of a symbol by name')
+    .option('--spec <id>', 'analyze impact of a spec by identifier')
     .addOption(
       new Option(
         '--direction <dir>',
@@ -148,6 +180,8 @@ JSON/TOON output schema:
     FileImpactResult (ImpactResult + symbols: ImpactResult[])
   --file (multiple):
     AggregatedFileImpactResult
+  --spec:
+    { spec: string, impact: SpecImpactResult }
   --symbol (no match):
     { error: "not_found", symbol: string }
 
@@ -160,6 +194,7 @@ JSON/TOON output schema:
       async (opts: {
         file?: string[]
         symbol?: string
+        spec?: string
         direction: string
         depth: string
         config?: string
@@ -173,9 +208,9 @@ JSON/TOON output schema:
           cliError('--depth must be a positive integer', opts.format, 1)
         }
 
-        const selectorCount = (opts.symbol ? 1 : 0) + (opts.file ? 1 : 0)
+        const selectorCount = (opts.symbol ? 1 : 0) + (opts.file ? 1 : 0) + (opts.spec ? 1 : 0)
         if (selectorCount !== 1) {
-          cliError('provide exactly one of --file or --symbol', opts.format, 1)
+          cliError('provide exactly one of --file, --symbol, or --spec', opts.format, 1)
         }
         if (opts.config !== undefined && opts.path !== undefined) {
           cliError('--config and --path are mutually exclusive', opts.format, 1)
@@ -196,6 +231,8 @@ JSON/TOON output schema:
         await withProvider(config, opts.format, async (provider) => {
           if (opts.symbol) {
             await handleSymbolImpact(provider, opts.symbol, direction, maxDepth, fmt)
+          } else if (opts.spec) {
+            await handleSpecImpact(provider, opts.spec, direction, maxDepth, fmt)
           } else if (opts.file) {
             await handleFilesImpact(
               provider,
@@ -338,6 +375,11 @@ async function handleFilesImpact(
       {
         targets: resolved.map((f) => f.path),
         riskLevel: overallRisk,
+        directDepsCount: directDependents,
+        indirectDepsCount: indirectDependents,
+        transitiveDepsCount: transitiveDependents,
+        affectedFilesCount: allAffectedFiles.size,
+        // Legacy fields for backward compatibility
         directDependents,
         indirectDependents,
         transitiveDependents,
@@ -387,7 +429,18 @@ async function handleSymbolImpact(
       )
       output(lines.join('\n'), 'text')
     } else {
-      output({ symbol: sym, impact: result }, fmt)
+      output(
+        {
+          symbol: sym,
+          riskLevel: result.riskLevel,
+          directDepsCount: result.directDependents,
+          indirectDepsCount: result.indirectDependents,
+          transitiveDepsCount: result.transitiveDependents,
+          affectedFilesCount: result.affectedFiles.length,
+          impact: result,
+        },
+        fmt,
+      )
     }
     return
   }
@@ -417,5 +470,49 @@ async function handleSymbolImpact(
       })),
     )
     output(results, fmt)
+  }
+}
+
+/**
+ * Handles spec-level impact analysis.
+ * @param provider - The code graph provider.
+ * @param specId - The spec identifier to analyze.
+ * @param direction - The traversal direction.
+ * @param maxDepth - Maximum traversal depth.
+ * @param fmt - The output format.
+ */
+async function handleSpecImpact(
+  provider: Awaited<ReturnType<typeof createCodeGraphProvider>>,
+  specId: string,
+  direction: 'upstream' | 'downstream' | 'both',
+  maxDepth: number,
+  fmt: 'text' | 'json' | 'toon',
+): Promise<void> {
+  const spec = await provider.getSpec(specId)
+  if (spec === undefined) {
+    if (fmt === 'text') {
+      output(`No spec found matching "${specId}".`, 'text')
+    } else {
+      output({ error: 'not_found', spec: specId }, fmt)
+    }
+    return
+  }
+
+  const result = await provider.analyzeSpecImpact(specId, direction, maxDepth)
+  if (fmt === 'text') {
+    output(formatSpecImpact(spec.specId, result, maxDepth).join('\n'), 'text')
+  } else {
+    output(
+      {
+        spec: spec.specId,
+        riskLevel: result.riskLevel,
+        directDepsCount: result.directDependents,
+        indirectDepsCount: result.indirectDependents,
+        transitiveDepsCount: result.transitiveDependents,
+        affectedFilesCount: result.affectedFiles.length,
+        impact: result,
+      },
+      fmt,
+    )
   }
 }

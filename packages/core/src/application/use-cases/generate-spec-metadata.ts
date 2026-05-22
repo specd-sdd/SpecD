@@ -6,6 +6,7 @@ import { type ContentHasher } from '../ports/content-hasher.js'
 import { WorkspaceNotFoundError } from '../errors/workspace-not-found-error.js'
 import { SpecNotFoundError } from '../errors/spec-not-found-error.js'
 import { type SpecMetadata } from '../../domain/services/parse-metadata.js'
+import { type SpecLockData } from '../../domain/services/parse-spec-lock.js'
 import { SpecPath } from '../../domain/value-objects/spec-path.js'
 import { inferFormat } from '../../domain/services/format-inference.js'
 import { parseSpecId } from '../../domain/services/parse-spec-id.js'
@@ -136,12 +137,46 @@ export class GenerateSpecMetadata {
     })
 
     // Assemble final metadata
+    const specLock = await specRepo.readSpecLock(spec)
     const metadata: SpecMetadata = {
       ...extracted.metadata,
+      ...(specLock !== null
+        ? { implementation: projectImplementationMetadata(input.specId, specLock) }
+        : {}),
       contentHashes: extracted.contentHashes,
       generatedBy: 'core',
     }
 
     return { metadata, hasExtraction: true }
+  }
+}
+
+/**
+ * Projects archived implementation data from `spec-lock.json` into metadata shape.
+ *
+ * @param specId - Owning spec identifier
+ * @param specLock - Parsed sidecar payload
+ * @returns Metadata implementation projection
+ */
+function projectImplementationMetadata(
+  specId: string,
+  specLock: SpecLockData,
+): NonNullable<SpecMetadata['implementation']> {
+  const files: Array<{ specId: string; file: string }> = []
+  const symbols: Array<{ specId: string; file: string; symbol: string }> = []
+
+  for (const entry of specLock.implementation) {
+    if (entry.symbols === undefined) {
+      files.push({ specId, file: entry.file })
+      continue
+    }
+    for (const symbol of entry.symbols) {
+      symbols.push({ specId, file: entry.file, symbol })
+    }
+  }
+
+  return {
+    ...(files.length > 0 ? { files } : {}),
+    ...(symbols.length > 0 ? { symbols } : {}),
   }
 }

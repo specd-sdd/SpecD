@@ -128,6 +128,40 @@
 - **THEN** it includes `USES_TYPE` and `CONSTRUCTS`
 - **AND** adding any additional scoped binding relation type still requires a spec change
 
+#### Scenario: File-level implementation link becomes COVERS_FILE relation
+
+- **GIVEN** a spec has a file-level archived implementation link to `core:src/index.ts`
+- **WHEN** graph relations are built from archived traceability
+- **THEN** a `COVERS_FILE` relation connects the spec node to that file node
+
+#### Scenario: Symbol-level implementation link becomes COVERS_SYMBOL relation
+
+- **GIVEN** a symbol-level archived implementation link exists for a symbol and spec
+- **WHEN** graph relations are built from archived traceability
+- **THEN** a `COVERS_SYMBOL` relation connects the spec node to that symbol node
+
+### Requirement: Relation staleness
+
+#### Scenario: Missing symbol marks implementation relation as stale
+
+- **GIVEN** an archived symbol-level implementation link exists
+- **AND** the target symbol is no longer detectable in the current graph index
+- **WHEN** graph relations are rebuilt
+- **THEN** the implementation relation is retained
+- **AND** its `COVERS_SYMBOL` metadata marks it as `stale: true`
+
+#### Scenario: File-level implementation relation is never marked stale
+
+- **GIVEN** an archived file-level implementation link exists for `core:src/index.ts`
+- **WHEN** graph relations are rebuilt
+- **THEN** the `COVERS_FILE` relation is retained without stale metadata
+
+#### Scenario: Workspace-boundary materialization failure is not represented as stale
+
+- **GIVEN** an implementation link failed earlier archive-time materialization because of workspace-boundary validation
+- **WHEN** graph relations are built from archived traceability
+- **THEN** no synthetic stale relation is created for that failure
+
 ### Requirement: Relation value object
 
 #### Scenario: Relation equality by source, target, and type

@@ -113,6 +113,29 @@
 - **WHEN** `analyzeImpact(store, target.id, 'upstream')` is called
 - **THEN** overriding methods are included in `affectedSymbols`
 
+### Requirement: Spec impact
+
+#### Scenario: Upstream spec impact includes dependent specs
+
+- **GIVEN** spec `core:archive-change` depends on `core:spec-lock`
+- **WHEN** `analyzeSpecImpact(store, 'core:spec-lock', 'upstream')` is called
+- **THEN** `core:archive-change` appears in the affected specs
+
+#### Scenario: Downstream spec impact includes covered files and symbols
+
+- **GIVEN** spec `core:change` has archived coverage for file `core:src/change.ts`
+- **AND** symbol `core:Change.transition` is linked through `COVERS_SYMBOL`
+- **WHEN** `analyzeSpecImpact(store, 'core:change', 'downstream')` is called
+- **THEN** the affected files include `core:src/change.ts`
+- **AND** the affected symbols include `core:Change.transition`
+
+#### Scenario: Spec impact deduplicates file and symbol coverage
+
+- **GIVEN** a spec covers symbol `core:Change.transition` inside file `core:src/change.ts`
+- **WHEN** `analyzeSpecImpact(store, 'core:change', 'downstream')` is called
+- **THEN** the affected files list contains `core:src/change.ts` once
+- **AND** the symbol still appears in the affected symbols list
+
 ### Requirement: Static type dependency impact
 
 #### Scenario: USES_TYPE dependent contributes to upstream impact

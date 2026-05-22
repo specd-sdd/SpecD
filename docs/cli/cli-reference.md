@@ -280,6 +280,34 @@ to inspect merged full content for a specific spec in this change.
 
 If `--fingerprint <hash>` matches the current compiled fingerprint, `text` mode still prints `Context Fingerprint: <sha256...>` first and then `Context unchanged since last call.`. Structured output keeps the fingerprint plus the current step availability, available steps, and warnings, while omitting the full context body.
 
+`change status` also renders implementation tracking when the change has tracked files or confirmed links. The implementation block shows tracked files grouped by `open`, `resolved`, and `ignored`, then confirmed links and any stale symbol diagnostics available from the current code graph. When the graph is not indexed or stale, the command prints a graph-state hint instead of failing.
+
+### change implementation
+
+```
+specd changes implementation <subcommand> <name> [options]
+```
+
+Review or mutate implementation tracking for an active change. Paths are always raw project-relative paths while the change is active; canonical `workspace:path` identities are only materialized during archive.
+
+Available subcommands:
+
+- `list` — show tracked files and confirmed links
+- `review` — show tracked files, confirmed links, stale symbol diagnostics, and out-of-scope sidecar preview
+- `add` — create or enrich a confirmed implementation link
+- `remove` — remove a file-level link or specific symbols
+- `ignore` — mark a tracked file as ignored
+- `resolve` — mark a tracked file as reviewed/resolved
+
+Examples:
+
+```bash
+specd changes implementation list my-change
+specd changes implementation add my-change --spec core:change --file packages/core/src/domain/entities/change.ts
+specd changes implementation add my-change --spec core:change --file packages/core/src/domain/entities/change.ts --symbol Change.transition
+specd changes implementation resolve my-change --file packages/core/src/domain/entities/change.ts
+```
+
 ### change artifacts
 
 ```
@@ -431,12 +459,15 @@ Archive a completed change. Scope-`spec` artifacts are synced into the spec repo
 
 If other active changes target the same specs, the archive is blocked by default. Use `--allow-overlap` to proceed despite the overlap.
 
-| Option                      | Description                                                      |
-| --------------------------- | ---------------------------------------------------------------- |
-| `--skip-hooks <phases>`     | Skip archive hook phases. Valid values: `pre`, `post`, `all`.    |
-| `--allow-overlap`           | Permit archiving despite spec overlap with other active changes. |
-| `--format text\|json\|toon` | Output format.                                                   |
-| `--config <path>`           | Config file path.                                                |
+If implementation sidecar maintenance would update `spec-lock.json` for specs outside the change scope, archive is also blocked by default. Use `--allow-out-of-scope` only when those extra sidecar updates are intentional.
+
+| Option                      | Description                                                                  |
+| --------------------------- | ---------------------------------------------------------------------------- |
+| `--skip-hooks <phases>`     | Skip archive hook phases. Valid values: `pre`, `post`, `all`.                |
+| `--allow-overlap`           | Permit archiving despite spec overlap with other active changes.             |
+| `--allow-out-of-scope`      | Permit archive-time implementation sidecar updates outside the change scope. |
+| `--format text\|json\|toon` | Output format.                                                               |
+| `--config <path>`           | Config file path.                                                            |
 
 ### change run-hooks
 
@@ -1068,7 +1099,7 @@ If a graph index is currently running, this command fails fast with: `The code g
 specd graph impact [options]
 ```
 
-Analyze dependents or dependencies of a symbol or one or more files. Context resolution follows the same configured-vs-bootstrap rules as `graph index`.
+Analyze dependents or dependencies of a spec, a symbol, or one or more files. Context resolution follows the same configured-vs-bootstrap rules as `graph index`.
 
 If a graph index is currently running, this command fails fast with: `The code graph is currently being indexed. Try again in a few seconds.`
 
@@ -1082,6 +1113,7 @@ Multiple `--file` flags aggregate impact across all specified files.
 
 | Option                                                             | Description                                                                           |
 | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------- |
+| `--spec <id>`                                                      | Spec ID to analyze.                                                                   |
 | `--symbol <name>`                                                  | Symbol name to analyze.                                                               |
 | `--file <path...>`                                                 | One or more file paths to analyze (config-relative, workspace-prefixed, or absolute). |
 | `--direction dependents\|dependencies\|upstream\|downstream\|both` | Impact direction (default: `dependents`).                                             |
@@ -1093,6 +1125,14 @@ Multiple `--file` flags aggregate impact across all specified files.
 `dependents` is the preferred name for blast-radius analysis: it reports code that
 depends on the target. `dependencies` reports code the target depends on. The legacy
 values `upstream` and `downstream` remain accepted aliases for compatibility.
+
+Examples:
+
+```bash
+specd graph impact --spec core:change --direction dependents
+specd graph impact --symbol "mergeSpecs" --direction both
+specd graph impact --file core:src/model.ts --direction dependents
+```
 
 ---
 

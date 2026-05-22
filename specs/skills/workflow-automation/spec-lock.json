@@ -1,0 +1,12 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["cli:command-resource-naming"],
+  "implementation": [
+    {
+      "file": "skills:templates/specd-implement/SKILL.md"
+    }
+  ]
+}

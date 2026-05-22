@@ -75,7 +75,13 @@
 
 - **WHEN** the SQLite schema is initialized for a fresh graph database
 - **THEN** persisted storage exists for `IMPORTS`, `DEFINES`, `CALLS`, `EXPORTS`,
-  `DEPENDS_ON`, `COVERS`, `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES`
+  `DEPENDS_ON`, `COVERS_FILE`, `COVERS_SYMBOL`, `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES`
+
+#### Scenario: COVERS_SYMBOL metadata survives SQLite persistence
+
+- **GIVEN** a persisted `COVERS_SYMBOL` relation with metadata `{ "stale": true }`
+- **WHEN** the relation is loaded through abstract graph-store queries
+- **THEN** the metadata still marks the relation as stale
 
 ### Requirement: SQLite full-text search
 

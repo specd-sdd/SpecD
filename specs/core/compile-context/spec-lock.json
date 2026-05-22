@@ -1,0 +1,33 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "core:change",
+    "core:config",
+    "core:spec-metadata",
+    "core:schema-format",
+    "core:delta-format",
+    "core:selector-model",
+    "core:spec-id-format",
+    "core:workspace",
+    "core:get-artifact-instruction",
+    "core:get-hook-instructions",
+    "core:preview-spec",
+    "core:lifecycle-engine",
+    "core:implementation-detector-port"
+  ],
+  "implementation": [
+    {
+      "file": "core:src/application/use-cases/compile-context.ts",
+      "symbols": ["CompileContext", "CompileContext.execute", "CompileContextResult"]
+    },
+    {
+      "file": "core:src/composition/kernel.ts"
+    },
+    {
+      "file": "core:src/composition/use-cases/compile-context.ts"
+    }
+  ]
+}

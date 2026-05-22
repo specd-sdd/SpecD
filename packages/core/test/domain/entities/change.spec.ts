@@ -156,6 +156,81 @@ describe('Change', () => {
     })
   })
 
+  describe('implementation tracking', () => {
+    it('returns the first time the change entered implementing', () => {
+      const createdAt = new Date('2024-01-01T00:00:00Z')
+      const implementingAt = new Date('2024-01-03T10:00:00Z')
+      const c = makeChange([
+        {
+          type: 'created',
+          at: createdAt,
+          by: actor,
+          specIds: ['auth/login'],
+          schemaName: '@specd/schema-std',
+          schemaVersion: 1,
+        },
+        { type: 'transitioned', from: 'drafting', to: 'designing', at: createdAt, by: actor },
+        { type: 'transitioned', from: 'designing', to: 'ready', at: createdAt, by: actor },
+        { type: 'transitioned', from: 'ready', to: 'implementing', at: implementingAt, by: actor },
+        {
+          type: 'transitioned',
+          from: 'implementing',
+          to: 'designing',
+          at: new Date('2024-01-04T00:00:00Z'),
+          by: actor,
+        },
+      ])
+
+      expect(c.getHistoricalImplementationAt()).toEqual(implementingAt)
+      expect(c.hasEverReachedImplementing).toBe(true)
+    })
+
+    it('keeps explicit file links when the last symbol is removed', () => {
+      const c = makeChange()
+      c.addImplementationLink({
+        specId: 'default:auth/login',
+        file: 'packages/core/src/login.ts',
+        fileLinkExplicit: true,
+        symbols: ['login'],
+      })
+
+      c.removeImplementationSymbol('default:auth/login', 'packages/core/src/login.ts', 'login')
+
+      expect(c.implementationLinks).toEqual([
+        {
+          specId: 'default:auth/login',
+          file: 'packages/core/src/login.ts',
+          fileLinkExplicit: true,
+        },
+      ])
+    })
+
+    it('removes container-only file links when the last symbol is removed', () => {
+      const c = makeChange()
+      c.addImplementationLink({
+        specId: 'default:auth/login',
+        file: 'packages/core/src/login.ts',
+        fileLinkExplicit: false,
+        symbols: ['login'],
+      })
+
+      c.removeImplementationSymbol('default:auth/login', 'packages/core/src/login.ts', 'login')
+
+      expect(c.implementationLinks).toEqual([])
+    })
+
+    it('rejects container-only links without symbols', () => {
+      const c = makeChange()
+      expect(() =>
+        c.addImplementationLink({
+          specId: 'default:auth/login',
+          file: 'packages/core/src/login.ts',
+          fileLinkExplicit: false,
+        }),
+      ).toThrow(InvalidChangeError)
+    })
+  })
+
   describe('transition', () => {
     it('transitions to a valid next state and appends event', () => {
       const c = makeChange()

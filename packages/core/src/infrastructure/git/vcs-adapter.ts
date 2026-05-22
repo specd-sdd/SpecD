@@ -49,6 +49,31 @@ export class GitVcsAdapter implements VcsAdapter {
   }
 
   /** @inheritdoc */
+  async refAt(at: string): Promise<string | null> {
+    try {
+      const revision = await git(this._cwd, 'rev-list', '-1', `--before=${at}`, 'HEAD')
+      if (revision.length === 0) return null
+      return await git(this._cwd, 'rev-parse', '--short', revision)
+    } catch {
+      return null
+    }
+  }
+
+  /** @inheritdoc */
+  async modifiedFiles(baseRef: string): Promise<readonly string[]> {
+    const diffOutput = await git(
+      this._cwd,
+      'diff',
+      '--name-only',
+      '--diff-filter=ACMR',
+      baseRef,
+      '--',
+    )
+    const untrackedOutput = await git(this._cwd, 'ls-files', '--others', '--exclude-standard')
+    return normalizePaths(diffOutput, untrackedOutput)
+  }
+
+  /** @inheritdoc */
   async show(ref: string, filePath: string): Promise<string | null> {
     try {
       return await git(this._cwd, 'show', `${ref}:${filePath}`)
@@ -56,4 +81,23 @@ export class GitVcsAdapter implements VcsAdapter {
       return null
     }
   }
+}
+
+/**
+ * Normalizes one or more newline-delimited path lists into a unique path array.
+ *
+ * @param outputs - Raw command outputs containing newline-delimited file paths
+ * @returns Unique, non-empty repository-relative file paths
+ */
+function normalizePaths(...outputs: readonly string[]): readonly string[] {
+  const files = new Set<string>()
+  for (const output of outputs) {
+    for (const line of output.split('\n')) {
+      const normalized = line.trim()
+      if (normalized.length > 0) {
+        files.add(normalized)
+      }
+    }
+  }
+  return [...files]
 }

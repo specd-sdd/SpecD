@@ -27,7 +27,7 @@
     {
       "requirement": "Impact analysis",
       "rules": [
-        "`analyzeImpact(store: GraphStore, target: string, direction: 'upstream' | 'downstream' | 'both', maxDepth?: number): Promise<ImpactResult>` SHALL compute the blast radius of modifying the target symbol. The optional `maxDepth` parameter (default: 3) controls how deep the traversal goes — it is passed through to `getUpstream`/`getDownstream` and limits the IMPORTS BFS loop.\n\nThe function produces an `ImpactResult` containing:\n\n- **`target`** — the symbol being analyzed\n- **`directDependents`** — count of depth-1 results (WILL BREAK)\n- **`indirectDependents`** — count of depth-2 results (LIKELY AFFECTED)\n- **`transitiveDependents`** — count of depth-3+ results (MAY NEED TESTING)\n- **`riskLevel`** — computed from dependent counts: `LOW`, `MEDIUM`, `HIGH`, or `CRITICAL`\n- **`affectedFiles`** — unique file paths containing any affected symbol\n- **`affectedSymbols`** — array of `AffectedSymbol` entries with depth information\n- **`affectedProcesses`** — execution flows that include the target or any affected symbol (when process data is available)\n\n`AffectedSymbol` SHALL contain:\n\n- **`id`** (`string`) — the symbol identifier\n- **`name`** (`string`) — the symbol's declared name\n- **`filePath`** (`string`) — workspace-prefixed file path\n- **`line`** (`number`) — 1-based line number\n- **`depth`** (`number`) — distance from the target: 1 = direct dependent, 2 = indirect, 3+ = transitive\n\nImpact analysis MUST include hierarchy relations in addition to existing call/import reachability:\n\n- changing a type symbol MUST affect symbols connected through `EXTENDS` and `IMPLEMENTS` according to traversal direction\n- changing a method symbol MUST affect symbols connected through `OVERRIDES` according to traversal direction\n- hierarchy-derived affected symbols participate in depth counts, risk calculation, and affected-file aggregation the same way as other affected symbols\n\nRisk level thresholds:\n\n| Level      | Condition                                                |\n| ---------- | -------------------------------------------------------- |\n| `LOW`      | 0–2 direct dependents, no indirect                       |\n| `MEDIUM`   | 3–5 direct dependents, or any indirect                   |\n| `HIGH`     | 6+ direct dependents, or 10+ total dependents            |\n| `CRITICAL` | 20+ total dependents, or target is in 3+ execution flows |"
+        "`analyzeImpact(store: GraphStore, target: string, direction: 'upstream' | 'downstream' | 'both', maxDepth?: number): Promise<ImpactResult>` SHALL compute the blast radius of modifying the target symbol. The optional `maxDepth` parameter (default: 3) controls how deep the traversal goes — it is passed through to `getUpstream`/`getDownstream` and limits the IMPORTS BFS loop.\n\nThe function produces an `ImpactResult` containing:\n\n- **`target`** — the symbol being analyzed\n- **`directDependents`** — count of depth-1 results (WILL BREAK)\n- **`indirectDependents`** — count of depth-2 results (LIKELY AFFECTED)\n- **`transitiveDependents`** — count of depth-3+ results (MAY NEED TESTING)\n- **`riskLevel`** — computed from dependent counts: `LOW`, `MEDIUM`, `HIGH`, or `CRITICAL`\n- **`affectedFiles`** — unique file paths containing any affected symbol\n- **`affectedSymbols`** — array of `AffectedSymbol` entries with depth information\n- **`affectedProcesses`** — execution flows that include the target or any affected symbol (when process data is available)\n\n`AffectedSymbol` SHALL contain:\n\n- **`id`** (`string`) — the symbol identifier\n- **`name`** (`string`) — the symbol's declared name\n- **`filePath`** (`string`) — workspace-prefixed file path\n- **`line`** (`number`) — 1-based line number\n- **`depth`** (`number`) — distance from the target: 1 = direct dependent, 2 = indirect, 3+ = transitive\n\nImpact analysis MUST include hierarchy relations in addition to existing call/import reachability:\n\n- changing a type symbol MUST affect symbols connected through `EXTENDS` and `IMPLEMENTS` according to traversal direction\n- changing a method symbol MUST affect symbols connected through `OVERRIDES` according to traversal direction\n- hierarchy-derived affected symbols participate in depth counts, risk calculation, and affected-file aggregation the same way as other affected symbols\n- requirement-aware symbol coverage relations (`COVERS_SYMBOL`) MAY also contribute affected specs when the caller requests requirement-aware impact views through higher-level traversal entry points\n\nRisk level thresholds:\n\n| Level      | Condition                                                |\n| ---------- | -------------------------------------------------------- |\n| `LOW`      | 0–2 direct dependents, no indirect                       |\n| `MEDIUM`   | 3–5 direct dependents, or any indirect                   |\n| `HIGH`     | 6+ direct dependents, or 10+ total dependents            |\n| `CRITICAL` | 20+ total dependents, or target is in 3+ execution flows |"
       ]
     },
     {
@@ -40,6 +40,12 @@
       "requirement": "File impact",
       "rules": [
         "`analyzeFileImpact(store: GraphStore, filePath: string, direction: 'upstream' | 'downstream' | 'both', maxDepth?: number): Promise<FileImpactResult>` SHALL compute aggregate impact for all symbols defined in the given file. The optional `maxDepth` parameter (default: 3) is passed through to each per-symbol `analyzeImpact` call and limits the file-level IMPORTS BFS.\n\nIt:\n\n1. Retrieves all symbols in the file via `findSymbols({ filePath })`\n2. Runs `analyzeImpact` for each symbol with the given `maxDepth`\n3. Merges results: deduplicates affected symbols (keeping the shallowest depth), takes the maximum risk level, unions affected files\n\n`FileImpactResult` extends `ImpactResult` with:\n\n- **`symbols`** — array of per-symbol `ImpactResult` entries\n- **`riskLevel`** — the maximum risk level across all symbols in the file\n\nWhen symbols in the file participate in `EXTENDS`, `IMPLEMENTS`, or `OVERRIDES`, their hierarchy-derived impact MUST be reflected in the aggregate result."
+      ]
+    },
+    {
+      "requirement": "Spec impact",
+      "rules": [
+        "`analyzeSpecImpact(store: GraphStore, specId: string, direction: 'upstream' | 'downstream' | 'both', maxDepth?: number): Promise<ImpactResult>` SHALL compute requirement-aware impact for one spec.\n\nIt MUST treat the following relation families as first-class blast-radius inputs:\n\n- `DEPENDS_ON` for `Spec -> Spec`\n- `COVERS_FILE` for `Spec -> File`\n- `COVERS_SYMBOL` for `Spec -> Symbol`\n\nIn upstream/dependents mode, spec impact reports:\n\n- specs that depend on the target spec\n- files covered by the target spec\n- symbols covered by the target spec\n\nIn downstream/dependencies mode, spec impact reports:\n\n- specs the target spec depends on\n- files and symbols reached through those downstream spec relationships where the traversal depth includes them\n\nThe result shape remains `ImpactResult`, but the affected file and affected symbol sets are allowed to originate from requirement-aware relations rather than only code-structure traversal."
       ]
     },
     {
@@ -195,6 +201,36 @@
       "then": ["overriding methods are included in affectedSymbols"]
     },
     {
+      "requirement": "Spec impact",
+      "name": "Upstream spec impact includes dependent specs",
+      "given": ["spec core:archive-change depends on core:spec-lock"],
+      "when": ["analyzeSpecImpact(store, 'core:spec-lock', 'upstream') is called"],
+      "then": ["core:archive-change appears in the affected specs"]
+    },
+    {
+      "requirement": "Spec impact",
+      "name": "Downstream spec impact includes covered files and symbols",
+      "given": [
+        "spec core:change has archived coverage for file core:src/change.ts",
+        "AND symbol core:Change.transition is linked through COVERS_SYMBOL"
+      ],
+      "when": ["analyzeSpecImpact(store, 'core:change', 'downstream') is called"],
+      "then": [
+        "the affected files include core:src/change.ts",
+        "AND the affected symbols include core:Change.transition"
+      ]
+    },
+    {
+      "requirement": "Spec impact",
+      "name": "Spec impact deduplicates file and symbol coverage",
+      "given": ["a spec covers symbol core:Change.transition inside file core:src/change.ts"],
+      "when": ["analyzeSpecImpact(store, 'core:change', 'downstream') is called"],
+      "then": [
+        "the affected files list contains core:src/change.ts once",
+        "AND the symbol still appears in the affected symbols list"
+      ]
+    },
+    {
       "requirement": "Static type dependency impact",
       "name": "USES_TYPE dependent contributes to upstream impact",
       "given": [
@@ -305,9 +341,33 @@
       "then": ["result contains root, levels (Map), totalCount, and truncated fields"]
     }
   ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "code-graph:traversal",
+        "file": "code-graph:src/domain/value-objects/impact-result.ts",
+        "symbol": "SpecImpactResult"
+      },
+      {
+        "specId": "code-graph:traversal",
+        "file": "code-graph:src/domain/value-objects/impact-result.ts",
+        "symbol": "ImpactResult"
+      },
+      {
+        "specId": "code-graph:traversal",
+        "file": "code-graph:src/domain/value-objects/impact-result.ts",
+        "symbol": "FileImpactResult"
+      },
+      {
+        "specId": "code-graph:traversal",
+        "file": "code-graph:src/domain/services/analyze-spec-impact.ts",
+        "symbol": "analyzeSpecImpact"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:ef44fe17ebbfd8e1e4bfd6da6cc80829465942f1b8dc63994d8f1861de176e7a",
-    "verify.md": "sha256:150d8eed78c71d2339e325fa22194be7d56c3e128281904d100b5b50b95dbc14"
+    "spec.md": "sha256:24ce7bd08301ce17fca8930d3f3d00cbc07a1c992027684667b041d08cbf1eb0",
+    "verify.md": "sha256:392a7f50c27264a5b25fac415a11ba684c7c3870ab9986b3fe2e7c4f54b21d69"
   },
   "generatedBy": "core"
 }

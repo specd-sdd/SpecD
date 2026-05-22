@@ -1,0 +1,75 @@
+- op: modified
+  description: 'Extend impact analysis to requirement-aware graph relations'
+  selector:
+    type: section
+    matches: 'Requirement: Impact analysis'
+  content: |
+    `analyzeImpact(store: GraphStore, target: string, direction: 'upstream' | 'downstream' | 'both', maxDepth?: number): Promise<ImpactResult>` SHALL compute the blast radius of modifying the target symbol. The optional `maxDepth` parameter (default: 3) controls how deep the traversal goes — it is passed through to `getUpstream`/`getDownstream` and limits the IMPORTS BFS loop.
+
+    The function produces an `ImpactResult` containing:
+
+    - **`target`** — the symbol being analyzed
+    - **`directDependents`** — count of depth-1 results (WILL BREAK)
+    - **`indirectDependents`** — count of depth-2 results (LIKELY AFFECTED)
+    - **`transitiveDependents`** — count of depth-3+ results (MAY NEED TESTING)
+    - **`riskLevel`** — computed from dependent counts: `LOW`, `MEDIUM`, `HIGH`, or `CRITICAL`
+    - **`affectedFiles`** — unique file paths containing any affected symbol
+    - **`affectedSymbols`** — array of `AffectedSymbol` entries with depth information
+    - **`affectedProcesses`** — execution flows that include the target or any affected symbol (when process data is available)
+
+    `AffectedSymbol` SHALL contain:
+
+    - **`id`** (`string`) — the symbol identifier
+    - **`name`** (`string`) — the symbol's declared name
+    - **`filePath`** (`string`) — workspace-prefixed file path
+    - **`line`** (`number`) — 1-based line number
+    - **`depth`** (`number`) — distance from the target: 1 = direct dependent, 2 = indirect, 3+ = transitive
+
+    Impact analysis MUST include hierarchy relations in addition to existing call/import reachability:
+
+    - changing a type symbol MUST affect symbols connected through `EXTENDS` and `IMPLEMENTS` according to traversal direction
+    - changing a method symbol MUST affect symbols connected through `OVERRIDES` according to traversal direction
+    - hierarchy-derived affected symbols participate in depth counts, risk calculation, and affected-file aggregation the same way as other affected symbols
+    - requirement-aware symbol coverage relations (`COVERS_SYMBOL`) MAY also contribute affected specs when the caller requests requirement-aware impact views through higher-level traversal entry points
+
+    Risk level thresholds:
+
+    | Level      | Condition                                                |
+    | ---------- | -------------------------------------------------------- |
+    | `LOW`      | 0–2 direct dependents, no indirect                       |
+    | `MEDIUM`   | 3–5 direct dependents, or any indirect                   |
+    | `HIGH`     | 6+ direct dependents, or 10+ total dependents            |
+    | `CRITICAL` | 20+ total dependents, or target is in 3+ execution flows |
+
+- op: added
+  description: 'Add first-class spec impact analysis'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: File impact'
+  content: |
+    ### Requirement: Spec impact
+
+    `analyzeSpecImpact(store: GraphStore, specId: string, direction: 'upstream' | 'downstream' | 'both', maxDepth?: number): Promise<ImpactResult>` SHALL compute requirement-aware impact for one spec.
+
+    It MUST treat the following relation families as first-class blast-radius inputs:
+
+    - `DEPENDS_ON` for `Spec -> Spec`
+    - `COVERS_FILE` for `Spec -> File`
+    - `COVERS_SYMBOL` for `Spec -> Symbol`
+
+    In upstream/dependents mode, spec impact reports:
+
+    - specs that depend on the target spec
+    - files covered by the target spec
+    - symbols covered by the target spec
+
+    In downstream/dependencies mode, spec impact reports:
+
+    - specs the target spec depends on
+    - files and symbols reached through those downstream spec relationships where the traversal depth includes them
+
+    The result shape remains `ImpactResult`, but the affected file and affected symbol sets are allowed to originate from requirement-aware relations rather than only code-structure traversal.

@@ -19,6 +19,8 @@ import { createBuiltinExtractorTransforms } from '../extractor-transforms/index.
 import { createSpecWorkspaceRoutes } from '../spec-workspace-routes.js'
 import { type SpecWorkspaceRoute } from '../../application/use-cases/_shared/spec-reference-resolver.js'
 import { LifecycleEngine } from '../../domain/services/lifecycle-engine.js'
+import { createVcsAdapter } from '../vcs-adapter.js'
+import { VcsImplementationDetector } from '../../infrastructure/vcs/vcs-implementation-detector.js'
 
 /**
  * Domain context for the primary (default) workspace used by `CompileContext`.
@@ -174,10 +176,14 @@ export function createCompileContext(
   const parsers = createArtifactParserRegistry()
   const hasher = new NodeContentHasher()
   const previewSpec = new PreviewSpec(changeRepo, opts.specRepositories, schemaProvider, parsers)
+  const implementationDetector = new VcsImplementationDetector(opts.configDir, async () =>
+    createVcsAdapter(opts.configDir),
+  )
   return new CompileContext(
     changeRepo,
     opts.specRepositories,
     schemaProvider,
+    implementationDetector,
     files,
     parsers,
     hasher,

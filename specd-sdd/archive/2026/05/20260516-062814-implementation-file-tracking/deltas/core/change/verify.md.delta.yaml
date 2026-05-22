@@ -1,0 +1,77 @@
+- op: added
+  description: 'Add scenarios for new Change implementation tracking requirements'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Historical implementation detection'
+  content: |
+    ### Requirement: Implementation tracking state
+
+    #### Scenario: Change persists tracked files separately from confirmed links
+
+    - **GIVEN** a change has one tracked implementation file in `open` state
+    - **AND** one confirmed implementation link for a spec and file
+    - **WHEN** the change is persisted and reloaded
+    - **THEN** the tracked file state is restored separately from the confirmed link set
+
+    #### Scenario: Symbol-level refinement does not create a duplicate file-level peer
+
+    - **GIVEN** a confirmed `spec + file` implementation link already exists
+    - **WHEN** a symbol is added to refine that link
+    - **THEN** the same `spec + file` set is enriched
+    - **AND** no duplicate peer link is created
+
+    ### Requirement: Explicit vs container-only file links
+
+    #### Scenario: Removing the last symbol preserves explicit file link
+
+    - **GIVEN** a `spec + file` link whose file-level presence was explicitly created
+    - **AND** it has one remaining symbol refinement
+    - **WHEN** that symbol is removed
+    - **THEN** the file-level link remains
+
+    #### Scenario: Removing the last symbol may delete container-only file presence
+
+    - **GIVEN** a `spec + file` link exists only as the container for symbol-level links
+    - **AND** it has one remaining symbol refinement
+    - **WHEN** that symbol is removed
+    - **THEN** the whole `spec + file` set may disappear
+
+    ### Requirement: Historical implementation detection guard
+
+    #### Scenario: Historical detection becomes true after implementing
+
+    - **GIVEN** a change whose history already contains a `transitioned` event with `to: 'implementing'`
+    - **WHEN** historical implementation detection is evaluated
+    - **THEN** it reports that implementation refresh may run
+
+    #### Scenario: Historical detection stays false before implementing
+
+    - **GIVEN** a change whose history has never transitioned to `implementing`
+    - **WHEN** historical implementation detection is evaluated
+    - **THEN** it reports that implementation refresh should not run
+
+- op: added
+  description: 'Add verification scenarios for schema mismatch requirements'
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Schema version'
+  content: |
+    #### Scenario: Schema name mismatch throws SchemaMismatchError
+
+    - **GIVEN** a change was created with schema name `schema-std`
+    - **AND** the active system schema is `custom-schema`
+    - **WHEN** the change is loaded or a use case is executed
+    - **THEN** `SchemaMismatchError` is thrown
+
+    #### Scenario: Schema version mismatch emits warning
+
+    - **GIVEN** a change was created with schema version 1
+    - **AND** the active system schema version is 2
+    - **WHEN** the change is loaded
+    - **THEN** a warning is emitted mentioning both versions
+    - **AND** the change remains usable

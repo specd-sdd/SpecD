@@ -9,7 +9,10 @@ import { type ActorIdentity } from '../../../src/domain/entities/change.js'
 import { SpecArtifact } from '../../../src/domain/value-objects/spec-artifact.js'
 import { ArtifactConflictError } from '../../../src/domain/errors/artifact-conflict-error.js'
 import { ChangeNotFoundError } from '../../../src/application/errors/change-not-found-error.js'
+import { SchemaMismatchError } from '../../../src/application/errors/schema-mismatch-error.js'
+import { Logger } from '../../../src/application/logger.js'
 import { FsChangeRepository } from '../../../src/infrastructure/fs/change-repository.js'
+import { vi } from 'vitest'
 import { sha256 } from '../../../src/infrastructure/fs/hash.js'
 import { ArtifactType } from '../../../src/domain/value-objects/artifact-type.js'
 
@@ -169,6 +172,32 @@ describe('FsChangeRepository', () => {
 
       const loaded = await ctx.repo.get('add-auth')
       expect(loaded?.state).toBe('designing')
+    })
+
+    it('round-trips tracked implementation files and links', async () => {
+      const change = makeChange('add-auth')
+      change.trackImplementationFile('packages/core/src/login.ts', 'resolved')
+      change.addImplementationLink({
+        specId: 'default:auth/login',
+        file: 'packages/core/src/login.ts',
+        fileLinkExplicit: true,
+        symbols: ['login', 'logout'],
+      })
+
+      await ctx.repo.save(change)
+      const loaded = await ctx.repo.get('add-auth')
+
+      expect(loaded?.trackedImplementationFiles).toEqual([
+        { file: 'packages/core/src/login.ts', state: 'resolved' },
+      ])
+      expect(loaded?.implementationLinks).toEqual([
+        {
+          specId: 'default:auth/login',
+          file: 'packages/core/src/login.ts',
+          fileLinkExplicit: true,
+          symbols: ['login', 'logout'],
+        },
+      ])
     })
   })
 
@@ -1855,6 +1884,122 @@ describe('FsChangeRepository', () => {
       expect(loaded?.state).toBe('designing')
       expect(loaded?.getArtifact('proposal')?.status).toBe('pending-review')
       expect(loaded?.getArtifact('design')?.status).toBe('drifted-pending-review')
+    })
+  })
+
+  describe('compliance validations', () => {
+    it('throws SchemaMismatchError when schema name differs from active schema', async () => {
+      const change = makeChange('c-schema-mismatch')
+      await ctx.repo.save(change)
+
+      const repo = new FsChangeRepository({
+        workspace: 'default',
+        ownership: 'owned',
+        isExternal: false,
+        configPath: ctx.configPath,
+        changesPath: ctx.changesPath,
+        draftsPath: ctx.draftsPath,
+        discardedPath: ctx.discardedPath,
+        activeSchema: { name: 'different-schema', version: 1 },
+      })
+
+      await expect(repo.get('c-schema-mismatch')).rejects.toThrow(SchemaMismatchError)
+    })
+
+    it('logs a warning when schema version differs from active schema', async () => {
+      const change = makeChange('c-version-mismatch')
+      await ctx.repo.save(change)
+
+      const repo = new FsChangeRepository({
+        workspace: 'default',
+        ownership: 'owned',
+        isExternal: false,
+        configPath: ctx.configPath,
+        changesPath: ctx.changesPath,
+        draftsPath: ctx.draftsPath,
+        discardedPath: ctx.discardedPath,
+        activeSchema: { name: '@specd/schema-std', version: 2 },
+      })
+
+      const warnSpy = vi.spyOn(Logger, 'warn')
+      await repo.get('c-version-mismatch')
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('created with schema version 1 but the active schema version is 2'),
+      )
+    })
+
+    it('preserves tracked-intent by not flipping filename when hash is null', async () => {
+      const type = new ArtifactType({
+        id: 'specs',
+        scope: 'spec',
+        output: 'specs/**/spec.md',
+        optional: false,
+        requires: [],
+        format: 'markdown',
+        validations: [],
+        deltaValidations: [],
+        preHashCleanup: [],
+      })
+
+      const repo = new FsChangeRepository({
+        workspace: 'default',
+        ownership: 'owned',
+        isExternal: false,
+        configPath: ctx.configPath,
+        changesPath: ctx.changesPath,
+        draftsPath: ctx.draftsPath,
+        discardedPath: ctx.discardedPath,
+        artifactTypes: [type],
+        // Mock resolver to simulate spec existing (which would normally trigger a flip to delta)
+        resolveSpecExists: async () => true,
+      })
+
+      const change = new Change({
+        name: 'c-normalization',
+        createdAt: new Date('2024-01-15T10:00:00.000Z'),
+        specIds: ['core:auth'],
+        history: [
+          {
+            type: 'created',
+            at: new Date('2024-01-15T10:00:00.000Z'),
+            by: actor,
+            specIds: ['core:auth'],
+            schemaName: '@specd/schema-std',
+            schemaVersion: 1,
+          },
+        ],
+        artifacts: new Map([
+          [
+            'specs',
+            new ChangeArtifact({
+              type: 'specs',
+              optional: false,
+              requires: [],
+              status: 'in-progress',
+              files: new Map([
+                [
+                  'core:auth',
+                  new ArtifactFile({
+                    key: 'core:auth',
+                    filename: 'specs/core/auth/spec.md',
+                    status: 'in-progress',
+                    // validatedHash is intentionally undefined (null in manifest)
+                  }),
+                ],
+              ]),
+            }),
+          ],
+        ]),
+      })
+
+      await repo.save(change)
+
+      const loaded = await repo.get('c-normalization')
+      const file = loaded?.getArtifact('specs')?.getFile('core:auth')
+
+      // Even though the spec exists (per resolveSpecExists), the filename should NOT
+      // have flipped to deltas/ because the hash is null (it's unvalidated).
+      expect(file?.filename).toBe('specs/core/auth/spec.md')
     })
   })
 })

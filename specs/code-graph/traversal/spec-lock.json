@@ -1,0 +1,17 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["code-graph:symbol-model", "code-graph:graph-store"],
+  "implementation": [
+    {
+      "file": "code-graph:src/domain/value-objects/impact-result.ts",
+      "symbols": ["SpecImpactResult", "ImpactResult", "FileImpactResult"]
+    },
+    {
+      "file": "code-graph:src/domain/services/analyze-spec-impact.ts",
+      "symbols": ["analyzeSpecImpact"]
+    }
+  ]
+}

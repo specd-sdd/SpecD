@@ -22,6 +22,18 @@
 - **WHEN** `clear()` is called followed by `index()`
 - **THEN** all files and symbols are re-processed (none skipped)
 
+#### Scenario: Coverage query methods delegate through the provider
+
+- **GIVEN** an opened `CodeGraphProvider`
+- **WHEN** `getCoveredFiles('core:change')`, `getCoveringSpecsForFile('core:src/change.ts')`, `getCoveredSymbols('core:change')`, and `getCoveringSpecsForSymbol('core:Change.transition')` are called
+- **THEN** each method delegates to the corresponding `GraphStore` coverage query
+
+#### Scenario: Spec impact delegates through traversal services
+
+- **GIVEN** an opened `CodeGraphProvider`
+- **WHEN** `analyzeSpecImpact('core:change', 'downstream')` is called
+- **THEN** the provider delegates to the traversal-layer spec impact analysis and returns its result
+
 ### Requirement: Factory function
 
 #### Scenario: Primary factory with SpecdConfig

@@ -1,0 +1,93 @@
+- op: added
+  description: 'Verify spec selector support in graph impact'
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Command signature'
+  content: |
+    #### Scenario: Spec selector enters requirement impact mode
+
+    - **GIVEN** spec `core:change` is indexed in the graph
+    - **WHEN** `specd graph impact --spec core:change` is run
+    - **THEN** the command analyzes requirement impact for that spec
+    - **AND** no file or symbol selector is required
+
+- op: added
+  description: 'Verify spec impact analysis output'
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Symbol impact analysis'
+    after:
+      type: section
+      matches: 'Requirement: Symbol impact analysis'
+  content: |
+    ### Requirement: Spec impact analysis
+
+    #### Scenario: Downstream spec analysis shows covered files and symbols
+
+    - **GIVEN** spec `core:change` covers file `core:src/change.ts` and symbol `core:Change.transition`
+    - **WHEN** `specd graph impact --spec core:change --direction downstream` is run
+    - **THEN** stdout shows the covered file and covered symbol in the impacted result
+
+    #### Scenario: Upstream spec analysis shows dependent specs
+
+    - **GIVEN** spec `core:archive-change` depends on `core:spec-lock`
+    - **WHEN** `specd graph impact --spec core:spec-lock --direction upstream` is run
+    - **THEN** stdout shows `core:archive-change` as an impacted spec
+
+    #### Scenario: Missing spec reports cleanly
+
+    - **GIVEN** spec `missing:spec` does not exist in the graph
+    - **WHEN** `specd graph impact --spec missing:spec` is run
+    - **THEN** stdout shows `No spec found matching "missing:spec".`
+    - **AND** the process exits with code 0
+
+- op: added
+  description: 'Verify JSON contract for aggregate impact fields'
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Output format'
+  content: |
+    #### Scenario: JSON output includes aggregate impact fields
+
+    - **WHEN** `specd graph impact --file <path> --format json` is run
+    - **THEN** stdout is valid JSON
+    - **AND** it contains `riskLevel`, `directDepsCount`, `indirectDepsCount`, `transitiveDepsCount`, and `affectedFilesCount`
+
+- op: modified
+  description: 'Expand selector exclusivity to include spec'
+  selector:
+    type: section
+    matches: 'Requirement: Error cases'
+  content: |
+    #### Scenario: No selector provided
+
+    - **WHEN** `specd graph impact` is run without `--file`, `--symbol`, or `--spec`
+    - **THEN** stderr contains `error: provide exactly one of --file, --symbol, or --spec`
+    - **AND** the process exits with code 1
+
+    #### Scenario: Multiple selectors provided
+
+    - **WHEN** `specd graph impact --file core:src/auth.ts --spec core:change` is run
+    - **THEN** stderr contains `error: provide exactly one of --file, --symbol, or --spec`
+    - **AND** the process exits with code 1
+
+    #### Scenario: Missing unprefixed selector reports normalized lookup
+
+    - **WHEN** `specd graph impact --file packages/core/src/missing.ts` is run
+    - **THEN** the command exits with code 1
+    - **AND** stderr includes the normalized config-relative path that was searched
+
+    #### Scenario: Mutually exclusive context flags fail fast
+
+    - **WHEN** `specd graph impact --file core:src/auth.ts --config ./specd.yaml --path .` is run
+    - **THEN** the command exits with code 1 before any graph provider is opened
+
+    #### Scenario: Infrastructure error exits with code 3
+
+    - **GIVEN** the provider cannot be opened
+    - **WHEN** `specd graph impact --file core:src/auth.ts` is run
+    - **THEN** stderr contains a `fatal:` prefixed error message
+    - **AND** the process exits with code 3

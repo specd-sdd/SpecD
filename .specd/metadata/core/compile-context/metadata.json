@@ -13,7 +13,8 @@
     "core:get-artifact-instruction",
     "core:get-hook-instructions",
     "core:preview-spec",
-    "core:lifecycle-engine"
+    "core:lifecycle-engine",
+    "core:implementation-detector-port"
   ],
   "context": [
     "AI agents entering a lifecycle step need relevant spec content and project context to understand the codebase they're working with — assembling this from scattered sources manually would be error-prone and inconsistent. `CompileContext` automates this assembly: it collects context specs according to the project's include/exclude configuration, reads structured metadata via `SpecRepository.metadata()`, evaluates step availability, and combines project context entries, spec content, and available steps into a single structured output. Artifact instructions and step hooks are separate concerns retrieved via `GetArtifactInstruction` and `GetHookInstructions` respectively."
@@ -22,13 +23,19 @@
     {
       "requirement": "Ports and constructor",
       "rules": [
-        "`CompileContext` receives at construction time: `ChangeRepository`, a map of `SpecRepository` instances (one per configured workspace), `SchemaProvider`, `FileReader`, `ArtifactParserRegistry`, `ContentHasher`, `PreviewSpec`, and `LifecycleEngine`.\n\n```typescript\nclass CompileContext {\n  constructor(\n    changes: ChangeRepository,\n    specs: ReadonlyMap<string, SpecRepository>,\n    schemaProvider: SchemaProvider,\n    files: FileReader,\n    parsers: ArtifactParserRegistry,\n    hasher: ContentHasher,\n    previewSpec: PreviewSpec,\n    lifecycle: LifecycleEngine,\n  )\n}\n```\n\n`SchemaProvider` is a lazy, caching port that returns the fully-resolved schema (with plugins and overrides applied). It replaces the previous `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths` triple. All are injected at kernel composition time, not passed per invocation.\n\n`PreviewSpec` is the use case `CompileContext` delegates to when it needs a materialized merged view of a spec with validated deltas applied. `ContentHasher` is used for metadata freshness checks and context fingerprint inputs. `LifecycleEngine` provides the schema-aware lifecycle interpretation needed for step availability and available-step diagnostics."
+        "`CompileContext` receives at construction time: `ChangeRepository`, a map of `SpecRepository` instances (one per configured workspace), `SchemaProvider`, `FileReader`, `ArtifactParserRegistry`, `ContentHasher`, `PreviewSpec`, `LifecycleEngine`, and `ImplementationDetector`.\n\n```typescript\nclass CompileContext {\n  constructor(\n    changes: ChangeRepository,\n    specs: ReadonlyMap<string, SpecRepository>,\n    schemaProvider: SchemaProvider,\n    files: FileReader,\n    parsers: ArtifactParserRegistry,\n    hasher: ContentHasher,\n    previewSpec: PreviewSpec,\n    lifecycle: LifecycleEngine,\n    implementationDetector: ImplementationDetector,\n  )\n}\n```\n\n`SchemaProvider` is a lazy, caching port that returns the fully-resolved schema (with plugins and overrides applied). It replaces the previous `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths` triple. All are injected at kernel composition time, not passed per invocation.\n\n`PreviewSpec` is the use case `CompileContext` delegates to when it needs a materialized merged view of a spec with validated deltas applied. `ContentHasher` is used for metadata freshness checks and context fingerprint inputs. `LifecycleEngine` provides the schema-aware lifecycle interpretation needed for step availability and available-step diagnostics. `ImplementationDetector` provides the targeted implementation-file refresh used when implementation tracking is active."
       ]
     },
     {
       "requirement": "Input",
       "rules": [
         "`CompileContext.execute` receives:\n\n- `name` — the change name to compile context for\n- `step` — the lifecycle step name being entered (e.g. `'designing'`, `'implementing'`, `'verifying'`, `'archiving'`)\n- `config` — the resolved project configuration containing `context`, `contextIncludeSpecs`, `contextExcludeSpecs`, per-workspace `contextIncludeSpecs` / `contextExcludeSpecs`, and `contextMode`\n- `includeChangeSpecs` (optional, default `false`) — when `true`, directly seeds `change.specIds` into the collected set. When `false`, direct seeding is skipped; the same specs may still be included through include patterns, `change.specDependsOn`, or `dependsOn` traversal.\n- `followDeps` (optional, default `false`) — when `true`, performs the `dependsOn` transitive traversal (step 5 of context spec collection) to discover additional specs. When `false` or absent, traversal is skipped and only specs collected in steps 1-4 are included.\n- `depth` (optional) — only valid when `followDeps` is `true`; limits `dependsOn` traversal to N levels deep (1 = direct dependencies only, 2 = deps of deps, etc.). When absent and `followDeps` is `true`, traversal is unlimited.\n- `sections` (optional) — when present, restricts the metadata-derived content rendered for each full-mode spec in the output to the listed sections (`'rules'`, `'constraints'`, `'scenarios'`). When absent, full-mode specs are rendered from their artifact files rather than from metadata sections. `sections` applies only to full-mode spec content — it does not affect list-mode specs, summary-mode specs, project context entries, or available steps.\n- `fingerprint` (optional) — when provided, `CompileContext` compares this value against the fingerprint it calculates from the current context inputs. If they match, the result's `status` field is set to `'unchanged'` and the full context is not assembled. If omitted or the fingerprint does not match, `status` is `'changed'` and the full context is returned with the new fingerprint."
+      ]
+    },
+    {
+      "requirement": "Implementation autodetection before context compilation",
+      "rules": [
+        "When the change has entered `implementing` at least once in its history, `CompileContext` MUST trigger targeted implementation autodetection before it assembles the final context result.\n\nThis refresh updates the tracked implementation-file state used by downstream workflow consumers before context is emitted."
       ]
     },
     {
@@ -496,11 +503,28 @@
       ]
     },
     {
+      "requirement": "Ports and constructor",
+      "name": "CompileContext is constructed with ImplementationDetector",
+      "when": ["CompileContext is assembled"],
+      "then": [
+        "it receives ImplementationDetector alongside PreviewSpec, LifecycleEngine, and its existing repositories and utilities"
+      ]
+    },
+    {
       "requirement": "Input",
       "name": "Input includes step, config, and optional traversal controls",
       "when": ["CompileContext.execute is called"],
       "then": [
         "it accepts the change name, target step, resolved config, and optional flags such as includeChangeSpecs, followDeps, depth, sections, and fingerprint"
+      ]
+    },
+    {
+      "requirement": "Implementation autodetection before context compilation",
+      "name": "Historical implementing state refreshes tracked implementation files before context assembly",
+      "given": ["a change has entered implementing at least once in its history"],
+      "when": ["CompileContext.execute() is called"],
+      "then": [
+        "it triggers implementation autodetection before assembling the final context result"
       ]
     },
     {
@@ -583,9 +607,38 @@
       ]
     }
   ],
+  "implementation": {
+    "files": [
+      {
+        "specId": "core:compile-context",
+        "file": "core:src/composition/kernel.ts"
+      },
+      {
+        "specId": "core:compile-context",
+        "file": "core:src/composition/use-cases/compile-context.ts"
+      }
+    ],
+    "symbols": [
+      {
+        "specId": "core:compile-context",
+        "file": "core:src/application/use-cases/compile-context.ts",
+        "symbol": "CompileContext"
+      },
+      {
+        "specId": "core:compile-context",
+        "file": "core:src/application/use-cases/compile-context.ts",
+        "symbol": "CompileContext.execute"
+      },
+      {
+        "specId": "core:compile-context",
+        "file": "core:src/application/use-cases/compile-context.ts",
+        "symbol": "CompileContextResult"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:0548f574be425bf288bfab54040a534d872f24179279019b1a2b49f3f50cc0ee",
-    "verify.md": "sha256:e297a752388ec1bd9d01388443a98868ab978aa5fbbdbbbf4d3aae0618ad10df"
+    "spec.md": "sha256:2a35339bef004415dfa82a2493f25fa403b446aeb798d46292f0704d1df4cc09",
+    "verify.md": "sha256:1d980c6b1841ce16f32d8feebedc7d0cf97d0e14078abddf929a735f3ed6cb13"
   },
   "generatedBy": "core"
 }

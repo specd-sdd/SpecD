@@ -1,0 +1,26 @@
+- op: modified
+  description: 'Persist explicit requirement-aware coverage relation families in Ladybug'
+  selector:
+    type: section
+    matches: 'Requirement: Relationship tables'
+  content: |
+    The Ladybug schema SHALL define relationship tables for the persisted relation types used by the code graph.
+
+    At minimum, the schema MUST persist:
+
+    | Relationship | From   | To     | Populated by                                  |
+    | ------------ | ------ | ------ | --------------------------------------------- |
+    | IMPORTS      | File   | File   | Indexer analysis                              |
+    | DEFINES      | File   | Symbol | Indexer analysis                              |
+    | CALLS        | Symbol | Symbol | Indexer analysis                              |
+    | EXPORTS      | File   | Symbol | Indexer analysis                              |
+    | DEPENDS_ON   | Spec   | Spec   | Spec indexing                                 |
+    | COVERS_FILE  | Spec   | File   | Archived file-level implementation linkage    |
+    | COVERS_SYMBOL| Spec   | Symbol | Archived symbol-level implementation linkage  |
+    | EXTENDS      | Symbol | Symbol | Indexer analysis                              |
+    | IMPLEMENTS   | Symbol | Symbol | Indexer analysis                              |
+    | OVERRIDES    | Symbol | Symbol | Indexer analysis                              |
+
+    The schema MUST provide persisted `COVERS_FILE` and `COVERS_SYMBOL` relation families so the backend can support requirement-aware impact and lookup. `COVERS_SYMBOL` relations MUST preserve edge metadata so symbol-level implementation links can surface `stale` state after reload.
+
+    Relationship tables have no persisted edge properties unless a requirement explicitly adds them. `COVERS_SYMBOL` is that explicit case and MUST retain metadata required by the abstract relation contract.

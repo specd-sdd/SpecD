@@ -16,7 +16,7 @@
     {
       "requirement": "Manifest structure",
       "rules": [
-        "Each change is persisted as a manifest.json file inside its change directory. It contains:\n\n```jsonc\n{\n  \"name\": \"add-oauth-login\",\n  \"createdAt\": \"2026-05-15T10:00:00.000Z\",\n  \"schema\": { \"name\": \"schema-std\", \"version\": 1 },\n  \"specIds\": [\"core:change\"],\n  \"invalidationPolicy\": \"downstream\",\n  \"artifacts\": [\n    {\n      \"type\": \"proposal\",\n      \"optional\": false,\n      \"requires\": [],\n      \"state\": \"complete\",\n      \"files\": [\n        {\n          \"key\": \"proposal\",\n          \"filename\": \"proposal.md\",\n          \"state\": \"complete\",\n          \"validatedHash\": \"sha256:...\",\n          \"hasDrift\": false,\n        },\n      ],\n    },\n  ],\n  \"history\": [],\n}\n```\n\nField definitions:\n\n- `name` — the change slug; immutable after creation\n- `createdAt` — ISO 8601 timestamp; immutable after creation; source of truth for the directory prefix\n- `schema` — name (string) and version (integer) of the schema active at creation; written once, never updated\n- `workspaces` — optional; accepted on load for backward compatibility with older manifests but no longer written on save. Active workspaces are derived at runtime from specIds via parseSpecId()\n- `specIds` — current snapshot of spec IDs; mutable\n- `invalidationPolicy` — the change's persisted invalidation policy (`none`, `surgical`, `downstream`, `global`)\n- `specDependsOn` (optional) — a record keyed by spec ID, each value being an array of spec ID strings representing that spec's current in-change declared dependencies. For existing persisted specs, the entry MUST be seeded when the spec first enters the change scope from spec-lock.json, then legacy metadata.json.dependsOn, then an empty set when neither exists. These entries are archive-time inputs to sidecar and metadata generation, not the long-term archived record.\n- `artifacts` — array of artifact descriptors. Each artifact has type, optional, requires, state, and a files array of ManifestArtifactFile entries. Each file entry has key, filename, state, validatedHash, and hasDrift.\n- state on both artifacts and files uses the ArtifactStatus domain values (missing, in-progress, complete, skipped, pending-review, drifted-pending-review). File state is the source of truth; artifact state is the persisted aggregate.\n- validatedHash remains persisted as the last successfully validated baseline only. It is null when not validated, a SHA-256 string when validated, or \"**skipped**\" when explicitly skipped. It MUST NOT be interpreted as proof that the file still exists or is still complete on disk.\n- hasDrift is persisted per file and indicates whether the file's current state differs from the validated baseline\n- `history` — append-only array of typed events. The event types, their semantics, and the derivation rules (current state, active approval, draft status) are defined in [specs/core/change/spec.md — Requirement: History and event sourcing](../change/spec.md). This section defines only the JSON serialization of those events. The current lifecycle state is derived from the most recent transitioned event's to field. Each event contains common fields: type, at, and by. The by field is an ActorIdentity object (defined in core:change) which includes name, email, and optional provider, providerId, and metadata.\n\nThe JSON serialization of each event type is unchanged."
+        "Each change is persisted as a manifest.json file inside its change directory. It contains:\n\n```jsonc\n{\n  \"name\": \"add-oauth-login\",\n  \"createdAt\": \"2026-05-15T10:00:00.000Z\",\n  \"schema\": { \"name\": \"schema-std\", \"version\": 1 },\n  \"specIds\": [\"core:change\"],\n  \"invalidationPolicy\": \"downstream\",\n  \"trackedImplementationFiles\": [\n    { \"file\": \"packages/core/src/domain/entities/change.ts\", \"state\": \"open\" }\n  ],\n  \"implementationLinks\": [\n    {\n      \"specId\": \"core:change\",\n      \"file\": \"packages/core/src/domain/entities/change.ts\",\n      \"fileLinkExplicit\": true,\n      \"symbols\": [\"Change.transition\"]\n    }\n  ],\n  \"artifacts\": [\n    {\n      \"type\": \"proposal\",\n      \"optional\": false,\n      \"requires\": [],\n      \"state\": \"complete\",\n      \"files\": [\n        {\n          \"key\": \"proposal\",\n          \"filename\": \"proposal.md\",\n          \"state\": \"complete\",\n          \"validatedHash\": \"sha256:...\",\n          \"hasDrift\": false\n        }\n      ]\n    }\n  ],\n  \"history\": []\n}\n```\n\nField definitions:\n\n- `name` — the change slug; immutable after creation\n- `createdAt` — ISO 8601 timestamp; immutable after creation; source of truth for the directory prefix\n- `schema` — name (string) and version (integer) of the schema active at creation; written once, never updated\n- `workspaces` — optional; accepted on load for backward compatibility with older manifests but no longer written on save. Active workspaces are derived at runtime from specIds via parseSpecId()\n- `specIds` — current snapshot of spec IDs; mutable\n- `invalidationPolicy` — the change's persisted invalidation policy (`none`, `surgical`, `downstream`, `global`)\n- `trackedImplementationFiles` — optional array of tracked implementation file entries; each entry requires `file` and `state`, where `file` is a raw project-relative path and `state` is one of `open`, `resolved`, or `ignored`\n- `implementationLinks` — optional array of confirmed implementation links; each entry requires `specId`, `file`, and `fileLinkExplicit`, and may include `symbols`\n- `fileLinkExplicit: false` is valid only when `symbols` is present and non-empty, because that shape means the file-level presence exists only as the container for symbol-level links\n- `specDependsOn` (optional) — a record keyed by spec ID, each value being an array of spec ID strings representing that spec's current in-change declared dependencies. For existing persisted specs, the entry MUST be seeded when the spec first enters the change scope from spec-lock.json, then legacy metadata.json.dependsOn, then an empty set when neither exists. These entries are archive-time inputs to sidecar and metadata generation, not the long-term archived record.\n- `artifacts` — array of artifact descriptors. Each artifact has type, optional, requires, state, and a files array of ManifestArtifactFile entries. Each file entry has key, filename, state, validatedHash, and hasDrift.\n- state on both artifacts and files uses the ArtifactStatus domain values (missing, in-progress, complete, skipped, pending-review, drifted-pending-review). File state is the source of truth; artifact state is the persisted aggregate.\n- validatedHash remains persisted as the last successfully validated baseline only. It is null when not validated, a SHA-256 string when validated, or \"**skipped**\" when explicitly skipped. It MUST NOT be interpreted as proof that the file still exists or is still complete on disk.\n- hasDrift is persisted per file and indicates whether the file's current state differs from the validated baseline\n- `history` — append-only array of typed events. The event types, their semantics, and the derivation rules (current state, active approval, draft status) are defined in [specs/core/change/spec.md — Requirement: History and event sourcing](../change/spec.md). This section defines only the JSON serialization of those events. The current lifecycle state is derived from the most recent transitioned event's to field. Each event contains common fields: type, at, and by. The by field is an ActorIdentity object (defined in core:change) which includes name, email, and optional provider, providerId, and metadata.\n\nThe JSON serialization of each event type is unchanged."
       ]
     },
     {
@@ -128,6 +128,25 @@
       ]
     },
     {
+      "requirement": "Manifest structure",
+      "name": "Manifest stores tracked implementation files with explicit state",
+      "when": ["a change manifest is written"],
+      "then": [
+        "tracked implementation files are persisted with raw project-relative file values",
+        "AND each tracked entry includes an explicit state"
+      ]
+    },
+    {
+      "requirement": "Manifest structure",
+      "name": "Manifest stores confirmed links with fileLinkExplicit semantics",
+      "when": ["confirmed implementation links are persisted"],
+      "then": [
+        "each link stores specId, raw project-relative file, and fileLinkExplicit",
+        "AND symbols is omitted for file-level-only links",
+        "AND fileLinkExplicit: false is only valid when symbols is present and non-empty"
+      ]
+    },
+    {
       "requirement": "Archive outcome history events",
       "name": "Failed archive attempt appends archive-failed event",
       "given": [
@@ -204,6 +223,20 @@
       "then": ["the normalization is rejected"]
     },
     {
+      "requirement": "Filename normalization preserves tracked intent",
+      "name": "Null validated hash does not trigger normalization flip",
+      "given": [
+        "a manifest tracks specs/core/core/new-spec/spec.md",
+        "AND the file has validatedHash: null",
+        "AND the spec now exists in the workspace (making it delta-capable)"
+      ],
+      "when": ["the change is reloaded"],
+      "then": [
+        "normalization preserves the direct specs/... filename",
+        "AND it does not flip the representation to deltas/... solely because the hash is null"
+      ]
+    },
+    {
       "requirement": "Schema version",
       "name": "Schema unchanged",
       "when": [
@@ -246,9 +279,43 @@
       ]
     }
   ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "core:change-manifest",
+        "file": "core:src/infrastructure/fs/change-repository.ts",
+        "symbol": "FsChangeRepository"
+      },
+      {
+        "specId": "core:change-manifest",
+        "file": "core:src/infrastructure/fs/change-repository.ts",
+        "symbol": "changeToManifest"
+      },
+      {
+        "specId": "core:change-manifest",
+        "file": "core:src/infrastructure/fs/change-repository.ts",
+        "symbol": "deserializeEvent"
+      },
+      {
+        "specId": "core:change-manifest",
+        "file": "core:src/infrastructure/fs/manifest.ts",
+        "symbol": "ManifestTrackedImplementationFile"
+      },
+      {
+        "specId": "core:change-manifest",
+        "file": "core:src/infrastructure/fs/manifest.ts",
+        "symbol": "ManifestImplementationLink"
+      },
+      {
+        "specId": "core:change-manifest",
+        "file": "core:src/infrastructure/fs/manifest.ts",
+        "symbol": "ManifestTrackedImplementationFileState"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:e25ac01b2821b6494178afc02e7a02a585bae482c74305a756f5dbeadc8dd10d",
-    "verify.md": "sha256:4eb9f35886d187866cf582d21605381dd88d2e1d53467b2c0262752bb60b693f"
+    "spec.md": "sha256:efc736eb23c716547f1c99b10478036b0489719cc795997a34e697c4ad5ea80f",
+    "verify.md": "sha256:871e5d631bb0e03c5d741362316746c5ebc60ed86f97226b8beb9453fe359f5b"
   },
   "generatedBy": "core"
 }

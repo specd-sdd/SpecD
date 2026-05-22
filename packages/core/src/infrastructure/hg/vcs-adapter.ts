@@ -45,6 +45,39 @@ export class HgVcsAdapter implements VcsAdapter {
   }
 
   /** @inheritdoc */
+  async refAt(at: string): Promise<string | null> {
+    try {
+      const revision = await hg(
+        this._cwd,
+        'log',
+        '-d',
+        `<${at}`,
+        '-l',
+        '1',
+        '--template',
+        '{node|short}',
+      )
+      return revision.length > 0 ? revision : null
+    } catch {
+      return null
+    }
+  }
+
+  /** @inheritdoc */
+  async modifiedFiles(baseRef: string): Promise<readonly string[]> {
+    const output = await hg(this._cwd, 'status', '--rev', baseRef)
+    return output
+      .split('\n')
+      .map((line) => line.trimEnd())
+      .filter((line) => {
+        const status = line[0]
+        return status === 'M' || status === 'A' || status === 'R' || status === '?'
+      })
+      .map((line) => line.slice(2).trim())
+      .filter((line) => line.length > 0)
+  }
+
+  /** @inheritdoc */
   async show(ref: string, filePath: string): Promise<string | null> {
     try {
       return await hg(this._cwd, 'cat', '-r', ref, filePath)

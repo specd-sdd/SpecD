@@ -8,7 +8,8 @@
     "core:spec-id-format",
     "default:_global/architecture",
     "core:lifecycle-engine",
-    "default:_global/logging"
+    "default:_global/logging",
+    "core:implementation-detector-port"
   ],
   "context": [
     "Without a single entity that owns spec work end-to-end, lifecycle state, approval gates, and artifact tracking would scatter across uncoordinated subsystems. A Change is the central domain entity in specd — a discrete, named unit of in-progress spec work covering one or more workspaces that moves from drafting through implementation and into the archive. Every specd operation targets a Change, and the Change enforces its own lifecycle and invariants; no external code may bypass them."
@@ -36,6 +37,24 @@
       "requirement": "Implementation and verification loop",
       "rules": [
         "The `implementing` and `verifying` states form a loop that repeats until verification passes.\n\nThe transition `implementing → verifying` is gated by the workflow model's task completion gating rule (see [`core:workflow-model` — Requirement: Task completion gating](../workflow-model/spec.md)). Because the `verifying` step's `requires` includes `tasks` (which declares `taskCompletionCheck`), the transition is automatically blocked when incomplete task items remain. This is a content-level check on the artifact files, not a check on approval state.\n\nVerification has two distinct outcomes:\n\n- **`implementation-failure`** — the code does not satisfy the current artifacts, but the artifacts still correctly describe the intended behavior and the required fix fits within the existing task set. This outcome returns the change to `implementing` without invalidating or downgrading unchanged artifacts.\n- **`artifact-review-required`** — the desired behavior has changed, the current artifacts are no longer sufficient, or the required fix would introduce tasks not already defined. This outcome returns the change to `designing`, where the artifacts are reviewed and updated.\n\nActual artifact drift is handled separately from verification outcomes. If any validated artifact file changes on disk and enters `drifted-pending-review`, the change is invalidated back to `designing` regardless of the current lifecycle state.\n\nThe loop may repeat any number of times. History records each round in full."
+      ]
+    },
+    {
+      "requirement": "Implementation tracking state",
+      "rules": [
+        "A `Change` SHALL persist implementation-tracking state separately from artifact state.\n\nThis state MUST distinguish:\n\n- `trackedImplementationFiles` — tracked raw project-relative files under review for the change\n- `implementationLinks` — confirmed `spec + file` implementation links, optionally refined by one or more symbols\n\nEach tracked implementation file MUST carry an explicit review state of `open`, `resolved`, or `ignored`.\n\n`implementationLinks` MUST support both:\n\n- file-level links (`spec -> file`)\n- symbol-level refinements (`spec -> file -> symbols`)\n\nA confirmed link's raw file path remains project-relative while the change is active. Canonical `workspace:path` normalization happens later during archive-time materialization."
+      ]
+    },
+    {
+      "requirement": "Explicit vs container-only file links",
+      "rules": [
+        "The `Change` entity MUST preserve whether a file-level implementation link was explicitly created on its own or exists only as the container for symbol-level links.\n\nThis distinction governs link-removal behavior:\n\n- removing the last symbol from a container-only `spec + file` set MAY remove the whole set\n- removing the last symbol from a `spec + file` set whose file-level link was explicitly created MUST preserve the file-level link"
+      ]
+    },
+    {
+      "requirement": "Historical implementation detection guard",
+      "rules": [
+        "The `Change` entity SHALL expose whether the change has ever entered `implementing` in its history.\n\nLifecycle use cases use this historical fact to decide when demand-driven implementation autodetection is meaningful. The `Change` entity itself does not perform implementation detection."
       ]
     },
     {
@@ -83,7 +102,7 @@
     {
       "requirement": "Schema version",
       "rules": [
-        "The `created` event records the `schemaName` and `schemaVersion` of the schema active at creation time.\n\nA **`schemaName` mismatch** (e.g. `schema-std` → `custom-schema`) indicates structural incompatibility — different artifact types, formats, delta rules, and validations. When a use case (`ArchiveChange`, `ValidateArtifacts`, `CompileContext`) detects that `schema.name() !== change.schemaName`, it must throw `SchemaMismatchError` before performing any work. This is an error, not a warning.\n\nA **`schemaVersion` mismatch** within the same schema name is advisory. A warning is emitted but the change remains fully usable. Archiving with a `schemaVersion` mismatch is allowed; a `schemaName` mismatch throws `SchemaMismatchError`."
+        "The `created` event records the `schemaName` and `schemaVersion` of the schema active at creation time.\n\nA **`schemaName` mismatch** (e.g. `schema-std` → `custom-schema`) indicates structural incompatibility. When a use case detects that `schema.name() !== change.schemaName`, it MUST throw `SchemaMismatchError` before performing any work.\n\nA **`schemaVersion` mismatch** within the same schema name is advisory. When a change is loaded and the active schema version differs from the one recorded in the change, the system MUST emit a warning. The change remains fully usable. Archiving with a `schemaVersion` mismatch is allowed."
       ]
     },
     {
@@ -495,6 +514,59 @@
       "then": ["it reports that implementation may not yet exist"]
     },
     {
+      "requirement": "Implementation tracking state",
+      "name": "Change persists tracked files separately from confirmed links",
+      "given": [
+        "a change has one tracked implementation file in open state",
+        "AND one confirmed implementation link for a spec and file"
+      ],
+      "when": ["the change is persisted and reloaded"],
+      "then": ["the tracked file state is restored separately from the confirmed link set"]
+    },
+    {
+      "requirement": "Implementation tracking state",
+      "name": "Symbol-level refinement does not create a duplicate file-level peer",
+      "given": ["a confirmed spec + file implementation link already exists"],
+      "when": ["a symbol is added to refine that link"],
+      "then": ["the same spec + file set is enriched", "AND no duplicate peer link is created"]
+    },
+    {
+      "requirement": "Explicit vs container-only file links",
+      "name": "Removing the last symbol preserves explicit file link",
+      "given": [
+        "a spec + file link whose file-level presence was explicitly created",
+        "AND it has one remaining symbol refinement"
+      ],
+      "when": ["that symbol is removed"],
+      "then": ["the file-level link remains"]
+    },
+    {
+      "requirement": "Explicit vs container-only file links",
+      "name": "Removing the last symbol may delete container-only file presence",
+      "given": [
+        "a spec + file link exists only as the container for symbol-level links",
+        "AND it has one remaining symbol refinement"
+      ],
+      "when": ["that symbol is removed"],
+      "then": ["the whole spec + file set may disappear"]
+    },
+    {
+      "requirement": "Historical implementation detection guard",
+      "name": "Historical detection becomes true after implementing",
+      "given": [
+        "a change whose history already contains a transitioned event with to: 'implementing'"
+      ],
+      "when": ["historical implementation detection is evaluated"],
+      "then": ["it reports that implementation refresh may run"]
+    },
+    {
+      "requirement": "Historical implementation detection guard",
+      "name": "Historical detection stays false before implementing",
+      "given": ["a change whose history has never transitioned to implementing"],
+      "when": ["historical implementation detection is evaluated"],
+      "then": ["it reports that implementation refresh should not run"]
+    },
+    {
       "requirement": "Archive outcome history",
       "name": "Failed archive attempt appends archive-failed event",
       "given": ["a change has entered archive execution", "AND archive fails before completion"],
@@ -524,6 +596,26 @@
       "name": "Schema mismatch does not block archive",
       "when": ["a Change with a schema version mismatch is in archivable state"],
       "then": ["archiving proceeds normally — the mismatch warning is advisory only"]
+    },
+    {
+      "requirement": "Schema version",
+      "name": "Schema name mismatch throws SchemaMismatchError",
+      "given": [
+        "a change was created with schema name schema-std",
+        "AND the active system schema is custom-schema"
+      ],
+      "when": ["the change is loaded or a use case is executed"],
+      "then": ["SchemaMismatchError is thrown"]
+    },
+    {
+      "requirement": "Schema version",
+      "name": "Schema version mismatch emits warning",
+      "given": [
+        "a change was created with schema version 1",
+        "AND the active system schema version is 2"
+      ],
+      "when": ["the change is loaded"],
+      "then": ["a warning is emitted mentioning both versions", "AND the change remains usable"]
     },
     {
       "requirement": "Drafting and discarding",
@@ -652,9 +744,98 @@
       ]
     }
   ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "core:change",
+        "file": "core:src/domain/entities/change.ts",
+        "symbol": "Change"
+      },
+      {
+        "specId": "core:change",
+        "file": "core:src/domain/entities/change.ts",
+        "symbol": "Change.getHistoricalImplementationAt"
+      },
+      {
+        "specId": "core:change",
+        "file": "core:src/domain/entities/change.ts",
+        "symbol": "Change.trackImplementationFile"
+      },
+      {
+        "specId": "core:change",
+        "file": "core:src/domain/entities/change.ts",
+        "symbol": "Change.addImplementationLink"
+      },
+      {
+        "specId": "core:change",
+        "file": "core:src/domain/entities/change.ts",
+        "symbol": "Change.removeImplementationLink"
+      },
+      {
+        "specId": "core:change",
+        "file": "core:src/domain/entities/change.ts",
+        "symbol": "Change.removeImplementationSymbol"
+      },
+      {
+        "specId": "core:change",
+        "file": "core:src/domain/entities/change.ts",
+        "symbol": "TrackedImplementationFile"
+      },
+      {
+        "specId": "core:change",
+        "file": "core:src/domain/entities/change.ts",
+        "symbol": "ImplementationLink"
+      },
+      {
+        "specId": "core:change",
+        "file": "core:src/application/errors/implementation-links-exist-error.ts",
+        "symbol": "ImplementationLinksExistError"
+      },
+      {
+        "specId": "core:change",
+        "file": "core:src/application/use-cases/_shared/implementation-tracking.ts",
+        "symbol": "ImplementationTrackingProjection"
+      },
+      {
+        "specId": "core:change",
+        "file": "core:src/application/use-cases/_shared/implementation-tracking.ts",
+        "symbol": "projectImplementationTracking"
+      },
+      {
+        "specId": "core:change",
+        "file": "core:src/application/use-cases/get-implementation-review.ts",
+        "symbol": "GetImplementationReview"
+      },
+      {
+        "specId": "core:change",
+        "file": "core:src/application/use-cases/get-implementation-review.ts",
+        "symbol": "GetImplementationReview.execute"
+      },
+      {
+        "specId": "core:change",
+        "file": "core:src/application/use-cases/get-implementation-review.ts",
+        "symbol": "GetImplementationReviewResult"
+      },
+      {
+        "specId": "core:change",
+        "file": "core:src/application/use-cases/update-implementation-tracking.ts",
+        "symbol": "UpdateImplementationTracking"
+      },
+      {
+        "specId": "core:change",
+        "file": "core:src/application/use-cases/update-implementation-tracking.ts",
+        "symbol": "UpdateImplementationTracking.execute"
+      },
+      {
+        "specId": "core:change",
+        "file": "core:src/application/use-cases/update-implementation-tracking.ts",
+        "symbol": "UpdateImplementationTrackingResult"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:cf6f01d22fddba84b64ef552be2686804892614d680f73c8844ac28bf69df909",
-    "verify.md": "sha256:d9fecad46bcc5685c130af71435fac36490422f2cb6d60765df1cc0bcec0d2f6"
+    "spec.md": "sha256:8f9c7af67906059a28ed739b89e9d156f6b9b7ba6c7a0d703c76ade94ad0b920",
+    "verify.md": "sha256:3bbbec2688212f61a62d826858e482147a741ca6c386d0107476dcd3e6236b8c"
   },
   "generatedBy": "core"
 }

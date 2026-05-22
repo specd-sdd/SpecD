@@ -2,6 +2,7 @@ import { type Change } from '../../domain/entities/change.js'
 import { type ChangeState } from '../../domain/value-objects/change-state.js'
 import { type ChangeRepository } from '../ports/change-repository.js'
 import { type ActorResolver } from '../ports/actor-resolver.js'
+import { type ImplementationDetector } from '../ports/implementation-detector.js'
 import { type SchemaProvider } from '../ports/schema-provider.js'
 import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
 import { InvalidStateTransitionError } from '../../domain/errors/invalid-state-transition-error.js'
@@ -99,6 +100,7 @@ export class TransitionChange {
   private readonly _changes: ChangeRepository
   private readonly _actor: ActorResolver
   private readonly _schemaProvider: SchemaProvider
+  private readonly _implementationDetector: ImplementationDetector
   private readonly _runStepHooks: RunStepHooks
   private readonly _lifecycle: LifecycleEngine
 
@@ -108,6 +110,7 @@ export class TransitionChange {
    * @param changes - Repository for loading and persisting the change
    * @param actor - Resolver for the actor identity
    * @param schemaProvider - Provider for the fully-resolved schema
+   * @param implementationDetector - Detector for targeted implementation refresh
    * @param runStepHooks - Use case for executing workflow hooks
    * @param lifecycle - Shared lifecycle interpreter
    */
@@ -115,12 +118,14 @@ export class TransitionChange {
     changes: ChangeRepository,
     actor: ActorResolver,
     schemaProvider: SchemaProvider,
+    implementationDetector: ImplementationDetector,
     runStepHooks: RunStepHooks,
     lifecycle: LifecycleEngine = new LifecycleEngine(Logger.debug.bind(Logger)),
   ) {
     this._changes = changes
     this._actor = actor
     this._schemaProvider = schemaProvider
+    this._implementationDetector = implementationDetector
     this._runStepHooks = runStepHooks
     this._lifecycle = lifecycle
   }
@@ -260,7 +265,15 @@ export class TransitionChange {
       await this._executeHooks(input.name, effectiveTarget, 'pre', onProgress)
     }
 
-    const persistedChange = await this._changes.mutate(input.name, (freshChange) => {
+    const persistedChange = await this._changes.mutate(input.name, async (freshChange) => {
+      if (freshChange.getHistoricalImplementationAt() !== null) {
+        const files = await this._implementationDetector.detectModifiedFiles(freshChange)
+        for (const file of files) {
+          if (freshChange.trackedImplementationFiles.some((entry) => entry.file === file)) continue
+          freshChange.trackImplementationFile(file, 'open')
+        }
+      }
+
       let invalidated = false
 
       if (

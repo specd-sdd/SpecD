@@ -6,7 +6,8 @@
     "core:change",
     "core:schema-format",
     "core:content-extraction",
-    "core:spec-repository-port"
+    "core:spec-repository-port",
+    "core:spec-lock"
   ],
   "context": [
     "Tooling and AI agents need a compact, machine-readable summary of each spec — its dependencies, content hashes, rules, and scenarios — without parsing the full artifact files every time. Each spec has a corresponding `metadata.json` file stored under `.specd/metadata/<workspace>/<capability-path>/`, separate from the spec's content artifacts. It is generated deterministically by core at archive time using the schema's `metadataExtraction` engine and is not part of the schema artifact system; content hashes enable staleness detection so consumers know when to regenerate."
@@ -64,6 +65,12 @@
       "requirement": "Version control",
       "rules": [
         "`metadata.json` files under `.specd/metadata/` must be committed to version control alongside the project. The `.specd/metadata/` directory must not be added to `.gitignore`."
+      ]
+    },
+    {
+      "requirement": "Implementation projection",
+      "rules": [
+        "Generated `metadata.json` SHALL project archived implementation traceability from `spec-lock.json` into an `implementation` field for fast machine consumption.\n\nThis metadata projection is derived data:\n\n- it MUST preserve the archived distinction between file-level and symbol-level links\n- it MUST NOT become the authoritative source of implementation truth\n- when projection and sidecar disagree, `spec-lock.json` remains authoritative"
       ]
     }
   ],
@@ -461,6 +468,16 @@
       "then": ["missing spec-lock.json is tolerated until opportunistic backfill creates it"]
     },
     {
+      "requirement": "Implementation projection",
+      "name": "Metadata projects archived implementation links from spec-lock",
+      "given": ["a persisted spec-lock.json with file-level and symbol-level implementation links"],
+      "when": ["metadata is generated for that spec"],
+      "then": [
+        "metadata.json includes an implementation projection derived from the sidecar",
+        "AND the sidecar remains the authoritative source"
+      ]
+    },
+    {
       "requirement": "Staleness detection",
       "name": "Content unchanged — no warning",
       "when": [
@@ -540,17 +557,38 @@
     }
   ],
   "implementation": {
+    "files": [
+      {
+        "specId": "core:spec-metadata",
+        "file": "core:src/application/use-cases/generate-spec-metadata.ts"
+      }
+    ],
     "symbols": [
       {
         "specId": "core:spec-metadata",
-        "file": "core:src/application/use-cases/archive-change.ts",
-        "symbol": "ArchiveChange"
+        "file": "core:src/domain/services/parse-metadata.ts",
+        "symbol": "specMetadataSchema"
+      },
+      {
+        "specId": "core:spec-metadata",
+        "file": "core:src/domain/services/parse-metadata.ts",
+        "symbol": "strictSpecMetadataSchema"
+      },
+      {
+        "specId": "core:spec-metadata",
+        "file": "core:src/domain/services/parse-metadata.ts",
+        "symbol": "permissiveSpecMetadataSchema"
+      },
+      {
+        "specId": "core:spec-metadata",
+        "file": "core:src/domain/services/parse-metadata.ts",
+        "symbol": "SpecMetadata"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:3f7249fc8affea43f820cf990032cd3a2fa49913849876b9fa933c67a148240b",
-    "verify.md": "sha256:cc3245419a906502a4f8328d7b4c33680ed6ed7d7c61d2c1750c74eb535a7437"
+    "spec.md": "sha256:f8dabb6368c453d0222177d8d46a16ccbea80179f50e5f973566b6cc67889f9e",
+    "verify.md": "sha256:124fd41a3c6406855d109238304a01d4b5272d75ca1979a05eb0d66b162ecf79"
   },
   "generatedBy": "core"
 }

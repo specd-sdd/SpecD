@@ -9,7 +9,11 @@ import { type SymbolQuery } from '../domain/value-objects/symbol-query.js'
 import { type GraphStatistics } from '../domain/value-objects/graph-statistics.js'
 import { type TraversalOptions } from '../domain/value-objects/traversal-options.js'
 import { type TraversalResult } from '../domain/value-objects/traversal-result.js'
-import { type ImpactResult, type FileImpactResult } from '../domain/value-objects/impact-result.js'
+import {
+  type ImpactResult,
+  type FileImpactResult,
+  type SpecImpactResult,
+} from '../domain/value-objects/impact-result.js'
 import { type ChangeDetectionResult } from '../domain/value-objects/change-detection-result.js'
 import { type HotspotOptions, type HotspotResult } from '../domain/value-objects/hotspot-result.js'
 import { type Relation } from '../domain/value-objects/relation.js'
@@ -18,6 +22,7 @@ import { getUpstream } from '../domain/services/get-upstream.js'
 import { getDownstream } from '../domain/services/get-downstream.js'
 import { analyzeImpact } from '../domain/services/analyze-impact.js'
 import { analyzeFileImpact } from '../domain/services/analyze-file-impact.js'
+import { analyzeSpecImpact } from '../domain/services/analyze-spec-impact.js'
 import { detectChanges } from '../domain/services/detect-changes.js'
 import { computeHotspots } from '../domain/services/compute-hotspots.js'
 
@@ -123,6 +128,42 @@ export class CodeGraphProvider {
   }
 
   /**
+   * Returns file coverage relations emitted by a spec.
+   * @param specId - The spec identifier.
+   * @returns File coverage relations.
+   */
+  async getCoveredFiles(specId: string): Promise<Relation[]> {
+    return this.store.getCoveredFiles(specId)
+  }
+
+  /**
+   * Returns specs that cover the given file.
+   * @param filePath - Canonical file path.
+   * @returns File coverage relations keyed by spec.
+   */
+  async getCoveringSpecs(filePath: string): Promise<Relation[]> {
+    return this.store.getCoveringSpecs(filePath)
+  }
+
+  /**
+   * Returns symbol coverage relations emitted by a spec.
+   * @param specId - The spec identifier.
+   * @returns Symbol coverage relations.
+   */
+  async getCoveredSymbols(specId: string): Promise<Relation[]> {
+    return this.store.getCoveredSymbols(specId)
+  }
+
+  /**
+   * Returns specs that cover the given symbol.
+   * @param symbolId - Canonical symbol identifier.
+   * @returns Symbol coverage relations keyed by spec.
+   */
+  async getSymbolCoveringSpecs(symbolId: string): Promise<Relation[]> {
+    return this.store.getSymbolCoveringSpecs(symbolId)
+  }
+
+  /**
    * Returns aggregate statistics about the code graph.
    * @returns The graph statistics.
    */
@@ -178,6 +219,21 @@ export class CodeGraphProvider {
     maxDepth?: number,
   ): Promise<FileImpactResult> {
     return analyzeFileImpact(this.store, filePath, direction, maxDepth)
+  }
+
+  /**
+   * Analyzes requirement-aware impact for a spec.
+   * @param specId - Spec identifier to analyze.
+   * @param direction - Direction of impact analysis.
+   * @param maxDepth - Maximum traversal depth.
+   * @returns Requirement-aware spec impact result.
+   */
+  async analyzeSpecImpact(
+    specId: string,
+    direction: 'upstream' | 'downstream' | 'both',
+    maxDepth?: number,
+  ): Promise<SpecImpactResult> {
+    return analyzeSpecImpact(this.store, specId, direction, maxDepth)
   }
 
   /**

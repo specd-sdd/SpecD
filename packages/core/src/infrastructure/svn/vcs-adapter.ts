@@ -53,6 +53,23 @@ export class SvnVcsAdapter implements VcsAdapter {
   }
 
   /** @inheritdoc */
+  async refAt(at: string): Promise<string | null> {
+    try {
+      const revision = await svn(this._cwd, 'info', '--show-item', 'revision', '-r', `{${at}}`)
+      return revision.length > 0 ? revision : null
+    } catch {
+      return null
+    }
+  }
+
+  /** @inheritdoc */
+  async modifiedFiles(baseRef: string): Promise<readonly string[]> {
+    const diffOutput = await svn(this._cwd, 'diff', '--summarize', '-r', `${baseRef}:WORKING`)
+    const statusOutput = await svn(this._cwd, 'status')
+    return normalizeSvnPaths(diffOutput, statusOutput)
+  }
+
+  /** @inheritdoc */
   async show(ref: string, filePath: string): Promise<string | null> {
     try {
       return await svn(this._cwd, 'cat', '-r', ref, filePath)
@@ -60,4 +77,35 @@ export class SvnVcsAdapter implements VcsAdapter {
       return null
     }
   }
+}
+
+/**
+ * Normalizes `svn diff --summarize` and `svn status` outputs into unique paths.
+ *
+ * @param diffOutput - Output from `svn diff --summarize`
+ * @param statusOutput - Output from `svn status`
+ * @returns Unique, non-empty repository-relative file paths
+ */
+function normalizeSvnPaths(diffOutput: string, statusOutput: string): readonly string[] {
+  const files = new Set<string>()
+
+  for (const line of diffOutput.split('\n')) {
+    const normalized = line.trim()
+    if (normalized.length === 0) continue
+    const parts = normalized.split(/\s+/)
+    const file = parts[parts.length - 1]
+    if (file !== undefined && file.length > 0) {
+      files.add(file)
+    }
+  }
+
+  for (const line of statusOutput.split('\n')) {
+    if (!line.startsWith('?')) continue
+    const file = line.slice(1).trim()
+    if (file.length > 0) {
+      files.add(file)
+    }
+  }
+
+  return [...files]
 }

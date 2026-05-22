@@ -1,0 +1,168 @@
+{
+  "title": "core:spec-lock",
+  "description": "Archived specs need a durable sidecar that preserves spec identity, persisted dependencies, and implementation traceability independently of metadata regeneration or graph re-indexing. `spec-lock.json` is that sidecar: the canonical archived record for spec schema identity and implementation links.",
+  "dependsOn": ["core:spec-id-format", "core:storage"],
+  "context": [
+    "Archived specs need a durable sidecar that preserves spec identity, persisted dependencies, and implementation traceability independently of metadata regeneration or graph re-indexing. `spec-lock.json` is that sidecar: the canonical archived record for spec schema identity and implementation links."
+  ],
+  "rules": [
+    {
+      "requirement": "Sidecar location and naming",
+      "rules": [
+        "The sidecar SHALL be a file named `spec-lock.json` located in the canonical persisted spec directory next to that spec's archived artifacts."
+      ]
+    },
+    {
+      "requirement": "Durable schema identity",
+      "rules": [
+        "`spec-lock.json` MUST store the spec schema identity under `schema`.\n\n- `schema.name` is required.\n- `schema.version` is required.\n\nOnce recorded for a persisted spec, this schema identity MUST remain immutable unless the spec is explicitly migrated through a future schema-migration capability."
+      ]
+    },
+    {
+      "requirement": "Persistent dependencies",
+      "rules": [
+        "`spec-lock.json` MUST store the final persisted `dependsOn` list for the archived spec as canonical spec IDs.\n\nThis sidecar list is the durable archived dependency record. Archive-time metadata generation and later metadata regeneration flows SHALL treat it as the authoritative fallback when dependency extraction omits `dependsOn`."
+      ]
+    },
+    {
+      "requirement": "Archived implementation links",
+      "rules": [
+        "`spec-lock.json` MUST store archived implementation traceability under an `implementation` array.\n\nEach entry MUST contain:\n\n- `file` — the canonical implementation file identity in `workspace:path` form, where `workspace` is the workspace of `specId` and `path` is relative to that workspace `codeRoot`\n\nEach entry MAY additionally contain:\n\n- `symbols` — a non-empty array of symbol names when the archived link is symbol-level\n\nWhen `symbols` is absent, the entry represents a file-level implementation link. When `symbols` is present, the entry represents symbol-level implementation traceability for that file."
+      ]
+    },
+    {
+      "requirement": "Archive-time materialization",
+      "rules": [
+        "`spec-lock.json` SHALL be written or updated only by archive-time materialization and explicit integrity-maintenance flows.\n\nArchive-time materialization MUST:\n\n- read raw project-relative implementation paths from the active change state\n- validate that each linked file belongs to the workspace implied by the archived `specId`\n- ignore entries whose raw file path falls under that workspace's `graph.excludePaths`\n- discard entries that cannot be normalized into a valid `workspace:path` identity\n- fail archive when a confirmed link points outside the workspace `codeRoot` implied by `specId`"
+      ]
+    },
+    {
+      "requirement": "Sidecar is the durable source of truth",
+      "rules": [
+        "`spec-lock.json` MUST be the durable archived source of truth for implementation traceability.\n\n`metadata.json` MAY project or cache this information for faster consumption, but metadata regeneration MUST NOT invent, mutate, or delete implementation links independently of the sidecar."
+      ]
+    }
+  ],
+  "constraints": [
+    "spec-lock.json MUST be valid JSON.",
+    "Canonical implementation file identities MUST use forward-slash-normalized workspace:path values.",
+    "symbols, when present, MUST be non-empty.",
+    "Sidecar maintenance MUST preserve file-level and symbol-level links as distinct archived traceability forms."
+  ],
+  "scenarios": [
+    {
+      "requirement": "Sidecar location and naming",
+      "name": "Sidecar is written next to archived spec artifacts",
+      "given": ["an archived spec with canonical persisted artifacts"],
+      "when": ["archive materializes its sidecar"],
+      "then": ["spec-lock.json is written in that same persisted spec directory"]
+    },
+    {
+      "requirement": "Durable schema identity",
+      "name": "Schema identity remains immutable after first persistence",
+      "given": [
+        "an existing spec-lock.json with schema: { \"name\": \"schema-std\", \"version\": 1 }"
+      ],
+      "when": ["the active project schema later changes"],
+      "then": ["the sidecar keeps the original stored schema identity"]
+    },
+    {
+      "requirement": "Persistent dependencies",
+      "name": "Sidecar dependencies are used as durable fallback",
+      "given": [
+        "a persisted spec whose spec-lock.json contains dependsOn",
+        "AND dependency extraction later omits dependsOn"
+      ],
+      "when": ["metadata is regenerated"],
+      "then": ["the sidecar dependsOn value is used as the authoritative fallback"]
+    },
+    {
+      "requirement": "Archived implementation links",
+      "name": "File-level link is stored without symbols",
+      "given": ["an archived implementation link for core:src/index.ts with no symbol refinements"],
+      "when": ["the sidecar is saved and reloaded"],
+      "then": [
+        "the implementation entry contains only the canonical file",
+        "AND it is interpreted as a file-level link"
+      ]
+    },
+    {
+      "requirement": "Archived implementation links",
+      "name": "Symbol-level link preserves symbol list",
+      "given": [
+        "an archived implementation link for core:src/index.ts with symbols [\"createUser\", \"deleteUser\"]"
+      ],
+      "when": ["the sidecar is saved and reloaded"],
+      "then": [
+        "the implementation entry preserves the canonical file",
+        "AND it preserves the exact non-empty symbols list"
+      ]
+    },
+    {
+      "requirement": "Archive-time materialization",
+      "name": "Excluded path is ignored during materialization",
+      "given": [
+        "a confirmed raw implementation link falls under the target workspace graph.excludePaths"
+      ],
+      "when": ["archive materializes implementation links"],
+      "then": [
+        "that link is skipped for spec-lock.json",
+        "AND archive does not fail solely because of that excluded path"
+      ]
+    },
+    {
+      "requirement": "Archive-time materialization",
+      "name": "Workspace-boundary mismatch fails archive",
+      "given": [
+        "a confirmed implementation link whose raw file path falls outside the codeRoot of the workspace implied by specId"
+      ],
+      "when": ["archive attempts materialization"],
+      "then": ["archive fails instead of writing an invalid canonical workspace:path"]
+    },
+    {
+      "requirement": "Sidecar is the durable source of truth",
+      "name": "Metadata regeneration does not mutate sidecar implementation links",
+      "given": ["an existing spec-lock.json with archived implementation links"],
+      "when": ["metadata is regenerated later"],
+      "then": [
+        "spec-lock.json content remains unchanged",
+        "AND metadata only projects from the sidecar"
+      ]
+    }
+  ],
+  "implementation": {
+    "files": [
+      {
+        "specId": "core:spec-lock",
+        "file": "core:test/infrastructure/fs/spec-repository.spec.ts"
+      }
+    ],
+    "symbols": [
+      {
+        "specId": "core:spec-lock",
+        "file": "core:src/domain/services/parse-spec-lock.ts",
+        "symbol": "SpecLockData"
+      },
+      {
+        "specId": "core:spec-lock",
+        "file": "core:src/domain/services/parse-spec-lock.ts",
+        "symbol": "SpecLockImplementationEntry"
+      },
+      {
+        "specId": "core:spec-lock",
+        "file": "core:src/domain/services/parse-spec-lock.ts",
+        "symbol": "specLockSchema"
+      },
+      {
+        "specId": "core:spec-lock",
+        "file": "core:src/domain/services/parse-spec-lock.ts",
+        "symbol": "parseSpecLock"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:c2a54420a7953005df60fa0b8b9fdf4c38569667a0b18802cf5e8addff8b3afd",
+    "verify.md": "sha256:f0fe315e5269429d386a20c0efebbd8fc83f6bb41a46cf38978f44ada4ad82fe"
+  },
+  "generatedBy": "core"
+}

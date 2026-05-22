@@ -711,6 +711,7 @@ describe('FsSpecRepository', () => {
         roCtx.repo.saveSpecLock(spec, {
           schema: { name: 'schema-std', version: 1 },
           dependsOn: ['core:storage'],
+          implementation: [],
         }),
       ).rejects.toThrow(ReadOnlyWorkspaceError)
     })
@@ -828,9 +829,10 @@ describe('FsSpecRepository', () => {
       originalHash?: string,
     ): SpecLockData {
       return {
-        schema: { name: 'schema-std', version: 1 },
-        dependsOn: ['core:storage'],
-        ...overrides,
+        schema: overrides.schema ?? { name: 'schema-std', version: 1 },
+        dependsOn: overrides.dependsOn ?? ['core:storage'],
+        implementation: overrides.implementation ?? [],
+        ...(overrides.originalHash !== undefined ? { originalHash: overrides.originalHash } : {}),
         ...(originalHash !== undefined ? { originalHash } : {}),
       }
     }

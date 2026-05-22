@@ -13,6 +13,10 @@ export type IndexProgressCallback = (percent: number, phase: string) => void
 export interface DiscoveredSpec {
   readonly spec: SpecNode
   readonly contentHash: string
+  readonly implementation?: ReadonlyArray<{
+    readonly file: string
+    readonly symbols?: readonly string[]
+  }>
 }
 
 /**

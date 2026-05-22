@@ -209,6 +209,34 @@ export abstract class GraphStore {
   abstract getSpecDependents(specId: string): Promise<Relation[]>
 
   /**
+   * Returns all file-coverage relations originating from the given spec.
+   * @param specId - The spec id to find covered files for.
+   * @returns An array of COVERS_FILE relations.
+   */
+  abstract getCoveredFiles(specId: string): Promise<Relation[]>
+
+  /**
+   * Returns all file-coverage relations targeting the given file.
+   * @param filePath - The canonical workspace-prefixed file path.
+   * @returns An array of COVERS_FILE relations.
+   */
+  abstract getCoveringSpecs(filePath: string): Promise<Relation[]>
+
+  /**
+   * Returns all symbol-coverage relations originating from the given spec.
+   * @param specId - The spec id to find covered symbols for.
+   * @returns An array of COVERS_SYMBOL relations.
+   */
+  abstract getCoveredSymbols(specId: string): Promise<Relation[]>
+
+  /**
+   * Returns all symbol-coverage relations targeting the given symbol.
+   * @param symbolId - The symbol id to find covering specs for.
+   * @returns An array of COVERS_SYMBOL relations.
+   */
+  abstract getSymbolCoveringSpecs(symbolId: string): Promise<Relation[]>
+
+  /**
    * Returns all symbols exported by the given file.
    * @param filePath - The file path to find exports for.
    * @returns An array of exported symbol nodes.

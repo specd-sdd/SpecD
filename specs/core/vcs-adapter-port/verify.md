@@ -51,6 +51,20 @@
 - **THEN** the promise MUST resolve to `null`
 - **AND** the method MUST NOT throw
 
+### Requirement: refAt resolves the revision active at a timestamp
+
+#### Scenario: refAt returns a historical revision when one exists
+
+- **GIVEN** a VCS repository with commits before and after an ISO timestamp
+- **WHEN** `refAt(at)` is called with that timestamp
+- **THEN** it resolves to the most recent revision at or before that time
+
+#### Scenario: refAt returns null when no historical revision exists
+
+- **GIVEN** a repository with no commit at or before the supplied timestamp
+- **WHEN** `refAt(at)` is called
+- **THEN** the promise MUST resolve to `null`
+
 ### Requirement: show retrieves file content at a revision
 
 #### Scenario: Non-existent revision
@@ -64,6 +78,15 @@
 - **GIVEN** a valid revision identifier
 - **WHEN** `show()` is called with a file path that does not exist at that revision
 - **THEN** the promise MUST resolve to `null`
+
+### Requirement: modifiedFiles lists changed repository files
+
+#### Scenario: modifiedFiles returns repository-relative paths
+
+- **GIVEN** a VCS repository with changes relative to a baseline reference
+- **WHEN** `modifiedFiles(baseRef)` is called
+- **THEN** it returns repository-relative changed file paths
+- **AND** missing matches are represented as an empty array
 
 ### Requirement: Null fallback implementation
 
@@ -87,7 +110,17 @@
 - **WHEN** `ref()` is called on a `NullVcsAdapter`
 - **THEN** the promise MUST resolve to `null`
 
+#### Scenario: NullVcsAdapter refAt returns null
+
+- **WHEN** `refAt(at)` is called on a `NullVcsAdapter`
+- **THEN** the promise MUST resolve to `null`
+
 #### Scenario: NullVcsAdapter show returns null
 
 - **WHEN** `show()` is called on a `NullVcsAdapter` with any arguments
 - **THEN** the promise MUST resolve to `null`
+
+#### Scenario: NullVcsAdapter modifiedFiles returns empty array
+
+- **WHEN** `modifiedFiles(baseRef)` is called on a `NullVcsAdapter`
+- **THEN** the promise MUST resolve to an empty array

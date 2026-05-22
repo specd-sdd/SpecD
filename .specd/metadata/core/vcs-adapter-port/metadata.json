@@ -31,9 +31,21 @@
       ]
     },
     {
+      "requirement": "refAt resolves the revision active at a timestamp",
+      "rules": [
+        "`refAt(at)` MUST accept an ISO-8601 timestamp string and return a `Promise<string | null>`.\n\nIt resolves to the most recent revision identifier at or before the supplied timestamp.\n\nWhen VCS is unavailable, the repository has no matching historical revision, or the backend cannot resolve a revision for that timestamp, `refAt()` MUST resolve to `null`. It MUST NOT throw for these no-data cases."
+      ]
+    },
+    {
       "requirement": "show retrieves file content at a revision",
       "rules": [
         "`show(ref, filePath)` MUST accept a revision identifier (`ref`) and a repository-relative file path (`filePath`), both as `string` parameters. It MUST return a `Promise<string | null>`.\n\nWhen the revision and file exist, `show()` MUST resolve to the file content as a string. When the revision or file path does not exist, `show()` MUST resolve to `null`. It MUST NOT throw for missing revisions or paths."
+      ]
+    },
+    {
+      "requirement": "modifiedFiles lists changed repository files",
+      "rules": [
+        "`modifiedFiles(baseRef)` MUST accept a baseline revision identifier (`baseRef`) as a string and return a `Promise<readonly string[]>`.\n\nThe returned array contains repository-relative file paths that differ between the current worktree state and the specified baseline reference.\n\nMissing or empty results MUST be represented as an empty array, not as `null`."
       ]
     },
     {
@@ -45,7 +57,7 @@
     {
       "requirement": "Null fallback implementation",
       "rules": [
-        "A `NullVcsAdapter` implementation MUST exist for environments where no VCS is detected. It MUST satisfy the following contract:\n\n- `rootDir()` MUST reject with an `Error` containing a message indicating no VCS was detected.\n- `branch()` MUST resolve to `\"none\"`.\n- `isClean()` MUST resolve to `true`.\n- `ref()` MUST resolve to `null`.\n- `show()` MUST resolve to `null` for any arguments.\n\nThe null implementation MUST NOT shell out to any external process or perform I/O."
+        "A `NullVcsAdapter` implementation MUST exist for environments where no VCS is detected. It MUST satisfy the following contract:\n\n- `rootDir()` MUST reject with an `Error` containing a message indicating no VCS was detected.\n- `branch()` MUST resolve to `\"none\"`.\n- `isClean()` MUST resolve to `true`.\n- `ref()` MUST resolve to `null`.\n- `refAt()` MUST resolve to `null` for any timestamp.\n- `show()` MUST resolve to `null` for any arguments.\n- `modifiedFiles()` MUST resolve to an empty array for any baseline."
       ]
     }
   ],
@@ -103,6 +115,20 @@
       "then": ["the promise MUST resolve to null", "AND the method MUST NOT throw"]
     },
     {
+      "requirement": "refAt resolves the revision active at a timestamp",
+      "name": "refAt returns a historical revision when one exists",
+      "given": ["a VCS repository with commits before and after an ISO timestamp"],
+      "when": ["refAt(at) is called with that timestamp"],
+      "then": ["it resolves to the most recent revision at or before that time"]
+    },
+    {
+      "requirement": "refAt resolves the revision active at a timestamp",
+      "name": "refAt returns null when no historical revision exists",
+      "given": ["a repository with no commit at or before the supplied timestamp"],
+      "when": ["refAt(at) is called"],
+      "then": ["the promise MUST resolve to null"]
+    },
+    {
       "requirement": "show retrieves file content at a revision",
       "name": "Non-existent revision",
       "when": ["show() is called with a revision that does not exist"],
@@ -114,6 +140,16 @@
       "given": ["a valid revision identifier"],
       "when": ["show() is called with a file path that does not exist at that revision"],
       "then": ["the promise MUST resolve to null"]
+    },
+    {
+      "requirement": "modifiedFiles lists changed repository files",
+      "name": "modifiedFiles returns repository-relative paths",
+      "given": ["a VCS repository with changes relative to a baseline reference"],
+      "when": ["modifiedFiles(baseRef) is called"],
+      "then": [
+        "it returns repository-relative changed file paths",
+        "AND missing matches are represented as an empty array"
+      ]
     },
     {
       "requirement": "Null fallback implementation",
@@ -141,14 +177,65 @@
     },
     {
       "requirement": "Null fallback implementation",
+      "name": "NullVcsAdapter refAt returns null",
+      "when": ["refAt(at) is called on a NullVcsAdapter"],
+      "then": ["the promise MUST resolve to null"]
+    },
+    {
+      "requirement": "Null fallback implementation",
       "name": "NullVcsAdapter show returns null",
       "when": ["show() is called on a NullVcsAdapter with any arguments"],
       "then": ["the promise MUST resolve to null"]
+    },
+    {
+      "requirement": "Null fallback implementation",
+      "name": "NullVcsAdapter modifiedFiles returns empty array",
+      "when": ["modifiedFiles(baseRef) is called on a NullVcsAdapter"],
+      "then": ["the promise MUST resolve to an empty array"]
     }
   ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "core:vcs-adapter-port",
+        "file": "core:src/application/ports/vcs-adapter.ts",
+        "symbol": "VcsAdapter.rootDir"
+      },
+      {
+        "specId": "core:vcs-adapter-port",
+        "file": "core:src/application/ports/vcs-adapter.ts",
+        "symbol": "VcsAdapter.branch"
+      },
+      {
+        "specId": "core:vcs-adapter-port",
+        "file": "core:src/application/ports/vcs-adapter.ts",
+        "symbol": "VcsAdapter.isClean"
+      },
+      {
+        "specId": "core:vcs-adapter-port",
+        "file": "core:src/application/ports/vcs-adapter.ts",
+        "symbol": "VcsAdapter.ref"
+      },
+      {
+        "specId": "core:vcs-adapter-port",
+        "file": "core:src/application/ports/vcs-adapter.ts",
+        "symbol": "VcsAdapter.refAt"
+      },
+      {
+        "specId": "core:vcs-adapter-port",
+        "file": "core:src/application/ports/vcs-adapter.ts",
+        "symbol": "VcsAdapter.modifiedFiles"
+      },
+      {
+        "specId": "core:vcs-adapter-port",
+        "file": "core:src/application/ports/vcs-adapter.ts",
+        "symbol": "VcsAdapter.show"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:a6e6f852969e7b5b25ba40a257aed2630c4c14ed32ca5f4251e95dca71139eca",
-    "verify.md": "sha256:ed89a1681f523cd5326c997ead1377bf1132789a384cb196ec89354a91003bd7"
+    "spec.md": "sha256:c643e4f87f196c468cdf3ccc11a3d31b3ee1f1cf1844ad288d5e018c04750db4",
+    "verify.md": "sha256:a2af9c850d037bf6bde13fd3bb0025ff49139453a003a3f7882f2f8ec3a578bb"
   },
   "generatedBy": "core"
 }

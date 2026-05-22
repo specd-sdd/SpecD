@@ -51,6 +51,19 @@
 - **THEN** the file remains `missing`
 - **AND** `validatedHash` is interpreted only as the last validated baseline
 
+#### Scenario: Manifest stores tracked implementation files with explicit state
+
+- **WHEN** a change manifest is written
+- **THEN** tracked implementation files are persisted with raw project-relative `file` values
+- **AND** each tracked entry includes an explicit `state`
+
+#### Scenario: Manifest stores confirmed links with fileLinkExplicit semantics
+
+- **WHEN** confirmed implementation links are persisted
+- **THEN** each link stores `specId`, raw project-relative `file`, and `fileLinkExplicit`
+- **AND** `symbols` is omitted for file-level-only links
+- **AND** `fileLinkExplicit: false` is only valid when `symbols` is present and non-empty
+
 ### Requirement: Archive outcome history events
 
 #### Scenario: Failed archive attempt appends archive-failed event
@@ -105,6 +118,15 @@
 - **GIVEN** a normalization step would change a tracked artifact from direct to delta representation or vice versa
 - **WHEN** exact semantic equivalence for that artifact file has not been proven
 - **THEN** the normalization is rejected
+
+#### Scenario: Null validated hash does not trigger normalization flip
+
+- **GIVEN** a manifest tracks `specs/core/core/new-spec/spec.md`
+- **AND** the file has `validatedHash: null`
+- **AND** the spec now exists in the workspace (making it delta-capable)
+- **WHEN** the change is reloaded
+- **THEN** normalization preserves the direct `specs/...` filename
+- **AND** it does not flip the representation to `deltas/...` solely because the hash is null
 
 ### Requirement: Schema version
 

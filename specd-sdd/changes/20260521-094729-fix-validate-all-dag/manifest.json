@@ -1,0 +1,1365 @@
+{
+  "name": "fix-validate-all-dag",
+  "createdAt": "2026-05-21T09:47:29.983Z",
+  "description": "Add Schema.artifactDag() and make changes validate --all follow schema DAG order with complete-file skip and shared DAG consumers.",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "core:schema-format",
+    "core:validate-artifacts",
+    "cli:change-validate",
+    "core:change",
+    "core:invalidate-change",
+    "core:lifecycle-engine",
+    "cli:change-status",
+    "core:get-artifact-instruction"
+  ],
+  "specDependsOn": {
+    "core:schema-format": [
+      "core:delta-format",
+      "core:selector-model",
+      "core:content-extraction",
+      "core:schema-merge"
+    ],
+    "core:validate-artifacts": [
+      "core:change",
+      "core:change-layout",
+      "core:change-manifest",
+      "core:lifecycle-engine",
+      "core:schema-format",
+      "core:delta-format",
+      "core:selector-model",
+      "core:storage",
+      "default:_global/architecture",
+      "core:spec-id-format"
+    ],
+    "cli:change-validate": [
+      "cli:entrypoint",
+      "core:change",
+      "core:validate-artifacts",
+      "core:spec-id-format",
+      "core:schema-format"
+    ],
+    "core:change": [
+      "core:change-manifest",
+      "core:workflow-model",
+      "core:spec-metadata",
+      "core:spec-id-format",
+      "default:_global/architecture",
+      "core:lifecycle-engine",
+      "default:_global/logging",
+      "core:schema-format"
+    ],
+    "core:invalidate-change": [
+      "core:change",
+      "core:lifecycle-engine",
+      "core:config",
+      "default:_global/architecture",
+      "core:schema-format"
+    ],
+    "core:lifecycle-engine": [
+      "core:change",
+      "core:workflow-model",
+      "core:schema-format",
+      "default:_global/architecture"
+    ],
+    "cli:change-status": [
+      "cli:entrypoint",
+      "core:change",
+      "core:get-status",
+      "core:schema-format",
+      "core:lifecycle-engine"
+    ],
+    "core:get-artifact-instruction": [
+      "core:schema-format",
+      "core:delta-format",
+      "core:change",
+      "core:schema-merge",
+      "core:template-variables",
+      "core:lifecycle-engine"
+    ]
+  },
+  "invalidationPolicy": "downstream",
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:b82d7fdaf96bc23944b2c1767617cfbd21bfbcaa12e48e764b1208dcfd0c717a"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "missing",
+      "files": [
+        {
+          "key": "core:schema-format",
+          "filename": "deltas/core/schema-format/spec.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "core:validate-artifacts",
+          "filename": "deltas/core/validate-artifacts/spec.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "cli:change-validate",
+          "filename": "deltas/cli/change-validate/spec.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "core:change",
+          "filename": "deltas/core/change/spec.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "core:invalidate-change",
+          "filename": "deltas/core/invalidate-change/spec.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "core:lifecycle-engine",
+          "filename": "deltas/core/lifecycle-engine/spec.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "cli:change-status",
+          "filename": "deltas/cli/change-status/spec.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "core:get-artifact-instruction",
+          "filename": "deltas/core/get-artifact-instruction/spec.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "missing",
+      "files": [
+        {
+          "key": "core:schema-format",
+          "filename": "deltas/core/schema-format/verify.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "core:validate-artifacts",
+          "filename": "deltas/core/validate-artifacts/verify.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "cli:change-validate",
+          "filename": "deltas/cli/change-validate/verify.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "core:change",
+          "filename": "deltas/core/change/verify.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "core:invalidate-change",
+          "filename": "deltas/core/invalidate-change/verify.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "core:lifecycle-engine",
+          "filename": "deltas/core/lifecycle-engine/verify.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "cli:change-status",
+          "filename": "deltas/cli/change-status/verify.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "core:get-artifact-instruction",
+          "filename": "deltas/core/get-artifact-instruction/verify.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "missing",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "missing",
+          "validatedHash": null
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "missing",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "missing",
+          "validatedHash": null
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-05-21T09:47:29.983Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": ["core:schema-format", "core:validate-artifacts", "cli:change-validate"],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-05-21T09:47:29.998Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "core:schema-format"
+        },
+        {
+          "type": "specs",
+          "key": "core:validate-artifacts"
+        },
+        {
+          "type": "specs",
+          "key": "cli:change-validate"
+        },
+        {
+          "type": "verify",
+          "key": "core:schema-format"
+        },
+        {
+          "type": "verify",
+          "key": "core:validate-artifacts"
+        },
+        {
+          "type": "verify",
+          "key": "cli:change-validate"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-21T09:50:32.466Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-21T09:53:21.800Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["core:schema-format", "core:validate-artifacts", "cli:change-validate"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:schema-format", "core:validate-artifacts", "cli:change-validate"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-05-21T09:53:21.803Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:change"
+        },
+        {
+          "type": "specs",
+          "key": "core:invalidate-change"
+        },
+        {
+          "type": "specs",
+          "key": "core:lifecycle-engine"
+        },
+        {
+          "type": "specs",
+          "key": "cli:change-status"
+        },
+        {
+          "type": "verify",
+          "key": "core:change"
+        },
+        {
+          "type": "verify",
+          "key": "core:invalidate-change"
+        },
+        {
+          "type": "verify",
+          "key": "core:lifecycle-engine"
+        },
+        {
+          "type": "verify",
+          "key": "cli:change-status"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-21T09:55:09.030Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:schema-format",
+            "core:validate-artifacts",
+            "cli:change-validate",
+            "core:change",
+            "core:invalidate-change",
+            "core:lifecycle-engine",
+            "cli:change-status"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:schema-format",
+            "core:validate-artifacts",
+            "cli:change-validate",
+            "core:change",
+            "core:invalidate-change",
+            "core:lifecycle-engine",
+            "cli:change-status"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-05-21T09:55:09.032Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:get-artifact-instruction"
+        },
+        {
+          "type": "verify",
+          "key": "core:get-artifact-instruction"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-22T07:32:25.607Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'implementation-file-tracking' was archived with overlapping specs: cli:change-status, core:change",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:change", "cli:change-status"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:change", "cli:change-status"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-22T07:34:10.388Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'implementation-file-tracking' was archived with overlapping specs: cli:change-status, core:change",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:change", "cli:change-status"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:change", "cli:change-status"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-22T07:34:49.644Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'implementation-file-tracking' was archived with overlapping specs: cli:change-status, core:change",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:change", "cli:change-status"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:change", "cli:change-status"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-22T07:37:41.288Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'implementation-file-tracking' was archived with overlapping specs: cli:change-status, core:change",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:change", "cli:change-status"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:change", "cli:change-status"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-22T07:50:32.281Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'implementation-file-tracking' was archived with overlapping specs: cli:change-status, core:change",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:change", "cli:change-status"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:change", "cli:change-status"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-22T07:51:52.697Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'implementation-file-tracking' was archived with overlapping specs: cli:change-status, core:change",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:change", "cli:change-status"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:change", "cli:change-status"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-22T07:52:15.678Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'implementation-file-tracking' was archived with overlapping specs: cli:change-status, core:change",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:change", "cli:change-status"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:change", "cli:change-status"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-22T07:52:42.984Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'implementation-file-tracking' was archived with overlapping specs: cli:change-status, core:change",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:change", "cli:change-status"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:change", "cli:change-status"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-22T07:54:55.770Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'implementation-file-tracking' was archived with overlapping specs: cli:change-status, core:change",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:change", "cli:change-status"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:change", "cli:change-status"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-22T07:55:06.779Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'implementation-file-tracking' was archived with overlapping specs: cli:change-status, core:change",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:change", "cli:change-status"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:change", "cli:change-status"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-22T08:00:43.031Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'implementation-file-tracking' was archived with overlapping specs: cli:change-status, core:change",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:change", "cli:change-status"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:change", "cli:change-status"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-22T08:02:51.209Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'implementation-file-tracking' was archived with overlapping specs: cli:change-status, core:change",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:change", "cli:change-status"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:change", "cli:change-status"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-22T08:03:10.262Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'implementation-file-tracking' was archived with overlapping specs: cli:change-status, core:change",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:change", "cli:change-status"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:change", "cli:change-status"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-22T08:03:23.624Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'implementation-file-tracking' was archived with overlapping specs: cli:change-status, core:change",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:change", "cli:change-status"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:change", "cli:change-status"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-22T08:03:30.230Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'implementation-file-tracking' was archived with overlapping specs: cli:change-status, core:change",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:change", "cli:change-status"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:change", "cli:change-status"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-22T08:03:52.987Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'implementation-file-tracking' was archived with overlapping specs: cli:change-status, core:change",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:change", "cli:change-status"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:change", "cli:change-status"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-22T08:06:17.065Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'implementation-file-tracking' was archived with overlapping specs: cli:change-status, core:change",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:change", "cli:change-status"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:change", "cli:change-status"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-22T08:06:38.207Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'implementation-file-tracking' was archived with overlapping specs: cli:change-status, core:change",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:change", "cli:change-status"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:change", "cli:change-status"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-22T08:10:17.522Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'implementation-file-tracking' was archived with overlapping specs: cli:change-status, core:change",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:change", "cli:change-status"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:change", "cli:change-status"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-22T08:10:40.170Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'implementation-file-tracking' was archived with overlapping specs: cli:change-status, core:change",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:change", "cli:change-status"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:change", "cli:change-status"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-22T10:31:22.652Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'implementation-file-tracking' was archived with overlapping specs: cli:change-status, core:change",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:change", "cli:change-status"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:change", "cli:change-status"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-22T10:52:14.709Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'implementation-file-tracking' was archived with overlapping specs: cli:change-status, core:change",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:change", "cli:change-status"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:change", "cli:change-status"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-22T10:52:24.305Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'implementation-file-tracking' was archived with overlapping specs: cli:change-status, core:change",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:change", "cli:change-status"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:change", "cli:change-status"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-22T10:52:33.322Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'implementation-file-tracking' was archived with overlapping specs: cli:change-status, core:change",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:change", "cli:change-status"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:change", "cli:change-status"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-22T10:52:48.180Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'implementation-file-tracking' was archived with overlapping specs: cli:change-status, core:change",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:change", "cli:change-status"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:change", "cli:change-status"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-22T10:53:04.021Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'implementation-file-tracking' was archived with overlapping specs: cli:change-status, core:change",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:change", "cli:change-status"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:change", "cli:change-status"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-22T10:53:24.841Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'implementation-file-tracking' was archived with overlapping specs: cli:change-status, core:change",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:change", "cli:change-status"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:change", "cli:change-status"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-22T10:53:55.681Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'implementation-file-tracking' was archived with overlapping specs: cli:change-status, core:change",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:change", "cli:change-status"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:change", "cli:change-status"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-22T11:13:36.856Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'implementation-file-tracking' was archived with overlapping specs: cli:change-status, core:change",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:change", "cli:change-status"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:change", "cli:change-status"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-22T11:15:17.819Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'implementation-file-tracking' was archived with overlapping specs: cli:change-status, core:change",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:change", "cli:change-status"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:change", "cli:change-status"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-22T11:17:24.082Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'implementation-file-tracking' was archived with overlapping specs: cli:change-status, core:change",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:change", "cli:change-status"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:change", "cli:change-status"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    }
+  ]
+}

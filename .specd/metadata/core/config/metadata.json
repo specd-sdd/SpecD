@@ -1239,8 +1239,9 @@
       ]
     }
   ],
+  "implementation": {},
   "contentHashes": {
-    "spec.md": "sha256:7d47d84204a83392dc49619ffd8a1e46a12adb281776e8aa8aa6cabb2cd5949a",
+    "spec.md": "sha256:74ad06036d62ba7dc25d3ffe69fe7bf32882a926f629a756b7a2272feb9c80c6",
     "verify.md": "sha256:c72d51f18d471935f5804d8a211b124c22f5d5c7366b8776d977acd69957a33e"
   },
   "generatedBy": "core"

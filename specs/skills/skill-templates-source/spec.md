@@ -15,7 +15,7 @@ Template files MUST live in `packages/skills/templates/<skill-name>/` WITHOUT fr
 The template directory MUST contain:
 
 - `specd/`, `specd-archive/`, `specd-design/`, `specd-implement/`, `specd-new/`, `specd-metadata/`, `specd-compliance/`, `specd-verify/` directories
-- `shared.md` as shared content across all skills
+- `shared.md` as shared content across all skills; the file MAY live in the root of the template directory or within a `shared/` subdirectory
 
 Each skill directory contains `.md` files (without frontmatter).
 
@@ -53,6 +53,16 @@ Runtime defaults MAY emit a smaller subset, but model/type coverage MUST include
 ### Requirement: Why no frontmatter in skills package
 
 The skills package does not include frontmatter because each agent environment has different metadata fields and compatibility rules. Agent plugins know their target environment and inject the appropriate metadata while preserving the base skill definition.
+
+### Requirement: Implementation tracking instructions in templates
+
+Workflow skill templates MUST include implementation-tracking guidance for active changes.
+
+At minimum:
+
+- implementation-oriented workflows MUST mention `specd changes implementation add` when code work is being linked back to specs
+- archive-oriented workflows MUST mention resolving tracked implementation files and reviewing implementation integrity before archive
+- shared workflow guidance MUST describe tracked implementation files and confirmed implementation links using the same terminology as the change artifacts
 
 ## Constraints
 

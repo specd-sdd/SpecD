@@ -72,6 +72,60 @@ enough to confirm the archived spec will preserve important existing content.
 If only one merged spec-scoped artifact is needed for review, use
 `specd changes spec-preview <name> <specId> --artifact <artifactId> --format text`.
 
+If implementation tracking is part of the change, review it before archiving:
+
+```bash
+specd changes implementation review <name>
+```
+
+This is the last checkpoint before implementation links become permanent. Downstream
+tooling (code graph, impact analysis, compliance) depends on these links being
+accurate and complete.
+
+**Verify that every spec in the change has links to its implementing code:**
+
+- For each spec, confirm that confirmed links exist for the files and symbols that
+  realize its requirements
+- Prefer symbol-level links (with `--symbol`) — they are precise and survive refactors
+  better than file-level links
+- File-level links (without `--symbol`) are acceptable only for config, templates,
+  barrel exports, or documentation files where no stable symbol exists
+- Stale symbols (flagged by `review`) indicate a link points to code that no longer
+  exists — fix or remove before archiving
+
+**If links are missing or incorrect, fix them before archiving:**
+
+```bash
+specd changes implementation add <name> --spec <specId> --file <path> --symbol "<SymbolName>"
+specd changes implementation add <name> --spec <specId> --file <path>
+specd changes implementation resolve <name> --file <path>
+```
+
+- `add` creates or enriches a link. Re-adding the same `(specId, file)` with new
+  symbols merges them into the existing link.
+- Use `--symbol` for named code constructs (functions, classes, types, methods).
+  Omit `--symbol` only for file-level links (config, templates, docs).
+- `resolve` marks one or more tracked files as fully reviewed. It supports a
+  comma-separated list of paths for efficient bulk resolution.
+  `specd changes implementation resolve <name> --file <path1>,<path2>,...`
+- `ignore` is for files that do **not** belong to the change's implementation surface.
+  It also supports comma-separated lists. Files with active confirmed links **cannot**
+  be ignored.
+  ```bash
+  specd changes implementation ignore <name> --file <path1>,<path2>
+  ```
+
+**Security & Integrity Guard:** All implementation management commands validate that
+the target files exist on disk. Archiving is blocked until all tracked files are
+resolved or ignored.
+
+**Blocking conditions:**
+
+- Tracked files in `open` state block archive — resolve or ignore them first
+- Links targeting files outside the spec's workspace `codeRoot` block archive
+- Links targeting specs outside the change scope block archive unless explicitly
+  overridden with `--allow-out-of-scope`
+
 ### 5. Archive
 
 ```bash
@@ -89,6 +143,12 @@ If the user confirms, re-run the command with `--allow-overlap`:
 
 ```bash
 specd changes archive <name> --skip-hooks all --allow-overlap --format toon
+```
+
+If the command fails because implementation sidecar maintenance would update specs outside the change scope, stop and surface the affected specs to the user. Only retry after explicit confirmation with:
+
+```bash
+specd changes archive <name> --skip-hooks all --allow-out-of-scope --format toon
 ```
 
 ### 6. Post-archive hooks

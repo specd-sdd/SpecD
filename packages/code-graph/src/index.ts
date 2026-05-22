@@ -6,7 +6,7 @@ export {
   type GraphStoreFactory,
   type GraphStoreFactoryOptions,
 } from './composition/graph-store-factory.js'
-export { CodeGraphProvider } from './composition/code-graph-provider.js'
+export type { CodeGraphProvider } from './composition/code-graph-provider.js'
 
 // Value objects
 export { type FileNode } from './domain/value-objects/file-node.js'

@@ -97,3 +97,12 @@
 - **GIVEN** merged review needs only one spec-scoped artifact
 - **WHEN** the agent runs preview for content review
 - **THEN** it prefers `specd changes spec-preview <change-name> <specId> --artifact <artifactId>` to avoid unrelated output
+
+### Requirement: Implementation traceability policy
+
+#### Scenario: Agent resolves tracked files explicitly before archive
+
+- **GIVEN** an agent has already added relevant implementation links
+- **AND** tracked implementation files still remain in `open` state
+- **WHEN** the workflow approaches archive
+- **THEN** the agent explicitly resolves or ignores those tracked files instead of assuming link creation alone closed review

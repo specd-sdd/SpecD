@@ -55,11 +55,17 @@
 
 ### Requirement: Relationship tables
 
-#### Scenario: COVERS is materialized even before population is activated
+#### Scenario: COVERS_FILE and COVERS_SYMBOL are materialized in the schema
 
 - **WHEN** the Ladybug schema is initialized for a fresh graph database
-- **THEN** a persisted `COVERS` relation family exists alongside the active code-graph relation families
-- **AND** the backend is ready to store `Spec -> File` links when spec-to-code indexing is introduced
+- **THEN** persisted `COVERS_FILE` and `COVERS_SYMBOL` relation families exist alongside the active code-graph relation families
+- **AND** the backend is ready to store both file-level and symbol-level spec coverage
+
+#### Scenario: COVERS_SYMBOL metadata survives Ladybug persistence
+
+- **GIVEN** a persisted `COVERS_SYMBOL` relation with metadata `{ "stale": true }`
+- **WHEN** the relation is loaded through abstract graph-store queries
+- **THEN** the metadata still marks the relation as stale
 
 ### Requirement: Full-text search implementation
 

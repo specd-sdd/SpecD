@@ -14,7 +14,12 @@ vi.mock('../../src/helpers/cli-context.js', () => ({
   resolveCliContext: vi.fn(),
 }))
 
+vi.mock('../../src/commands/change/_implementation-tracking.js', () => ({
+  enrichImplementationTracking: vi.fn(),
+}))
+
 import { resolveCliContext } from '../../src/helpers/cli-context.js'
+import { enrichImplementationTracking } from '../../src/commands/change/_implementation-tracking.js'
 import { registerChangeStatus } from '../../src/commands/change/status.js'
 import { ChangeNotFoundError } from '@specd/core'
 
@@ -39,6 +44,14 @@ function setup() {
   const config = makeMockConfig()
   const kernel = makeMockKernel()
   vi.mocked(resolveCliContext).mockResolvedValue({ config, configFilePath: null, kernel })
+  vi.mocked(enrichImplementationTracking).mockResolvedValue({
+    trackedFiles: [],
+    links: [],
+    graphHint: {
+      status: 'fresh',
+      message: 'Code graph is fresh; stale symbol diagnostics are authoritative.',
+    },
+  })
   const stdout = captureStdout()
   const stderr = captureStderr()
   mockProcessExit()
@@ -259,6 +272,164 @@ describe('Output format', () => {
     expect(parsed.lifecycle.nextArtifact).toBe('specs')
     expect(parsed.lifecycle.changePath).toBeDefined()
     expect(parsed.lifecycle.schemaInfo).toEqual({ name: '@specd/schema-std', version: 1 })
+  })
+
+  it('JSON output includes hasTasks and drift-aware state in artifactDag', async () => {
+    const { kernel, stdout } = setup()
+    const change = makeMockChange({
+      name: 'add-login',
+      state: 'implementing',
+    })
+    kernel.changes.status.execute.mockResolvedValue({
+      change,
+      artifactStatuses: [
+        {
+          type: 'proposal',
+          state: 'complete',
+          effectiveStatus: 'complete',
+          displayStatus: 'complete-with-drift',
+          files: [{ key: 'proposal', filename: 'proposal.md', state: 'complete', hasDrift: true }],
+        },
+      ],
+      lifecycle: {
+        ...defaultLifecycle,
+        schemaInfo: {
+          name: '@specd/schema-std',
+          version: 1,
+          artifacts: [{ id: 'proposal', scope: 'change', hasTasks: true, requires: [] }],
+        },
+      },
+      blockers: [],
+      nextAction: defaultNextAction,
+    })
+
+    const program = makeProgram()
+    registerChangeStatus(program.command('change'))
+    await program.parseAsync(['node', 'specd', 'change', 'status', 'add-login', '--format', 'json'])
+
+    const result = JSON.parse(stdout())
+    const proposal = result.artifactDag.find((a: any) => a.id === 'proposal')
+    expect(proposal.hasTasks).toBe(true)
+    expect(proposal.state).toBe('complete-with-drift')
+  })
+
+  it('renders implementation tracking in text output', async () => {
+    const { kernel, stdout } = setup()
+    const change = makeMockChange({
+      name: 'impl-change',
+      state: 'implementing',
+      specIds: ['core:change'],
+    })
+    kernel.changes.status.execute.mockResolvedValue({
+      change,
+      artifactStatuses: [],
+      lifecycle: defaultLifecycle,
+      blockers: [],
+      nextAction: defaultNextAction,
+      implementationTracking: {
+        trackedFiles: [{ file: 'packages/core/src/change.ts', state: 'open' }],
+        links: [
+          {
+            specId: 'core:change',
+            file: 'packages/core/src/change.ts',
+            fileLinkExplicit: true,
+            symbols: ['Change.transition'],
+          },
+        ],
+      },
+    })
+    vi.mocked(enrichImplementationTracking).mockResolvedValue({
+      trackedFiles: [{ file: 'packages/core/src/change.ts', state: 'open' }],
+      links: [
+        {
+          specId: 'core:change',
+          file: 'packages/core/src/change.ts',
+          fileLinkExplicit: true,
+          symbols: ['Change.transition'],
+          staleSymbols: [],
+        },
+      ],
+      graphHint: {
+        status: 'fresh',
+        message: 'Code graph is fresh; stale symbol diagnostics are authoritative.',
+      },
+    })
+
+    const program = makeProgram()
+    registerChangeStatus(program.command('change'))
+    await program.parseAsync([
+      'node',
+      'specd',
+      'change',
+      'status',
+      'impl-change',
+      '--implementation',
+    ])
+
+    const out = stdout()
+    expect(out).toContain('implementation:')
+    expect(out).toContain('Change.transition')
+    expect(out).toContain('Code graph is fresh')
+  })
+
+  it('omits implementation tracking by default', async () => {
+    const { kernel, stdout } = setup()
+    const change = makeMockChange({
+      name: 'impl-change',
+      state: 'implementing',
+    })
+    kernel.changes.status.execute.mockResolvedValue({
+      change,
+      artifactStatuses: [],
+      lifecycle: defaultLifecycle,
+      blockers: [],
+      nextAction: defaultNextAction,
+      implementationTracking: {
+        trackedFiles: [{ file: 'packages/core/src/change.ts', state: 'open' }],
+        links: [],
+      },
+    })
+
+    const program = makeProgram()
+    registerChangeStatus(program.command('change'))
+    await program.parseAsync(['node', 'specd', 'change', 'status', 'impl-change'])
+
+    const out = stdout()
+    expect(out).not.toContain('implementation:')
+  })
+
+  it('omits implementation tracking in JSON output by default', async () => {
+    const { kernel, stdout } = setup()
+    const change = makeMockChange({
+      name: 'impl-change',
+      state: 'implementing',
+    })
+    kernel.changes.status.execute.mockResolvedValue({
+      change,
+      artifactStatuses: [],
+      lifecycle: defaultLifecycle,
+      blockers: [],
+      nextAction: defaultNextAction,
+      implementationTracking: {
+        trackedFiles: [{ file: 'packages/core/src/change.ts', state: 'open' }],
+        links: [],
+      },
+    })
+
+    const program = makeProgram()
+    registerChangeStatus(program.command('change'))
+    await program.parseAsync([
+      'node',
+      'specd',
+      'change',
+      'status',
+      'impl-change',
+      '--format',
+      'json',
+    ])
+
+    const result = JSON.parse(stdout())
+    expect(result.implementationTracking).toBeUndefined()
   })
 })
 

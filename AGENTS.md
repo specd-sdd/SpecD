@@ -6,6 +6,17 @@ You are working on **specd**, a spec-driven development platform built in TypeSc
 
 ---
 
+## Mandatory: Research Protocol (Graph-First)
+
+You are a **Graph-First Agent**. Generic search tools (`grep_search`, `glob`) are legacy fallbacks.
+
+- **Symbols & Logic:** You MUST NOT use `grep_search` to find where a function, class, or type is defined or used. You MUST use `specd graph search` or `specd graph impact`.
+- **Architectural Inquiry:** If the user asks "How does X work?", you MUST start by checking `specd graph stats` and performing a `specd graph search`.
+- **Bootstrap Requirement:** In any new session or clean install, your FIRST ACTION for research is `specd project status --graph`. If the graph is not indexed, you MUST request permission to index it (`specd graph index`) before answering code-related questions.
+- **Precision:** Prefer `specd graph impact` for blast-radius analysis over manual file inspection.
+
+---
+
 ## Mandatory: Enter Through specd
 
 specd is now the primary workflow entry point for this repository. Do not treat the
@@ -176,44 +187,87 @@ Key decisions:
 
 ## Using Code Graph
 
-Use the code graph for intelligent code search and impact analysis. All graph commands require an index to be built first.
+The code graph is your **primary research tool**. Use it to navigate the codebase and understand relationships before making any changes.
 
-### Index the codebase
+### Essential Workflow Commands
+
+| Goal                           | Command                                                                                                  |
+| :----------------------------- | :------------------------------------------------------------------------------------------------------- |
+| **Bootstrap / Check Health**   | `node packages/cli/dist/index.js graph stats --format toon`                                              |
+| **Index (First time / Force)** | `node packages/cli/dist/index.js graph index --format toon`                                              |
+| **Search Symbols (BM25)**      | `node packages/cli/dist/index.js graph search "<query>" --symbols --format toon`                         |
+| **Search Specs (BM25)**        | `node packages/cli/dist/index.js graph search "<query>" --specs --format toon`                           |
+| **Find Definition/Usages**     | `node packages/cli/dist/index.js graph search "<name>" --symbols --format toon`                          |
+| **Blast Radius (Dependents)**  | `node packages/cli/dist/index.js graph impact --symbol "<name>" --direction dependents --format toon`    |
+| **Dependency Tree**            | `node packages/cli/dist/index.js graph impact --file "<ws:path>" --direction dependencies --format toon` |
+| **High-Risk Hotspots**         | `node packages/cli/dist/index.js graph hotspots --format toon`                                           |
+
+### Research Scenarios & Examples
+
+#### 1. Finding where a symbol is defined or used
+
+Instead of `grep`, use `specd graph search`. It handles multi-workspace resolution and filters by kind.
 
 ```bash
-node packages/cli/dist/index.js graph index
+# Find a specific class or interface
+node packages/cli/dist/index.js graph search "SpecRepository" --symbols --kind class --format text
+
+# Find all functions containing "parse"
+node packages/cli/dist/index.js graph search "parse" --symbols --kind function --format text
 ```
 
-### Available commands
+#### 2. What symbols are covered/affected by a specification?
 
-| Command                         | Description                                       |
-| ------------------------------- | ------------------------------------------------- |
-| `graph index`                   | Build the code graph index                        |
-| `graph stats`                   | Show index statistics (files, symbols, languages) |
-| `graph search <query>`          | Full-text search across symbols and specs         |
-| `graph search --symbols`        | Search only symbols                               |
-| `graph search --specs`          | Search only specs                                 |
-| `graph impact --file <path...>` | Analyze impact on one or more files               |
-| `graph impact --symbol <name>`  | Analyze impact on a symbol                        |
-| `graph hotspots`                | Rank symbols by impact score (callers, importers) |
-
-### Examples
+If you want to know which part of the code implements a spec, or which symbols to update when a spec changes.
 
 ```bash
-# Search for a function across the codebase
-node packages/cli/dist/index.js graph search "parseSpec" --format toon
+# Find symbols explicitly linked to a spec via coversSymbol
+node packages/cli/dist/index.js graph search "core:core/spec-repository" --specs --spec-content --format text
+```
 
-# Find all usages of a symbol
-node packages/cli/dist/index.js graph impact --symbol "mergeSpecs" --format toon
+#### 3. Analyzing the impact of modifying a symbol (Blast Radius)
 
-# Check what breaks if you modify a file
-node packages/cli/dist/index.js graph impact --file packages/core/src/model.ts --format toon
+"If I change this function, what else might break?" — use `dependents`.
 
-# Analyze impact of multiple files
-node packages/cli/dist/index.js graph impact --file a.ts --file b.ts --format toon
+```bash
+# See all callers and dependents of a specific symbol
+node packages/cli/dist/index.js graph impact --symbol "mergeSpecs" --direction dependents --format text
+```
 
-# Find high-impact symbols in the codebase
-node packages/cli/dist/index.js graph hotspots --format toon
+#### 4. Analyzing the impact of modifying a file
+
+"Which other files or workspaces depend on this file?"
+
+```bash
+# Identify files impacted by changes in a core service
+node packages/cli/dist/index.js graph impact --file "core:src/application/kernel.ts" --direction dependents --format text
+```
+
+#### 5. Understanding what a file/symbol depends on
+
+"What does this logic consume? What are its dependencies?" — use `dependencies`.
+
+```bash
+# See all symbols and files that 'kernel.ts' imports or calls
+node packages/cli/dist/index.js graph impact --file "core:src/application/kernel.ts" --direction dependencies --format text
+```
+
+#### 6. Finding requirements and related logic
+
+Search for business logic, constraints, or error codes in both specs and code.
+
+```bash
+# Search for "atomic archive" across everything
+node packages/cli/dist/index.js graph search "atomic archive" --format text
+```
+
+#### 7. Identifying complex or "hot" symbols
+
+Find symbols that are highly coupled and need extra care during refactoring.
+
+```bash
+# Find high-impact hotspots with CRITICAL risk
+node packages/cli/dist/index.js graph hotspots --min-risk CRITICAL --format text
 ```
 
 ---

@@ -4,6 +4,7 @@ import { SchemaMismatchError } from '../errors/schema-mismatch-error.js'
 import { type ChangeRepository } from '../ports/change-repository.js'
 import { type SpecRepository } from '../ports/spec-repository.js'
 import { type SchemaProvider } from '../ports/schema-provider.js'
+import { type ImplementationDetector } from '../ports/implementation-detector.js'
 import { type FileReader } from '../ports/file-reader.js'
 import { type ArtifactParserRegistry } from '../ports/artifact-parser.js'
 import { type ExtractorTransformRegistry } from '../../domain/services/content-extraction.js'
@@ -202,6 +203,7 @@ export class CompileContext {
   private readonly _changes: ChangeRepository
   private readonly _specs: ReadonlyMap<string, SpecRepository>
   private readonly _schemaProvider: SchemaProvider
+  private readonly _implementationDetector: ImplementationDetector
   private readonly _files: FileReader
   private readonly _parsers: ArtifactParserRegistry
   private readonly _hasher: ContentHasher
@@ -216,6 +218,7 @@ export class CompileContext {
    * @param changes - Repository for loading the change
    * @param specs - Spec repositories keyed by workspace name
    * @param schemaProvider - Provider for the fully-resolved schema
+   * @param implementationDetector - Detector for targeted implementation refresh
    * @param files - Reader for project-level context file entries
    * @param parsers - Registry of artifact format parsers
    * @param hasher - Content hasher for metadata freshness checks
@@ -228,6 +231,7 @@ export class CompileContext {
     changes: ChangeRepository,
     specs: ReadonlyMap<string, SpecRepository>,
     schemaProvider: SchemaProvider,
+    implementationDetector: ImplementationDetector,
     files: FileReader,
     parsers: ArtifactParserRegistry,
     hasher: ContentHasher,
@@ -239,6 +243,7 @@ export class CompileContext {
     this._changes = changes
     this._specs = specs
     this._schemaProvider = schemaProvider
+    this._implementationDetector = implementationDetector
     this._files = files
     this._parsers = parsers
     this._hasher = hasher
@@ -257,7 +262,16 @@ export class CompileContext {
    * @throws {SchemaNotFoundError} If the schema reference cannot be resolved
    */
   async execute(input: CompileContextInput): Promise<CompileContextResult> {
-    const change = await this._changes.get(input.name)
+    const change = await this._changes.mutate(input.name, async (freshChange) => {
+      if (freshChange.getHistoricalImplementationAt() !== null) {
+        const files = await this._implementationDetector.detectModifiedFiles(freshChange)
+        for (const file of files) {
+          if (freshChange.trackedImplementationFiles.some((entry) => entry.file === file)) continue
+          freshChange.trackImplementationFile(file, 'open')
+        }
+      }
+      return freshChange
+    })
     if (change === null) throw new ChangeNotFoundError(input.name)
 
     const schema = await this._schemaProvider.get()

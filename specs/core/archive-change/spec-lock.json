@@ -18,12 +18,23 @@
     "core:workspace",
     "core:spec-id-format",
     "core:spec-overlap",
-    "default:_global/logging"
+    "default:_global/logging",
+    "core:spec-lock"
   ],
   "implementation": [
     {
       "file": "core:src/application/use-cases/archive-change.ts",
-      "symbols": ["ArchiveChange"]
+      "symbols": [
+        "ArchiveChange",
+        "ArchiveChange.execute",
+        "createArchiveWorkspaceImplementationConfig"
+      ]
+    },
+    {
+      "file": "core:src/composition/kernel.ts"
+    },
+    {
+      "file": "core:src/composition/use-cases/archive-change.ts"
     }
   ]
 }

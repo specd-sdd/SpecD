@@ -1,0 +1,35 @@
+- op: added
+  description: 'Add manifest scenario for tracked implementation files and confirmed links'
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Manifest structure'
+  content: |
+    #### Scenario: Manifest stores tracked implementation files with explicit state
+
+    - **WHEN** a change manifest is written
+    - **THEN** tracked implementation files are persisted with raw project-relative `file` values
+    - **AND** each tracked entry includes an explicit `state`
+
+    #### Scenario: Manifest stores confirmed links with fileLinkExplicit semantics
+
+    - **WHEN** confirmed implementation links are persisted
+    - **THEN** each link stores `specId`, raw project-relative `file`, and `fileLinkExplicit`
+    - **AND** `symbols` is omitted for file-level-only links
+    - **AND** `fileLinkExplicit: false` is only valid when `symbols` is present and non-empty
+
+- op: added
+  description: 'Verify that null validatedHash does not trigger normalization flip'
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Filename normalization preserves tracked intent'
+  content: |
+    #### Scenario: Null validated hash does not trigger normalization flip
+
+    - **GIVEN** a manifest tracks `specs/core/core/new-spec/spec.md`
+    - **AND** the file has `validatedHash: null`
+    - **AND** the spec now exists in the workspace (making it delta-capable)
+    - **WHEN** the change is reloaded
+    - **THEN** normalization preserves the direct `specs/...` filename
+    - **AND** it does not flip the representation to `deltas/...` solely because the hash is null

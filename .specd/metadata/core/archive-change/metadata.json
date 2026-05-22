@@ -16,7 +16,8 @@
     "core:workspace",
     "core:spec-id-format",
     "core:spec-overlap",
-    "default:_global/logging"
+    "default:_global/logging",
+    "core:spec-lock"
   ],
   "context": [
     "Once a change has completed its full lifecycle, its spec modifications need to be applied to the project and the change itself preserved for posterity — but this finalization involves delta merging, hook execution, and metadata generation that must happen atomically and in the right order. `ArchiveChange` is the use case that merges delta artifacts into project specs, moves the change directory to the archive, and fires lifecycle hooks before and after. It is gated on `archivable` state."
@@ -134,6 +135,24 @@
       "requirement": "Result shape",
       "rules": [
         "`ArchiveChange.execute` must return a result object. The result must include:\n\n- `archivedChange` — the `ArchivedChange` record that was persisted\n- `postHookFailures` — array of hook commands that failed post-archive, empty on full success\n- `staleMetadataSpecPaths` — array of spec paths where `metadata.json` generation failed during this archive (e.g. extraction produced no required fields); empty when all metadata was generated successfully\n- `invalidatedChanges` — array of objects describing changes that were invalidated due to spec overlap, each containing:\n  - `name` — the invalidated change's name\n  - `specIds` — readonly array of overlapping spec IDs that triggered the invalidation\n    Empty when no changes were invalidated (either no overlap existed or `allowOverlap` was `false` and the archive was blocked).\n\n`ArchiveChange` throws on pre-archive hook failure or `assertArchivable` failure. Post-archive failures are returned, not thrown."
+      ]
+    },
+    {
+      "requirement": "Tracked implementation review guard",
+      "rules": [
+        "Before archive materializes implementation links, `ArchiveChange` MUST verify that no tracked implementation file remains in `open` state.\n\nFiles in `resolved` or `ignored` state satisfy this guard. If any tracked implementation file remains `open`, archive MUST fail with repair guidance telling the operator to resolve or ignore the file explicitly."
+      ]
+    },
+    {
+      "requirement": "Implementation materialization into spec-lock",
+      "rules": [
+        "During archive, confirmed `implementationLinks` from the active change manifest MUST be materialized into the affected specs' `spec-lock.json` sidecars.\n\nMaterialization MUST:\n\n- normalize eligible raw file paths into canonical `workspace:path` identities\n- persist file-level links when a confirmed link has no `symbols`\n- persist symbol-level links when a confirmed link has one or more `symbols`\n- ignore links whose raw file path falls under the target workspace `graph.excludePaths`\n- discard links that cannot be normalized into a valid `workspace:path`\n- fail archive when a confirmed link points outside the `codeRoot` of the workspace implied by `specId`"
+      ]
+    },
+    {
+      "requirement": "Out-of-scope sidecar update guard",
+      "rules": [
+        "Archive-time implementation integrity maintenance MAY discover that preserving a consistent implementation map would require sidecar updates outside the immediately archived spec scope.\n\nBy default, `ArchiveChange` MUST fail when those out-of-scope updates would occur.\n\nProceeding with those external sidecar updates requires an explicit `--allow-out-of-scope` override."
       ]
     }
   ],
@@ -834,20 +853,94 @@
         "no sidecar is created implicitly",
         "AND legacy metadata.json generation may still continue"
       ]
+    },
+    {
+      "requirement": "Tracked implementation review guard",
+      "name": "Open tracked implementation file blocks archive",
+      "given": ["a change still has a tracked implementation file in open state"],
+      "when": ["ArchiveChange.execute is called"],
+      "then": [
+        "archive fails",
+        "AND the error tells the operator to resolve or ignore that tracked file explicitly"
+      ]
+    },
+    {
+      "requirement": "Implementation materialization into spec-lock",
+      "name": "File-level and symbol-level links materialize into sidecar",
+      "given": ["a change has one confirmed file-level link and one confirmed symbol-level link"],
+      "when": ["the change archives successfully"],
+      "then": [
+        "spec-lock.json persists the file-level link without symbols",
+        "AND it persists the symbol-level link with its non-empty symbols list"
+      ]
+    },
+    {
+      "requirement": "Implementation materialization into spec-lock",
+      "name": "Excluded path is ignored during sidecar materialization",
+      "given": [
+        "a confirmed implementation link falls under the target workspace graph.excludePaths"
+      ],
+      "when": ["archive materializes links"],
+      "then": ["that link is skipped without failing archive"]
+    },
+    {
+      "requirement": "Implementation materialization into spec-lock",
+      "name": "File outside target workspace codeRoot fails archive",
+      "given": [
+        "a confirmed implementation link points to a raw file path outside the target workspace codeRoot"
+      ],
+      "when": ["archive materializes links"],
+      "then": ["archive fails instead of writing an invalid canonical sidecar entry"]
+    },
+    {
+      "requirement": "Out-of-scope sidecar update guard",
+      "name": "Out-of-scope sidecar maintenance fails by default",
+      "given": [
+        "implementation integrity maintenance would require sidecar updates outside the archived spec scope"
+      ],
+      "when": ["archive runs without override"],
+      "then": ["archive fails before applying those external updates"]
+    },
+    {
+      "requirement": "Out-of-scope sidecar update guard",
+      "name": "Explicit override allows out-of-scope sidecar updates",
+      "given": ["the same out-of-scope sidecar maintenance situation"],
+      "when": ["archive runs with --allow-out-of-scope"],
+      "then": ["archive is allowed to proceed with those external sidecar updates"]
     }
   ],
   "implementation": {
+    "files": [
+      {
+        "specId": "core:archive-change",
+        "file": "core:src/composition/kernel.ts"
+      },
+      {
+        "specId": "core:archive-change",
+        "file": "core:src/composition/use-cases/archive-change.ts"
+      }
+    ],
     "symbols": [
       {
         "specId": "core:archive-change",
         "file": "core:src/application/use-cases/archive-change.ts",
         "symbol": "ArchiveChange"
+      },
+      {
+        "specId": "core:archive-change",
+        "file": "core:src/application/use-cases/archive-change.ts",
+        "symbol": "ArchiveChange.execute"
+      },
+      {
+        "specId": "core:archive-change",
+        "file": "core:src/application/use-cases/archive-change.ts",
+        "symbol": "createArchiveWorkspaceImplementationConfig"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:f2efa24d7cac19b51473ad297613eebce1b5242c284e4285297efbbfec250b0a",
-    "verify.md": "sha256:d44334c47c3f9b61c381223c2d7e9b1a9e1aa23f5a9af4cb37055776c54053cf"
+    "spec.md": "sha256:9e223f6e2eaef1e754475a694c42119e99ee2589934109849f70ffe972b3a3f6",
+    "verify.md": "sha256:c4aa8e0e07203a1eaebb5f0e3c3302d41157139019ad2930a156e2290a058fb9"
   },
   "generatedBy": "core"
 }

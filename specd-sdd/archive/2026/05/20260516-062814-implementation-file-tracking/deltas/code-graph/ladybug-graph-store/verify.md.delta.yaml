@@ -1,0 +1,17 @@
+- op: modified
+  description: 'Replace generic COVERS verification with file and symbol coverage'
+  selector:
+    type: section
+    matches: 'Requirement: Relationship tables'
+  content: |
+    #### Scenario: COVERS_FILE and COVERS_SYMBOL are materialized in the schema
+
+    - **WHEN** the Ladybug schema is initialized for a fresh graph database
+    - **THEN** persisted `COVERS_FILE` and `COVERS_SYMBOL` relation families exist alongside the active code-graph relation families
+    - **AND** the backend is ready to store both file-level and symbol-level spec coverage
+
+    #### Scenario: COVERS_SYMBOL metadata survives Ladybug persistence
+
+    - **GIVEN** a persisted `COVERS_SYMBOL` relation with metadata `{ "stale": true }`
+    - **WHEN** the relation is loaded through abstract graph-store queries
+    - **THEN** the metadata still marks the relation as stale

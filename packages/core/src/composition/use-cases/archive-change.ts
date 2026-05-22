@@ -68,6 +68,11 @@ export interface FsArchiveChangeOptions {
   readonly projectRoot: string
   /** Workspace routing metadata for cross-workspace spec reference resolution. */
   readonly workspaceRoutes?: readonly SpecWorkspaceRoute[]
+  /** Workspace implementation materialization config keyed by workspace name. */
+  readonly workspaceImplementationConfigs?: ReadonlyMap<
+    string,
+    { readonly codeRoot: string; readonly excludePaths: readonly string[] }
+  >
 }
 
 /**
@@ -225,5 +230,7 @@ export function createArchiveChange(
     saveMetadata,
     createBuiltinExtractorTransforms(),
     opts.workspaceRoutes ?? [],
+    opts.projectRoot,
+    opts.workspaceImplementationConfigs ?? new Map(),
   )
 }

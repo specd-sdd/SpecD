@@ -1,0 +1,25 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["core:composition", "default:_global/architecture"],
+  "implementation": [
+    {
+      "file": "core:src/infrastructure/git/vcs-adapter.ts",
+      "symbols": ["GitVcsAdapter", "GitVcsAdapter.refAt", "GitVcsAdapter.modifiedFiles"]
+    },
+    {
+      "file": "core:src/infrastructure/hg/vcs-adapter.ts",
+      "symbols": ["HgVcsAdapter", "HgVcsAdapter.refAt", "HgVcsAdapter.modifiedFiles"]
+    },
+    {
+      "file": "core:src/infrastructure/null/vcs-adapter.ts",
+      "symbols": ["NullVcsAdapter", "NullVcsAdapter.refAt", "NullVcsAdapter.modifiedFiles"]
+    },
+    {
+      "file": "core:src/infrastructure/svn/vcs-adapter.ts",
+      "symbols": ["SvnVcsAdapter", "SvnVcsAdapter.refAt", "SvnVcsAdapter.modifiedFiles"]
+    }
+  ]
+}

@@ -9,7 +9,12 @@ export {
   strictSpecMetadataSchema,
   type SpecMetadata,
 } from './parse-metadata.js'
-export { parseSpecLock, specLockSchema, type SpecLockData } from './parse-spec-lock.js'
+export {
+  parseSpecLock,
+  specLockSchema,
+  type SpecLockData,
+  type SpecLockImplementationEntry,
+} from './parse-spec-lock.js'
 export { parseSpecId } from './parse-spec-id.js'
 export { extractSpecSummary } from './spec-summary.js'
 export { inferFormat } from './format-inference.js'

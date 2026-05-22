@@ -1,0 +1,52 @@
+- op: added
+  description: 'Add implementation detector dependency'
+  position:
+    parent:
+      type: section
+      matches: 'Spec Dependencies'
+  content: |
+    - [`core:implementation-detector-port`](../implementation-detector-port/spec.md) — targeted autodetection before context compilation
+
+- op: modified
+  description: 'Extend constructor dependencies with ImplementationDetector'
+  selector:
+    type: section
+    matches: 'Requirement: Ports and constructor'
+  content: |
+    `CompileContext` receives at construction time: `ChangeRepository`, a map of `SpecRepository` instances (one per configured workspace), `SchemaProvider`, `FileReader`, `ArtifactParserRegistry`, `ContentHasher`, `PreviewSpec`, `LifecycleEngine`, and `ImplementationDetector`.
+
+    ```typescript
+    class CompileContext {
+      constructor(
+        changes: ChangeRepository,
+        specs: ReadonlyMap<string, SpecRepository>,
+        schemaProvider: SchemaProvider,
+        files: FileReader,
+        parsers: ArtifactParserRegistry,
+        hasher: ContentHasher,
+        previewSpec: PreviewSpec,
+        lifecycle: LifecycleEngine,
+        implementationDetector: ImplementationDetector,
+      )
+    }
+    ```
+
+    `SchemaProvider` is a lazy, caching port that returns the fully-resolved schema (with plugins and overrides applied). It replaces the previous `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths` triple. All are injected at kernel composition time, not passed per invocation.
+
+    `PreviewSpec` is the use case `CompileContext` delegates to when it needs a materialized merged view of a spec with validated deltas applied. `ContentHasher` is used for metadata freshness checks and context fingerprint inputs. `LifecycleEngine` provides the schema-aware lifecycle interpretation needed for step availability and available-step diagnostics. `ImplementationDetector` provides the targeted implementation-file refresh used when implementation tracking is active.
+
+- op: added
+  description: 'Trigger implementation autodetection before context assembly'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Input'
+  content: |
+    ### Requirement: Implementation autodetection before context compilation
+
+    When the change has entered `implementing` at least once in its history, `CompileContext` MUST trigger targeted implementation autodetection before it assembles the final context result.
+
+    This refresh updates the tracked implementation-file state used by downstream workflow consumers before context is emitted.

@@ -282,6 +282,22 @@ export class SQLiteGraphStore extends GraphStore {
     return this.getRelationsByTarget(RelationType.DependsOn, specId)
   }
 
+  async getCoveredFiles(specId: string): Promise<Relation[]> {
+    return this.getRelationsBySource(RelationType.CoversFile, specId)
+  }
+
+  async getCoveringSpecs(filePath: string): Promise<Relation[]> {
+    return this.getRelationsByTarget(RelationType.CoversFile, filePath)
+  }
+
+  async getCoveredSymbols(specId: string): Promise<Relation[]> {
+    return this.getRelationsBySource(RelationType.CoversSymbol, specId)
+  }
+
+  async getSymbolCoveringSpecs(symbolId: string): Promise<Relation[]> {
+    return this.getRelationsByTarget(RelationType.CoversSymbol, symbolId)
+  }
+
   async getExportedSymbols(filePath: string): Promise<SymbolNode[]> {
     const rows = this.statement(
       `
@@ -868,8 +884,10 @@ export class SQLiteGraphStore extends GraphStore {
         return this.symbolExists(relation.source) && this.symbolExists(relation.target)
       case RelationType.DependsOn:
         return this.specExists(relation.source) && this.specExists(relation.target)
-      case RelationType.Covers:
+      case RelationType.CoversFile:
         return this.specExists(relation.source) && this.fileExists(relation.target)
+      case RelationType.CoversSymbol:
+        return this.specExists(relation.source) && this.symbolExists(relation.target)
       default:
         return false
     }

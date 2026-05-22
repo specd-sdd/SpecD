@@ -35,6 +35,12 @@
       "rules": [
         "`createVcsAdapter` MUST return a `Promise<VcsAdapter>` — the application port interface defined in `application/ports/vcs-adapter.ts`. The concrete adapter type is an implementation detail not exposed to callers."
       ]
+    },
+    {
+      "requirement": "Factory returns modified-file-capable adapters",
+      "rules": [
+        "`createVcsAdapter` MUST return a `VcsAdapter` implementation that satisfies the full current `core:vcs-adapter-port` contract, including modified-file enumeration used by implementation detection.\n\nThe factory remains responsible only for composition and backend selection. It does not itself perform implementation detection."
+      ]
     }
   ],
   "constraints": [
@@ -123,11 +129,82 @@
       "name": "Return type satisfies VcsAdapter",
       "when": ["createVcsAdapter(cwd) resolves"],
       "then": ["the returned object satisfies the VcsAdapter interface"]
+    },
+    {
+      "requirement": "Factory returns modified-file-capable adapters",
+      "name": "Returned adapter satisfies modifiedFiles contract",
+      "given": ["createVcsAdapter(cwd) resolves to a concrete adapter"],
+      "when": ["implementation detection later calls modifiedFiles(baseRef) on that adapter"],
+      "then": ["the adapter satisfies the full current VcsAdapter port contract"]
     }
   ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "core:vcs-adapter",
+        "file": "core:src/infrastructure/git/vcs-adapter.ts",
+        "symbol": "GitVcsAdapter"
+      },
+      {
+        "specId": "core:vcs-adapter",
+        "file": "core:src/infrastructure/git/vcs-adapter.ts",
+        "symbol": "GitVcsAdapter.refAt"
+      },
+      {
+        "specId": "core:vcs-adapter",
+        "file": "core:src/infrastructure/git/vcs-adapter.ts",
+        "symbol": "GitVcsAdapter.modifiedFiles"
+      },
+      {
+        "specId": "core:vcs-adapter",
+        "file": "core:src/infrastructure/hg/vcs-adapter.ts",
+        "symbol": "HgVcsAdapter"
+      },
+      {
+        "specId": "core:vcs-adapter",
+        "file": "core:src/infrastructure/hg/vcs-adapter.ts",
+        "symbol": "HgVcsAdapter.refAt"
+      },
+      {
+        "specId": "core:vcs-adapter",
+        "file": "core:src/infrastructure/hg/vcs-adapter.ts",
+        "symbol": "HgVcsAdapter.modifiedFiles"
+      },
+      {
+        "specId": "core:vcs-adapter",
+        "file": "core:src/infrastructure/null/vcs-adapter.ts",
+        "symbol": "NullVcsAdapter"
+      },
+      {
+        "specId": "core:vcs-adapter",
+        "file": "core:src/infrastructure/null/vcs-adapter.ts",
+        "symbol": "NullVcsAdapter.refAt"
+      },
+      {
+        "specId": "core:vcs-adapter",
+        "file": "core:src/infrastructure/null/vcs-adapter.ts",
+        "symbol": "NullVcsAdapter.modifiedFiles"
+      },
+      {
+        "specId": "core:vcs-adapter",
+        "file": "core:src/infrastructure/svn/vcs-adapter.ts",
+        "symbol": "SvnVcsAdapter"
+      },
+      {
+        "specId": "core:vcs-adapter",
+        "file": "core:src/infrastructure/svn/vcs-adapter.ts",
+        "symbol": "SvnVcsAdapter.refAt"
+      },
+      {
+        "specId": "core:vcs-adapter",
+        "file": "core:src/infrastructure/svn/vcs-adapter.ts",
+        "symbol": "SvnVcsAdapter.modifiedFiles"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:5b0d54090d4cb3c77f41f3a64c46a20327a678e03aa8169590526d0416538e63",
-    "verify.md": "sha256:641505c1cf78dc0a9272be715f4f376753f5352a60da70d61bd6410ebbac54b7"
+    "spec.md": "sha256:22434bdc7aef538264899335e165d50df069493a32b9e46bdda40f3cb532cbf2",
+    "verify.md": "sha256:270725eb5017c53692c4fa15174f95b37750fbe90e4d972c72efddcbb46f22f5"
   },
   "generatedBy": "core"
 }

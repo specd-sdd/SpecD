@@ -75,7 +75,7 @@
     {
       "requirement": "Spec dependency indexing",
       "rules": [
-        "The indexer SHALL build `SpecNode` entries with `DEPENDS_ON` relations. Specs are resolved via the workspace's `specs()` callback (backed by `SpecRepository`), NOT by reading the filesystem directly. For each spec provided by the repository:\n\n1. Load metadata via `SpecRepository.metadata()` — extract `title`, `description`, and `dependsOn`\n2. If metadata is absent (`null`), use defaults: `title` = specId, `description` = `''`, `dependsOn` = `[]`. There is no fallback parsing of `spec.md` — metadata should be regenerated via `spec generate-metadata` before indexing.\n3. Compute a `contentHash` (SHA-256 of all artifacts in `spec.filenames`) — this includes `spec.md`, `verify.md`, and any other spec artifacts\n4. Create a `SpecNode` and upsert it into the store\n5. Create a `DEPENDS_ON` relation for each entry in `dependsOn`\n\nMetadata changes alone do NOT trigger re-indexing — only changes to spec content artifacts (`spec.md`, `verify.md`, etc.) affect the `contentHash`. Metadata freshness is tracked independently by `@specd/core`.\n\nSpec discovery follows the same incremental model as source files: the `contentHash` is compared against the stored hash, and only specs with changed hashes are re-processed. Unchanged specs are skipped entirely.\n\nSpec indexing runs as an additional phase after source file indexing (Phase 1 and Phase 2). It does not depend on source file data and could run in parallel, but sequencing after source indexing simplifies the implementation."
+        "The indexer SHALL build `SpecNode` entries with `DEPENDS_ON` relations. Specs are resolved via the workspace's `specs()` callback (backed by `SpecRepository`), NOT by reading the filesystem directly. For each spec provided by the repository:\n\n1. Load metadata via `SpecRepository.metadata()` — extract `title`, `description`, and `dependsOn`\n2. If metadata is absent (`null`), use defaults: `title` = specId, `description` = `''`, `dependsOn` = `[]`. There is no fallback parsing of `spec.md` — metadata should be regenerated via `spec generate-metadata` before indexing.\n3. Load `spec-lock.json` when present and treat it as the durable source for archived implementation traceability\n4. Compute a `contentHash` (SHA-256 of all artifacts in `spec.filenames`) — this includes `spec.md`, `verify.md`, and any other spec artifacts\n5. Create a `SpecNode` and upsert it into the store\n6. Create a `DEPENDS_ON` relation for each entry in `dependsOn`\n7. Create a `COVERS_FILE` relation for each archived file-level implementation entry from `spec-lock.json`\n8. Create a `COVERS_SYMBOL` relation for each archived symbol-level implementation entry from `spec-lock.json`, preserving any `stale` metadata required by the relation model\n\nMetadata changes alone do NOT trigger re-indexing — only changes to spec content artifacts (`spec.md`, `verify.md`, etc.) affect the `contentHash`. Metadata freshness is tracked independently by `@specd/core`.\n\nSpec indexing runs as an additional phase after source file indexing (Phase 1 and Phase 2). It does not depend on source file data and could run in parallel, but sequencing after source indexing simplifies the implementation."
       ]
     }
   ],
@@ -504,6 +504,29 @@
       ]
     },
     {
+      "requirement": "Spec dependency indexing",
+      "name": "Archived file-level implementation becomes COVERS_FILE",
+      "given": ["a spec sidecar contains a file-level implementation entry for core:src/change.ts"],
+      "when": ["IndexCodeGraph.execute() indexes spec metadata"],
+      "then": ["it emits a COVERS_FILE relation from that spec to that file"]
+    },
+    {
+      "requirement": "Spec dependency indexing",
+      "name": "Archived symbol-level implementation becomes COVERS_SYMBOL",
+      "given": [
+        "a spec sidecar contains a symbol-level implementation entry for core:Change.transition"
+      ],
+      "when": ["IndexCodeGraph.execute() indexes spec metadata"],
+      "then": ["it emits a COVERS_SYMBOL relation from that spec to that symbol"]
+    },
+    {
+      "requirement": "Spec dependency indexing",
+      "name": "Archived stale symbol coverage preserves metadata",
+      "given": ["a spec sidecar marks a symbol-level implementation entry as stale"],
+      "when": ["IndexCodeGraph.execute() indexes spec metadata"],
+      "then": ["the emitted COVERS_SYMBOL relation preserves stale: true in metadata"]
+    },
+    {
       "requirement": "Error isolation",
       "name": "Parse error in one file does not abort others",
       "given": ["a workspace with files A (valid) and B (contains syntax error)"],
@@ -542,9 +565,33 @@
       ]
     }
   ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "code-graph:indexer",
+        "file": "code-graph:src/application/use-cases/index-code-graph.ts",
+        "symbol": "IndexCodeGraph"
+      },
+      {
+        "specId": "code-graph:indexer",
+        "file": "code-graph:src/domain/value-objects/index-options.ts",
+        "symbol": "IndexOptions"
+      },
+      {
+        "specId": "code-graph:indexer",
+        "file": "code-graph:src/domain/value-objects/index-options.ts",
+        "symbol": "WorkspaceIndexTarget"
+      },
+      {
+        "specId": "code-graph:indexer",
+        "file": "code-graph:src/domain/value-objects/index-options.ts",
+        "symbol": "DiscoveredSpec"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:6b53aa2fcc34fa279d0d6dfd3493bc76e74607310d156e03e81d4ab517ef6360",
-    "verify.md": "sha256:81928cbc4a678156512d6a13038688b519ef579c88dfa63f1d6b866ebce65bc0"
+    "spec.md": "sha256:c6bf489b8fa23be9e0f0b699246b74477cfce848d49b314e839cc0eee004d535",
+    "verify.md": "sha256:6080edac0c3114e71c14a909b2162e85243155d24841ed4d903299ba2943ecca"
   },
   "generatedBy": "core"
 }

@@ -1,0 +1,29 @@
+- op: added
+  description: 'Verify implementation autodetection before context compilation'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Input'
+  content: |
+    ### Requirement: Implementation autodetection before context compilation
+
+    #### Scenario: Historical implementing state refreshes tracked implementation files before context assembly
+
+    - **GIVEN** a change has entered `implementing` at least once in its history
+    - **WHEN** `CompileContext.execute()` is called
+    - **THEN** it triggers implementation autodetection before assembling the final context result
+
+- op: added
+  description: 'Add constructor scenario for ImplementationDetector dependency'
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Ports and constructor'
+  content: |
+    #### Scenario: CompileContext is constructed with ImplementationDetector
+
+    - **WHEN** `CompileContext` is assembled
+    - **THEN** it receives `ImplementationDetector` alongside `PreviewSpec`, `LifecycleEngine`, and its existing repositories and utilities

@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { GetStatus } from '../../../src/application/use-cases/get-status.js'
 import { ChangeNotFoundError } from '../../../src/application/errors/change-not-found-error.js'
 import { ChangeArtifact } from '../../../src/domain/entities/change-artifact.js'
@@ -21,6 +21,9 @@ function makeGetStatus(
     schema?: ReturnType<typeof makeSchema> | null
     approvals?: { spec: boolean; signoff: boolean }
     failSchema?: boolean
+    implementationDetector?: {
+      detectModifiedFiles: (change: ReturnType<typeof makeChange>) => Promise<readonly string[]>
+    }
   } = {},
 ) {
   const schema = opts.schema === undefined ? makeStdSchema() : opts.schema
@@ -31,7 +34,15 @@ function makeGetStatus(
         },
       }
     : makeSchemaProvider(schema)
-  return new GetStatus(changes, schemaProvider, opts.approvals ?? defaultApprovals)
+  return new GetStatus(
+    changes,
+    schemaProvider,
+    (opts.implementationDetector ??
+      ({
+        detectModifiedFiles: async () => [],
+      } as const)) as never,
+    opts.approvals ?? defaultApprovals,
+  )
 }
 
 function makeStdSchema() {
@@ -460,6 +471,30 @@ describe('GetStatus', () => {
       await expect(uc.execute({ name: 'missing' })).rejects.toMatchObject({
         code: 'CHANGE_NOT_FOUND',
       })
+    })
+
+    it('runs implementation autodetection after the change has entered implementing', async () => {
+      const change = makeChange('implementation-status')
+      change.transition('designing', testActor)
+      change.transition('ready', testActor)
+      change.transition('implementing', testActor)
+      const repo = makeChangeRepository([change])
+      const implementationDetector = {
+        detectModifiedFiles: vi
+          .fn()
+          .mockResolvedValue(['packages/core/src/application/use-cases/get-status.ts']),
+      }
+      const uc = makeGetStatus(repo, { implementationDetector })
+
+      const result = await uc.execute({ name: 'implementation-status' })
+
+      expect(implementationDetector.detectModifiedFiles).toHaveBeenCalledTimes(1)
+      expect(result.implementationTracking.trackedFiles).toEqual([
+        {
+          file: 'packages/core/src/application/use-cases/get-status.ts',
+          state: 'open',
+        },
+      ])
     })
   })
 

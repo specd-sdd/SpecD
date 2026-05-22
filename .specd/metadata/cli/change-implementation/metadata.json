@@ -1,0 +1,288 @@
+{
+  "title": "cli:change-implementation",
+  "description": "Implementation traceability needs an explicit workflow surface during an active change so operators and agents can review changed files, confirm spec links, and close the review loop before archive. `specd changes implementation` is the CLI command group that manages tracked implementation files and confirmed implementation links.",
+  "dependsOn": ["core:change", "code-graph:symbol-model"],
+  "context": [
+    "Implementation traceability needs an explicit workflow surface during an active change so operators and agents can review changed files, confirm spec links, and close the review loop before archive. `specd changes implementation` is the CLI command group that manages tracked implementation files and confirmed implementation links."
+  ],
+  "rules": [
+    {
+      "requirement": "Command signature",
+      "rules": [
+        "Implementation tracking features SHALL be exposed under the `specd changes implementation` command group."
+      ]
+    },
+    {
+      "requirement": "List subcommand",
+      "rules": [
+        "`specd changes implementation list <name>` MUST return the current implementation-tracking state of the change.\n\nIts output MUST include:\n\n- tracked implementation files grouped by review state (`open`, `resolved`, `ignored`)\n- confirmed implementation links grouped by `specId` and file\n- symbol-level refinements when a link has `symbols`\n- stale-link diagnostics for symbol-level links whose target symbol no longer exists in the graph database\n\nWhen a symbol-level link contains a composed member identifier such as `X.Y`, `X#Y`, or `X::Y`, and the exact stored symbol string is not found in the graph, the CLI SHOULD retry stale resolution against the same file using the rightmost member segment plus the graph-reported symbol kind.\n\nThis fallback is best-effort only. It MUST NOT rewrite the stored symbol string, MUST NOT mutate change state or archived sidecars, and MUST leave the symbol marked stale when multiple same-file matches make the fallback ambiguous."
+      ]
+    },
+    {
+      "requirement": "Add subcommand",
+      "rules": [
+        "`specd changes implementation add <name> --spec <specId> --file <path> [--symbol <name> ...]` SHALL create or enrich a confirmed implementation link.\n\nThe command MUST:\n\n- use the raw project-relative file path exactly as supplied by the user after path normalization\n- validate that the file exists on disk at the supplied path; if the file is missing, the command MUST throw `ImplementationFileNotFoundError` and not modify the change manifest\n- create or confirm the file-level link for the `spec + file` set\n- refine that same `spec + file` set with symbol-level traceability when one or more `--symbol` values are provided\n- ensure the file is present in `trackedImplementationFiles`, creating a tracked entry with state `open` when it was not already tracked\n- preserve the distinction between explicit file-level links and file presence that exists only as the container for symbol-level links"
+      ]
+    },
+    {
+      "requirement": "Resolve subcommand",
+      "rules": [
+        "`specd changes implementation resolve <name> --file <paths...>` SHALL mark one or more tracked implementation files as fully reviewed for the current change.\n\nThe command MUST:\n\n- support a comma-separated list of paths for the `--file` option\n- validate that EVERY file exists on disk; throw `ImplementationFileNotFoundError` if any file is missing and abort the operation\n\nResolving a file means:\n\n- all relevant spec/file/symbol links for that file have been captured for this change\n- there is no remaining implementation classification work for that tracked file\n\n`resolve` MUST update tracked-file review state only. It MUST NOT add, remove, or rewrite implementation links."
+      ]
+    },
+    {
+      "requirement": "Ignore subcommand",
+      "rules": [
+        "`specd changes implementation ignore <name> --file <paths...>` SHALL mark one or more tracked implementation files as `ignored`.\n\nThe command MUST:\n\n- support a comma-separated list of paths for the `--file` option\n- validate that EVERY file exists on disk; throw `ImplementationFileNotFoundError` if any file is missing and abort the operation\n\nIgnoring a file means that file remains part of tracked review history for the change but is excluded from unresolved tracked-file review. `ignore` MUST operate on tracked-file state, not by deleting the tracked entry outright."
+      ]
+    },
+    {
+      "requirement": "Remove subcommand",
+      "rules": [
+        "`specd changes implementation remove <name> --spec <specId> --file <path> [--symbol <name> ...]` SHALL remove confirmed implementation links.\n\nWhen one or more `--symbol` values are supplied, the command MUST remove only those symbol-level links for the `spec + file` set.\n\nWhen no `--symbol` is supplied, the command MUST remove the whole `spec + file` set, including any symbol-level refinements attached to it.\n\nIf the last symbol is removed from a `spec + file` set whose file-level presence was never explicitly created, the command MAY remove the whole `spec + file` set. If the file-level link was explicitly created earlier, removing symbols MUST preserve that file-level link."
+      ]
+    },
+    {
+      "requirement": "Review subcommand",
+      "rules": [
+        "`specd changes implementation review <name>` SHALL support implementation-traceability integrity review.\n\nThe review flow MUST:\n\n- report stale symbol-level links whose target symbol is absent from the graph database\n- use the current tracked implementation files and confirmed implementation links as review input\n- distinguish symbol-level stale diagnostics from archive-time materialization failures and workspace-boundary validation failures\n- surface when implementation-sidecar maintenance would require updates outside the current spec scope\n\nFor symbol-level stale diagnostics, the review flow SHOULD apply the same composed-member fallback used by `list` and `change status` for symbols containing `.`, `#`, or `::`, restricted to same-file matching and without mutating stored link data."
+      ]
+    },
+    {
+      "requirement": "Shared path semantics",
+      "rules": [
+        "Manual implementation management and autodetection MUST use the same raw project-relative file-path semantics during the active change.\n\nThe CLI MUST NOT require users to enter canonical `workspace:path` identities during change-time authoring. That normalization belongs to archive-time materialization."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "Command signature",
+      "name": "Subcommands are reachable",
+      "when": ["specd changes implementation --help is run"],
+      "then": ["it lists list, add, resolve, ignore, remove, and review as subcommands"]
+    },
+    {
+      "requirement": "List subcommand",
+      "name": "List shows tracked files by review state",
+      "given": ["a change with tracked implementation files in open, resolved, and ignored state"],
+      "when": ["specd changes implementation list <name> is run"],
+      "then": ["the output distinguishes those tracked-file review states"]
+    },
+    {
+      "requirement": "List subcommand",
+      "name": "List shows file-level and symbol-level links",
+      "given": ["a change with one file-level link and one symbol-level refinement"],
+      "when": ["specd changes implementation list <name> is run"],
+      "then": [
+        "the output shows the confirmed links grouped by spec and file",
+        "AND symbol refinements are shown only on the symbol-level link"
+      ]
+    },
+    {
+      "requirement": "List subcommand",
+      "name": "List resolves composed member links by same-file fallback",
+      "given": [
+        "a symbol-level link stores VcsAdapter.rootDir",
+        "AND the graph does not expose that exact stored string",
+        "AND the same file contains one graph symbol named rootDir with the expected kind"
+      ],
+      "when": ["specd changes implementation list <name> is run"],
+      "then": [
+        "the CLI uses the same-file fallback on the rightmost member segment",
+        "AND the symbol is not reported as stale"
+      ]
+    },
+    {
+      "requirement": "List subcommand",
+      "name": "List keeps composed member links stale when fallback is ambiguous",
+      "given": [
+        "a symbol-level link stores X::Y",
+        "AND the graph does not expose that exact stored string",
+        "AND the same file contains multiple graph symbols named Y"
+      ],
+      "when": ["specd changes implementation list <name> is run"],
+      "then": [
+        "the CLI leaves the symbol marked stale",
+        "AND it does not guess between the candidate same-file matches"
+      ]
+    },
+    {
+      "requirement": "Add subcommand",
+      "name": "Add creates tracked file when none existed",
+      "given": ["packages/core/src/domain/entities/change.ts is not yet tracked"],
+      "when": [
+        "specd changes implementation add <name> --spec core:change --file packages/core/src/domain/entities/change.ts is run"
+      ],
+      "then": [
+        "the confirmed file-level link is created",
+        "AND the file is added to trackedImplementationFiles with state open"
+      ]
+    },
+    {
+      "requirement": "Add subcommand",
+      "name": "Add refines an existing spec-plus-file link with symbols",
+      "given": [
+        "a file-level link already exists for core:change and packages/core/src/domain/entities/change.ts"
+      ],
+      "when": [
+        "specd changes implementation add <name> --spec core:change --file packages/core/src/domain/entities/change.ts --symbol Change.transition is run"
+      ],
+      "then": [
+        "the same spec + file link is enriched with the symbol refinement",
+        "AND no duplicate peer file-level link is created"
+      ]
+    },
+    {
+      "requirement": "Add subcommand",
+      "name": "Adding a link to a missing file fails",
+      "given": ["the file packages/core/src/missing-file.ts does not exist on disk"],
+      "when": [
+        "specd changes implementation add <name> --spec core:change --file packages/core/src/missing-file.ts is run"
+      ],
+      "then": [
+        "the command fails with ImplementationFileNotFoundError",
+        "AND the change manifest is not modified"
+      ]
+    },
+    {
+      "requirement": "Resolve subcommand",
+      "name": "Resolve closes tracked-file review for multiple files via comma-separated list",
+      "given": [
+        "tracked implementation files f1.ts and f2.ts are in open state",
+        "AND both files exist on disk"
+      ],
+      "when": ["specd changes implementation resolve <name> --file f1.ts,f2.ts is run"],
+      "then": ["both tracked files move to resolved"]
+    },
+    {
+      "requirement": "Resolve subcommand",
+      "name": "Resolving a missing file fails",
+      "given": ["the file missing.ts does not exist on disk"],
+      "when": ["specd changes implementation resolve <name> --file missing.ts is run"],
+      "then": [
+        "the command fails with ImplementationFileNotFoundError",
+        "AND no tracked-file states are updated"
+      ]
+    },
+    {
+      "requirement": "Ignore subcommand",
+      "name": "Ignore marks multiple files as ignored via comma-separated list",
+      "given": [
+        "tracked implementation files f3.ts and f4.ts are in open state",
+        "AND both files exist on disk"
+      ],
+      "when": ["specd changes implementation ignore <name> --file f3.ts,f4.ts is run"],
+      "then": ["both tracked files move to ignored"]
+    },
+    {
+      "requirement": "Ignore subcommand",
+      "name": "Ignoring a missing file fails",
+      "given": ["the file missing.ts does not exist on disk"],
+      "when": ["specd changes implementation ignore <name> --file missing.ts is run"],
+      "then": [
+        "the command fails with ImplementationFileNotFoundError",
+        "AND no tracked-file states are updated"
+      ]
+    },
+    {
+      "requirement": "Remove subcommand",
+      "name": "Removing one symbol preserves the remaining refinements",
+      "given": [
+        "a confirmed spec + file link with symbols [\"Change.invalidate\", \"Change.transition\"]"
+      ],
+      "when": [
+        "specd changes implementation remove <name> --spec core:change --file <path> --symbol Change.invalidate is run"
+      ],
+      "then": ["only Change.transition remains on that link"]
+    },
+    {
+      "requirement": "Remove subcommand",
+      "name": "Removing last symbol preserves explicit file-level link",
+      "given": [
+        "a spec + file link whose file-level presence was explicitly created earlier",
+        "AND it currently has one remaining symbol refinement"
+      ],
+      "when": ["that last symbol is removed"],
+      "then": ["the explicit file-level link remains"]
+    },
+    {
+      "requirement": "Review subcommand",
+      "name": "Review reports stale symbol-level links only",
+      "given": [
+        "a confirmed symbol-level implementation link",
+        "AND the target symbol no longer exists in the graph database"
+      ],
+      "when": ["specd changes implementation review <name> is run"],
+      "then": [
+        "the review reports that link as stale",
+        "AND the stale diagnosis is tied to missing symbol presence, not generic archive materialization errors"
+      ]
+    },
+    {
+      "requirement": "Review subcommand",
+      "name": "Review retries composed member links before reporting stale",
+      "given": [
+        "a confirmed symbol-level implementation link stores CodeGraphProvider.analyzeSpecImpact",
+        "AND the graph does not expose that exact stored string",
+        "AND the same file contains one graph symbol named analyzeSpecImpact with the expected kind"
+      ],
+      "when": ["specd changes implementation review <name> is run"],
+      "then": [
+        "the review uses the same-file composed-member fallback",
+        "AND it does not report that link as stale"
+      ]
+    },
+    {
+      "requirement": "Shared path semantics",
+      "name": "Manual add uses raw project-relative path instead of workspace:path",
+      "when": [
+        "specd changes implementation add <name> --spec core:change --file packages/core/src/domain/entities/change.ts is run"
+      ],
+      "then": [
+        "the command accepts the raw project-relative path",
+        "AND it does not require the user to provide core:src/domain/entities/change.ts"
+      ]
+    }
+  ],
+  "implementation": {
+    "files": [
+      {
+        "specId": "cli:change-implementation",
+        "file": "cli:src/index.ts"
+      }
+    ],
+    "symbols": [
+      {
+        "specId": "cli:change-implementation",
+        "file": "cli:src/commands/change/_implementation-tracking.ts",
+        "symbol": "enrichImplementationTracking"
+      },
+      {
+        "specId": "cli:change-implementation",
+        "file": "cli:src/commands/change/_implementation-tracking.ts",
+        "symbol": "extractRightmostMemberSegment"
+      },
+      {
+        "specId": "cli:change-implementation",
+        "file": "cli:src/commands/change/implementation.ts",
+        "symbol": "registerChangeImplementation"
+      },
+      {
+        "specId": "cli:change-implementation",
+        "file": "cli:src/commands/change/implementation.ts",
+        "symbol": "renderImplementationState"
+      },
+      {
+        "specId": "cli:change-implementation",
+        "file": "cli:src/commands/change/implementation.ts",
+        "symbol": "mutateImplementationTracking"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:e06f257a9541e5f59f808d008153954136e32417dcf837be26e632d0805abf9c",
+    "verify.md": "sha256:9d8be3d60d223bca0f7aec97f6972879a3414a5c85756d273f033643cf5c485a"
+  },
+  "generatedBy": "core"
+}

@@ -1,0 +1,23 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "code-graph:graph-store",
+    "code-graph:language-adapter",
+    "code-graph:symbol-model",
+    "code-graph:workspace-integration",
+    "core:config"
+  ],
+  "implementation": [
+    {
+      "file": "code-graph:src/application/use-cases/index-code-graph.ts",
+      "symbols": ["IndexCodeGraph"]
+    },
+    {
+      "file": "code-graph:src/domain/value-objects/index-options.ts",
+      "symbols": ["IndexOptions", "WorkspaceIndexTarget", "DiscoveredSpec"]
+    }
+  ]
+}

@@ -7,7 +7,8 @@
     "core:hook-execution-model",
     "core:workflow-model",
     "default:_global/architecture",
-    "core:lifecycle-engine"
+    "core:lifecycle-engine",
+    "core:implementation-detector-port"
   ],
   "context": [
     "Changes must advance through a strict lifecycle, and the rules for doing so — approval gates, task completion checks, validation clearing, requires enforcement, and hook execution — are too complex for callers to enforce ad-hoc. The `TransitionChange` use case centralises lifecycle state transitions, delegating schema-aware lifecycle interpretation (approval-gate routing, workflow requires evaluation, recursive blocking, and task gating) to `LifecycleEngine` while still owning hook execution, redesign invalidation, and persistence of the final transitioned state."
@@ -23,6 +24,12 @@
       "requirement": "Change must exist",
       "rules": [
         "The use case MUST load the change from the `ChangeRepository` by name. If no change exists with the given name, it MUST throw `ChangeNotFoundError`."
+      ]
+    },
+    {
+      "requirement": "Implementation autodetection before transition",
+      "rules": [
+        "Before evaluating lifecycle transition rules, `TransitionChange` MUST trigger targeted implementation autodetection when the change has entered `implementing` at least once in its history.\n\nThis refresh occurs before requires enforcement, task-completion checks, and transition execution so lifecycle decisions see current tracked implementation-file review state."
       ]
     },
     {
@@ -118,7 +125,7 @@
     {
       "requirement": "Dependencies",
       "rules": [
-        "`TransitionChange` depends on the following ports injected via constructor:\n\n- `ChangeRepository` — for loading, artifact content access, and persistence\n- `ActorResolver` — for resolving the current actor identity\n- `SchemaProvider` — for obtaining the fully-resolved active schema to look up workflow steps and requires\n- `LifecycleEngine` — for authoritative schema-aware lifecycle routing, dependency interpretation, and blocker resolution\n- `RunStepHooks` — for executing `run:` hooks at step boundaries"
+        "`TransitionChange` depends on `ChangeRepository`, `ActorResolver`, `SchemaProvider`, `LifecycleEngine`, `RunStepHooks`, and `ImplementationDetector`."
       ]
     }
   ],
@@ -142,6 +149,15 @@
         "TransitionChange.execute is called with a name that does not exist in the repository"
       ],
       "then": ["a ChangeNotFoundError is thrown"]
+    },
+    {
+      "requirement": "Implementation autodetection before transition",
+      "name": "Historical implementing state triggers refresh before transition checks",
+      "given": ["a change has entered implementing at least once in its history"],
+      "when": ["TransitionChange.execute() is called"],
+      "then": [
+        "it triggers implementation autodetection before requires enforcement and transition execution"
+      ]
     },
     {
       "requirement": "Approval-gate routing for spec approval",
@@ -545,11 +561,48 @@
       "then": [
         "it receives ChangeRepository, ActorResolver, SchemaProvider, LifecycleEngine, and RunStepHooks"
       ]
+    },
+    {
+      "requirement": "Dependencies",
+      "name": "TransitionChange receives ImplementationDetector dependency",
+      "when": ["TransitionChange is assembled"],
+      "then": [
+        "it receives ImplementationDetector alongside ChangeRepository, ActorResolver, SchemaProvider, LifecycleEngine, and RunStepHooks"
+      ]
     }
   ],
+  "implementation": {
+    "files": [
+      {
+        "specId": "core:transition-change",
+        "file": "core:src/composition/kernel.ts"
+      },
+      {
+        "specId": "core:transition-change",
+        "file": "core:src/composition/use-cases/transition-change.ts"
+      }
+    ],
+    "symbols": [
+      {
+        "specId": "core:transition-change",
+        "file": "core:src/application/use-cases/transition-change.ts",
+        "symbol": "TransitionChange"
+      },
+      {
+        "specId": "core:transition-change",
+        "file": "core:src/application/use-cases/transition-change.ts",
+        "symbol": "TransitionChange.execute"
+      },
+      {
+        "specId": "core:transition-change",
+        "file": "core:src/application/use-cases/transition-change.ts",
+        "symbol": "TransitionChangeResult"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:d67f3a83eec6a746e6ec15a3fc4fb5d08b56142805100a470ed04c3a878d04f0",
-    "verify.md": "sha256:9c126311d5e77c73493fa7ccc8dff5e53882830739a72fb93a7c69c8d87c3c5f"
+    "spec.md": "sha256:7ecf0e94ee3cc3aa387644c4819e080a23f73098feea18f969ccd67e359b31e6",
+    "verify.md": "sha256:6a01a364c5cc9f69bf57cef6dd988f5c79ba6a1f0704bd23087208b126e3a5c8"
   },
   "generatedBy": "core"
 }

@@ -29,6 +29,18 @@ export class NullVcsAdapter implements VcsAdapter {
 
   /** @inheritdoc */
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  refAt(at: string): Promise<string | null> {
+    return Promise.resolve(null)
+  }
+
+  /** @inheritdoc */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  modifiedFiles(baseRef: string): Promise<readonly string[]> {
+    return Promise.resolve([])
+  }
+
+  /** @inheritdoc */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   show(ref: string, filePath: string): Promise<string | null> {
     return Promise.resolve(null)
   }

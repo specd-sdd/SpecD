@@ -277,12 +277,25 @@
 - **WHEN** `CompileContext` is assembled
 - **THEN** it receives `PreviewSpec` and `LifecycleEngine` alongside its existing repositories and utilities
 
+#### Scenario: CompileContext is constructed with ImplementationDetector
+
+- **WHEN** `CompileContext` is assembled
+- **THEN** it receives `ImplementationDetector` alongside `PreviewSpec`, `LifecycleEngine`, and its existing repositories and utilities
+
 ### Requirement: Input
 
 #### Scenario: Input includes step, config, and optional traversal controls
 
 - **WHEN** `CompileContext.execute` is called
 - **THEN** it accepts the change name, target step, resolved config, and optional flags such as `includeChangeSpecs`, `followDeps`, `depth`, `sections`, and `fingerprint`
+
+### Requirement: Implementation autodetection before context compilation
+
+#### Scenario: Historical implementing state refreshes tracked implementation files before context assembly
+
+- **GIVEN** a change has entered `implementing` at least once in its history
+- **WHEN** `CompileContext.execute()` is called
+- **THEN** it triggers implementation autodetection before assembling the final context result
 
 ### Requirement: Schema name guard
 

@@ -104,9 +104,13 @@ Parse the argument to determine the audit mode:
 1. **Fetch project configuration.** Run `specd config show --format toon` to identify the `configPath`.
 
 2. **Determine the report directory.**
-   - `REPORTS_BASE_DIR` = `{configPath}/reports/spec-compliance`
-   - Generate the timestamp: `TIMESTAMP=$(date +"%Y%m%d-%H%M%S")`
-   - `REPORT_DIR="${REPORTS_BASE_DIR}/${TIMESTAMP}"`
+
+- `TIMESTAMP=$(date +"%Y%m%d-%H%M%S")`
+- If `mode = change`: extract the change path from the status output and set
+  `REPORT_DIR` to `<changePath>/reports/${TIMESTAMP}`. This keeps the audit
+  alongside the change.
+- Otherwise: `REPORTS_BASE_DIR` = `{configPath}/reports/spec-compliance`,
+  `REPORT_DIR="${REPORTS_BASE_DIR}/${TIMESTAMP}"`.
 
 3. **Create the output directory:**
 

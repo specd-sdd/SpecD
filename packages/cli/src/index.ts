@@ -26,6 +26,7 @@ import { registerChangeArtifactInstruction } from './commands/change/artifact-in
 import { registerChangeOverlap } from './commands/change/check-overlap.js'
 import { registerChangeSpecPreview } from './commands/change/spec-preview.js'
 import { registerChangeInvalidate } from './commands/change/invalidate.js'
+import { registerChangeImplementation } from './commands/change/implementation.js'
 
 // drafts
 import { registerDraftsList } from './commands/drafts/list.js'
@@ -133,6 +134,7 @@ registerChangeArtifactInstruction(changeCmd)
 registerChangeOverlap(changeCmd)
 registerChangeSpecPreview(changeCmd)
 registerChangeInvalidate(changeCmd)
+registerChangeImplementation(changeCmd)
 
 // ---- drafts ----
 const draftsCmd = program

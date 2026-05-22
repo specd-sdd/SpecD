@@ -31,3 +31,8 @@ export interface ImpactResult {
 export interface FileImpactResult extends ImpactResult {
   readonly symbols: readonly ImpactResult[]
 }
+
+/** Impact result for a spec requirement. */
+export interface SpecImpactResult extends ImpactResult {
+  readonly affectedSpecs: readonly string[]
+}

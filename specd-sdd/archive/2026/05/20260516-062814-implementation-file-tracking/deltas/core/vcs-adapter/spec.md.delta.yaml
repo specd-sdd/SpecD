@@ -1,0 +1,15 @@
+- op: added
+  description: 'Keep factory aligned with modified-file capable VcsAdapter implementations'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Returns the VcsAdapter port interface'
+  content: |
+    ### Requirement: Factory returns modified-file-capable adapters
+
+    `createVcsAdapter` MUST return a `VcsAdapter` implementation that satisfies the full current `core:vcs-adapter-port` contract, including modified-file enumeration used by implementation detection.
+
+    The factory remains responsible only for composition and backend selection. It does not itself perform implementation detection.

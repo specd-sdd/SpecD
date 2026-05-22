@@ -10,6 +10,8 @@ import { ResolveSchema } from '../../application/use-cases/resolve-schema.js'
 import { LazySchemaProvider } from '../lazy-schema-provider.js'
 import { Logger } from '../../application/logger.js'
 import { LifecycleEngine } from '../../domain/services/lifecycle-engine.js'
+import { createVcsAdapter } from '../vcs-adapter.js'
+import { VcsImplementationDetector } from '../../infrastructure/vcs/vcs-implementation-detector.js'
 
 /**
  * Domain context for a `ChangeRepository` bound to a single workspace.
@@ -133,9 +135,13 @@ export function createGetStatus(
   })
   const resolveSchema = new ResolveSchema(schemas, opts.schemaRef, [], undefined)
   const schemaProvider = new LazySchemaProvider(resolveSchema)
+  const implementationDetector = new VcsImplementationDetector(opts.configDir, async () =>
+    createVcsAdapter(opts.configDir),
+  )
   return new GetStatus(
     changeRepo,
     schemaProvider,
+    implementationDetector,
     opts.approvals,
     new LifecycleEngine(Logger.debug.bind(Logger)),
   )

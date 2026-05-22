@@ -51,6 +51,27 @@ export const specMetadataSchema = z
       )
       .optional(),
     context: z.array(z.string()).optional(),
+    implementation: z
+      .object({
+        files: z
+          .array(
+            z.object({
+              specId: z.string(),
+              file: z.string(),
+            }),
+          )
+          .optional(),
+        symbols: z
+          .array(
+            z.object({
+              specId: z.string(),
+              file: z.string(),
+              symbol: z.string(),
+            }),
+          )
+          .optional(),
+      })
+      .optional(),
     generatedBy: z.enum(['core', 'agent']).optional(),
   })
   .passthrough()
@@ -99,6 +120,27 @@ export const strictSpecMetadataSchema = z
       )
       .optional(),
     context: z.array(z.string().min(1)).optional(),
+    implementation: z
+      .object({
+        files: z
+          .array(
+            z.object({
+              specId: specIdString,
+              file: z.string().min(1),
+            }),
+          )
+          .optional(),
+        symbols: z
+          .array(
+            z.object({
+              specId: specIdString,
+              file: z.string().min(1),
+              symbol: z.string().min(1),
+            }),
+          )
+          .optional(),
+      })
+      .optional(),
     generatedBy: z.enum(['core', 'agent']).optional(),
   })
   .passthrough()
@@ -148,6 +190,27 @@ export const permissiveSpecMetadataSchema = z
       )
       .optional(),
     context: z.array(z.string().min(1)).optional(),
+    implementation: z
+      .object({
+        files: z
+          .array(
+            z.object({
+              specId: specIdString,
+              file: z.string().min(1),
+            }),
+          )
+          .optional(),
+        symbols: z
+          .array(
+            z.object({
+              specId: specIdString,
+              file: z.string().min(1),
+              symbol: z.string().min(1),
+            }),
+          )
+          .optional(),
+      })
+      .optional(),
     generatedBy: z.enum(['core', 'agent']).optional(),
   })
   .passthrough()
@@ -169,6 +232,14 @@ export interface SpecMetadata {
     readonly then?: string[]
   }>
   readonly context?: string[]
+  readonly implementation?: {
+    readonly files?: ReadonlyArray<{ readonly specId: string; readonly file: string }>
+    readonly symbols?: ReadonlyArray<{
+      readonly specId: string
+      readonly file: string
+      readonly symbol: string
+    }>
+  }
   readonly generatedBy?: 'core' | 'agent'
   readonly originalHash?: string
 }

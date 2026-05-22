@@ -48,6 +48,18 @@
 - **WHEN** a graph has been indexed successfully
 - **THEN** the store can persist and later return `lastIndexedAt`, `lastIndexedRef`, and the graph fingerprint
 
+#### Scenario: Backend persists spec coverage relation families
+
+- **WHEN** a backend advertises conformance to `GraphStore`
+- **THEN** its persisted relation model includes `COVERS_FILE` and `COVERS_SYMBOL`
+- **AND** these relations remain queryable through the abstract coverage methods
+
+#### Scenario: Symbol coverage metadata survives round-trip
+
+- **GIVEN** a `COVERS_SYMBOL` relation with metadata `{ "stale": true }`
+- **WHEN** it is persisted and loaded back through the abstract `GraphStore`
+- **THEN** the returned relation preserves that metadata without backend-specific decoding
+
 ### Requirement: Store recreation
 
 #### Scenario: Recreate drops prior persisted graph state
@@ -185,6 +197,30 @@
 - **GIVEN** symbol `createKernel` has outgoing `CALLS`, `CONSTRUCTS`, and `USES_TYPE` relations
 - **WHEN** `getCallees(createKernel.id)` is called
 - **THEN** all three dependency relations are returned
+
+#### Scenario: getCoveredFiles returns spec file coverage
+
+- **GIVEN** spec `core:change` covers files `core:src/change.ts` and `core:src/state.ts`
+- **WHEN** `getCoveredFiles('core:change')` is called
+- **THEN** both persisted `COVERS_FILE` relations are returned
+
+#### Scenario: getCoveringSpecsForFile returns specs covering a file
+
+- **GIVEN** file `core:src/change.ts` is covered by specs `core:change` and `core:change-manifest`
+- **WHEN** `getCoveringSpecsForFile('core:src/change.ts')` is called
+- **THEN** both `COVERS_FILE` relations are returned
+
+#### Scenario: getCoveredSymbols returns spec symbol coverage
+
+- **GIVEN** spec `core:change` covers symbol `core:Change.transition`
+- **WHEN** `getCoveredSymbols('core:change')` is called
+- **THEN** the persisted `COVERS_SYMBOL` relation is returned
+
+#### Scenario: getCoveringSpecsForSymbol returns specs covering a symbol
+
+- **GIVEN** symbol `core:Change.transition` is covered by spec `core:change`
+- **WHEN** `getCoveringSpecsForSymbol('core:Change.transition')` is called
+- **THEN** the persisted `COVERS_SYMBOL` relation is returned
 
 ### Requirement: Graph statistics
 

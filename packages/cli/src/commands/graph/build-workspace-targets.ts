@@ -95,11 +95,20 @@ async function resolveSpecsFromRepo(
     let title = specId
     let description = ''
     let dependsOn: string[] = []
+    let implementation: DiscoveredSpec['implementation']
     const metadata = await repo.metadata(spec)
     if (metadata) {
       title = metadata.title ?? specId
       description = metadata.description ?? ''
       dependsOn = metadata.dependsOn ?? []
+    }
+    const specLock = await repo.readSpecLock(spec)
+    if (specLock !== null && specLock.implementation.length > 0) {
+      implementation = specLock.implementation.map((entry) => ({
+        file: entry.file,
+        ...(entry.symbols !== undefined ? { symbols: [...entry.symbols] } : {}),
+      }))
+      dependsOn = [...specLock.dependsOn]
     }
 
     // Build content: spec.md first if present, then rest alphabetically
@@ -135,6 +144,7 @@ async function resolveSpecsFromRepo(
         workspace,
       },
       contentHash,
+      ...(implementation !== undefined ? { implementation } : {}),
     })
   }
 

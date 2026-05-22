@@ -3,5 +3,24 @@
     "name": "schema-std",
     "version": 1
   },
-  "dependsOn": ["cli:entrypoint", "core:change", "core:get-status"]
+  "dependsOn": ["cli:entrypoint", "core:change", "core:get-status"],
+  "implementation": [
+    {
+      "file": "cli:src/commands/change/status.ts",
+      "symbols": ["registerChangeStatus", "renderDag"]
+    },
+    {
+      "file": "cli:src/commands/change/_implementation-tracking.ts",
+      "symbols": [
+        "EnrichedImplementationLink",
+        "GraphHint",
+        "EnrichedImplementationTracking",
+        "enrichImplementationTracking",
+        "extractRightmostMemberSegment"
+      ]
+    },
+    {
+      "file": "cli:src/index.ts"
+    }
+  ]
 }

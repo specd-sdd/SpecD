@@ -10,6 +10,46 @@
     "core:spec-id-format",
     "default:_global/architecture",
     "core:lifecycle-engine",
-    "default:_global/logging"
+    "default:_global/logging",
+    "core:implementation-detector-port"
+  ],
+  "implementation": [
+    {
+      "file": "core:src/domain/entities/change.ts",
+      "symbols": [
+        "Change",
+        "Change.getHistoricalImplementationAt",
+        "Change.trackImplementationFile",
+        "Change.addImplementationLink",
+        "Change.removeImplementationLink",
+        "Change.removeImplementationSymbol",
+        "TrackedImplementationFile",
+        "ImplementationLink"
+      ]
+    },
+    {
+      "file": "core:src/application/errors/implementation-links-exist-error.ts",
+      "symbols": ["ImplementationLinksExistError"]
+    },
+    {
+      "file": "core:src/application/use-cases/_shared/implementation-tracking.ts",
+      "symbols": ["ImplementationTrackingProjection", "projectImplementationTracking"]
+    },
+    {
+      "file": "core:src/application/use-cases/get-implementation-review.ts",
+      "symbols": [
+        "GetImplementationReview",
+        "GetImplementationReview.execute",
+        "GetImplementationReviewResult"
+      ]
+    },
+    {
+      "file": "core:src/application/use-cases/update-implementation-tracking.ts",
+      "symbols": [
+        "UpdateImplementationTracking",
+        "UpdateImplementationTracking.execute",
+        "UpdateImplementationTrackingResult"
+      ]
+    }
   ]
 }

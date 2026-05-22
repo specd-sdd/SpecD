@@ -1,0 +1,21 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["skills:skill"],
+  "implementation": [
+    {
+      "file": "skills:templates/shared/shared.md"
+    },
+    {
+      "file": "skills:templates/specd-archive/SKILL.md"
+    },
+    {
+      "file": "skills:templates/specd-verify/SKILL.md"
+    },
+    {
+      "file": "skills:templates/specd-implement/SKILL.md"
+    }
+  ]
+}

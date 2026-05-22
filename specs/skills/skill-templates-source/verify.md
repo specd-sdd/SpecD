@@ -75,3 +75,11 @@
 - **WHEN** shared skill templates and installed skill outputs are compared
 - **THEN** templates remain runtime-agnostic without frontmatter
 - **AND** runtime-specific frontmatter is injected by the target agent plugin during install
+
+### Requirement: Implementation tracking instructions in templates
+
+#### Scenario: Templates mention add plus review-state resolution before archive
+
+- **WHEN** implementation-oriented and archive-oriented workflow templates are inspected
+- **THEN** they mention `specd changes implementation add`
+- **AND** they mention resolving or ignoring tracked implementation files before archive

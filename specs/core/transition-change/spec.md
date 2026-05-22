@@ -22,6 +22,12 @@ The `implementingTaskChecks` and `implementingRequires` fields are removed. Task
 
 The use case MUST load the change from the `ChangeRepository` by name. If no change exists with the given name, it MUST throw `ChangeNotFoundError`.
 
+### Requirement: Implementation autodetection before transition
+
+Before evaluating lifecycle transition rules, `TransitionChange` MUST trigger targeted implementation autodetection when the change has entered `implementing` at least once in its history.
+
+This refresh occurs before requires enforcement, task-completion checks, and transition execution so lifecycle decisions see current tracked implementation-file review state.
+
 ### Requirement: Approval-gate routing for spec approval
 
 When the change is in `ready` state, the requested target is `implementing`, and `approvalsSpec` is `true`, the use case MUST route the transition to `pending-spec-approval` instead of `implementing`.
@@ -164,13 +170,7 @@ The previous `postHookFailures` field is removed because both hook phases are no
 
 ### Requirement: Dependencies
 
-`TransitionChange` depends on the following ports injected via constructor:
-
-- `ChangeRepository` — for loading, artifact content access, and persistence
-- `ActorResolver` — for resolving the current actor identity
-- `SchemaProvider` — for obtaining the fully-resolved active schema to look up workflow steps and requires
-- `LifecycleEngine` — for authoritative schema-aware lifecycle routing, dependency interpretation, and blocker resolution
-- `RunStepHooks` — for executing `run:` hooks at step boundaries
+`TransitionChange` depends on `ChangeRepository`, `ActorResolver`, `SchemaProvider`, `LifecycleEngine`, `RunStepHooks`, and `ImplementationDetector`.
 
 ## Constraints
 
@@ -193,3 +193,4 @@ The previous `postHookFailures` field is removed because both hook phases are no
 - [`core:workflow-model`](../workflow-model/spec.md) — workflow `requires` and verification routing
 - [`default:_global/architecture`](../../../_global/architecture/spec.md) — application ownership and port boundaries
 - [`core:lifecycle-engine`](../lifecycle-engine/spec.md) — authoritative lifecycle routing and dependency interpretation used before hook execution and persistence
+- [`core:implementation-detector-port`](../implementation-detector-port/spec.md) — targeted autodetection before lifecycle transitions

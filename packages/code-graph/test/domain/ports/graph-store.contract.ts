@@ -570,6 +570,50 @@ export function graphStoreContractTests(
       expect(dependents).toHaveLength(1)
       expect(dependents[0]!.source).toBe('core:core/change')
     })
+
+    it('persists and retrieves relation metadata', async () => {
+      const spec = createSpecNode({
+        specId: 'core:auth',
+        path: 'specs/auth',
+        title: 'Auth',
+        contentHash: 'sha256:a',
+        workspace: 'test',
+      })
+      const symbol = createSymbolNode({
+        name: 'login',
+        kind: SymbolKind.Function,
+        filePath: 'src/auth.ts',
+        line: 1,
+        column: 0,
+      })
+      const metadata = { stale: true, reason: 'symbol removed' }
+      const rel = createRelation({
+        source: spec.specId,
+        target: symbol.id,
+        type: RelationType.CoversSymbol,
+        metadata,
+      })
+
+      // Use bulkLoad to ensure nodes exist before relation
+      await store.bulkLoad({
+        files: [
+          createFileNode({
+            path: 'src/auth.ts',
+            configRelativePath: '',
+            language: 'typescript',
+            contentHash: 'sha256:b',
+            workspace: 'test',
+          }),
+        ],
+        symbols: [symbol],
+        specs: [spec],
+        relations: [rel],
+      })
+
+      const retrieved = await store.getCoveredSymbols(spec.specId)
+      expect(retrieved).toHaveLength(1)
+      expect(retrieved[0]!.metadata).toEqual(metadata)
+    })
   })
 }
 

@@ -1,0 +1,29 @@
+- op: added
+  description: 'Verify implementation autodetection before transition evaluation'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Change must exist'
+  content: |
+    ### Requirement: Implementation autodetection before transition
+
+    #### Scenario: Historical implementing state triggers refresh before transition checks
+
+    - **GIVEN** a change has entered `implementing` at least once in its history
+    - **WHEN** `TransitionChange.execute()` is called
+    - **THEN** it triggers implementation autodetection before requires enforcement and transition execution
+
+- op: added
+  description: 'Add dependency scenario for ImplementationDetector'
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Dependencies'
+  content: |
+    #### Scenario: TransitionChange receives ImplementationDetector dependency
+
+    - **WHEN** `TransitionChange` is assembled
+    - **THEN** it receives `ImplementationDetector` alongside `ChangeRepository`, `ActorResolver`, `SchemaProvider`, `LifecycleEngine`, and `RunStepHooks`

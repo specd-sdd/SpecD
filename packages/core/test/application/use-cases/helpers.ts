@@ -197,6 +197,16 @@ function cloneChange(change: Change): Change {
     specIds: change.specIds,
     history: change.history.map((event) => cloneChangeEvent(event)),
     artifacts,
+    trackedImplementationFiles: change.trackedImplementationFiles.map((entry) => ({
+      file: entry.file,
+      state: entry.state,
+    })),
+    implementationLinks: change.implementationLinks.map((link) => ({
+      specId: link.specId,
+      file: link.file,
+      fileLinkExplicit: link.fileLinkExplicit,
+      ...(link.symbols !== undefined ? { symbols: [...link.symbols] } : {}),
+    })),
     specDependsOn,
     invalidationPolicy: change.invalidationPolicy,
   })

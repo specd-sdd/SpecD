@@ -79,6 +79,39 @@ Actual artifact drift is handled separately from verification outcomes. If any v
 
 The loop may repeat any number of times. History records each round in full.
 
+### Requirement: Implementation tracking state
+
+A `Change` SHALL persist implementation-tracking state separately from artifact state.
+
+This state MUST distinguish:
+
+- `trackedImplementationFiles` — tracked raw project-relative files under review for the change
+- `implementationLinks` — confirmed `spec + file` implementation links, optionally refined by one or more symbols
+
+Each tracked implementation file MUST carry an explicit review state of `open`, `resolved`, or `ignored`.
+
+`implementationLinks` MUST support both:
+
+- file-level links (`spec -> file`)
+- symbol-level refinements (`spec -> file -> symbols`)
+
+A confirmed link's raw file path remains project-relative while the change is active. Canonical `workspace:path` normalization happens later during archive-time materialization.
+
+### Requirement: Explicit vs container-only file links
+
+The `Change` entity MUST preserve whether a file-level implementation link was explicitly created on its own or exists only as the container for symbol-level links.
+
+This distinction governs link-removal behavior:
+
+- removing the last symbol from a container-only `spec + file` set MAY remove the whole set
+- removing the last symbol from a `spec + file` set whose file-level link was explicitly created MUST preserve the file-level link
+
+### Requirement: Historical implementation detection guard
+
+The `Change` entity SHALL expose whether the change has ever entered `implementing` in its history.
+
+Lifecycle use cases use this historical fact to decide when demand-driven implementation autodetection is meaningful. The `Change` entity itself does not perform implementation detection.
+
 ### Requirement: Spec approval gate
 
 When `approvals.spec: true`, the transition from `ready` to `implementing` is blocked. The change must first transition to `pending-spec-approval`, receive an explicit approval (approver identity, reason, artifact hashes), and then transition to `spec-approved` before `implementing` becomes reachable.
@@ -247,9 +280,9 @@ The signal is historical, not state-based. It remains true once reached unless t
 
 The `created` event records the `schemaName` and `schemaVersion` of the schema active at creation time.
 
-A **`schemaName` mismatch** (e.g. `schema-std` → `custom-schema`) indicates structural incompatibility — different artifact types, formats, delta rules, and validations. When a use case (`ArchiveChange`, `ValidateArtifacts`, `CompileContext`) detects that `schema.name() !== change.schemaName`, it must throw `SchemaMismatchError` before performing any work. This is an error, not a warning.
+A **`schemaName` mismatch** (e.g. `schema-std` → `custom-schema`) indicates structural incompatibility. When a use case detects that `schema.name() !== change.schemaName`, it MUST throw `SchemaMismatchError` before performing any work.
 
-A **`schemaVersion` mismatch** within the same schema name is advisory. A warning is emitted but the change remains fully usable. Archiving with a `schemaVersion` mismatch is allowed; a `schemaName` mismatch throws `SchemaMismatchError`.
+A **`schemaVersion` mismatch** within the same schema name is advisory. When a change is loaded and the active schema version differs from the one recorded in the change, the system MUST emit a warning. The change remains fully usable. Archiving with a `schemaVersion` mismatch is allowed.
 
 ### Requirement: Drafting and discarding
 
@@ -359,3 +392,4 @@ When a file is canonically `missing`, `missing` remains the canonical state even
 - [`default:_global/architecture`](../../_global/architecture/spec.md) — domain ownership of lifecycle and artifact invariants
 - [`core:lifecycle-engine`](../lifecycle-engine/spec.md) — interprets schema-aware lifecycle and dependency status from persisted change facts
 - [`default:_global/logging`](../../_global/logging/spec.md) — debug logging conventions for archive-attempt diagnostics reflected in change history
+- [`core:implementation-detector-port`](../implementation-detector-port/spec.md) — triggers autodetection before status load and transitions

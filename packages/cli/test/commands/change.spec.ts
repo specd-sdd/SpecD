@@ -22,9 +22,13 @@ vi.mock('../../src/load-config.js', () => ({
   resolveConfigPath: vi.fn().mockResolvedValue(null),
 }))
 vi.mock('../../src/kernel.js', () => ({ createCliKernel: vi.fn() }))
+vi.mock('../../src/commands/change/_implementation-tracking.js', () => ({
+  enrichImplementationTracking: vi.fn(),
+}))
 
 import { loadConfig } from '../../src/load-config.js'
 import { createCliKernel } from '../../src/kernel.js'
+import { enrichImplementationTracking } from '../../src/commands/change/_implementation-tracking.js'
 import { registerChangeList } from '../../src/commands/change/list.js'
 import { registerChangeCreate } from '../../src/commands/change/create.js'
 import { registerChangeStatus } from '../../src/commands/change/status.js'
@@ -38,6 +42,14 @@ function setup() {
   const kernel = makeMockKernel()
   vi.mocked(loadConfig).mockResolvedValue(config)
   vi.mocked(createCliKernel).mockResolvedValue(kernel)
+  vi.mocked(enrichImplementationTracking).mockResolvedValue({
+    trackedFiles: [],
+    links: [],
+    graphHint: {
+      status: 'fresh',
+      message: 'Code graph is fresh; stale symbol diagnostics are authoritative.',
+    },
+  })
   const stdout = captureStdout()
   const stderr = captureStderr()
   mockProcessExit()

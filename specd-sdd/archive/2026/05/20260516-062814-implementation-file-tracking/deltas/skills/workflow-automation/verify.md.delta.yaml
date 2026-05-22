@@ -1,0 +1,15 @@
+- op: added
+  description: 'Verify automation policy treats tracked files separately from confirmed links'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: Implementation traceability policy
+
+    #### Scenario: Agent resolves tracked files explicitly before archive
+
+    - **GIVEN** an agent has already added relevant implementation links
+    - **AND** tracked implementation files still remain in `open` state
+    - **WHEN** the workflow approaches archive
+    - **THEN** the agent explicitly resolves or ignores those tracked files instead of assuming link creation alone closed review

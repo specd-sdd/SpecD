@@ -4,6 +4,7 @@ import { getUpstream } from '../../../src/domain/services/get-upstream.js'
 import { getDownstream } from '../../../src/domain/services/get-downstream.js'
 import { analyzeImpact } from '../../../src/domain/services/analyze-impact.js'
 import { analyzeFileImpact } from '../../../src/domain/services/analyze-file-impact.js'
+import { analyzeSpecImpact } from '../../../src/domain/services/analyze-spec-impact.js'
 import { detectChanges } from '../../../src/domain/services/detect-changes.js'
 import { createFileNode } from '../../../src/domain/value-objects/file-node.js'
 import { createSymbolNode } from '../../../src/domain/value-objects/symbol-node.js'
@@ -536,6 +537,68 @@ describe('Traversal services', () => {
       const result = await detectChanges(store, ['nonexistent.ts'])
       expect(result.riskLevel).toBe('LOW')
       expect(result.summary).toContain('No symbols found')
+    })
+  })
+
+  describe('analyzeSpecImpact', () => {
+    it('combines dependsOn, covers-file, and covers-symbol relations', async () => {
+      const coveredSymbol = sym('transition', 'core:src/change.ts', 10)
+
+      await store.bulkLoad({
+        files: [file('core:src/change.ts'), file('core:src/status.ts')],
+        symbols: [coveredSymbol],
+        specs: [
+          {
+            specId: 'core:change',
+            workspace: 'core',
+            path: 'change',
+            title: 'Change',
+            description: '',
+            contentHash: 'sha256:change',
+            content: '',
+            dependsOn: [],
+          },
+          {
+            specId: 'core:get-status',
+            workspace: 'core',
+            path: 'get-status',
+            title: 'GetStatus',
+            description: '',
+            contentHash: 'sha256:get-status',
+            content: '',
+            dependsOn: [],
+          },
+        ],
+        relations: [
+          createRelation({
+            source: 'core:get-status',
+            target: 'core:change',
+            type: RelationType.DependsOn,
+          }),
+          createRelation({
+            source: 'core:change',
+            target: 'core:src/change.ts',
+            type: RelationType.CoversFile,
+          }),
+          createRelation({
+            source: 'core:get-status',
+            target: 'core:src/status.ts',
+            type: RelationType.CoversFile,
+          }),
+          createRelation({
+            source: 'core:change',
+            target: coveredSymbol.id,
+            type: RelationType.CoversSymbol,
+          }),
+        ],
+      })
+
+      const result = await analyzeSpecImpact(store, 'core:change', 'upstream', 3)
+
+      expect(result.affectedSpecs).toEqual(['core:get-status'])
+      expect(result.affectedFiles).toEqual(['core:src/change.ts', 'core:src/status.ts'])
+      expect(result.affectedSymbols.map((symbol) => symbol.name)).toEqual(['transition'])
+      expect(result.directDependents).toBe(1)
     })
   })
 })

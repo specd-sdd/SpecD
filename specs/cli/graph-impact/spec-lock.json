@@ -1,0 +1,25 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "cli:entrypoint",
+    "core:config",
+    "code-graph:composition",
+    "code-graph:traversal",
+    "code-graph:workspace-integration"
+  ],
+  "implementation": [
+    {
+      "file": "cli:src/commands/graph/build-workspace-targets.ts"
+    },
+    {
+      "file": "cli:src/commands/graph/impact.ts",
+      "symbols": ["registerGraphImpact", "formatImpact", "formatSpecImpact", "parseImpactDirection"]
+    },
+    {
+      "file": "cli:src/index.ts"
+    }
+  ]
+}

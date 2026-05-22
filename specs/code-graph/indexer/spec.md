@@ -172,13 +172,14 @@ The indexer SHALL build `SpecNode` entries with `DEPENDS_ON` relations. Specs ar
 
 1. Load metadata via `SpecRepository.metadata()` — extract `title`, `description`, and `dependsOn`
 2. If metadata is absent (`null`), use defaults: `title` = specId, `description` = `''`, `dependsOn` = `[]`. There is no fallback parsing of `spec.md` — metadata should be regenerated via `spec generate-metadata` before indexing.
-3. Compute a `contentHash` (SHA-256 of all artifacts in `spec.filenames`) — this includes `spec.md`, `verify.md`, and any other spec artifacts
-4. Create a `SpecNode` and upsert it into the store
-5. Create a `DEPENDS_ON` relation for each entry in `dependsOn`
+3. Load `spec-lock.json` when present and treat it as the durable source for archived implementation traceability
+4. Compute a `contentHash` (SHA-256 of all artifacts in `spec.filenames`) — this includes `spec.md`, `verify.md`, and any other spec artifacts
+5. Create a `SpecNode` and upsert it into the store
+6. Create a `DEPENDS_ON` relation for each entry in `dependsOn`
+7. Create a `COVERS_FILE` relation for each archived file-level implementation entry from `spec-lock.json`
+8. Create a `COVERS_SYMBOL` relation for each archived symbol-level implementation entry from `spec-lock.json`, preserving any `stale` metadata required by the relation model
 
 Metadata changes alone do NOT trigger re-indexing — only changes to spec content artifacts (`spec.md`, `verify.md`, etc.) affect the `contentHash`. Metadata freshness is tracked independently by `@specd/core`.
-
-Spec discovery follows the same incremental model as source files: the `contentHash` is compared against the stored hash, and only specs with changed hashes are re-processed. Unchanged specs are skipped entirely.
 
 Spec indexing runs as an additional phase after source file indexing (Phase 1 and Phase 2). It does not depend on source file data and could run in parallel, but sequencing after source indexing simplifies the implementation.
 

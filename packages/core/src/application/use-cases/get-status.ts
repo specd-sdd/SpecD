@@ -5,6 +5,7 @@ import { type ArtifactDisplayStatus } from '../../domain/value-objects/artifact-
 import { type ArtifactType } from '../../domain/value-objects/artifact-type.js'
 import { type ChangeState, VALID_TRANSITIONS } from '../../domain/value-objects/change-state.js'
 import { type ChangeRepository } from '../ports/change-repository.js'
+import { type ImplementationDetector } from '../ports/implementation-detector.js'
 import { type SchemaProvider } from '../ports/schema-provider.js'
 import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
 import {
@@ -12,6 +13,10 @@ import {
   type LifecycleReviewSummary,
 } from '../../domain/services/lifecycle-engine.js'
 import { Logger } from '../logger.js'
+import {
+  type ImplementationTrackingProjection,
+  projectImplementationTracking,
+} from './_shared/implementation-tracking.js'
 
 /** Input for the {@link GetStatus} use case. */
 export interface GetStatusInput {
@@ -173,6 +178,8 @@ export interface GetStatusResult {
   readonly artifactStatuses: ArtifactStatusEntry[]
   /** Pre-computed lifecycle context. */
   readonly lifecycle: LifecycleContext
+  /** Raw implementation-tracking projection. */
+  readonly implementationTracking: ImplementationTrackingProjection
   /** Whether validated artifacts require review before continuing. */
   readonly review: ReviewSummary
   /** High-visibility blockers preventing progress. */
@@ -190,6 +197,7 @@ export interface GetStatusResult {
 export class GetStatus {
   private readonly _changes: ChangeRepository
   private readonly _schemaProvider: SchemaProvider
+  private readonly _implementationDetector: ImplementationDetector
   private readonly _approvals: { readonly spec: boolean; readonly signoff: boolean }
   private readonly _lifecycle: LifecycleEngine
 
@@ -198,6 +206,7 @@ export class GetStatus {
    *
    * @param changes - Repository for loading the change
    * @param schemaProvider - Provider for the fully-resolved schema
+   * @param implementationDetector - Detector for targeted implementation refresh
    * @param approvals - Whether approval gates are active
    * @param approvals.spec - Whether the spec approval gate is enabled
    * @param approvals.signoff - Whether the signoff gate is enabled
@@ -206,11 +215,13 @@ export class GetStatus {
   constructor(
     changes: ChangeRepository,
     schemaProvider: SchemaProvider,
+    implementationDetector: ImplementationDetector,
     approvals: { readonly spec: boolean; readonly signoff: boolean },
     lifecycle: LifecycleEngine = new LifecycleEngine(Logger.debug.bind(Logger)),
   ) {
     this._changes = changes
     this._schemaProvider = schemaProvider
+    this._implementationDetector = implementationDetector
     this._approvals = approvals
     this._lifecycle = lifecycle
   }
@@ -223,7 +234,16 @@ export class GetStatus {
    * @throws {ChangeNotFoundError} If no change with the given name exists
    */
   async execute(input: GetStatusInput): Promise<GetStatusResult> {
-    const change = await this._changes.get(input.name)
+    const change = await this._changes.mutate(input.name, async (freshChange) => {
+      if (freshChange.getHistoricalImplementationAt() !== null) {
+        const files = await this._implementationDetector.detectModifiedFiles(freshChange)
+        for (const file of files) {
+          if (freshChange.trackedImplementationFiles.some((entry) => entry.file === file)) continue
+          freshChange.trackImplementationFile(file, 'open')
+        }
+      }
+      return freshChange
+    })
     if (change === null) {
       throw new ChangeNotFoundError(input.name)
     }
@@ -329,7 +349,15 @@ export class GetStatus {
       schemaInfo,
     }
 
-    return { change, artifactStatuses, lifecycle, review, blockers, nextAction }
+    return {
+      change,
+      artifactStatuses,
+      lifecycle,
+      implementationTracking: projectImplementationTracking(change),
+      review,
+      blockers,
+      nextAction,
+    }
   }
 
   /**

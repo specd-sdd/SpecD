@@ -252,6 +252,64 @@ describe('GenerateSpecMetadata', () => {
     expect(result.metadata.dependsOn).toEqual(['default:_global/architecture'])
   })
 
+  it('projects implementation files and symbols from spec-lock.json', async () => {
+    const schema = makeSchema({
+      artifacts: [
+        makeArtifactType('specs', {
+          scope: 'spec',
+          output: 'spec.md',
+          format: 'markdown',
+        }),
+      ],
+      metadataExtraction: {},
+    })
+
+    const spec = new Spec('core', SpecPath.parse('change'), ['spec.md'])
+    const repo = makeSpecRepository({
+      workspace: 'core',
+      specs: [spec],
+      artifacts: {
+        'change/spec.md': '# Change\n',
+        'change/spec-lock.json': JSON.stringify({
+          schema: { name: 'specd', version: 1 },
+          dependsOn: [],
+          implementation: [
+            { file: 'core:src/domain/entities/change.ts' },
+            {
+              file: 'core:src/application/use-cases/get-status.ts',
+              symbols: ['GetStatus.execute'],
+            },
+          ],
+        }),
+      },
+    })
+
+    const markdownParser = makeParser({
+      parse: () => ({ root: { type: 'document', children: [] } }),
+    })
+
+    const useCase = new GenerateSpecMetadata(
+      new Map([['core', repo]]),
+      makeSchemaProvider(schema),
+      makeParsers(markdownParser),
+      makeContentHasher(),
+      createBuiltinExtractorTransforms(),
+    )
+
+    const result = await useCase.execute({ specId: 'core:change' })
+
+    expect(result.metadata.implementation).toEqual({
+      files: [{ specId: 'core:change', file: 'core:src/domain/entities/change.ts' }],
+      symbols: [
+        {
+          specId: 'core:change',
+          file: 'core:src/application/use-cases/get-status.ts',
+          symbol: 'GetStatus.execute',
+        },
+      ],
+    })
+  })
+
   it('accepts canonical spec ids without backticks or links', async () => {
     const schema = makeSchema({
       artifacts: [

@@ -1,0 +1,28 @@
+- op: added
+  description: 'Add spec-lock dependency'
+  position:
+    parent:
+      type: section
+      matches: 'Spec Dependencies'
+  content: |
+    - [`core:spec-lock`](../spec-lock/spec.md) — durable archived implementation traceability source
+
+- op: added
+  description: 'Project archived implementation links into metadata'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Version control'
+  content: |
+    ### Requirement: Implementation projection
+
+    Generated `metadata.json` SHALL project archived implementation traceability from `spec-lock.json` into an `implementation` field for fast machine consumption.
+
+    This metadata projection is derived data:
+
+    - it MUST preserve the archived distinction between file-level and symbol-level links
+    - it MUST NOT become the authoritative source of implementation truth
+    - when projection and sidecar disagree, `spec-lock.json` remains authoritative

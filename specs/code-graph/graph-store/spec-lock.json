@@ -1,0 +1,23 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "code-graph:symbol-model",
+    "default:_global/architecture",
+    "code-graph:staleness-detection"
+  ],
+  "implementation": [
+    {
+      "file": "code-graph:src/domain/ports/graph-store.ts",
+      "symbols": [
+        "GraphStore",
+        "GraphStore.getCoveredFiles",
+        "GraphStore.getCoveringSpecs",
+        "GraphStore.getCoveredSymbols",
+        "GraphStore.getSymbolCoveringSpecs"
+      ]
+    }
+  ]
+}

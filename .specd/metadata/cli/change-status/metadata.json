@@ -15,7 +15,7 @@
     {
       "requirement": "Output format",
       "rules": [
-        "In `text` mode (default), the command prints a structured summary to stdout:\n\n```\nchange:      <name>\nstate:       <state>\nspecs:       <specId>, <specId>, ...\ndescription: <description>            ← only if set\n\nartifacts (DAG):                      ← ASCII tree rendering\n  [✓] complete  [ ] missing  [!] drifted  [~] needs review  [?] in-progress\n\n  [~] proposal [scope: change]\n  └─ [~] specs [scope: spec]\n     ├─ [~] verify [scope: spec]\n     │  └─ [~] design [scope: change]\n     │     └─ [!] tasks [scope: change] [hasTasks]\n\nblockers:                             ← High-visibility section for errors\n  ! <CODE>: <message>\n  ...\n\nnext action:                          ← Direct recommendation\n  target:  <targetStep>\n  command: <command>\n  reason:  <reason>\n\nlifecycle:\n  transitions:  <available1>, <available2>, ...    ← only availableTransitions\n  next artifact: <artifactId>                      ← omitted when null\n  approvals:     spec=on|off  signoff=on|off\n  path:          <changePath>\n\nreview:\n  required:  yes|no\n  route:     designing\n  reason:    artifact-drift|artifact-review-required|spec-overlap-conflict\n  overlap:                                         ← only when reason is spec-overlap-conflict\n    - archived: <name1>, specs: <specId1>, <specId2>\n    - archived: <name2>, specs: <specId3>\n  affected:\n    <artifact-type>:\n      - <absolute-path>\n      - <absolute-path>\n\nartifacts (details):                  ← Detailed file list\n  <type>  <state>\n    <file-key>  <file-state>  <filename>\n  ...\n```\n\nThe `description:` line is omitted when no description is set on the change.\n\nThe `artifacts (DAG):` section renders an ASCII tree of the artifact dependency hierarchy. Each node MUST include a status symbol from the legend, an explicit `[scope: change]` or `[scope: spec]` label, and an optional `[hasTasks]` label if the artifact has task capability enabled. The legend MUST be printed at the top of the DAG.\n\nThe status symbols map to aggregate artifact states:\n\n- `[✓]` -> `complete` or `skipped`\n- `[ ]` -> `missing`\n- `[!]` -> `drifted-pending-review`\n- `[~]` -> `pending-review` or `pending-parent-artifact-review`\n- `[?]` -> `in-progress`\n\nThe `blockers:` section is a high-visibility list of the `blockers` array returned by `GetStatus`. It lists every blocker code and its descriptive message. This section is omitted when there are no blockers.\n\nThe `next action:` section presents the `nextAction` object from `GetStatus`. The `command:` line uses formatting that highlights the command for easy copy-pasting. This section is always present.\n\nThe `lifecycle:` section is always present. The `transitions:` line shows only `availableTransitions` (transitions that would succeed now). It is omitted when the list is empty. The `next artifact:` line is omitted when `nextArtifact` is `null`.\n\nThe `review:` section is omitted when `review.required` is `false`. When present, it summarizes why the change must return through design review. Within that section, affected files are rendered using their absolute paths so an operator or agent can jump directly to the file that needs review. If supplemental `key` data is present, it is secondary and must not replace the path-first rendering.\n\nWhen `review.reason` is `'spec-overlap-conflict'`, the review section additionally shows an `overlap:` subsection listing each unhandled overlap entry as a bullet with the archived change name and overlapping spec IDs. This subsection is omitted for all other reasons. Multiple entries (from multiple archived changes) are listed newest-first.\n\nThe `artifacts (details):` section provides the granular file-level statuses. Each artifact line shows the artifact type ID and its persisted aggregate `state`. Under each artifact, the command prints every tracked file with its file key, persisted file `state`, and relative filename. Artifacts are listed in schema-declared order, with file rows in artifact order.\n\nIn `json` or `toon` mode, the output is:\n\n```json\n{\n  \"name\": \"...\",\n  \"state\": \"...\",\n  \"specIds\": [\"...\"],\n  \"schema\": { \"name\": \"...\", \"version\": 1 },\n  \"description\": \"...\",\n  \"blockers\": [{ \"code\": \"...\", \"message\": \"...\" }],\n  \"nextAction\": {\n    \"targetStep\": \"...\",\n    \"actionType\": \"...\",\n    \"reason\": \"...\",\n    \"command\": \"...\"\n  },\n  \"artifactDag\": [\n    {\n      \"id\": \"...\",\n      \"scope\": \"change|spec\",\n      \"hasTasks\": true,\n      \"state\": \"...\",\n      \"requires\": [\"...\"],\n      \"children\": [\"...\"]\n    }\n  ],\n  \"artifacts\": [\n    {\n      \"type\": \"...\",\n      \"state\": \"pending-review\",\n      \"effectiveStatus\": \"pending-review\",\n      \"files\": [\n        {\n          \"key\": \"...\",\n          \"filename\": \"...\",\n          \"state\": \"drifted-pending-review\"\n        }\n      ]\n    }\n  ],\n  \"review\": {\n    \"required\": true,\n    \"route\": \"designing\",\n    \"reason\": \"artifact-drift|artifact-review-required|spec-overlap-conflict\",\n    \"overlapDetail\": [],\n    \"affectedArtifacts\": [\n      {\n        \"type\": \"specs\",\n        \"files\": [\n          {\n            \"key\": \"core:change\",\n            \"filename\": \"deltas/core/core/change/spec.md.delta.yaml\",\n            \"path\": \"/abs/path/.specd/changes/<change>/deltas/core/core/change/spec.md.delta.yaml\"\n          }\n        ]\n      }\n    ]\n  },\n  \"lifecycle\": {\n    \"validTransitions\": [\"...\"],\n    \"availableTransitions\": [\"...\"],\n    \"blockers\": [{ \"transition\": \"...\", \"reason\": \"requires\", \"blocking\": [\"...\"] }],\n    \"approvals\": { \"spec\": false, \"signoff\": false },\n    \"nextArtifact\": \"...\",\n    \"changePath\": \"...\",\n    \"schemaInfo\": { \"name\": \"...\", \"version\": 1 }\n  }\n}\n```\n\n`description` is omitted from the JSON object when not set. The `lifecycle` object is always present. `nextArtifact` is `null` (not omitted) when all artifacts are done.\n\n`overlapDetail` is always present in the JSON `review` object:\n\n- When `review.reason` is `'spec-overlap-conflict'`: an array of `{ archivedChangeName, overlappingSpecIds }` entries ordered newest-first\n- For all other reasons: an empty array `[]`"
+        "In `json` or `toon` mode, the `artifactDag` array MUST include the `hasTasks` field for every entry.\n\nThe `state` field in the top-level `artifactDag` MUST reflect the drift-aware display state projection (e.g., `complete-with-drift`) rather than the raw canonical state, ensuring that agents can detect drift without manually comparing hashes."
       ]
     },
     {
@@ -41,13 +41,21 @@
       "rules": [
         "When the change uses any schema (not just schema-std), the JSON output MUST include a nested schema object with derived fields:\n\n```\nschema:\n  name: \"...\"\n  version: 1\n  artifactDag:\n    - id: \"...\"\n      scope: \"change|spec\"\n      optional: true|false\n      requires: [\"...\"]\n      hasTasks: true|false\n      output: \"...\"\n```\n\n`artifactDag` is derived from the schema's `artifacts` array.\n`hasTasks` is true when the artifact has `hasTasks: true` explicitly or has a `taskCompletionCheck` declaration.\nThis allows design/implement skills to replace `schema show` calls."
       ]
+    },
+    {
+      "requirement": "Implementation section",
+      "rules": [
+        "When implementation tracking is active for a change, the status display SHALL include an `Implementation` section derived from the `GetStatus` result **ONLY if the `--implementation` flag is provided**.\n\nThat section MUST expose:\n\n- tracked implementation files grouped or labeled by review state (`open`, `resolved`, `ignored`)\n- confirmed implementation links, showing file-level links and any symbol-level refinements\n- stale-link warnings for symbol-level links whose symbol is absent from the graph database\n\nThe CLI section is based on the `GetStatus` projection. It MUST NOT recompute implementation tracking state independently, but it MAY enrich symbol-level links with stale diagnostics and graph-state hints by querying the code graph.\n\nWhen a symbol-level link contains a composed member identifier such as `X.Y`, `X#Y`, or `X::Y`, and the exact stored symbol string is not found in the graph, the CLI SHOULD retry stale resolution against the same file using the rightmost member segment plus the graph-reported symbol kind.\n\nThis fallback is best-effort only. It MUST NOT rewrite the stored symbol string, MUST NOT mutate change state or archived sidecars, and MUST leave the symbol marked stale when multiple same-file matches make the fallback ambiguous."
+      ]
     }
   ],
   "constraints": [
     "The output includes all artifacts declared by the schema, not only those present on disk",
     "effectiveStatus reflects dependency cascading — an artifact may be in-progress because a dependency is incomplete even if its own hash matches",
-    "The CLI command is a pure serializer — all lifecycle computation is performed by the GetStatus use case in @specd/core",
-    "The CLI command MUST NOT call SchemaRegistry, config show, or any other use case to compute lifecycle data — it serializes what GetStatus returns",
+    "The CLI command serializes lifecycle and implementation-tracking state returned by GetStatus; it does not recompute core state independently",
+    "The CLI command MAY enrich implementation output with stale symbol diagnostics and graph-state hints by querying the code graph",
+    "When applying stale-symbol enrichment, the CLI MAY use a same-file composed-member fallback for symbols containing ., #, or ::, but MUST treat it as review-time enrichment only",
+    "The CLI command MUST NOT call SchemaRegistry, config show, or any other use case to compute lifecycle data — it serializes what GetStatus returns for lifecycle interpretation",
     "Lifecycle semantics shown by the command (effective artifact status, blockers, available transitions, next artifact, review summary, next action) are projections of the GetStatus result, which is itself derived from LifecycleEngine; the CLI must not re-derive them independently"
   ],
   "scenarios": [
@@ -118,6 +126,26 @@
       "then": [
         "the command prints those blocker codes and messages",
         "AND it does not substitute a locally recomputed explanation"
+      ]
+    },
+    {
+      "requirement": "Output format",
+      "name": "JSON output includes hasTasks in artifactDag",
+      "given": ["a change using a schema where one artifact has task capability"],
+      "when": ["specd change status <name> --format json is run"],
+      "then": ["the artifactDag array entries include hasTasks: true for that artifact"]
+    },
+    {
+      "requirement": "Output format",
+      "name": "JSON output state reflects drift-aware projection",
+      "given": [
+        "an artifact in complete canonical state",
+        "AND it has detected content drift (hasDrift: true)"
+      ],
+      "when": ["specd change status <name> --format json is run"],
+      "then": [
+        "the state field in artifactDag is reported as complete-with-drift",
+        "AND agents can detect drift without manually comparing hashes"
       ]
     },
     {
@@ -220,11 +248,142 @@
       "given": ["GetStatus returns review.required: true with reason: 'artifact-review-required'"],
       "when": ["specd change status <name> is run"],
       "then": ["no overlap: subsection appears in the review section"]
+    },
+    {
+      "requirement": "Implementation section",
+      "name": "Status renders tracked implementation files by review state",
+      "given": [
+        "GetStatus returns tracked implementation files in open, resolved, and ignored state"
+      ],
+      "when": ["specd change status <name> --implementation is rendered"],
+      "then": ["the implementation section exposes those tracked-file review states"]
+    },
+    {
+      "requirement": "Implementation section",
+      "name": "Status renders file-level and symbol-level confirmed links",
+      "given": [
+        "GetStatus returns confirmed implementation links",
+        "AND one link has symbol refinements while another is file-level only"
+      ],
+      "when": ["specd change status <name> --implementation is rendered"],
+      "then": [
+        "the implementation section shows both links",
+        "AND only the symbol-level link renders symbol refinements"
+      ]
+    },
+    {
+      "requirement": "Implementation section",
+      "name": "Status may enrich symbol links with stale diagnostics",
+      "given": [
+        "GetStatus returns symbol-level implementation links",
+        "AND the CLI can query an indexed code graph"
+      ],
+      "when": [
+        "one target symbol is absent from the graph database",
+        "AND specd change status <name> --implementation is run"
+      ],
+      "then": [
+        "the rendered implementation section marks that symbol-level link as stale",
+        "AND file-level links are not marked stale"
+      ]
+    },
+    {
+      "requirement": "Implementation section",
+      "name": "Status retries composed member links against the same file",
+      "given": [
+        "GetStatus returns a symbol-level link with stored symbol ArchiveChange.execute",
+        "AND the code graph does not expose that exact stored string",
+        "AND the same file contains one graph symbol named execute with the expected kind"
+      ],
+      "when": ["specd change status <name> --implementation is rendered"],
+      "then": [
+        "the CLI resolves staleness using the same-file fallback on the rightmost member segment",
+        "AND the link is not reported as stale"
+      ]
+    },
+    {
+      "requirement": "Implementation section",
+      "name": "Status keeps composed member links stale when fallback is ambiguous",
+      "given": [
+        "GetStatus returns a symbol-level link with stored symbol X.Y",
+        "AND the code graph does not expose that exact stored string",
+        "AND the same file contains multiple graph symbols named Y"
+      ],
+      "when": ["specd change status <name> --implementation is rendered"],
+      "then": [
+        "the CLI leaves the stored symbol marked stale",
+        "AND it does not guess which same-file symbol should satisfy the link"
+      ]
+    },
+    {
+      "requirement": "Implementation section",
+      "name": "Status shows graph-state hint when stale diagnostics are unavailable",
+      "given": [
+        "GetStatus returns symbol-level implementation links",
+        "AND the code graph is not indexed or is known stale"
+      ],
+      "when": ["specd change status <name> --implementation is rendered"],
+      "then": [
+        "the implementation section still renders the raw links",
+        "AND it adds a graph-state hint instead of failing"
+      ]
+    },
+    {
+      "requirement": "Implementation section",
+      "name": "Implementation section omitted by default",
+      "given": ["GetStatus returns implementation tracking data"],
+      "when": ["specd change status <name> is run without --implementation"],
+      "then": ["stdout omits the implementation section"]
     }
   ],
+  "implementation": {
+    "files": [
+      {
+        "specId": "cli:change-status",
+        "file": "cli:src/index.ts"
+      }
+    ],
+    "symbols": [
+      {
+        "specId": "cli:change-status",
+        "file": "cli:src/commands/change/status.ts",
+        "symbol": "registerChangeStatus"
+      },
+      {
+        "specId": "cli:change-status",
+        "file": "cli:src/commands/change/status.ts",
+        "symbol": "renderDag"
+      },
+      {
+        "specId": "cli:change-status",
+        "file": "cli:src/commands/change/_implementation-tracking.ts",
+        "symbol": "EnrichedImplementationLink"
+      },
+      {
+        "specId": "cli:change-status",
+        "file": "cli:src/commands/change/_implementation-tracking.ts",
+        "symbol": "GraphHint"
+      },
+      {
+        "specId": "cli:change-status",
+        "file": "cli:src/commands/change/_implementation-tracking.ts",
+        "symbol": "EnrichedImplementationTracking"
+      },
+      {
+        "specId": "cli:change-status",
+        "file": "cli:src/commands/change/_implementation-tracking.ts",
+        "symbol": "enrichImplementationTracking"
+      },
+      {
+        "specId": "cli:change-status",
+        "file": "cli:src/commands/change/_implementation-tracking.ts",
+        "symbol": "extractRightmostMemberSegment"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:3741f1aca1ef25a560bd5b50acbf0b10c1041877cef7b09a50ff1072072e5b7f",
-    "verify.md": "sha256:d6912e4fbfc32ccc2e6367e55f1cd6852bcfb179aa1f4d7b0184fc28247e3df8"
+    "spec.md": "sha256:ac27228db8a87a97d4803113269f494a6ccfce094b33c42801f2ffc01db4692b",
+    "verify.md": "sha256:3aaebf6a2c765514c385e005db488fd0174b30fe1160c9e0f97db565cab6bc3d"
   },
   "generatedBy": "core"
 }

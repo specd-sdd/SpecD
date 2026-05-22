@@ -512,3 +512,47 @@
 - **WHEN** opportunistic backfill is attempted
 - **THEN** no sidecar is created implicitly
 - **AND** legacy `metadata.json` generation may still continue
+
+### Requirement: Tracked implementation review guard
+
+#### Scenario: Open tracked implementation file blocks archive
+
+- **GIVEN** a change still has a tracked implementation file in `open` state
+- **WHEN** `ArchiveChange.execute` is called
+- **THEN** archive fails
+- **AND** the error tells the operator to resolve or ignore that tracked file explicitly
+
+### Requirement: Implementation materialization into spec-lock
+
+#### Scenario: File-level and symbol-level links materialize into sidecar
+
+- **GIVEN** a change has one confirmed file-level link and one confirmed symbol-level link
+- **WHEN** the change archives successfully
+- **THEN** `spec-lock.json` persists the file-level link without `symbols`
+- **AND** it persists the symbol-level link with its non-empty `symbols` list
+
+#### Scenario: Excluded path is ignored during sidecar materialization
+
+- **GIVEN** a confirmed implementation link falls under the target workspace `graph.excludePaths`
+- **WHEN** archive materializes links
+- **THEN** that link is skipped without failing archive
+
+#### Scenario: File outside target workspace codeRoot fails archive
+
+- **GIVEN** a confirmed implementation link points to a raw file path outside the target workspace `codeRoot`
+- **WHEN** archive materializes links
+- **THEN** archive fails instead of writing an invalid canonical sidecar entry
+
+### Requirement: Out-of-scope sidecar update guard
+
+#### Scenario: Out-of-scope sidecar maintenance fails by default
+
+- **GIVEN** implementation integrity maintenance would require sidecar updates outside the archived spec scope
+- **WHEN** archive runs without override
+- **THEN** archive fails before applying those external updates
+
+#### Scenario: Explicit override allows out-of-scope sidecar updates
+
+- **GIVEN** the same out-of-scope sidecar maintenance situation
+- **WHEN** archive runs with `--allow-out-of-scope`
+- **THEN** archive is allowed to proceed with those external sidecar updates

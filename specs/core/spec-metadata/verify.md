@@ -292,6 +292,15 @@
 - **WHEN** tooling reads its metadata state
 - **THEN** missing `spec-lock.json` is tolerated until opportunistic backfill creates it
 
+### Requirement: Implementation projection
+
+#### Scenario: Metadata projects archived implementation links from spec-lock
+
+- **GIVEN** a persisted `spec-lock.json` with file-level and symbol-level implementation links
+- **WHEN** metadata is generated for that spec
+- **THEN** `metadata.json` includes an `implementation` projection derived from the sidecar
+- **AND** the sidecar remains the authoritative source
+
 ### Requirement: Staleness detection
 
 #### Scenario: Content unchanged — no warning

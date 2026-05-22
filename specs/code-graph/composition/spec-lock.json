@@ -1,0 +1,30 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "code-graph:symbol-model",
+    "code-graph:graph-store",
+    "code-graph:ladybug-graph-store",
+    "code-graph:sqlite-graph-store",
+    "code-graph:language-adapter",
+    "code-graph:indexer",
+    "code-graph:traversal",
+    "default:_global/architecture"
+  ],
+  "implementation": [
+    {
+      "file": "code-graph:src/composition/code-graph-provider.ts",
+      "symbols": [
+        "CodeGraphProvider",
+        "CodeGraphProvider.getCoveredFiles",
+        "CodeGraphProvider.getCoveredSymbols",
+        "CodeGraphProvider.analyzeSpecImpact"
+      ]
+    },
+    {
+      "file": "code-graph:src/index.ts"
+    }
+  ]
+}

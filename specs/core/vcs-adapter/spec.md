@@ -28,6 +28,12 @@ When no VCS is detected (all probes fail), `createVcsAdapter` MUST return a `Nul
 
 `createVcsAdapter` MUST return a `Promise<VcsAdapter>` — the application port interface defined in `application/ports/vcs-adapter.ts`. The concrete adapter type is an implementation detail not exposed to callers.
 
+### Requirement: Factory returns modified-file-capable adapters
+
+`createVcsAdapter` MUST return a `VcsAdapter` implementation that satisfies the full current `core:vcs-adapter-port` contract, including modified-file enumeration used by implementation detection.
+
+The factory remains responsible only for composition and backend selection. It does not itself perform implementation detection.
+
 ## Constraints
 
 - The factory is async — VCS detection requires spawning external processes

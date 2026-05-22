@@ -296,6 +296,24 @@
 - **THEN** specIds are `core:spec-metadata` and `cli:spec-metadata` respectively
 - **AND** no primary key collision occurs
 
+#### Scenario: Archived file-level implementation becomes COVERS_FILE
+
+- **GIVEN** a spec sidecar contains a file-level implementation entry for `core:src/change.ts`
+- **WHEN** `IndexCodeGraph.execute()` indexes spec metadata
+- **THEN** it emits a `COVERS_FILE` relation from that spec to that file
+
+#### Scenario: Archived symbol-level implementation becomes COVERS_SYMBOL
+
+- **GIVEN** a spec sidecar contains a symbol-level implementation entry for `core:Change.transition`
+- **WHEN** `IndexCodeGraph.execute()` indexes spec metadata
+- **THEN** it emits a `COVERS_SYMBOL` relation from that spec to that symbol
+
+#### Scenario: Archived stale symbol coverage preserves metadata
+
+- **GIVEN** a spec sidecar marks a symbol-level implementation entry as stale
+- **WHEN** `IndexCodeGraph.execute()` indexes spec metadata
+- **THEN** the emitted `COVERS_SYMBOL` relation preserves `stale: true` in metadata
+
 ### Requirement: Error isolation
 
 #### Scenario: Parse error in one file does not abort others

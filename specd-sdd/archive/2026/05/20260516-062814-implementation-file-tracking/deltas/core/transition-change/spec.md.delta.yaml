@@ -1,0 +1,32 @@
+- op: added
+  description: 'Add implementation detector dependency'
+  position:
+    parent:
+      type: section
+      matches: 'Spec Dependencies'
+  content: |
+    - [`core:implementation-detector-port`](../implementation-detector-port/spec.md) — targeted autodetection before lifecycle transitions
+
+- op: modified
+  description: 'Extend dependencies with ImplementationDetector'
+  selector:
+    type: section
+    matches: 'Requirement: Dependencies'
+  content: |
+    `TransitionChange` depends on `ChangeRepository`, `ActorResolver`, `SchemaProvider`, `LifecycleEngine`, `RunStepHooks`, and `ImplementationDetector`.
+
+- op: added
+  description: 'Trigger implementation autodetection before transition evaluation'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Change must exist'
+  content: |
+    ### Requirement: Implementation autodetection before transition
+
+    Before evaluating lifecycle transition rules, `TransitionChange` MUST trigger targeted implementation autodetection when the change has entered `implementing` at least once in its history.
+
+    This refresh occurs before requires enforcement, task-completion checks, and transition execution so lifecycle decisions see current tracked implementation-file review state.

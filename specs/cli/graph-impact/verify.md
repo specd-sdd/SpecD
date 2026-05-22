@@ -30,6 +30,13 @@
 - **THEN** the command exits with code 1
 - **AND** stderr does not present `--changes` as a supported selector
 
+#### Scenario: Spec selector enters requirement impact mode
+
+- **GIVEN** spec `core:change` is indexed in the graph
+- **WHEN** `specd graph impact --spec core:change` is run
+- **THEN** the command analyzes requirement impact for that spec
+- **AND** no file or symbol selector is required
+
 ### Requirement: File impact analysis
 
 #### Scenario: Upstream file analysis with defaults
@@ -97,6 +104,27 @@
 - **THEN** the analysis includes dependents up to depth 5
 - **AND** each affected symbol in the text output shows `(d=N)` with its depth
 
+### Requirement: Spec impact analysis
+
+#### Scenario: Downstream spec analysis shows covered files and symbols
+
+- **GIVEN** spec `core:change` covers file `core:src/change.ts` and symbol `core:Change.transition`
+- **WHEN** `specd graph impact --spec core:change --direction downstream` is run
+- **THEN** stdout shows the covered file and covered symbol in the impacted result
+
+#### Scenario: Upstream spec analysis shows dependent specs
+
+- **GIVEN** spec `core:archive-change` depends on `core:spec-lock`
+- **WHEN** `specd graph impact --spec core:spec-lock --direction upstream` is run
+- **THEN** stdout shows `core:archive-change` as an impacted spec
+
+#### Scenario: Missing spec reports cleanly
+
+- **GIVEN** spec `missing:spec` does not exist in the graph
+- **WHEN** `specd graph impact --spec missing:spec` is run
+- **THEN** stdout shows `No spec found matching "missing:spec".`
+- **AND** the process exits with code 0
+
 ### Requirement: Concurrent indexing guard
 
 #### Scenario: Impact analysis fails fast while the indexing lock is present
@@ -137,18 +165,24 @@
 - **WHEN** `specd graph impact --symbol createKernel --format json` is run
 - **THEN** stdout is valid JSON containing `symbol` and `impact` objects
 
+#### Scenario: JSON output includes aggregate impact fields
+
+- **WHEN** `specd graph impact --file <path> --format json` is run
+- **THEN** stdout is valid JSON
+- **AND** it contains `riskLevel`, `directDepsCount`, `indirectDepsCount`, `transitiveDepsCount`, and `affectedFilesCount`
+
 ### Requirement: Error cases
 
 #### Scenario: No selector provided
 
-- **WHEN** `specd graph impact` is run without `--file` or `--symbol`
-- **THEN** stderr contains `error: provide exactly one of --file or --symbol`
+- **WHEN** `specd graph impact` is run without `--file`, `--symbol`, or `--spec`
+- **THEN** stderr contains `error: provide exactly one of --file, --symbol, or --spec`
 - **AND** the process exits with code 1
 
 #### Scenario: Multiple selectors provided
 
-- **WHEN** `specd graph impact --file core:src/auth.ts --symbol validate` is run
-- **THEN** stderr contains `error: provide exactly one of --file or --symbol`
+- **WHEN** `specd graph impact --file core:src/auth.ts --spec core:change` is run
+- **THEN** stderr contains `error: provide exactly one of --file, --symbol, or --spec`
 - **AND** the process exits with code 1
 
 #### Scenario: Missing unprefixed selector reports normalized lookup

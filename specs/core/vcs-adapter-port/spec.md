@@ -28,11 +28,27 @@ When the repository is in a detached or unknown-head state, `branch()` MUST retu
 
 When VCS is unavailable or the repository has no commits, `ref()` MUST resolve to `null`. It MUST NOT throw in these cases.
 
+### Requirement: refAt resolves the revision active at a timestamp
+
+`refAt(at)` MUST accept an ISO-8601 timestamp string and return a `Promise<string | null>`.
+
+It resolves to the most recent revision identifier at or before the supplied timestamp.
+
+When VCS is unavailable, the repository has no matching historical revision, or the backend cannot resolve a revision for that timestamp, `refAt()` MUST resolve to `null`. It MUST NOT throw for these no-data cases.
+
 ### Requirement: show retrieves file content at a revision
 
 `show(ref, filePath)` MUST accept a revision identifier (`ref`) and a repository-relative file path (`filePath`), both as `string` parameters. It MUST return a `Promise<string | null>`.
 
 When the revision and file exist, `show()` MUST resolve to the file content as a string. When the revision or file path does not exist, `show()` MUST resolve to `null`. It MUST NOT throw for missing revisions or paths.
+
+### Requirement: modifiedFiles lists changed repository files
+
+`modifiedFiles(baseRef)` MUST accept a baseline revision identifier (`baseRef`) as a string and return a `Promise<readonly string[]>`.
+
+The returned array contains repository-relative file paths that differ between the current worktree state and the specified baseline reference.
+
+Missing or empty results MUST be represented as an empty array, not as `null`.
 
 ### Requirement: Interface-only declaration
 
@@ -46,9 +62,9 @@ A `NullVcsAdapter` implementation MUST exist for environments where no VCS is de
 - `branch()` MUST resolve to `"none"`.
 - `isClean()` MUST resolve to `true`.
 - `ref()` MUST resolve to `null`.
+- `refAt()` MUST resolve to `null` for any timestamp.
 - `show()` MUST resolve to `null` for any arguments.
-
-The null implementation MUST NOT shell out to any external process or perform I/O.
+- `modifiedFiles()` MUST resolve to an empty array for any baseline.
 
 ## Constraints
 
@@ -61,5 +77,4 @@ The null implementation MUST NOT shell out to any external process or perform I/
 ## Spec Dependencies
 
 - [`default:_global/architecture`](../../_global/architecture/spec.md) -- hexagonal architecture, port/adapter separation
-
 - [`core:vcs-adapter`](../vcs-adapter/spec.md) -- factory that selects the concrete implementation

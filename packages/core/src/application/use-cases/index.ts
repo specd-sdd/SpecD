@@ -62,6 +62,18 @@ export {
   type ReviewSummary,
   type ReviewOverlapEntry,
 } from './get-status.js'
+export { type ImplementationTrackingProjection } from './_shared/implementation-tracking.js'
+export {
+  type GetImplementationReview,
+  type GetImplementationReviewInput,
+  type GetImplementationReviewResult,
+} from './get-implementation-review.js'
+export {
+  type UpdateImplementationTracking,
+  type UpdateImplementationTrackingAction,
+  type UpdateImplementationTrackingInput,
+  type UpdateImplementationTrackingResult,
+} from './update-implementation-tracking.js'
 export {
   type HookPhaseSelector,
   type TransitionChange,

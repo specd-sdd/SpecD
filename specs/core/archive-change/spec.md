@@ -287,6 +287,33 @@ Backfill rules:
 
 `ArchiveChange` throws on pre-archive hook failure or `assertArchivable` failure. Post-archive failures are returned, not thrown.
 
+### Requirement: Tracked implementation review guard
+
+Before archive materializes implementation links, `ArchiveChange` MUST verify that no tracked implementation file remains in `open` state.
+
+Files in `resolved` or `ignored` state satisfy this guard. If any tracked implementation file remains `open`, archive MUST fail with repair guidance telling the operator to resolve or ignore the file explicitly.
+
+### Requirement: Implementation materialization into spec-lock
+
+During archive, confirmed `implementationLinks` from the active change manifest MUST be materialized into the affected specs' `spec-lock.json` sidecars.
+
+Materialization MUST:
+
+- normalize eligible raw file paths into canonical `workspace:path` identities
+- persist file-level links when a confirmed link has no `symbols`
+- persist symbol-level links when a confirmed link has one or more `symbols`
+- ignore links whose raw file path falls under the target workspace `graph.excludePaths`
+- discard links that cannot be normalized into a valid `workspace:path`
+- fail archive when a confirmed link points outside the `codeRoot` of the workspace implied by `specId`
+
+### Requirement: Out-of-scope sidecar update guard
+
+Archive-time implementation integrity maintenance MAY discover that preserving a consistent implementation map would require sidecar updates outside the immediately archived spec scope.
+
+By default, `ArchiveChange` MUST fail when those out-of-scope updates would occur.
+
+Proceeding with those external sidecar updates requires an explicit `--allow-out-of-scope` override.
+
 ## Constraints
 
 - `change.assertArchivable()` must be called before any hooks or file modifications
@@ -317,3 +344,4 @@ Backfill rules:
 - [`core:spec-id-format`](../spec-id-format/spec.md) — canonical `workspace:capabilityPath` format for `specIds`
 - [`core:spec-overlap`](../spec-overlap/spec.md) — `detectSpecOverlap` domain service for overlap detection
 - [`default:_global/logging`](../../_global/logging/spec.md) — debug logging requirements for archive preparation, staged commit, and failure diagnostics
+- [`core:spec-lock`](../spec-lock/spec.md) — archive-time implementation sidecar materialization

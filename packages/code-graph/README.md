@@ -27,7 +27,7 @@ The graph has three node types:
 | `SymbolNode` | `id`, `name`, `kind`, `filePath`, `line`, `column`                   | A declared symbol within a file.                    |
 | `SpecNode`   | `specId`, `path`, `title`, `description`, `contentHash`, `dependsOn` | A specd spec document.                              |
 
-Relations between nodes are typed by `RelationType`: `IMPORTS`, `EXPORTS`, `CALLS`, `CONSTRUCTS`, `USES_TYPE`, `DEFINES`, `DEPENDS_ON`, `COVERS`, `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES`.
+Relations between nodes are typed by `RelationType`: `IMPORTS`, `EXPORTS`, `CALLS`, `CONSTRUCTS`, `USES_TYPE`, `DEFINES`, `DEPENDS_ON`, `COVERS_FILE`, `COVERS_SYMBOL`, `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES`.
 
 `CONSTRUCTS` records deterministic instantiation or constructor-like dependencies. `USES_TYPE` records static type dependencies in signatures, annotations, fields, or deterministic binding declarations. Both are included in traversal, impact analysis, and hotspot scoring alongside `CALLS`.
 

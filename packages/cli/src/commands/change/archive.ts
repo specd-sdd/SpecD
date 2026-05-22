@@ -20,6 +20,10 @@ export function registerChangeArchive(parent: Command): void {
     .description('Move a completed change to the archive, removing it from the active change list.')
     .option('--skip-hooks <phases>', 'skip archive hook phases (pre,post,all)')
     .option('--allow-overlap', 'permit archiving despite spec overlap with other active changes')
+    .option(
+      '--allow-out-of-scope',
+      'allow archive-time implementation sidecar updates outside the current change scope',
+    )
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
     .addHelpText(
@@ -32,7 +36,13 @@ JSON/TOON output schema:
     .action(
       async (
         name: string,
-        opts: { format: string; config?: string; skipHooks?: string; allowOverlap?: true },
+        opts: {
+          format: string
+          config?: string
+          skipHooks?: string
+          allowOverlap?: true
+          allowOutOfScope?: true
+        },
       ) => {
         try {
           const skipHookPhases =
@@ -46,6 +56,7 @@ JSON/TOON output schema:
             name,
             skipHookPhases,
             ...(opts.allowOverlap === true ? { allowOverlap: true } : {}),
+            ...(opts.allowOutOfScope === true ? { allowOutOfScope: true } : {}),
           })
 
           const archivePath = path.relative(config.projectRoot, result.archiveDirPath)

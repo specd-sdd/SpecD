@@ -32,18 +32,35 @@ export interface SpecLockData {
     readonly version: number
   }
   readonly dependsOn: readonly string[]
+  readonly implementation: readonly SpecLockImplementationEntry[]
   readonly originalHash?: string | undefined
+}
+
+/** One archived implementation link persisted in `spec-lock.json`. */
+export interface SpecLockImplementationEntry {
+  readonly file: string
+  readonly symbols?: readonly string[] | undefined
 }
 
 /**
  * Runtime schema for `spec-lock.json`.
  */
-export const specLockSchema: z.ZodType<SpecLockData> = z.object({
+export const specLockSchema: z.ZodType<SpecLockData, z.ZodTypeDef, unknown> = z.object({
   schema: z.object({
     name: z.string().min(1),
     version: z.number().int().nonnegative(),
   }),
   dependsOn: z.array(specIdString),
+  implementation: z
+    .array(
+      z
+        .object({
+          file: z.string().min(1),
+          symbols: z.array(z.string().min(1)).nonempty().optional(),
+        })
+        .strict(),
+    )
+    .default([]),
   originalHash: z.string().regex(HASH_RE).optional(),
 })
 

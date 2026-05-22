@@ -15,7 +15,7 @@
     {
       "requirement": "Template migration",
       "rules": [
-        "The template directory MUST contain:\n\n- `specd/`, `specd-archive/`, `specd-design/`, `specd-implement/`, `specd-new/`, `specd-metadata/`, `specd-compliance/`, `specd-verify/` directories\n- `shared.md` as shared content across all skills\n\nEach skill directory contains `.md` files (without frontmatter)."
+        "The template directory MUST contain:\n\n- `specd/`, `specd-archive/`, `specd-design/`, `specd-implement/`, `specd-new/`, `specd-metadata/`, `specd-compliance/`, `specd-verify/` directories\n- `shared.md` as shared content across all skills; the file MAY live in the root of the template directory or within a `shared/` subdirectory\n\nEach skill directory contains `.md` files (without frontmatter)."
       ]
     },
     {
@@ -46,6 +46,12 @@
       "requirement": "Why no frontmatter in skills package",
       "rules": [
         "The skills package does not include frontmatter because each agent environment has different metadata fields and compatibility rules. Agent plugins know their target environment and inject the appropriate metadata while preserving the base skill definition."
+      ]
+    },
+    {
+      "requirement": "Implementation tracking instructions in templates",
+      "rules": [
+        "Workflow skill templates MUST include implementation-tracking guidance for active changes.\n\nAt minimum:\n\n- implementation-oriented workflows MUST mention `specd changes implementation add` when code work is being linked back to specs\n- archive-oriented workflows MUST mention resolving tracked implementation files and reviewing implementation integrity before archive\n- shared workflow guidance MUST describe tracked implementation files and confirmed implementation links using the same terminology as the change artifacts"
       ]
     }
   ],
@@ -147,11 +153,40 @@
         "templates remain runtime-agnostic without frontmatter",
         "AND runtime-specific frontmatter is injected by the target agent plugin during install"
       ]
+    },
+    {
+      "requirement": "Implementation tracking instructions in templates",
+      "name": "Templates mention add plus review-state resolution before archive",
+      "when": ["implementation-oriented and archive-oriented workflow templates are inspected"],
+      "then": [
+        "they mention specd changes implementation add",
+        "AND they mention resolving or ignoring tracked implementation files before archive"
+      ]
     }
   ],
+  "implementation": {
+    "files": [
+      {
+        "specId": "skills:skill-templates-source",
+        "file": "skills:templates/shared/shared.md"
+      },
+      {
+        "specId": "skills:skill-templates-source",
+        "file": "skills:templates/specd-archive/SKILL.md"
+      },
+      {
+        "specId": "skills:skill-templates-source",
+        "file": "skills:templates/specd-verify/SKILL.md"
+      },
+      {
+        "specId": "skills:skill-templates-source",
+        "file": "skills:templates/specd-implement/SKILL.md"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:89513ed2222104b6537e18ff15c2b68c820d3c5018fbd36fd9d607ae4cb88669",
-    "verify.md": "sha256:eb887c481dd709f9bea16aca94bfbe74eb3415a7fa82df879899b3974f48fd72"
+    "spec.md": "sha256:9adf80cd48b95236d0a75907ee8689cccad4785ab7c4349c98c71800bfc40bf7",
+    "verify.md": "sha256:a0c1e5f926915dbb1664145d699b674bacf4c067b282787a37eec4305756408f"
   },
   "generatedBy": "core"
 }

@@ -1,0 +1,51 @@
+- op: added
+  description: 'Add modified-file enumeration to VcsAdapter'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: show retrieves file content at a revision'
+  content: |
+    ### Requirement: modifiedFiles lists changed repository files
+
+    `modifiedFiles(baseRef)` MUST accept a baseline revision identifier (`baseRef`) as a string and return a `Promise<readonly string[]>`.
+
+    The returned array contains repository-relative file paths that differ between the current worktree state and the specified baseline reference.
+
+    Missing or empty results MUST be represented as an empty array, not as `null`.
+
+- op: added
+  description: 'Add historical baseline resolution to VcsAdapter'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: ref returns the current short revision'
+  content: |
+    ### Requirement: refAt resolves the revision active at a timestamp
+
+    `refAt(at)` MUST accept an ISO-8601 timestamp string and return a `Promise<string | null>`.
+
+    It resolves to the most recent revision identifier at or before the supplied timestamp.
+
+    When VCS is unavailable, the repository has no matching historical revision, or the backend cannot resolve a revision for that timestamp, `refAt()` MUST resolve to `null`. It MUST NOT throw for these no-data cases.
+
+- op: modified
+  description: 'Update null fallback to include modifiedFiles'
+  selector:
+    type: section
+    matches: 'Requirement: Null fallback implementation'
+  content: |
+    A `NullVcsAdapter` implementation MUST exist for environments where no VCS is detected. It MUST satisfy the following contract:
+
+    - `rootDir()` MUST reject with an `Error` containing a message indicating no VCS was detected.
+    - `branch()` MUST resolve to `"none"`.
+    - `isClean()` MUST resolve to `true`.
+    - `ref()` MUST resolve to `null`.
+    - `refAt()` MUST resolve to `null` for any timestamp.
+    - `show()` MUST resolve to `null` for any arguments.
+    - `modifiedFiles()` MUST resolve to an empty array for any baseline.

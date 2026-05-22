@@ -1,0 +1,21 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "code-graph:graph-store",
+    "core:config",
+    "code-graph:symbol-model",
+    "code-graph:workspace-integration"
+  ],
+  "implementation": [
+    {
+      "file": "code-graph:src/infrastructure/ladybug/ladybug-graph-store.ts"
+    },
+    {
+      "file": "code-graph:src/infrastructure/ladybug/schema.ts",
+      "symbols": ["SCHEMA_VERSION", "SCHEMA_DDL"]
+    }
+  ]
+}

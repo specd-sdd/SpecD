@@ -50,7 +50,7 @@
     {
       "requirement": "Persisted relation storage",
       "rules": [
-        "The SQLite schema SHALL persist the relation families required by the abstract graph\nmodel:\n\n- `IMPORTS`\n- `DEFINES`\n- `CALLS`\n- `EXPORTS`\n- `DEPENDS_ON`\n- `COVERS`\n- `EXTENDS`\n- `IMPLEMENTS`\n- `OVERRIDES`\n\nThe adapter MAY represent relation storage with a single relation table, per-type\ntables, or another SQLite-appropriate layout, provided the observable `GraphStore`\nquery semantics remain preserved."
+        "The SQLite schema SHALL persist the relation families required by the abstract graph model:\n\n- `IMPORTS`\n- `DEFINES`\n- `CALLS`\n- `EXPORTS`\n- `DEPENDS_ON`\n- `COVERS_FILE`\n- `COVERS_SYMBOL`\n- `EXTENDS`\n- `IMPLEMENTS`\n- `OVERRIDES`\n\nThe adapter MAY represent relation storage with a single relation table, per-type tables, or another SQLite-appropriate layout, provided the observable `GraphStore` query semantics remain preserved.\n\n`COVERS_SYMBOL` entries MUST preserve relation metadata so symbol-level implementation links can surface `stale` state consistently after reload."
       ]
     },
     {
@@ -160,6 +160,13 @@
       "then": ["persisted storage exists for IMPORTS, DEFINES, CALLS, EXPORTS,"]
     },
     {
+      "requirement": "Persisted relation storage",
+      "name": "COVERS_SYMBOL metadata survives SQLite persistence",
+      "given": ["a persisted COVERS_SYMBOL relation with metadata { \"stale\": true }"],
+      "when": ["the relation is loaded through abstract graph-store queries"],
+      "then": ["the metadata still marks the relation as stale"]
+    },
+    {
       "requirement": "SQLite full-text search",
       "name": "Symbol and spec search use SQLite full-text search",
       "given": ["symbols and specs have been indexed into SQLite"],
@@ -253,9 +260,17 @@
       ]
     }
   ],
+  "implementation": {
+    "files": [
+      {
+        "specId": "code-graph:sqlite-graph-store",
+        "file": "code-graph:src/infrastructure/sqlite/sqlite-graph-store.ts"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:09299494b0043129616aa6f38136693c42515f7983f451959efa1654bd24b860",
-    "verify.md": "sha256:abdf8921a6a39fcc3dbb53aae8a4cbcdb92777aaf796c46718f745368cb2a666"
+    "spec.md": "sha256:7da62ece8ffcd62dadf6d4211c717d0c05f8bf1413a8a4d6993548341f5a70df",
+    "verify.md": "sha256:e913e3e480ae73268cb34744d7fbc962ad2cdbe2649f05e48a4231f81bb5ece5"
   },
   "generatedBy": "core"
 }

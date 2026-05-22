@@ -1,0 +1,21 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "cli:entrypoint",
+    "core:change",
+    "core:archive-change",
+    "core:hook-execution-model",
+    "cli:command-resource-naming"
+  ],
+  "implementation": [
+    {
+      "file": "cli:src/commands/change/archive.ts"
+    },
+    {
+      "file": "cli:src/index.ts"
+    }
+  ]
+}

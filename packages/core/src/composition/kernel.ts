@@ -40,6 +40,9 @@ import { ValidateSchema } from '../application/use-cases/validate-schema.js'
 import { DetectOverlap } from '../application/use-cases/detect-overlap.js'
 import { PreviewSpec } from '../application/use-cases/preview-spec.js'
 import { GetSpecOutline } from '../application/use-cases/get-spec-outline.js'
+import { UpdateImplementationTracking } from '../application/use-cases/update-implementation-tracking.js'
+import { GetImplementationReview } from '../application/use-cases/get-implementation-review.js'
+import { createArchiveWorkspaceImplementationConfig } from '../application/use-cases/archive-change.js'
 import { buildSchema } from '../domain/services/build-schema.js'
 import { LifecycleEngine } from '../domain/services/lifecycle-engine.js'
 import { type ChangeRepository } from '../application/ports/change-repository.js'
@@ -57,6 +60,7 @@ import {
 import { LazySchemaProvider } from './lazy-schema-provider.js'
 import { createSpecWorkspaceRoutes } from './spec-workspace-routes.js'
 import { createDefaultLogger } from '../infrastructure/logging/pino-logger.js'
+import { VcsImplementationDetector } from '../infrastructure/vcs/vcs-implementation-detector.js'
 
 /**
  * All use cases instantiated from a single `SpecdConfig`, grouped by domain area.
@@ -117,6 +121,10 @@ export interface Kernel {
     getHookInstructions: GetHookInstructions
     /** Returns artifact-specific instructions, rules, and delta guidance. */
     getArtifactInstruction: GetArtifactInstruction
+    /** Applies add/remove/ignore/resolve mutations to implementation tracking. */
+    updateImplementationTracking: UpdateImplementationTracking
+    /** Returns raw implementation-tracking review projection. */
+    getImplementationReview: GetImplementationReview
     /** Detects specs targeted by multiple active changes. */
     detectOverlap: DetectOverlap
     /** Previews a spec with deltas applied from a change. */
@@ -238,6 +246,7 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
   // PreviewSpec — used by CompileContext and exposed as changes.preview
   const previewSpec = new PreviewSpec(i.changes, i.specs, schemaProvider, i.parsers)
   const lifecycle = new LifecycleEngine(Logger.debug.bind(Logger))
+  const implementationDetector = new VcsImplementationDetector(config.projectRoot, i.vcs)
 
   return {
     registry,
@@ -248,13 +257,21 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
       status: new GetStatus(
         i.changes,
         schemaProvider,
+        implementationDetector,
         {
           spec: config.approvals.spec,
           signoff: config.approvals.signoff,
         },
         lifecycle,
       ),
-      transition: new TransitionChange(i.changes, i.actor, schemaProvider, runStepHooks, lifecycle),
+      transition: new TransitionChange(
+        i.changes,
+        i.actor,
+        schemaProvider,
+        implementationDetector,
+        runStepHooks,
+        lifecycle,
+      ),
       draft: new DraftChange(i.changes, i.actor),
       restore: new RestoreChange(i.changes, i.actor),
       discard: new DiscardChange(i.changes, i.actor),
@@ -277,6 +294,8 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
         new SaveSpecMetadata(i.specs),
         i.registry.extractorTransforms,
         workspaceRoutes,
+        config.projectRoot,
+        createArchiveWorkspaceImplementationConfig(config.workspaces),
       ),
       validate: new ValidateArtifacts(
         i.changes,
@@ -293,6 +312,7 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
         i.changes,
         i.specs,
         schemaProvider,
+        implementationDetector,
         i.files,
         i.parsers,
         i.hasher,
@@ -319,6 +339,8 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
       ),
       detectOverlap: new DetectOverlap(i.changes),
       preview: previewSpec,
+      updateImplementationTracking: new UpdateImplementationTracking(i.changes),
+      getImplementationReview: new GetImplementationReview(i.changes),
       getArtifactInstruction: new GetArtifactInstruction(
         i.changes,
         i.specs,

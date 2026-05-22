@@ -1,0 +1,17 @@
+- op: added
+  description: 'Verify factory returns VcsAdapter implementations that support modified-file enumeration'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Returns the VcsAdapter port interface'
+  content: |
+    ### Requirement: Factory returns modified-file-capable adapters
+
+    #### Scenario: Returned adapter satisfies modifiedFiles contract
+
+    - **GIVEN** `createVcsAdapter(cwd)` resolves to a concrete adapter
+    - **WHEN** implementation detection later calls `modifiedFiles(baseRef)` on that adapter
+    - **THEN** the adapter satisfies the full current `VcsAdapter` port contract

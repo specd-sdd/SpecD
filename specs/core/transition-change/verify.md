@@ -9,6 +9,14 @@
 - **WHEN** `TransitionChange.execute` is called with a name that does not exist in the repository
 - **THEN** a `ChangeNotFoundError` is thrown
 
+### Requirement: Implementation autodetection before transition
+
+#### Scenario: Historical implementing state triggers refresh before transition checks
+
+- **GIVEN** a change has entered `implementing` at least once in its history
+- **WHEN** `TransitionChange.execute()` is called
+- **THEN** it triggers implementation autodetection before requires enforcement and transition execution
+
 ### Requirement: Approval-gate routing for spec approval
 
 #### Scenario: Ready to implementing is rerouted when spec approval is active
@@ -333,3 +341,8 @@
 
 - **WHEN** `TransitionChange` is assembled
 - **THEN** it receives `ChangeRepository`, `ActorResolver`, `SchemaProvider`, `LifecycleEngine`, and `RunStepHooks`
+
+#### Scenario: TransitionChange receives ImplementationDetector dependency
+
+- **WHEN** `TransitionChange` is assembled
+- **THEN** it receives `ImplementationDetector` alongside `ChangeRepository`, `ActorResolver`, `SchemaProvider`, `LifecycleEngine`, and `RunStepHooks`

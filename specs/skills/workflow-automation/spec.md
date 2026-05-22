@@ -59,6 +59,18 @@ When overlap or drift risk exists for spec deltas, agents SHALL verify merged co
 
 When review only needs one spec-scoped artifact, agents SHOULD prefer `specd changes spec-preview <change-name> <specId> --artifact <artifactId>` to reduce unnecessary output volume.
 
+### Requirement: Implementation traceability policy
+
+AI agents SHALL maintain implementation traceability as part of normal change workflow.
+
+Specifically:
+
+- agents MUST use `specd changes implementation add` to confirm relevant spec-to-file or spec-to-symbol links
+- agents MUST treat tracked implementation files as a review surface distinct from confirmed links
+- agents MUST explicitly resolve or ignore tracked implementation files before archive
+- when resolving or ignoring multiple files, agents SHOULD use comma-separated lists in the `--file` option for better efficiency
+- agents SHALL use implementation integrity review when stale symbol links or sidecar maintenance issues are present
+
 ## Spec Dependencies
 
 - [`cli:command-resource-naming`](../cli/command-resource-naming/spec.md) — canonical plural naming policy used by agent-facing command examples

@@ -170,7 +170,8 @@ export class InMemoryGraphStore extends GraphStore {
       (r) =>
         !(
           (r.type === RelationType.DependsOn && (r.source === specId || r.target === specId)) ||
-          (r.type === RelationType.Covers && r.source === specId)
+          ((r.type === RelationType.CoversFile || r.type === RelationType.CoversSymbol) &&
+            r.source === specId)
         ),
     )
   }
@@ -268,6 +269,26 @@ export class InMemoryGraphStore extends GraphStore {
   async getSpecDependents(specId: string): Promise<Relation[]> {
     this.ensureOpen()
     return this.getRelationsByTarget(RelationType.DependsOn, specId)
+  }
+
+  async getCoveredFiles(specId: string): Promise<Relation[]> {
+    this.ensureOpen()
+    return this.getRelationsBySource(RelationType.CoversFile, specId)
+  }
+
+  async getCoveringSpecs(filePath: string): Promise<Relation[]> {
+    this.ensureOpen()
+    return this.getRelationsByTarget(RelationType.CoversFile, filePath)
+  }
+
+  async getCoveredSymbols(specId: string): Promise<Relation[]> {
+    this.ensureOpen()
+    return this.getRelationsBySource(RelationType.CoversSymbol, specId)
+  }
+
+  async getSymbolCoveringSpecs(symbolId: string): Promise<Relation[]> {
+    this.ensureOpen()
+    return this.getRelationsByTarget(RelationType.CoversSymbol, symbolId)
   }
 
   async findSymbols(query: SymbolQuery): Promise<SymbolNode[]> {

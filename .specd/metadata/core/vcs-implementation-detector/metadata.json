@@ -1,0 +1,121 @@
+{
+  "title": "core:vcs-implementation-detector",
+  "description": "The first implementation detector in specd derives candidate implementation files from VCS worktree state, but that behavior should not be conflated with the detector abstraction itself or with VCS adapter composition. This spec defines the VCS-backed implementation that translates VCS modified-file information into implementation-detector results.",
+  "dependsOn": ["core:implementation-detector-port", "core:vcs-adapter-port"],
+  "context": [
+    "The first implementation detector in specd derives candidate implementation files from VCS worktree state, but that behavior should not be conflated with the detector abstraction itself or with VCS adapter composition. This spec defines the VCS-backed implementation that translates VCS modified-file information into implementation-detector results."
+  ],
+  "rules": [
+    {
+      "requirement": "Implements the detector port",
+      "rules": [
+        "The VCS-backed implementation detector SHALL implement `core:implementation-detector-port`.\n\nIts externally visible behavior MUST satisfy the detector contract for project-relative modified-file discovery."
+      ]
+    },
+    {
+      "requirement": "Uses the VCS adapter port",
+      "rules": [
+        "The detector SHALL obtain modified-file information through `core:vcs-adapter-port`.\n\nIt MUST delegate VCS-specific enumeration to the adapter instead of embedding git-, hg-, or svn-specific command behavior directly inside change-lifecycle use cases."
+      ]
+    },
+    {
+      "requirement": "Resolves the historical implementation baseline",
+      "rules": [
+        "The detector SHALL derive its baseline from the first time the change entered `implementing`.\n\nIt MUST ask the change for that timestamp, resolve the corresponding historical revision through `VcsAdapter.refAt(...)`, and use that revision as the baseline for `modifiedFiles(...)`.\n\nIf no historical `implementing` timestamp exists or the VCS backend cannot resolve a matching historical revision, the detector MAY fall back to `VcsAdapter.ref()` rather than failing outright."
+      ]
+    },
+    {
+      "requirement": "Modified-file candidate mapping",
+      "rules": [
+        "When asked for modified files since a baseline reference, the detector MUST return project-relative candidate file paths derived from the VCS adapter result.\n\nThe detector MUST normalize path separators to forward slashes before returning them."
+      ]
+    },
+    {
+      "requirement": "No workspace normalization",
+      "rules": [
+        "The VCS-backed detector MUST NOT resolve files to canonical `workspace:path` identities.\n\nWorkspace validation, `graph.excludePaths` filtering, and canonical normalization belong to archive-time materialization, not to detection."
+      ]
+    }
+  ],
+  "constraints": [
+    "The detector MUST preserve raw project-relative semantics.",
+    "The detector MUST remain replaceable by non-VCS implementations through the detector port."
+  ],
+  "scenarios": [
+    {
+      "requirement": "Implements the detector port",
+      "name": "VCS-backed detector satisfies detector contract",
+      "when": ["the VCS-backed detector is used through the ImplementationDetector port"],
+      "then": [
+        "callers receive project-relative modified-file candidates through the abstract detector interface"
+      ]
+    },
+    {
+      "requirement": "Uses the VCS adapter port",
+      "name": "Detector delegates modified-file enumeration to VcsAdapter",
+      "given": ["a VCS adapter implementation is available"],
+      "when": ["the detector is asked for modified files"],
+      "then": ["it queries the VCS adapter port instead of running VCS-specific logic inline"]
+    },
+    {
+      "requirement": "Resolves the historical implementation baseline",
+      "name": "Detector uses the first implementing timestamp to resolve baseline",
+      "given": [
+        "a change first entered implementing at a known timestamp",
+        "AND the VCS adapter can resolve a historical revision for that timestamp"
+      ],
+      "when": ["the detector is asked for modified files"],
+      "then": [
+        "it calls refAt(...) with that timestamp",
+        "AND it uses the returned revision as the baseline for modifiedFiles(...)"
+      ]
+    },
+    {
+      "requirement": "Resolves the historical implementation baseline",
+      "name": "Detector falls back when historical baseline cannot be resolved",
+      "given": [
+        "the VCS adapter cannot resolve a historical revision for the implementing timestamp"
+      ],
+      "when": ["the detector is asked for modified files"],
+      "then": [
+        "it falls back to ref()",
+        "AND it still returns project-relative candidates instead of failing"
+      ]
+    },
+    {
+      "requirement": "Modified-file candidate mapping",
+      "name": "Returned candidates are normalized from VCS output",
+      "given": ["the adapter returns repository-relative changed files"],
+      "when": ["the detector maps them into detector output"],
+      "then": ["the detector returns forward-slash-normalized project-relative paths"]
+    },
+    {
+      "requirement": "No workspace normalization",
+      "name": "Detector does not emit workspace-prefixed identities",
+      "when": ["the VCS-backed detector returns candidate files"],
+      "then": [
+        "the returned values are not normalized to workspace:path",
+        "AND workspace validation remains deferred to archive-time materialization"
+      ]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "core:vcs-implementation-detector",
+        "file": "core:src/infrastructure/vcs/vcs-implementation-detector.ts",
+        "symbol": "VcsImplementationDetector"
+      },
+      {
+        "specId": "core:vcs-implementation-detector",
+        "file": "core:src/infrastructure/vcs/vcs-implementation-detector.ts",
+        "symbol": "VcsImplementationDetector.detectModifiedFiles"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:6ed708feb421c6eabacc277f2b71e4b09f4d0d925432343e22269130d3c96f9f",
+    "verify.md": "sha256:771c8d9de6d470be743004194cab4c99212616f043387724e3e9bb50471877cd"
+  },
+  "generatedBy": "core"
+}

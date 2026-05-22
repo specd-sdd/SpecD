@@ -1,0 +1,13 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["core:implementation-detector-port", "core:vcs-adapter-port"],
+  "implementation": [
+    {
+      "file": "core:src/infrastructure/vcs/vcs-implementation-detector.ts",
+      "symbols": ["VcsImplementationDetector", "VcsImplementationDetector.detectModifiedFiles"]
+    }
+  ]
+}

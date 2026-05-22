@@ -1,0 +1,13 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["default:_global/conventions"],
+  "implementation": [
+    {
+      "file": "code-graph:src/domain/value-objects/relation-type.ts",
+      "symbols": ["RelationType", "isRelationType"]
+    }
+  ]
+}

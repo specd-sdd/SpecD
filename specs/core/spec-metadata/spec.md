@@ -153,6 +153,16 @@ A spec that cannot be resolved (missing file, unknown workspace) is silently ski
 
 `metadata.json` files under `.specd/metadata/` must be committed to version control alongside the project. The `.specd/metadata/` directory must not be added to `.gitignore`.
 
+### Requirement: Implementation projection
+
+Generated `metadata.json` SHALL project archived implementation traceability from `spec-lock.json` into an `implementation` field for fast machine consumption.
+
+This metadata projection is derived data:
+
+- it MUST preserve the archived distinction between file-level and symbol-level links
+- it MUST NOT become the authoritative source of implementation truth
+- when projection and sidecar disagree, `spec-lock.json` remains authoritative
+
 ## Pending
 
 - **Spec index** — operations like `specd spec find --keyword <term>` currently require traversing all spec directories to read individual `metadata.json` files. If the number of specs grows to a point where traversal is slow, a generated index (analogous to the archive `index.jsonl`) should be introduced: individual files remain the source of truth, the index is derived and rebuilt via `specd spec reindex`. Not needed until there is a measurable performance problem.
@@ -176,3 +186,4 @@ A spec that cannot be resolved (missing file, unknown workspace) is silently ski
 - [`core:schema-format`](../schema-format/spec.md) — `requiredSpecArtifacts`, used to determine which files to hash for staleness detection
 - [`core:content-extraction`](../content-extraction/spec.md) — the extraction engine used as CompileContext fallback when metadata is stale
 - [`core:spec-repository-port`](../spec-repository-port/spec.md) — `metadata()` and `saveMetadata()` methods used for all metadata access
+- [`core:spec-lock`](../spec-lock/spec.md) — durable archived implementation traceability source

@@ -1,0 +1,24 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["core:change", "code-graph:symbol-model"],
+  "implementation": [
+    {
+      "file": "cli:src/commands/change/_implementation-tracking.ts",
+      "symbols": ["enrichImplementationTracking", "extractRightmostMemberSegment"]
+    },
+    {
+      "file": "cli:src/commands/change/implementation.ts",
+      "symbols": [
+        "registerChangeImplementation",
+        "renderImplementationState",
+        "mutateImplementationTracking"
+      ]
+    },
+    {
+      "file": "cli:src/index.ts"
+    }
+  ]
+}

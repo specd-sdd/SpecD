@@ -47,6 +47,12 @@
       "rules": [
         "Agents SHALL treat `specd changes validate` as structural/state validation only. A successful validation MUST NOT be interpreted as semantic approval of artifact content.\n\nAgents MUST perform content review of requirements, constraints, and intent alignment before progressing lifecycle steps that depend on artifact correctness.\n\nWhen overlap or drift risk exists for spec deltas, agents SHALL verify merged content with `specd changes spec-preview <change-name> <specId>` before accepting the delta outcome.\n\nWhen review only needs one spec-scoped artifact, agents SHOULD prefer `specd changes spec-preview <change-name> <specId> --artifact <artifactId>` to reduce unnecessary output volume."
       ]
+    },
+    {
+      "requirement": "Implementation traceability policy",
+      "rules": [
+        "AI agents SHALL maintain implementation traceability as part of normal change workflow.\n\nSpecifically:\n\n- agents MUST use `specd changes implementation add` to confirm relevant spec-to-file or spec-to-symbol links\n- agents MUST treat tracked implementation files as a review surface distinct from confirmed links\n- agents MUST explicitly resolve or ignore tracked implementation files before archive\n- when resolving or ignoring multiple files, agents SHOULD use comma-separated lists in the `--file` option for better efficiency\n- agents SHALL use implementation integrity review when stale symbol links or sidecar maintenance issues are present"
+      ]
     }
   ],
   "scenarios": [
@@ -164,11 +170,31 @@
       "then": [
         "it prefers specd changes spec-preview <change-name> <specId> --artifact <artifactId> to avoid unrelated output"
       ]
+    },
+    {
+      "requirement": "Implementation traceability policy",
+      "name": "Agent resolves tracked files explicitly before archive",
+      "given": [
+        "an agent has already added relevant implementation links",
+        "AND tracked implementation files still remain in open state"
+      ],
+      "when": ["the workflow approaches archive"],
+      "then": [
+        "the agent explicitly resolves or ignores those tracked files instead of assuming link creation alone closed review"
+      ]
     }
   ],
+  "implementation": {
+    "files": [
+      {
+        "specId": "skills:workflow-automation",
+        "file": "skills:templates/specd-implement/SKILL.md"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:18a0fd8a7ecb590067b8cfae7dc933273b656b05ad85b4d725352240c27cf554",
-    "verify.md": "sha256:f58b58b58a4c7d4be64eb00d7a8b5e1a6baba503cb6c4a62d599553dc531e6fe"
+    "spec.md": "sha256:4cb68e8ff731941bb2a6491cd3836e99cc8ffb3d3014f837eadec979738aaee9",
+    "verify.md": "sha256:8a1be13b58437046cba47b4468273c9771867953118088b58a7934bb20468c65"
   },
   "generatedBy": "core"
 }
