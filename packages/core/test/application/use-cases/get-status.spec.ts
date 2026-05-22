@@ -3,6 +3,7 @@ import { GetStatus } from '../../../src/application/use-cases/get-status.js'
 import { ChangeNotFoundError } from '../../../src/application/errors/change-not-found-error.js'
 import { ChangeArtifact } from '../../../src/domain/entities/change-artifact.js'
 import { ArtifactFile } from '../../../src/domain/value-objects/artifact-file.js'
+import { SpecArtifact } from '../../../src/domain/value-objects/spec-artifact.js'
 import { VALID_TRANSITIONS } from '../../../src/domain/value-objects/change-state.js'
 import {
   makeChangeRepository,
@@ -816,6 +817,99 @@ describe('GetStatus', () => {
       const artifact = result.artifactStatuses.find((a) => a.type === 'specs')
       expect(artifact).toBeDefined()
       expect(artifact!.displayStatus).toBe('pending-review')
+    })
+  })
+
+  describe('task completion counts', () => {
+    it('returns task completion for task-capable artifacts', async () => {
+      const change = makeChange('task-counts')
+      change.transition('designing', testActor)
+      addCompleteArtifact(change, 'tasks', ['specs', 'design'])
+
+      const repo = makeChangeRepository([change])
+      vi.spyOn(repo, 'artifact').mockImplementation(async (_change, filename) => {
+        if (filename !== 'tasks.md') return null
+        return new SpecArtifact(filename, '- [ ] task 1\n- [x] task 2\n- [ ] task 3')
+      })
+
+      const schema = makeSchema({
+        artifacts: [
+          makeArtifactType('tasks', {
+            requires: ['specs', 'design'],
+            hasTasks: true,
+            taskCompletionCheck: {
+              incompletePattern: '^- \\[ \\] .+$',
+              completePattern: '^- \\[x\\] .+$',
+            },
+          }),
+        ],
+      })
+      const uc = makeGetStatus(repo, { schema })
+
+      const result = await uc.execute({ name: 'task-counts' })
+
+      expect(result.artifactStatuses[0]?.taskCompletion).toEqual({
+        complete: 1,
+        incomplete: 2,
+        total: 3,
+      })
+    })
+
+    it('omits task completion when the artifact file does not exist', async () => {
+      const change = makeChange('missing-task-file')
+      change.transition('designing', testActor)
+      addCompleteArtifact(change, 'tasks', ['specs', 'design'])
+
+      const repo = makeChangeRepository([change])
+      const schema = makeSchema({
+        artifacts: [
+          makeArtifactType('tasks', {
+            requires: ['specs', 'design'],
+            hasTasks: true,
+            taskCompletionCheck: {
+              incompletePattern: '^- \\[ \\] .+$',
+              completePattern: '^- \\[x\\] .+$',
+            },
+          }),
+        ],
+      })
+      const uc = makeGetStatus(repo, { schema })
+
+      const result = await uc.execute({ name: 'missing-task-file' })
+
+      expect(result.artifactStatuses[0]?.taskCompletion).toBeUndefined()
+    })
+
+    it('uses incomplete count as total when only incompletePattern is configured', async () => {
+      const change = makeChange('incomplete-only')
+      change.transition('designing', testActor)
+      addCompleteArtifact(change, 'tasks', ['specs', 'design'])
+
+      const repo = makeChangeRepository([change])
+      vi.spyOn(repo, 'artifact').mockResolvedValue(
+        new SpecArtifact('tasks.md', '- [ ] task 1\n- [ ] task 2'),
+      )
+
+      const schema = makeSchema({
+        artifacts: [
+          makeArtifactType('tasks', {
+            requires: ['specs', 'design'],
+            hasTasks: true,
+            taskCompletionCheck: {
+              incompletePattern: '^- \\[ \\] .+$',
+            },
+          }),
+        ],
+      })
+      const uc = makeGetStatus(repo, { schema })
+
+      const result = await uc.execute({ name: 'incomplete-only' })
+
+      expect(result.artifactStatuses[0]?.taskCompletion).toEqual({
+        complete: 0,
+        incomplete: 2,
+        total: 2,
+      })
     })
   })
 })

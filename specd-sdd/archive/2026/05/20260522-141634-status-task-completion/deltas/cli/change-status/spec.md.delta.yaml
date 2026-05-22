@@ -1,0 +1,31 @@
+- op: added
+  description: 'Add requirement for task completion display in DAG'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Output format'
+  content: |
+    ### Requirement: Task completion display in DAG
+
+    When a schema artifact type has `hasTasks: true` and the `GetStatus` result includes `taskCompletion` data for that artifact, the DAG render SHALL replace the static `[hasTasks]` tag with `[hasTasks - N/M done]`, where `N` is the number of complete items and `M` is the total.
+
+    The `[hasTasks]` fallback SHALL still appear when the artifact has `hasTasks: true` but no `taskCompletion` data is available (e.g. artifact file does not exist).
+
+    The `hasTasks` field in `artifactDag` entries for JSON/toon output MUST remain `true/false` as before.
+
+- op: added
+  description: 'Add requirement for task completion in details section'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Implementation section'
+  content: |
+    ### Requirement: Task completion in details section
+
+    The details section of the text output SHALL show task completion counts for each artifact that has `taskCompletion` data, appended inline after the status line in the format `tasks: N/M`.

@@ -8,19 +8,6 @@
     {
       "file": "cli:src/commands/change/status.ts",
       "symbols": ["registerChangeStatus", "renderDag"]
-    },
-    {
-      "file": "cli:src/commands/change/_implementation-tracking.ts",
-      "symbols": [
-        "EnrichedImplementationLink",
-        "GraphHint",
-        "EnrichedImplementationTracking",
-        "enrichImplementationTracking",
-        "extractRightmostMemberSegment"
-      ]
-    },
-    {
-      "file": "cli:src/index.ts"
     }
   ]
 }

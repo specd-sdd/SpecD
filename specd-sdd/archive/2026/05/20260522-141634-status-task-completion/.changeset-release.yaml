@@ -1,0 +1,3 @@
+releases:
+  core:get-status: minor
+  cli:change-status: minor

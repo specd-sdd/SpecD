@@ -19,6 +19,12 @@
       ]
     },
     {
+      "requirement": "Task completion display in DAG",
+      "rules": [
+        "When a schema artifact type has `hasTasks: true` and the `GetStatus` result includes `taskCompletion` data for that artifact, the DAG render SHALL replace the static `[hasTasks]` tag with `[hasTasks - N/M done]`, where `N` is the number of complete items and `M` is the total.\n\nThe `[hasTasks]` fallback SHALL still appear when the artifact has `hasTasks: true` but no `taskCompletion` data is available (e.g. artifact file does not exist).\n\nThe `hasTasks` field in `artifactDag` entries for JSON/toon output MUST remain `true/false` as before."
+      ]
+    },
+    {
       "requirement": "Display-state rendering",
       "rules": [
         "Human-facing status output SHALL render artifact/file display states rather than forcing users to infer drift from raw canonical state plus hashes.\n\nSpecifically:\n\n- canonical `complete` plus `hasDrift=true` SHALL render as `complete-with-drift`\n- canonical `missing` remains `missing` even if `hasDrift=true`\n- canonical review states (`pending-review`, `drifted-pending-review`, `pending-parent-artifact-review`) remain visually stronger than drift-only display projections\n\nJSON/toon output SHALL include both canonical state and display-state fields when returned by GetStatus; text output SHALL prioritize the display state for human readability."
@@ -46,6 +52,12 @@
       "requirement": "Implementation section",
       "rules": [
         "When implementation tracking is active for a change, the status display SHALL include an `Implementation` section derived from the `GetStatus` result **ONLY if the `--implementation` flag is provided**.\n\nThat section MUST expose:\n\n- tracked implementation files grouped or labeled by review state (`open`, `resolved`, `ignored`)\n- confirmed implementation links, showing file-level links and any symbol-level refinements\n- stale-link warnings for symbol-level links whose symbol is absent from the graph database\n\nThe CLI section is based on the `GetStatus` projection. It MUST NOT recompute implementation tracking state independently, but it MAY enrich symbol-level links with stale diagnostics and graph-state hints by querying the code graph.\n\nWhen a symbol-level link contains a composed member identifier such as `X.Y`, `X#Y`, or `X::Y`, and the exact stored symbol string is not found in the graph, the CLI SHOULD retry stale resolution against the same file using the rightmost member segment plus the graph-reported symbol kind.\n\nThis fallback is best-effort only. It MUST NOT rewrite the stored symbol string, MUST NOT mutate change state or archived sidecars, and MUST leave the symbol marked stale when multiple same-file matches make the fallback ambiguous."
+      ]
+    },
+    {
+      "requirement": "Task completion in details section",
+      "rules": [
+        "The details section of the text output SHALL show task completion counts for each artifact that has `taskCompletion` data, appended inline after the status line in the format `tasks: N/M`."
       ]
     }
   ],
@@ -147,6 +159,26 @@
         "the state field in artifactDag is reported as complete-with-drift",
         "AND agents can detect drift without manually comparing hashes"
       ]
+    },
+    {
+      "requirement": "Task completion display in DAG",
+      "name": "DAG shows task completion counts when data is available",
+      "given": [
+        "a change with an artifact that has hasTasks: true",
+        "AND GetStatus returns taskCompletion: { complete: 3, incomplete: 7, total: 10 } for that artifact"
+      ],
+      "when": ["specd change status <name> is run"],
+      "then": ["the DAG render shows [hasTasks - 3/10 done] instead of [hasTasks]"]
+    },
+    {
+      "requirement": "Task completion display in DAG",
+      "name": "DAG shows fallback hasTasks tag when no task completion data",
+      "given": [
+        "a change with an artifact that has hasTasks: true",
+        "AND GetStatus returns no taskCompletion for that artifact"
+      ],
+      "when": ["specd change status <name> is run"],
+      "then": ["the DAG render shows [hasTasks]"]
     },
     {
       "requirement": "Display-state rendering",
@@ -334,15 +366,18 @@
       "given": ["GetStatus returns implementation tracking data"],
       "when": ["specd change status <name> is run without --implementation"],
       "then": ["stdout omits the implementation section"]
+    },
+    {
+      "requirement": "Task completion in details section",
+      "name": "Details show task counts for task-complete artifacts",
+      "given": [
+        "a change with an artifact that has taskCompletion: { complete: 5, incomplete: 5, total: 10 }"
+      ],
+      "when": ["specd change status <name> is run"],
+      "then": ["the details section shows tasks: 5/10 appended to that artifact's status line"]
     }
   ],
   "implementation": {
-    "files": [
-      {
-        "specId": "cli:change-status",
-        "file": "cli:src/index.ts"
-      }
-    ],
     "symbols": [
       {
         "specId": "cli:change-status",
@@ -353,37 +388,12 @@
         "specId": "cli:change-status",
         "file": "cli:src/commands/change/status.ts",
         "symbol": "renderDag"
-      },
-      {
-        "specId": "cli:change-status",
-        "file": "cli:src/commands/change/_implementation-tracking.ts",
-        "symbol": "EnrichedImplementationLink"
-      },
-      {
-        "specId": "cli:change-status",
-        "file": "cli:src/commands/change/_implementation-tracking.ts",
-        "symbol": "GraphHint"
-      },
-      {
-        "specId": "cli:change-status",
-        "file": "cli:src/commands/change/_implementation-tracking.ts",
-        "symbol": "EnrichedImplementationTracking"
-      },
-      {
-        "specId": "cli:change-status",
-        "file": "cli:src/commands/change/_implementation-tracking.ts",
-        "symbol": "enrichImplementationTracking"
-      },
-      {
-        "specId": "cli:change-status",
-        "file": "cli:src/commands/change/_implementation-tracking.ts",
-        "symbol": "extractRightmostMemberSegment"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:ac27228db8a87a97d4803113269f494a6ccfce094b33c42801f2ffc01db4692b",
-    "verify.md": "sha256:3aaebf6a2c765514c385e005db488fd0174b30fe1160c9e0f97db565cab6bc3d"
+    "spec.md": "sha256:e58f8f42a2e2db52871a841dbe078d688fba03ba90cdc4949c7e3edb962eadee",
+    "verify.md": "sha256:f11c3c59f2c833e60a76dc665f47479452cf0bdf6021341a290d994d28a8407b"
   },
   "generatedBy": "core"
 }

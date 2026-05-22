@@ -105,6 +105,20 @@ Each ArtifactStatusEntry MUST include:
 
 `displayStatus` for aggregated artifacts SHALL be derived from file-level display states, using precedence that keeps real workflow states stronger than display-only drift projections.
 
+### Requirement: Reports task completion counts for task-capable artifacts
+
+When the schema artifact type has `hasTasks: true` and declares `taskCompletionCheck`, `GetStatus` MUST load each file of that artifact and count completed and incomplete task items using the declared patterns.
+
+`GetStatus` MUST use `ChangeRepository.artifact()` to load file content. The task completion counts MUST be exposed as an optional `taskCompletion` field on each `ArtifactStatusEntry` that corresponds to a task-capable artifact.
+
+The `taskCompletion` object MUST contain:
+
+- `complete` — count of complete task items (matched via `completePattern`)
+- `incomplete` — count of incomplete task items (matched via `incompletePattern`)
+- `total` — sum of complete and incomplete (when `completePattern` is declared), or equal to `incomplete` (when only `incompletePattern` is declared)
+
+When the artifact file does not exist or the file content is empty, the `taskCompletion` field MUST be omitted.
+
 ### Requirement: Throws ChangeNotFoundError for unknown changes
 
 If no change with the given name exists in the repository, `execute()` MUST throw a `ChangeNotFoundError` with code `CHANGE_NOT_FOUND`. It MUST NOT return `null`.

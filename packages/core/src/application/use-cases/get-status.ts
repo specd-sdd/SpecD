@@ -12,6 +12,7 @@ import {
   LifecycleEngine,
   type LifecycleReviewSummary,
 } from '../../domain/services/lifecycle-engine.js'
+import { safeRegex } from '../../domain/services/safe-regex.js'
 import { Logger } from '../logger.js'
 import {
   type ImplementationTrackingProjection,
@@ -66,6 +67,16 @@ function aggregateDisplayStatus(files: readonly ArtifactFileStatus[]): ArtifactD
   return files[0]!.displayStatus
 }
 
+/** Completed vs incomplete task counts for one artifact type. */
+export interface TaskCompletionStatus {
+  /** Count of completed task items. */
+  readonly complete: number
+  /** Count of incomplete task items. */
+  readonly incomplete: number
+  /** Total count of tracked task items. */
+  readonly total: number
+}
+
 /** Status of a single artifact with file detail and dependency-aware effective status. */
 export interface ArtifactStatusEntry {
   /** Artifact type identifier (e.g. `'proposal'`, `'spec'`). */
@@ -76,6 +87,8 @@ export interface ArtifactStatusEntry {
   readonly effectiveStatus: ArtifactStatus
   /** Human-facing aggregated display status derived from file display states. */
   readonly displayStatus: ArtifactDisplayStatus
+  /** Completed and incomplete task counts for task-capable artifacts, when available. */
+  readonly taskCompletion?: TaskCompletionStatus
   /** Per-file status details. */
   readonly files: ArtifactFileStatus[]
 }
@@ -299,6 +312,50 @@ export class GetStatus {
           displayStatus: aggregateDisplayStatus(files),
           files,
         })
+      }
+
+      for (const artifactType of schemaInfo.artifacts) {
+        if (!artifactType.hasTasks) continue
+        const taskCheck = artifactType.taskCompletionCheck
+        if (taskCheck?.incompletePattern === undefined) continue
+
+        const statusIndex = artifactStatuses.findIndex((entry) => entry.type === artifactType.id)
+        const changeArtifact = change.getArtifact(artifactType.id)
+        if (statusIndex < 0 || changeArtifact === null) continue
+
+        const incompleteRe = safeRegex(taskCheck.incompletePattern, 'gm')
+        if (incompleteRe === null) continue
+
+        const completeRe =
+          taskCheck.completePattern !== undefined
+            ? safeRegex(taskCheck.completePattern, 'gm')
+            : null
+
+        let incompleteCount = 0
+        let completeCount = 0
+
+        for (const file of changeArtifact.files.values()) {
+          const loaded = await this._changes.artifact(change, file.filename)
+          if (loaded === null || loaded.content.length === 0) continue
+
+          incompleteCount += (loaded.content.match(incompleteRe) ?? []).length
+          if (completeRe !== null) {
+            completeCount += (loaded.content.match(completeRe) ?? []).length
+          }
+        }
+
+        const total = incompleteCount + completeCount
+        if (total === 0) continue
+
+        const statusEntry = artifactStatuses[statusIndex]!
+        artifactStatuses[statusIndex] = {
+          ...statusEntry,
+          taskCompletion: {
+            complete: completeCount,
+            incomplete: incompleteCount,
+            total,
+          },
+        }
       }
 
       review = this._projectReview(verdict.review, changePath)

@@ -37,6 +37,7 @@ JSON/TOON output schema:
       type: string
       state: string
       effectiveStatus: string
+      taskCompletion?: { complete: number, incomplete: number, total: number }
       files: Array<{ key: string, filename: string, state: string, validatedHash?: string }>
     }>
     review: {
@@ -181,7 +182,13 @@ JSON/TOON output schema:
             lines.push('')
             lines.push('artifacts (details):')
             for (const a of artifactStatuses) {
-              lines.push(`  ${a.type}  ${a.displayStatus}  (effective: ${a.effectiveStatus})`)
+              const taskSuffix =
+                a.taskCompletion !== undefined
+                  ? `  tasks: ${a.taskCompletion.complete}/${a.taskCompletion.total}`
+                  : ''
+              lines.push(
+                `  ${a.type}  ${a.displayStatus}  (effective: ${a.effectiveStatus})${taskSuffix}`,
+              )
               for (const file of a.files) {
                 const hash = file.validatedHash !== undefined ? `  ${file.validatedHash}` : ''
                 const drift = file.hasDrift ? '  [drift]' : ''
@@ -225,6 +232,7 @@ JSON/TOON output schema:
                   state: a.state,
                   displayStatus: a.displayStatus,
                   effectiveStatus: a.effectiveStatus,
+                  ...(a.taskCompletion !== undefined ? { taskCompletion: a.taskCompletion } : {}),
                   files: a.files.map((file) => ({
                     key: file.key,
                     filename: file.filename,
@@ -345,12 +353,17 @@ function renderDag(
     const artifact = artifactTypes.find((a) => a.id === id)
     if (!artifact) return
 
-    const status = artifactStatuses.find((as) => as.type === id)?.effectiveStatus ?? 'missing'
+    const artifactStatus = artifactStatuses.find((as) => as.type === id)
+    const status = artifactStatus?.effectiveStatus ?? 'missing'
     const symbol = stateSymbols[status] ?? '[?]'
     const scope = `[scope: ${artifact.scope}]`
 
     const connector = isRoot ? '' : isLast ? '└── ' : '├── '
-    const taskTag = artifact.hasTasks ? ' [hasTasks]' : ''
+    const taskTag = artifact.hasTasks
+      ? artifactStatus?.taskCompletion !== undefined
+        ? ` [hasTasks - ${artifactStatus.taskCompletion.complete}/${artifactStatus.taskCompletion.total} done]`
+        : ' [hasTasks]'
+      : ''
     lines.push(`${prefix}${connector}${symbol} ${id} ${scope}${taskTag}`)
 
     const children = artifactTypes.filter((a) => a.requires && a.requires.includes(id))

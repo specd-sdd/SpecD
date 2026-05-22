@@ -15,13 +15,7 @@
   "implementation": [
     {
       "file": "core:src/application/use-cases/get-status.ts",
-      "symbols": ["GetStatus", "GetStatus.execute", "GetStatusResult"]
-    },
-    {
-      "file": "core:src/composition/kernel.ts"
-    },
-    {
-      "file": "core:src/composition/use-cases/get-status.ts"
+      "symbols": ["ArtifactStatusEntry", "TaskCompletionStatus", "GetStatus.execute"]
     }
   ]
 }

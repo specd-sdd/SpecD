@@ -288,6 +288,7 @@ describe('Output format', () => {
           state: 'complete',
           effectiveStatus: 'complete',
           displayStatus: 'complete-with-drift',
+          taskCompletion: { complete: 3, incomplete: 7, total: 10 },
           files: [{ key: 'proposal', filename: 'proposal.md', state: 'complete', hasDrift: true }],
         },
       ],
@@ -311,6 +312,7 @@ describe('Output format', () => {
     const proposal = result.artifactDag.find((a: any) => a.id === 'proposal')
     expect(proposal.hasTasks).toBe(true)
     expect(proposal.state).toBe('complete-with-drift')
+    expect(result.artifacts[0].taskCompletion).toEqual({ complete: 3, incomplete: 7, total: 10 })
   })
 
   it('renders implementation tracking in text output', async () => {
@@ -596,7 +598,13 @@ describe('Artifact DAG rendering', () => {
       artifactStatuses: [
         { type: 'proposal', state: 'complete', effectiveStatus: 'complete', files: [] },
         { type: 'design', state: 'complete', effectiveStatus: 'complete', files: [] },
-        { type: 'tasks', state: 'missing', effectiveStatus: 'missing', files: [] },
+        {
+          type: 'tasks',
+          state: 'missing',
+          effectiveStatus: 'missing',
+          taskCompletion: { complete: 3, incomplete: 7, total: 10 },
+          files: [],
+        },
       ],
       blockers: [],
       nextAction: defaultNextAction,
@@ -628,7 +636,35 @@ describe('Artifact DAG rendering', () => {
 
     expect(dagLines[0]).toMatch(/\[✓\] proposal \[scope: change\]/)
     expect(dagLines[1]).toMatch(/└── \[✓\] design \[scope: spec\]/)
-    expect(dagLines[2]).toMatch(/    └── \[ \] tasks \[scope: spec\] \[hasTasks\]/)
+    expect(dagLines[2]).toMatch(/    └── \[ \] tasks \[scope: spec\] \[hasTasks - 3\/10 done\]/)
+  })
+
+  it('shows task counts in the details section when taskCompletion is present', async () => {
+    const { kernel, stdout } = setup()
+    const change = makeMockChange({ name: 'my-change', state: 'implementing' })
+
+    kernel.changes.status.execute.mockResolvedValue({
+      change,
+      artifactStatuses: [
+        {
+          type: 'tasks',
+          state: 'complete',
+          displayStatus: 'complete',
+          effectiveStatus: 'complete',
+          taskCompletion: { complete: 5, incomplete: 5, total: 10 },
+          files: [],
+        },
+      ],
+      blockers: [],
+      nextAction: defaultNextAction,
+      lifecycle: defaultLifecycle,
+    })
+
+    const program = makeProgram()
+    registerChangeStatus(program.command('change'))
+    await program.parseAsync(['node', 'specd', 'change', 'status', 'my-change'])
+
+    expect(stdout()).toContain('tasks  complete  (effective: complete)  tasks: 5/10')
   })
 
   it('renders multiple roots and branches correctly', async () => {

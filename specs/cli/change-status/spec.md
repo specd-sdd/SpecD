@@ -21,6 +21,14 @@ In `json` or `toon` mode, the `artifactDag` array MUST include the `hasTasks` fi
 
 The `state` field in the top-level `artifactDag` MUST reflect the drift-aware display state projection (e.g., `complete-with-drift`) rather than the raw canonical state, ensuring that agents can detect drift without manually comparing hashes.
 
+### Requirement: Task completion display in DAG
+
+When a schema artifact type has `hasTasks: true` and the `GetStatus` result includes `taskCompletion` data for that artifact, the DAG render SHALL replace the static `[hasTasks]` tag with `[hasTasks - N/M done]`, where `N` is the number of complete items and `M` is the total.
+
+The `[hasTasks]` fallback SHALL still appear when the artifact has `hasTasks: true` but no `taskCompletion` data is available (e.g. artifact file does not exist).
+
+The `hasTasks` field in `artifactDag` entries for JSON/toon output MUST remain `true/false` as before.
+
 ### Requirement: Display-state rendering
 
 Human-facing status output SHALL render artifact/file display states rather than forcing users to infer drift from raw canonical state plus hashes.
@@ -85,6 +93,10 @@ The CLI section is based on the `GetStatus` projection. It MUST NOT recompute im
 When a symbol-level link contains a composed member identifier such as `X.Y`, `X#Y`, or `X::Y`, and the exact stored symbol string is not found in the graph, the CLI SHOULD retry stale resolution against the same file using the rightmost member segment plus the graph-reported symbol kind.
 
 This fallback is best-effort only. It MUST NOT rewrite the stored symbol string, MUST NOT mutate change state or archived sidecars, and MUST leave the symbol marked stale when multiple same-file matches make the fallback ambiguous.
+
+### Requirement: Task completion in details section
+
+The details section of the text output SHALL show task completion counts for each artifact that has `taskCompletion` data, appended inline after the status line in the format `tasks: N/M`.
 
 ## Constraints
 

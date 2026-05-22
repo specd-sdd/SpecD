@@ -70,6 +70,22 @@
 - **THEN** the `state` field in `artifactDag` is reported as `complete-with-drift`
 - **AND** agents can detect drift without manually comparing hashes
 
+### Requirement: Task completion display in DAG
+
+#### Scenario: DAG shows task completion counts when data is available
+
+- **GIVEN** a change with an artifact that has `hasTasks: true`
+- **AND** `GetStatus` returns `taskCompletion: { complete: 3, incomplete: 7, total: 10 }` for that artifact
+- **WHEN** `specd change status <name>` is run
+- **THEN** the DAG render shows `[hasTasks - 3/10 done]` instead of `[hasTasks]`
+
+#### Scenario: DAG shows fallback hasTasks tag when no task completion data
+
+- **GIVEN** a change with an artifact that has `hasTasks: true`
+- **AND** `GetStatus` returns no `taskCompletion` for that artifact
+- **WHEN** `specd change status <name>` is run
+- **THEN** the DAG render shows `[hasTasks]`
+
 ### Requirement: Display-state rendering
 
 #### Scenario: Text output prefers complete-with-drift over raw complete
@@ -209,3 +225,11 @@
 - **GIVEN** `GetStatus` returns implementation tracking data
 - **WHEN** `specd change status <name>` is run without `--implementation`
 - **THEN** stdout omits the implementation section
+
+### Requirement: Task completion in details section
+
+#### Scenario: Details show task counts for task-complete artifacts
+
+- **GIVEN** a change with an artifact that has `taskCompletion: { complete: 5, incomplete: 5, total: 10 }`
+- **WHEN** `specd change status <name>` is run
+- **THEN** the details section shows `tasks: 5/10` appended to that artifact's status line

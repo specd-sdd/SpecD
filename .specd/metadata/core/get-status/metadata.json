@@ -45,6 +45,12 @@
       ]
     },
     {
+      "requirement": "Reports task completion counts for task-capable artifacts",
+      "rules": [
+        "When the schema artifact type has `hasTasks: true` and declares `taskCompletionCheck`, `GetStatus` MUST load each file of that artifact and count completed and incomplete task items using the declared patterns.\n\n`GetStatus` MUST use `ChangeRepository.artifact()` to load file content. The task completion counts MUST be exposed as an optional `taskCompletion` field on each `ArtifactStatusEntry` that corresponds to a task-capable artifact.\n\nThe `taskCompletion` object MUST contain:\n\n- `complete` — count of complete task items (matched via `completePattern`)\n- `incomplete` — count of incomplete task items (matched via `incompletePattern`)\n- `total` — sum of complete and incomplete (when `completePattern` is declared), or equal to `incomplete` (when only `incompletePattern` is declared)\n\nWhen the artifact file does not exist or the file content is empty, the `taskCompletion` field MUST be omitted."
+      ]
+    },
+    {
       "requirement": "Throws ChangeNotFoundError for unknown changes",
       "rules": [
         "If no change with the given name exists in the repository, `execute()` MUST throw a `ChangeNotFoundError` with code `CHANGE_NOT_FOUND`. It MUST NOT return `null`."
@@ -183,6 +189,46 @@
       ],
       "when": ["GetStatus aggregates artifact display state"],
       "then": ["the artifact displayStatus is pending-review"]
+    },
+    {
+      "requirement": "Reports task completion counts for task-capable artifacts",
+      "name": "Task completion counts returned for task-capable artifacts",
+      "given": [
+        "a change with an artifact type that has hasTasks: true and taskCompletionCheck.incompletePattern set",
+        "AND taskCompletionCheck.completePattern is also set",
+        "AND the artifact file contains [ ] task 1, [x] task 2, [ ] task 3"
+      ],
+      "when": ["GetStatus.execute() is called"],
+      "then": [
+        "the ArtifactStatusEntry for that artifact includes taskCompletion",
+        "AND taskCompletion.incomplete is 2",
+        "AND taskCompletion.complete is 1",
+        "AND taskCompletion.total is 3"
+      ]
+    },
+    {
+      "requirement": "Reports task completion counts for task-capable artifacts",
+      "name": "Task completion omitted when artifact file does not exist",
+      "given": [
+        "a change with an artifact type that has hasTasks: true",
+        "AND the artifact file does not exist on disk"
+      ],
+      "when": ["GetStatus.execute() is called"],
+      "then": ["the ArtifactStatusEntry for that artifact does NOT include taskCompletion"]
+    },
+    {
+      "requirement": "Reports task completion counts for task-capable artifacts",
+      "name": "Task completion with only incompletePattern",
+      "given": [
+        "a change with an artifact type that has hasTasks: true",
+        "AND only taskCompletionCheck.incompletePattern is set (no completePattern)",
+        "AND the artifact file contains [ ] task 1, [ ] task 2"
+      ],
+      "when": ["GetStatus.execute() is called"],
+      "then": [
+        "taskCompletion.incomplete is 2",
+        "AND taskCompletion.total equals taskCompletion.incomplete"
+      ]
     },
     {
       "requirement": "Throws ChangeNotFoundError for unknown changes",
@@ -370,37 +416,27 @@
     }
   ],
   "implementation": {
-    "files": [
-      {
-        "specId": "core:get-status",
-        "file": "core:src/composition/kernel.ts"
-      },
-      {
-        "specId": "core:get-status",
-        "file": "core:src/composition/use-cases/get-status.ts"
-      }
-    ],
     "symbols": [
       {
         "specId": "core:get-status",
         "file": "core:src/application/use-cases/get-status.ts",
-        "symbol": "GetStatus"
+        "symbol": "ArtifactStatusEntry"
+      },
+      {
+        "specId": "core:get-status",
+        "file": "core:src/application/use-cases/get-status.ts",
+        "symbol": "TaskCompletionStatus"
       },
       {
         "specId": "core:get-status",
         "file": "core:src/application/use-cases/get-status.ts",
         "symbol": "GetStatus.execute"
-      },
-      {
-        "specId": "core:get-status",
-        "file": "core:src/application/use-cases/get-status.ts",
-        "symbol": "GetStatusResult"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:6cc360a6343fef9a36173b4b34f4bff8cbb3a27b0ae0c3cbd72b866967fe614d",
-    "verify.md": "sha256:d36d13f9df85260981760c9c934888afaa3f9fe08ba8c7ac2e7af86bf6fccf91"
+    "spec.md": "sha256:e84196c33c774b01ad93269e18025db228986a79767b7ef9df49d4f347c9d7dd",
+    "verify.md": "sha256:489bdcf3207623540207c19a668d42ee1f1165312dd899fff8051a7f30a20622"
   },
   "generatedBy": "core"
 }

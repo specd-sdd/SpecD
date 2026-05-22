@@ -1,0 +1,43 @@
+- op: added
+  description: 'Add verification scenarios for task completion display in DAG'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Output format'
+  content: |
+    ### Requirement: Task completion display in DAG
+
+    #### Scenario: DAG shows task completion counts when data is available
+
+    - **GIVEN** a change with an artifact that has `hasTasks: true`
+    - **AND** `GetStatus` returns `taskCompletion: { complete: 3, incomplete: 7, total: 10 }` for that artifact
+    - **WHEN** `specd change status <name>` is run
+    - **THEN** the DAG render shows `[hasTasks - 3/10 done]` instead of `[hasTasks]`
+
+    #### Scenario: DAG shows fallback hasTasks tag when no task completion data
+
+    - **GIVEN** a change with an artifact that has `hasTasks: true`
+    - **AND** `GetStatus` returns no `taskCompletion` for that artifact
+    - **WHEN** `specd change status <name>` is run
+    - **THEN** the DAG render shows `[hasTasks]`
+
+- op: added
+  description: 'Add verification scenarios for task completion in details section'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Implementation section'
+  content: |
+    ### Requirement: Task completion in details section
+
+    #### Scenario: Details show task counts for task-complete artifacts
+
+    - **GIVEN** a change with an artifact that has `taskCompletion: { complete: 5, incomplete: 5, total: 10 }`
+    - **WHEN** `specd change status <name>` is run
+    - **THEN** the details section shows `tasks: 5/10` appended to that artifact's status line

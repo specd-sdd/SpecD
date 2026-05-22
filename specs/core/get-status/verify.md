@@ -82,6 +82,35 @@
 - **WHEN** `GetStatus` aggregates artifact display state
 - **THEN** the artifact `displayStatus` is `pending-review`
 
+### Requirement: Reports task completion counts for task-capable artifacts
+
+#### Scenario: Task completion counts returned for task-capable artifacts
+
+- **GIVEN** a change with an artifact type that has `hasTasks: true` and `taskCompletionCheck.incompletePattern` set
+- **AND** `taskCompletionCheck.completePattern` is also set
+- **AND** the artifact file contains `[ ] task 1`, `[x] task 2`, `[ ] task 3`
+- **WHEN** `GetStatus.execute()` is called
+- **THEN** the `ArtifactStatusEntry` for that artifact includes `taskCompletion`
+- **AND** `taskCompletion.incomplete` is `2`
+- **AND** `taskCompletion.complete` is `1`
+- **AND** `taskCompletion.total` is `3`
+
+#### Scenario: Task completion omitted when artifact file does not exist
+
+- **GIVEN** a change with an artifact type that has `hasTasks: true`
+- **AND** the artifact file does not exist on disk
+- **WHEN** `GetStatus.execute()` is called
+- **THEN** the `ArtifactStatusEntry` for that artifact does NOT include `taskCompletion`
+
+#### Scenario: Task completion with only incompletePattern
+
+- **GIVEN** a change with an artifact type that has `hasTasks: true`
+- **AND** only `taskCompletionCheck.incompletePattern` is set (no `completePattern`)
+- **AND** the artifact file contains `[ ] task 1`, `[ ] task 2`
+- **WHEN** `GetStatus.execute()` is called
+- **THEN** `taskCompletion.incomplete` is `2`
+- **AND** `taskCompletion.total` equals `taskCompletion.incomplete`
+
 ### Requirement: Throws ChangeNotFoundError for unknown changes
 
 #### Scenario: Change does not exist
