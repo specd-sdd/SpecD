@@ -1,0 +1,28 @@
+- op: added
+  description: 'Verify typed errors for archive failures'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: Typed errors for archive failures
+
+    #### Scenario: Dependency mismatch throws ArchiveDependencyMismatchError
+
+    - **GIVEN** a change with `dependsOn: ['core:storage']`
+    - **AND** the extracted metadata from artifacts has `dependsOn: ['core:new-dep']`
+    - **WHEN** `ArchiveChange` is executed
+    - **THEN** `ArchiveDependencyMismatchError` is thrown
+    - **AND** the error includes both the extracted and persisted dependencies
+
+    #### Scenario: Missing artifact throws ArchiveArtifactMissingError
+
+    - **GIVEN** a change targeting a spec whose tracked artifact is missing from the filesystem
+    - **WHEN** `ArchiveChange` is executed
+    - **THEN** `ArchiveArtifactMissingError` is thrown
+
+    #### Scenario: Open implementation file throws ArchiveImplementationStateError
+
+    - **GIVEN** a change with implementation files that are currently marked as open in the detector
+    - **WHEN** `ArchiveChange` is executed
+    - **THEN** `ArchiveImplementationStateError` is thrown

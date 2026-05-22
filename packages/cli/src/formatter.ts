@@ -1,4 +1,5 @@
 import { encode as encodeToon } from '@toon-format/toon'
+import { CliValidationError } from './errors/index.js'
 
 /**
  * Supported output format values.
@@ -16,11 +17,11 @@ const VALID_FORMATS: readonly string[] = ['text', 'json', 'toon']
  *
  * @param raw - The raw string value provided via `--format`
  * @returns A validated `OutputFormat`
- * @throws {Error} If the value is not a recognised format
+ * @throws {CliValidationError} If the value is not a recognised format
  */
 export function parseFormat(raw: string): OutputFormat {
   if (!VALID_FORMATS.includes(raw)) {
-    throw new Error(`invalid format '${raw}' — must be one of: text, json, toon`)
+    throw new CliValidationError(`invalid format '${raw}' — must be one of: text, json, toon`)
   }
   return raw as OutputFormat
 }

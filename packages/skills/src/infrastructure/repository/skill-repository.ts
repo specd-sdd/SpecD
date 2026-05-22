@@ -11,6 +11,7 @@ import type {
   SkillBundle,
   SkillBundleInstallTarget,
 } from '../../domain/skill-bundle.js'
+import { SkillNotFoundError } from '../../domain/errors/skill-not-found-error.js'
 import { TemplateReader } from './template-reader.js'
 
 /**
@@ -144,7 +145,7 @@ class FsSkillRepository implements SkillRepository {
    * @param variables - Placeholder variables.
    * @param config - Optional project configuration.
    * @returns Resolved install bundle.
-   * @throws Error if skill is not found.
+   * @throws SkillNotFoundError if skill is not found.
    */
   getBundle(
     name: string,
@@ -153,7 +154,7 @@ class FsSkillRepository implements SkillRepository {
   ): SkillBundle {
     const skill = this.get(name)
     if (skill === undefined) {
-      throw new Error(`Skill '${name}' was not found`)
+      throw new SkillNotFoundError(name)
     }
 
     let finalVariables = { ...variables }

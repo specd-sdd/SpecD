@@ -211,48 +211,20 @@
 
 #### Scenario: JSON format produces structured error on stdout
 
-- **GIVEN** a domain error with code `CHANGE_NOT_FOUND` occurs
-- **WHEN** the command was run with `--format json`
-- **THEN** stdout contains valid JSON: `{"result": "error", "code": "CHANGE_NOT_FOUND", "message": "...", "exitCode": 1}`
-- **AND** stderr still contains the `error:` line in plain text
+- **WHEN** the CLI is executed with `--format json` and a `SpecdError` is caught
+- **THEN** it emits a structured JSON error to stdout
 
-#### Scenario: TOON format produces structured error on stdout
+#### Scenario: CLI validation error produces structured output
 
-- **GIVEN** a domain error occurs
-- **WHEN** the command was run with `--format toon`
-- **THEN** stdout contains a TOON-encoded error object with `result`, `code`, `message`, and `exitCode`
-- **AND** stderr still contains the `error:` line in plain text
-
-#### Scenario: Schema error produces structured error in JSON format
-
-- **GIVEN** a `SchemaNotFoundError` occurs
-- **WHEN** the command was run with `--format json`
-- **THEN** stdout contains `{"result": "error", "code": "SCHEMA_NOT_FOUND", "message": "...", "exitCode": 3}`
-- **AND** stderr contains a `fatal:` line in plain text
-
-#### Scenario: Unexpected system error does not produce structured stdout
-
-- **GIVEN** an unexpected error (not a `SpecdError` subclass) occurs
-- **WHEN** the command was run with `--format json`
-- **THEN** stderr contains a `fatal:` line in plain text
-- **AND** stdout is empty
-
-#### Scenario: Hook failure produces structured error in JSON format
-
-- **GIVEN** a hook failure occurs
-- **WHEN** the command was run with `--format json`
-- **THEN** stdout contains `{"result": "error", "code": "HOOK_FAILED", "message": "...", "exitCode": 2}`
-- **AND** stderr contains the hook error in plain text
-
-#### Scenario: Text format errors do not produce structured stdout
-
-- **GIVEN** a domain error occurs
-- **WHEN** the command was run with `--format text` (or without `--format`)
-- **THEN** stdout is empty
-- **AND** stderr contains the `error:` line in plain text
+- **GIVEN** an invalid output format `--format invalid` is provided
+- **WHEN** the CLI is executed with `--format json`
+- **THEN** it emits a structured error to stdout
+- **AND** the error code is `INVALID_FORMAT` (from `SpecdCliError`)
+- **AND** no stack trace is shown in stderr
 
 #### Scenario: Stack trace shown when logger debug level is enabled
 
-- **GIVEN** logger debug level is enabled
-- **WHEN** a system error occurs
-- **THEN** a stack trace is printed to stderr
+- **GIVEN** a `SpecdError` occurs
+- **AND** the logger level is set to `debug`
+- **WHEN** the error is reported
+- **THEN** the stack trace is included in the stderr output

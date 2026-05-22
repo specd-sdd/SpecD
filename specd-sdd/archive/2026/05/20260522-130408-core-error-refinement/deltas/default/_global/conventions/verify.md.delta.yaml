@@ -1,0 +1,22 @@
+- op: modified
+  description: 'Verify monorepo error parent convention'
+  selector:
+    type: section
+    matches: 'Requirement: Error types'
+  content: |
+    #### Scenario: Raw Error thrown in domain code
+
+    - **WHEN** a domain or application use case throws a generic `Error`
+    - **THEN** it is a convention violation — use `SpecdError` (or package-level base) instead
+
+    #### Scenario: Core error missing SpecdError parent
+
+    - **GIVEN** a new domain error class in `@specd/core`
+    - **WHEN** the error is defined
+    - **THEN** it MUST extend `SpecdError`
+
+    #### Scenario: Monorepo package error hierarchy
+
+    - **GIVEN** a monorepo package that depends on `@specd/core`
+    - **WHEN** it defines its own base error class
+    - **THEN** that class MUST extend `SpecdError`

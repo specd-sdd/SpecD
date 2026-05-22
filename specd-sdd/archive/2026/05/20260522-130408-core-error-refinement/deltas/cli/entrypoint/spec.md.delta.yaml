@@ -1,0 +1,18 @@
+- op: added
+  description: 'Reference the new error handling conventions'
+  position:
+    parent:
+      type: section
+      matches: 'Spec Dependencies'
+  content: |
+    - [`default:_global/error-handling-conventions`](../../_global/error-handling-conventions/spec.md) — canonical error handling standards for the monorepo.
+
+- op: modified
+  description: 'Mandate structured CLI errors'
+  selector:
+    type: section
+    matches: 'Requirement: Structured error output'
+  content: |
+    The CLI SHALL ensure all user-facing errors (validation, format, configuration) use typed error classes that follow the "Specd Error Contract" defined in [`default:_global/error-handling-conventions`](../../_global/error-handling-conventions/spec.md).
+
+    `@specd/cli` SHALL define its own `SpecdCliError` base class (extending `SpecdError`) for CLI-specific errors. Generic `Error` throws MUST be eliminated from formatters, command helpers, and argument validation logic to ensure the global `handleError` can emit structured JSON/TOON output without stack traces.

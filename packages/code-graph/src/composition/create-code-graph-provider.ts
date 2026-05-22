@@ -14,6 +14,7 @@ import {
   type GraphStoreFactory,
   type GraphStoreFactoryOptions,
 } from './graph-store-factory.js'
+import { GraphStoreRegistryError } from '../domain/errors/graph-store-registry-error.js'
 
 const DEFAULT_GRAPH_STORE_ID = 'sqlite'
 
@@ -44,7 +45,7 @@ const BUILTIN_GRAPH_STORE_FACTORIES: Readonly<Record<string, GraphStoreFactory>>
  * @param options - SpecdConfig or CodeGraphOptions.
  * @param factoryOptions - Optional composition overrides for the SpecdConfig overload.
  * @returns A fully configured {@link CodeGraphProvider} instance.
- * @throws {Error} When the selected or additively-registered backend id is invalid.
+ * @throws {GraphStoreRegistryError} When the selected or additively-registered backend id is invalid.
  */
 export function createCodeGraphProvider(
   options: SpecdConfig | CodeGraphOptions,
@@ -56,7 +57,7 @@ export function createCodeGraphProvider(
   const graphStoreId = graphOptions?.graphStoreId ?? DEFAULT_GRAPH_STORE_ID
   const graphStoreFactory = graphStoreRegistry[graphStoreId]
   if (graphStoreFactory === undefined) {
-    throw new Error(`graph store '${graphStoreId}' is not registered`)
+    throw GraphStoreRegistryError.notFound(graphStoreId)
   }
 
   const store = graphStoreFactory.create({ storagePath })
@@ -90,7 +91,7 @@ function isSpecdConfig(options: SpecdConfig | CodeGraphOptions): options is Spec
  *
  * @param extra - Optional additive registrations.
  * @returns The merged graph-store factory registry.
- * @throws {Error} When an additive registration collides with an existing id.
+ * @throws {GraphStoreRegistryError} When an additive registration collides with an existing id.
  */
 function createGraphStoreRegistry(
   extra?: Readonly<Record<string, GraphStoreFactory>>,
@@ -98,7 +99,7 @@ function createGraphStoreRegistry(
   const registry: Record<string, GraphStoreFactory> = { ...BUILTIN_GRAPH_STORE_FACTORIES }
   for (const [id, factory] of Object.entries(extra ?? {})) {
     if (registry[id] !== undefined) {
-      throw new Error(`graph store '${id}' is already registered`)
+      throw GraphStoreRegistryError.alreadyRegistered(id)
     }
     registry[id] = factory
   }

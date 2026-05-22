@@ -1,9 +1,9 @@
-import { CodeGraphError } from './code-graph-error.js'
+import { SpecdCodeGraphError } from './specd-code-graph-error.js'
 
 /**
  * Error thrown when an unrecognized symbol kind string is encountered.
  */
-export class InvalidSymbolKindError extends CodeGraphError {
+export class InvalidSymbolKindError extends SpecdCodeGraphError {
   /**
    * Returns the machine-readable error code.
    * @returns The error code 'INVALID_SYMBOL_KIND'.

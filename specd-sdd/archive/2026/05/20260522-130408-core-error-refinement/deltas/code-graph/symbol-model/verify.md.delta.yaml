@@ -1,0 +1,17 @@
+- op: modified
+  description: 'Verify SpecdCodeGraphError extends SpecdError'
+  selector:
+    type: section
+    matches: 'Requirement: Error types'
+  content: |
+    #### Scenario: SpecdCodeGraphError extends SpecdError
+
+    - **WHEN** `SpecdCodeGraphError` is instantiated
+    - **THEN** it extends `SpecdError` from `@specd/core`
+    - **AND** it includes the `specd: true` discriminator
+
+    #### Scenario: Duplicate symbol id detected
+
+    - **GIVEN** two symbols in the same file produce the same ID
+    - **WHEN** the symbol model validates the file
+    - **THEN** `DuplicateSymbolIdError` (extending `SpecdCodeGraphError`) is thrown

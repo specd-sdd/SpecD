@@ -23,9 +23,11 @@ import {
   HookFailedError,
   SchemaValidationError,
   ConfigValidationError,
+  ArchiveDependencyMismatchError,
   type LoggerPort,
 } from '@specd/core'
 import { handleError } from '../src/handle-error.js'
+import { CliValidationError } from '../src/errors/index.js'
 import { mockProcessExit, ExitSentinel } from './commands/helpers.js'
 
 function capturedStderr(): string {
@@ -190,6 +192,48 @@ describe('handleError — structured error output', () => {
     expect(parsed.code).toBe('CHANGE_NOT_FOUND')
     expect(parsed.exitCode).toBe(1)
     expect(parsed.message).toContain('my-change')
+  })
+
+  it('CliValidationError emits structured JSON to stdout when format is json', () => {
+    callHandleError(new CliValidationError('invalid flag'), 'json')
+    const parsed = JSON.parse(capturedStdout()) as Record<string, unknown>
+    expect(parsed.result).toBe('error')
+    expect(parsed.code).toBe('CLI_VALIDATION_ERROR')
+    expect(parsed.exitCode).toBe(1)
+    expect(parsed.message).toContain('invalid flag')
+  })
+
+  it('custom error with specd: true discriminator emits structured JSON', () => {
+    const customError = new Error('custom failure')
+    ;(customError as any).specd = true
+    ;(customError as any).code = 'CUSTOM_ERROR_CODE'
+
+    callHandleError(customError, 'json')
+    const parsed = JSON.parse(capturedStdout()) as Record<string, unknown>
+    expect(parsed.result).toBe('error')
+    expect(parsed.code).toBe('CUSTOM_ERROR_CODE')
+    expect(parsed.exitCode).toBe(1)
+    expect(parsed.message).toContain('custom failure')
+  })
+
+  it('structured output preserves contextual metadata from SpecdError getters', () => {
+    callHandleError(
+      new ArchiveDependencyMismatchError(
+        'core:archive-change',
+        ['core:change', 'core:storage'],
+        ['core:change', 'default:_global/error-handling-conventions'],
+      ),
+      'json',
+    )
+
+    const parsed = JSON.parse(capturedStdout()) as Record<string, unknown>
+    expect(parsed.code).toBe('ARCHIVE_DEPENDENCY_MISMATCH')
+    expect(parsed.message).toContain('Archive failed')
+    expect(parsed.metadata).toEqual({
+      specId: 'core:archive-change',
+      expectedDeps: ['core:change', 'core:storage'],
+      actualDeps: ['core:change', 'default:_global/error-handling-conventions'],
+    })
   })
 
   it('domain error emits structured output when format is toon', () => {

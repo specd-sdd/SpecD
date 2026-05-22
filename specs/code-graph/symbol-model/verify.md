@@ -274,14 +274,14 @@
 
 ### Requirement: Error types
 
-#### Scenario: CodeGraphError is independent of SpecdError
+#### Scenario: SpecdCodeGraphError extends SpecdError
 
-- **WHEN** `CodeGraphError` is instantiated
-- **THEN** it extends `Error` directly, not `SpecdError`
-- **AND** error types do not import from `@specd/core`
+- **WHEN** `SpecdCodeGraphError` is instantiated
+- **THEN** it extends `SpecdError` from `@specd/core`
+- **AND** it includes the `specd: true` discriminator
 
 #### Scenario: Duplicate symbol id detected
 
-- **GIVEN** two symbols in the same file that produce the same deterministic id
-- **WHEN** they are validated
-- **THEN** `DuplicateSymbolIdError` is thrown with both symbols' details
+- **GIVEN** two symbols in the same file produce the same ID
+- **WHEN** the symbol model validates the file
+- **THEN** `DuplicateSymbolIdError` (extending `SpecdCodeGraphError`) is thrown

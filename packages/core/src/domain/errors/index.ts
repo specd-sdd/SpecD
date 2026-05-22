@@ -24,7 +24,12 @@ export { MissingDefaultWorkspaceError } from './missing-default-workspace-error.
 export { StepNotValidError } from './step-not-valid-error.js'
 export { HookNotFoundError } from './hook-not-found-error.js'
 export { SpecOverlapError } from './spec-overlap-error.js'
+export { SpecPublicationError } from './spec-publication-error.js'
+export { ArchiveDependencyMismatchError } from './archive-dependency-mismatch-error.js'
+export { ArchiveArtifactMissingError } from './archive-artifact-missing-error.js'
+export { ArchiveImplementationStateError } from './archive-implementation-state-error.js'
 export {
   HistoricalImplementationGuardError,
   type GuardedChangeOperation,
 } from './historical-implementation-guard-error.js'
+export { InvalidInputError } from './invalid-input-error.js'

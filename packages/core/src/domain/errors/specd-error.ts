@@ -6,6 +6,15 @@
  */
 export abstract class SpecdError extends Error {
   /**
+   * Discriminator for SpecdError.
+   *
+   * @returns true
+   */
+  get specd(): true {
+    return true
+  }
+
+  /**
    * Machine-readable error code used for programmatic handling.
    *
    * @returns The error code string

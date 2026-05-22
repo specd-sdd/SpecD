@@ -1,0 +1,21 @@
+- op: added
+  description: 'Verify typed errors for dependency update failures'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: Typed errors for dependency update failures
+
+    #### Scenario: Mutually exclusive flags throw validation error
+
+    - **WHEN** `UpdateSpecDeps` is called with both `--set` and `--add`
+    - **THEN** a typed validation error is thrown (e.g. `InvalidInputError`)
+    - **AND** the machine-readable code is `INVALID_INPUT`
+
+    #### Scenario: Dependency not found throws error
+
+    - **GIVEN** a spec has `dependsOn: ['core:existing']`
+    - **WHEN** `UpdateSpecDeps` is called to remove `'core:non-existent'`
+    - **THEN** a typed error is thrown
+    - **AND** the message indicates which dependency was not found

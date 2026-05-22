@@ -1,0 +1,26 @@
+- op: added
+  description: 'Reference the new error handling conventions'
+  position:
+    parent:
+      type: section
+      matches: 'Spec Dependencies'
+  content: |
+    - [`default:_global/error-handling-conventions`](../../_global/error-handling-conventions/spec.md) — canonical error handling standards for the monorepo.
+
+- op: added
+  description: 'Mandate typed errors for dependency update failures'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Persistence and output'
+  content: |
+    ### Requirement: Typed errors for dependency update failures
+
+    `UpdateSpecDeps` MUST NOT throw generic `Error` for validation or lookup failures. It SHALL use typed `SpecdError` subclasses (or general core validation errors) for the following scenarios:
+    - Flag validation (mutually exclusive flags, missing flags).
+    - Dependency lookup failures (dependency not found).
+
+    Each error MUST follow the [`default:_global/error-handling-conventions`](../../_global/error-handling-conventions/spec.md) for actionable messaging.

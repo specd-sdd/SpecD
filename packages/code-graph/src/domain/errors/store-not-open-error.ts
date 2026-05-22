@@ -1,9 +1,9 @@
-import { CodeGraphError } from './code-graph-error.js'
+import { SpecdCodeGraphError } from './specd-code-graph-error.js'
 
 /**
  * Error thrown when an operation is attempted on a graph store that has not been opened.
  */
-export class StoreNotOpenError extends CodeGraphError {
+export class StoreNotOpenError extends SpecdCodeGraphError {
   /**
    * Returns the machine-readable error code.
    * @returns The error code 'STORE_NOT_OPEN'.

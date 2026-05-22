@@ -1,0 +1,25 @@
+- op: modified
+  description: 'Verify structured CLI errors'
+  selector:
+    type: section
+    matches: 'Requirement: Structured error output'
+  content: |
+    #### Scenario: JSON format produces structured error on stdout
+
+    - **WHEN** the CLI is executed with `--format json` and a `SpecdError` is caught
+    - **THEN** it emits a structured JSON error to stdout
+
+    #### Scenario: CLI validation error produces structured output
+
+    - **GIVEN** an invalid output format `--format invalid` is provided
+    - **WHEN** the CLI is executed with `--format json`
+    - **THEN** it emits a structured error to stdout
+    - **AND** the error code is `INVALID_FORMAT` (from `SpecdCliError`)
+    - **AND** no stack trace is shown in stderr
+
+    #### Scenario: Stack trace shown when logger debug level is enabled
+
+    - **GIVEN** a `SpecdError` occurs
+    - **AND** the logger level is set to `debug`
+    - **WHEN** the error is reported
+    - **THEN** the stack trace is included in the stderr output

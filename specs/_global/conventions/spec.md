@@ -22,7 +22,7 @@ No default exports. All exported values use named exports. This makes refactorin
 
 Source files use `kebab-case.ts`. Test files use the `.spec.ts` suffix and match the source file name (`change.ts` → `change.spec.ts`), living in `test/` mirroring the `src/` structure — never co-located with source files. No `index.ts` barrel files except at the package root (`src/index.ts`). Layer-level barrels (`domain/index.ts`, `application/index.ts`, `composition/index.ts`) are permitted in packages with more than 50 internal modules.
 
-### Requirement: No `any`
+### Requirement: No any
 
 `any` is forbidden. Use `unknown` at boundaries and narrow with type guards. If a third-party type requires `any`, wrap it in a typed adapter.
 
@@ -32,7 +32,7 @@ All exported functions and class methods have explicit return type annotations. 
 
 ### Requirement: Error types
 
-All domain and application errors extend `SpecdError` (defined in `@specd/core`). Errors include a machine-readable `code` string for programmatic handling by CLI and MCP.
+All user-facing errors in `@specd/core` MUST explicitly extend `SpecdError`. Use cases MUST NOT throw generic `Error` for expected failure modes or validation failures. Every error MUST provide a machine-readable `code` and follow the Actionable Messaging standards defined in [`default:_global/error-handling-conventions`](../error-handling-conventions/spec.md).
 
 ### Requirement: Private backing fields use underscore prefix
 
@@ -69,6 +69,8 @@ Prefer `readonly` arrays and properties on domain value objects and entities whe
 ## Spec Dependencies
 
 _none — this is a global constraint spec_
+
+- [`default:_global/error-handling-conventions`](../error-handling-conventions/spec.md) — canonical error handling standards for the monorepo.
 
 ## ADRs
 

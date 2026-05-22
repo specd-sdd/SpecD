@@ -1,7 +1,13 @@
 {
   "title": "UpdateSpecDeps",
   "description": "Spec dependencies must be captured during authoring — before metadata files exist — so that `CompileContext` can resolve the full dependency graph from the start. The `UpdateSpecDeps` use case updates the declared `dependsOn` dependencies for a single spec within a change, storing them in `change.specDependsOn` as the highest-priority source for resolution. It supports three mutually exclusive operations: add, remove, and set (replace all).",
-  "dependsOn": ["core:change", "core:spec-id-format", "core:compile-context", "core:composition"],
+  "dependsOn": [
+    "core:change",
+    "core:spec-id-format",
+    "core:compile-context",
+    "core:composition",
+    "default:_global/error-handling-conventions"
+  ],
   "context": [
     "Spec dependencies must be captured during authoring — before metadata files exist — so that `CompileContext` can resolve the full dependency graph from the start. The `UpdateSpecDeps` use case updates the declared `dependsOn` dependencies for a single spec within a change, storing them in `change.specDependsOn` as the highest-priority source for resolution. It supports three mutually exclusive operations: add, remove, and set (replace all)."
   ],
@@ -64,6 +70,12 @@
       "requirement": "Persistence and output",
       "rules": [
         "After computing the new dependency list, the use case MUST update and persist the change through `ChangeRepository.mutate(name, fn)`.\n\nInside the mutation callback, the repository supplies the fresh persisted `Change` for `name`; the use case calls `change.setSpecDependsOn(specId, result)` on that instance and returns it. When the callback resolves, the repository persists the updated manifest.\n\n`UpdateSpecDeps.execute` then returns an `UpdateSpecDepsResult` containing `specId` and the resulting `dependsOn` array."
+      ]
+    },
+    {
+      "requirement": "Typed errors for dependency update failures",
+      "rules": [
+        "`UpdateSpecDeps` MUST NOT throw generic `Error` for validation or lookup failures. It SHALL use typed `SpecdError` subclasses (or general core validation errors) for the following scenarios:\n\n- Flag validation (mutually exclusive flags, missing flags).\n- Dependency lookup failures (dependency not found).\n\nEach error MUST follow the [`default:_global/error-handling-conventions`](../../_global/error-handling-conventions/spec.md) for actionable messaging."
       ]
     }
   ],
@@ -166,11 +178,39 @@
       "given": ["a change where spec 'auth/login' has no existing specDependsOn entry"],
       "when": ["execute is called with add: ['core/session']"],
       "then": ["the resulting dependsOn is ['core/session']"]
+    },
+    {
+      "requirement": "Typed errors for dependency update failures",
+      "name": "Mutually exclusive flags throw validation error",
+      "when": ["UpdateSpecDeps is called with both --set and --add"],
+      "then": [
+        "a typed validation error is thrown (e.g. InvalidInputError)",
+        "AND the machine-readable code is INVALID_INPUT"
+      ]
+    },
+    {
+      "requirement": "Typed errors for dependency update failures",
+      "name": "Dependency not found throws error",
+      "given": ["a spec has dependsOn: ['core:existing']"],
+      "when": ["UpdateSpecDeps is called to remove 'core:non-existent'"],
+      "then": [
+        "a typed error is thrown",
+        "AND the message indicates which dependency was not found"
+      ]
     }
   ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "core:update-spec-deps",
+        "file": "core:src/application/use-cases/update-spec-deps.ts",
+        "symbol": "UpdateSpecDeps"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:24dce23967718bb6e9e70e13f73b833857cd513f4c479cb26b4bf8189a0c9b65",
-    "verify.md": "sha256:0082ea4d0b73129c98eeb327fd8af0605104fd25fa84b36326bd2c6473fe817a"
+    "spec.md": "sha256:9dd1b9737b6f5f0b820b2f6b6d7b0eb86a4a5d6b5d42610d9758587d9fa57833",
+    "verify.md": "sha256:56342d1cc2150660c20044f9be8f2b8988defe775c49e07200796e2967168f43"
   },
   "generatedBy": "core"
 }

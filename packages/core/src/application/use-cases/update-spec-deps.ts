@@ -1,5 +1,6 @@
 import { type ChangeRepository } from '../ports/change-repository.js'
 import { parseSpecId } from '../../domain/services/parse-spec-id.js'
+import { InvalidInputError } from '../../domain/errors/index.js'
 
 /** Input for the {@link UpdateSpecDeps} use case. */
 export interface UpdateSpecDepsInput {
@@ -47,17 +48,17 @@ export class UpdateSpecDeps {
    * @param input - Update parameters
    * @returns The resulting dependency list for the spec
    * @throws {ChangeNotFoundError} If no change with the given name exists
-   * @throws {Error} If `specId` is not in `change.specIds`, or if `set` is used with `add`/`remove`,
+   * @throws {InvalidInputError} If `specId` is not in `change.specIds`, or if `set` is used with `add`/`remove`,
    *   or if a `remove` value is not in current deps, or if no operation is specified
    */
   async execute(input: UpdateSpecDepsInput): Promise<UpdateSpecDepsResult> {
     // Validate mutual exclusivity
     if (input.set !== undefined && (input.add !== undefined || input.remove !== undefined)) {
-      throw new Error('--set is mutually exclusive with --add and --remove')
+      throw new InvalidInputError('--set is mutually exclusive with --add and --remove')
     }
 
     if (input.set === undefined && input.add === undefined && input.remove === undefined) {
-      throw new Error('at least one of --add, --remove, or --set must be provided')
+      throw new InvalidInputError('at least one of --add, --remove, or --set must be provided')
     }
 
     // Validate dep spec ID formats
@@ -69,7 +70,7 @@ export class UpdateSpecDeps {
 
     return this._changes.mutate(input.name, (change) => {
       if (!change.specIds.includes(input.specId)) {
-        throw new Error(
+        throw new InvalidInputError(
           `spec '${input.specId}' is not in change '${input.name}' — specIds: [${change.specIds.join(', ')}]`,
         )
       }
@@ -86,7 +87,9 @@ export class UpdateSpecDeps {
           for (const id of input.remove) {
             const idx = current.indexOf(id)
             if (idx === -1) {
-              throw new Error(`dependency '${id}' not found in current deps for '${input.specId}'`)
+              throw new InvalidInputError(
+                `dependency '${id}' not found in current deps for '${input.specId}'`,
+              )
             }
             current.splice(idx, 1)
           }

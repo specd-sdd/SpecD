@@ -1,0 +1,1348 @@
+{
+  "name": "core-error-refinement",
+  "createdAt": "2026-05-22T13:04:08.910Z",
+  "description": "Refine monorepo error handling so user-facing failures are reported through typed SpecdError hierarchies instead of generic Error throws. This adds package-level error bases for core, cli, code-graph, and skills, updates archive and dependency workflows to emit machine-readable errors, and introduces a global error-handling conventions spec to formalize the contract.",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "core:archive-change",
+    "core:update-spec-deps",
+    "default:_global/conventions",
+    "default:_global/error-handling-conventions",
+    "code-graph:symbol-model",
+    "cli:entrypoint",
+    "skills:skill"
+  ],
+  "specDependsOn": {
+    "core:archive-change": [
+      "core:change",
+      "core:schema-format",
+      "core:delta-format",
+      "core:validate-artifacts",
+      "core:storage",
+      "core:run-step-hooks",
+      "core:hook-execution-model",
+      "core:template-variables",
+      "core:spec-metadata",
+      "core:content-extraction",
+      "default:_global/architecture",
+      "core:workspace",
+      "core:spec-id-format",
+      "core:spec-overlap",
+      "default:_global/logging",
+      "core:spec-lock",
+      "default:_global/error-handling-conventions"
+    ],
+    "core:update-spec-deps": [
+      "core:change",
+      "core:spec-id-format",
+      "core:compile-context",
+      "core:composition",
+      "default:_global/error-handling-conventions"
+    ],
+    "default:_global/error-handling-conventions": ["default:_global/conventions"],
+    "code-graph:symbol-model": [
+      "default:_global/conventions",
+      "default:_global/error-handling-conventions"
+    ],
+    "cli:entrypoint": ["core:config", "default:_global/error-handling-conventions"],
+    "skills:skill": ["default:_global/error-handling-conventions"],
+    "default:_global/conventions": ["default:_global/error-handling-conventions"]
+  },
+  "invalidationPolicy": "downstream",
+  "trackedImplementationFiles": [
+    {
+      "file": "AGENTS.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260521-094729-fix-validate-all-dag/manifest.json",
+      "state": "ignored"
+    },
+    {
+      "file": "GEMINI.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260522-130408-core-error-refinement/.specd-exploration.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260522-130408-core-error-refinement/deltas/cli/entrypoint/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260522-130408-core-error-refinement/deltas/cli/entrypoint/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260522-130408-core-error-refinement/deltas/code-graph/symbol-model/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260522-130408-core-error-refinement/deltas/code-graph/symbol-model/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260522-130408-core-error-refinement/deltas/core/archive-change/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260522-130408-core-error-refinement/deltas/core/archive-change/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260522-130408-core-error-refinement/deltas/core/update-spec-deps/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260522-130408-core-error-refinement/deltas/core/update-spec-deps/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260522-130408-core-error-refinement/deltas/default/_global/conventions/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260522-130408-core-error-refinement/deltas/default/_global/conventions/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260522-130408-core-error-refinement/deltas/skills/skill/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260522-130408-core-error-refinement/deltas/skills/skill/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260522-130408-core-error-refinement/design.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260522-130408-core-error-refinement/manifest.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260522-130408-core-error-refinement/proposal.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260522-130408-core-error-refinement/specs/default/_global/error-handling-conventions/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260522-130408-core-error-refinement/specs/default/_global/error-handling-conventions/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260522-130408-core-error-refinement/tasks.md",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/domain/errors/specd-code-graph-error.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/formatter.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/handle-error.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/helpers/parse-comma-values.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/composition/create-code-graph-provider.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/errors/duplicate-symbol-id-error.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/errors/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/errors/invalid-relation-type-error.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/errors/invalid-symbol-kind-error.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/errors/store-not-open-error.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/archive-change.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/update-spec-deps.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/domain/errors/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/domain/errors/specd-error.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/skills/src/domain/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/skills/src/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/skills/src/infrastructure/repository/skill-repository.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/errors/cli-validation-error.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/errors/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/errors/specd-cli-error.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/errors/graph-store-registry-error.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/domain/errors/specd-code-graph-error.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/domain/errors/archive-artifact-missing-error.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/domain/errors/archive-dependency-mismatch-error.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/domain/errors/archive-implementation-state-error.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/domain/errors/invalid-input-error.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/domain/errors/specd-error.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/skills/src/domain/errors/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/skills/src/domain/errors/skill-not-found-error.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/skills/src/domain/errors/specd-skills-error.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "update-archive-change.cjs",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/archive-change.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/handle-error.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "specd-sdd/changes/20260522-141634-status-task-completion/.specd-exploration.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260522-141634-status-task-completion/deltas/cli/change-status/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260522-141634-status-task-completion/deltas/core/get-status/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260522-141634-status-task-completion/manifest.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260522-141634-status-task-completion/proposal.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260522-141634-status-task-completion/deltas/cli/change-status/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260522-141634-status-task-completion/deltas/core/get-status/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260522-141634-status-task-completion/design.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260522-141634-status-task-completion/tasks.md",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/src/domain/skill.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "specd-sdd/changes/20260522-130408-core-error-refinement/.changeset-release.yaml",
+      "state": "ignored"
+    }
+  ],
+  "implementationLinks": [
+    {
+      "specId": "code-graph:symbol-model",
+      "file": "packages/code-graph/src/domain/errors/specd-code-graph-error.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["SpecdCodeGraphError"]
+    },
+    {
+      "specId": "core:archive-change",
+      "file": "packages/core/src/domain/errors/archive-dependency-mismatch-error.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["ArchiveDependencyMismatchError"]
+    },
+    {
+      "specId": "core:archive-change",
+      "file": "packages/core/src/domain/errors/archive-artifact-missing-error.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["ArchiveArtifactMissingError"]
+    },
+    {
+      "specId": "core:archive-change",
+      "file": "packages/core/src/domain/errors/archive-implementation-state-error.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["ArchiveImplementationStateError"]
+    },
+    {
+      "specId": "cli:entrypoint",
+      "file": "packages/cli/src/errors/specd-cli-error.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["SpecdCliError"]
+    },
+    {
+      "specId": "cli:entrypoint",
+      "file": "packages/cli/src/errors/cli-validation-error.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["CliValidationError"]
+    },
+    {
+      "specId": "skills:skill",
+      "file": "packages/skills/src/domain/errors/specd-skills-error.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["SpecdSkillsError"]
+    },
+    {
+      "specId": "skills:skill",
+      "file": "packages/skills/src/domain/errors/skill-not-found-error.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["SkillNotFoundError"]
+    },
+    {
+      "specId": "core:archive-change",
+      "file": "packages/core/src/application/use-cases/archive-change.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["ArchiveChange"]
+    },
+    {
+      "specId": "core:update-spec-deps",
+      "file": "packages/core/src/application/use-cases/update-spec-deps.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["UpdateSpecDeps"]
+    },
+    {
+      "specId": "default:_global/error-handling-conventions",
+      "file": "packages/core/src/domain/errors/specd-error.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["SpecdError"]
+    },
+    {
+      "specId": "default:_global/error-handling-conventions",
+      "file": "packages/cli/src/handle-error.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["handleError"]
+    },
+    {
+      "specId": "cli:entrypoint",
+      "file": "packages/cli/src/formatter.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["parseFormat", "output"]
+    },
+    {
+      "specId": "cli:entrypoint",
+      "file": "packages/cli/src/helpers/parse-comma-values.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["parseCommaSeparatedValues"]
+    },
+    {
+      "specId": "skills:skill",
+      "file": "packages/skills/src/domain/skill.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["Skill", "SkillTemplate"]
+    }
+  ],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:a81e92da778138e7aa70658f8c01f5829f7a97a576cdc8b05068bec48eb81816"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:archive-change",
+          "filename": "deltas/core/archive-change/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:f2423deb0cb6f599b9e6b5b8b9c3b77f2ef3644e0a674935cc8d9b2a7814d264"
+        },
+        {
+          "key": "core:update-spec-deps",
+          "filename": "deltas/core/update-spec-deps/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:f804137dfa8e8fbb351c7f30047b6327a8b12b1bf6ac17150d458b903eab4745"
+        },
+        {
+          "key": "default:_global/conventions",
+          "filename": "deltas/default/_global/conventions/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:9804ad937112283aebf55963cb700a6d0e988a469c5e03d800c7533950458359"
+        },
+        {
+          "key": "default:_global/error-handling-conventions",
+          "filename": "specs/default/_global/error-handling-conventions/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:f15d0261a4079c7c92974635d98f885117c3a7a0bc51405d650e2415b99b60ae"
+        },
+        {
+          "key": "code-graph:symbol-model",
+          "filename": "deltas/code-graph/symbol-model/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:943ac344ed76176ec9bdec81e7d491f2f9684fd20d55d38fa81789d5178e7051"
+        },
+        {
+          "key": "cli:entrypoint",
+          "filename": "deltas/cli/entrypoint/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:4df118ce4269e17d8b8b2cc5d479c6c9178f56153c4478fd8fc9f7ce25c19c66"
+        },
+        {
+          "key": "skills:skill",
+          "filename": "deltas/skills/skill/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:64f00dd01a4a7d532805c0d450981706bd0bcdd1ec3161cb86907b28ed23fd24"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:archive-change",
+          "filename": "deltas/core/archive-change/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:f297551112a44a1e44fe03a575374d2cab0a378ffac0f31aa34c2c65aca6ad7f"
+        },
+        {
+          "key": "core:update-spec-deps",
+          "filename": "deltas/core/update-spec-deps/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:7401d2d56214804d6100939ed6778c0a31af0cd50d0fad3c7ebd583e2a17a2d5"
+        },
+        {
+          "key": "default:_global/conventions",
+          "filename": "deltas/default/_global/conventions/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:173f24ebc8b29ba78d80b8fc78cb5631e27b54abcef650e610329c68943f48f4"
+        },
+        {
+          "key": "default:_global/error-handling-conventions",
+          "filename": "specs/default/_global/error-handling-conventions/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:c401e34e489be2ca3736d24ba3cabb2d4f14a8c166574db7a56070bcbe1dbd6e"
+        },
+        {
+          "key": "code-graph:symbol-model",
+          "filename": "deltas/code-graph/symbol-model/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:b3ebd7bace696b28aee04c88958b789cd4790844c1cc84cea2c032a9e51074b8"
+        },
+        {
+          "key": "cli:entrypoint",
+          "filename": "deltas/cli/entrypoint/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:4719aa5aaf17e1b00c1161122634fe2611257ccaafaae734d2eb7f9fe10a2fe9"
+        },
+        {
+          "key": "skills:skill",
+          "filename": "deltas/skills/skill/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:f785053d429dc16e51c6b39388d4cec323f4e1ec8f33b1e32807e1eb1a6c4161"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:22b1f7ecc2ff8cc50de5403c83126f1914a6d7afb910e8485fe0d00ef5773cdc"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:df1829d965be58d99d725281aebdaebe77ff790e3392606ce602f0513473c6aa"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-05-22T13:04:08.910Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": ["core:archive-change", "core:update-spec-deps", "default:_global/conventions"],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-05-22T13:04:08.934Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "core:archive-change"
+        },
+        {
+          "type": "specs",
+          "key": "core:update-spec-deps"
+        },
+        {
+          "type": "specs",
+          "key": "default:_global/conventions"
+        },
+        {
+          "type": "verify",
+          "key": "core:archive-change"
+        },
+        {
+          "type": "verify",
+          "key": "core:update-spec-deps"
+        },
+        {
+          "type": "verify",
+          "key": "default:_global/conventions"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-22T13:05:15.594Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-22T13:06:39.673Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["core:archive-change", "core:update-spec-deps", "default:_global/conventions"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:archive-change", "core:update-spec-deps", "default:_global/conventions"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-05-22T13:06:39.675Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:error-handling-conventions"
+        },
+        {
+          "type": "verify",
+          "key": "core:error-handling-conventions"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-22T13:11:34.846Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:archive-change",
+            "core:update-spec-deps",
+            "default:_global/conventions",
+            "core:error-handling-conventions"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:archive-change",
+            "core:update-spec-deps",
+            "default:_global/conventions",
+            "core:error-handling-conventions"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-22T13:11:34.884Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:archive-change",
+            "core:update-spec-deps",
+            "default:_global/conventions",
+            "core:error-handling-conventions"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:archive-change",
+            "core:update-spec-deps",
+            "default:_global/conventions",
+            "core:error-handling-conventions"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-05-22T13:11:34.885Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "default:_global/error-handling-conventions"
+        },
+        {
+          "type": "verify",
+          "key": "default:_global/error-handling-conventions"
+        }
+      ],
+      "filesRemoved": [
+        {
+          "type": "specs",
+          "key": "core:error-handling-conventions"
+        },
+        {
+          "type": "verify",
+          "key": "core:error-handling-conventions"
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-22T13:12:39.193Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:archive-change",
+            "core:update-spec-deps",
+            "default:_global/conventions",
+            "default:_global/error-handling-conventions"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:archive-change",
+            "core:update-spec-deps",
+            "default:_global/conventions",
+            "default:_global/error-handling-conventions"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-22T13:14:08.788Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:archive-change",
+            "core:update-spec-deps",
+            "default:_global/conventions",
+            "default:_global/error-handling-conventions"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:archive-change",
+            "core:update-spec-deps",
+            "default:_global/conventions",
+            "default:_global/error-handling-conventions"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-22T13:15:27.379Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:archive-change",
+            "core:update-spec-deps",
+            "default:_global/conventions",
+            "default:_global/error-handling-conventions"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:archive-change",
+            "core:update-spec-deps",
+            "default:_global/conventions",
+            "default:_global/error-handling-conventions"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-05-22T13:15:27.390Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "code-graph:symbol-model"
+        },
+        {
+          "type": "specs",
+          "key": "cli:entrypoint"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:symbol-model"
+        },
+        {
+          "type": "verify",
+          "key": "cli:entrypoint"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-22T13:15:43.826Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:archive-change",
+            "core:update-spec-deps",
+            "default:_global/conventions",
+            "default:_global/error-handling-conventions",
+            "code-graph:symbol-model",
+            "cli:entrypoint"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:archive-change",
+            "core:update-spec-deps",
+            "default:_global/conventions",
+            "default:_global/error-handling-conventions",
+            "code-graph:symbol-model",
+            "cli:entrypoint"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-05-22T13:15:43.828Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "skills:skill"
+        },
+        {
+          "type": "verify",
+          "key": "skills:skill"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-22T13:21:07.969Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]; specs [code-graph:symbol-model]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["code-graph:symbol-model"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:archive-change",
+            "core:update-spec-deps",
+            "default:_global/conventions",
+            "default:_global/error-handling-conventions",
+            "code-graph:symbol-model",
+            "cli:entrypoint",
+            "skills:skill"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-22T13:22:26.237Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:archive-change",
+            "core:update-spec-deps",
+            "default:_global/conventions",
+            "default:_global/error-handling-conventions",
+            "code-graph:symbol-model",
+            "cli:entrypoint",
+            "skills:skill"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:archive-change",
+            "core:update-spec-deps",
+            "default:_global/conventions",
+            "default:_global/error-handling-conventions",
+            "code-graph:symbol-model",
+            "cli:entrypoint",
+            "skills:skill"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-22T13:22:53.606Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:archive-change",
+            "core:update-spec-deps",
+            "default:_global/conventions",
+            "default:_global/error-handling-conventions",
+            "code-graph:symbol-model",
+            "cli:entrypoint",
+            "skills:skill"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:archive-change",
+            "core:update-spec-deps",
+            "default:_global/conventions",
+            "default:_global/error-handling-conventions",
+            "code-graph:symbol-model",
+            "cli:entrypoint",
+            "skills:skill"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-22T13:26:57.381Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: verify [default:_global/error-handling-conventions]",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": ["default:_global/error-handling-conventions"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-22T13:34:08.798Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-22T13:34:56.288Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-22T14:34:24.606Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-22T14:37:19.652Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-22T14:37:43.338Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "description-updated",
+      "at": "2026-05-22T14:47:07.396Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "description": "Refine monorepo error handling so user-facing failures are reported through typed SpecdError hierarchies instead of generic Error throws. This adds package-level error bases for core, cli, code-graph, and skills, updates archive and dependency workflows to emit machine-readable errors, and introduces a global error-handling conventions spec to formalize the contract."
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-22T14:47:13.175Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-05-22T14:47:13.413Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: extracted dependencies mismatch persisted metadata. Re-run dependency extraction.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-05-22T14:47:23.401Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: extracted dependencies mismatch persisted metadata. Re-run dependency extraction.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-05-22T14:52:57.793Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Tracked implementation files remain open for change \"core-error-refinement\". Resolve or ignore them first.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-05-22T14:53:31.627Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'core:archive-change': extracted dependencies [core:change, core:schema-format, core:delta-format, core:validate-artifacts, core:storage, core:run-step-hooks, core:hook-execution-model, core:template-variables, core:spec-metadata, core:content-extraction, default:_global/architecture, core:workspace, core:spec-id-format, core:spec-overlap, default:_global/logging, core:spec-lock, default:_global/error-handling-conventions] do not match persisted dependencies [core:change, core:schema-format, core:delta-format, core:validate-artifacts, core:storage, core:run-step-hooks, core:hook-execution-model, core:template-variables, core:spec-metadata, core:content-extraction, default:_global/architecture, core:workspace, core:spec-id-format, core:spec-overlap, default:_global/logging, core:spec-lock, core:error-handling-conventions, default:_global/error-handling-conventions]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-05-22T14:53:58.231Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'core:update-spec-deps': extracted dependencies [core:change, core:spec-id-format, core:compile-context, core:composition, default:_global/error-handling-conventions] do not match persisted dependencies [core:change, core:spec-id-format, core:compile-context, core:composition, core:error-handling-conventions, default:_global/error-handling-conventions]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-05-22T14:54:10.614Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'code-graph:symbol-model': extracted dependencies [default:_global/conventions, default:_global/error-handling-conventions] do not match persisted dependencies [default:_global/conventions]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
+    }
+  ],
+  "archivedAt": "2026-05-22T14:54:49.498Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "1***i@u***.com",
+    "provider": "git"
+  }
+}

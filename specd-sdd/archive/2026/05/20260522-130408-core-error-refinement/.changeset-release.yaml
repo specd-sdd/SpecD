@@ -1,0 +1,8 @@
+releases:
+  core:archive-change: patch
+  core:update-spec-deps: patch
+  default:_global/conventions: patch
+  default:_global/error-handling-conventions: minor
+  code-graph:symbol-model: patch
+  cli:entrypoint: patch
+  skills:skill: patch

@@ -1,6 +1,7 @@
 {
   "title": "skills:skill",
   "description": "Defines the core domain models for skills: `Skill` and `SkillTemplate`. These are pure domain types with no I/O dependencies.",
+  "dependsOn": ["default:_global/error-handling-conventions"],
   "context": [
     "Defines the core domain models for skills: `Skill` and `SkillTemplate`. These are pure domain types with no I/O dependencies."
   ],
@@ -27,6 +28,12 @@
       "requirement": "Lazy content loading",
       "rules": [
         "Template content MUST be loaded lazily via `getContent()`. The `Skill` object itself MUST NOT hold loaded content in memory."
+      ]
+    },
+    {
+      "requirement": "Typed errors for skill operations",
+      "rules": [
+        "All skill-related domain errors (e.g., \"Skill not found\") MUST use typed error classes extending a package-level base class (e.g., `SpecdSkillsError`). This base class MUST follow the \"Specd Error Contract\" and extend `SpecdError` from `@specd/core`."
       ]
     }
   ],
@@ -71,11 +78,45 @@
       "name": "Domain has no I/O imports",
       "when": ["the domain layer is inspected"],
       "then": ["no imports from node:fs or similar I/O modules exist"]
+    },
+    {
+      "requirement": "Typed errors for skill operations",
+      "name": "Skill not found throws SpecdSkillsError",
+      "given": ["a request for a skill that is not installed"],
+      "when": ["the skill repository is queried"],
+      "then": [
+        "a typed error extending SpecdSkillsError is thrown",
+        "AND the error code is SKILL_NOT_FOUND"
+      ]
     }
   ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "skills:skill",
+        "file": "skills:src/domain/errors/specd-skills-error.ts",
+        "symbol": "SpecdSkillsError"
+      },
+      {
+        "specId": "skills:skill",
+        "file": "skills:src/domain/errors/skill-not-found-error.ts",
+        "symbol": "SkillNotFoundError"
+      },
+      {
+        "specId": "skills:skill",
+        "file": "skills:src/domain/skill.ts",
+        "symbol": "Skill"
+      },
+      {
+        "specId": "skills:skill",
+        "file": "skills:src/domain/skill.ts",
+        "symbol": "SkillTemplate"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:b095b5d557038ee85896061dd5760073a0d73443ef4001408e370da4e4aec26e",
-    "verify.md": "sha256:a04deee796ca8be0c0db7700769eb094e809126efeff0f95fe5253d5b0a45458"
+    "spec.md": "sha256:65ebaeaa9e5f39c4bc88c9907e6492a061a7cfdbdd7b4e1f8d3bfd91d003ceff",
+    "verify.md": "sha256:2e6de88bf615f58642dbdd395d373bdbcf16673d07599f0d6b2ab5dc3a5b3b2a"
   },
   "generatedBy": "core"
 }

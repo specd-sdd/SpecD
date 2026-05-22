@@ -96,3 +96,18 @@
 - **GIVEN** a change where spec `'auth/login'` has no existing `specDependsOn` entry
 - **WHEN** `execute` is called with `add: ['core/session']`
 - **THEN** the resulting `dependsOn` is `['core/session']`
+
+### Requirement: Typed errors for dependency update failures
+
+#### Scenario: Mutually exclusive flags throw validation error
+
+- **WHEN** `UpdateSpecDeps` is called with both `--set` and `--add`
+- **THEN** a typed validation error is thrown (e.g. `InvalidInputError`)
+- **AND** the machine-readable code is `INVALID_INPUT`
+
+#### Scenario: Dependency not found throws error
+
+- **GIVEN** a spec has `dependsOn: ['core:existing']`
+- **WHEN** `UpdateSpecDeps` is called to remove `'core:non-existent'`
+- **THEN** a typed error is thrown
+- **AND** the message indicates which dependency was not found

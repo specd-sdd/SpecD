@@ -1,7 +1,7 @@
 {
   "title": "Symbol Model",
   "description": "A code graph needs a unified, language-agnostic representation of source code structure before any persistence, traversal, or impact analysis can operate on it. The symbol model defines the domain entities and value objects that represent files, symbols, and the relationships between them — the foundational vocabulary for the entire `@specd/code-graph` package.",
-  "dependsOn": ["default:_global/conventions"],
+  "dependsOn": ["default:_global/conventions", "default:_global/error-handling-conventions"],
   "context": [
     "A code graph needs a unified, language-agnostic representation of source code structure before any persistence, traversal, or impact analysis can operate on it. The symbol model defines the domain entities and value objects that represent files, symbols, and the relationships between them — the foundational vocabulary for the entire `@specd/code-graph` package."
   ],
@@ -81,7 +81,7 @@
     {
       "requirement": "Error types",
       "rules": [
-        "`@specd/code-graph` SHALL define its own `CodeGraphError` base class extending `Error`. All package-specific errors MUST extend `CodeGraphError`. Error types MUST NOT depend on `@specd/core` and MUST NOT use `SpecdError` or any core error type. Errors from `@specd/core` dependencies (e.g. `NodeContentHasher`) may propagate unmodified through `@specd/code-graph` — they are not wrapped or caught.\n\nSpecific error subclasses include:\n\n- `InvalidSymbolKindError` — when a symbol kind value is not in the `SymbolKind` enum\n- `InvalidRelationTypeError` — when a relation type value is not in the defined set\n- `DuplicateSymbolIdError` — when two symbols in the same file produce the same deterministic id"
+        "`@specd/code-graph` SHALL define its own `SpecdCodeGraphError` base class which MUST extend `SpecdError` from `@specd/core`. All package-specific errors MUST extend `SpecdCodeGraphError`.\n\nBy extending `SpecdError`, all code-graph errors automatically follow the \"Specd Error Contract\" defined in [`default:_global/error-handling-conventions`](../../_global/error-handling-conventions/spec.md), including the `specd: true` discriminator and machine-readable `code` requirement.\n\n- `InvalidSymbolKindError` — when a symbol kind value is not in the `SymbolKind` enum\n- `InvalidRelationTypeError` — when a relation type value is not in the defined set\n- `DuplicateSymbolIdError` — when two symbols in the same file produce the same deterministic id\n- `StoreNotOpenError` — when an operation is attempted on a closed or uninitialized store"
       ]
     }
   ],
@@ -441,38 +441,33 @@
     },
     {
       "requirement": "Error types",
-      "name": "CodeGraphError is independent of SpecdError",
-      "when": ["CodeGraphError is instantiated"],
+      "name": "SpecdCodeGraphError extends SpecdError",
+      "when": ["SpecdCodeGraphError is instantiated"],
       "then": [
-        "it extends Error directly, not SpecdError",
-        "AND error types do not import from @specd/core"
+        "it extends SpecdError from @specd/core",
+        "AND it includes the specd: true discriminator"
       ]
     },
     {
       "requirement": "Error types",
       "name": "Duplicate symbol id detected",
-      "given": ["two symbols in the same file that produce the same deterministic id"],
-      "when": ["they are validated"],
-      "then": ["DuplicateSymbolIdError is thrown with both symbols' details"]
+      "given": ["two symbols in the same file produce the same ID"],
+      "when": ["the symbol model validates the file"],
+      "then": ["DuplicateSymbolIdError (extending SpecdCodeGraphError) is thrown"]
     }
   ],
   "implementation": {
     "symbols": [
       {
         "specId": "code-graph:symbol-model",
-        "file": "code-graph:src/domain/value-objects/relation-type.ts",
-        "symbol": "RelationType"
-      },
-      {
-        "specId": "code-graph:symbol-model",
-        "file": "code-graph:src/domain/value-objects/relation-type.ts",
-        "symbol": "isRelationType"
+        "file": "code-graph:src/domain/errors/specd-code-graph-error.ts",
+        "symbol": "SpecdCodeGraphError"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:473a60a46d61608866143f165408094d556f25c2be41cfaf63cc51b124dcfc3a",
-    "verify.md": "sha256:b1d67c72ff0d09d6b6ec76a433bad608e3d4002c178c7440ca5adc0f8403df51"
+    "spec.md": "sha256:92e7e0c1763414b726d413a61da07be0fc54594b14ec433fae99258c86d1f43a",
+    "verify.md": "sha256:c359eb3ba92dae287bf8343b6d96adf5cbe25e49b12a81b2f2fb4563eb43827a"
   },
   "generatedBy": "core"
 }

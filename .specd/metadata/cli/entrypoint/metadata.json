@@ -1,7 +1,7 @@
 {
   "title": "CLI Entrypoint",
   "description": "Every subcommand needs consistent config discovery, output routing, and error reporting — without a shared entrypoint contract, each command would reimplement these concerns differently. This spec defines the global behaviour of the `specd` CLI: configuration discovery (with the `--config` override), stdout/stderr conventions, the `--format` flag, and uniform exit codes.",
-  "dependsOn": ["core:config"],
+  "dependsOn": ["core:config", "default:_global/error-handling-conventions"],
   "context": [
     "Every subcommand needs consistent config discovery, output routing, and error reporting — without a shared entrypoint contract, each command would reimplement these concerns differently. This spec defines the global behaviour of the `specd` CLI: configuration discovery (with the `--config` override), stdout/stderr conventions, the `--format` flag, and uniform exit codes."
   ],
@@ -45,7 +45,7 @@
     {
       "requirement": "Structured error output",
       "rules": [
-        "When `--format` is `json` or `toon`, errors are **also** written to stdout in the corresponding structured format so that programmatic consumers (LLMs, scripts, CI) can parse them without reading stderr. The structured error object contains:\n\n```json\n{\n  \"result\": \"error\",\n  \"code\": \"<MACHINE_READABLE_CODE>\",\n  \"message\": \"<human-readable description>\",\n  \"exitCode\": 1\n}\n```\n\n- `result` — always the string `\"error\"`\n- `code` — the machine-readable error code from the `SpecdError` subclass (e.g. `DEPENDS_ON_OVERWRITE`, `CHANGE_NOT_FOUND`, `HOOK_FAILED`, `SCHEMA_NOT_FOUND`)\n- `message` — the same message written to stderr (without the `error:`/`fatal:` prefix)\n- `exitCode` — the numeric exit code (1, 2, or 3)\n\nStructured error output is only emitted for known error types — subtypes of `SpecdError` that carry a machine-readable `code`. Generic or unexpected errors (exit code 3 from unhandled exceptions) are written to stderr only; stdout remains empty.\n\nWhen `--format` is `text` (the default), errors go to stderr only and stdout remains empty — no change from the existing behaviour for human users."
+        "The CLI SHALL ensure all user-facing errors (validation, format, configuration) use typed error classes that follow the \"Specd Error Contract\" defined in [`default:_global/error-handling-conventions`](../../_global/error-handling-conventions/spec.md).\n\n`@specd/cli` SHALL define its own `SpecdCliError` base class (extending `SpecdError`) for CLI-specific errors. Generic `Error` throws MUST be eliminated from formatters, command helpers, and argument validation logic to ensure the global `handleError` can emit structured JSON/TOON output without stack traces."
       ]
     },
     {
@@ -315,68 +315,60 @@
     {
       "requirement": "Structured error output",
       "name": "JSON format produces structured error on stdout",
-      "given": ["a domain error with code CHANGE_NOT_FOUND occurs"],
-      "when": ["the command was run with --format json"],
+      "when": ["the CLI is executed with --format json and a SpecdError is caught"],
+      "then": ["it emits a structured JSON error to stdout"]
+    },
+    {
+      "requirement": "Structured error output",
+      "name": "CLI validation error produces structured output",
+      "given": ["an invalid output format --format invalid is provided"],
+      "when": ["the CLI is executed with --format json"],
       "then": [
-        "stdout contains valid JSON: {\"result\": \"error\", \"code\": \"CHANGE_NOT_FOUND\", \"message\": \"...\", \"exitCode\": 1}",
-        "AND stderr still contains the error: line in plain text"
+        "it emits a structured error to stdout",
+        "AND the error code is INVALID_FORMAT (from SpecdCliError)",
+        "AND no stack trace is shown in stderr"
       ]
-    },
-    {
-      "requirement": "Structured error output",
-      "name": "TOON format produces structured error on stdout",
-      "given": ["a domain error occurs"],
-      "when": ["the command was run with --format toon"],
-      "then": [
-        "stdout contains a TOON-encoded error object with result, code, message, and exitCode",
-        "AND stderr still contains the error: line in plain text"
-      ]
-    },
-    {
-      "requirement": "Structured error output",
-      "name": "Schema error produces structured error in JSON format",
-      "given": ["a SchemaNotFoundError occurs"],
-      "when": ["the command was run with --format json"],
-      "then": [
-        "stdout contains {\"result\": \"error\", \"code\": \"SCHEMA_NOT_FOUND\", \"message\": \"...\", \"exitCode\": 3}",
-        "AND stderr contains a fatal: line in plain text"
-      ]
-    },
-    {
-      "requirement": "Structured error output",
-      "name": "Unexpected system error does not produce structured stdout",
-      "given": ["an unexpected error (not a SpecdError subclass) occurs"],
-      "when": ["the command was run with --format json"],
-      "then": ["stderr contains a fatal: line in plain text", "AND stdout is empty"]
-    },
-    {
-      "requirement": "Structured error output",
-      "name": "Hook failure produces structured error in JSON format",
-      "given": ["a hook failure occurs"],
-      "when": ["the command was run with --format json"],
-      "then": [
-        "stdout contains {\"result\": \"error\", \"code\": \"HOOK_FAILED\", \"message\": \"...\", \"exitCode\": 2}",
-        "AND stderr contains the hook error in plain text"
-      ]
-    },
-    {
-      "requirement": "Structured error output",
-      "name": "Text format errors do not produce structured stdout",
-      "given": ["a domain error occurs"],
-      "when": ["the command was run with --format text (or without --format)"],
-      "then": ["stdout is empty", "AND stderr contains the error: line in plain text"]
     },
     {
       "requirement": "Structured error output",
       "name": "Stack trace shown when logger debug level is enabled",
-      "given": ["logger debug level is enabled"],
-      "when": ["a system error occurs"],
-      "then": ["a stack trace is printed to stderr"]
+      "given": ["a SpecdError occurs", "AND the logger level is set to debug"],
+      "when": ["the error is reported"],
+      "then": ["the stack trace is included in the stderr output"]
     }
   ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "cli:entrypoint",
+        "file": "cli:src/errors/specd-cli-error.ts",
+        "symbol": "SpecdCliError"
+      },
+      {
+        "specId": "cli:entrypoint",
+        "file": "cli:src/errors/cli-validation-error.ts",
+        "symbol": "CliValidationError"
+      },
+      {
+        "specId": "cli:entrypoint",
+        "file": "cli:src/formatter.ts",
+        "symbol": "parseFormat"
+      },
+      {
+        "specId": "cli:entrypoint",
+        "file": "cli:src/formatter.ts",
+        "symbol": "output"
+      },
+      {
+        "specId": "cli:entrypoint",
+        "file": "cli:src/helpers/parse-comma-values.ts",
+        "symbol": "parseCommaSeparatedValues"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:32cdd478e6eacdbef1c32b472ddaa14a19f80836b66152d0a47b0354331ab767",
-    "verify.md": "sha256:814a9fd8864edeca4c6a725ea70b3e8f1ecd1aaeb568fb444c87c93f0f48d304"
+    "spec.md": "sha256:56092c81a6091bea888288b17291782a25e3cb2de8cf298f37afc2971a14708e",
+    "verify.md": "sha256:35cfbe46ce0edde357d636fe59e766a20b4ae3d5626434e1e08bfded28ca7e3e"
   },
   "generatedBy": "core"
 }

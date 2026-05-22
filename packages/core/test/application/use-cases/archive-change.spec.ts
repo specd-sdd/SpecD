@@ -7,6 +7,8 @@ import { HookFailedError } from '../../../src/domain/errors/hook-failed-error.js
 import { InvalidStateTransitionError } from '../../../src/domain/errors/invalid-state-transition-error.js'
 import { DeltaApplicationError } from '../../../src/domain/errors/delta-application-error.js'
 import { SpecOverlapError } from '../../../src/domain/errors/spec-overlap-error.js'
+import { ArchiveDependencyMismatchError } from '../../../src/domain/errors/archive-dependency-mismatch-error.js'
+import { ArchiveImplementationStateError } from '../../../src/domain/errors/archive-implementation-state-error.js'
 import { Change, type ChangeEvent } from '../../../src/domain/entities/change.js'
 import { ArchivedChange } from '../../../src/domain/entities/archived-change.js'
 import { Spec } from '../../../src/domain/entities/spec.js'
@@ -570,7 +572,7 @@ describe('ArchiveChange', () => {
       )
 
       await expect(uc.execute({ name: 'my-change' })).rejects.toThrow(
-        /Extracted dependsOn mismatch/,
+        ArchiveDependencyMismatchError,
       )
       expect(specRepo.saved.has('spec.md')).toBe(false)
       expect((saveMetadata.execute as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(0)
@@ -687,7 +689,7 @@ describe('ArchiveChange', () => {
       )
 
       await expect(uc.execute({ name: 'my-change' })).rejects.toThrow(
-        /Extracted dependsOn mismatch/,
+        ArchiveDependencyMismatchError,
       )
       expect(publishCalls).toEqual([])
       expect(specRepo.saved.has('auth/oauth/spec-lock.json')).toBe(false)
@@ -1039,9 +1041,7 @@ describe('ArchiveChange', () => {
         makeSaveMetadata(),
       )
 
-      await expect(uc.execute({ name: 'my-change' })).rejects.toThrow(
-        '/tmp/specd-staging/auth-oauth',
-      )
+      await expect(uc.execute({ name: 'my-change' })).rejects.toThrow(SpecPublicationError)
       expect(archiveSpy).not.toHaveBeenCalled()
 
       const persisted = await repo.get('my-change')
@@ -2836,7 +2836,7 @@ describe('ArchiveChange', () => {
       )
 
       await expect(uc.execute({ name: 'my-change' })).rejects.toThrow(
-        /tracked implementation files remain open/,
+        ArchiveImplementationStateError,
       )
     })
 
@@ -2877,7 +2877,9 @@ describe('ArchiveChange', () => {
         new Map([['default', { codeRoot: '/project/specs/default', excludePaths: [] }]]),
       )
 
-      await expect(uc.execute({ name: 'my-change' })).rejects.toThrow(/outside the change scope/)
+      await expect(uc.execute({ name: 'my-change' })).rejects.toThrow(
+        ArchiveImplementationStateError,
+      )
     })
 
     it('publishes out-of-scope implementation sidecars when allowOutOfScope is true', async () => {

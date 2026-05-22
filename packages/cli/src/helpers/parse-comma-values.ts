@@ -1,3 +1,5 @@
+import { CliValidationError } from '../errors/index.js'
+
 /**
  * Parses a comma-separated string and validates each token against a set of allowed values.
  *
@@ -8,7 +10,7 @@
  * @param validValues - Set of allowed token values
  * @param optionName - CLI option name for error messages (e.g. `"--status"`)
  * @returns Set of validated tokens
- * @throws {Error} When a token is not in `validValues`
+ * @throws {CliValidationError} When a token is not in `validValues`
  */
 export function parseCommaSeparatedValues<T extends string>(
   value: string,
@@ -25,7 +27,7 @@ export function parseCommaSeparatedValues<T extends string>(
   for (const token of tokens) {
     if (!validValues.has(token as T)) {
       const allowed = [...validValues].join(', ')
-      throw new Error(`invalid ${optionName} value '${token}' (valid: ${allowed})`)
+      throw new CliValidationError(`invalid ${optionName} value '${token}' (valid: ${allowed})`)
     }
     result.add(token as T)
   }

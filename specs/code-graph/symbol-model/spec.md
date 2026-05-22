@@ -162,13 +162,14 @@ All model types — `FileNode`, `SymbolNode`, `Relation`, and any aggregate cont
 
 ### Requirement: Error types
 
-`@specd/code-graph` SHALL define its own `CodeGraphError` base class extending `Error`. All package-specific errors MUST extend `CodeGraphError`. Error types MUST NOT depend on `@specd/core` and MUST NOT use `SpecdError` or any core error type. Errors from `@specd/core` dependencies (e.g. `NodeContentHasher`) may propagate unmodified through `@specd/code-graph` — they are not wrapped or caught.
+`@specd/code-graph` SHALL define its own `SpecdCodeGraphError` base class which MUST extend `SpecdError` from `@specd/core`. All package-specific errors MUST extend `SpecdCodeGraphError`.
 
-Specific error subclasses include:
+By extending `SpecdError`, all code-graph errors automatically follow the "Specd Error Contract" defined in [`default:_global/error-handling-conventions`](../../_global/error-handling-conventions/spec.md), including the `specd: true` discriminator and machine-readable `code` requirement.
 
 - `InvalidSymbolKindError` — when a symbol kind value is not in the `SymbolKind` enum
 - `InvalidRelationTypeError` — when a relation type value is not in the defined set
 - `DuplicateSymbolIdError` — when two symbols in the same file produce the same deterministic id
+- `StoreNotOpenError` — when an operation is attempted on a closed or uninitialized store
 
 ## Constraints
 
@@ -235,3 +236,4 @@ const specRelation: Relation = {
 ## Spec Dependencies
 
 - [`default:_global/conventions`](../../_global/conventions/spec.md) — naming conventions, immutability patterns
+- [`default:_global/error-handling-conventions`](../../_global/error-handling-conventions/spec.md) — canonical error handling standards for the monorepo.

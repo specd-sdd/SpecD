@@ -30,6 +30,9 @@ import { type RunStepHooks } from './run-step-hooks.js'
 import { Logger } from '../logger.js'
 import { type SpecLockData } from '../../domain/services/parse-spec-lock.js'
 import { DependsOnOverwriteError } from '../../domain/errors/depends-on-overwrite-error.js'
+import { ArchiveArtifactMissingError } from '../../domain/errors/archive-artifact-missing-error.js'
+import { ArchiveDependencyMismatchError } from '../../domain/errors/archive-dependency-mismatch-error.js'
+import { ArchiveImplementationStateError } from '../../domain/errors/archive-implementation-state-error.js'
 import {
   extractMetadataFromSpecArtifacts,
   type MetadataArtifactInput,
@@ -557,7 +560,7 @@ export class ArchiveChange {
         const trackedFilename = resolveTrackedArchiveFilename(specFile, expectedFilename)
         const trackedArtifact = await this._changes.artifact(change, trackedFilename)
         if (trackedArtifact === null) {
-          throw new Error(`Tracked artifact '${trackedFilename}' is missing for '${specId}'`)
+          throw new ArchiveArtifactMissingError(trackedFilename, 'tracked')
         }
 
         Logger.debug('ArchiveChange selected tracked artifact file', {
@@ -578,7 +581,7 @@ export class ArchiveChange {
           }
 
           if (baseArtifact === null) {
-            throw new Error(`Base artifact '${outputBasename}' is missing for '${specId}'`)
+            throw new ArchiveArtifactMissingError(outputBasename, 'base')
           }
 
           const deltaEntries = yamlParser.parseDelta(trackedArtifact.content)
@@ -627,7 +630,8 @@ export class ArchiveChange {
       const specRepo = this._specs.get(workspace)
       if (specRepo === undefined) {
         if (implementationBySpecId.has(specId) && !change.specIds.includes(specId)) {
-          throw new Error(
+          throw new ArchiveImplementationStateError(
+            [],
             `Cannot archive implementation tracking for "${specId}" because workspace "${workspace}" has no spec repository.`,
           )
         }
@@ -737,8 +741,10 @@ export class ArchiveChange {
       preExtracted.metadata.dependsOn !== undefined &&
       !DependsOnOverwriteError.areSame(preExtracted.metadata.dependsOn, finalDependsOn)
     ) {
-      throw new Error(
-        `Extracted dependsOn mismatch for '${args.publication.specId}': extracted=${JSON.stringify(preExtracted.metadata.dependsOn)} persisted=${JSON.stringify(finalDependsOn)}`,
+      throw new ArchiveDependencyMismatchError(
+        args.publication.specId,
+        [...finalDependsOn],
+        [...preExtracted.metadata.dependsOn],
       )
     }
 
@@ -957,13 +963,9 @@ export class ArchiveChange {
       .map((entry) => entry.file)
     if (openFiles.length === 0) return
 
-    throw new Error(
-      [
-        `Cannot archive change "${change.name}" while tracked implementation files remain open.`,
-        '',
-        'Resolve or ignore these files first:',
-        ...openFiles.map((file) => `  - ${file}`),
-      ].join('\n'),
+    throw new ArchiveImplementationStateError(
+      openFiles,
+      `Tracked implementation files remain open for change "${change.name}". Resolve or ignore them first.`,
     )
   }
 
@@ -984,15 +986,9 @@ export class ArchiveChange {
       return
     }
 
-    throw new Error(
-      [
-        `Cannot archive change "${change.name}" because implementation sidecar updates would touch specs outside the change scope.`,
-        '',
-        'Out-of-scope specs:',
-        ...preparedPlan.outOfScopeImplementationSpecIds.map((specId) => `  - ${specId}`),
-        '',
-        `Re-run with 'change archive ${change.name} --allow-out-of-scope' if those updates are intentional.`,
-      ].join('\n'),
+    throw new ArchiveImplementationStateError(
+      [],
+      `Implementation sidecar updates would touch specs outside the change "${change.name}" scope (${preparedPlan.outOfScopeImplementationSpecIds.join(', ')}). Re-run with --allow-out-of-scope if intentional.`,
     )
   }
 
@@ -1012,16 +1008,18 @@ export class ArchiveChange {
       const { workspace } = parseSpecId(link.specId)
       const workspaceConfig = this._workspaceConfigs.get(workspace)
       if (workspaceConfig === undefined) {
-        throw new Error(
-          `Implementation link "${link.specId}" -> "${link.file}" targets unknown workspace "${workspace}".`,
+        throw new ArchiveImplementationStateError(
+          [link.file],
+          `Implementation link "${link.specId}" targets unknown workspace "${workspace}".`,
         )
       }
 
       const rawAbsolute = path.resolve(this._projectRoot, link.file)
       const relativeToCodeRoot = toPortableRelativePath(workspaceConfig.codeRoot, rawAbsolute)
       if (relativeToCodeRoot === null) {
-        throw new Error(
-          `Implementation link "${link.specId}" -> "${link.file}" points outside workspace "${workspace}" codeRoot.`,
+        throw new ArchiveImplementationStateError(
+          [link.file],
+          `Implementation link "${link.specId}" points outside workspace "${workspace}" codeRoot.`,
         )
       }
 

@@ -1,0 +1,23 @@
+- op: added
+  description: 'Reference the new error handling conventions'
+  position:
+    parent:
+      type: section
+      matches: 'Spec Dependencies'
+  content: |
+    - [`default:_global/error-handling-conventions`](../../_global/error-handling-conventions/spec.md) — canonical error handling standards for the monorepo.
+
+- op: modified
+  description: 'Align SpecdCodeGraphError with SpecdError and the global contract'
+  selector:
+    type: section
+    matches: 'Requirement: Error types'
+  content: |
+    `@specd/code-graph` SHALL define its own `SpecdCodeGraphError` base class which MUST extend `SpecdError` from `@specd/core`. All package-specific errors MUST extend `SpecdCodeGraphError`.
+
+    By extending `SpecdError`, all code-graph errors automatically follow the "Specd Error Contract" defined in [`default:_global/error-handling-conventions`](../../_global/error-handling-conventions/spec.md), including the `specd: true` discriminator and machine-readable `code` requirement.
+
+    - `InvalidSymbolKindError` — when a symbol kind value is not in the `SymbolKind` enum
+    - `InvalidRelationTypeError` — when a relation type value is not in the defined set
+    - `DuplicateSymbolIdError` — when two symbols in the same file produce the same deterministic id
+    - `StoreNotOpenError` — when an operation is attempted on a closed or uninitialized store

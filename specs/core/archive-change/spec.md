@@ -287,6 +287,17 @@ Backfill rules:
 
 `ArchiveChange` throws on pre-archive hook failure or `assertArchivable` failure. Post-archive failures are returned, not thrown.
 
+### Requirement: Typed errors for archive failures
+
+`ArchiveChange` MUST NOT throw generic `Error` for validation or state failures. It SHALL use typed `SpecdError` subclasses for the following scenarios:
+
+- `ArchiveDependencyMismatchError` — when extracted dependencies mismatch persisted ones.
+- `ArchiveArtifactMissingError` — when a tracked or base artifact is missing.
+- `ArchiveImplementationStateError` — when implementation files are open or out-of-scope sidecar updates are detected.
+- `ArchivePreflightError` — for other preflight validation failures.
+
+Each error MUST follow the [`default:_global/error-handling-conventions`](../../_global/error-handling-conventions/spec.md) for actionable messaging.
+
 ### Requirement: Tracked implementation review guard
 
 Before archive materializes implementation links, `ArchiveChange` MUST verify that no tracked implementation file remains in `open` state.
@@ -345,3 +356,4 @@ Proceeding with those external sidecar updates requires an explicit `--allow-out
 - [`core:spec-overlap`](../spec-overlap/spec.md) — `detectSpecOverlap` domain service for overlap detection
 - [`default:_global/logging`](../../_global/logging/spec.md) — debug logging requirements for archive preparation, staged commit, and failure diagnostics
 - [`core:spec-lock`](../spec-lock/spec.md) — archive-time implementation sidecar materialization
+- [`default:_global/error-handling-conventions`](../../_global/error-handling-conventions/spec.md) — canonical error handling standards for the monorepo.

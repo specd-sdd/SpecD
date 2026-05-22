@@ -80,7 +80,7 @@ export {
 } from './application/use-cases/_shared/compute-graph-fingerprint.js'
 
 // Errors
-export { CodeGraphError } from './domain/errors/code-graph-error.js'
+export { SpecdCodeGraphError } from './domain/errors/specd-code-graph-error.js'
 export { InvalidSymbolKindError } from './domain/errors/invalid-symbol-kind-error.js'
 export { InvalidRelationTypeError } from './domain/errors/invalid-relation-type-error.js'
 export { DuplicateSymbolIdError } from './domain/errors/duplicate-symbol-id-error.js'

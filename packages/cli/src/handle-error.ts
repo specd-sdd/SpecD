@@ -13,7 +13,9 @@ import { output } from './formatter.js'
  */
 interface CliErrorOptions {
   /** Extra detail written to stderr before the main error line (e.g. hook stderr). */
-  detail?: string
+  detail?: string | undefined
+  /** Additional error metadata for structured output. */
+  metadata?: Record<string, unknown> | undefined
 }
 
 /**
@@ -42,9 +44,103 @@ export function cliError(
   const prefix = exitCode === 3 ? 'fatal' : 'error'
   process.stderr.write(`${prefix}: ${message}\n`)
   if (format === 'json' || format === 'toon') {
-    output({ result: 'error', code, message, exitCode }, format)
+    const payload: Record<string, unknown> = { result: 'error', code, message, exitCode }
+    if (options?.metadata !== undefined && Object.keys(options.metadata).length > 0) {
+      payload.metadata = options.metadata
+    }
+    output(payload, format)
   }
   process.exit(exitCode)
+}
+
+/**
+ * Shape of an error compatible with SpecdError for structured output.
+ */
+interface SpecdErrorLike {
+  /** The discriminator indicating this is a specd error */
+  specd?: boolean
+  /** The machine-readable error code */
+  code: string
+  /** The human-readable error message */
+  message: string
+  /** Optional command that failed (for hook errors) */
+  command?: string
+  /** Optional stderr output (for hook errors) */
+  stderr?: string
+  /** Additional contextual metadata for structured output. */
+  [key: string]: unknown
+}
+
+const STRUCTURED_ERROR_BASE_FIELDS = new Set([
+  'name',
+  'message',
+  'stack',
+  'code',
+  'specd',
+  'command',
+  'stderr',
+])
+
+/**
+ * Extracts structured metadata fields from a Specd-compatible error.
+ *
+ * Own enumerable fields are included first, then getter-backed properties from
+ * the prototype chain. Private backing fields and base error properties are
+ * excluded from the structured metadata payload.
+ *
+ * @param err - The error object to inspect for metadata
+ * @returns Structured metadata safe for JSON or TOON output
+ */
+function extractErrorMetadata(err: SpecdErrorLike): Record<string, unknown> {
+  const metadata: Record<string, unknown> = {}
+
+  for (const key of Object.keys(err)) {
+    if (STRUCTURED_ERROR_BASE_FIELDS.has(key) || key.startsWith('_')) continue
+    const value: unknown = err[key]
+    metadata[key] = value
+  }
+
+  let proto = getPrototype(err)
+  while (proto !== null && proto !== Error.prototype && proto !== Object.prototype) {
+    const descriptors = Object.getOwnPropertyDescriptors(proto)
+    for (const [key, descriptor] of Object.entries(descriptors)) {
+      if (STRUCTURED_ERROR_BASE_FIELDS.has(key) || key === 'constructor' || key in metadata) {
+        continue
+      }
+      if (typeof descriptor.get !== 'function') continue
+      try {
+        const value: unknown = descriptor.get.call(err)
+        metadata[key] = value
+      } catch {
+        // Ignore metadata getters that fail; error reporting must remain best-effort.
+      }
+    }
+    proto = getPrototype(proto)
+  }
+
+  return metadata
+}
+
+/**
+ * Safely retrieves the prototype of an object without leaking `any` into callers.
+ *
+ * @param value - The object whose prototype should be inspected
+ * @returns The prototype object, or `null` when the prototype chain ends
+ */
+function getPrototype(value: object): object | null {
+  return Object.getPrototypeOf(value) as object | null
+}
+
+/**
+ * Type guard for errors conforming to the Specd Error Contract.
+ * @param err - The error to check
+ * @returns True if the error is SpecdError-like
+ */
+function isSpecdErrorLike(err: unknown): err is SpecdErrorLike {
+  if (err instanceof SpecdError) {
+    return true
+  }
+  return typeof err === 'object' && err !== null && 'specd' in err && err.specd === true
 }
 
 /**
@@ -68,21 +164,32 @@ export function cliError(
  */
 export function handleError(err: unknown, format?: string): never {
   // Known domain/application errors — all extend SpecdError with a machine-readable code
-  if (err instanceof SpecdError) {
-    if (err instanceof HookFailedError) {
-      return cliError(`hook '${err.command}' failed`, format, 2, err.code, { detail: err.stderr })
+  if (isSpecdErrorLike(err)) {
+    const code = err.code
+    const metadata = extractErrorMetadata(err)
+
+    if (err instanceof HookFailedError || code === 'HOOK_FAILED') {
+      return cliError(`hook '${err.command}' failed`, format, 2, code, {
+        detail: err.stderr,
+        metadata,
+      })
     }
 
-    if (err instanceof SchemaNotFoundError || err instanceof SchemaValidationError) {
-      return cliError(err.message, format, 3, err.code)
+    if (
+      err instanceof SchemaNotFoundError ||
+      err instanceof SchemaValidationError ||
+      code === 'SCHEMA_NOT_FOUND' ||
+      code === 'SCHEMA_VALIDATION_ERROR'
+    ) {
+      return cliError(err.message, format, 3, code, { metadata })
     }
 
-    if (err instanceof HistoricalImplementationGuardError) {
-      return cliError(err.message, format, 1, err.code)
+    if (err instanceof HistoricalImplementationGuardError || code === 'IMPLEMENTATION_DETECTED') {
+      return cliError(err.message, format, 1, code, { metadata })
     }
 
     // All other SpecdError subtypes → exit 1
-    return cliError(err.message, format, 1, err.code)
+    return cliError(err.message, format, 1, code, { metadata })
   }
 
   // Generic/unexpected errors — stderr only, no structured output

@@ -1,0 +1,16 @@
+- op: added
+  description: 'Reference the new error handling conventions'
+  position:
+    parent:
+      type: section
+      matches: 'Spec Dependencies'
+  content: |
+    - [`default:_global/error-handling-conventions`](../error-handling-conventions/spec.md) — canonical error handling standards for the monorepo.
+
+- op: modified
+  description: 'Update error handling requirements to follow global conventions'
+  selector:
+    type: section
+    matches: 'Requirement: Error types'
+  content: |
+    All user-facing errors in `@specd/core` MUST explicitly extend `SpecdError`. Use cases MUST NOT throw generic `Error` for expected failure modes or validation failures. Every error MUST provide a machine-readable `code` and follow the Actionable Messaging standards defined in [`default:_global/error-handling-conventions`](../error-handling-conventions/spec.md).

@@ -56,6 +56,15 @@ Inside the mutation callback, the repository supplies the fresh persisted `Chang
 
 `UpdateSpecDeps.execute` then returns an `UpdateSpecDepsResult` containing `specId` and the resulting `dependsOn` array.
 
+### Requirement: Typed errors for dependency update failures
+
+`UpdateSpecDeps` MUST NOT throw generic `Error` for validation or lookup failures. It SHALL use typed `SpecdError` subclasses (or general core validation errors) for the following scenarios:
+
+- Flag validation (mutually exclusive flags, missing flags).
+- Dependency lookup failures (dependency not found).
+
+Each error MUST follow the [`default:_global/error-handling-conventions`](../../_global/error-handling-conventions/spec.md) for actionable messaging.
+
 ## Constraints
 
 - Updating `specDependsOn` does NOT trigger approval invalidation — this is a dependency metadata operation, not a spec scope change
@@ -68,3 +77,4 @@ Inside the mutation callback, the repository supplies the fresh persisted `Chang
 - [`core:spec-id-format`](../spec-id-format/spec.md) — spec ID parsing via `parseSpecId`
 - [`core:compile-context`](../compile-context/spec.md) — consumer of `specDependsOn` for dependency resolution
 - [`core:composition`](../composition/spec.md) — wiring and port injection
+- [`default:_global/error-handling-conventions`](../../_global/error-handling-conventions/spec.md) — canonical error handling standards for the monorepo.

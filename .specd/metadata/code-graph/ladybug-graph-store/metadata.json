@@ -44,7 +44,7 @@
     {
       "requirement": "Relationship tables",
       "rules": [
-        "The Ladybug schema SHALL define relationship tables for the persisted relation types used by the code graph.\n\nAt minimum, the schema MUST persist:\n\n| Relationship | From   | To     | Populated by                                  |\n| ------------ | ------ | ------ | --------------------------------------------- |\n| IMPORTS      | File   | File   | Indexer analysis                              |\n| DEFINES      | File   | Symbol | Indexer analysis                              |\n| CALLS        | Symbol | Symbol | Indexer analysis                              |\n| EXPORTS      | File   | Symbol | Indexer analysis                              |\n| DEPENDS\\_ON   | Spec   | Spec   | Spec indexing                                 |\n| COVERS\\_FILE  | Spec   | File   | Archived file-level implementation linkage    |\n| COVERS\\_SYMBOL| Spec   | Symbol | Archived symbol-level implementation linkage  |\n| EXTENDS      | Symbol | Symbol | Indexer analysis                              |\n| IMPLEMENTS   | Symbol | Symbol | Indexer analysis                              |\n| OVERRIDES    | Symbol | Symbol | Indexer analysis                              |\n\nThe schema MUST provide persisted `COVERS_FILE` and `COVERS_SYMBOL` relation families so the backend can support requirement-aware impact and lookup. `COVERS_SYMBOL` relations MUST preserve edge metadata so symbol-level implementation links can surface `stale` state after reload.\n\nRelationship tables have no persisted edge properties unless a requirement explicitly adds them. `COVERS_SYMBOL` is that explicit case and MUST retain metadata required by the abstract relation contract."
+        "The Ladybug schema SHALL define relationship tables for the persisted relation types used by the code graph.\n\nAt minimum, the schema MUST persist:\n\n| Relationship  | From   | To     | Populated by                                 |\n| ------------- | ------ | ------ | -------------------------------------------- |\n| IMPORTS       | File   | File   | Indexer analysis                             |\n| DEFINES       | File   | Symbol | Indexer analysis                             |\n| CALLS         | Symbol | Symbol | Indexer analysis                             |\n| EXPORTS       | File   | Symbol | Indexer analysis                             |\n| DEPENDS\\_ON    | Spec   | Spec   | Spec indexing                                |\n| COVERS\\_FILE   | Spec   | File   | Archived file-level implementation linkage   |\n| COVERS\\_SYMBOL | Spec   | Symbol | Archived symbol-level implementation linkage |\n| EXTENDS       | Symbol | Symbol | Indexer analysis                             |\n| IMPLEMENTS    | Symbol | Symbol | Indexer analysis                             |\n| OVERRIDES     | Symbol | Symbol | Indexer analysis                             |\n\nThe schema MUST provide persisted `COVERS_FILE` and `COVERS_SYMBOL` relation families so the backend can support requirement-aware impact and lookup. `COVERS_SYMBOL` relations MUST preserve edge metadata so symbol-level implementation links can surface `stale` state after reload.\n\nRelationship tables have no persisted edge properties unless a requirement explicitly adds them. `COVERS_SYMBOL` is that explicit case and MUST retain metadata required by the abstract relation contract."
       ]
     },
     {
@@ -297,8 +297,8 @@
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:e9f066904239eaa52d9ed95e035940e1777560c66dfce726fac8598dfbe4d0b6",
-    "verify.md": "sha256:08086970abc6b0e3a0ea471b896c436acd08746f6fe1b39d0a0011a23d7522ad"
+    "spec.md": "sha256:d29ba7eeb6a4d49e63bbf0cc0d7257ab91535ffd9528a703ce48be52da68fa15",
+    "verify.md": "sha256:57432f95ac198da536b084ba4b86b1dddab58ecf447a27d3a7b4b61bdcbeecc3"
   },
   "generatedBy": "core"
 }

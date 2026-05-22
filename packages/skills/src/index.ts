@@ -1,4 +1,4 @@
-export type { Skill, SkillTemplate, ResolvedFile, SkillBundle } from './domain/index.js'
+export * from './domain/index.js'
 export type { SharedFile, SkillRepository } from './application/ports/index.js'
 export {
   GetSkill,

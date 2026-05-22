@@ -19,22 +19,25 @@
     "core:spec-id-format",
     "core:spec-overlap",
     "default:_global/logging",
-    "core:spec-lock"
+    "core:spec-lock",
+    "default:_global/error-handling-conventions"
   ],
   "implementation": [
     {
+      "file": "core:src/domain/errors/archive-dependency-mismatch-error.ts",
+      "symbols": ["ArchiveDependencyMismatchError"]
+    },
+    {
+      "file": "core:src/domain/errors/archive-artifact-missing-error.ts",
+      "symbols": ["ArchiveArtifactMissingError"]
+    },
+    {
+      "file": "core:src/domain/errors/archive-implementation-state-error.ts",
+      "symbols": ["ArchiveImplementationStateError"]
+    },
+    {
       "file": "core:src/application/use-cases/archive-change.ts",
-      "symbols": [
-        "ArchiveChange",
-        "ArchiveChange.execute",
-        "createArchiveWorkspaceImplementationConfig"
-      ]
-    },
-    {
-      "file": "core:src/composition/kernel.ts"
-    },
-    {
-      "file": "core:src/composition/use-cases/archive-change.ts"
+      "symbols": ["ArchiveChange"]
     }
   ]
 }

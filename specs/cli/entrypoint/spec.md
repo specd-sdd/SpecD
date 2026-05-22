@@ -55,25 +55,9 @@ Errors always go to stderr as plain `error:` or `fatal:` text for human consumpt
 
 ### Requirement: Structured error output
 
-When `--format` is `json` or `toon`, errors are **also** written to stdout in the corresponding structured format so that programmatic consumers (LLMs, scripts, CI) can parse them without reading stderr. The structured error object contains:
+The CLI SHALL ensure all user-facing errors (validation, format, configuration) use typed error classes that follow the "Specd Error Contract" defined in [`default:_global/error-handling-conventions`](../../_global/error-handling-conventions/spec.md).
 
-```json
-{
-  "result": "error",
-  "code": "<MACHINE_READABLE_CODE>",
-  "message": "<human-readable description>",
-  "exitCode": 1
-}
-```
-
-- `result` — always the string `"error"`
-- `code` — the machine-readable error code from the `SpecdError` subclass (e.g. `DEPENDS_ON_OVERWRITE`, `CHANGE_NOT_FOUND`, `HOOK_FAILED`, `SCHEMA_NOT_FOUND`)
-- `message` — the same message written to stderr (without the `error:`/`fatal:` prefix)
-- `exitCode` — the numeric exit code (1, 2, or 3)
-
-Structured error output is only emitted for known error types — subtypes of `SpecdError` that carry a machine-readable `code`. Generic or unexpected errors (exit code 3 from unhandled exceptions) are written to stderr only; stdout remains empty.
-
-When `--format` is `text` (the default), errors go to stderr only and stdout remains empty — no change from the existing behaviour for human users.
+`@specd/cli` SHALL define its own `SpecdCliError` base class (extending `SpecdError`) for CLI-specific errors. Generic `Error` throws MUST be eliminated from formatters, command helpers, and argument validation logic to ensure the global `handleError` can emit structured JSON/TOON output without stack traces.
 
 ### Requirement: JSON/TOON output schema in help
 
@@ -159,3 +143,4 @@ specd change transition my-change implementing
 ## Spec Dependencies
 
 - [`core:config`](../../core/config/spec.md) — SpecdConfig shape and config file format
+- [`default:_global/error-handling-conventions`](../../_global/error-handling-conventions/spec.md) — canonical error handling standards for the monorepo.

@@ -3,11 +3,11 @@
     "name": "schema-std",
     "version": 1
   },
-  "dependsOn": ["default:_global/conventions"],
+  "dependsOn": ["default:_global/conventions", "default:_global/error-handling-conventions"],
   "implementation": [
     {
-      "file": "code-graph:src/domain/value-objects/relation-type.ts",
-      "symbols": ["RelationType", "isRelationType"]
+      "file": "code-graph:src/domain/errors/specd-code-graph-error.ts",
+      "symbols": ["SpecdCodeGraphError"]
     }
   ]
 }

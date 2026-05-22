@@ -1,0 +1,28 @@
+- op: added
+  description: 'Reference the new error handling conventions'
+  position:
+    parent:
+      type: section
+      matches: 'Spec Dependencies'
+  content: |
+    - [`default:_global/error-handling-conventions`](../../_global/error-handling-conventions/spec.md) — canonical error handling standards for the monorepo.
+
+- op: added
+  description: 'Mandate typed errors for archive failures'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Result shape'
+  content: |
+    ### Requirement: Typed errors for archive failures
+
+    `ArchiveChange` MUST NOT throw generic `Error` for validation or state failures. It SHALL use typed `SpecdError` subclasses for the following scenarios:
+    - `ArchiveDependencyMismatchError` — when extracted dependencies mismatch persisted ones.
+    - `ArchiveArtifactMissingError` — when a tracked or base artifact is missing.
+    - `ArchiveImplementationStateError` — when implementation files are open or out-of-scope sidecar updates are detected.
+    - `ArchivePreflightError` — for other preflight validation failures.
+
+    Each error MUST follow the [`default:_global/error-handling-conventions`](../../_global/error-handling-conventions/spec.md) for actionable messaging.

@@ -1,9 +1,9 @@
-import { CodeGraphError } from './code-graph-error.js'
+import { SpecdCodeGraphError } from './specd-code-graph-error.js'
 
 /**
- * Error thrown when a symbol with the same id already exists in the graph.
+ * Thrown when a symbol with the same ID already exists in the graph.
  */
-export class DuplicateSymbolIdError extends CodeGraphError {
+export class DuplicateSymbolIdError extends SpecdCodeGraphError {
   /**
    * Returns the machine-readable error code.
    * @returns The error code 'DUPLICATE_SYMBOL_ID'.

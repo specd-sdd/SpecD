@@ -17,7 +17,8 @@
     "core:spec-id-format",
     "core:spec-overlap",
     "default:_global/logging",
-    "core:spec-lock"
+    "core:spec-lock",
+    "default:_global/error-handling-conventions"
   ],
   "context": [
     "Once a change has completed its full lifecycle, its spec modifications need to be applied to the project and the change itself preserved for posterity — but this finalization involves delta merging, hook execution, and metadata generation that must happen atomically and in the right order. `ArchiveChange` is the use case that merges delta artifacts into project specs, moves the change directory to the archive, and fires lifecycle hooks before and after. It is gated on `archivable` state."
@@ -135,6 +136,12 @@
       "requirement": "Result shape",
       "rules": [
         "`ArchiveChange.execute` must return a result object. The result must include:\n\n- `archivedChange` — the `ArchivedChange` record that was persisted\n- `postHookFailures` — array of hook commands that failed post-archive, empty on full success\n- `staleMetadataSpecPaths` — array of spec paths where `metadata.json` generation failed during this archive (e.g. extraction produced no required fields); empty when all metadata was generated successfully\n- `invalidatedChanges` — array of objects describing changes that were invalidated due to spec overlap, each containing:\n  - `name` — the invalidated change's name\n  - `specIds` — readonly array of overlapping spec IDs that triggered the invalidation\n    Empty when no changes were invalidated (either no overlap existed or `allowOverlap` was `false` and the archive was blocked).\n\n`ArchiveChange` throws on pre-archive hook failure or `assertArchivable` failure. Post-archive failures are returned, not thrown."
+      ]
+    },
+    {
+      "requirement": "Typed errors for archive failures",
+      "rules": [
+        "`ArchiveChange` MUST NOT throw generic `Error` for validation or state failures. It SHALL use typed `SpecdError` subclasses for the following scenarios:\n\n- `ArchiveDependencyMismatchError` — when extracted dependencies mismatch persisted ones.\n- `ArchiveArtifactMissingError` — when a tracked or base artifact is missing.\n- `ArchiveImplementationStateError` — when implementation files are open or out-of-scope sidecar updates are detected.\n- `ArchivePreflightError` — for other preflight validation failures.\n\nEach error MUST follow the [`default:_global/error-handling-conventions`](../../_global/error-handling-conventions/spec.md) for actionable messaging."
       ]
     },
     {
@@ -907,40 +914,64 @@
       "given": ["the same out-of-scope sidecar maintenance situation"],
       "when": ["archive runs with --allow-out-of-scope"],
       "then": ["archive is allowed to proceed with those external sidecar updates"]
+    },
+    {
+      "requirement": "Typed errors for archive failures",
+      "name": "Dependency mismatch throws ArchiveDependencyMismatchError",
+      "given": [
+        "a change with dependsOn: ['core:storage']",
+        "AND the extracted metadata from artifacts has dependsOn: ['core:new-dep']"
+      ],
+      "when": ["ArchiveChange is executed"],
+      "then": [
+        "ArchiveDependencyMismatchError is thrown",
+        "AND the error includes both the extracted and persisted dependencies"
+      ]
+    },
+    {
+      "requirement": "Typed errors for archive failures",
+      "name": "Missing artifact throws ArchiveArtifactMissingError",
+      "given": ["a change targeting a spec whose tracked artifact is missing from the filesystem"],
+      "when": ["ArchiveChange is executed"],
+      "then": ["ArchiveArtifactMissingError is thrown"]
+    },
+    {
+      "requirement": "Typed errors for archive failures",
+      "name": "Open implementation file throws ArchiveImplementationStateError",
+      "given": [
+        "a change with implementation files that are currently marked as open in the detector"
+      ],
+      "when": ["ArchiveChange is executed"],
+      "then": ["ArchiveImplementationStateError is thrown"]
     }
   ],
   "implementation": {
-    "files": [
+    "symbols": [
       {
         "specId": "core:archive-change",
-        "file": "core:src/composition/kernel.ts"
+        "file": "core:src/domain/errors/archive-dependency-mismatch-error.ts",
+        "symbol": "ArchiveDependencyMismatchError"
       },
       {
         "specId": "core:archive-change",
-        "file": "core:src/composition/use-cases/archive-change.ts"
-      }
-    ],
-    "symbols": [
+        "file": "core:src/domain/errors/archive-artifact-missing-error.ts",
+        "symbol": "ArchiveArtifactMissingError"
+      },
+      {
+        "specId": "core:archive-change",
+        "file": "core:src/domain/errors/archive-implementation-state-error.ts",
+        "symbol": "ArchiveImplementationStateError"
+      },
       {
         "specId": "core:archive-change",
         "file": "core:src/application/use-cases/archive-change.ts",
         "symbol": "ArchiveChange"
-      },
-      {
-        "specId": "core:archive-change",
-        "file": "core:src/application/use-cases/archive-change.ts",
-        "symbol": "ArchiveChange.execute"
-      },
-      {
-        "specId": "core:archive-change",
-        "file": "core:src/application/use-cases/archive-change.ts",
-        "symbol": "createArchiveWorkspaceImplementationConfig"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:9e223f6e2eaef1e754475a694c42119e99ee2589934109849f70ffe972b3a3f6",
-    "verify.md": "sha256:c4aa8e0e07203a1eaebb5f0e3c3302d41157139019ad2930a156e2290a058fb9"
+    "spec.md": "sha256:a266c28d0bf2c6ef0e2d90fc377e6e9b57f99ae25ddd6363adf1acc0d16180dc",
+    "verify.md": "sha256:806d14bbaa8aca9ee196d40c2de37da020b1d50ae270db84ee3bc99a046b1813"
   },
   "generatedBy": "core"
 }

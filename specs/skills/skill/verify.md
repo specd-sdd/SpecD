@@ -37,3 +37,12 @@
 
 - **WHEN** the domain layer is inspected
 - **THEN** no imports from `node:fs` or similar I/O modules exist
+
+### Requirement: Typed errors for skill operations
+
+#### Scenario: Skill not found throws SpecdSkillsError
+
+- **GIVEN** a request for a skill that is not installed
+- **WHEN** the skill repository is queried
+- **THEN** a typed error extending `SpecdSkillsError` is thrown
+- **AND** the error code is `SKILL_NOT_FOUND`

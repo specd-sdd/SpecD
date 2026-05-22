@@ -115,6 +115,11 @@ specd changes implementation resolve <name> --file <path>
   specd changes implementation ignore <name> --file <path1>,<path2>
   ```
 
+You know which files belong to the implementation surface based on your understanding of
+the change's requirements and design. If you're unsure about a file, review its content
+and dependencies to determine whether it contributes to realizing the change's specs.
+When in doubt, it's safer to track a file with links than to ignore it.
+
 **Security & Integrity Guard:** All implementation management commands validate that
 the target files exist on disk. Archiving is blocked until all tracked files are
 resolved or ignored.

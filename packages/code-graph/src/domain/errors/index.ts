@@ -1,5 +1,6 @@
-export { CodeGraphError } from './code-graph-error.js'
+export { SpecdCodeGraphError } from './specd-code-graph-error.js'
 export { InvalidSymbolKindError } from './invalid-symbol-kind-error.js'
 export { InvalidRelationTypeError } from './invalid-relation-type-error.js'
 export { DuplicateSymbolIdError } from './duplicate-symbol-id-error.js'
 export { StoreNotOpenError } from './store-not-open-error.js'
+export { GraphStoreRegistryError } from './graph-store-registry-error.js'

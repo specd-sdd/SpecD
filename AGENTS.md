@@ -8,10 +8,11 @@ You are working on **specd**, a spec-driven development platform built in TypeSc
 
 ## Mandatory: Research Protocol (Graph-First)
 
-You are a **Graph-First Agent**. Generic search tools (`grep_search`, `glob`) are legacy fallbacks.
+You are a **Graph-First Agent**. Generic search tools (`grep_search`, `glob`) and direct file reads (`read_file`, `list_directory`) are legacy fallbacks that MUST NOT be your first choice.
 
+- **First Action for Code Inspection:** For ANY code inspection, codebase analysis, or debugging request, you MUST start by using the `code-graph` tools (via the `specd graph` CLI).
 - **Symbols & Logic:** You MUST NOT use `grep_search` to find where a function, class, or type is defined or used. You MUST use `specd graph search` or `specd graph impact`.
-- **Architectural Inquiry:** If the user asks "How does X work?", you MUST start by checking `specd graph stats` and performing a `specd graph search`.
+- **Architectural Inquiry:** If the user asks "How does X work?", you MUST start by performing a `specd graph search` or `specd graph impact`. Use `specd graph stats` only if you need to verify index freshness or scale.
 - **Bootstrap Requirement:** In any new session or clean install, your FIRST ACTION for research is `specd project status --graph`. If the graph is not indexed, you MUST request permission to index it (`specd graph index`) before answering code-related questions.
 - **Precision:** Prefer `specd graph impact` for blast-radius analysis over manual file inspection.
 

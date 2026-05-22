@@ -1,6 +1,7 @@
 {
   "title": "Coding Conventions",
   "description": "Without consistent language-level conventions, a multi-package monorepo drifts into incompatible styles that slow down both humans and agents. This spec defines the TypeScript conventions for the specd monorepo — strict mode, ESM-only, naming, error handling, and more. They apply to all packages unless a package-level spec explicitly overrides a specific rule.",
+  "dependsOn": ["default:_global/error-handling-conventions"],
   "context": [
     "Without consistent language-level conventions, a multi-package monorepo drifts into incompatible styles that slow down both humans and agents. This spec defines the TypeScript conventions for the specd monorepo — strict mode, ESM-only, naming, error handling, and more. They apply to all packages unless a package-level spec explicitly overrides a specific rule."
   ],
@@ -44,7 +45,7 @@
     {
       "requirement": "Error types",
       "rules": [
-        "All domain and application errors extend `SpecdError` (defined in `@specd/core`). Errors include a machine-readable `code` string for programmatic handling by CLI and MCP."
+        "All user-facing errors in `@specd/core` MUST explicitly extend `SpecdError`. Use cases MUST NOT throw generic `Error` for expected failure modes or validation failures. Every error MUST provide a machine-readable `code` and follow the Actionable Messaging standards defined in [`default:_global/error-handling-conventions`](../error-handling-conventions/spec.md)."
       ]
     },
     {
@@ -123,8 +124,22 @@
     {
       "requirement": "Error types",
       "name": "Raw Error thrown in domain code",
-      "when": ["domain or application code throws new Error('something')"],
-      "then": ["it must be replaced with a typed SpecdError subclass"]
+      "when": ["a domain or application use case throws a generic Error"],
+      "then": ["it is a convention violation — use SpecdError (or package-level base) instead"]
+    },
+    {
+      "requirement": "Error types",
+      "name": "Core error missing SpecdError parent",
+      "given": ["a new domain error class in @specd/core"],
+      "when": ["the error is defined"],
+      "then": ["it MUST extend SpecdError"]
+    },
+    {
+      "requirement": "Error types",
+      "name": "Monorepo package error hierarchy",
+      "given": ["a monorepo package that depends on @specd/core"],
+      "when": ["it defines its own base error class"],
+      "then": ["that class MUST extend SpecdError"]
     },
     {
       "requirement": "Private backing fields use underscore prefix",
@@ -159,9 +174,10 @@
       "then": ["it should be typed as readonly string[]"]
     }
   ],
+  "implementation": {},
   "contentHashes": {
-    "spec.md": "sha256:4e0dbfa804b6eee09d149e586df68d02a060e51916b596fab98dea80e47bb0dc",
-    "verify.md": "sha256:9dd5bb3432b73ff956f4900cf1ce64301e1ea79430c1ea633546b3ac61b15c99"
+    "spec.md": "sha256:63e29def48b8d6733110c8d7f8bcde5f272a39607cda24e51717c767f693dd8f",
+    "verify.md": "sha256:79310e52c401071cd52164ab363fa1ff87137b846c5db339aeb9ed4918051a88"
   },
   "generatedBy": "core"
 }

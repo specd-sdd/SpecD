@@ -1,9 +1,9 @@
-import { CodeGraphError } from './code-graph-error.js'
+import { SpecdCodeGraphError } from './specd-code-graph-error.js'
 
 /**
  * Error thrown when an unrecognized relation type string is encountered.
  */
-export class InvalidRelationTypeError extends CodeGraphError {
+export class InvalidRelationTypeError extends SpecdCodeGraphError {
   /**
    * Returns the machine-readable error code.
    * @returns The error code 'INVALID_RELATION_TYPE'.

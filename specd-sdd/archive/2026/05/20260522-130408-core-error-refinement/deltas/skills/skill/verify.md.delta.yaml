@@ -1,0 +1,15 @@
+- op: added
+  description: 'Verify typed skills errors'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: Typed errors for skill operations
+
+    #### Scenario: Skill not found throws SpecdSkillsError
+
+    - **GIVEN** a request for a skill that is not installed
+    - **WHEN** the skill repository is queried
+    - **THEN** a typed error extending `SpecdSkillsError` is thrown
+    - **AND** the error code is `SKILL_NOT_FOUND`

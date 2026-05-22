@@ -35,7 +35,7 @@
 - **WHEN** a test file lives at `src/domain/entities/change.spec.ts`
 - **THEN** it must be moved to `test/domain/entities/change.spec.ts`
 
-### Requirement: No `any`
+### Requirement: No any
 
 #### Scenario: any in function parameter
 
@@ -53,8 +53,20 @@
 
 #### Scenario: Raw Error thrown in domain code
 
-- **WHEN** domain or application code throws `new Error('something')`
-- **THEN** it must be replaced with a typed `SpecdError` subclass
+- **WHEN** a domain or application use case throws a generic `Error`
+- **THEN** it is a convention violation — use `SpecdError` (or package-level base) instead
+
+#### Scenario: Core error missing SpecdError parent
+
+- **GIVEN** a new domain error class in `@specd/core`
+- **WHEN** the error is defined
+- **THEN** it MUST extend `SpecdError`
+
+#### Scenario: Monorepo package error hierarchy
+
+- **GIVEN** a monorepo package that depends on `@specd/core`
+- **WHEN** it defines its own base error class
+- **THEN** that class MUST extend `SpecdError`
 
 ### Requirement: Private backing fields use underscore prefix
 
