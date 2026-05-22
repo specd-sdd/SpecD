@@ -1,0 +1,78 @@
+- op: modified
+  description: 'Verify that full-batch preflight completes before any canonical publication begins'
+  selector:
+    type: section
+    matches: '^Requirement: Prepare archive plan before permanent writes$'
+  content: |
+    #### Scenario: Later artifact failure prevents all permanent writes
+
+    - **GIVEN** archive can compute merged output for `spec.md`
+    - **AND** a later artifact such as `verify.md` fails during tracked-file resolution or delta application
+    - **WHEN** `ArchiveChange.execute` prepares the archive plan
+    - **THEN** no permanent spec artifact is written
+    - **AND** the change remains pending archive from an external observer's point of view
+
+    #### Scenario: Delta base is checked during prepare phase
+
+    - **GIVEN** a tracked delta artifact requires an existing base artifact in the target spec repository
+    - **AND** that base artifact is missing
+    - **WHEN** `ArchiveChange.execute` prepares the archive plan
+    - **THEN** the archive fails before any permanent write begins
+
+    #### Scenario: Later spec preflight failure blocks earlier spec publication
+
+    - **GIVEN** archive has prepared a multi-spec batch
+    - **AND** an earlier spec in the batch is ready to publish
+    - **AND** a later spec in the same batch still has an archive-time check that will fail
+    - **WHEN** `ArchiveChange.execute` performs full-batch preflight
+    - **THEN** the later failure is detected before canonical publication begins for any spec
+    - **AND** the earlier spec is not published first
+
+    #### Scenario: Metadata consistency failure is part of prepare-phase preflight
+
+    - **GIVEN** archive has prepared merged canonical content for multiple specs
+    - **AND** one spec produces an extracted `dependsOn` value that conflicts with the final persisted dependency set
+    - **WHEN** `ArchiveChange.execute` completes archive-batch preflight
+    - **THEN** the mismatch fails the archive before canonical publication begins for every spec in the batch
+- op: modified
+  description: 'Verify the two-stage safety boundary: full-batch preflight before publication, per-spec atomicity after'
+  selector:
+    type: section
+    matches: '^Requirement: Staged archive commit and failed-attempt visibility$'
+  content: |
+    #### Scenario: Pre-publication failure leaves no canonical spec writes
+
+    - **GIVEN** archive execution has started
+    - **AND** a failure occurs before staged publication to canonical storage begins
+    - **WHEN** `ArchiveChange.execute` aborts
+    - **THEN** no canonical spec repository shows a partially synced artifact
+
+    #### Scenario: Publication unit includes spec-lock sidecar
+
+    - **GIVEN** archive has prepared merged canonical artifacts for a spec
+    - **AND** archive has determined the final `spec-lock.json` content for that spec
+    - **WHEN** staged publication is built
+    - **THEN** the publication unit includes both the merged canonical spec artifacts and `spec-lock.json`
+
+    #### Scenario: Publication failure preserves staged output for manual recovery
+
+    - **GIVEN** staged archive output has been prepared for a spec
+    - **AND** final publication from staging to canonical storage fails for that spec
+    - **WHEN** `ArchiveChange.execute` reports the failure
+    - **THEN** the canonical spec tree does not contain a partially written version of that spec
+    - **AND** the staged output is not deleted automatically
+    - **AND** the reported failure indicates that the staged material can be moved manually
+
+    #### Scenario: Batch preflight succeeds before first staged publication starts
+
+    - **GIVEN** a change archives more than one spec
+    - **WHEN** the first staged publication unit begins
+    - **THEN** every archive-time check that can still fail the archive has already succeeded for the full batch
+
+    #### Scenario: Multi-spec archive is not required to be one filesystem transaction
+
+    - **GIVEN** a change archives more than one spec
+    - **WHEN** the archive contract is evaluated
+    - **THEN** the spec guarantees full-batch preflight atomicity before canonical publication starts
+    - **AND** it guarantees atomic publication per spec once staged canonical publication has started
+    - **AND** it does not promise one indivisible filesystem transaction for the whole batch

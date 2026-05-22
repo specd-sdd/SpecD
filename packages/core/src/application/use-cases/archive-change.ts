@@ -1,4 +1,5 @@
 import path from 'node:path'
+import ignore from 'ignore'
 import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
 import { SchemaMismatchError } from '../errors/schema-mismatch-error.js'
 import { ParserNotRegisteredError } from '../errors/parser-not-registered-error.js'
@@ -10,6 +11,7 @@ import { type ArchiveRepository } from '../ports/archive-repository.js'
 import { type ActorResolver } from '../ports/actor-resolver.js'
 import { type ArtifactParserRegistry } from '../ports/artifact-parser.js'
 import { type SchemaProvider } from '../ports/schema-provider.js'
+import { type SpecdWorkspaceConfig } from '../specd-config.js'
 import { type ExtractorTransformRegistry } from '../../domain/services/extract-metadata.js'
 import { type ArchivedChange } from '../../domain/entities/archived-change.js'
 import { type ActorIdentity, type Change } from '../../domain/entities/change.js'
@@ -56,6 +58,13 @@ export interface ArchiveChangeInput {
    * Defaults to `false`.
    */
   readonly allowOverlap?: boolean
+  /**
+   * When `true`, allows archive-time sidecar maintenance to update specs
+   * outside the active change scope.
+   *
+   * Defaults to `false`.
+   */
+  readonly allowOutOfScope?: boolean
 }
 
 /** Entry describing a change invalidated due to spec overlap during archive. */
@@ -95,14 +104,51 @@ interface PreparedArchiveWrite {
 
 /** In-memory archive plan built before any permanent writes begin. */
 interface PreparedArchivePlan {
-  readonly writes: readonly PreparedArchiveWrite[]
+  readonly publications: readonly PreparedArchivePublication[]
   readonly staleSpecIds: readonly string[]
+  readonly implementationBySpecId: ReadonlyMap<string, readonly MaterializedImplementationLink[]>
+  readonly outOfScopeImplementationSpecIds: readonly string[]
 }
 
 /** Minimal tracked-file view needed during archive filename resolution. */
 interface TrackedArchiveFile {
   readonly filename: string
   readonly validatedHash: string | undefined
+}
+
+/** Publication unit for one spec during archive. */
+interface PreparedArchivePublication {
+  readonly specId: string
+  readonly spec: Spec
+  readonly specRepo: SpecRepository
+  readonly writes: readonly PreparedArchiveWrite[]
+}
+
+/** Preflighted publication unit with all failure-prone archive checks resolved. */
+interface PreparedArchivePreflightSpec {
+  readonly specId: string
+  readonly workspace: string
+  readonly specPath: SpecPath
+  readonly spec: Spec
+  readonly specRepo: SpecRepository
+  readonly writes: readonly PreparedArchiveWrite[]
+  readonly extractionArtifacts: readonly MetadataArtifactInput[]
+  readonly existingSpecLock: SpecLockData | null
+  readonly finalDependsOn: readonly string[]
+  readonly publicationSpecLock: SpecLockData | undefined
+  readonly sidecarActive: boolean
+}
+
+/** One implementation link after archive-time canonicalization. */
+interface MaterializedImplementationLink {
+  readonly file: string
+  readonly symbols?: readonly string[]
+}
+
+/** Workspace-specific archive materialization constraints. */
+interface ArchiveWorkspaceImplementationConfig {
+  readonly codeRoot: string
+  readonly excludePaths: readonly string[]
 }
 
 /**
@@ -124,6 +170,8 @@ export class ArchiveChange {
   private readonly _saveMetadata: SaveSpecMetadata
   private readonly _extractorTransforms: ExtractorTransformRegistry
   private readonly _workspaceRoutes: readonly SpecWorkspaceRoute[]
+  private readonly _projectRoot: string
+  private readonly _workspaceConfigs: ReadonlyMap<string, ArchiveWorkspaceImplementationConfig>
 
   /**
    * Creates a new `ArchiveChange` use case instance.
@@ -139,6 +187,8 @@ export class ArchiveChange {
    * @param saveMetadata - Use case for writing metadata
    * @param extractorTransforms - Shared extractor transform registry for pre-publication extraction
    * @param workspaceRoutes - Workspace routing metadata for cross-workspace spec reference resolution
+   * @param projectRoot - Project root used to canonicalize raw implementation paths
+   * @param workspaceConfigs - Workspace codeRoot and exclusion config for archive materialization
    */
   constructor(
     changes: ChangeRepository,
@@ -152,6 +202,8 @@ export class ArchiveChange {
     saveMetadata: SaveSpecMetadata,
     extractorTransforms: ExtractorTransformRegistry = new Map(),
     workspaceRoutes: readonly SpecWorkspaceRoute[] = [],
+    projectRoot = process.cwd(),
+    workspaceConfigs: ReadonlyMap<string, ArchiveWorkspaceImplementationConfig> = new Map(),
   ) {
     this._changes = changes
     this._specs = specs
@@ -164,6 +216,8 @@ export class ArchiveChange {
     this._saveMetadata = saveMetadata
     this._extractorTransforms = extractorTransforms
     this._workspaceRoutes = workspaceRoutes
+    this._projectRoot = projectRoot
+    this._workspaceConfigs = workspaceConfigs
   }
 
   /**
@@ -296,10 +350,25 @@ export class ArchiveChange {
     let preparedPlan: PreparedArchivePlan
     try {
       preparedPlan = await this._prepareArchivePlan(change, schema)
+      this._assertOutOfScopeImplementationAllowed(change, preparedPlan, input.allowOutOfScope)
       Logger.debug('ArchiveChange prepared archive plan', {
         change: change.name,
-        writeCount: preparedPlan.writes.length,
+        publicationCount: preparedPlan.publications.length,
         staleSpecCount: preparedPlan.staleSpecIds.length,
+        outOfScopeImplementationSpecCount: preparedPlan.outOfScopeImplementationSpecIds.length,
+      })
+    } catch (error) {
+      await this._recordArchiveFailure(input.name, 'prepare', error, archivingActor, false)
+      throw error
+    }
+
+    let preparedPreflight: readonly PreparedArchivePreflightSpec[]
+
+    try {
+      preparedPreflight = await this._prepareArchivePreflight(change, schema, preparedPlan)
+      Logger.debug('ArchiveChange completed full-batch archive preflight', {
+        change: change.name,
+        publicationCount: preparedPreflight.length,
       })
     } catch (error) {
       await this._recordArchiveFailure(input.name, 'prepare', error, archivingActor, false)
@@ -317,73 +386,31 @@ export class ArchiveChange {
     >()
 
     try {
-      for (const publication of groupArchiveWritesBySpec(preparedPlan.writes)) {
-        const firstWrite = publication[0]
-        if (firstWrite === undefined) continue
-        const { workspace, capPath } = parseSpecId(firstWrite.specId)
-        const extractionArtifacts = await this._buildFinalSpecArtifactsForExtraction(
-          firstWrite.specRepo,
-          firstWrite.spec,
-          schema,
-          publication,
-        )
-        const preExtracted = await extractMetadataFromSpecArtifacts({
-          effectiveSpecSchema: schema,
-          workspace,
-          specPath: firstWrite.spec.name,
-          artifacts: extractionArtifacts,
-          parsers: this._parsers,
-          extractorTransforms: this._extractorTransforms,
-          repositories: this._specs,
-          workspaceRoutes: this._workspaceRoutes,
-        })
-        const existingSpecLock = await firstWrite.specRepo.readSpecLock(firstWrite.spec)
-        const metadata = await firstWrite.specRepo.metadata(firstWrite.spec)
-        const canCreateSidecar =
-          existingSpecLock !== null ||
-          this._isStructurallyCompatiblePreparedArtifacts(extractionArtifacts)
-        const finalDependsOn = this._resolvePersistedDependsOn({
-          manifestDeps: change.specDependsOn.get(firstWrite.specId),
-          extractedDeps: preExtracted.metadata.dependsOn,
-          existingSpecLock,
-          metadataDeps: metadata?.dependsOn,
-        })
-
-        if (
-          canCreateSidecar &&
-          preExtracted.metadata.dependsOn !== undefined &&
-          !DependsOnOverwriteError.areSame(preExtracted.metadata.dependsOn, finalDependsOn)
-        ) {
-          throw new Error(
-            `Extracted dependsOn mismatch for '${firstWrite.specId}': extracted=${JSON.stringify(preExtracted.metadata.dependsOn)} persisted=${JSON.stringify(finalDependsOn)}`,
-          )
-        }
-
-        const publicationSpecLock = canCreateSidecar
-          ? this._buildPublicationSpecLock(existingSpecLock, schema, finalDependsOn)
-          : undefined
-
+      for (const publication of preparedPreflight) {
         Logger.debug('ArchiveChange starting staged spec publication', {
           change: change.name,
-          specId: firstWrite.specId,
-          artifactCount: publication.length,
+          specId: publication.specId,
+          artifactCount: publication.writes.length,
+          implementationCount: publication.publicationSpecLock?.implementation.length ?? 0,
         })
-        await firstWrite.specRepo.publish(firstWrite.spec, {
-          artifacts: publication.map(
+        await publication.specRepo.publish(publication.spec, {
+          artifacts: publication.writes.map(
             (write) => new SpecArtifact(write.outputFilename, write.content),
           ),
-          ...(publicationSpecLock !== undefined ? { specLock: publicationSpecLock } : {}),
+          ...(publication.publicationSpecLock !== undefined
+            ? { specLock: publication.publicationSpecLock }
+            : {}),
         })
         Logger.debug('ArchiveChange completed staged spec publication', {
           change: change.name,
-          specId: firstWrite.specId,
-          artifactCount: publication.length,
+          specId: publication.specId,
+          artifactCount: publication.writes.length,
         })
-        postPublicationStates.set(firstWrite.specId, {
-          workspace,
-          specPath: SpecPath.parse(capPath),
-          finalDependsOn,
-          sidecarActive: publicationSpecLock !== undefined,
+        postPublicationStates.set(publication.specId, {
+          workspace: publication.workspace,
+          specPath: publication.specPath,
+          finalDependsOn: publication.finalDependsOn,
+          sidecarActive: publication.sidecarActive,
         })
       }
     } catch (error) {
@@ -481,8 +508,15 @@ export class ArchiveChange {
    * @returns Prepared write plan and metadata-staleness set
    */
   private async _prepareArchivePlan(change: Change, schema: Schema): Promise<PreparedArchivePlan> {
-    const writes: PreparedArchiveWrite[] = []
+    this._assertTrackedImplementationFilesResolved(change)
+
+    const writesBySpecId = new Map<string, PreparedArchiveWrite[]>()
     const staleSpecIds = new Set<string>()
+    const implementationBySpecId = this._materializeImplementationLinks(change)
+    const publicationSpecIds = new Set<string>([
+      ...change.specIds,
+      ...implementationBySpecId.keys(),
+    ])
     const yamlParser = this._parsers.get('yaml')
 
     for (const specId of change.specIds) {
@@ -491,6 +525,8 @@ export class ArchiveChange {
       if (specRepo === undefined) continue
 
       const spec = new Spec(workspace, SpecPath.parse(capabilityPath), [])
+
+      const writes = writesBySpecId.get(specId) ?? []
 
       for (const artifactType of schema.artifacts()) {
         if (artifactType.scope !== 'spec') continue
@@ -574,12 +610,160 @@ export class ArchiveChange {
         staleSpecIds.add(specId)
       }
 
-      if (change.specDependsOn.get(specId) !== undefined) {
+      writesBySpecId.set(specId, writes)
+
+      if (
+        change.specDependsOn.get(specId) !== undefined ||
+        implementationBySpecId.has(specId) ||
+        writes.length > 0
+      ) {
         staleSpecIds.add(specId)
       }
     }
 
-    return { writes, staleSpecIds: [...staleSpecIds] }
+    const publications: PreparedArchivePublication[] = []
+    for (const specId of publicationSpecIds) {
+      const { workspace, capPath: capabilityPath } = parseSpecId(specId)
+      const specRepo = this._specs.get(workspace)
+      if (specRepo === undefined) {
+        if (implementationBySpecId.has(specId) && !change.specIds.includes(specId)) {
+          throw new Error(
+            `Cannot archive implementation tracking for "${specId}" because workspace "${workspace}" has no spec repository.`,
+          )
+        }
+        continue
+      }
+      const writes = writesBySpecId.get(specId) ?? []
+      if (
+        writes.length === 0 &&
+        change.specDependsOn.get(specId) === undefined &&
+        !implementationBySpecId.has(specId)
+      ) {
+        continue
+      }
+      publications.push({
+        specId,
+        spec: new Spec(workspace, SpecPath.parse(capabilityPath), []),
+        specRepo,
+        writes,
+      })
+    }
+
+    return {
+      publications,
+      staleSpecIds: [...staleSpecIds],
+      implementationBySpecId,
+      outOfScopeImplementationSpecIds: [...implementationBySpecId.keys()].filter(
+        (specId) => !change.specIds.includes(specId),
+      ),
+    }
+  }
+
+  /**
+   * Executes the full archive-batch preflight before canonical publication.
+   *
+   * @param change - Active change being archived
+   * @param schema - Resolved active schema
+   * @param preparedPlan - Prepared archive write plan
+   * @returns Fully preflighted publication units for the commit phase
+   */
+  private async _prepareArchivePreflight(
+    change: Change,
+    schema: Schema,
+    preparedPlan: PreparedArchivePlan,
+  ): Promise<readonly PreparedArchivePreflightSpec[]> {
+    const preflighted: PreparedArchivePreflightSpec[] = []
+    for (const publication of preparedPlan.publications) {
+      preflighted.push(
+        await this._prepareSpecPublicationPreflight({
+          change,
+          schema,
+          publication,
+          implementationBySpecId: preparedPlan.implementationBySpecId,
+        }),
+      )
+    }
+    return preflighted
+  }
+
+  /**
+   * Resolves all archive-time checks for one spec without publishing it.
+   *
+   * @param args - Per-spec archive preflight inputs
+   * @param args.change - Active change being archived
+   * @param args.schema - Resolved active schema
+   * @param args.publication - Publication unit with staged canonical writes
+   * @param args.implementationBySpecId - Canonicalized implementation links by spec id
+   * @returns Preflighted publication state ready for canonical publish
+   * @throws {Error} When metadata extraction and persisted dependency state conflict
+   */
+  private async _prepareSpecPublicationPreflight(args: {
+    readonly change: Change
+    readonly schema: Schema
+    readonly publication: PreparedArchivePublication
+    readonly implementationBySpecId: ReadonlyMap<string, readonly MaterializedImplementationLink[]>
+  }): Promise<PreparedArchivePreflightSpec> {
+    const { workspace, capPath } = parseSpecId(args.publication.specId)
+    const extractionArtifacts = await this._buildFinalSpecArtifactsForExtraction(
+      args.publication.specRepo,
+      args.publication.spec,
+      args.schema,
+      args.publication.writes,
+    )
+    const preExtracted = await extractMetadataFromSpecArtifacts({
+      effectiveSpecSchema: args.schema,
+      workspace,
+      specPath: args.publication.spec.name,
+      artifacts: extractionArtifacts,
+      parsers: this._parsers,
+      extractorTransforms: this._extractorTransforms,
+      repositories: this._specs,
+      workspaceRoutes: this._workspaceRoutes,
+    })
+    const existingSpecLock = await args.publication.specRepo.readSpecLock(args.publication.spec)
+    const metadata = await args.publication.specRepo.metadata(args.publication.spec)
+    const sidecarActive =
+      existingSpecLock !== null ||
+      this._isStructurallyCompatiblePreparedArtifacts(extractionArtifacts)
+    const finalDependsOn = this._resolvePersistedDependsOn({
+      manifestDeps: args.change.specDependsOn.get(args.publication.specId),
+      extractedDeps: preExtracted.metadata.dependsOn,
+      existingSpecLock,
+      metadataDeps: metadata?.dependsOn,
+    })
+
+    if (
+      sidecarActive &&
+      preExtracted.metadata.dependsOn !== undefined &&
+      !DependsOnOverwriteError.areSame(preExtracted.metadata.dependsOn, finalDependsOn)
+    ) {
+      throw new Error(
+        `Extracted dependsOn mismatch for '${args.publication.specId}': extracted=${JSON.stringify(preExtracted.metadata.dependsOn)} persisted=${JSON.stringify(finalDependsOn)}`,
+      )
+    }
+
+    const publicationSpecLock = sidecarActive
+      ? this._buildPublicationSpecLock(
+          existingSpecLock,
+          args.schema,
+          finalDependsOn,
+          args.implementationBySpecId.get(args.publication.specId) ?? [],
+        )
+      : undefined
+
+    return {
+      specId: args.publication.specId,
+      workspace,
+      specPath: SpecPath.parse(capPath),
+      spec: args.publication.spec,
+      specRepo: args.publication.specRepo,
+      writes: args.publication.writes,
+      extractionArtifacts,
+      existingSpecLock,
+      finalDependsOn,
+      publicationSpecLock,
+      sidecarActive,
+    }
   }
 
   /**
@@ -728,17 +912,23 @@ export class ArchiveChange {
    * @param existingSpecLock - Existing sidecar, when present
    * @param schema - Effective schema driving this archive
    * @param dependsOn - Final dependency set to persist
+   * @param implementation - Final materialized implementation links for this spec
    * @returns Sidecar payload to stage with publication
    */
   private _buildPublicationSpecLock(
     existingSpecLock: SpecLockData | null,
     schema: Schema,
     dependsOn: readonly string[],
+    implementation: readonly MaterializedImplementationLink[],
   ): SpecLockData {
     if (existingSpecLock !== null) {
       return {
         schema: existingSpecLock.schema,
         dependsOn: [...dependsOn],
+        implementation: implementation.map((entry) => ({
+          file: entry.file,
+          ...(entry.symbols !== undefined ? { symbols: [...entry.symbols] } : {}),
+        })),
         ...(existingSpecLock.originalHash !== undefined
           ? { originalHash: existingSpecLock.originalHash }
           : {}),
@@ -748,7 +938,118 @@ export class ArchiveChange {
     return {
       schema: { name: schema.name(), version: schema.version() },
       dependsOn: [...dependsOn],
+      implementation: implementation.map((entry) => ({
+        file: entry.file,
+        ...(entry.symbols !== undefined ? { symbols: [...entry.symbols] } : {}),
+      })),
     }
+  }
+
+  /**
+   * Fails archive when tracked implementation review still has open files.
+   *
+   * @param change - Change being archived
+   * @throws {Error} When one or more tracked implementation files remain open
+   */
+  private _assertTrackedImplementationFilesResolved(change: Change): void {
+    const openFiles = change.trackedImplementationFiles
+      .filter((entry) => entry.state === 'open')
+      .map((entry) => entry.file)
+    if (openFiles.length === 0) return
+
+    throw new Error(
+      [
+        `Cannot archive change "${change.name}" while tracked implementation files remain open.`,
+        '',
+        'Resolve or ignore these files first:',
+        ...openFiles.map((file) => `  - ${file}`),
+      ].join('\n'),
+    )
+  }
+
+  /**
+   * Enforces the out-of-scope implementation sidecar guard.
+   *
+   * @param change - Change being archived
+   * @param preparedPlan - Prepared archive plan with implementation sidecar targets
+   * @param allowOutOfScope - Whether the explicit override flag was supplied
+   * @throws {Error} When out-of-scope implementation sidecar updates are detected without override
+   */
+  private _assertOutOfScopeImplementationAllowed(
+    change: Change,
+    preparedPlan: PreparedArchivePlan,
+    allowOutOfScope: boolean | undefined,
+  ): void {
+    if (preparedPlan.outOfScopeImplementationSpecIds.length === 0 || allowOutOfScope === true) {
+      return
+    }
+
+    throw new Error(
+      [
+        `Cannot archive change "${change.name}" because implementation sidecar updates would touch specs outside the change scope.`,
+        '',
+        'Out-of-scope specs:',
+        ...preparedPlan.outOfScopeImplementationSpecIds.map((specId) => `  - ${specId}`),
+        '',
+        `Re-run with 'change archive ${change.name} --allow-out-of-scope' if those updates are intentional.`,
+      ].join('\n'),
+    )
+  }
+
+  /**
+   * Canonicalizes change-time implementation links into archive-time sidecar entries.
+   *
+   * @param change - Change being archived
+   * @returns Canonical implementation links grouped by owning spec id
+   * @throws {Error} When an implementation link targets an unknown workspace or falls outside its codeRoot
+   */
+  private _materializeImplementationLinks(
+    change: Change,
+  ): ReadonlyMap<string, readonly MaterializedImplementationLink[]> {
+    const bySpecId = new Map<string, MaterializedImplementationLink[]>()
+
+    for (const link of change.implementationLinks) {
+      const { workspace } = parseSpecId(link.specId)
+      const workspaceConfig = this._workspaceConfigs.get(workspace)
+      if (workspaceConfig === undefined) {
+        throw new Error(
+          `Implementation link "${link.specId}" -> "${link.file}" targets unknown workspace "${workspace}".`,
+        )
+      }
+
+      const rawAbsolute = path.resolve(this._projectRoot, link.file)
+      const relativeToCodeRoot = toPortableRelativePath(workspaceConfig.codeRoot, rawAbsolute)
+      if (relativeToCodeRoot === null) {
+        throw new Error(
+          `Implementation link "${link.specId}" -> "${link.file}" points outside workspace "${workspace}" codeRoot.`,
+        )
+      }
+
+      if (matchesWorkspaceExclude(relativeToCodeRoot, workspaceConfig.excludePaths)) {
+        Logger.debug('ArchiveChange ignored excluded implementation link during materialization', {
+          change: change.name,
+          specId: link.specId,
+          file: link.file,
+          workspace,
+        })
+        continue
+      }
+
+      const entry: MaterializedImplementationLink = {
+        file: `${workspace}:${relativeToCodeRoot}`,
+        ...(link.symbols !== undefined && link.symbols.length > 0
+          ? { symbols: [...link.symbols] }
+          : {}),
+      }
+      const existing = bySpecId.get(link.specId)
+      if (existing === undefined) {
+        bySpecId.set(link.specId, [entry])
+        continue
+      }
+      existing.push(entry)
+    }
+
+    return bySpecId
   }
 }
 
@@ -786,27 +1087,56 @@ function resolveTrackedArchiveFilename(
 }
 
 /**
- * Groups prepared archive writes by target spec publication unit.
+ * Converts an absolute path to a portable path relative to a workspace code root.
  *
- * Each returned array contains the canonical artifact files that must become
- * visible together for one spec.
- *
- * @param writes - Flat prepared archive writes
- * @returns Publication groups in encounter order
+ * @param rootDir - Workspace code root
+ * @param absolutePath - Absolute file path to convert
+ * @returns Portable relative path, or `null` when the file falls outside the root
  */
-function groupArchiveWritesBySpec(
-  writes: readonly PreparedArchiveWrite[],
-): readonly (readonly PreparedArchiveWrite[])[] {
-  const grouped = new Map<string, PreparedArchiveWrite[]>()
-
-  for (const write of writes) {
-    const existing = grouped.get(write.specId)
-    if (existing === undefined) {
-      grouped.set(write.specId, [write])
-      continue
-    }
-    existing.push(write)
+function toPortableRelativePath(rootDir: string, absolutePath: string): string | null {
+  const relative = path.relative(rootDir, absolutePath)
+  if (
+    relative.length === 0 ||
+    relative === '.' ||
+    relative.startsWith(`..${path.sep}`) ||
+    relative === '..' ||
+    path.isAbsolute(relative)
+  ) {
+    return null
   }
+  return relative.split(path.sep).join('/')
+}
 
-  return [...grouped.values()]
+/**
+ * Checks whether a canonical workspace-relative path is excluded from graph ownership.
+ *
+ * @param filePath - Workspace-relative file path
+ * @param excludePaths - Ignore-style exclusion patterns
+ * @returns Whether the file path is excluded
+ */
+function matchesWorkspaceExclude(filePath: string, excludePaths: readonly string[]): boolean {
+  if (excludePaths.length === 0) return false
+  const matcher = ignore()
+  matcher.add([...excludePaths])
+  return matcher.ignores(filePath)
+}
+
+/**
+ * Builds workspace materialization constraints consumed by `ArchiveChange`.
+ *
+ * @param workspaces - Project workspaces from config
+ * @returns Workspace implementation materialization config keyed by workspace name
+ */
+export function createArchiveWorkspaceImplementationConfig(
+  workspaces: readonly SpecdWorkspaceConfig[],
+): ReadonlyMap<string, ArchiveWorkspaceImplementationConfig> {
+  return new Map(
+    workspaces.map((workspace) => [
+      workspace.name,
+      {
+        codeRoot: workspace.codeRoot,
+        excludePaths: workspace.graph?.excludePaths ?? [],
+      },
+    ]),
+  )
 }

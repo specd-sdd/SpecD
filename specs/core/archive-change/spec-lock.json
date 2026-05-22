@@ -19,5 +19,11 @@
     "core:spec-id-format",
     "core:spec-overlap",
     "default:_global/logging"
+  ],
+  "implementation": [
+    {
+      "file": "core:src/application/use-cases/archive-change.ts",
+      "symbols": ["ArchiveChange"]
+    }
   ]
 }

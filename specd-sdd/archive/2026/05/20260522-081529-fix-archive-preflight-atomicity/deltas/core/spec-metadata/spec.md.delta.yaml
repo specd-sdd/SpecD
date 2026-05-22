@@ -1,0 +1,28 @@
+- op: modified
+  description: 'Require metadata-related archive checks to complete during full-batch preflight'
+  selector:
+    type: section
+    matches: '^Requirement: Deterministic generation at archive time$'
+  content: |
+    `metadata.json` is generated deterministically by core as part of the `ArchiveChange` use case, but every metadata-related archive check that can still fail the archive attempt MUST complete during the full archive-batch preflight before canonical publication begins for any spec.
+
+    Archive-time flow for modified specs:
+
+    1. Prepare the merged canonical artifact content for every affected spec in memory.
+    2. Determine the final persisted `dependsOn` set for each archive-target spec.
+    3. Run `extractMetadata()` over the prepared merged content for each relevant spec and evaluate archive-time consistency requirements such as `dependsOn` mismatch detection.
+    4. Determine the final `spec-lock.json` content for each spec that will publish a sidecar.
+    5. Confirm that every metadata-related archive check across the full archive batch has succeeded.
+    6. Only then publish the canonical spec artifacts plus `spec-lock.json` for each spec as staged publication units.
+    7. After publication succeeds for a spec, run `GenerateSpecMetadata` against the canonical persisted spec.
+    8. Compute `contentHashes` for the required persisted spec artifacts and persist `metadata.json`.
+
+    The archive-owned persisted dependency rules are:
+
+    - If `change.specDependsOn` has an entry for the spec, that value is the final persisted `dependsOn` set for the archive attempt.
+    - If `metadataExtraction.dependsOn` returns a value during the pre-publication extraction pass, the extracted value MUST match the final persisted `dependsOn` set being sealed for that spec or archive fails.
+    - This mismatch rule applies both when a canonical `spec-lock.json` already exists and when the archive is creating `spec-lock.json` for the first time.
+    - If `metadataExtraction.dependsOn` is omitted, `metadata.json.dependsOn` MUST still be written from the final persisted dependency set.
+    - Outside archive, a legacy spec with no sidecar MAY still remain on extraction-backed metadata flows until opportunistic backfill succeeds.
+
+    `metadata.json.dependsOn` remains a supported consumer surface, but for persisted specs it is a projection of the archive-owned sidecar state rather than an independent source of truth.

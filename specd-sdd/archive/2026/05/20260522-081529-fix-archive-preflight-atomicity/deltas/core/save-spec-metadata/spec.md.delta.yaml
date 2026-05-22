@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'SaveSpecMetadata remains downstream of archive preflight and needs no spec.md change for this bug'

@@ -79,13 +79,13 @@
     {
       "requirement": "Prepare archive plan before permanent writes",
       "rules": [
-        "Before writing any permanent spec artifact, `ArchiveChange` MUST build a complete archive plan that resolves every tracked spec-scoped artifact in the change.\n\nThe prepare phase MUST:\n\n1. Load the tracked artifact file selected for each spec-scoped artifact.\n2. For delta-backed artifacts, resolve the concrete base artifact for that specific artifact file.\n3. Apply each delta and compute the final merged content in memory.\n4. Collect every permanent spec write that would be needed for the archive.\n\nIf any tracked artifact cannot be loaded, any required base artifact is unavailable, or any delta application fails, `ArchiveChange` MUST abort before any permanent spec write is performed."
+        "`ArchiveChange` MUST complete a full archive-batch preflight before canonical publication begins for any spec.\n\nDuring this preflight, `ArchiveChange` MUST resolve every tracked archive input, apply every required delta, build every planned canonical write, and execute every archive-time check that can still fail the archive attempt.\n\nArchive-time checks covered by this rule include structural checks, metadata-extraction consistency checks, persisted-dependency sealing checks, sidecar-eligibility checks, and any other validation or consistency rule whose failure would reject the archive attempt.\n\nIf any preflight step fails for any spec in the archive batch, `ArchiveChange` MUST abort the archive before canonical publication begins for every spec. It MUST NOT publish an earlier spec and then continue validating a later spec.\n\nThe output of this requirement is an in-memory archive plan that is fully validated for the entire batch. Only after that full preflight succeeds MAY `ArchiveChange` start staged canonical publication."
       ]
     },
     {
       "requirement": "Staged archive commit and failed-attempt visibility",
       "rules": [
-        "After the archive plan has been prepared successfully, `ArchiveChange` MUST delegate permanent archive persistence through a staged publication model instead of interleaving merge work and permanent spec writes in the same loop.\n\nThe guarantee is per-spec, not a fake all-spec transaction for the whole batch:\n\n- For each spec being archived, canonical publication MUST be atomic at the spec level when the storage adapter supports staged publication in the target filesystem.\n- The per-spec publication unit MUST include the merged canonical spec artifacts plus the final `spec-lock.json` for that spec.\n- If publication fails for one spec, that spec MUST NOT be left partially written in canonical storage.\n- `ArchiveChange` does not need to promise that an entire multi-spec archive publishes all specs as one indivisible filesystem transaction.\n\nIf final publication from staging to canonical storage fails for a spec:\n\n- the staged output for that spec MUST NOT be deleted automatically\n- the failure MUST surface clearly so the user can inspect the staged material and complete the move manually if needed\n- the canonical spec tree MUST not contain a partially written version of that spec, whether for ordinary spec artifacts or for `spec-lock.json`\n\nDiagnostic history and debug logging MAY record the failed attempt, but a failed archive publication MUST NOT be treated as a successful archive."
+        "Canonical publication begins only after the full archive-batch preflight has succeeded.\n\nA failure that occurs during preflight MUST leave canonical storage unchanged for every spec in the archive batch.\n\nAfter canonical publication begins, failures are limited to the staged publication or archive-finalization phases. Those failures MUST preserve the existing guarantee that canonical storage does not expose a partially written version of an individual published spec.\n\nMulti-spec archive therefore has two distinct safety boundaries:\n\n- full-batch preflight atomicity before any canonical publication begins\n- per-spec publication atomicity once staged canonical publication has started\n\nThe archive contract still does not promise one indivisible filesystem transaction for the whole multi-spec batch."
       ]
     },
     {
@@ -664,6 +664,32 @@
       "then": ["the archive fails before any permanent write begins"]
     },
     {
+      "requirement": "Prepare archive plan before permanent writes",
+      "name": "Later spec preflight failure blocks earlier spec publication",
+      "given": [
+        "archive has prepared a multi-spec batch",
+        "AND an earlier spec in the batch is ready to publish",
+        "AND a later spec in the same batch still has an archive-time check that will fail"
+      ],
+      "when": ["ArchiveChange.execute performs full-batch preflight"],
+      "then": [
+        "the later failure is detected before canonical publication begins for any spec",
+        "AND the earlier spec is not published first"
+      ]
+    },
+    {
+      "requirement": "Prepare archive plan before permanent writes",
+      "name": "Metadata consistency failure is part of prepare-phase preflight",
+      "given": [
+        "archive has prepared merged canonical content for multiple specs",
+        "AND one spec produces an extracted dependsOn value that conflicts with the final persisted dependency set"
+      ],
+      "when": ["ArchiveChange.execute completes archive-batch preflight"],
+      "then": [
+        "the mismatch fails the archive before canonical publication begins for every spec in the batch"
+      ]
+    },
+    {
       "requirement": "Staged archive commit and failed-attempt visibility",
       "name": "Pre-publication failure leaves no canonical spec writes",
       "given": [
@@ -701,11 +727,21 @@
     },
     {
       "requirement": "Staged archive commit and failed-attempt visibility",
+      "name": "Batch preflight succeeds before first staged publication starts",
+      "given": ["a change archives more than one spec"],
+      "when": ["the first staged publication unit begins"],
+      "then": [
+        "every archive-time check that can still fail the archive has already succeeded for the full batch"
+      ]
+    },
+    {
+      "requirement": "Staged archive commit and failed-attempt visibility",
       "name": "Multi-spec archive is not required to be one filesystem transaction",
       "given": ["a change archives more than one spec"],
       "when": ["the archive contract is evaluated"],
       "then": [
-        "the spec guarantees atomic publication per spec",
+        "the spec guarantees full-batch preflight atomicity before canonical publication starts",
+        "AND it guarantees atomic publication per spec once staged canonical publication has started",
         "AND it does not promise one indivisible filesystem transaction for the whole batch"
       ]
     },
@@ -800,9 +836,18 @@
       ]
     }
   ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "core:archive-change",
+        "file": "core:src/application/use-cases/archive-change.ts",
+        "symbol": "ArchiveChange"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:eea87e56c47c538a49855a68a8954aca234585b0a824e5327ed278956f0681c7",
-    "verify.md": "sha256:3a462d1e86fdb214f9882102618353c67b76d7703915b03f3c79e263187bc87b"
+    "spec.md": "sha256:f2efa24d7cac19b51473ad297613eebce1b5242c284e4285297efbbfec250b0a",
+    "verify.md": "sha256:d44334c47c3f9b61c381223c2d7e9b1a9e1aa23f5a9af4cb37055776c54053cf"
   },
   "generatedBy": "core"
 }

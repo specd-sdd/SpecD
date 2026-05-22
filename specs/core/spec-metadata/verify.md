@@ -234,11 +234,19 @@
 - **WHEN** metadata is generated for that spec
 - **THEN** `dependsOn` in the written metadata comes from `change.specDependsOn`, not from the extraction engine
 
-#### Scenario: Pre-publication extraction checks final persisted dependsOn
+#### Scenario: Pre-publication extraction checks final persisted dependsOn during full-batch preflight
 
 - **GIVEN** archive has prepared the merged canonical content for a modified spec
 - **WHEN** archive determines the final persisted `dependsOn` set for that spec
-- **THEN** it runs `extractMetadata()` against the prepared content before canonical publication begins
+- **THEN** it runs `extractMetadata()` against the prepared content during the full archive-batch preflight
+- **AND** that check completes before canonical publication begins for any spec in the batch
+
+#### Scenario: Metadata-related failure in one spec blocks publication of earlier specs
+
+- **GIVEN** a multi-spec archive batch where one spec has already passed metadata-related checks
+- **AND** a later spec in the same batch will fail metadata-related archive validation
+- **WHEN** `ArchiveChange.execute` completes metadata-related preflight for the batch
+- **THEN** the later failure aborts the archive before canonical publication begins for the earlier spec
 
 #### Scenario: Omitted extraction falls back to the final persisted dependency set
 
@@ -254,13 +262,13 @@
 - **WHEN** a non-archive metadata flow regenerates metadata before opportunistic backfill succeeds
 - **THEN** `metadata.json.dependsOn` may still be derived from extraction until sidecar backfill succeeds
 
-#### Scenario: Mismatched extracted dependsOn blocks archive even on first sidecar creation
+#### Scenario: Mismatched extracted dependsOn blocks archive before any batch publication starts
 
 - **GIVEN** archive is sealing the final persisted dependency state for a modified spec
 - **AND** the spec may or may not already have a canonical `spec-lock.json`
 - **AND** extraction yields a different `dependsOn` value
 - **WHEN** archive performs the pre-publication consistency check
-- **THEN** archive fails for that spec before canonical publication begins
+- **THEN** archive fails for that spec before canonical publication begins for any spec in the batch
 
 #### Scenario: Generation failure does not block archive
 

@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'Existing SaveSpecMetadata verification remains valid because the archive bug is outside this use case'

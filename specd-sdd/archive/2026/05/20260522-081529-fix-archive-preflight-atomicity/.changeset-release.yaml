@@ -1,0 +1,4 @@
+releases:
+  core:archive-change: patch
+  core:spec-metadata: patch
+  core:save-spec-metadata: patch

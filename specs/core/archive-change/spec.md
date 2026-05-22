@@ -127,35 +127,30 @@ If the tracked file for a delta-capable artifact is a direct `specs/...` file, `
 
 ### Requirement: Prepare archive plan before permanent writes
 
-Before writing any permanent spec artifact, `ArchiveChange` MUST build a complete archive plan that resolves every tracked spec-scoped artifact in the change.
+`ArchiveChange` MUST complete a full archive-batch preflight before canonical publication begins for any spec.
 
-The prepare phase MUST:
+During this preflight, `ArchiveChange` MUST resolve every tracked archive input, apply every required delta, build every planned canonical write, and execute every archive-time check that can still fail the archive attempt.
 
-1. Load the tracked artifact file selected for each spec-scoped artifact.
-2. For delta-backed artifacts, resolve the concrete base artifact for that specific artifact file.
-3. Apply each delta and compute the final merged content in memory.
-4. Collect every permanent spec write that would be needed for the archive.
+Archive-time checks covered by this rule include structural checks, metadata-extraction consistency checks, persisted-dependency sealing checks, sidecar-eligibility checks, and any other validation or consistency rule whose failure would reject the archive attempt.
 
-If any tracked artifact cannot be loaded, any required base artifact is unavailable, or any delta application fails, `ArchiveChange` MUST abort before any permanent spec write is performed.
+If any preflight step fails for any spec in the archive batch, `ArchiveChange` MUST abort the archive before canonical publication begins for every spec. It MUST NOT publish an earlier spec and then continue validating a later spec.
+
+The output of this requirement is an in-memory archive plan that is fully validated for the entire batch. Only after that full preflight succeeds MAY `ArchiveChange` start staged canonical publication.
 
 ### Requirement: Staged archive commit and failed-attempt visibility
 
-After the archive plan has been prepared successfully, `ArchiveChange` MUST delegate permanent archive persistence through a staged publication model instead of interleaving merge work and permanent spec writes in the same loop.
+Canonical publication begins only after the full archive-batch preflight has succeeded.
 
-The guarantee is per-spec, not a fake all-spec transaction for the whole batch:
+A failure that occurs during preflight MUST leave canonical storage unchanged for every spec in the archive batch.
 
-- For each spec being archived, canonical publication MUST be atomic at the spec level when the storage adapter supports staged publication in the target filesystem.
-- The per-spec publication unit MUST include the merged canonical spec artifacts plus the final `spec-lock.json` for that spec.
-- If publication fails for one spec, that spec MUST NOT be left partially written in canonical storage.
-- `ArchiveChange` does not need to promise that an entire multi-spec archive publishes all specs as one indivisible filesystem transaction.
+After canonical publication begins, failures are limited to the staged publication or archive-finalization phases. Those failures MUST preserve the existing guarantee that canonical storage does not expose a partially written version of an individual published spec.
 
-If final publication from staging to canonical storage fails for a spec:
+Multi-spec archive therefore has two distinct safety boundaries:
 
-- the staged output for that spec MUST NOT be deleted automatically
-- the failure MUST surface clearly so the user can inspect the staged material and complete the move manually if needed
-- the canonical spec tree MUST not contain a partially written version of that spec, whether for ordinary spec artifacts or for `spec-lock.json`
+- full-batch preflight atomicity before any canonical publication begins
+- per-spec publication atomicity once staged canonical publication has started
 
-Diagnostic history and debug logging MAY record the failed attempt, but a failed archive publication MUST NOT be treated as a successful archive.
+The archive contract still does not promise one indivisible filesystem transaction for the whole multi-spec batch.
 
 ### Requirement: Archive debug logging
 

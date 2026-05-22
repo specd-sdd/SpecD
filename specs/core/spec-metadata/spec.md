@@ -109,17 +109,18 @@ A static helper `DependsOnOverwriteError.areSame(a, b)` compares two `dependsOn`
 
 ### Requirement: Deterministic generation at archive time
 
-`metadata.json` is generated deterministically by core as part of the `ArchiveChange` use case, but sidecar consistency is checked before canonical publication begins for each spec.
+`metadata.json` is generated deterministically by core as part of the `ArchiveChange` use case, but every metadata-related archive check that can still fail the archive attempt MUST complete during the full archive-batch preflight before canonical publication begins for any spec.
 
-Archive-time flow for a modified spec:
+Archive-time flow for modified specs:
 
-1. Prepare the merged canonical artifact content for the spec in memory.
-2. Determine the final persisted `dependsOn` set for the archive attempt.
-3. Run `extractMetadata()` over the prepared merged content to validate archive-time consistency for fields such as `dependsOn`.
-4. Determine the final `spec-lock.json` content to publish for that spec.
-5. Publish the canonical spec artifacts plus `spec-lock.json` together as one staged spec publication unit.
-6. After publication succeeds, run `GenerateSpecMetadata` against the canonical persisted spec.
-7. Compute `contentHashes` for the required persisted spec artifacts and persist `metadata.json`.
+1. Prepare the merged canonical artifact content for every affected spec in memory.
+2. Determine the final persisted `dependsOn` set for each archive-target spec.
+3. Run `extractMetadata()` over the prepared merged content for each relevant spec and evaluate archive-time consistency requirements such as `dependsOn` mismatch detection.
+4. Determine the final `spec-lock.json` content for each spec that will publish a sidecar.
+5. Confirm that every metadata-related archive check across the full archive batch has succeeded.
+6. Only then publish the canonical spec artifacts plus `spec-lock.json` for each spec as staged publication units.
+7. After publication succeeds for a spec, run `GenerateSpecMetadata` against the canonical persisted spec.
+8. Compute `contentHashes` for the required persisted spec artifacts and persist `metadata.json`.
 
 The archive-owned persisted dependency rules are:
 

@@ -259,6 +259,15 @@
       "then": ["it accepts the spec repositories map as its only dependency"]
     }
   ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "core:save-spec-metadata",
+        "file": "core:src/application/use-cases/save-spec-metadata.ts",
+        "symbol": "SaveSpecMetadata"
+      }
+    ]
+  },
   "contentHashes": {
     "spec.md": "sha256:831f6860271f56c56e9b7375f0c2827633e8a27cbd9f774c54a69fc7f4799028",
     "verify.md": "sha256:131145b21a64e6c214c60333afcb69979390a291fc7f98b1b7380a8490e05d22"

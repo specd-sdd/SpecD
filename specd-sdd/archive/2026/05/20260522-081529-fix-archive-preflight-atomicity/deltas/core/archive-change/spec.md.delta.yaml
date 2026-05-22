@@ -1,0 +1,33 @@
+- op: modified
+  description: 'Require a full archive-batch preflight before any canonical publication begins'
+  selector:
+    type: section
+    matches: '^Requirement: Prepare archive plan before permanent writes$'
+  content: |
+    `ArchiveChange` MUST complete a full archive-batch preflight before canonical publication begins for any spec.
+
+    During this preflight, `ArchiveChange` MUST resolve every tracked archive input, apply every required delta, build every planned canonical write, and execute every archive-time check that can still fail the archive attempt.
+
+    Archive-time checks covered by this rule include structural checks, metadata-extraction consistency checks, persisted-dependency sealing checks, sidecar-eligibility checks, and any other validation or consistency rule whose failure would reject the archive attempt.
+
+    If any preflight step fails for any spec in the archive batch, `ArchiveChange` MUST abort the archive before canonical publication begins for every spec. It MUST NOT publish an earlier spec and then continue validating a later spec.
+
+    The output of this requirement is an in-memory archive plan that is fully validated for the entire batch. Only after that full preflight succeeds MAY `ArchiveChange` start staged canonical publication.
+- op: modified
+  description: 'Strengthen pre-publication guarantee from per-spec to full-batch preflight'
+  selector:
+    type: section
+    matches: '^Requirement: Staged archive commit and failed-attempt visibility$'
+  content: |
+    Canonical publication begins only after the full archive-batch preflight has succeeded.
+
+    A failure that occurs during preflight MUST leave canonical storage unchanged for every spec in the archive batch.
+
+    After canonical publication begins, failures are limited to the staged publication or archive-finalization phases. Those failures MUST preserve the existing guarantee that canonical storage does not expose a partially written version of an individual published spec.
+
+    Multi-spec archive therefore has two distinct safety boundaries:
+
+    - full-batch preflight atomicity before any canonical publication begins
+    - per-spec publication atomicity once staged canonical publication has started
+
+    The archive contract still does not promise one indivisible filesystem transaction for the whole multi-spec batch.

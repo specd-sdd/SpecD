@@ -9,5 +9,11 @@
     "core:schema-format",
     "core:content-extraction",
     "core:spec-repository-port"
+  ],
+  "implementation": [
+    {
+      "file": "core:src/application/use-cases/archive-change.ts",
+      "symbols": ["ArchiveChange"]
+    }
   ]
 }

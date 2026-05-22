@@ -3,5 +3,11 @@
     "name": "schema-std",
     "version": 1
   },
-  "dependsOn": ["core:spec-metadata", "default:_global/architecture"]
+  "dependsOn": ["core:spec-metadata", "default:_global/architecture"],
+  "implementation": [
+    {
+      "file": "core:src/application/use-cases/save-spec-metadata.ts",
+      "symbols": ["SaveSpecMetadata"]
+    }
+  ]
 }

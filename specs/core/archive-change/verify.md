@@ -393,6 +393,22 @@
 - **WHEN** `ArchiveChange.execute` prepares the archive plan
 - **THEN** the archive fails before any permanent write begins
 
+#### Scenario: Later spec preflight failure blocks earlier spec publication
+
+- **GIVEN** archive has prepared a multi-spec batch
+- **AND** an earlier spec in the batch is ready to publish
+- **AND** a later spec in the same batch still has an archive-time check that will fail
+- **WHEN** `ArchiveChange.execute` performs full-batch preflight
+- **THEN** the later failure is detected before canonical publication begins for any spec
+- **AND** the earlier spec is not published first
+
+#### Scenario: Metadata consistency failure is part of prepare-phase preflight
+
+- **GIVEN** archive has prepared merged canonical content for multiple specs
+- **AND** one spec produces an extracted `dependsOn` value that conflicts with the final persisted dependency set
+- **WHEN** `ArchiveChange.execute` completes archive-batch preflight
+- **THEN** the mismatch fails the archive before canonical publication begins for every spec in the batch
+
 ### Requirement: Staged archive commit and failed-attempt visibility
 
 #### Scenario: Pre-publication failure leaves no canonical spec writes
@@ -418,11 +434,18 @@
 - **AND** the staged output is not deleted automatically
 - **AND** the reported failure indicates that the staged material can be moved manually
 
+#### Scenario: Batch preflight succeeds before first staged publication starts
+
+- **GIVEN** a change archives more than one spec
+- **WHEN** the first staged publication unit begins
+- **THEN** every archive-time check that can still fail the archive has already succeeded for the full batch
+
 #### Scenario: Multi-spec archive is not required to be one filesystem transaction
 
 - **GIVEN** a change archives more than one spec
 - **WHEN** the archive contract is evaluated
-- **THEN** the spec guarantees atomic publication per spec
+- **THEN** the spec guarantees full-batch preflight atomicity before canonical publication starts
+- **AND** it guarantees atomic publication per spec once staged canonical publication has started
 - **AND** it does not promise one indivisible filesystem transaction for the whole batch
 
 ### Requirement: spec-lock sidecar persistence

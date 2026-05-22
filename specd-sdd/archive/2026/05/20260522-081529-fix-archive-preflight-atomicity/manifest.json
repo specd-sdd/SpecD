@@ -1,0 +1,1565 @@
+{
+  "name": "fix-archive-preflight-atomicity",
+  "createdAt": "2026-05-22T08:15:29.761Z",
+  "description": "Archive now performs a full batch preflight before any canonical spec publication begins, so archive-time failures cannot leave earlier specs partially merged. The implementation refactors ArchiveChange into separate planning, preflight, and publication phases, updates metadata consistency checks to run before commit, and adds regressions that prove later-spec failures block all prior publication.",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": ["core:archive-change", "core:spec-metadata", "core:save-spec-metadata"],
+  "specDependsOn": {
+    "core:archive-change": [
+      "core:change",
+      "core:schema-format",
+      "core:delta-format",
+      "core:validate-artifacts",
+      "core:storage",
+      "core:run-step-hooks",
+      "core:hook-execution-model",
+      "core:template-variables",
+      "core:spec-metadata",
+      "core:content-extraction",
+      "default:_global/architecture",
+      "core:workspace",
+      "core:spec-id-format",
+      "core:spec-overlap",
+      "default:_global/logging"
+    ],
+    "core:spec-metadata": [
+      "core:config",
+      "core:change",
+      "core:schema-format",
+      "core:content-extraction",
+      "core:spec-repository-port"
+    ],
+    "core:save-spec-metadata": ["core:spec-metadata", "default:_global/architecture"]
+  },
+  "invalidationPolicy": "downstream",
+  "trackedImplementationFiles": [
+    {
+      "file": "AGENTS.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/cli/cli-reference.md",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/src/commands/change/archive.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/src/commands/change/status.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/build-workspace-targets.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/impact.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/src/index.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/test/commands/change-status.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/test/commands/change.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/test/commands/change/change-status.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/test/commands/graph-impact.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/test/commands/helpers.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/README.md",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/application/use-cases/index-code-graph.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/composition/code-graph-provider.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/domain/ports/graph-store.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/domain/value-objects/impact-result.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/domain/value-objects/index-options.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/domain/value-objects/relation-type.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/index.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/ladybug/ladybug-graph-store.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/ladybug/schema.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/sqlite/sqlite-graph-store.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/test/domain/ports/graph-store.contract.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/test/domain/services/traversal.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/test/domain/value-objects/relation-type.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/test/helpers/in-memory-graph-store.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/package.json",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/errors/index.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/ports/index.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/ports/vcs-adapter.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/archive-change.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/compile-context.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/generate-spec-metadata.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/get-status.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/index.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/transition-change.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/composition/kernel.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/archive-change.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/compile-context.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/get-status.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/transition-change.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/domain/entities/change.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/domain/services/index.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/domain/services/parse-metadata.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/domain/services/parse-spec-lock.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/infrastructure/fs/change-repository.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/infrastructure/fs/manifest.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/infrastructure/git/vcs-adapter.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/infrastructure/hg/vcs-adapter.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/infrastructure/null/vcs-adapter.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/infrastructure/svn/vcs-adapter.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/archive-change.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/compile-context.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/generate-spec-metadata.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/get-status.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/helpers.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/transition-change.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/domain/entities/change.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/domain/services/parse-spec-lock.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/infrastructure/fs/change-repository.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/infrastructure/fs/spec-repository.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/templates/shared/shared.md",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/templates/specd-archive/SKILL.md",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/templates/specd-implement/SKILL.md",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/templates/specd-verify/SKILL.md",
+      "state": "ignored"
+    },
+    {
+      "file": "pnpm-lock.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": ".claude.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".codegraph/.gitignore",
+      "state": "ignored"
+    },
+    {
+      "file": ".codegraph/config.json",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/src/commands/change/_implementation-tracking.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/src/commands/change/implementation.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/test/commands/change-implementation-tracking.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/test/commands/change-implementation.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/domain/services/analyze-spec-impact.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/errors/implementation-links-exist-error.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/ports/implementation-detector.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/_shared/implementation-tracking.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/get-implementation-review.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/update-implementation-tracking.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/infrastructure/vcs/vcs-implementation-detector.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/infrastructure/vcs/vcs-implementation-detector.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/.specd-exploration.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/cli/change-status/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/cli/change-status/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/cli/graph-impact/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/cli/graph-impact/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/code-graph/composition/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/code-graph/composition/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/code-graph/graph-store/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/code-graph/graph-store/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/code-graph/indexer/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/code-graph/indexer/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/code-graph/ladybug-graph-store/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/code-graph/ladybug-graph-store/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/code-graph/sqlite-graph-store/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/code-graph/sqlite-graph-store/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/code-graph/symbol-model/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/code-graph/symbol-model/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/code-graph/traversal/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/code-graph/traversal/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/core/archive-change/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/core/archive-change/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/core/change-manifest/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/core/change-manifest/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/core/change/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/core/change/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/core/compile-context/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/core/compile-context/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/core/get-status/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/core/get-status/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/core/spec-metadata/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/core/spec-metadata/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/core/transition-change/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/core/transition-change/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/core/vcs-adapter-port/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/core/vcs-adapter-port/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/core/vcs-adapter/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/core/vcs-adapter/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/skills/skill-templates-source/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/skills/skill-templates-source/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/skills/workflow-automation/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/skills/workflow-automation/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/design.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/manifest.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/proposal.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/specs/cli/change-implementation/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/specs/cli/change-implementation/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/specs/core/implementation-detector-port/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/specs/core/implementation-detector-port/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/specs/core/spec-lock/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/specs/core/spec-lock/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/specs/core/vcs-implementation-detector/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/specs/core/vcs-implementation-detector/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/tasks.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260521-094729-fix-validate-all-dag/.specd-exploration.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260521-094729-fix-validate-all-dag/manifest.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260521-094729-fix-validate-all-dag/proposal.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260522-081529-fix-archive-preflight-atomicity/.specd-exploration.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260522-081529-fix-archive-preflight-atomicity/deltas/core/archive-change/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260522-081529-fix-archive-preflight-atomicity/deltas/core/archive-change/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260522-081529-fix-archive-preflight-atomicity/deltas/core/save-spec-metadata/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260522-081529-fix-archive-preflight-atomicity/deltas/core/save-spec-metadata/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260522-081529-fix-archive-preflight-atomicity/deltas/core/spec-metadata/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260522-081529-fix-archive-preflight-atomicity/deltas/core/spec-metadata/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260522-081529-fix-archive-preflight-atomicity/design.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260522-081529-fix-archive-preflight-atomicity/manifest.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260522-081529-fix-archive-preflight-atomicity/proposal.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260522-081529-fix-archive-preflight-atomicity/tasks.md",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/save-spec-metadata.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/skills/templates/specd-compliance/SKILL.md",
+      "state": "ignored"
+    },
+    {
+      "file": "AGENTS.md,open",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/cli/cli-reference.md,open",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/src/commands/change/archive.ts,open",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/src/commands/change/status.ts,open",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/build-workspace-targets.ts,open",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/impact.ts,open",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/src/index.ts,open",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/test/commands/change-status.spec.ts,open",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/test/commands/change.spec.ts,open",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/test/commands/change/change-status.spec.ts,open",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/test/commands/graph-impact.spec.ts,open",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/test/commands/helpers.ts,open",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/README.md,open",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/application/use-cases/index-code-graph.ts,open",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/composition/code-graph-provider.ts,open",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/domain/ports/graph-store.ts,open",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/domain/value-objects/impact-result.ts,open",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/domain/value-objects/index-options.ts,open",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/domain/value-objects/relation-type.ts,open",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/index.ts,open",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/ladybug/ladybug-graph-store.ts,open",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/ladybug/schema.ts,open",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/sqlite/sqlite-graph-store.ts,open",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/test/domain/ports/graph-store.contract.ts,open",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/test/domain/services/traversal.spec.ts,open",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/test/domain/value-objects/relation-type.spec.ts,open",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/test/helpers/in-memory-graph-store.ts,open",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/package.json,open",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/errors/index.ts,open",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/ports/index.ts,open",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/ports/vcs-adapter.ts,open",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/compile-context.ts,open",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/generate-spec-metadata.ts,open",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/get-status.ts,open",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/index.ts,open",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/transition-change.ts,open",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/composition/kernel.ts,open",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/archive-change.ts,open",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/compile-context.ts,open",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/get-status.ts,open",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/transition-change.ts,open",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/domain/entities/change.ts,open",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/domain/services/index.ts,open",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/domain/services/parse-metadata.ts,open",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/domain/services/parse-spec-lock.ts,open",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/infrastructure/fs/change-repository.ts,open",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/infrastructure/fs/manifest.ts,open",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/infrastructure/git/vcs-adapter.ts,open",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/infrastructure/hg/vcs-adapter.ts,open",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/infrastructure/null/vcs-adapter.ts,open",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/infrastructure/svn/vcs-adapter.ts,open",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/archive-change.spec.ts,open",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/compile-context.spec.ts,open",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/generate-spec-metadata.spec.ts,open",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/get-status.spec.ts,open",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/helpers.ts,open",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/transition-change.spec.ts,open",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/domain/entities/change.spec.ts,open",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/domain/services/parse-spec-lock.spec.ts,open",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/infrastructure/fs/change-repository.spec.ts,open",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/infrastructure/fs/spec-repository.spec.ts,open",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/templates/shared/shared.md,open",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/templates/specd-archive/SKILL.md,open",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/templates/specd-implement/SKILL.md,open",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/templates/specd-verify/SKILL.md,open",
+      "state": "ignored"
+    },
+    {
+      "file": "pnpm-lock.yaml,open",
+      "state": "ignored"
+    },
+    {
+      "file": "specd.yaml,open",
+      "state": "ignored"
+    },
+    {
+      "file": ".claude.json,open",
+      "state": "ignored"
+    },
+    {
+      "file": ".codegraph/.gitignore,open",
+      "state": "ignored"
+    },
+    {
+      "file": ".codegraph/config.json,open",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/src/commands/change/_implementation-tracking.ts,open",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/src/commands/change/implementation.ts,open",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/test/commands/change-implementation-tracking.spec.ts,open",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/test/commands/change-implementation.spec.ts,open",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/domain/services/analyze-spec-impact.ts,open",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/errors/implementation-links-exist-error.ts,open",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/ports/implementation-detector.ts,open",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/_shared/implementation-tracking.ts,open",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/get-implementation-review.ts,open",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/update-implementation-tracking.ts,open",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/infrastructure/vcs/vcs-implementation-detector.ts,open",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/infrastructure/vcs/vcs-implementation-detector.spec.ts,open",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/.specd-exploration.md,open",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/cli/change-status/spec.md.delta.yaml,open",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/cli/change-status/verify.md.delta.yaml,open",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/cli/graph-impact/spec.md.delta.yaml,open",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/cli/graph-impact/verify.md.delta.yaml,open",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/code-graph/composition/spec.md.delta.yaml,open",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/code-graph/composition/verify.md.delta.yaml,open",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/code-graph/graph-store/spec.md.delta.yaml,open",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/code-graph/graph-store/verify.md.delta.yaml,open",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/code-graph/indexer/spec.md.delta.yaml,open",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/code-graph/indexer/verify.md.delta.yaml,open",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/code-graph/ladybug-graph-store/spec.md.delta.yaml,open",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/code-graph/ladybug-graph-store/verify.md.delta.yaml,open",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/code-graph/sqlite-graph-store/spec.md.delta.yaml,open",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/code-graph/sqlite-graph-store/verify.md.delta.yaml,open",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/code-graph/symbol-model/spec.md.delta.yaml,open",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/code-graph/symbol-model/verify.md.delta.yaml,open",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/code-graph/traversal/spec.md.delta.yaml,open",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/code-graph/traversal/verify.md.delta.yaml,open",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/core/archive-change/spec.md.delta.yaml,open",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/core/archive-change/verify.md.delta.yaml,open",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/core/change-manifest/spec.md.delta.yaml,open",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/core/change-manifest/verify.md.delta.yaml,open",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/core/change/spec.md.delta.yaml,open",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/core/change/verify.md.delta.yaml,open",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/core/compile-context/spec.md.delta.yaml,open",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/core/compile-context/verify.md.delta.yaml,open",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/core/get-status/spec.md.delta.yaml,open",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/core/get-status/verify.md.delta.yaml,open",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/core/spec-metadata/spec.md.delta.yaml,open",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/core/spec-metadata/verify.md.delta.yaml,open",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/core/transition-change/spec.md.delta.yaml,open",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/core/transition-change/verify.md.delta.yaml,open",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/core/vcs-adapter-port/spec.md.delta.yaml,open",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/core/vcs-adapter-port/verify.md.delta.yaml,open",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/core/vcs-adapter/spec.md.delta.yaml,open",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/core/vcs-adapter/verify.md.delta.yaml,open",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/skills/skill-templates-source/spec.md.delta.yaml,open",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/skills/skill-templates-source/verify.md.delta.yaml,open",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/skills/workflow-automation/spec.md.delta.yaml,open",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/skills/workflow-automation/verify.md.delta.yaml,open",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/design.md,open",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/manifest.json,open",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/proposal.md,open",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/specs/cli/change-implementation/spec.md,open",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/specs/cli/change-implementation/verify.md,open",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/specs/core/implementation-detector-port/spec.md,open",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/specs/core/implementation-detector-port/verify.md,open",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/specs/core/spec-lock/spec.md,open",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/specs/core/spec-lock/verify.md,open",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/specs/core/vcs-implementation-detector/spec.md,open",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/specs/core/vcs-implementation-detector/verify.md,open",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260516-062814-implementation-file-tracking/tasks.md,open",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260521-094729-fix-validate-all-dag/.specd-exploration.md,open",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260521-094729-fix-validate-all-dag/manifest.json,open",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260521-094729-fix-validate-all-dag/proposal.md,open",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260522-081529-fix-archive-preflight-atomicity/.specd-exploration.md,open",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260522-081529-fix-archive-preflight-atomicity/deltas/core/archive-change/spec.md.delta.yaml,open",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260522-081529-fix-archive-preflight-atomicity/deltas/core/archive-change/verify.md.delta.yaml,open",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260522-081529-fix-archive-preflight-atomicity/deltas/core/save-spec-metadata/spec.md.delta.yaml,open",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260522-081529-fix-archive-preflight-atomicity/deltas/core/save-spec-metadata/verify.md.delta.yaml,open",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260522-081529-fix-archive-preflight-atomicity/deltas/core/spec-metadata/spec.md.delta.yaml,open",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260522-081529-fix-archive-preflight-atomicity/deltas/core/spec-metadata/verify.md.delta.yaml,open",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260522-081529-fix-archive-preflight-atomicity/design.md,open",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260522-081529-fix-archive-preflight-atomicity/manifest.json,open",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260522-081529-fix-archive-preflight-atomicity/proposal.md,open",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260522-081529-fix-archive-preflight-atomicity/tasks.md,open",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/templates/specd-compliance/SKILL.md,open",
+      "state": "ignored"
+    }
+  ],
+  "implementationLinks": [
+    {
+      "specId": "core:spec-metadata",
+      "file": "packages/core/src/application/use-cases/archive-change.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["ArchiveChange"]
+    },
+    {
+      "specId": "core:save-spec-metadata",
+      "file": "packages/core/src/application/use-cases/save-spec-metadata.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["SaveSpecMetadata"]
+    },
+    {
+      "specId": "core:archive-change",
+      "file": "packages/core/src/application/use-cases/archive-change.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["ArchiveChange"]
+    }
+  ],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:69744541a76bce700861671570834690a59abfca821f2ec3d323d4a6016c77bd"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:archive-change",
+          "filename": "deltas/core/archive-change/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:8e802d3216bb25840987af72484ee57744620b4e2a1cd5e85c387e3d1825a948"
+        },
+        {
+          "key": "core:spec-metadata",
+          "filename": "deltas/core/spec-metadata/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:6a9e645c160d43347d37f73339cbeb5e98108607a700b6c2d7e949d03181a8b9"
+        },
+        {
+          "key": "core:save-spec-metadata",
+          "filename": "deltas/core/save-spec-metadata/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:86aa6b426a6ea17eee59c5887d1b401bc263952f045eb7c9b2bcf909e972c0ba"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:archive-change",
+          "filename": "deltas/core/archive-change/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:2f91ef5349cdd4611ab6e895cb017adffebbcc538d48146e08dc1b9e6d0d9a05"
+        },
+        {
+          "key": "core:spec-metadata",
+          "filename": "deltas/core/spec-metadata/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:dde14c1609551a2f0a3e4e92038be19b5dd0fb7b94f467ba297af081baa7bab5"
+        },
+        {
+          "key": "core:save-spec-metadata",
+          "filename": "deltas/core/save-spec-metadata/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:c21cea6014cc7d76c424c3d52dfe45663ecb50a04f742de0ac6167e60e37aaa7"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:68931843d23682d8b3ce66cb5de94b963dbc9797ced181a4f17920eb8c55d5c5"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:f91deb3eddb1f947f56691bb6ab3f7a257564d66b3a3c4ec6bc779f8fc57fb7e"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-05-22T08:15:29.761Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": ["core:archive-change", "core:spec-metadata", "core:save-spec-metadata"],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-05-22T08:15:29.778Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "core:archive-change"
+        },
+        {
+          "type": "specs",
+          "key": "core:spec-metadata"
+        },
+        {
+          "type": "specs",
+          "key": "core:save-spec-metadata"
+        },
+        {
+          "type": "verify",
+          "key": "core:archive-change"
+        },
+        {
+          "type": "verify",
+          "key": "core:spec-metadata"
+        },
+        {
+          "type": "verify",
+          "key": "core:save-spec-metadata"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-22T08:16:31.506Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-22T08:22:19.722Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["core:archive-change", "core:spec-metadata", "core:save-spec-metadata"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:archive-change", "core:spec-metadata", "core:save-spec-metadata"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-22T08:36:23.699Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-22T08:37:15.561Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-22T08:49:15.866Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-22T08:51:25.427Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-22T08:51:53.715Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "description-updated",
+      "at": "2026-05-22T08:55:41.952Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "description": "Archive now performs a full batch preflight before any canonical spec publication begins, so archive-time failures cannot leave earlier specs partially merged. The implementation refactors ArchiveChange into separate planning, preflight, and publication phases, updates metadata consistency checks to run before commit, and adds regressions that prove later-spec failures block all prior publication."
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-22T08:55:46.358Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-05-22T08:56:10.512Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Cannot archive change \"fix-archive-preflight-atomicity\" while tracked implementation files remain open.\n\nResolve or ignore these files first:\n  - AGENTS.md\n  - docs/cli/cli-reference.md\n  - packages/cli/src/commands/change/archive.ts\n  - packages/cli/src/commands/change/status.ts\n  - packages/cli/src/commands/graph/build-workspace-targets.ts\n  - packages/cli/src/commands/graph/impact.ts\n  - packages/cli/src/index.ts\n  - packages/cli/test/commands/change-status.spec.ts\n  - packages/cli/test/commands/change.spec.ts\n  - packages/cli/test/commands/change/change-status.spec.ts\n  - packages/cli/test/commands/graph-impact.spec.ts\n  - packages/cli/test/commands/helpers.ts\n  - packages/code-graph/README.md\n  - packages/code-graph/src/application/use-cases/index-code-graph.ts\n  - packages/code-graph/src/composition/code-graph-provider.ts\n  - packages/code-graph/src/domain/ports/graph-store.ts\n  - packages/code-graph/src/domain/value-objects/impact-result.ts\n  - packages/code-graph/src/domain/value-objects/index-options.ts\n  - packages/code-graph/src/domain/value-objects/relation-type.ts\n  - packages/code-graph/src/index.ts\n  - packages/code-graph/src/infrastructure/ladybug/ladybug-graph-store.ts\n  - packages/code-graph/src/infrastructure/ladybug/schema.ts\n  - packages/code-graph/src/infrastructure/sqlite/sqlite-graph-store.ts\n  - packages/code-graph/test/domain/ports/graph-store.contract.ts\n  - packages/code-graph/test/domain/services/traversal.spec.ts\n  - packages/code-graph/test/domain/value-objects/relation-type.spec.ts\n  - packages/code-graph/test/helpers/in-memory-graph-store.ts\n  - packages/core/package.json\n  - packages/core/src/application/errors/index.ts\n  - packages/core/src/application/ports/index.ts\n  - packages/core/src/application/ports/vcs-adapter.ts\n  - packages/core/src/application/use-cases/compile-context.ts\n  - packages/core/src/application/use-cases/generate-spec-metadata.ts\n  - packages/core/src/application/use-cases/get-status.ts\n  - packages/core/src/application/use-cases/index.ts\n  - packages/core/src/application/use-cases/transition-change.ts\n  - packages/core/src/composition/kernel.ts\n  - packages/core/src/composition/use-cases/archive-change.ts\n  - packages/core/src/composition/use-cases/compile-context.ts\n  - packages/core/src/composition/use-cases/get-status.ts\n  - packages/core/src/composition/use-cases/transition-change.ts\n  - packages/core/src/domain/entities/change.ts\n  - packages/core/src/domain/services/index.ts\n  - packages/core/src/domain/services/parse-metadata.ts\n  - packages/core/src/domain/services/parse-spec-lock.ts\n  - packages/core/src/infrastructure/fs/change-repository.ts\n  - packages/core/src/infrastructure/fs/manifest.ts\n  - packages/core/src/infrastructure/git/vcs-adapter.ts\n  - packages/core/src/infrastructure/hg/vcs-adapter.ts\n  - packages/core/src/infrastructure/null/vcs-adapter.ts\n  - packages/core/src/infrastructure/svn/vcs-adapter.ts\n  - packages/core/test/application/use-cases/archive-change.spec.ts\n  - packages/core/test/application/use-cases/compile-context.spec.ts\n  - packages/core/test/application/use-cases/generate-spec-metadata.spec.ts\n  - packages/core/test/application/use-cases/get-status.spec.ts\n  - packages/core/test/application/use-cases/helpers.ts\n  - packages/core/test/application/use-cases/transition-change.spec.ts\n  - packages/core/test/domain/entities/change.spec.ts\n  - packages/core/test/domain/services/parse-spec-lock.spec.ts\n  - packages/core/test/infrastructure/fs/change-repository.spec.ts\n  - packages/core/test/infrastructure/fs/spec-repository.spec.ts\n  - packages/skills/templates/shared/shared.md\n  - packages/skills/templates/specd-archive/SKILL.md\n  - packages/skills/templates/specd-implement/SKILL.md\n  - packages/skills/templates/specd-verify/SKILL.md\n  - pnpm-lock.yaml\n  - specd.yaml\n  - .claude.json\n  - .codegraph/.gitignore\n  - .codegraph/config.json\n  - packages/cli/src/commands/change/_implementation-tracking.ts\n  - packages/cli/src/commands/change/implementation.ts\n  - packages/cli/test/commands/change-implementation-tracking.spec.ts\n  - packages/cli/test/commands/change-implementation.spec.ts\n  - packages/code-graph/src/domain/services/analyze-spec-impact.ts\n  - packages/core/src/application/errors/implementation-links-exist-error.ts\n  - packages/core/src/application/ports/implementation-detector.ts\n  - packages/core/src/application/use-cases/_shared/implementation-tracking.ts\n  - packages/core/src/application/use-cases/get-implementation-review.ts\n  - packages/core/src/application/use-cases/update-implementation-tracking.ts\n  - packages/core/src/infrastructure/vcs/vcs-implementation-detector.ts\n  - packages/core/test/infrastructure/vcs/vcs-implementation-detector.spec.ts\n  - specd-sdd/changes/20260516-062814-implementation-file-tracking/.specd-exploration.md\n  - specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/cli/change-status/spec.md.delta.yaml\n  - specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/cli/change-status/verify.md.delta.yaml\n  - specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/cli/graph-impact/spec.md.delta.yaml\n  - specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/cli/graph-impact/verify.md.delta.yaml\n  - specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/code-graph/composition/spec.md.delta.yaml\n  - specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/code-graph/composition/verify.md.delta.yaml\n  - specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/code-graph/graph-store/spec.md.delta.yaml\n  - specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/code-graph/graph-store/verify.md.delta.yaml\n  - specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/code-graph/indexer/spec.md.delta.yaml\n  - specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/code-graph/indexer/verify.md.delta.yaml\n  - specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/code-graph/ladybug-graph-store/spec.md.delta.yaml\n  - specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/code-graph/ladybug-graph-store/verify.md.delta.yaml\n  - specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/code-graph/sqlite-graph-store/spec.md.delta.yaml\n  - specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/code-graph/sqlite-graph-store/verify.md.delta.yaml\n  - specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/code-graph/symbol-model/spec.md.delta.yaml\n  - specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/code-graph/symbol-model/verify.md.delta.yaml\n  - specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/code-graph/traversal/spec.md.delta.yaml\n  - specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/code-graph/traversal/verify.md.delta.yaml\n  - specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/core/archive-change/spec.md.delta.yaml\n  - specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/core/archive-change/verify.md.delta.yaml\n  - specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/core/change-manifest/spec.md.delta.yaml\n  - specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/core/change-manifest/verify.md.delta.yaml\n  - specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/core/change/spec.md.delta.yaml\n  - specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/core/change/verify.md.delta.yaml\n  - specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/core/compile-context/spec.md.delta.yaml\n  - specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/core/compile-context/verify.md.delta.yaml\n  - specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/core/get-status/spec.md.delta.yaml\n  - specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/core/get-status/verify.md.delta.yaml\n  - specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/core/spec-metadata/spec.md.delta.yaml\n  - specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/core/spec-metadata/verify.md.delta.yaml\n  - specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/core/transition-change/spec.md.delta.yaml\n  - specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/core/transition-change/verify.md.delta.yaml\n  - specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/core/vcs-adapter-port/spec.md.delta.yaml\n  - specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/core/vcs-adapter-port/verify.md.delta.yaml\n  - specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/core/vcs-adapter/spec.md.delta.yaml\n  - specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/core/vcs-adapter/verify.md.delta.yaml\n  - specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/skills/skill-templates-source/spec.md.delta.yaml\n  - specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/skills/skill-templates-source/verify.md.delta.yaml\n  - specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/skills/workflow-automation/spec.md.delta.yaml\n  - specd-sdd/changes/20260516-062814-implementation-file-tracking/deltas/skills/workflow-automation/verify.md.delta.yaml\n  - specd-sdd/changes/20260516-062814-implementation-file-tracking/design.md\n  - specd-sdd/changes/20260516-062814-implementation-file-tracking/manifest.json\n  - specd-sdd/changes/20260516-062814-implementation-file-tracking/proposal.md\n  - specd-sdd/changes/20260516-062814-implementation-file-tracking/specs/cli/change-implementation/spec.md\n  - specd-sdd/changes/20260516-062814-implementation-file-tracking/specs/cli/change-implementation/verify.md\n  - specd-sdd/changes/20260516-062814-implementation-file-tracking/specs/core/implementation-detector-port/spec.md\n  - specd-sdd/changes/20260516-062814-implementation-file-tracking/specs/core/implementation-detector-port/verify.md\n  - specd-sdd/changes/20260516-062814-implementation-file-tracking/specs/core/spec-lock/spec.md\n  - specd-sdd/changes/20260516-062814-implementation-file-tracking/specs/core/spec-lock/verify.md\n  - specd-sdd/changes/20260516-062814-implementation-file-tracking/specs/core/vcs-implementation-detector/spec.md\n  - specd-sdd/changes/20260516-062814-implementation-file-tracking/specs/core/vcs-implementation-detector/verify.md\n  - specd-sdd/changes/20260516-062814-implementation-file-tracking/tasks.md\n  - specd-sdd/changes/20260521-094729-fix-validate-all-dag/.specd-exploration.md\n  - specd-sdd/changes/20260521-094729-fix-validate-all-dag/manifest.json\n  - specd-sdd/changes/20260521-094729-fix-validate-all-dag/proposal.md\n  - specd-sdd/changes/20260522-081529-fix-archive-preflight-atomicity/.specd-exploration.md\n  - specd-sdd/changes/20260522-081529-fix-archive-preflight-atomicity/deltas/core/archive-change/spec.md.delta.yaml\n  - specd-sdd/changes/20260522-081529-fix-archive-preflight-atomicity/deltas/core/archive-change/verify.md.delta.yaml\n  - specd-sdd/changes/20260522-081529-fix-archive-preflight-atomicity/deltas/core/save-spec-metadata/spec.md.delta.yaml\n  - specd-sdd/changes/20260522-081529-fix-archive-preflight-atomicity/deltas/core/save-spec-metadata/verify.md.delta.yaml\n  - specd-sdd/changes/20260522-081529-fix-archive-preflight-atomicity/deltas/core/spec-metadata/spec.md.delta.yaml\n  - specd-sdd/changes/20260522-081529-fix-archive-preflight-atomicity/deltas/core/spec-metadata/verify.md.delta.yaml\n  - specd-sdd/changes/20260522-081529-fix-archive-preflight-atomicity/design.md\n  - specd-sdd/changes/20260522-081529-fix-archive-preflight-atomicity/manifest.json\n  - specd-sdd/changes/20260522-081529-fix-archive-preflight-atomicity/proposal.md\n  - specd-sdd/changes/20260522-081529-fix-archive-preflight-atomicity/tasks.md\n  - packages/skills/templates/specd-compliance/SKILL.md",
+      "commitStarted": false
+    }
+  ],
+  "archivedAt": "2026-05-22T09:02:31.801Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "1***i@u***.com",
+    "provider": "git"
+  }
+}

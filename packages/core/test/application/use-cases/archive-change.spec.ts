@@ -409,6 +409,7 @@ describe('ArchiveChange', () => {
       expect(JSON.parse(specRepo.saved.get('spec-lock.json')!)).toEqual({
         schema: { name: 'test-schema', version: 1 },
         dependsOn: ['core:storage'],
+        implementation: [],
       })
     })
 
@@ -477,6 +478,7 @@ describe('ArchiveChange', () => {
       expect(JSON.parse(specRepo.saved.get('spec-lock.json')!)).toEqual({
         schema: { name: 'schema-std', version: 1 },
         dependsOn: ['core:new'],
+        implementation: [],
       })
     })
 
@@ -570,7 +572,248 @@ describe('ArchiveChange', () => {
       await expect(uc.execute({ name: 'my-change' })).rejects.toThrow(
         /Extracted dependsOn mismatch/,
       )
+      expect(specRepo.saved.has('spec.md')).toBe(false)
       expect((saveMetadata.execute as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(0)
+
+      const persisted = await changeRepo.get('my-change')
+      const lastEvent = persisted?.history.at(-1)
+      expect(lastEvent?.type).toBe('archive-failed')
+      if (lastEvent?.type === 'archive-failed') {
+        expect(lastEvent.step).toBe('prepare')
+        expect(lastEvent.commitStarted).toBe(false)
+      }
+    })
+
+    it('blocks earlier spec publication when a later spec fails preflight', async () => {
+      const artifactType = makeArtifactType('spec', { delta: false, scope: 'spec' })
+      const schema = makeSchema({
+        artifacts: [artifactType],
+        metadataExtraction: {
+          dependsOn: {
+            artifact: 'spec',
+            extractor: {
+              selector: { type: 'section', matches: '^Spec Dependencies$' },
+              extract: 'content',
+              capture: '(core:[a-z-]+)',
+            },
+          },
+        },
+      })
+      const publishCalls: string[] = []
+      const specRepo = makeSpecRepository({
+        specs: [
+          new Spec('default', SpecPath.parse('auth/oauth'), ['spec.md']),
+          new Spec('default', SpecPath.parse('auth/shared'), ['spec.md']),
+        ],
+        artifacts: {
+          'auth/oauth/spec.md': '# OAuth',
+          'auth/shared/spec.md': '# Shared',
+        },
+        async publish(spec): Promise<void> {
+          publishCalls.push(spec.name.toString())
+        },
+      })
+      const markdownParser = makeParser({
+        parse: (content) => ({
+          root: {
+            type: 'document',
+            children: [
+              {
+                type: 'section',
+                label: 'Spec Dependencies',
+                children: [{ type: 'paragraph', value: content }],
+              },
+            ],
+          },
+        }),
+        renderSubtree: (node) =>
+          (node.value as string | undefined) ??
+          (node.children ?? [])
+            .map((child) => ((child as { value?: unknown }).value as string | undefined) ?? '')
+            .join('\n'),
+      })
+      const change = makeArchivableChange('my-change', {
+        specIds: ['default:auth/oauth', 'default:auth/shared'],
+      })
+      change.setSpecDependsOn('default:auth/oauth', ['core:oauth'])
+      change.setSpecDependsOn('default:auth/shared', ['core:manifest'])
+      change.setArtifact(
+        new ChangeArtifact({
+          type: 'spec',
+          files: new Map([
+            [
+              'default:auth/oauth',
+              new ArtifactFile({
+                key: 'default:auth/oauth',
+                filename: 'specs/default/auth/oauth/spec.md',
+                status: 'complete',
+                validatedHash: 'oauth123',
+              }),
+            ],
+            [
+              'default:auth/shared',
+              new ArtifactFile({
+                key: 'default:auth/shared',
+                filename: 'specs/default/auth/shared/spec.md',
+                status: 'complete',
+                validatedHash: 'shared123',
+              }),
+            ],
+          ]),
+        }),
+      )
+      const changeRepo = Object.assign(makeChangeRepository([change]), {
+        async artifact(_change: Change, filename: string): Promise<SpecArtifact | null> {
+          if (filename === 'specs/default/auth/oauth/spec.md') {
+            return new SpecArtifact('spec.md', '# Spec Dependencies\n- core:oauth')
+          }
+          if (filename === 'specs/default/auth/shared/spec.md') {
+            return new SpecArtifact('spec.md', '# Spec Dependencies\n- core:extracted')
+          }
+          return null
+        },
+      })
+
+      const uc = new ArchiveChange(
+        changeRepo,
+        new Map([['default', specRepo]]),
+        makeArchiveRepository(),
+        makeRunStepHooks(),
+        makeActorResolver(),
+        makeParsers(markdownParser),
+        makeSchemaProvider(schema),
+        makeGenerateMetadata(),
+        makeSaveMetadata(),
+      )
+
+      await expect(uc.execute({ name: 'my-change' })).rejects.toThrow(
+        /Extracted dependsOn mismatch/,
+      )
+      expect(publishCalls).toEqual([])
+      expect(specRepo.saved.has('auth/oauth/spec-lock.json')).toBe(false)
+      expect(specRepo.saved.has('auth/shared/spec-lock.json')).toBe(false)
+    })
+
+    it('completes batch preflight before the first publish starts', async () => {
+      const artifactType = makeArtifactType('spec', { delta: false, scope: 'spec' })
+      const schema = makeSchema({
+        artifacts: [artifactType],
+        metadataExtraction: {
+          dependsOn: {
+            artifact: 'spec',
+            extractor: {
+              selector: { type: 'section', matches: '^Spec Dependencies$' },
+              extract: 'content',
+              capture: '(core:[a-z-]+)',
+            },
+          },
+        },
+      })
+      const events: string[] = []
+      const parser = makeParser({
+        parse: (content) => {
+          events.push(`parse:${content}`)
+          return {
+            root: {
+              type: 'document',
+              children: [
+                {
+                  type: 'section',
+                  label: 'Spec Dependencies',
+                  children: [{ type: 'paragraph', value: content }],
+                },
+              ],
+            },
+          }
+        },
+        renderSubtree: (node) =>
+          (node.value as string | undefined) ??
+          (node.children ?? [])
+            .map((child) => ((child as { value?: unknown }).value as string | undefined) ?? '')
+            .join('\n'),
+      })
+      const specRepo = makeSpecRepository({
+        specs: [
+          new Spec('default', SpecPath.parse('auth/oauth'), ['spec.md']),
+          new Spec('default', SpecPath.parse('auth/shared'), ['spec.md']),
+        ],
+        artifacts: {
+          'auth/oauth/spec.md': '# OAuth',
+          'auth/shared/spec.md': '# Shared',
+        },
+        async publish(spec): Promise<void> {
+          events.push(`publish:${spec.name.toString()}`)
+        },
+      })
+      const change = makeArchivableChange('my-change', {
+        specIds: ['default:auth/oauth', 'default:auth/shared'],
+      })
+      change.setSpecDependsOn('default:auth/oauth', ['core:oauth'])
+      change.setSpecDependsOn('default:auth/shared', ['core:shared'])
+      change.setArtifact(
+        new ChangeArtifact({
+          type: 'spec',
+          files: new Map([
+            [
+              'default:auth/oauth',
+              new ArtifactFile({
+                key: 'default:auth/oauth',
+                filename: 'specs/default/auth/oauth/spec.md',
+                status: 'complete',
+                validatedHash: 'oauth123',
+              }),
+            ],
+            [
+              'default:auth/shared',
+              new ArtifactFile({
+                key: 'default:auth/shared',
+                filename: 'specs/default/auth/shared/spec.md',
+                status: 'complete',
+                validatedHash: 'shared123',
+              }),
+            ],
+          ]),
+        }),
+      )
+      const changeRepo = Object.assign(makeChangeRepository([change]), {
+        async artifact(_change: Change, filename: string): Promise<SpecArtifact | null> {
+          if (filename === 'specs/default/auth/oauth/spec.md') {
+            return new SpecArtifact('spec.md', '# Spec Dependencies\n- core:oauth')
+          }
+          if (filename === 'specs/default/auth/shared/spec.md') {
+            return new SpecArtifact('spec.md', '# Spec Dependencies\n- core:shared')
+          }
+          return null
+        },
+      })
+
+      const uc = new ArchiveChange(
+        changeRepo,
+        new Map([['default', specRepo]]),
+        makeArchiveRepository(),
+        makeRunStepHooks(),
+        makeActorResolver(),
+        makeParsers(parser),
+        makeSchemaProvider(schema),
+        makeGenerateMetadata(),
+        makeSaveMetadata(),
+      )
+
+      await expect(uc.execute({ name: 'my-change' })).resolves.toBeDefined()
+
+      const firstPublishIndex = events.findIndex((event) => event.startsWith('publish:'))
+      const sharedParseIndex = events.findIndex((event) =>
+        event.includes('# Spec Dependencies\n- core:shared'),
+      )
+      const oauthParseIndex = events.findIndex((event) =>
+        event.includes('# Spec Dependencies\n- core:oauth'),
+      )
+
+      expect(firstPublishIndex).toBeGreaterThan(-1)
+      expect(oauthParseIndex).toBeGreaterThan(-1)
+      expect(sharedParseIndex).toBeGreaterThan(-1)
+      expect(oauthParseIndex).toBeLessThan(firstPublishIndex)
+      expect(sharedParseIndex).toBeLessThan(firstPublishIndex)
     })
 
     it('falls back to spec-lock dependsOn when extraction omits dependsOn', async () => {
@@ -2572,6 +2815,111 @@ describe('ArchiveChange', () => {
       )
 
       await expect(uc.execute({ name: 'my-change' })).rejects.toThrow(ReadOnlyWorkspaceError)
+    })
+  })
+
+  describe('implementation archive guards', () => {
+    it('fails when tracked implementation files remain open', async () => {
+      const change = makeArchivableChange('my-change')
+      change.trackImplementationFile('packages/core/src/change.ts', 'open')
+
+      const uc = new ArchiveChange(
+        makeChangeRepository([change]),
+        new Map([['default', makeSpecRepository()]]),
+        makeArchiveRepository(),
+        makeRunStepHooks(),
+        makeActorResolver(),
+        makeParsers(),
+        makeSchemaProvider(makeSchema()),
+        makeGenerateMetadata(),
+        makeSaveMetadata(),
+      )
+
+      await expect(uc.execute({ name: 'my-change' })).rejects.toThrow(
+        /tracked implementation files remain open/,
+      )
+    })
+
+    it('fails when implementation links target specs outside scope without allowOutOfScope', async () => {
+      const change = makeArchivableChange('my-change', {
+        specIds: ['default:auth/oauth'],
+      })
+      change.trackImplementationFile('specs/default/auth/shared/spec.md', 'resolved')
+      change.addImplementationLink({
+        specId: 'default:auth/shared',
+        file: 'specs/default/auth/shared/spec.md',
+        fileLinkExplicit: true,
+      })
+
+      const uc = new ArchiveChange(
+        makeChangeRepository([change]),
+        new Map([
+          [
+            'default',
+            makeSpecRepository({
+              specs: [
+                new Spec('default', SpecPath.parse('auth/oauth'), ['spec.md']),
+                new Spec('default', SpecPath.parse('auth/shared'), ['spec.md']),
+              ],
+            }),
+          ],
+        ]),
+        makeArchiveRepository(),
+        makeRunStepHooks(),
+        makeActorResolver(),
+        makeParsers(),
+        makeSchemaProvider(makeSchema()),
+        makeGenerateMetadata(),
+        makeSaveMetadata(),
+        new Map(),
+        [],
+        '/project',
+        new Map([['default', { codeRoot: '/project/specs/default', excludePaths: [] }]]),
+      )
+
+      await expect(uc.execute({ name: 'my-change' })).rejects.toThrow(/outside the change scope/)
+    })
+
+    it('publishes out-of-scope implementation sidecars when allowOutOfScope is true', async () => {
+      const change = makeArchivableChange('my-change', {
+        specIds: ['default:auth/oauth'],
+      })
+      change.trackImplementationFile('specs/default/auth/shared/spec.md', 'resolved')
+      change.addImplementationLink({
+        specId: 'default:auth/shared',
+        file: 'specs/default/auth/shared/spec.md',
+        fileLinkExplicit: true,
+      })
+
+      const specRepo = makeSpecRepository({
+        specs: [
+          new Spec('default', SpecPath.parse('auth/oauth'), ['spec.md']),
+          new Spec('default', SpecPath.parse('auth/shared'), ['spec.md']),
+        ],
+      })
+      const uc = new ArchiveChange(
+        makeChangeRepository([change]),
+        new Map([['default', specRepo]]),
+        makeArchiveRepository(),
+        makeRunStepHooks(),
+        makeActorResolver(),
+        makeParsers(),
+        makeSchemaProvider(makeSchema()),
+        makeGenerateMetadata(),
+        makeSaveMetadata(),
+        new Map(),
+        [],
+        '/project',
+        new Map([['default', { codeRoot: '/project/specs/default', excludePaths: [] }]]),
+      )
+
+      await uc.execute({ name: 'my-change', allowOutOfScope: true })
+
+      const savedSpecLock = specRepo.saved.get('auth/shared/spec-lock.json')
+      expect(savedSpecLock).toBeDefined()
+      expect(JSON.parse(savedSpecLock ?? '{}')).toMatchObject({
+        implementation: [{ file: 'default:auth/shared/spec.md' }],
+      })
     })
   })
 })

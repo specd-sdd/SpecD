@@ -45,7 +45,7 @@
     {
       "requirement": "Deterministic generation at archive time",
       "rules": [
-        "`metadata.json` is generated deterministically by core as part of the `ArchiveChange` use case, but sidecar consistency is checked before canonical publication begins for each spec.\n\nArchive-time flow for a modified spec:\n\n1. Prepare the merged canonical artifact content for the spec in memory.\n2. Determine the final persisted `dependsOn` set for the archive attempt.\n3. Run `extractMetadata()` over the prepared merged content to validate archive-time consistency for fields such as `dependsOn`.\n4. Determine the final `spec-lock.json` content to publish for that spec.\n5. Publish the canonical spec artifacts plus `spec-lock.json` together as one staged spec publication unit.\n6. After publication succeeds, run `GenerateSpecMetadata` against the canonical persisted spec.\n7. Compute `contentHashes` for the required persisted spec artifacts and persist `metadata.json`.\n\nThe archive-owned persisted dependency rules are:\n\n- If `change.specDependsOn` has an entry for the spec, that value is the final persisted `dependsOn` set for the archive attempt.\n- If `metadataExtraction.dependsOn` returns a value during the pre-publication extraction pass, the extracted value MUST match the final persisted `dependsOn` set being sealed for that spec or archive fails.\n- This mismatch rule applies both when a canonical `spec-lock.json` already exists and when the archive is creating `spec-lock.json` for the first time.\n- If `metadataExtraction.dependsOn` is omitted, `metadata.json.dependsOn` MUST still be written from the final persisted dependency set.\n- Outside archive, a legacy spec with no sidecar MAY still remain on extraction-backed metadata flows until opportunistic backfill succeeds.\n\n`metadata.json.dependsOn` remains a supported consumer surface, but for persisted specs it is a projection of the archive-owned sidecar state rather than an independent source of truth."
+        "`metadata.json` is generated deterministically by core as part of the `ArchiveChange` use case, but every metadata-related archive check that can still fail the archive attempt MUST complete during the full archive-batch preflight before canonical publication begins for any spec.\n\nArchive-time flow for modified specs:\n\n1. Prepare the merged canonical artifact content for every affected spec in memory.\n2. Determine the final persisted `dependsOn` set for each archive-target spec.\n3. Run `extractMetadata()` over the prepared merged content for each relevant spec and evaluate archive-time consistency requirements such as `dependsOn` mismatch detection.\n4. Determine the final `spec-lock.json` content for each spec that will publish a sidecar.\n5. Confirm that every metadata-related archive check across the full archive batch has succeeded.\n6. Only then publish the canonical spec artifacts plus `spec-lock.json` for each spec as staged publication units.\n7. After publication succeeds for a spec, run `GenerateSpecMetadata` against the canonical persisted spec.\n8. Compute `contentHashes` for the required persisted spec artifacts and persist `metadata.json`.\n\nThe archive-owned persisted dependency rules are:\n\n- If `change.specDependsOn` has an entry for the spec, that value is the final persisted `dependsOn` set for the archive attempt.\n- If `metadataExtraction.dependsOn` returns a value during the pre-publication extraction pass, the extracted value MUST match the final persisted `dependsOn` set being sealed for that spec or archive fails.\n- This mismatch rule applies both when a canonical `spec-lock.json` already exists and when the archive is creating `spec-lock.json` for the first time.\n- If `metadataExtraction.dependsOn` is omitted, `metadata.json.dependsOn` MUST still be written from the final persisted dependency set.\n- Outside archive, a legacy spec with no sidecar MAY still remain on extraction-backed metadata flows until opportunistic backfill succeeds.\n\n`metadata.json.dependsOn` remains a supported consumer surface, but for persisted specs it is a projection of the archive-owned sidecar state rather than an independent source of truth."
       ]
     },
     {
@@ -379,11 +379,24 @@
     },
     {
       "requirement": "Deterministic generation at archive time",
-      "name": "Pre-publication extraction checks final persisted dependsOn",
+      "name": "Pre-publication extraction checks final persisted dependsOn during full-batch preflight",
       "given": ["archive has prepared the merged canonical content for a modified spec"],
       "when": ["archive determines the final persisted dependsOn set for that spec"],
       "then": [
-        "it runs extractMetadata() against the prepared content before canonical publication begins"
+        "it runs extractMetadata() against the prepared content during the full archive-batch preflight",
+        "AND that check completes before canonical publication begins for any spec in the batch"
+      ]
+    },
+    {
+      "requirement": "Deterministic generation at archive time",
+      "name": "Metadata-related failure in one spec blocks publication of earlier specs",
+      "given": [
+        "a multi-spec archive batch where one spec has already passed metadata-related checks",
+        "AND a later spec in the same batch will fail metadata-related archive validation"
+      ],
+      "when": ["ArchiveChange.execute completes metadata-related preflight for the batch"],
+      "then": [
+        "the later failure aborts the archive before canonical publication begins for the earlier spec"
       ]
     },
     {
@@ -409,14 +422,16 @@
     },
     {
       "requirement": "Deterministic generation at archive time",
-      "name": "Mismatched extracted dependsOn blocks archive even on first sidecar creation",
+      "name": "Mismatched extracted dependsOn blocks archive before any batch publication starts",
       "given": [
         "archive is sealing the final persisted dependency state for a modified spec",
         "AND the spec may or may not already have a canonical spec-lock.json",
         "AND extraction yields a different dependsOn value"
       ],
       "when": ["archive performs the pre-publication consistency check"],
-      "then": ["archive fails for that spec before canonical publication begins"]
+      "then": [
+        "archive fails for that spec before canonical publication begins for any spec in the batch"
+      ]
     },
     {
       "requirement": "Deterministic generation at archive time",
@@ -524,9 +539,18 @@
       ]
     }
   ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "core:spec-metadata",
+        "file": "core:src/application/use-cases/archive-change.ts",
+        "symbol": "ArchiveChange"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:c6da5eb05951cf29855f2b86cbc4eb48f5de06ca53ce7245bca5fa5523a2350d",
-    "verify.md": "sha256:dae84db4d3ef8bc5369ad7223121ce873001a33ee34325427d5ece1ecb48d841"
+    "spec.md": "sha256:3f7249fc8affea43f820cf990032cd3a2fa49913849876b9fa933c67a148240b",
+    "verify.md": "sha256:cc3245419a906502a4f8328d7b4c33680ed6ed7d7c61d2c1750c74eb535a7437"
   },
   "generatedBy": "core"
 }
