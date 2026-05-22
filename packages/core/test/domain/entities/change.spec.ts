@@ -8,6 +8,10 @@ import { HistoricalImplementationGuardError } from '../../../src/domain/errors/h
 import type { ActorIdentity, ChangeEvent } from '../../../src/domain/entities/change.js'
 import type { ArtifactStatus } from '../../../src/domain/value-objects/artifact-status.js'
 import { ArtifactType } from '../../../src/domain/value-objects/artifact-type.js'
+import {
+  ArtifactDag,
+  artifactDagFromChangeArtifacts,
+} from '../../../src/domain/value-objects/artifact-dag.js'
 
 const actor: ActorIdentity = { name: 'Alice', email: 'alice@example.com' }
 const otherActor: ActorIdentity = { name: 'Bob', email: 'bob@example.com' }
@@ -25,6 +29,17 @@ function makeChange(history: ChangeEvent[] = []) {
 function makeArtifact(type: string, status: ArtifactStatus, requires: string[] = []) {
   const file = new ArtifactFile({ key: type, filename: `${type}.md`, status })
   return new ChangeArtifact({ type, requires, files: new Map([[type, file]]) })
+}
+
+function dagFor(change: Change): ArtifactDag {
+  return artifactDagFromChangeArtifacts(change.artifacts.values())
+}
+
+function allArtifacts(change: Change) {
+  return [...change.artifacts.values()].map((artifact) => ({
+    type: artifact.type,
+    files: [...artifact.files.keys()],
+  }))
 }
 
 describe('Change', () => {
@@ -284,7 +299,7 @@ describe('Change', () => {
       const c = makeChange()
       c.transition('designing', actor)
       c.transition('ready', actor)
-      c.invalidate('spec-change', actor, allArtifactsMessage)
+      c.invalidate('spec-change', actor, allArtifactsMessage, allArtifacts(c), dagFor(c))
 
       const history = c.history
       const last = history[history.length - 1]
@@ -300,16 +315,20 @@ describe('Change', () => {
       const c = makeChange()
       c.transition('designing', actor)
       c.transition('ready', actor)
-      c.invalidate('spec-change', actor, allArtifactsMessage)
+      c.invalidate('spec-change', actor, allArtifactsMessage, allArtifacts(c), dagFor(c))
       expect(c.state).toBe('designing')
     })
 
     it('records the cause on the invalidated event', () => {
       const c = makeChange()
       c.transition('designing', actor)
-      c.invalidate('artifact-drift', actor, 'Invalidated because validated artifacts drifted', [
-        { type: 'proposal', files: ['proposal'] },
-      ])
+      c.invalidate(
+        'artifact-drift',
+        actor,
+        'Invalidated because validated artifacts drifted',
+        [{ type: 'proposal', files: ['proposal'] }],
+        dagFor(c),
+      )
 
       const evt = c.history.find((e) => e.type === 'invalidated')
       expect(evt?.type === 'invalidated' && evt.cause).toBe('artifact-drift')
@@ -319,7 +338,7 @@ describe('Change', () => {
       const c = makeChange()
       c.transition('designing', actor)
       c.transition('ready', actor)
-      c.invalidate('spec-change', actor, allArtifactsMessage)
+      c.invalidate('spec-change', actor, allArtifactsMessage, allArtifacts(c), dagFor(c))
 
       const transitioned = [...c.history].reverse().find((e) => e.type === 'transitioned')
       expect(transitioned?.type === 'transitioned' && transitioned.from).toBe('ready')
@@ -336,7 +355,7 @@ describe('Change', () => {
       proposal.markComplete('proposal', 'sha256:abc')
       c.setArtifact(proposal)
 
-      c.invalidate('spec-change', actor, allArtifactsMessage)
+      c.invalidate('spec-change', actor, allArtifactsMessage, allArtifacts(c), dagFor(c))
 
       expect(proposal.getFile('proposal')?.validatedHash).toBe('sha256:abc')
       expect(proposal.status).toBe('pending-review')
@@ -353,7 +372,7 @@ describe('Change', () => {
       adr.markSkipped()
       c.setArtifact(adr)
 
-      c.invalidate('spec-change', actor, allArtifactsMessage)
+      c.invalidate('spec-change', actor, allArtifactsMessage, allArtifacts(c), dagFor(c))
 
       expect(adr.getFile('adr')?.validatedHash).toBe(SKIPPED_SENTINEL)
       expect(adr.status).toBe('pending-review')
@@ -373,7 +392,13 @@ describe('Change', () => {
       c.setArtifact(proposal)
       c.setArtifact(design)
 
-      c.invalidate('artifact-review-required', actor, allArtifactsMessage)
+      c.invalidate(
+        'artifact-review-required',
+        actor,
+        allArtifactsMessage,
+        allArtifacts(c),
+        dagFor(c),
+      )
 
       expect(proposal.getFile('proposal')?.validatedHash).toBe('sha256:111')
       expect(proposal.status).toBe('pending-review')
@@ -391,7 +416,13 @@ describe('Change', () => {
       c.transition('archivable', actor)
       expect(c.state).toBe('archivable')
 
-      c.invalidate('artifact-review-required', actor, allArtifactsMessage)
+      c.invalidate(
+        'artifact-review-required',
+        actor,
+        allArtifactsMessage,
+        allArtifacts(c),
+        dagFor(c),
+      )
       expect(c.state).toBe('designing')
     })
 
@@ -436,9 +467,13 @@ describe('Change', () => {
       c.setArtifact(design)
       c.setArtifact(tasks)
 
-      c.invalidate('artifact-drift', actor, 'Invalidated because validated artifacts drifted', [
-        { type: 'tasks', files: ['tasks'] },
-      ])
+      c.invalidate(
+        'artifact-drift',
+        actor,
+        'Invalidated because validated artifacts drifted',
+        [{ type: 'tasks', files: ['tasks'] }],
+        dagFor(c),
+      )
 
       expect(tasks.getFile('tasks')?.validatedHash).toBe('sha256:t')
       expect(tasks.status).toBe('drifted-pending-review')
@@ -491,9 +526,13 @@ describe('Change', () => {
       c.setArtifact(design)
       c.setArtifact(tasks)
 
-      c.invalidate('artifact-drift', actor, 'Invalidated because validated artifacts drifted', [
-        { type: 'specs', files: ['specs'] },
-      ])
+      c.invalidate(
+        'artifact-drift',
+        actor,
+        'Invalidated because validated artifacts drifted',
+        [{ type: 'specs', files: ['specs'] }],
+        dagFor(c),
+      )
 
       expect(specs.getFile('specs')?.validatedHash).toBe('sha256:s')
       expect(specs.status).toBe('drifted-pending-review')
@@ -514,9 +553,13 @@ describe('Change', () => {
       c.transition('implementing', actor)
       const message =
         "Invalidated because change 'alpha' was archived with overlapping specs: auth/login"
-      c.invalidate('spec-overlap-conflict', actor, message, [
-        { type: 'proposal', files: ['proposal'] },
-      ])
+      c.invalidate(
+        'spec-overlap-conflict',
+        actor,
+        message,
+        [{ type: 'proposal', files: ['proposal'] }],
+        dagFor(c),
+      )
 
       const evt = c.history.find((e) => e.type === 'invalidated')
       expect(evt?.type === 'invalidated' && evt.cause).toBe('spec-overlap-conflict')
@@ -594,6 +637,7 @@ describe('Change', () => {
         actor,
         'drift',
         [{ type: 'design', files: ['design'] }],
+        dagFor(c),
         'none',
       )
       expect(c.state).toBe('designing')
@@ -612,6 +656,7 @@ describe('Change', () => {
         actor,
         'drift',
         [{ type: 'design', files: ['design'] }],
+        dagFor(c),
         'surgical',
       )
       expect(c.state).toBe('designing')
@@ -630,6 +675,7 @@ describe('Change', () => {
         actor,
         'drift',
         [{ type: 'design', files: ['design'] }],
+        dagFor(c),
         'global',
       )
       expect(c.state).toBe('designing')
@@ -649,6 +695,7 @@ describe('Change', () => {
         actor,
         'drift',
         [{ type: 'design', files: ['design'] }],
+        dagFor(c),
         'downstream',
       )
       expect(c.state).toBe('designing')
@@ -664,7 +711,13 @@ describe('Change', () => {
     it('respects stored policy when no override is passed', () => {
       const c = makeChangeWithChain()
       c.invalidationPolicy = 'surgical'
-      c.invalidate('artifact-drift', actor, 'drift', [{ type: 'design', files: ['design'] }])
+      c.invalidate(
+        'artifact-drift',
+        actor,
+        'drift',
+        [{ type: 'design', files: ['design'] }],
+        dagFor(c),
+      )
       expect(c.getArtifact('tasks')?.status).toBe('complete')
       expect(c.getArtifact('design')?.status).toBe('drifted-pending-review')
     })
@@ -676,6 +729,7 @@ describe('Change', () => {
         actor,
         'manual review',
         [{ type: 'design', files: ['design'] }],
+        dagFor(c),
         'surgical',
       )
       expect(c.getArtifact('design')?.getFile('design')?.hasDrift).toBe(false)
@@ -725,7 +779,7 @@ describe('Change', () => {
       const c = makeChange()
       c.transition('designing', actor)
       c.recordSpecApproval('LGTM', {}, actor)
-      c.invalidate('spec-change', actor, allArtifactsMessage)
+      c.invalidate('spec-change', actor, allArtifactsMessage, allArtifacts(c), dagFor(c))
       expect(c.activeSpecApproval).toBeUndefined()
     })
 
@@ -733,7 +787,7 @@ describe('Change', () => {
       const c = makeChange()
       c.transition('designing', actor)
       c.recordSpecApproval('First approval', {}, actor)
-      c.invalidate('spec-change', actor, allArtifactsMessage)
+      c.invalidate('spec-change', actor, allArtifactsMessage, allArtifacts(c), dagFor(c))
       c.recordSpecApproval('Second approval', {}, otherActor)
       expect(c.activeSpecApproval?.reason).toBe('Second approval')
     })
@@ -753,7 +807,13 @@ describe('Change', () => {
     it('returns undefined after invalidation supersedes signoff', () => {
       const c = makeChange()
       c.recordSignoff('Ship it', {}, actor)
-      c.invalidate('artifact-review-required', actor, allArtifactsMessage)
+      c.invalidate(
+        'artifact-review-required',
+        actor,
+        allArtifactsMessage,
+        allArtifacts(c),
+        dagFor(c),
+      )
       expect(c.activeSignoff).toBeUndefined()
     })
   })
@@ -986,7 +1046,7 @@ describe('Change', () => {
     it('updates specIds, derives workspaces, and invalidates', () => {
       const c = makeChange()
       c.transition('designing', actor)
-      c.updateSpecIds(['billing:invoices/create', 'auth/register'], actor)
+      c.updateSpecIds(['billing:invoices/create', 'auth/register'], actor, dagFor(c))
       expect(c.specIds).toEqual(['billing:invoices/create', 'auth/register'])
       expect(c.workspaces).toContain('billing')
       expect(c.workspaces).toContain('default')
@@ -998,7 +1058,7 @@ describe('Change', () => {
     it('deduplicates specIds', () => {
       const c = makeChange()
       c.transition('designing', actor)
-      c.updateSpecIds(['auth/login', 'auth/login', 'billing:invoices'], actor)
+      c.updateSpecIds(['auth/login', 'auth/login', 'billing:invoices'], actor, dagFor(c))
       expect(c.specIds).toEqual(['auth/login', 'billing:invoices'])
     })
   })
@@ -1282,7 +1342,7 @@ describe('Change', () => {
           ['auth/session', ['auth/jwt']],
         ]),
       })
-      c.updateSpecIds(['auth/login'], actor)
+      c.updateSpecIds(['auth/login'], actor, dagFor(c))
       expect(c.specDependsOn.has('auth/session')).toBe(false)
       expect([...c.specDependsOn.get('auth/login')!]).toEqual(['auth/shared'])
     })
@@ -1295,7 +1355,7 @@ describe('Change', () => {
         history: [],
         specDependsOn: new Map([['auth/login', ['auth/shared']]]),
       })
-      c.updateSpecIds(['billing/core'], actor)
+      c.updateSpecIds(['billing/core'], actor, dagFor(c))
       expect(c.specDependsOn.size).toBe(0)
     })
 
@@ -1307,7 +1367,7 @@ describe('Change', () => {
         history: [],
         specDependsOn: new Map([['auth/login', ['auth/shared']]]),
       })
-      c.updateSpecIds(['auth/login', 'auth/session'], actor)
+      c.updateSpecIds(['auth/login', 'auth/session'], actor, dagFor(c))
       expect(c.specDependsOn.size).toBe(1)
       expect([...c.specDependsOn.get('auth/login')!]).toEqual(['auth/shared'])
     })

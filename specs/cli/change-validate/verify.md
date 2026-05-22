@@ -143,13 +143,19 @@
 
 ### Requirement: Batch mode (--all)
 
-#### Scenario: --all without specPath validates all specIds
+#### Scenario: Change-scoped batch step omits specPath
 
-- **GIVEN** a change with specIds `["default:auth/login", "default:auth/logout"]` and valid artifacts for both
-- **WHEN** `specd change validate my-change --all` is run
-- **THEN** both specs are validated
-- **AND** text output shows success for each spec
-- **AND** summary shows `validated 2/2 specs`
+- **GIVEN** a change with `proposal` (change-scoped) and multiple `specIds`
+- **WHEN** `specd changes validate <name> --all` runs
+- **THEN** the change-scoped `proposal` step invokes `ValidateArtifacts` without a `specPath` argument
+
+#### Scenario: --all walks DAG with change-scoped once and spec-scoped per specId
+
+- **GIVEN** a change with specIds `["core:schema-format", "cli:change-validate"]` and valid deltas for the next incomplete DAG steps
+- **WHEN** `specd change validate fix-validate-all-dag --all` is run
+- **THEN** change-scoped artifacts such as `proposal` are validated once
+- **AND** spec-scoped artifacts such as `specs` are validated once per specId
+- **AND** validation order respects `artifactDag().topologicalOrder()` (parents before children)
 
 #### Scenario: --all with specPath is rejected
 
@@ -161,22 +167,22 @@
 - **WHEN** `specd change validate my-change` is run without specPath or --all
 - **THEN** stderr contains `error: either <specPath> or --all is required` and exit code is 1
 
-#### Scenario: --all with --artifact validates one artifact across all specs
+#### Scenario: --all with --artifact filters DAG steps
 
-- **GIVEN** a change with 2 specIds
-- **WHEN** `specd change validate my-change --all --artifact proposal` is run
-- **THEN** only the `proposal` artifact is validated for each spec
+- **GIVEN** a change with 2 specIds and incomplete `specs` deltas
+- **WHEN** `specd change validate my-change --all --artifact specs` is run
+- **THEN** only `specs` validation steps run (once per specId)
+- **AND** other artifact types are not validated in that batch
 
 #### Scenario: --all with partial failures exits 1
 
-- **GIVEN** a change with 2 specIds, one passes and one fails validation
+- **GIVEN** a batch where one scheduled step fails and another passes
 - **WHEN** `specd change validate my-change --all` is run
-- **THEN** both specs are validated (batch continues)
+- **THEN** all scheduled steps still run
 - **AND** exit code is 1
-- **AND** summary shows `validated 1/2 specs`
 
-#### Scenario: --all JSON output
+#### Scenario: --all JSON output lists scheduled steps
 
-- **GIVEN** a change with 2 specIds, both pass
+- **GIVEN** a batch where all scheduled steps pass
 - **WHEN** `specd change validate my-change --all --format json` is run
-- **THEN** output is `{ passed: true, total: 2, results: [...] }` with per-spec entries
+- **THEN** output includes `passed`, `total`, and `results[]` with `artifact` and `spec` (null for change-scoped steps) per entry

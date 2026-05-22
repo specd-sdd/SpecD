@@ -28,19 +28,18 @@
       "core:change-layout",
       "core:change-manifest",
       "core:lifecycle-engine",
-      "core:schema-format",
       "core:delta-format",
       "core:selector-model",
       "core:storage",
       "default:_global/architecture",
-      "core:spec-id-format"
+      "core:spec-id-format",
+      "core:schema-format"
     ],
     "cli:change-validate": [
       "cli:entrypoint",
       "core:change",
       "core:validate-artifacts",
-      "core:spec-id-format",
-      "core:schema-format"
+      "core:spec-id-format"
     ],
     "core:change": [
       "core:change-manifest",
@@ -50,38 +49,321 @@
       "default:_global/architecture",
       "core:lifecycle-engine",
       "default:_global/logging",
-      "core:schema-format"
+      "core:implementation-detector-port"
     ],
     "core:invalidate-change": [
       "core:change",
       "core:lifecycle-engine",
       "core:config",
-      "default:_global/architecture",
-      "core:schema-format"
+      "default:_global/architecture"
     ],
     "core:lifecycle-engine": [
       "core:change",
       "core:workflow-model",
-      "core:schema-format",
-      "default:_global/architecture"
+      "default:_global/architecture",
+      "core:schema-format"
     ],
-    "cli:change-status": [
-      "cli:entrypoint",
-      "core:change",
-      "core:get-status",
-      "core:schema-format",
-      "core:lifecycle-engine"
-    ],
+    "cli:change-status": ["cli:entrypoint", "core:change", "core:get-status"],
     "core:get-artifact-instruction": [
-      "core:schema-format",
       "core:delta-format",
       "core:change",
       "core:schema-merge",
       "core:template-variables",
-      "core:lifecycle-engine"
+      "core:lifecycle-engine",
+      "core:schema-format"
     ]
   },
   "invalidationPolicy": "downstream",
+  "trackedImplementationFiles": [
+    {
+      "file": "packages/core/src/domain/value-objects/artifact-dag.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/domain/value-objects/schema.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/validate-artifacts.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/change/validate.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/change/status.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/cli/cli-reference.md",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/change-status.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/change-validate.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/archive-change.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/edit-change.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/invalidate-change.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/transition-change.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/domain/entities/change.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/domain/services/lifecycle-engine.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/domain/value-objects/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/infrastructure/fs/change-repository.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/get-artifact-instruction.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/get-status.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/helpers.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/invalidate-change.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/validate-artifacts.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/domain/entities/change.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/domain/services/lifecycle-engine.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/infrastructure/fs/change-repository.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "specd-sdd/changes/20260521-094729-fix-validate-all-dag/.specd-exploration.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260521-094729-fix-validate-all-dag/manifest.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260521-094729-fix-validate-all-dag/proposal.md",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/domain/value-objects/artifact-dag.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "specd-sdd/changes/20260521-094729-fix-validate-all-dag/deltas/cli/change-status/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260521-094729-fix-validate-all-dag/deltas/cli/change-status/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260521-094729-fix-validate-all-dag/deltas/cli/change-validate/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260521-094729-fix-validate-all-dag/deltas/cli/change-validate/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260521-094729-fix-validate-all-dag/deltas/core/change/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260521-094729-fix-validate-all-dag/deltas/core/change/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260521-094729-fix-validate-all-dag/deltas/core/get-artifact-instruction/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260521-094729-fix-validate-all-dag/deltas/core/get-artifact-instruction/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260521-094729-fix-validate-all-dag/deltas/core/invalidate-change/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260521-094729-fix-validate-all-dag/deltas/core/invalidate-change/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260521-094729-fix-validate-all-dag/deltas/core/lifecycle-engine/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260521-094729-fix-validate-all-dag/deltas/core/lifecycle-engine/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260521-094729-fix-validate-all-dag/deltas/core/schema-format/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260521-094729-fix-validate-all-dag/deltas/core/schema-format/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260521-094729-fix-validate-all-dag/deltas/core/validate-artifacts/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260521-094729-fix-validate-all-dag/deltas/core/validate-artifacts/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260521-094729-fix-validate-all-dag/design.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260521-094729-fix-validate-all-dag/tasks.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260521-094729-fix-validate-all-dag/reports/20260522-193804/_partial-cli.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260521-094729-fix-validate-all-dag/reports/20260522-193804/_partial-core.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260521-094729-fix-validate-all-dag/reports/20260522-193804/specs-compliance-change-fix-validate-all-dag-20260522-193804.md",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/composition/kernel.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/edit-change.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/edit-change.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/get-artifact-instruction.ts",
+      "state": "resolved"
+    }
+  ],
+  "implementationLinks": [
+    {
+      "specId": "core:schema-format",
+      "file": "packages/core/src/domain/value-objects/artifact-dag.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["ArtifactDag", "artifactDagFromChangeArtifacts"]
+    },
+    {
+      "specId": "core:schema-format",
+      "file": "packages/core/src/domain/value-objects/schema.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["Schema"]
+    },
+    {
+      "specId": "core:validate-artifacts",
+      "file": "packages/core/src/application/use-cases/validate-artifacts.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["ValidateArtifacts"]
+    },
+    {
+      "specId": "cli:change-validate",
+      "file": "packages/cli/src/commands/change/validate.ts",
+      "fileLinkExplicit": true,
+      "symbols": ["executeBatch"]
+    },
+    {
+      "specId": "cli:change-status",
+      "file": "packages/cli/src/commands/change/status.ts",
+      "fileLinkExplicit": true,
+      "symbols": ["resolveStatusSchemaDag", "renderDag"]
+    },
+    {
+      "specId": "core:change",
+      "file": "packages/core/src/application/use-cases/edit-change.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["EditChange"]
+    },
+    {
+      "specId": "core:change",
+      "file": "packages/core/src/domain/entities/change.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["Change"]
+    },
+    {
+      "specId": "core:change",
+      "file": "packages/core/src/composition/kernel.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:invalidate-change",
+      "file": "packages/core/src/application/use-cases/invalidate-change.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["InvalidateChange"]
+    },
+    {
+      "specId": "core:lifecycle-engine",
+      "file": "packages/core/src/domain/services/lifecycle-engine.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["LifecycleEngine"]
+    },
+    {
+      "specId": "core:get-artifact-instruction",
+      "file": "packages/core/src/application/use-cases/get-artifact-instruction.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["GetArtifactInstruction"]
+    },
+    {
+      "specId": "core:validate-artifacts",
+      "file": "packages/core/src/composition/use-cases/edit-change.ts",
+      "fileLinkExplicit": true
+    }
+  ],
   "artifacts": [
     {
       "type": "proposal",
@@ -93,7 +375,7 @@
           "key": "proposal",
           "filename": "proposal.md",
           "state": "complete",
-          "validatedHash": "sha256:b82d7fdaf96bc23944b2c1767617cfbd21bfbcaa12e48e764b1208dcfd0c717a"
+          "validatedHash": "sha256:357cd6e640b09625194c7352b17c34521b95ff87d8192f3bb779778b54fb19fc"
         }
       ]
     },
@@ -101,55 +383,55 @@
       "type": "specs",
       "optional": false,
       "requires": ["proposal"],
-      "state": "missing",
+      "state": "complete",
       "files": [
         {
           "key": "core:schema-format",
           "filename": "deltas/core/schema-format/spec.md.delta.yaml",
-          "state": "missing",
-          "validatedHash": null
+          "state": "complete",
+          "validatedHash": "sha256:8575bfcd1678fda9c477f63d181f892b4e61255930d8c58aeb506f015d63b916"
         },
         {
           "key": "core:validate-artifacts",
           "filename": "deltas/core/validate-artifacts/spec.md.delta.yaml",
-          "state": "missing",
-          "validatedHash": null
+          "state": "complete",
+          "validatedHash": "sha256:d5df0833b12508a50f592cf547f8eea63c3257358bdf49043ab45cfe54d1d6b7"
         },
         {
           "key": "cli:change-validate",
           "filename": "deltas/cli/change-validate/spec.md.delta.yaml",
-          "state": "missing",
-          "validatedHash": null
+          "state": "complete",
+          "validatedHash": "sha256:5476e94d2201f087ca02f89c1ff30210575061c8587b9f948780fd40f77499e7"
         },
         {
           "key": "core:change",
           "filename": "deltas/core/change/spec.md.delta.yaml",
-          "state": "missing",
-          "validatedHash": null
+          "state": "complete",
+          "validatedHash": "sha256:64f7289c0b1bf4b99696021f1dae47f323ddde830aa7a228916a4119c0647339"
         },
         {
           "key": "core:invalidate-change",
           "filename": "deltas/core/invalidate-change/spec.md.delta.yaml",
-          "state": "missing",
-          "validatedHash": null
+          "state": "complete",
+          "validatedHash": "sha256:71c10fddaed17c3701c26674025d61dac1ab0ed577dce99c49b17590a7cde645"
         },
         {
           "key": "core:lifecycle-engine",
           "filename": "deltas/core/lifecycle-engine/spec.md.delta.yaml",
-          "state": "missing",
-          "validatedHash": null
+          "state": "complete",
+          "validatedHash": "sha256:6de299f8ff4a384c4b6834a0b3b647c95d212fba21fde2812ac0f6a4ab67cbc8"
         },
         {
           "key": "cli:change-status",
           "filename": "deltas/cli/change-status/spec.md.delta.yaml",
-          "state": "missing",
-          "validatedHash": null
+          "state": "complete",
+          "validatedHash": "sha256:0e74d743bae2aea1aa33e3be5817ae78c44e7f43057948c9273936e665d6e231"
         },
         {
           "key": "core:get-artifact-instruction",
           "filename": "deltas/core/get-artifact-instruction/spec.md.delta.yaml",
-          "state": "missing",
-          "validatedHash": null
+          "state": "complete",
+          "validatedHash": "sha256:d25ac2e58f16a2609960ee29040303de677936ab624ce4a3491ca46f28827ceb"
         }
       ]
     },
@@ -157,55 +439,55 @@
       "type": "verify",
       "optional": false,
       "requires": ["specs"],
-      "state": "missing",
+      "state": "complete",
       "files": [
         {
           "key": "core:schema-format",
           "filename": "deltas/core/schema-format/verify.md.delta.yaml",
-          "state": "missing",
-          "validatedHash": null
+          "state": "complete",
+          "validatedHash": "sha256:ede8083ade7609012473fbd58a867877c84c886042b62e46871324d35f7b3260"
         },
         {
           "key": "core:validate-artifacts",
           "filename": "deltas/core/validate-artifacts/verify.md.delta.yaml",
-          "state": "missing",
-          "validatedHash": null
+          "state": "complete",
+          "validatedHash": "sha256:76cefdb601b7e60d067ec98e61c600c09fea2293e7191e8ac4b0d18c3c59a70b"
         },
         {
           "key": "cli:change-validate",
           "filename": "deltas/cli/change-validate/verify.md.delta.yaml",
-          "state": "missing",
-          "validatedHash": null
+          "state": "complete",
+          "validatedHash": "sha256:0c21e9a335eb8c6cbab5895a4ec9274948b774aaa8a14c0dcc3321d8336d8d77"
         },
         {
           "key": "core:change",
           "filename": "deltas/core/change/verify.md.delta.yaml",
-          "state": "missing",
-          "validatedHash": null
+          "state": "complete",
+          "validatedHash": "sha256:59d8fa19913342f893a6c0ed245482ea6da40b20ce56be9e62462304676e8cce"
         },
         {
           "key": "core:invalidate-change",
           "filename": "deltas/core/invalidate-change/verify.md.delta.yaml",
-          "state": "missing",
-          "validatedHash": null
+          "state": "complete",
+          "validatedHash": "sha256:d67dac3344b89a75049807f2d3d9d364d64a1d89595e733ff1f61b4c92fc8b63"
         },
         {
           "key": "core:lifecycle-engine",
           "filename": "deltas/core/lifecycle-engine/verify.md.delta.yaml",
-          "state": "missing",
-          "validatedHash": null
+          "state": "complete",
+          "validatedHash": "sha256:9e8263638119a8a827cc09934f51a2cec21fd73ef3f8b3cd6c6ebd121c8cf803"
         },
         {
           "key": "cli:change-status",
           "filename": "deltas/cli/change-status/verify.md.delta.yaml",
-          "state": "missing",
-          "validatedHash": null
+          "state": "complete",
+          "validatedHash": "sha256:431613b960e2db92afdb3d5e4f3a6ce649c415d6da678f5feb9637fe5bdd50bb"
         },
         {
           "key": "core:get-artifact-instruction",
           "filename": "deltas/core/get-artifact-instruction/verify.md.delta.yaml",
-          "state": "missing",
-          "validatedHash": null
+          "state": "complete",
+          "validatedHash": "sha256:7e7396ea56189af66cd0c51b3d892a6a14c52e2a80277f2741d7d383a815547b"
         }
       ]
     },
@@ -213,13 +495,13 @@
       "type": "design",
       "optional": false,
       "requires": ["proposal", "specs", "verify"],
-      "state": "missing",
+      "state": "complete",
       "files": [
         {
           "key": "design",
           "filename": "design.md",
-          "state": "missing",
-          "validatedHash": null
+          "state": "complete",
+          "validatedHash": "sha256:40f019efcf36e76b22471df403f665165b9bc486f89c8ec7ba4143b84d076b13"
         }
       ]
     },
@@ -227,13 +509,13 @@
       "type": "tasks",
       "optional": false,
       "requires": ["specs", "design"],
-      "state": "missing",
+      "state": "complete",
       "files": [
         {
           "key": "tasks",
           "filename": "tasks.md",
-          "state": "missing",
-          "validatedHash": null
+          "state": "complete",
+          "validatedHash": "sha256:d844d513d5339f2b92d7dfca03c84914383f176aec45aa341db64afb5aef55f6"
         }
       ]
     }
@@ -1360,6 +1642,315 @@
           "files": ["tasks"]
         }
       ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-22T16:21:39.824Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:schema-format",
+            "core:validate-artifacts",
+            "cli:change-validate",
+            "core:change",
+            "core:invalidate-change",
+            "core:lifecycle-engine",
+            "cli:change-status",
+            "core:get-artifact-instruction"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:schema-format",
+            "core:validate-artifacts",
+            "cli:change-validate",
+            "core:change",
+            "core:invalidate-change",
+            "core:lifecycle-engine",
+            "cli:change-status",
+            "core:get-artifact-instruction"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-22T16:28:40.999Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: verify [core:schema-format]",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": ["core:schema-format"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-22T16:35:53.130Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-22T16:37:08.450Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-22T17:32:27.405Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-22T17:45:45.822Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:schema-format",
+            "core:validate-artifacts",
+            "cli:change-validate",
+            "core:change",
+            "core:invalidate-change",
+            "core:lifecycle-engine",
+            "cli:change-status",
+            "core:get-artifact-instruction"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:schema-format",
+            "core:validate-artifacts",
+            "cli:change-validate",
+            "core:change",
+            "core:invalidate-change",
+            "core:lifecycle-engine",
+            "cli:change-status",
+            "core:get-artifact-instruction"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-22T17:45:45.822Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-22T17:52:32.926Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-22T17:55:58.633Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-22T18:08:00.299Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-22T18:10:03.491Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-22T18:10:17.773Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-22T18:13:57.304Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-05-22T18:13:57.802Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'cli:change-validate': extracted dependencies [cli:entrypoint, core:change, core:validate-artifacts, core:spec-id-format] do not match persisted dependencies [cli:entrypoint, core:change, core:validate-artifacts, core:spec-id-format, core:schema-format]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-05-22T18:14:12.718Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'core:change': extracted dependencies [core:change-manifest, core:workflow-model, core:spec-metadata, core:spec-id-format, default:_global/architecture, core:lifecycle-engine, default:_global/logging, core:implementation-detector-port] do not match persisted dependencies [core:change-manifest, core:workflow-model, core:spec-metadata, core:spec-id-format, default:_global/architecture, core:lifecycle-engine, default:_global/logging, core:schema-format]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-05-22T18:14:20.552Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'core:invalidate-change': extracted dependencies [core:change, core:lifecycle-engine, core:config, default:_global/architecture] do not match persisted dependencies [core:change, core:lifecycle-engine, core:config, default:_global/architecture, core:schema-format]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-05-22T18:14:44.620Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'core:validate-artifacts': extracted dependencies [core:change, core:change-layout, core:change-manifest, core:lifecycle-engine, core:schema-format, core:delta-format, core:selector-model, core:storage, default:_global/architecture, core:spec-id-format] do not match persisted dependencies [core:change, core:change-layout, core:change-manifest, core:lifecycle-engine, core:delta-format, core:selector-model, core:storage, default:_global/architecture, core:spec-id-format]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-05-22T18:14:49.630Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'core:lifecycle-engine': extracted dependencies [core:change, core:workflow-model, core:schema-format, default:_global/architecture] do not match persisted dependencies [core:change, core:workflow-model, default:_global/architecture]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-05-22T18:14:56.880Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'cli:change-status': extracted dependencies [cli:entrypoint, core:change, core:get-status] do not match persisted dependencies [cli:entrypoint, core:change, core:get-status, core:lifecycle-engine]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
     }
-  ]
+  ],
+  "archivedAt": "2026-05-22T18:15:02.842Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "1***i@u***.com",
+    "provider": "git"
+  }
 }

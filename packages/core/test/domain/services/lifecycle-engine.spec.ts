@@ -239,6 +239,26 @@ describe('LifecycleEngine', () => {
     expect(driftBlockers).toHaveLength(0)
   })
 
+  it('selects next artifact in topological order, not schema declaration order', () => {
+    const change = makeChange()
+    change.setArtifact(makeArtifact('proposal', 'complete'))
+    change.setArtifact(makeArtifact('design', 'in-progress'))
+    change.setArtifact(makeArtifact('specs', 'in-progress'))
+    change.setArtifact(makeArtifact('verify', 'in-progress'))
+
+    const schema = makeSchema({
+      artifacts: [
+        makeArtifactType('design', { requires: ['proposal', 'specs', 'verify'] }),
+        makeArtifactType('proposal'),
+        makeArtifactType('specs', { requires: ['proposal'] }),
+        makeArtifactType('verify', { requires: ['specs'] }),
+      ],
+    })
+
+    const verdict = new LifecycleEngine().evaluate(change, schema)
+    expect(verdict.nextArtifact).toBe('specs')
+  })
+
   it('uses canonical missing state even when hasDrift is true', () => {
     const change = makeChange()
     const missingDriftedFile = new ArtifactFile({

@@ -47,6 +47,7 @@ export {
   type RuleEntry,
   type ArtifactRules,
 } from './artifact-type.js'
+export { ArtifactDag, artifactDagFromChangeArtifacts } from './artifact-dag.js'
 export { Schema, type SchemaKind } from './schema.js'
 export { OverlapEntry, type OverlapChange } from './overlap-entry.js'
 export { OverlapReport } from './overlap-report.js'

@@ -202,6 +202,49 @@
 - **WHEN** a `preHashCleanup` entry omits the `id` field
 - **THEN** `SchemaRegistry.resolve()` must throw a `SchemaValidationError`
 
+### Requirement: Schema artifact DAG API
+
+#### Scenario: topologicalOrder places parents before children
+
+- **GIVEN** schema-std where `specs` requires `proposal` and `verify` requires `specs`
+- **WHEN** `schema.artifactDag().topologicalOrder()` is computed
+- **THEN** `proposal` appears before `specs`
+- **AND** `specs` appears before `verify`
+
+#### Scenario: childrenOf returns direct dependents only
+
+- **GIVEN** schema-std
+- **WHEN** `schema.artifactDag().childrenOf('proposal')` is computed
+- **THEN** the result includes `specs` and `design`
+- **AND** the result does not include `verify` (not a direct child of `proposal`)
+
+#### Scenario: descendantsOf expands transitively
+
+- **GIVEN** schema-std
+- **WHEN** `schema.artifactDag().descendantsOf(['specs'])` is computed
+- **THEN** the result includes `verify` and `tasks`
+
+#### Scenario: artifactDag is cached on Schema
+
+- **GIVEN** a resolved `Schema` instance
+- **WHEN** `artifactDag()` is called twice
+- **THEN** both calls return the same object reference
+
+### Requirement: Canonical artifact DAG derivation
+
+#### Scenario: EditChange passes schema artifactDag on scope edit
+
+- **GIVEN** an active schema and a change with artifacts whose persisted `requires` differ from the schema
+- **WHEN** `EditChange` updates `specIds` and triggers invalidation with policy `downstream`
+- **THEN** downstream expansion uses `schema.artifactDag().descendantsOf()`, not edges rebuilt only from persisted change `requires`
+
+#### Scenario: Runtime consumers use schema.artifactDag only
+
+- **GIVEN** validation, status, invalidation, or lifecycle code that needs artifact children or topological order
+- **WHEN** that code runs against a resolved schema
+- **THEN** it obtains DAG structure exclusively via `schema.artifactDag()`
+- **AND** it does not construct parallel adjacency maps from `requires.includes` filters
+
 ### Requirement: taskCompletionCheck
 
 #### Scenario: hasTasks is the master switch over patterns

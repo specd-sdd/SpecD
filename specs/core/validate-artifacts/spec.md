@@ -38,6 +38,8 @@ class ValidateArtifacts {
 
 For `scope: spec` artifacts, `specPath` is still required because the same artifact type (e.g., `specs`) exists for multiple specs.
 
+When `specPath` is omitted for a `scope: change` artifact, `ValidateArtifacts` MUST NOT require membership in `change.specIds` for routing; it MUST validate the change-scoped artifact files for the requested `artifactId` only.
+
 When `specPath` is provided and the artifact is `scope: change`, the specPath is ignored — the artifact ID is sufficient.
 
 ### Requirement: Schema name guard
@@ -56,6 +58,8 @@ Before validating an artifact, `ValidateArtifacts` must check that all artifact 
 
 The dependency-aware status lookup SHALL be interpreted through `LifecycleEngine`, since recursive parent blocking and schema DAG semantics do not belong on the `Change` entity. If a required dependency is neither `complete` nor `skipped`, validation of the dependent artifact is skipped and reported as a dependency-blocked failure. A `skipped` optional artifact satisfies the dependency. `skipped` artifacts are not validated — there is no file to check.
 
+When `ValidateArtifacts` validates more than one artifact or file in a single `execute` invocation (including batch drivers and full-artifact passes), it MUST recompute lifecycle/effective-status interpretation after each persisted completion so dependents processed later in the same invocation observe parents completed in that pass. It MUST NOT rely on a lifecycle snapshot frozen only at `execute` start.
+
 Dependency-blocked failures MUST include the dependency artifact ID and its effective status as observed at validation time.
 
 When the dependency status is `pending-parent-artifact-review`, the failure description MUST also include the upstream parent blocker context (artifact ID and status) when available from recursive blocker resolution.
@@ -63,6 +67,20 @@ When the dependency status is `pending-parent-artifact-review`, the failure desc
 For blockers outside review-propagation (`missing` and `in-progress`), the failure description MUST still include the dependency status and MUST NOT degrade to generic "incomplete dependency" wording.
 
 `pending-review` and `drifted-pending-review` are review blockers. For these statuses, the failure description MUST present them as review-state blockers (not generic incompleteness) and MUST include the status explicitly.
+
+### Requirement: Artifact traversal order
+
+When `ValidateArtifacts` validates multiple artifacts in one `execute` invocation without a single `artifactId` filter, it MUST iterate artifacts in `schema.artifactDag().topologicalOrder()`.
+
+When `artifactId` is provided but the invocation still validates all tracked files for that artifact type across the change (for example CLI batch `--all --artifact`), the outer driver MUST still respect `topologicalOrder()` for artifact-type steps; within each artifact type, spec-scoped files follow the change's `specIds` order.
+
+### Requirement: Complete and skipped file bypass
+
+For each tracked artifact file considered by validation, if the file's canonical persisted status is `complete` or `skipped`, `ValidateArtifacts` MUST NOT re-read the file, MUST NOT re-run structural validation or delta preview for that file, and MUST NOT invoke `markComplete` again for that file.
+
+Files in review or drift states (`pending-review`, `drifted-pending-review`, and any other non-terminal canonical state except `missing` when no file exists) MUST still be validated when selected by the invocation.
+
+Approval/signoff drift detection MUST still run for files that are actually validated in the invocation; bypassing `complete`/`skipped` files reduces unnecessary drift comparisons and avoids spurious `artifact-drift` invalidation during batch validation.
 
 ### Requirement: Approval invalidation on content change
 

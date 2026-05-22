@@ -1,0 +1,10 @@
+- op: modified
+  description: 'Auto-selection uses LifecycleEngine topological next artifact'
+  selector:
+    type: section
+    matches: 'Requirement: Input'
+  content: |
+    `GetArtifactInstruction.execute` receives:
+
+    - `name` (string, required) — the change name
+    - `artifactId` (string, optional) — the artifact ID from the schema (e.g. `specs`, `verify`, `tasks`). When omitted, the use case auto-resolves the next artifact to work on using `LifecycleEngine.nextArtifact`, which selects the first artifact in `schema.artifactDag().topologicalOrder()` whose dependencies are effectively satisfied (`complete` or `skipped`) but that is itself not yet effectively complete or skipped. If all artifacts are already complete/skipped, it throws `ArtifactNotFoundError`.

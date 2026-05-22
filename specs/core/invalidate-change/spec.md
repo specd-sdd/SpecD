@@ -82,10 +82,20 @@ After change-level invalidation is accepted, artifact/file-state behavior MUST f
 
 - `none` — no artifact/file state is invalidated
 - `surgical` — only the normalized target set is invalidated
-- `downstream` — the normalized target set and all of its DAG descendants are invalidated
+- `downstream` — the normalized target set and all schema DAG descendants of the target artifact types are invalidated
 - `global` — every artifact/file in the change is invalidated
 
+The use case MUST obtain `schema.artifactDag()` from the active schema and pass it to `Change.invalidate()` for policy expansion.
+
 The final affected set MUST be deduplicated before mutation and reporting.
+
+### Requirement: Affected-set traversal order
+
+After policy expansion and deduplication, `InvalidateChange` MUST order artifact types for human-facing reporting using `schema.artifactDag().topologicalOrder()`, retaining only artifact types present in the final affected set.
+
+Within each artifact type, file entries MUST follow stable change manifest order.
+
+The use case MUST NOT build a private adjacency map from persisted artifact `requires` for ordering.
 
 ### Requirement: Manual invalidation does not invent drift
 

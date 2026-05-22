@@ -1,0 +1,16 @@
+- op: added
+  description: 'Downstream expansion uses supplied ArtifactDag'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Policy-aware invalidation'
+  content: |
+    #### Scenario: Downstream policy uses artifactDag descendants
+
+    - **GIVEN** schema-std `artifactDag` where invalidating `specs` expands to `verify` and `tasks`
+    - **WHEN** `Change.invalidate()` is called with effective policy `downstream`, focused targets under `specs`, and that `artifactDag`
+    - **THEN** files under `verify` and `tasks` are reopened according to policy
+    - **AND** expansion does not depend on persisted artifact `requires` maps on the change

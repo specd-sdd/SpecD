@@ -8,11 +8,20 @@
     "core:change-layout",
     "core:change-manifest",
     "core:lifecycle-engine",
-    "core:schema-format",
     "core:delta-format",
     "core:selector-model",
     "core:storage",
     "default:_global/architecture",
-    "core:spec-id-format"
+    "core:spec-id-format",
+    "core:schema-format"
+  ],
+  "implementation": [
+    {
+      "file": "core:src/application/use-cases/validate-artifacts.ts",
+      "symbols": ["ValidateArtifacts"]
+    },
+    {
+      "file": "core:src/composition/use-cases/edit-change.ts"
+    }
   ]
 }

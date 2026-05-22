@@ -314,14 +314,13 @@ This separation ensures the entity does not need schema knowledge in order to an
 
 ### Requirement: Policy-aware invalidation
 
-`Change.invalidate()` SHALL remain the entity-owned authority for change-level invalidation and artifact/file-state consequences.
-
-It SHALL accept:
+`Change.invalidate()` SHALL accept:
 
 - a domain invalidation cause
 - a human-readable message
 - a focused `affectedArtifacts` payload identifying the concrete artifact/file entries that triggered invalidation
 - an optional `invalidationPolicyOverride`
+- a required `artifactDag: ArtifactDag` argument supplying schema-derived DAG structure for policy expansion
 
 The effective invalidation policy is resolved from the override when present, otherwise from the change's persisted `invalidationPolicy`.
 
@@ -331,10 +330,12 @@ Artifact/file-state consequences follow the effective policy:
 
 - `none` — no artifact/file enters a reopened review state solely because of invalidation
 - `surgical` — only the normalized affected target set is reopened
-- `downstream` — the normalized affected target set and its DAG descendants are reopened
+- `downstream` — the normalized affected target set and all artifact ids returned by `artifactDag.descendantsOf()` for the normalized target artifact types are reopened
 - `global` — every artifact/file in the change is reopened
 
 The entity SHALL deduplicate the final affected set before applying reopened state transitions.
+
+`Change` MUST NOT derive DAG edges from persisted artifact `requires` maps or private BFS helpers; downstream expansion MUST use the supplied `artifactDag`.
 
 ### Requirement: Per-file drift tracking
 

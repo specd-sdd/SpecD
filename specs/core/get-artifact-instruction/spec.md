@@ -30,7 +30,7 @@ class GetArtifactInstruction {
 `GetArtifactInstruction.execute` receives:
 
 - `name` (string, required) — the change name
-- `artifactId` (string, optional) — the artifact ID from the schema (e.g. `specs`, `verify`, `tasks`). When omitted, the use case auto-resolves the next artifact to work on using `LifecycleEngine`: the first artifact in schema declaration order whose dependencies are effectively satisfied (`complete` or `skipped`) but that is itself not yet effectively complete or skipped. If all artifacts are already complete/skipped, it throws `ArtifactNotFoundError`.
+- `artifactId` (string, optional) — the artifact ID from the schema (e.g. `specs`, `verify`, `tasks`). When omitted, the use case auto-resolves the next artifact to work on using `LifecycleEngine.nextArtifact`, which selects the first artifact in `schema.artifactDag().topologicalOrder()` whose dependencies are effectively satisfied (`complete` or `skipped`) but that is itself not yet effectively complete or skipped. If all artifacts are already complete/skipped, it throws `ArtifactNotFoundError`.
 
 ### Requirement: Change lookup
 

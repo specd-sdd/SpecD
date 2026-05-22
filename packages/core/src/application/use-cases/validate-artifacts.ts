@@ -6,6 +6,7 @@ import { type SpecRepository } from '../ports/spec-repository.js'
 import { type SchemaProvider } from '../ports/schema-provider.js'
 import { type ArtifactParserRegistry } from '../ports/artifact-parser.js'
 import { DeltaApplicationError } from '../../domain/errors/delta-application-error.js'
+import { type Spec } from '../../domain/entities/spec.js'
 import { type ActorResolver } from '../ports/actor-resolver.js'
 import { type ExtractorTransformRegistry } from '../../domain/services/content-extraction.js'
 import {
@@ -41,10 +42,11 @@ export interface ValidateArtifactsInput {
   /** The change name to validate. */
   readonly name: string
   /**
-   * The spec path to validate — must be one of `change.specIds`.
+   * The spec path to validate — must be one of `change.specIds` when provided.
    * Encoded as `<workspace>:<capability-path>` (e.g. `"default:auth/oauth"`).
+   * Omitted for `scope: change` artifacts (including batch `--all` steps).
    */
-  readonly specPath: string
+  readonly specPath?: string
   /**
    * When provided, only the artifact with this ID is validated.
    * All other artifacts are skipped and the required-artifacts check is bypassed.
@@ -166,11 +168,23 @@ export class ValidateArtifacts {
     const change = await this._changes.get(input.name)
     if (change === null) throw new ChangeNotFoundError(input.name)
 
-    if (!change.specIds.includes(input.specPath)) {
-      throw new SpecNotInChangeError(input.specPath, input.name)
-    }
-
     const schema = await this._schemaProvider.get()
+
+    const targetArtifactType =
+      input.artifactId !== undefined
+        ? schema.artifacts().find((a) => a.id === input.artifactId)
+        : undefined
+    const isChangeScopedTarget = targetArtifactType?.scope === 'change'
+
+    if (input.specPath !== undefined) {
+      if (!isChangeScopedTarget && !change.specIds.includes(input.specPath)) {
+        throw new SpecNotInChangeError(input.specPath, input.name)
+      }
+    } else if (input.artifactId !== undefined) {
+      if (targetArtifactType?.scope === 'spec') {
+        throw new SpecNotInChangeError('<specPath required>', input.name)
+      }
+    }
 
     // --- Schema name guard ---
     if (schema.name() !== change.schemaName) {
@@ -210,21 +224,55 @@ export class ValidateArtifacts {
     const artifactVerdicts = new Map(
       lifecycle.artifacts.map((artifact) => [artifact.type, artifact]),
     )
+    const markVerdictComplete = (artifactId: string): void => {
+      const verdict = artifactVerdicts.get(artifactId)
+      if (verdict === undefined) return
+      artifactVerdicts.set(artifactId, {
+        ...verdict,
+        state: 'complete',
+        effectiveStatus: 'complete',
+      })
+    }
+
+    const artifactTypesToValidate =
+      input.artifactId !== undefined
+        ? schema.artifacts().filter((a) => a.id === input.artifactId)
+        : schema
+            .artifactDag()
+            .topologicalOrder()
+            .map((id) => schema.artifact(id))
+            .filter((a): a is NonNullable<typeof a> => a !== null)
+
+    if (
+      input.specPath === undefined &&
+      artifactTypesToValidate.some((artifactType) => artifactType.scope === 'spec')
+    ) {
+      throw new SpecNotInChangeError('<specPath required>', input.name)
+    }
 
     Logger.debug('ValidateArtifacts projected lifecycle engine dependency state', {
       change: change.name,
-      specPath: input.specPath,
+      specPath: input.specPath ?? null,
       artifactId: input.artifactId ?? null,
       blockerCodes: lifecycle.blockers.map((blocker) => blocker.code),
     })
 
-    const { workspace, capPath: capabilityPath } = parseSpecId(input.specPath)
-    const specRepo = this._specs.get(workspace)
-    const existingSpec =
-      specRepo !== undefined && capabilityPath.length > 0
-        ? await specRepo.get(SpecPath.parse(capabilityPath))
-        : null
-    const specExists = existingSpec !== null
+    let workspace = ''
+    let capabilityPath = ''
+    let specRepo: SpecRepository | undefined
+    let existingSpec: Spec | null = null
+    let specExists = false
+    if (input.specPath !== undefined) {
+      const parsed = parseSpecId(input.specPath)
+      workspace = parsed.workspace
+      capabilityPath = parsed.capPath
+      specRepo = this._specs.get(workspace)
+      existingSpec =
+        specRepo !== undefined && capabilityPath.length > 0
+          ? await specRepo.get(SpecPath.parse(capabilityPath))
+          : null
+      specExists = existingSpec !== null
+    }
     const crossRules = schema.crossArtifactValidations()
 
     // --- Required artifacts check (skipped when artifactId is provided) ---
@@ -281,9 +329,7 @@ export class ValidateArtifacts {
     }
 
     // --- Per-artifact validation ---
-    for (const artifactType of schema.artifacts()) {
-      if (input.artifactId !== undefined && artifactType.id !== input.artifactId) continue
-
+    for (const artifactType of artifactTypesToValidate) {
       const blockedDep = artifactType.requires
         .map((reqId) => ({
           reqId,
@@ -308,7 +354,7 @@ export class ValidateArtifacts {
         continue
       }
 
-      const fileKey = artifactType.scope === 'change' ? artifactType.id : input.specPath
+      const fileKey = artifactType.scope === 'change' ? artifactType.id : input.specPath!
       const expectedFilename = expectedArtifactFilename({
         artifactType,
         key: fileKey,
@@ -318,6 +364,15 @@ export class ValidateArtifacts {
       const changeArtifact = change.getArtifact(artifactType.id)
       const trackedFile = changeArtifact?.getFile(fileKey)
       const validationFilename = resolveArtifactValidationFilename(trackedFile, expectedFilename)
+      if (trackedFile?.status === 'complete') {
+        files.push({
+          artifactId: artifactType.id,
+          key: fileKey,
+          filename: validationFilename,
+          status: 'validated',
+        })
+        continue
+      }
       if (trackedFile?.status === 'skipped') {
         files.push({
           artifactId: artifactType.id,
@@ -393,6 +448,7 @@ export class ValidateArtifacts {
               fileKey,
               validatedHash: this._sha256(cleanedContent),
             })
+            markVerdictComplete(artifactType.id)
             continue
           }
         }
@@ -557,9 +613,10 @@ export class ValidateArtifacts {
         })
 
         const deps = extractedMetadataForArtifact?.dependsOn
-        if (deps !== undefined && deps.length > 0) {
+        if (deps !== undefined && deps.length > 0 && input.specPath !== undefined) {
           specDependsOnUpdates.set(input.specPath, deps)
         }
+        markVerdictComplete(artifactType.id)
       }
     }
 
@@ -591,7 +648,7 @@ export class ValidateArtifacts {
             const participantFileKey =
               participantArtifactType.scope === 'change'
                 ? participantArtifactType.id
-                : input.specPath
+                : input.specPath!
 
             const changeArtifact = change.getArtifact(participant.artifact)
             const trackedFile = changeArtifact?.getFile(participantFileKey)
@@ -663,6 +720,7 @@ export class ValidateArtifacts {
               .map((artifact) => `${artifact.type} [${artifact.files.join(', ')}]`)
               .join('; ')}`,
             affectedArtifacts,
+            schema.artifactDag(),
           )
         }
 

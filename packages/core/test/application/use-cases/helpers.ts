@@ -9,6 +9,10 @@ import {
   ArtifactType,
   type ArtifactTypeProps,
 } from '../../../src/domain/value-objects/artifact-type.js'
+import {
+  ArtifactDag,
+  artifactDagFromChangeArtifacts,
+} from '../../../src/domain/value-objects/artifact-dag.js'
 import { Schema } from '../../../src/domain/value-objects/schema.js'
 import { type MetadataExtraction } from '../../../src/domain/value-objects/metadata-extraction.js'
 import { type CrossArtifactValidationRule } from '../../../src/domain/value-objects/cross-artifact-validation.js'
@@ -627,10 +631,20 @@ export function makeArtifactType(id: string, extra: Partial<ArtifactTypeProps> =
 }
 
 /**
- * Creates a `Schema` with the given artifact types and workflow steps.
+ * Builds an {@link ArtifactDag} from a change's persisted artifact graph.
  *
- * Accepts either an options object or a plain array of artifact types.
+ * @param change - Change with artifact entries
+ * @returns DAG for `Change.invalidate` / `updateSpecIds` in tests
  */
+export function artifactDagFromChange(change: Change): ArtifactDag {
+  return artifactDagFromChangeArtifacts(
+    [...change.artifacts.values()].map((artifact) => ({
+      type: artifact.type,
+      requires: artifact.requires,
+    })),
+  )
+}
+
 export function makeSchema(
   optsOrArtifacts:
     | {

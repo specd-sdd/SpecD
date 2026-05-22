@@ -56,7 +56,13 @@
     {
       "requirement": "Policy-aware artifact effects",
       "rules": [
-        "After change-level invalidation is accepted, artifact/file-state behavior MUST follow the effective policy:\n\n- `none` — no artifact/file state is invalidated\n- `surgical` — only the normalized target set is invalidated\n- `downstream` — the normalized target set and all of its DAG descendants are invalidated\n- `global` — every artifact/file in the change is invalidated\n\nThe final affected set MUST be deduplicated before mutation and reporting."
+        "After change-level invalidation is accepted, artifact/file-state behavior MUST follow the effective policy:\n\n- `none` — no artifact/file state is invalidated\n- `surgical` — only the normalized target set is invalidated\n- `downstream` — the normalized target set and all schema DAG descendants of the target artifact types are invalidated\n- `global` — every artifact/file in the change is invalidated\n\nThe use case MUST obtain `schema.artifactDag()` from the active schema and pass it to `Change.invalidate()` for policy expansion.\n\nThe final affected set MUST be deduplicated before mutation and reporting."
+      ]
+    },
+    {
+      "requirement": "Affected-set traversal order",
+      "rules": [
+        "After policy expansion and deduplication, `InvalidateChange` MUST order artifact types for human-facing reporting using `schema.artifactDag().topologicalOrder()`, retaining only artifact types present in the final affected set.\n\nWithin each artifact type, file entries MUST follow stable change manifest order.\n\nThe use case MUST NOT build a private adjacency map from persisted artifact `requires` for ordering."
       ]
     },
     {
@@ -185,11 +191,31 @@
         "the returned affected set includes that file only once",
         "AND it also returns the effective invalidation policy and updated change"
       ]
+    },
+    {
+      "requirement": "Affected-set traversal order",
+      "name": "Reported artifacts follow DAG topological order",
+      "given": [
+        "a downstream invalidation whose expanded affected set spans specs, verify, and design"
+      ],
+      "when": ["InvalidateChange.execute succeeds"],
+      "then": [
+        "human-facing reporting orders artifact types in schema.artifactDag().topologicalOrder() among affected types"
+      ]
     }
   ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "core:invalidate-change",
+        "file": "core:src/application/use-cases/invalidate-change.ts",
+        "symbol": "InvalidateChange"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:f9f797f7f567450a57d31aaa5437e0fefc7fa59ef84d48c386bb91e9f2bafad9",
-    "verify.md": "sha256:ed66aa6acde034c50fc9cf4e1b2a93e23d570f54b9d189b32718c62ca6b2de63"
+    "spec.md": "sha256:cd019fc9a2143f33b5bc420426552445cef79322895274003bc8c17558e3a388",
+    "verify.md": "sha256:2212fb2843137d2dc434d13195e0e519b7521fe2d8c3a59de5fd538977de0a34"
   },
   "generatedBy": "core"
 }

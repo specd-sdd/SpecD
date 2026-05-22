@@ -132,23 +132,30 @@ If `--artifact` is provided with an artifact ID that does not exist in the activ
 
 ### Requirement: Batch mode (--all)
 
-With `--all`, the command loads the change's `specIds` and validates each one in order. `--all` is mutually exclusive with the `<workspace:capability-path>` positional — providing both exits with `error: --all and <specPath> are mutually exclusive`. Omitting both exits with `error: either <specPath> or --all is required`.
+With `--all`, the command validates the change using the active schema's artifact DAG instead of looping `specIds` with a full multi-artifact pass per spec.
 
-`--artifact` works with `--all` — it validates only that artifact type for every spec in the change.
+`--all` is mutually exclusive with the `<workspace:capability-path>` positional — providing both exits with `error: --all and <specPath> are mutually exclusive`. Omitting both exits with `error: either <specPath> or --all is required`.
 
-For each spec, the command invokes `ValidateArtifacts` and collects results. Individual spec failures do not abort the batch — all specs are validated.
+The batch driver MUST walk `schema.artifactDag().topologicalOrder()`. For each artifact type in that order:
 
-**Text output:** each spec's result is printed as in single-spec mode (success or failure block), followed by a summary line: `validated N/M specs`.
+- **`scope: change`** — invoke `ValidateArtifacts` once for that artifact type with **no `specPath` field** in the use-case input (do not pass a placeholder `specIds[0]`).
+- **`scope: spec`** — invoke `ValidateArtifacts` once per `specId` in the change for that artifact type.
 
-**JSON output:** `{ passed: <bool>, total: M, results: [{ spec: "<id>", passed: <bool>, failures: [...], warnings: [...] }] }`
+When `--artifact <artifactId>` is combined with `--all`, the driver MUST use the same topological walk but execute only steps whose artifact id matches `<artifactId>`.
 
-The process exits with code 1 if any spec has failures, 0 if all pass.
+Individual validation failures MUST NOT abort the batch early — all scheduled steps run and results are aggregated.
+
+**Text output:** each scheduled step's result is printed as in single-spec mode (success or failure block), followed by a summary line reporting how many steps passed versus scheduled.
+
+**JSON output:** `{ passed: <bool>, total: M, results: [{ spec: "<specId or null for change-scoped>", artifact: "<artifactId>", passed: <bool>, failures: [...], warnings: [...] }] }` — one entry per scheduled validation step. Each step MUST include a `warnings` array (possibly empty). Structural optimisation hints from the use case MAY be mapped into `warnings`; the field name MUST NOT be `notes` in batch JSON output.
+
+The process exits with code 1 if any step has failures, 0 if all pass.
 
 ## Constraints
 
 - Validation output (failures and warnings) goes to stdout; only CLI/system errors go to stderr
 - The command marks artifacts as complete in the manifest when they pass
-- Batch mode uses the change's `specIds` list — no custom spec resolution in the CLI layer
+- Batch mode schedules validation from `artifactDag().topologicalOrder()` and artifact `scope`; it does not invoke a full multi-artifact `ValidateArtifacts` pass per `specId`
 
 ## Examples
 

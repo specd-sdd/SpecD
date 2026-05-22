@@ -114,8 +114,30 @@ _none_
 - Re-validation of `complete` files is risky when approval/signoff is active (`artifact-drift` + `downstream` policy).
 - **Spec overlap warning** (non-blocking for design): `core:change` and `cli:change-status` are also targeted by active change `implementation-file-tracking`. Archive order or `--allow-overlap` may be needed later.
 
+## Resolved decisions
+
+1. **Batch skip rule**: Skip validation only for file status `complete` or `skipped`. Re-validate `drifted-pending-review`, `complete-with-drift`, `in-progress`, `pending-review`, `missing`, and all other non-terminal states.
+2. **Structured status wire shape**: `ArtifactDag` exposes `childrenOf(id)` only; CLI (`change status` JSON/toon) and any other consumers map to `artifactDag[].children` at the presentation layer — no precomputed children map on the VO.
+3. **Documentation**: Update `docs/cli/cli-reference.md` for `--all` DAG semantics — tracked in `design.md` / `tasks.md`.
+4. **`LifecycleEngine.nextArtifact`**: First artifact in `artifactDag().topologicalOrder()` whose effective status is not `complete`/`skipped` and whose `requires` dependencies are satisfied (replaces declaration-order scan).
+5. **`--all --artifact <id>`**: Uses the same DAG-aware batch driver as full `--all`; walks topological order and runs only steps matching `<id>` (change-scoped once, spec-scoped per `specId`).
+6. **`build-schema` graph build**: Out of scope for v1 — keep existing `detectCycle` at load; do not require `ArtifactDag` reuse inside `validateArtifactGraph` in this change.
+
+## Compliance remediation (post-audit)
+
+Full-mode compliance (`reports/20260522-193804/`) found **partial** alignment after the main DAG implementation. This pass closes:
+
+| ID              | Fix                                                                                          |
+| --------------- | -------------------------------------------------------------------------------------------- |
+| SF-1            | `EditChange` uses active `schema.artifactDag()` (not `artifactDagFromChangeArtifacts`)       |
+| VA-1 / CLI-V1   | Change-scoped `ValidateArtifacts` omits `specPath`; batch driver does not pass a placeholder |
+| CLI-V2          | Batch JSON `results[]` exposes `warnings` per merged spec                                    |
+| CLI-S1 / CLI-S2 | Text DAG uses `displayStatus`; `hasTasks` true when `taskCompletionCheck` is set             |
+| VA-2 / SF-2     | Unit tests for topo multi-artifact order; status prefers `schema.artifactDag()`              |
+| UX              | Text DAG renders each artifact id once (skip already-drawn nodes in convergent graphs)       |
+
+Specs, design, tasks, and verify deltas are updated; implementation follows in `/specd-implement`.
+
 ## Open questions
 
-1. **Drift display states**: Skip only canonical `complete` and `skipped`, or also force re-validation for `drifted-pending-review` / `complete-with-drift`? (Recommendation: skip only `complete` and `skipped`.)
-2. **`ArtifactDag` on structured status**: Expose `children` precomputed on `ArtifactDag` for JSON/toon consumers, or keep CLI mapping thin over `childrenOf()`? (Recommendation: `childrenOf()` only — CLI maps to wire shape.)
-3. **Docs**: Update `docs/cli/cli-reference.md` for `--all` DAG semantics in design/tasks.
+_none — resolved 2026-05-21._

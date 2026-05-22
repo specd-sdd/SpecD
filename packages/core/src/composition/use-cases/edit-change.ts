@@ -5,6 +5,10 @@ import { getDefaultWorkspace } from '../get-default-workspace.js'
 import { createChangeRepository } from '../change-repository.js'
 import { createVcsActorResolver } from '../actor-resolver.js'
 import { createSpecRepository } from '../spec-repository.js'
+import { ResolveSchema } from '../../application/use-cases/resolve-schema.js'
+import { LazySchemaProvider } from '../lazy-schema-provider.js'
+import { createSchemaRegistry } from '../schema-registry.js'
+import { createSchemaRepository } from '../schema-repository.js'
 
 /** Domain context for `createEditChange(context, options)`. */
 export interface EditChangeContext {
@@ -87,7 +91,34 @@ export function createEditChange(
       ]),
     )
     const actor = createVcsActorResolver()
-    return new EditChange(changeRepo, specRepos, actor)
+    const schemaRepos = new Map(
+      config.workspaces
+        .filter((ws) => ws.schemasPath !== null)
+        .map((ws) => [
+          ws.name,
+          createSchemaRepository(
+            'fs',
+            {
+              workspace: ws.name,
+              ownership: ws.ownership,
+              isExternal: ws.isExternal,
+              configPath: config.configPath,
+            },
+            { schemasPath: ws.schemasPath! },
+          ),
+        ]),
+    ) as ReadonlyMap<
+      string,
+      import('../../application/ports/schema-repository.js').SchemaRepository
+    >
+    const schemas = createSchemaRegistry('fs', {
+      nodeModulesPaths: [path.join(config.projectRoot, 'node_modules')],
+      configDir: config.projectRoot,
+      schemaRepositories: schemaRepos,
+    })
+    const resolveSchema = new ResolveSchema(schemas, config.schemaRef, [], undefined)
+    const schemaProvider = new LazySchemaProvider(resolveSchema)
+    return new EditChange(changeRepo, specRepos, actor, schemaProvider)
   }
   const opts = options!
   const changeRepo = createChangeRepository('fs', configOrContext, {
@@ -105,5 +136,11 @@ export function createEditChange(
     ],
   ])
   const actor = createVcsActorResolver()
-  return new EditChange(changeRepo, specRepos, actor)
+  const schemaProvider: import('../../application/ports/schema-provider.js').SchemaProvider = {
+    get: () =>
+      Promise.reject(
+        new Error('EditChange context factory requires SpecdConfig for schema resolution'),
+      ),
+  }
+  return new EditChange(changeRepo, specRepos, actor, schemaProvider)
 }

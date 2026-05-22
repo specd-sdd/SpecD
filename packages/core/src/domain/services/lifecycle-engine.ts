@@ -653,8 +653,11 @@ export class LifecycleEngine {
     schema: Schema,
     verdictByArtifact: ReadonlyMap<string, LifecycleArtifactVerdict>,
   ): string | null {
-    for (const artifactType of schema.artifacts()) {
-      const status = verdictByArtifact.get(artifactType.id)?.effectiveStatus ?? 'missing'
+    for (const artifactId of schema.artifactDag().topologicalOrder()) {
+      const artifactType = schema.artifact(artifactId)
+      if (artifactType === null) continue
+
+      const status = verdictByArtifact.get(artifactId)?.effectiveStatus ?? 'missing'
       if (status === 'complete' || status === 'skipped') continue
 
       const dependenciesReady = artifactType.requires.every((requiredId) => {
@@ -663,7 +666,7 @@ export class LifecycleEngine {
       })
 
       if (dependenciesReady) {
-        return artifactType.id
+        return artifactId
       }
     }
 

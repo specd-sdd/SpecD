@@ -4,8 +4,8 @@
   "dependsOn": [
     "core:change",
     "core:workflow-model",
-    "core:schema-format",
-    "default:_global/architecture"
+    "default:_global/architecture",
+    "core:schema-format"
   ],
   "context": [
     "Unifying lifecycle validation, artifact status, and repair diagnostics into a single source of truth is critical to preventing \"liar context\" and ensuring consistent system behavior. The `LifecycleEngine` is a centralized domain service that combines the change's persisted state with schema-defined workflow rules to derive the authoritative effective state, available transitions, and machine-readable blockers."
@@ -51,6 +51,12 @@
       "requirement": "Shared lifecycle interpretation for consumers",
       "rules": [
         "Use cases that need DAG-aware lifecycle answers MUST consume `LifecycleEngine` rather than reimplementing schema interpretation locally.\n\nThis includes, at minimum:\n\n- status/reporting consumers that need effective artifact status or blockers\n- transition consumers that need routing and gated availability\n- validation consumers that need dependency-order checks or recursive blocker context\n- instruction consumers that need to determine which artifact is next in the DAG"
+      ]
+    },
+    {
+      "requirement": "Next artifact topological order",
+      "rules": [
+        "When deriving the recommended next artifact for a change, `LifecycleEngine` MUST scan artifacts in `schema.artifactDag().topologicalOrder()` and return the first artifact id whose effective status is neither `complete` nor `skipped` and whose required dependencies are effectively satisfied (`complete` or `skipped`).\n\nDeclaration order in `schema.artifacts()` MUST NOT be used as a proxy for DAG order for this selection.\n\nIf every artifact is effectively `complete` or `skipped`, the engine MUST report no next artifact (`null`)."
       ]
     }
   ],
@@ -147,11 +153,36 @@
         "they all obtain those answers from LifecycleEngine.evaluate",
         "AND none of them reimplements dependency-aware lifecycle interpretation locally"
       ]
+    },
+    {
+      "requirement": "Next artifact topological order",
+      "name": "Next artifact prefers DAG order over declaration order",
+      "given": [
+        "schema-std where proposal is effectively complete, design is incomplete but its only incomplete dependency is specs, and specs is incomplete"
+      ],
+      "when": ["LifecycleEngine derives the next artifact"],
+      "then": ["the next artifact is specs (not design)"]
+    },
+    {
+      "requirement": "Next artifact topological order",
+      "name": "All artifacts complete yields null next artifact",
+      "given": ["every artifact is effectively complete or skipped"],
+      "when": ["LifecycleEngine derives the next artifact"],
+      "then": ["the next artifact is null"]
     }
   ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "core:lifecycle-engine",
+        "file": "core:src/domain/services/lifecycle-engine.ts",
+        "symbol": "LifecycleEngine"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:9c95aaba9fd94edb8eb59282e484858059120ec5daa9789c503462e22f9fff90",
-    "verify.md": "sha256:148e5119665283b556c99c359d0122c1ceb1e5aabf19d2d295d0bc074d9ff156"
+    "spec.md": "sha256:9f3b3d415aa2a0f3af252fd2abc5005cab89b6542c288cd60ba20c22669253b9",
+    "verify.md": "sha256:f6bfaf4c2d33feb1afaf5a1e0ecdce642ba1ee2a08645072d6acb7c0423e6400"
   },
   "generatedBy": "core"
 }

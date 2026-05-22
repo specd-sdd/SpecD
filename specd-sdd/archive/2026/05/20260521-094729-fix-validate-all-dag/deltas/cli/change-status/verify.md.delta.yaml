@@ -1,0 +1,48 @@
+- op: modified
+  description: 'DAG children scenarios plus preserved overlap scenario'
+  selector:
+    type: section
+    matches: 'Requirement: Schema-derived fields'
+  content: |
+    #### Scenario: JSON output includes artifactDag
+
+    - **GIVEN** a change using a schema where one artifact has `hasTasks: true`
+    - **WHEN** `specd change status <name> --format json` is run
+    - **THEN** the JSON output includes `schema.artifactDag` array
+    - **AND** each entry includes id, scope, optional, requires, children, hasTasks, output
+    - **AND** `children` equals `schema.artifactDag().childrenOf(id)` for that entry
+    - **AND** the `hasTasks` boolean reflects the schema definition
+
+    #### Scenario: JSON output for non-schema-std also includes artifactDag
+
+    - **GIVEN** a change using a custom schema
+    - **WHEN** `specd change status <name> --format json` is run
+    - **THEN** the JSON output includes `schema.artifactDag` array
+    - **AND** `children` on each entry matches `childrenOf` from that schema's `artifactDag()`
+
+    #### Scenario: Text DAG tree uses schema artifactDag roots and children
+
+    - **GIVEN** a change using schema-std
+    - **WHEN** `specd change status <name>` is run in text mode
+    - **THEN** stdout includes an `artifacts (DAG):` section
+    - **AND** the tree's root and child ordering matches `artifactDag().roots()` and `childrenOf()` (not declaration order alone)
+
+    #### Scenario: Text DAG uses display status for drift
+
+    - **GIVEN** an artifact file with canonical status `complete` and `hasDrift: true`
+    - **WHEN** `specd change status <name>` is run in text mode
+    - **THEN** the DAG line for that artifact shows display status `complete-with-drift` (or equivalent display projection), not only raw `complete`
+
+    #### Scenario: Text DAG does not repeat convergent nodes
+
+    - **GIVEN** schema-std where `design` is a direct child of both `proposal` and `specs`
+    - **WHEN** `specd change status <name>` is run in text mode
+    - **THEN** the `design` subtree appears once in the DAG section (not duplicated under every parent path)
+
+    #### Scenario: Text output shows overlap entries when reason is spec-overlap-conflict
+
+    - **GIVEN** `GetStatus` returns `review.required: true` with `reason: 'spec-overlap-conflict'`
+    - **AND** `review.overlapDetail` has two entries: `[{ archivedChangeName: 'beta', overlappingSpecIds: ['core:config'] }, { archivedChangeName: 'alpha', overlappingSpecIds: ['core:kernel'] }]`
+    - **WHEN** `specd change status <name>` is run
+    - **THEN** the review section shows `reason: spec-overlap-conflict`
+    - **AND** an `overlap:` subsection lists both entries as bullets

@@ -1,3 +1,4 @@
+import { ArtifactDag } from './artifact-dag.js'
 import { ArtifactType } from './artifact-type.js'
 import { type CrossArtifactValidationRule } from './cross-artifact-validation.js'
 import { type MetadataExtraction } from './metadata-extraction.js'
@@ -26,6 +27,7 @@ export class Schema {
   private readonly _crossArtifactValidations: readonly CrossArtifactValidationRule[]
   private readonly _workflow: readonly WorkflowStep[]
   private readonly _workflowIndex: ReadonlyMap<string, WorkflowStep>
+  private _artifactDag: ArtifactDag | undefined
 
   /**
    * Creates a fully-resolved schema instance.
@@ -86,6 +88,18 @@ export class Schema {
    */
   artifacts(): readonly ArtifactType[] {
     return this._artifacts
+  }
+
+  /**
+   * Returns the schema-derived artifact dependency DAG (lazy-cached).
+   *
+   * @returns Canonical {@link ArtifactDag} for this schema's artifact types
+   */
+  artifactDag(): ArtifactDag {
+    if (this._artifactDag === undefined) {
+      this._artifactDag = ArtifactDag.from(this._artifacts)
+    }
+    return this._artifactDag
   }
 
   /**

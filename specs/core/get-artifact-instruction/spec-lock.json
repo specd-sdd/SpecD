@@ -1,0 +1,20 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "core:delta-format",
+    "core:change",
+    "core:schema-merge",
+    "core:template-variables",
+    "core:lifecycle-engine",
+    "core:schema-format"
+  ],
+  "implementation": [
+    {
+      "file": "core:src/application/use-cases/get-artifact-instruction.ts",
+      "symbols": ["GetArtifactInstruction"]
+    }
+  ]
+}

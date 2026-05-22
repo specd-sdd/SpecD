@@ -99,6 +99,14 @@ This includes, at minimum:
 - validation consumers that need dependency-order checks or recursive blocker context
 - instruction consumers that need to determine which artifact is next in the DAG
 
+### Requirement: Next artifact topological order
+
+When deriving the recommended next artifact for a change, `LifecycleEngine` MUST scan artifacts in `schema.artifactDag().topologicalOrder()` and return the first artifact id whose effective status is neither `complete` nor `skipped` and whose required dependencies are effectively satisfied (`complete` or `skipped`).
+
+Declaration order in `schema.artifacts()` MUST NOT be used as a proxy for DAG order for this selection.
+
+If every artifact is effectively `complete` or `skipped`, the engine MUST report no next artifact (`null`).
+
 ## Spec Dependencies
 
 - [`core:change`](../change/spec.md) — Source of persisted state facts (hashes, history, base status).

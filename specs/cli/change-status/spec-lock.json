@@ -7,7 +7,7 @@
   "implementation": [
     {
       "file": "cli:src/commands/change/status.ts",
-      "symbols": ["registerChangeStatus", "renderDag"]
+      "symbols": ["resolveStatusSchemaDag", "renderDag"]
     }
   ]
 }

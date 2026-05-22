@@ -45,7 +45,7 @@
     {
       "requirement": "Schema-derived fields",
       "rules": [
-        "When the change uses any schema (not just schema-std), the JSON output MUST include a nested schema object with derived fields:\n\n```\nschema:\n  name: \"...\"\n  version: 1\n  artifactDag:\n    - id: \"...\"\n      scope: \"change|spec\"\n      optional: true|false\n      requires: [\"...\"]\n      hasTasks: true|false\n      output: \"...\"\n```\n\n`artifactDag` is derived from the schema's `artifacts` array.\n`hasTasks` is true when the artifact has `hasTasks: true` explicitly or has a `taskCompletionCheck` declaration.\nThis allows design/implement skills to replace `schema show` calls."
+        "When the change uses any schema (not just schema-std), the JSON output MUST include a nested schema object with derived fields:\n\n```\nschema:\n  name: \"...\"\n  version: 1\n  artifactDag:\n    - id: \"...\"\n      scope: \"change|spec\"\n      optional: true|false\n      requires: [\"...\"]\n      children: [\"...\"]\n      hasTasks: true|false\n      output: \"...\"\n```\n\n`artifactDag` entries MUST be emitted in `schema.artifactDag().topologicalOrder()`.\n\nFor each entry, `requires` comes from the schema artifact definition and `children` MUST be `schema.artifactDag().childrenOf(id)` — the CLI MUST NOT derive children with local `requires.includes(id)` filters.\n\n`hasTasks` is true when the artifact has `hasTasks: true` explicitly or has a `taskCompletionCheck` declaration.\n\nText-mode `artifacts (DAG):` tree rendering MUST use the same roots (`artifactDag().roots()`) and child ordering (`childrenOf`) as structured output.\n\nText-mode DAG node labels MUST use each artifact's **display status** from `GetStatus` (for example `complete-with-drift`), not raw `effectiveStatus`, so drift is visible without reading the details section.\n\nWhen the DAG has convergent edges (one artifact required by multiple parents), the text tree MUST render each artifact type id **at most once**. Dependents reached again via another branch MUST NOT repeat the full subtree; the renderer MAY omit duplicate child expansion or annotate with a short reference (for example `└── (see <id> above)`).\n\nWhen the CLI has resolved the active `Schema` instance, structured and text DAG derivation MUST use `schema.artifactDag()` (cached) rather than rebuilding `ArtifactDag.from` on a detached artifact list, so ordering matches every other consumer.\n\nThis allows design/implement skills to replace `schema show` calls."
       ]
     },
     {
@@ -220,7 +220,8 @@
       "when": ["specd change status <name> --format json is run"],
       "then": [
         "the JSON output includes schema.artifactDag array",
-        "AND each entry includes id, scope, optional, requires, hasTasks, output",
+        "AND each entry includes id, scope, optional, requires, children, hasTasks, output",
+        "AND children equals schema.artifactDag().childrenOf(id) for that entry",
         "AND the hasTasks boolean reflects the schema definition"
       ]
     },
@@ -229,7 +230,38 @@
       "name": "JSON output for non-schema-std also includes artifactDag",
       "given": ["a change using a custom schema"],
       "when": ["specd change status <name> --format json is run"],
-      "then": ["the JSON output includes schema.artifactDag array"]
+      "then": [
+        "the JSON output includes schema.artifactDag array",
+        "AND children on each entry matches childrenOf from that schema's artifactDag()"
+      ]
+    },
+    {
+      "requirement": "Schema-derived fields",
+      "name": "Text DAG tree uses schema artifactDag roots and children",
+      "given": ["a change using schema-std"],
+      "when": ["specd change status <name> is run in text mode"],
+      "then": [
+        "stdout includes an artifacts (DAG): section",
+        "AND the tree's root and child ordering matches artifactDag().roots() and childrenOf() (not declaration order alone)"
+      ]
+    },
+    {
+      "requirement": "Schema-derived fields",
+      "name": "Text DAG uses display status for drift",
+      "given": ["an artifact file with canonical status complete and hasDrift: true"],
+      "when": ["specd change status <name> is run in text mode"],
+      "then": [
+        "the DAG line for that artifact shows display status complete-with-drift (or equivalent display projection), not only raw complete"
+      ]
+    },
+    {
+      "requirement": "Schema-derived fields",
+      "name": "Text DAG does not repeat convergent nodes",
+      "given": ["schema-std where design is a direct child of both proposal and specs"],
+      "when": ["specd change status <name> is run in text mode"],
+      "then": [
+        "the design subtree appears once in the DAG section (not duplicated under every parent path)"
+      ]
     },
     {
       "requirement": "Schema-derived fields",
@@ -243,43 +275,6 @@
         "the review section shows reason: spec-overlap-conflict",
         "AND an overlap: subsection lists both entries as bullets"
       ]
-    },
-    {
-      "requirement": "Schema-derived fields",
-      "name": "Text output with single overlap entry",
-      "given": [
-        "GetStatus returns review.required: true with reason: 'spec-overlap-conflict'",
-        "AND review.overlapDetail has one entry"
-      ],
-      "when": ["specd change status <name> is run"],
-      "then": ["the overlap subsection shows one bullet with the archived change name and specs"]
-    },
-    {
-      "requirement": "Schema-derived fields",
-      "name": "JSON output includes overlapDetail array when reason is spec-overlap-conflict",
-      "given": [
-        "GetStatus returns review.required: true with reason: 'spec-overlap-conflict'",
-        "AND review.overlapDetail has two entries"
-      ],
-      "when": ["specd change status <name> --format json is run"],
-      "then": [
-        "review.overlapDetail is an array with two entries ordered newest-first",
-        "AND each entry has archivedChangeName and overlappingSpecIds"
-      ]
-    },
-    {
-      "requirement": "Schema-derived fields",
-      "name": "JSON output has empty overlapDetail array for other reasons",
-      "given": ["GetStatus returns review.required: true with reason: 'artifact-drift'"],
-      "when": ["specd change status <name> --format json is run"],
-      "then": ["review.overlapDetail is []"]
-    },
-    {
-      "requirement": "Schema-derived fields",
-      "name": "Overlap subsection omitted in text when reason is not spec-overlap-conflict",
-      "given": ["GetStatus returns review.required: true with reason: 'artifact-review-required'"],
-      "when": ["specd change status <name> is run"],
-      "then": ["no overlap: subsection appears in the review section"]
     },
     {
       "requirement": "Implementation section",
@@ -382,7 +377,7 @@
       {
         "specId": "cli:change-status",
         "file": "cli:src/commands/change/status.ts",
-        "symbol": "registerChangeStatus"
+        "symbol": "resolveStatusSchemaDag"
       },
       {
         "specId": "cli:change-status",
@@ -392,8 +387,8 @@
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:e58f8f42a2e2db52871a841dbe078d688fba03ba90cdc4949c7e3edb962eadee",
-    "verify.md": "sha256:f11c3c59f2c833e60a76dc665f47479452cf0bdf6021341a290d994d28a8407b"
+    "spec.md": "sha256:72d9383747539faa8f8d47e0be7b0cda1b90ff29e36373e1a65f32d560ae93d0",
+    "verify.md": "sha256:166e12d701dda636b426839853c9c4416e5e862e34a7aad76f5e896c4d53639f"
   },
   "generatedBy": "core"
 }

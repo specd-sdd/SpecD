@@ -11,14 +11,39 @@ import {
   makeActorResolver,
   makeChange,
   makeSpecRepository,
+  makeSchemaProvider,
+  makeSchema,
+  makeArtifactType,
 } from './helpers.js'
+
+function makeEditChange(
+  repo: ReturnType<typeof makeChangeRepository>,
+  specs: ReadonlyMap<string, ReturnType<typeof makeSpecRepository>> = new Map(),
+) {
+  return new EditChange(repo, specs, makeActorResolver(), makeSchemaProvider(makeSchema()))
+}
 
 describe('EditChange', () => {
   describe('adding spec IDs', () => {
+    it('uses schema artifactDag when updating spec IDs', async () => {
+      const schema = makeSchema([
+        makeArtifactType('specs', { scope: 'spec', output: 'spec.md', requires: [] }),
+        makeArtifactType('verify', { scope: 'spec', output: 'verify.md', requires: ['specs'] }),
+      ])
+      const dagSpy = vi.spyOn(schema, 'artifactDag')
+      const change = makeChange('my-change', { specIds: ['auth/login'] })
+      const repo = makeChangeRepository([change])
+      const uc = new EditChange(repo, new Map(), makeActorResolver(), makeSchemaProvider(schema))
+
+      await uc.execute({ name: 'my-change', addSpecIds: ['billing/pay'] })
+
+      expect(dagSpy).toHaveBeenCalled()
+    })
+
     it('adds spec IDs to the change', async () => {
       const change = makeChange('my-change', { specIds: ['auth/login'] })
       const repo = makeChangeRepository([change])
-      const uc = new EditChange(repo, new Map(), makeActorResolver())
+      const uc = makeEditChange(repo)
 
       const result = await uc.execute({ name: 'my-change', addSpecIds: ['billing/pay'] })
 
@@ -29,7 +54,7 @@ describe('EditChange', () => {
     it('does not duplicate spec IDs already present', async () => {
       const change = makeChange('my-change', { specIds: ['auth/login'] })
       const repo = makeChangeRepository([change])
-      const uc = new EditChange(repo, new Map(), makeActorResolver())
+      const uc = makeEditChange(repo)
 
       const result = await uc.execute({ name: 'my-change', addSpecIds: ['auth/login'] })
 
@@ -41,7 +66,7 @@ describe('EditChange', () => {
       const change = makeChange('my-change', { specIds: ['auth/login'] })
       const repo = makeChangeRepository([change])
       const unscaffoldSpy = vi.spyOn(repo, 'unscaffold')
-      const uc = new EditChange(repo, new Map(), makeActorResolver())
+      const uc = makeEditChange(repo)
 
       await uc.execute({ name: 'my-change', addSpecIds: ['billing/pay'] })
 
@@ -60,7 +85,7 @@ describe('EditChange', () => {
           }),
         },
       })
-      const uc = new EditChange(repo, new Map([['default', specRepo]]), makeActorResolver())
+      const uc = makeEditChange(repo, new Map([['default', specRepo]]))
 
       const result = await uc.execute({ name: 'my-change', addSpecIds: ['billing/pay'] })
 
@@ -78,7 +103,7 @@ describe('EditChange', () => {
           }),
         },
       })
-      const uc = new EditChange(repo, new Map([['default', specRepo]]), makeActorResolver())
+      const uc = makeEditChange(repo, new Map([['default', specRepo]]))
 
       const result = await uc.execute({ name: 'my-change', addSpecIds: ['billing/pay'] })
 
@@ -92,7 +117,7 @@ describe('EditChange', () => {
       const specRepo = makeSpecRepository({
         specs: [new Spec('default', SpecPath.parse('core/config'), ['spec.md'])],
       })
-      const uc = new EditChange(repo, new Map([['default', specRepo]]), makeActorResolver())
+      const uc = makeEditChange(repo, new Map([['default', specRepo]]))
 
       const result = await uc.execute({ name: 'my-change', addSpecIds: ['billing/pay'] })
 
@@ -104,7 +129,7 @@ describe('EditChange', () => {
     it('removes spec IDs from the change', async () => {
       const change = makeChange('my-change', { specIds: ['auth/login', 'billing/pay'] })
       const repo = makeChangeRepository([change])
-      const uc = new EditChange(repo, new Map(), makeActorResolver())
+      const uc = makeEditChange(repo)
 
       const result = await uc.execute({ name: 'my-change', removeSpecIds: ['billing/pay'] })
 
@@ -114,7 +139,7 @@ describe('EditChange', () => {
     it('throws SpecNotInChangeError when removing a spec not in the change', async () => {
       const change = makeChange('my-change', { specIds: ['auth/login'] })
       const repo = makeChangeRepository([change])
-      const uc = new EditChange(repo, new Map(), makeActorResolver())
+      const uc = makeEditChange(repo)
 
       await expect(
         uc.execute({ name: 'my-change', removeSpecIds: ['billing/pay'] }),
@@ -125,7 +150,7 @@ describe('EditChange', () => {
       const change = makeChange('my-change', { specIds: ['auth/login', 'billing/pay'] })
       const repo = makeChangeRepository([change])
       const unscaffoldSpy = vi.spyOn(repo, 'unscaffold')
-      const uc = new EditChange(repo, new Map(), makeActorResolver())
+      const uc = makeEditChange(repo)
 
       await uc.execute({ name: 'my-change', removeSpecIds: ['billing/pay'] })
 
@@ -142,7 +167,7 @@ describe('EditChange', () => {
       })
       const repo = makeChangeRepository([change])
       const unscaffoldSpy = vi.spyOn(repo, 'unscaffold')
-      const uc = new EditChange(repo, new Map(), makeActorResolver())
+      const uc = makeEditChange(repo)
 
       await uc.execute({ name: 'my-change', removeSpecIds: ['billing/pay', 'core/config'] })
 
@@ -157,7 +182,7 @@ describe('EditChange', () => {
   describe('when the change does not exist', () => {
     it('throws ChangeNotFoundError', async () => {
       const repo = makeChangeRepository()
-      const uc = new EditChange(repo, new Map(), makeActorResolver())
+      const uc = makeEditChange(repo)
 
       await expect(uc.execute({ name: 'missing', addSpecIds: ['auth/login'] })).rejects.toThrow(
         ChangeNotFoundError,
@@ -169,7 +194,7 @@ describe('EditChange', () => {
     it('allows removing all specIds', async () => {
       const change = makeChange('my-change', { specIds: ['auth/login'] })
       const repo = makeChangeRepository([change])
-      const uc = new EditChange(repo, new Map(), makeActorResolver())
+      const uc = makeEditChange(repo)
 
       const result = await uc.execute({ name: 'my-change', removeSpecIds: ['auth/login'] })
 
@@ -183,7 +208,7 @@ describe('EditChange', () => {
     it('saves the updated change to the repository', async () => {
       const change = makeChange('my-change', { specIds: ['auth/login'] })
       const repo = makeChangeRepository([change])
-      const uc = new EditChange(repo, new Map(), makeActorResolver())
+      const uc = makeEditChange(repo)
 
       await uc.execute({ name: 'my-change', addSpecIds: ['billing/pay'] })
 
@@ -196,7 +221,7 @@ describe('EditChange', () => {
       const change = makeChange('my-change', { specIds: ['auth/login'] })
       const repo = makeChangeRepository([change])
       const mutateSpy = vi.spyOn(repo, 'mutate')
-      const uc = new EditChange(repo, new Map(), makeActorResolver())
+      const uc = makeEditChange(repo)
 
       await uc.execute({ name: 'my-change', addSpecIds: ['billing/pay'] })
 
@@ -209,7 +234,7 @@ describe('EditChange', () => {
     it('returns invalidated=true when specIds actually changed', async () => {
       const change = makeChange('my-change', { specIds: ['auth/login'] })
       const repo = makeChangeRepository([change])
-      const uc = new EditChange(repo, new Map(), makeActorResolver())
+      const uc = makeEditChange(repo)
 
       const result = await uc.execute({ name: 'my-change', addSpecIds: ['billing/pay'] })
 
@@ -219,7 +244,7 @@ describe('EditChange', () => {
     it('returns invalidated=false when no add or remove is provided', async () => {
       const change = makeChange('my-change', { specIds: ['auth/login'] })
       const repo = makeChangeRepository([change])
-      const uc = new EditChange(repo, new Map(), makeActorResolver())
+      const uc = makeEditChange(repo)
 
       const result = await uc.execute({ name: 'my-change' })
 
@@ -229,7 +254,7 @@ describe('EditChange', () => {
     it('returns invalidated=false when specIds did not change', async () => {
       const change = makeChange('my-change', { specIds: ['auth/login'] })
       const repo = makeChangeRepository([change])
-      const uc = new EditChange(repo, new Map(), makeActorResolver())
+      const uc = makeEditChange(repo)
 
       const result = await uc.execute({ name: 'my-change', addSpecIds: ['auth/login'] })
 
@@ -241,7 +266,7 @@ describe('EditChange', () => {
     it('updates the change invalidation policy', async () => {
       const change = makeChange('my-change', { specIds: ['auth/login'] })
       const repo = makeChangeRepository([change])
-      const uc = new EditChange(repo, new Map(), makeActorResolver())
+      const uc = makeEditChange(repo)
 
       const result = await uc.execute({
         name: 'my-change',
@@ -256,7 +281,7 @@ describe('EditChange', () => {
       const change = makeChange('my-change', { specIds: ['auth/login'] })
       change.invalidationPolicy = 'surgical'
       const repo = makeChangeRepository([change])
-      const uc = new EditChange(repo, new Map(), makeActorResolver())
+      const uc = makeEditChange(repo)
 
       const result = await uc.execute({
         name: 'my-change',
@@ -286,7 +311,7 @@ describe('EditChange', () => {
         }),
       )
       const repo = makeChangeRepository([change])
-      const uc = new EditChange(repo, new Map(), makeActorResolver())
+      const uc = makeEditChange(repo)
 
       const result = await uc.execute({
         name: 'my-change',

@@ -289,6 +289,7 @@ export class TransitionChange {
             type: artifact.type,
             files: [...artifact.files.keys()],
           })),
+          schema.artifactDag(),
         )
         invalidated = true
       }

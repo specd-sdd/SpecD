@@ -8,5 +8,11 @@
     "core:lifecycle-engine",
     "core:config",
     "default:_global/architecture"
+  ],
+  "implementation": [
+    {
+      "file": "core:src/application/use-cases/invalidate-change.ts",
+      "symbols": ["InvalidateChange"]
+    }
   ]
 }

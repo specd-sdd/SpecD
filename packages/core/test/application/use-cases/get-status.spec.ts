@@ -12,6 +12,7 @@ import {
   makeSchema,
   makeArtifactType,
   testActor,
+  artifactDagFromChange,
 } from './helpers.js'
 
 const defaultApprovals = { spec: false, signoff: false }
@@ -238,6 +239,7 @@ describe('GetStatus', () => {
         testActor,
         'Invalidated because validated artifacts drifted: tasks (tasks)',
         [{ type: 'tasks', files: ['tasks'] }],
+        artifactDagFromChange(change),
       )
 
       const repo = makeChangeRepository([change])
@@ -290,6 +292,7 @@ describe('GetStatus', () => {
         testActor,
         "Invalidated because change 'alpha' was archived with overlapping specs: auth/login",
         [{ type: 'proposal', files: ['proposal'] }],
+        artifactDagFromChange(change),
       )
 
       const repo = makeChangeRepository([change])
@@ -329,12 +332,14 @@ describe('GetStatus', () => {
         testActor,
         "Invalidated because change 'alpha' was archived with overlapping specs: auth/login",
         [{ type: 'proposal', files: ['proposal'] }],
+        artifactDagFromChange(change),
       )
       change.invalidate(
         'spec-overlap-conflict',
         testActor,
         "Invalidated because change 'beta' was archived with overlapping specs: core/config",
         [{ type: 'proposal', files: ['proposal'] }],
+        artifactDagFromChange(change),
       )
 
       const repo = makeChangeRepository([change])
@@ -373,6 +378,7 @@ describe('GetStatus', () => {
         testActor,
         "Invalidated because change 'old' was archived with overlapping specs: auth/login",
         [{ type: 'proposal', files: ['proposal'] }],
+        artifactDagFromChange(change),
       )
       change.transition('ready', testActor)
       change.invalidate(
@@ -380,6 +386,7 @@ describe('GetStatus', () => {
         testActor,
         "Invalidated because change 'new' was archived with overlapping specs: auth/login",
         [{ type: 'proposal', files: ['proposal'] }],
+        artifactDagFromChange(change),
       )
 
       const repo = makeChangeRepository([change])
@@ -416,6 +423,7 @@ describe('GetStatus', () => {
         testActor,
         "Invalidated because change 'alpha' was archived with overlapping specs: auth/login",
         [{ type: 'proposal', files: ['proposal'] }],
+        artifactDagFromChange(change),
       )
 
       const repo = makeChangeRepository([change])
@@ -824,7 +832,7 @@ describe('GetStatus', () => {
     it('returns task completion for task-capable artifacts', async () => {
       const change = makeChange('task-counts')
       change.transition('designing', testActor)
-      addCompleteArtifact(change, 'tasks', ['specs', 'design'])
+      addCompleteArtifact(change, 'tasks', [])
 
       const repo = makeChangeRepository([change])
       vi.spyOn(repo, 'artifact').mockImplementation(async (_change, filename) => {
@@ -835,7 +843,7 @@ describe('GetStatus', () => {
       const schema = makeSchema({
         artifacts: [
           makeArtifactType('tasks', {
-            requires: ['specs', 'design'],
+            requires: [],
             hasTasks: true,
             taskCompletionCheck: {
               incompletePattern: '^- \\[ \\] .+$',
@@ -847,8 +855,9 @@ describe('GetStatus', () => {
       const uc = makeGetStatus(repo, { schema })
 
       const result = await uc.execute({ name: 'task-counts' })
+      const tasksStatus = result.artifactStatuses.find((a) => a.type === 'tasks')
 
-      expect(result.artifactStatuses[0]?.taskCompletion).toEqual({
+      expect(tasksStatus?.taskCompletion).toEqual({
         complete: 1,
         incomplete: 2,
         total: 3,
@@ -858,13 +867,13 @@ describe('GetStatus', () => {
     it('omits task completion when the artifact file does not exist', async () => {
       const change = makeChange('missing-task-file')
       change.transition('designing', testActor)
-      addCompleteArtifact(change, 'tasks', ['specs', 'design'])
+      addCompleteArtifact(change, 'tasks', [])
 
       const repo = makeChangeRepository([change])
       const schema = makeSchema({
         artifacts: [
           makeArtifactType('tasks', {
-            requires: ['specs', 'design'],
+            requires: [],
             hasTasks: true,
             taskCompletionCheck: {
               incompletePattern: '^- \\[ \\] .+$',
@@ -877,13 +886,15 @@ describe('GetStatus', () => {
 
       const result = await uc.execute({ name: 'missing-task-file' })
 
-      expect(result.artifactStatuses[0]?.taskCompletion).toBeUndefined()
+      expect(
+        result.artifactStatuses.find((a) => a.type === 'tasks')?.taskCompletion,
+      ).toBeUndefined()
     })
 
     it('uses incomplete count as total when only incompletePattern is configured', async () => {
       const change = makeChange('incomplete-only')
       change.transition('designing', testActor)
-      addCompleteArtifact(change, 'tasks', ['specs', 'design'])
+      addCompleteArtifact(change, 'tasks', [])
 
       const repo = makeChangeRepository([change])
       vi.spyOn(repo, 'artifact').mockResolvedValue(
@@ -893,7 +904,7 @@ describe('GetStatus', () => {
       const schema = makeSchema({
         artifacts: [
           makeArtifactType('tasks', {
-            requires: ['specs', 'design'],
+            requires: [],
             hasTasks: true,
             taskCompletionCheck: {
               incompletePattern: '^- \\[ \\] .+$',
@@ -905,7 +916,7 @@ describe('GetStatus', () => {
 
       const result = await uc.execute({ name: 'incomplete-only' })
 
-      expect(result.artifactStatuses[0]?.taskCompletion).toEqual({
+      expect(result.artifactStatuses.find((a) => a.type === 'tasks')?.taskCompletion).toEqual({
         complete: 0,
         incomplete: 2,
         total: 2,

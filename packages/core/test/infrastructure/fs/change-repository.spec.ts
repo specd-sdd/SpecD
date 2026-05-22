@@ -14,6 +14,7 @@ import { Logger } from '../../../src/application/logger.js'
 import { FsChangeRepository } from '../../../src/infrastructure/fs/change-repository.js'
 import { vi } from 'vitest'
 import { sha256 } from '../../../src/infrastructure/fs/hash.js'
+import { artifactDagFromChangeArtifacts } from '../../../src/domain/value-objects/artifact-dag.js'
 import { ArtifactType } from '../../../src/domain/value-objects/artifact-type.js'
 
 const actor: ActorIdentity = { name: 'Alice', email: 'alice@example.com' }
@@ -136,6 +137,7 @@ describe('FsChangeRepository', () => {
         actor,
         'Invalidated because validated artifacts drifted: proposal (proposal)',
         [{ type: 'proposal', files: ['proposal'] }],
+        artifactDagFromChangeArtifacts([{ type: 'proposal', requires: [] }]),
       )
       await ctx.repo.save(change)
 

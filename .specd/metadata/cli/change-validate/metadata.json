@@ -57,14 +57,14 @@
     {
       "requirement": "Batch mode (--all)",
       "rules": [
-        "With `--all`, the command loads the change's `specIds` and validates each one in order. `--all` is mutually exclusive with the `<workspace:capability-path>` positional — providing both exits with `error: --all and <specPath> are mutually exclusive`. Omitting both exits with `error: either <specPath> or --all is required`.\n\n`--artifact` works with `--all` — it validates only that artifact type for every spec in the change.\n\nFor each spec, the command invokes `ValidateArtifacts` and collects results. Individual spec failures do not abort the batch — all specs are validated.\n\n**Text output:** each spec's result is printed as in single-spec mode (success or failure block), followed by a summary line: `validated N/M specs`.\n\n**JSON output:** `{ passed: <bool>, total: M, results: [{ spec: \"<id>\", passed: <bool>, failures: [...], warnings: [...] }] }`\n\nThe process exits with code 1 if any spec has failures, 0 if all pass."
+        "With `--all`, the command validates the change using the active schema's artifact DAG instead of looping `specIds` with a full multi-artifact pass per spec.\n\n`--all` is mutually exclusive with the `<workspace:capability-path>` positional — providing both exits with `error: --all and <specPath> are mutually exclusive`. Omitting both exits with `error: either <specPath> or --all is required`.\n\nThe batch driver MUST walk `schema.artifactDag().topologicalOrder()`. For each artifact type in that order:\n\n- **`scope: change`** — invoke `ValidateArtifacts` once for that artifact type with **no `specPath` field** in the use-case input (do not pass a placeholder `specIds[0]`).\n- **`scope: spec`** — invoke `ValidateArtifacts` once per `specId` in the change for that artifact type.\n\nWhen `--artifact <artifactId>` is combined with `--all`, the driver MUST use the same topological walk but execute only steps whose artifact id matches `<artifactId>`.\n\nIndividual validation failures MUST NOT abort the batch early — all scheduled steps run and results are aggregated.\n\n**Text output:** each scheduled step's result is printed as in single-spec mode (success or failure block), followed by a summary line reporting how many steps passed versus scheduled.\n\n**JSON output:** `{ passed: <bool>, total: M, results: [{ spec: \"<specId or null for change-scoped>\", artifact: \"<artifactId>\", passed: <bool>, failures: [...], warnings: [...] }] }` — one entry per scheduled validation step. Each step MUST include a `warnings` array (possibly empty). Structural optimisation hints from the use case MAY be mapped into `warnings`; the field name MUST NOT be `notes` in batch JSON output.\n\nThe process exits with code 1 if any step has failures, 0 if all pass."
       ]
     }
   ],
   "constraints": [
     "Validation output (failures and warnings) goes to stdout; only CLI/system errors go to stderr",
     "The command marks artifacts as complete in the manifest when they pass",
-    "Batch mode uses the change's specIds list — no custom spec resolution in the CLI layer"
+    "Batch mode schedules validation from artifactDag().topologicalOrder() and artifact scope; it does not invoke a full multi-artifact ValidateArtifacts pass per specId"
   ],
   "scenarios": [
     {
@@ -251,15 +251,24 @@
     },
     {
       "requirement": "Batch mode (--all)",
-      "name": "--all without specPath validates all specIds",
-      "given": [
-        "a change with specIds [\"default:auth/login\", \"default:auth/logout\"] and valid artifacts for both"
-      ],
-      "when": ["specd change validate my-change --all is run"],
+      "name": "Change-scoped batch step omits specPath",
+      "given": ["a change with proposal (change-scoped) and multiple specIds"],
+      "when": ["specd changes validate <name> --all runs"],
       "then": [
-        "both specs are validated",
-        "AND text output shows success for each spec",
-        "AND summary shows validated 2/2 specs"
+        "the change-scoped proposal step invokes ValidateArtifacts without a specPath argument"
+      ]
+    },
+    {
+      "requirement": "Batch mode (--all)",
+      "name": "--all walks DAG with change-scoped once and spec-scoped per specId",
+      "given": [
+        "a change with specIds [\"core:schema-format\", \"cli:change-validate\"] and valid deltas for the next incomplete DAG steps"
+      ],
+      "when": ["specd change validate fix-validate-all-dag --all is run"],
+      "then": [
+        "change-scoped artifacts such as proposal are validated once",
+        "AND spec-scoped artifacts such as specs are validated once per specId",
+        "AND validation order respects artifactDag().topologicalOrder() (parents before children)"
       ]
     },
     {
@@ -278,33 +287,43 @@
     },
     {
       "requirement": "Batch mode (--all)",
-      "name": "--all with --artifact validates one artifact across all specs",
-      "given": ["a change with 2 specIds"],
-      "when": ["specd change validate my-change --all --artifact proposal is run"],
-      "then": ["only the proposal artifact is validated for each spec"]
-    },
-    {
-      "requirement": "Batch mode (--all)",
-      "name": "--all with partial failures exits 1",
-      "given": ["a change with 2 specIds, one passes and one fails validation"],
-      "when": ["specd change validate my-change --all is run"],
+      "name": "--all with --artifact filters DAG steps",
+      "given": ["a change with 2 specIds and incomplete specs deltas"],
+      "when": ["specd change validate my-change --all --artifact specs is run"],
       "then": [
-        "both specs are validated (batch continues)",
-        "AND exit code is 1",
-        "AND summary shows validated 1/2 specs"
+        "only specs validation steps run (once per specId)",
+        "AND other artifact types are not validated in that batch"
       ]
     },
     {
       "requirement": "Batch mode (--all)",
-      "name": "--all JSON output",
-      "given": ["a change with 2 specIds, both pass"],
+      "name": "--all with partial failures exits 1",
+      "given": ["a batch where one scheduled step fails and another passes"],
+      "when": ["specd change validate my-change --all is run"],
+      "then": ["all scheduled steps still run", "AND exit code is 1"]
+    },
+    {
+      "requirement": "Batch mode (--all)",
+      "name": "--all JSON output lists scheduled steps",
+      "given": ["a batch where all scheduled steps pass"],
       "when": ["specd change validate my-change --all --format json is run"],
-      "then": ["output is { passed: true, total: 2, results: [...] } with per-spec entries"]
+      "then": [
+        "output includes passed, total, and results[] with artifact and spec (null for change-scoped steps) per entry"
+      ]
     }
   ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "cli:change-validate",
+        "file": "cli:src/commands/change/validate.ts",
+        "symbol": "executeBatch"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:7f9ff6a09b9c56d6090a7cde538174fbf283cdd6251309535cbb0786e537f9d9",
-    "verify.md": "sha256:b8019cf10b147dbdc0fdf65dd50711e9bcba2dca94c1dab0cce1ad3f4d1e53da"
+    "spec.md": "sha256:54b6ca0264404d9263dab84bca0f84ccc9879886e51a467ca2f749f8a6e4b441",
+    "verify.md": "sha256:6007c3cdae89a7051f2b04659f48539f398721aabe08b0cd479d27aa2dd5b538"
   },
   "generatedBy": "core"
 }

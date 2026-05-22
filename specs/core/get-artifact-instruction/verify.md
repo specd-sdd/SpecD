@@ -84,7 +84,7 @@
 
 - **GIVEN** `proposal` is effectively complete
 - **AND** `specs` is not effectively complete
-- **AND** `LifecycleEngine.evaluate` reports `specs` as the first effectively ready incomplete artifact
+- **AND** `LifecycleEngine.nextArtifact` reports `specs` as the first incomplete artifact in `artifactDag().topologicalOrder()` with satisfied dependencies
 - **WHEN** `GetArtifactInstruction.execute` is called without `artifactId`
 - **THEN** the returned `artifactId` is `specs`
 
@@ -94,3 +94,9 @@
 - **AND** `LifecycleEngine.evaluate` reports its effective status as `pending-parent-artifact-review`
 - **WHEN** `GetArtifactInstruction.execute` is called without `artifactId`
 - **THEN** that artifact is not selected as complete/resolved by auto-resolution
+
+#### Scenario: All artifacts complete throws ArtifactNotFoundError
+
+- **GIVEN** every artifact is effectively `complete` or `skipped`
+- **WHEN** `GetArtifactInstruction.execute` is called without `artifactId`
+- **THEN** `ArtifactNotFoundError` is thrown

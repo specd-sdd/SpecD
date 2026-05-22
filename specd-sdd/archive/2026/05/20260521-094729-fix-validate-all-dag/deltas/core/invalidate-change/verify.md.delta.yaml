@@ -1,0 +1,17 @@
+- op: added
+  description: 'Reporting order follows topologicalOrder'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Output contract'
+  content: |
+    ### Requirement: Affected-set traversal order
+
+    #### Scenario: Reported artifacts follow DAG topological order
+
+    - **GIVEN** a downstream invalidation whose expanded affected set spans `specs`, `verify`, and `design`
+    - **WHEN** `InvalidateChange.execute` succeeds
+    - **THEN** human-facing reporting orders artifact types in `schema.artifactDag().topologicalOrder()` among affected types

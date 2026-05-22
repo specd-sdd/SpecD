@@ -83,6 +83,42 @@
 - **WHEN** `ValidateArtifacts.execute` is called
 - **THEN** no delta validation, application preview, or structural validation is run for `design` — there is no file to check
 
+### Requirement: Artifact traversal order
+
+#### Scenario: Multi-artifact pass follows topological order
+
+- **GIVEN** a change where `proposal` is complete and `specs` delta is ready but `verify` is not yet complete
+- **WHEN** `ValidateArtifacts` validates all artifacts for one spec in a single `execute` without `artifactId`
+- **THEN** `specs` is validated before `verify` is attempted
+- **AND** dependency-blocked failures for `verify` do not occur solely because `specs` was validated later in declaration order within the same pass
+
+#### Scenario: Lifecycle snapshot refreshes after markComplete in same execute
+
+- **GIVEN** a change where parent and child artifacts are both incomplete at `execute` start
+- **WHEN** the parent artifact validates successfully and is persisted as `complete` before the child is processed in the same `execute`
+- **THEN** the child dependency check observes the parent as `complete`
+
+### Requirement: Complete and skipped file bypass
+
+#### Scenario: Complete file is not re-validated
+
+- **GIVEN** a tracked file with canonical status `complete` and unchanged on-disk content
+- **WHEN** `ValidateArtifacts` includes that file in the current invocation
+- **THEN** structural validation for that file is skipped
+- **AND** `markComplete` is not invoked again for that file
+
+#### Scenario: Skipped file is not re-validated
+
+- **GIVEN** a tracked optional artifact file marked `skipped`
+- **WHEN** `ValidateArtifacts` includes that file in the current invocation
+- **THEN** structural validation for that file is skipped
+
+#### Scenario: Drift-pending file is still validated
+
+- **GIVEN** a tracked file with canonical status `drifted-pending-review`
+- **WHEN** `ValidateArtifacts` includes that file in the current invocation
+- **THEN** structural validation still runs for that file
+
 ### Requirement: Approval invalidation on content change
 
 #### Scenario: Drift collection records all file keys in one invalidation
@@ -491,6 +527,13 @@
 - **GIVEN** a change-scoped artifact such as `design`
 - **WHEN** `ValidateArtifacts.execute` is called for that artifact
 - **THEN** `specPath` is optional
+
+#### Scenario: Change-scoped validation without specPath
+
+- **GIVEN** a change with `scope: change` artifact `proposal` and at least one `specId`
+- **WHEN** `ValidateArtifacts` is invoked with `artifactId: proposal` and no `specPath`
+- **THEN** validation runs for the proposal artifact files
+- **AND** no `SpecNotInChangeError` is thrown solely because `specPath` was omitted
 
 ### Requirement: Schema name guard
 

@@ -98,3 +98,11 @@
 - **WHEN** `InvalidateChange.execute` succeeds
 - **THEN** the returned affected set includes that file only once
 - **AND** it also returns the effective invalidation policy and updated change
+
+### Requirement: Affected-set traversal order
+
+#### Scenario: Reported artifacts follow DAG topological order
+
+- **GIVEN** a downstream invalidation whose expanded affected set spans `specs`, `verify`, and `design`
+- **WHEN** `InvalidateChange.execute` succeeds
+- **THEN** human-facing reporting orders artifact types in `schema.artifactDag().topologicalOrder()` among affected types

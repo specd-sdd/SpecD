@@ -302,6 +302,64 @@ describe('ValidateArtifacts', () => {
       ).toBe(true)
     })
 
+    it('allows a child artifact to validate in the same execute after parent succeeds', async () => {
+      const proposalType = makeArtifactType('proposal')
+      const specsType = makeArtifactType('specs', { requires: ['proposal'] })
+      const schema = makeSchema([proposalType, specsType])
+
+      const content = 'valid content'
+      const change = makeChangeWithArtifacts('c', [
+        new ChangeArtifact({
+          type: 'proposal',
+          files: new Map([
+            [
+              'proposal',
+              new ArtifactFile({ key: 'proposal', filename: 'proposal.md', status: 'in-progress' }),
+            ],
+          ]),
+        }),
+        new ChangeArtifact({
+          type: 'specs',
+          requires: ['proposal'],
+          files: new Map([
+            [
+              'specs',
+              new ArtifactFile({ key: 'specs', filename: 'spec.md', status: 'in-progress' }),
+            ],
+          ]),
+        }),
+      ])
+
+      const files = new Map([
+        ['proposal.md', content],
+        ['spec.md', content],
+      ])
+      const repo = makeChangeRepository([change])
+      Object.assign(repo, {
+        async artifact(_change: Change, filename: string): Promise<SpecArtifact | null> {
+          const c = files.get(filename)
+          return c !== undefined ? new SpecArtifact(filename, c) : null
+        },
+      })
+
+      const uc = new ValidateArtifacts(
+        repo,
+        new Map(),
+        makeSchemaProvider(schema),
+        makeParsers(),
+        makeActorResolver(),
+        makeContentHasher(),
+      )
+
+      const result = await uc.execute({
+        name: 'c',
+        specPath: 'default:auth',
+      })
+
+      expect(result.passed).toBe(true)
+      expect(result.failures.some((f) => f.artifactId === 'specs')).toBe(false)
+    })
+
     it('proceeds when dependency is complete', async () => {
       const proposalType = makeArtifactType('proposal')
       const specsType = makeArtifactType('specs', { requires: ['proposal'] })
@@ -614,13 +672,18 @@ describe('ValidateArtifacts', () => {
           const invalidateSpy = vi.spyOn(freshChange, 'invalidate')
           const result = await fn(freshChange)
           if (invalidateSpy.mock.calls.length > 0) {
-            const [cause, actor, message, affectedArtifacts] = invalidateSpy.mock.calls[0] as [
-              string,
-              unknown,
-              string,
-              Array<{ type: string; files: string[] }>,
+            const [cause, actor, message, affectedArtifacts] = invalidateSpy.mock.calls[0]!
+            invalidateCall = [
+              cause,
+              actor,
+              {
+                message: message ?? '',
+                affectedArtifacts: (affectedArtifacts ?? []).map((entry) => ({
+                  type: entry.type,
+                  files: [...entry.files],
+                })),
+              },
             ]
-            invalidateCall = [cause, actor, { message, affectedArtifacts }]
           }
           return result
         })
@@ -712,6 +775,77 @@ describe('ValidateArtifacts', () => {
 
       const saved = repo.store.get('c')
       expect(saved?.history.some((e) => e.type === 'invalidated')).toBe(false)
+    })
+  })
+
+  describe('Complete and skipped file bypass', () => {
+    it('skips re-validation of files already marked complete', async () => {
+      const proposalType = makeArtifactType('proposal')
+      const specsType = makeArtifactType('specs', { requires: ['proposal'] })
+      const schema = makeSchema([proposalType, specsType])
+
+      const proposalArtifact = new ChangeArtifact({
+        type: 'proposal',
+        files: new Map([
+          [
+            'proposal',
+            new ArtifactFile({
+              key: 'proposal',
+              filename: 'proposal.md',
+              status: 'complete',
+              validatedHash: sha256('proposal'),
+            }),
+          ],
+        ]),
+      })
+      const specsArtifact = new ChangeArtifact({
+        type: 'specs',
+        requires: ['proposal'],
+        files: new Map([
+          [
+            'specs',
+            new ArtifactFile({
+              key: 'specs',
+              filename: 'spec.md',
+              status: 'complete',
+              validatedHash: sha256('specs'),
+            }),
+          ],
+        ]),
+      })
+      const change = makeChangeWithArtifacts('c', [proposalArtifact, specsArtifact])
+
+      const artifactCalls: string[] = []
+      const repo = makeChangeRepository([change])
+      Object.assign(repo, {
+        async artifact(_change: Change, filename: string): Promise<SpecArtifact | null> {
+          artifactCalls.push(filename)
+          return new SpecArtifact(filename, 'should-not-be-read')
+        },
+      })
+
+      const uc = new ValidateArtifacts(
+        repo,
+        new Map(),
+        makeSchemaProvider(schema),
+        makeParsers(),
+        makeActorResolver(),
+        makeContentHasher(),
+      )
+
+      const result = await uc.execute({
+        name: 'c',
+        specPath: 'default:auth',
+      })
+
+      expect(result.passed).toBe(true)
+      expect(artifactCalls).toEqual([])
+      expect(result.files).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ artifactId: 'proposal', status: 'validated' }),
+          expect.objectContaining({ artifactId: 'specs', status: 'validated' }),
+        ]),
+      )
     })
   })
 
@@ -3460,6 +3594,132 @@ describe('ValidateArtifacts', () => {
           false,
         )
       })
+    })
+  })
+
+  describe('change-scoped specPath', () => {
+    it('validates change-scoped artifact without specPath', async () => {
+      const proposalType = makeArtifactType('proposal', {
+        scope: 'change',
+        output: 'proposal.md',
+        requires: [],
+      })
+      const schema = makeSchema([proposalType])
+      const change = makeChangeWithArtifacts(
+        'c',
+        [
+          new ChangeArtifact({
+            type: 'proposal',
+            files: new Map([
+              [
+                'proposal',
+                new ArtifactFile({
+                  key: 'proposal',
+                  filename: 'proposal.md',
+                  status: 'in-progress',
+                }),
+              ],
+            ]),
+          }),
+        ],
+        { specIds: [] },
+      )
+      const repo = makeChangeRepository([change])
+      repo.artifact = async () => new SpecArtifact('proposal.md', '# Proposal')
+
+      const uc = new ValidateArtifacts(
+        repo,
+        new Map(),
+        makeSchemaProvider(schema),
+        makeParsers(makeParser()),
+        makeActorResolver(),
+        makeContentHasher(),
+      )
+
+      const result = await uc.execute({ name: 'c', artifactId: 'proposal' })
+
+      expect(result.passed).toBe(true)
+    })
+
+    it('throws SpecNotInChangeError when spec-scoped artifact omits specPath', async () => {
+      const schema = makeSchema([
+        makeArtifactType('specs', { scope: 'spec', output: 'spec.md', requires: [] }),
+      ])
+      const change = makeChangeWithArtifacts('c', [], { specIds: ['default:auth'] })
+      const uc = new ValidateArtifacts(
+        makeChangeRepository([change]),
+        new Map(),
+        makeSchemaProvider(schema),
+        makeParsers(),
+        makeActorResolver(),
+        makeContentHasher(),
+      )
+
+      await expect(uc.execute({ name: 'c', artifactId: 'specs' })).rejects.toThrow(
+        SpecNotInChangeError,
+      )
+    })
+  })
+
+  describe('topological validation order', () => {
+    it('validates multiple change-scoped artifacts in DAG order', async () => {
+      const schema = makeSchema([
+        makeArtifactType('proposal', {
+          scope: 'change',
+          output: 'proposal.md',
+          requires: [],
+        }),
+        makeArtifactType('design', {
+          scope: 'change',
+          output: 'design.md',
+          requires: ['proposal'],
+        }),
+        makeArtifactType('tasks', {
+          scope: 'change',
+          output: 'tasks.md',
+          requires: ['design'],
+        }),
+      ])
+      const change = makeChangeWithArtifacts(
+        'c',
+        ['proposal', 'design', 'tasks'].map(
+          (id) =>
+            new ChangeArtifact({
+              type: id,
+              files: new Map([
+                [
+                  id,
+                  new ArtifactFile({
+                    key: id,
+                    filename: `${id}.md`,
+                    status: 'in-progress',
+                  }),
+                ],
+              ]),
+            }),
+        ),
+        { specIds: [] },
+      )
+      const validationOrder: string[] = []
+      const repo = makeChangeRepository([change])
+      repo.artifact = async (_change, filename) => {
+        const id = filename.replace(/\.md$/, '')
+        validationOrder.push(id)
+        return new SpecArtifact(filename, `# ${id}`)
+      }
+
+      const uc = new ValidateArtifacts(
+        repo,
+        new Map(),
+        makeSchemaProvider(schema),
+        makeParsers(makeParser()),
+        makeActorResolver(),
+        makeContentHasher(),
+      )
+
+      await uc.execute({ name: 'c' })
+
+      expect(validationOrder).toEqual(['proposal', 'design', 'tasks'])
     })
   })
 })

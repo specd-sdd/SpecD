@@ -324,7 +324,7 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
       list: new ListChanges(i.changes),
       listDrafts: new ListDrafts(i.changes),
       listDiscarded: new ListDiscarded(i.changes),
-      edit: new EditChange(i.changes, i.specs, i.actor),
+      edit: new EditChange(i.changes, i.specs, i.actor, schemaProvider),
       invalidate: new InvalidateChange(i.changes, i.actor, schemaProvider),
       skipArtifact: new SkipArtifact(i.changes, i.actor),
       updateSpecDeps: new UpdateSpecDeps(i.changes),

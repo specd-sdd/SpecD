@@ -6,12 +6,12 @@
     "core:change-layout",
     "core:change-manifest",
     "core:lifecycle-engine",
-    "core:schema-format",
     "core:delta-format",
     "core:selector-model",
     "core:storage",
     "default:_global/architecture",
-    "core:spec-id-format"
+    "core:spec-id-format",
+    "core:schema-format"
   ],
   "context": [
     "Artifacts must be structurally valid and conflict-free before a change can progress, yet no other code path is allowed to mark an artifact complete — a single chokepoint is needed to enforce this invariant. `ValidateArtifacts` is that chokepoint: it checks a change's artifact files against the active schema, enforces required artifacts, validates structural rules, detects delta conflicts, invalidates any outstanding approval when content has changed, and is the only path through which an artifact may reach `complete` status."
@@ -26,7 +26,7 @@
     {
       "requirement": "Input",
       "rules": [
-        "`ValidateArtifactsInput.specPath` is optional when validating `scope: change` artifacts. For `scope: change` artifacts (like `design`, `tasks`), the artifact is uniquely identified by its artifact ID alone — there is no ambiguity about which spec it belongs to.\n\nFor `scope: spec` artifacts, `specPath` is still required because the same artifact type (e.g., `specs`) exists for multiple specs.\n\nWhen `specPath` is provided and the artifact is `scope: change`, the specPath is ignored — the artifact ID is sufficient."
+        "`ValidateArtifactsInput.specPath` is optional when validating `scope: change` artifacts. For `scope: change` artifacts (like `design`, `tasks`), the artifact is uniquely identified by its artifact ID alone — there is no ambiguity about which spec it belongs to.\n\nFor `scope: spec` artifacts, `specPath` is still required because the same artifact type (e.g., `specs`) exists for multiple specs.\n\nWhen `specPath` is omitted for a `scope: change` artifact, `ValidateArtifacts` MUST NOT require membership in `change.specIds` for routing; it MUST validate the change-scoped artifact files for the requested `artifactId` only.\n\nWhen `specPath` is provided and the artifact is `scope: change`, the specPath is ignored — the artifact ID is sufficient."
       ]
     },
     {
@@ -44,7 +44,19 @@
     {
       "requirement": "Dependency order check",
       "rules": [
-        "Before validating an artifact, `ValidateArtifacts` must check that all artifact IDs in its `requires` list are either `complete` or `skipped`.\n\nThe dependency-aware status lookup SHALL be interpreted through `LifecycleEngine`, since recursive parent blocking and schema DAG semantics do not belong on the `Change` entity. If a required dependency is neither `complete` nor `skipped`, validation of the dependent artifact is skipped and reported as a dependency-blocked failure. A `skipped` optional artifact satisfies the dependency. `skipped` artifacts are not validated — there is no file to check.\n\nDependency-blocked failures MUST include the dependency artifact ID and its effective status as observed at validation time.\n\nWhen the dependency status is `pending-parent-artifact-review`, the failure description MUST also include the upstream parent blocker context (artifact ID and status) when available from recursive blocker resolution.\n\nFor blockers outside review-propagation (`missing` and `in-progress`), the failure description MUST still include the dependency status and MUST NOT degrade to generic \"incomplete dependency\" wording.\n\n`pending-review` and `drifted-pending-review` are review blockers. For these statuses, the failure description MUST present them as review-state blockers (not generic incompleteness) and MUST include the status explicitly."
+        "Before validating an artifact, `ValidateArtifacts` must check that all artifact IDs in its `requires` list are either `complete` or `skipped`.\n\nThe dependency-aware status lookup SHALL be interpreted through `LifecycleEngine`, since recursive parent blocking and schema DAG semantics do not belong on the `Change` entity. If a required dependency is neither `complete` nor `skipped`, validation of the dependent artifact is skipped and reported as a dependency-blocked failure. A `skipped` optional artifact satisfies the dependency. `skipped` artifacts are not validated — there is no file to check.\n\nWhen `ValidateArtifacts` validates more than one artifact or file in a single `execute` invocation (including batch drivers and full-artifact passes), it MUST recompute lifecycle/effective-status interpretation after each persisted completion so dependents processed later in the same invocation observe parents completed in that pass. It MUST NOT rely on a lifecycle snapshot frozen only at `execute` start.\n\nDependency-blocked failures MUST include the dependency artifact ID and its effective status as observed at validation time.\n\nWhen the dependency status is `pending-parent-artifact-review`, the failure description MUST also include the upstream parent blocker context (artifact ID and status) when available from recursive blocker resolution.\n\nFor blockers outside review-propagation (`missing` and `in-progress`), the failure description MUST still include the dependency status and MUST NOT degrade to generic \"incomplete dependency\" wording.\n\n`pending-review` and `drifted-pending-review` are review blockers. For these statuses, the failure description MUST present them as review-state blockers (not generic incompleteness) and MUST include the status explicitly."
+      ]
+    },
+    {
+      "requirement": "Artifact traversal order",
+      "rules": [
+        "When `ValidateArtifacts` validates multiple artifacts in one `execute` invocation without a single `artifactId` filter, it MUST iterate artifacts in `schema.artifactDag().topologicalOrder()`.\n\nWhen `artifactId` is provided but the invocation still validates all tracked files for that artifact type across the change (for example CLI batch `--all --artifact`), the outer driver MUST still respect `topologicalOrder()` for artifact-type steps; within each artifact type, spec-scoped files follow the change's `specIds` order."
+      ]
+    },
+    {
+      "requirement": "Complete and skipped file bypass",
+      "rules": [
+        "For each tracked artifact file considered by validation, if the file's canonical persisted status is `complete` or `skipped`, `ValidateArtifacts` MUST NOT re-read the file, MUST NOT re-run structural validation or delta preview for that file, and MUST NOT invoke `markComplete` again for that file.\n\nFiles in review or drift states (`pending-review`, `drifted-pending-review`, and any other non-terminal canonical state except `missing` when no file exists) MUST still be validated when selected by the invocation.\n\nApproval/signoff drift detection MUST still run for files that are actually validated in the invocation; bypassing `complete`/`skipped` files reduces unnecessary drift comparisons and avoids spurious `artifact-drift` invalidation during batch validation."
       ]
     },
     {
@@ -272,6 +284,53 @@
       "then": [
         "no delta validation, application preview, or structural validation is run for design — there is no file to check"
       ]
+    },
+    {
+      "requirement": "Artifact traversal order",
+      "name": "Multi-artifact pass follows topological order",
+      "given": [
+        "a change where proposal is complete and specs delta is ready but verify is not yet complete"
+      ],
+      "when": [
+        "ValidateArtifacts validates all artifacts for one spec in a single execute without artifactId"
+      ],
+      "then": [
+        "specs is validated before verify is attempted",
+        "AND dependency-blocked failures for verify do not occur solely because specs was validated later in declaration order within the same pass"
+      ]
+    },
+    {
+      "requirement": "Artifact traversal order",
+      "name": "Lifecycle snapshot refreshes after markComplete in same execute",
+      "given": ["a change where parent and child artifacts are both incomplete at execute start"],
+      "when": [
+        "the parent artifact validates successfully and is persisted as complete before the child is processed in the same execute"
+      ],
+      "then": ["the child dependency check observes the parent as complete"]
+    },
+    {
+      "requirement": "Complete and skipped file bypass",
+      "name": "Complete file is not re-validated",
+      "given": ["a tracked file with canonical status complete and unchanged on-disk content"],
+      "when": ["ValidateArtifacts includes that file in the current invocation"],
+      "then": [
+        "structural validation for that file is skipped",
+        "AND markComplete is not invoked again for that file"
+      ]
+    },
+    {
+      "requirement": "Complete and skipped file bypass",
+      "name": "Skipped file is not re-validated",
+      "given": ["a tracked optional artifact file marked skipped"],
+      "when": ["ValidateArtifacts includes that file in the current invocation"],
+      "then": ["structural validation for that file is skipped"]
+    },
+    {
+      "requirement": "Complete and skipped file bypass",
+      "name": "Drift-pending file is still validated",
+      "given": ["a tracked file with canonical status drifted-pending-review"],
+      "when": ["ValidateArtifacts includes that file in the current invocation"],
+      "then": ["structural validation still runs for that file"]
     },
     {
       "requirement": "Approval invalidation on content change",
@@ -819,6 +878,16 @@
       "then": ["specPath is optional"]
     },
     {
+      "requirement": "Input",
+      "name": "Change-scoped validation without specPath",
+      "given": ["a change with scope: change artifact proposal and at least one specId"],
+      "when": ["ValidateArtifacts is invoked with artifactId: proposal and no specPath"],
+      "then": [
+        "validation runs for the proposal artifact files",
+        "AND no SpecNotInChangeError is thrown solely because specPath was omitted"
+      ]
+    },
+    {
       "requirement": "Schema name guard",
       "name": "Schema mismatch throws before validation",
       "given": ["the change was created under a different schema name"],
@@ -935,9 +1004,24 @@
       ]
     }
   ],
+  "implementation": {
+    "files": [
+      {
+        "specId": "core:validate-artifacts",
+        "file": "core:src/composition/use-cases/edit-change.ts"
+      }
+    ],
+    "symbols": [
+      {
+        "specId": "core:validate-artifacts",
+        "file": "core:src/application/use-cases/validate-artifacts.ts",
+        "symbol": "ValidateArtifacts"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:b6d1404a385bda23ec4c8715427160a683f6094b82133004f441de85451b6577",
-    "verify.md": "sha256:88d01286f33cfba511a026ec2f196a87be72a51be7dfabb43ea07314434b4cec"
+    "spec.md": "sha256:a021936d2563fc2b49e660bb506b873bba3ffeaf36e790af9b39882ad3bcff95",
+    "verify.md": "sha256:147c127873cb08d7646f491a5917ed3e0d512248125e7bebda583753ad290f72"
   },
   "generatedBy": "core"
 }

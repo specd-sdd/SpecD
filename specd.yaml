@@ -1,5 +1,8 @@
 schema: '@specd/schema-std'
 
+logging:
+  level: debug
+
 privacy:
   mode: mask
 

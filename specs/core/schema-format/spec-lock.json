@@ -1,0 +1,22 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "core:delta-format",
+    "core:selector-model",
+    "core:content-extraction",
+    "core:schema-merge"
+  ],
+  "implementation": [
+    {
+      "file": "core:src/domain/value-objects/artifact-dag.ts",
+      "symbols": ["ArtifactDag", "artifactDagFromChangeArtifacts"]
+    },
+    {
+      "file": "core:src/domain/value-objects/schema.ts",
+      "symbols": ["Schema"]
+    }
+  ]
+}

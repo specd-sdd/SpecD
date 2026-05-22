@@ -6,7 +6,13 @@
   "dependsOn": [
     "core:change",
     "core:workflow-model",
-    "core:schema-format",
-    "default:_global/architecture"
+    "default:_global/architecture",
+    "core:schema-format"
+  ],
+  "implementation": [
+    {
+      "file": "core:src/domain/services/lifecycle-engine.ts",
+      "symbols": ["LifecycleEngine"]
+    }
   ]
 }

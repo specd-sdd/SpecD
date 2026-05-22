@@ -2,8 +2,47 @@ import { type Command } from 'commander'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'
-import { type ArtifactStatusEntry, type ArtifactType } from '@specd/core'
+import { ArtifactDag, type ArtifactStatusEntry, type ArtifactType } from '@specd/core'
 import { enrichImplementationTracking } from './_implementation-tracking.js'
+
+/** Resolved active schema from the kernel. */
+type ActiveSchemaResult = Awaited<
+  ReturnType<import('@specd/core').Kernel['specs']['getActiveSchema']['execute']>
+>
+
+/** Schema metadata attached to lifecycle evaluation. */
+type LifecycleSchemaInfo = NonNullable<
+  Awaited<
+    ReturnType<import('@specd/core').Kernel['changes']['status']['execute']>
+  >['lifecycle']['schemaInfo']
+>
+
+/**
+ * Resolves the canonical schema DAG for status rendering, falling back to lifecycle schemaInfo.
+ *
+ * @param activeSchema - Result from `getActiveSchema`
+ * @param schemaInfo - Schema snapshot attached to lifecycle
+ * @returns DAG and artifact types for rendering
+ */
+function resolveStatusSchemaDag(
+  activeSchema: ActiveSchemaResult,
+  schemaInfo: LifecycleSchemaInfo,
+): { dag: ArtifactDag; artifactTypes: readonly ArtifactType[] } {
+  if (
+    !activeSchema.raw &&
+    typeof activeSchema.schema.artifactDag === 'function' &&
+    typeof activeSchema.schema.artifacts === 'function'
+  ) {
+    return {
+      dag: activeSchema.schema.artifactDag(),
+      artifactTypes: activeSchema.schema.artifacts(),
+    }
+  }
+  return {
+    dag: ArtifactDag.from(schemaInfo.artifacts),
+    artifactTypes: schemaInfo.artifacts,
+  }
+}
 
 /**
  * Registers the `change status` subcommand on the given parent command.
@@ -91,12 +130,17 @@ JSON/TOON output schema:
 
             // Artifact DAG Section
             if (lifecycle.schemaInfo !== null) {
+              const activeSchema = await kernel.specs.getActiveSchema.execute()
+              const { dag, artifactTypes } = resolveStatusSchemaDag(
+                activeSchema,
+                lifecycle.schemaInfo,
+              )
               lines.push('artifacts (DAG):')
               lines.push(
                 '  [✓] complete  [ ] missing  [!] drifted  [~] needs review  [?] in-progress',
               )
               lines.push('')
-              lines.push(...renderDag(lifecycle.schemaInfo.artifacts, artifactStatuses))
+              lines.push(...renderDag(dag, artifactTypes, artifactStatuses))
               lines.push('')
             }
 
@@ -200,6 +244,33 @@ JSON/TOON output schema:
 
             output(lines.join('\n'), 'text')
           } else {
+            const schemaInfo = lifecycle.schemaInfo
+            const statusDag =
+              schemaInfo !== null
+                ? resolveStatusSchemaDag(await kernel.specs.getActiveSchema.execute(), schemaInfo)
+                : null
+            const schemaPayload =
+              schemaInfo !== null && statusDag !== null
+                ? {
+                    name: schemaInfo.name,
+                    version: schemaInfo.version,
+                    artifactDag: statusDag.dag.topologicalOrder().map((id) => {
+                      const a = statusDag.artifactTypes.find((art) => art.id === id)
+                      if (a === undefined) {
+                        throw new Error(`Schema artifact "${id}" missing from lifecycle schemaInfo`)
+                      }
+                      return {
+                        id: a.id,
+                        scope: a.scope,
+                        optional: a.optional ?? false,
+                        requires: a.requires ?? [],
+                        hasTasks: a.hasTasks === true || a.taskCompletionCheck !== undefined,
+                        output: a.output,
+                        children: [...statusDag.dag.childrenOf(a.id)],
+                      }
+                    }),
+                  }
+                : undefined
             output(
               {
                 name: change.name,
@@ -215,18 +286,25 @@ JSON/TOON output schema:
                   command: nextAction.command,
                 },
                 artifactDag:
-                  lifecycle.schemaInfo?.artifacts.map((a) => ({
-                    id: a.id,
-                    scope: a.scope,
-                    state:
-                      artifactStatuses.find((as) => as.type === a.id)?.displayStatus ?? 'missing',
-                    requires: a.requires ?? [],
-                    hasTasks: a.hasTasks,
-                    children:
-                      lifecycle.schemaInfo?.artifacts
-                        .filter((child) => child.requires.includes(a.id))
-                        .map((child) => child.id) ?? [],
-                  })) ?? [],
+                  statusDag === null
+                    ? []
+                    : statusDag.dag
+                        .topologicalOrder()
+                        .map((id) => {
+                          const a = statusDag.artifactTypes.find((art) => art.id === id)
+                          if (a === undefined) return null
+                          return {
+                            id: a.id,
+                            scope: a.scope,
+                            state:
+                              artifactStatuses.find((as) => as.type === a.id)?.displayStatus ??
+                              'missing',
+                            requires: a.requires ?? [],
+                            hasTasks: a.hasTasks === true || a.taskCompletionCheck !== undefined,
+                            children: [...statusDag.dag.childrenOf(a.id)],
+                          }
+                        })
+                        .filter((entry): entry is NonNullable<typeof entry> => entry !== null),
                 artifacts: artifactStatuses.map((a) => ({
                   type: a.type,
                   state: a.state,
@@ -283,23 +361,7 @@ JSON/TOON output schema:
                       },
                     }
                   : {}),
-                ...(lifecycle.schemaInfo !== null
-                  ? {
-                      schema: {
-                        name: lifecycle.schemaInfo.name,
-                        version: lifecycle.schemaInfo.version,
-                        artifactDag:
-                          lifecycle.schemaInfo.artifacts?.map((a) => ({
-                            id: a.id,
-                            scope: a.scope,
-                            optional: a.optional ?? false,
-                            requires: a.requires ?? [],
-                            hasTasks: a.hasTasks,
-                            output: a.output,
-                          })) ?? [],
-                      },
-                    }
-                  : {}),
+                ...(schemaPayload !== undefined ? { schema: schemaPayload } : {}),
                 approvalGates: {
                   specEnabled: lifecycle.approvals.spec,
                   signoffEnabled: lifecycle.approvals.signoff,
@@ -318,21 +380,22 @@ JSON/TOON output schema:
 /**
  * Renders the artifact dependency graph as an ASCII tree.
  *
+ * @param dag - Schema-derived artifact DAG (roots and child ordering)
  * @param artifactTypes - All artifact types defined in the schema
  * @param artifactStatuses - Current statuses for all artifacts in the change
  * @returns Array of formatted lines representing the tree
  */
 function renderDag(
+  dag: ArtifactDag,
   artifactTypes: readonly ArtifactType[],
   artifactStatuses: ArtifactStatusEntry[],
 ): string[] {
-  const rootIds = artifactTypes
-    .filter((a) => !a.requires || a.requires.length === 0)
-    .map((a) => a.id)
+  const rootIds = [...dag.roots()]
   const lines: string[] = []
 
   const stateSymbols: Record<string, string> = {
     complete: '[✓]',
+    'complete-with-drift': '[!]',
     skipped: '[✓]',
     missing: '[ ]',
     'drifted-pending-review': '[!]',
@@ -340,6 +403,8 @@ function renderDag(
     'pending-parent-artifact-review': '[~]',
     'in-progress': '[?]',
   }
+
+  const visited = new Set<string>()
 
   /**
    * Draws a single node and recursively its children.
@@ -350,11 +415,14 @@ function renderDag(
    * @param isLast - Whether this is the last child of its parent
    */
   function drawNode(id: string, prefix: string, isRoot: boolean, isLast: boolean): void {
+    if (visited.has(id)) return
+    visited.add(id)
+
     const artifact = artifactTypes.find((a) => a.id === id)
     if (!artifact) return
 
     const artifactStatus = artifactStatuses.find((as) => as.type === id)
-    const status = artifactStatus?.effectiveStatus ?? 'missing'
+    const status = artifactStatus?.displayStatus ?? artifactStatus?.effectiveStatus ?? 'missing'
     const symbol = stateSymbols[status] ?? '[?]'
     const scope = `[scope: ${artifact.scope}]`
 
@@ -366,12 +434,12 @@ function renderDag(
       : ''
     lines.push(`${prefix}${connector}${symbol} ${id} ${scope}${taskTag}`)
 
-    const children = artifactTypes.filter((a) => a.requires && a.requires.includes(id))
+    const children = dag.childrenOf(id)
     const newPrefix = isRoot ? prefix : prefix + (isLast ? '    ' : '│   ')
 
     let i = 0
-    for (const child of children) {
-      drawNode(child.id, newPrefix, false, i === children.length - 1)
+    for (const childId of children) {
+      drawNode(childId, newPrefix, false, i === children.length - 1)
       i++
     }
   }

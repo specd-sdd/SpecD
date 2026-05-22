@@ -77,3 +77,17 @@
 - **WHEN** each consumer needs DAG-aware lifecycle answers for the same change
 - **THEN** they all obtain those answers from `LifecycleEngine.evaluate`
 - **AND** none of them reimplements dependency-aware lifecycle interpretation locally
+
+### Requirement: Next artifact topological order
+
+#### Scenario: Next artifact prefers DAG order over declaration order
+
+- **GIVEN** schema-std where `proposal` is effectively complete, `design` is incomplete but its only incomplete dependency is `specs`, and `specs` is incomplete
+- **WHEN** `LifecycleEngine` derives the next artifact
+- **THEN** the next artifact is `specs` (not `design`)
+
+#### Scenario: All artifacts complete yields null next artifact
+
+- **GIVEN** every artifact is effectively `complete` or `skipped`
+- **WHEN** `LifecycleEngine` derives the next artifact
+- **THEN** the next artifact is `null`

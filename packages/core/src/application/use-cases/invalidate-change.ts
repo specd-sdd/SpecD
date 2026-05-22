@@ -5,6 +5,7 @@ import { type SchemaProvider } from '../ports/schema-provider.js'
 import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
 import { InvalidInvalidateTargetError } from '../errors/invalid-invalidate-target-error.js'
 import { InvalidateRequiresForceError } from '../errors/invalidate-requires-force-error.js'
+import { type ArtifactDag } from '../../domain/value-objects/artifact-dag.js'
 import { type InvalidationPolicy } from '../../domain/value-objects/invalidation-policy.js'
 
 /** A single target identifying an artifact (and optionally a specific file within it). */
@@ -91,7 +92,13 @@ export class InvalidateChange {
 
     if (effectivePolicy === 'none') {
       const persisted = await this._changes.mutate(input.name, (freshChange) => {
-        freshChange.invalidate('artifact-review-required', actor, input.reason, [])
+        freshChange.invalidate(
+          'artifact-review-required',
+          actor,
+          input.reason,
+          [],
+          schema.artifactDag(),
+        )
         return freshChange
       })
 
@@ -110,12 +117,18 @@ export class InvalidateChange {
         actor,
         input.reason,
         affectedArtifacts,
+        schema.artifactDag(),
         effectivePolicy,
       )
       return freshChange
     })
 
-    const expanded = expandAffectedSet(resolvedTargets, change, effectivePolicy)
+    const expanded = expandAffectedSet(
+      resolvedTargets,
+      change,
+      effectivePolicy,
+      schema.artifactDag(),
+    )
 
     return { change: persisted, effectivePolicy, affected: expanded }
   }
@@ -223,12 +236,14 @@ function resolveTargets(
  * @param directTargets - The resolved direct targets
  * @param change - The change for DAG traversal
  * @param policy - The effective policy controlling expansion
+ * @param artifactDag - Schema-derived DAG for `downstream` expansion
  * @returns Affected files labelled with their expansion origin
  */
 function expandAffectedSet(
   directTargets: Array<{ artifactId: string; key: string; filename: string }>,
   change: Change,
   policy: InvalidationPolicy,
+  artifactDag: ArtifactDag,
 ): AffectedArtifactFile[] {
   const results: AffectedArtifactFile[] = []
   const directArtifactOrder = uniqueArtifactIds(directTargets.map((target) => target.artifactId))
@@ -247,7 +262,7 @@ function expandAffectedSet(
   const directTypeIds = new Set(directArtifactOrder)
 
   if (policy === 'global') {
-    const artifactTraversalOrder = orderArtifactsByTraversal(change, directArtifactOrder, true)
+    const artifactTraversalOrder = artifactDag.topologicalOrder()
     for (const typeId of artifactTraversalOrder) {
       if (directTypeIds.has(typeId)) continue
       const artifact = change.getArtifact(typeId)
@@ -263,7 +278,13 @@ function expandAffectedSet(
     }
     return results
   }
-  const artifactTraversalOrder = orderArtifactsByTraversal(change, directArtifactOrder, false)
+  const expandedTypeIds = new Set([
+    ...directArtifactOrder,
+    ...artifactDag.descendantsOf(directArtifactOrder),
+  ])
+  const artifactTraversalOrder = artifactDag
+    .topologicalOrder()
+    .filter((typeId) => expandedTypeIds.has(typeId))
   for (const typeId of artifactTraversalOrder) {
     if (directTypeIds.has(typeId)) continue
     const artifact = change.getArtifact(typeId)
@@ -295,55 +316,5 @@ function uniqueArtifactIds(artifactIds: readonly string[]): string[] {
     seen.add(artifactId)
     ordered.push(artifactId)
   }
-  return ordered
-}
-
-/**
- * Orders artifacts using a linear DAG-forest traversal rooted at direct targets.
- *
- * @param change - Change whose artifact DAG is traversed
- * @param directArtifactOrder - Directly targeted artifacts in caller order
- * @param includeRemainingArtifacts - Whether to continue with remaining roots after targeted branches
- * @returns Artifact ids in deterministic reporting order
- */
-function orderArtifactsByTraversal(
-  change: Change,
-  directArtifactOrder: readonly string[],
-  includeRemainingArtifacts: boolean,
-): string[] {
-  const children = new Map<string, string[]>()
-  for (const [typeId, artifact] of change.artifacts) {
-    for (const dep of artifact.requires) {
-      const current = children.get(dep)
-      if (current === undefined) {
-        children.set(dep, [typeId])
-      } else {
-        current.push(typeId)
-      }
-    }
-  }
-
-  const ordered: string[] = []
-  const visited = new Set<string>()
-
-  const visit = (typeId: string): void => {
-    if (visited.has(typeId)) return
-    visited.add(typeId)
-    ordered.push(typeId)
-    for (const child of children.get(typeId) ?? []) {
-      visit(child)
-    }
-  }
-
-  for (const typeId of directArtifactOrder) {
-    visit(typeId)
-  }
-
-  if (includeRemainingArtifacts) {
-    for (const [typeId] of change.artifacts) {
-      visit(typeId)
-    }
-  }
-
   return ordered
 }

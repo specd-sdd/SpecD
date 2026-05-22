@@ -1,0 +1,49 @@
+- op: modified
+  description: 'DAG-aware batch scenarios'
+  selector:
+    type: section
+    matches: 'Requirement: Batch mode \(--all\)'
+  content: |
+    #### Scenario: Change-scoped batch step omits specPath
+
+    - **GIVEN** a change with `proposal` (change-scoped) and multiple `specIds`
+    - **WHEN** `specd changes validate <name> --all` runs
+    - **THEN** the change-scoped `proposal` step invokes `ValidateArtifacts` without a `specPath` argument
+
+    #### Scenario: --all walks DAG with change-scoped once and spec-scoped per specId
+
+    - **GIVEN** a change with specIds `["core:schema-format", "cli:change-validate"]` and valid deltas for the next incomplete DAG steps
+    - **WHEN** `specd change validate fix-validate-all-dag --all` is run
+    - **THEN** change-scoped artifacts such as `proposal` are validated once
+    - **AND** spec-scoped artifacts such as `specs` are validated once per specId
+    - **AND** validation order respects `artifactDag().topologicalOrder()` (parents before children)
+
+    #### Scenario: --all with specPath is rejected
+
+    - **WHEN** `specd change validate my-change default:auth/login --all` is run
+    - **THEN** stderr contains `error: --all and <specPath> are mutually exclusive` and exit code is 1
+
+    #### Scenario: neither specPath nor --all is rejected
+
+    - **WHEN** `specd change validate my-change` is run without specPath or --all
+    - **THEN** stderr contains `error: either <specPath> or --all is required` and exit code is 1
+
+    #### Scenario: --all with --artifact filters DAG steps
+
+    - **GIVEN** a change with 2 specIds and incomplete `specs` deltas
+    - **WHEN** `specd change validate my-change --all --artifact specs` is run
+    - **THEN** only `specs` validation steps run (once per specId)
+    - **AND** other artifact types are not validated in that batch
+
+    #### Scenario: --all with partial failures exits 1
+
+    - **GIVEN** a batch where one scheduled step fails and another passes
+    - **WHEN** `specd change validate my-change --all` is run
+    - **THEN** all scheduled steps still run
+    - **AND** exit code is 1
+
+    #### Scenario: --all JSON output lists scheduled steps
+
+    - **GIVEN** a batch where all scheduled steps pass
+    - **WHEN** `specd change validate my-change --all --format json` is run
+    - **THEN** output includes `passed`, `total`, and `results[]` with `artifact` and `spec` (null for change-scoped steps) per entry

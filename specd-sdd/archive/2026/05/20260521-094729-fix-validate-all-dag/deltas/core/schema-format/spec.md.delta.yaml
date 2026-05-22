@@ -1,0 +1,64 @@
+- op: added
+  description: 'Document Schema.artifactDag() and ArtifactDag value object'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Artifact definition'
+  content: |
+    ### Requirement: Schema artifact DAG API
+
+    A resolved `Schema` MUST expose `artifactDag(): ArtifactDag` — the single canonical runtime API for artifact dependency structure derived only from `artifacts[].requires`.
+
+    `artifactDag()` MUST return the same cached `ArtifactDag` instance for the lifetime of the `Schema` object.
+
+    `ArtifactDag` MUST provide:
+
+    - `roots()` — artifact ids whose `requires` list is empty
+    - `childrenOf(id)` — direct dependents (artifacts that list `id` in `requires`), ordered with stable tie-break using schema declaration order among children
+    - `topologicalOrder()` — every artifact id exactly once, parents before children, stable tie-break using schema declaration order
+    - `descendantsOf(ids)` — transitive dependents of the given ids, deduplicated, ordered with the same stable tie-break
+
+    Cycle detection at schema load remains owned by schema build/validation; `ArtifactDag` assumes the graph is acyclic.
+
+    ### Requirement: Canonical artifact DAG derivation
+
+    Runtime code that needs artifact DAG structure (roots, children, topological order, descendants, or equivalent adjacency) MUST obtain it through `schema.artifactDag()` and MUST NOT rebuild parallel graphs from `requires` via local `includes` filters, private BFS/DFS helpers, or declaration-order scans used as a proxy for dependency order.
+
+    This constraint applies to validation batching, lifecycle next-artifact selection, invalidation downstream expansion, status DAG rendering, affected-set reporting order, and **`EditChange.updateSpecIds`** (scope edits that trigger invalidation).
+
+    Non-exhaustive consumers that MUST use `schema.artifactDag()` (or receive it from a caller that resolved the active schema): `ValidateArtifacts`, `InvalidateChange`, `TransitionChange`, `ArchiveChange`, `ChangeRepository` mutation paths, `LifecycleEngine`, `EditChange`, and CLI commands that emit DAG structure when the active `Schema` is available.
+
+    `artifactDagFromChangeArtifacts()` remains a test/helper for building a DAG from persisted change artifacts only; production use cases MUST NOT use it when an active schema is available.
+
+- op: modified
+  description: 'Clarify requires feeds ArtifactDag not ad-hoc traversal'
+  selector:
+    type: section
+    matches: 'Requirement: Artifact definition'
+  content: |
+    Each entry in `artifacts` must include:
+
+    - `id` (string, required) — unique identifier within the schema, e.g. `proposal`, `specs`, `design`, `tasks`
+    - `scope` (`spec` | `change`, required) — declares where this artifact lives after the change is archived. `spec` means the artifact file is synced to the `SpecRepository` (e.g. `spec.md`, `verify.md` — files that become part of the project's permanent spec record). `change` means the artifact stays only in the change directory and is never synced (e.g. `proposal.md`, `tasks.md` — working documents used during the change process).
+    - `optional` (boolean, optional, default `false`) — when `false`, `ValidateArtifacts` requires this artifact to be present in the change before validation can pass. When `true`, the artifact may be absent without failing validation; if present, it is validated and (for `scope: spec` artifacts) synced normally. `scope` and `optional` are independent.
+    - `hasTasks` (boolean, optional, default `false`) — when `true`, the artifact is explicitly marked as containing trackable tasks. This is the **master switch** for task capability: it enables task completion checks and displays the `[hasTasks]` indicator in CLI status. If omitted or `false`, task capability is disabled even if `taskCompletionCheck` patterns are defined.
+    - `output` (string or glob, required) — path pattern for the artifact's files **relative to the change directory**, e.g. `proposal.md` or `specs/**/spec.md`. When creating a new artifact file within a change, the filename is derived from the last literal segment of the glob (e.g. `spec.md` from `specs/**/spec.md`); if the last segment is a wildcard, the filename falls back to the template filename (e.g. `spec.md` from `template: templates/spec.md`). If neither the glob nor the template yields a determinate filename, `SchemaRegistry.resolve()` must throw a `SchemaValidationError`. The final location of these files in the project repo after syncing is configured separately and may differ.
+    - `description` (string, optional) — human-readable summary for tooling
+    - `template` (string, optional) — path to a template file, relative to the schema directory; see Requirement: Template resolution
+    - `instruction` (string, optional) — AI instruction text assembled by `GetArtifactInstruction`
+    - `requires` (array of artifact IDs, optional) — artifacts that must be resolved before this one; used to compute `Change.effectiveStatus()` and to build `Schema.artifactDag()`. A dependency is resolved when its status is `complete` or `skipped`. `skipped` is only reachable for `optional: true` artifacts. Any other state (`missing`, `in-progress`) blocks the dependent artifact.
+    - `format` (`markdown` | `json` | `yaml` | `plaintext`, optional) — declares the file format of this artifact. Used by `GetArtifactInstruction` to select the correct `ArtifactParser` adapter when injecting delta instructions. If omitted, the format is inferred from the file extension of the derived output filename (`.md` → `markdown`, `.json` → `json`, `.yaml` / `.yml` → `yaml`); any other extension defaults to `plaintext`. Must be declared explicitly when the extension is ambiguous or non-standard.
+    - `delta` (boolean, optional, default `false`) — declares that this artifact supports delta files. Only valid when `scope: spec`; `SchemaRegistry.resolve()` must throw a `SchemaValidationError` if `delta: true` is combined with `scope: change`. When `true`, a delta file for this artifact (`deltas/<workspace>/<capability-path>/<filename>.delta.yaml`) may be present in the change directory. When `false`, delta files for this artifact are rejected at validation time.
+    - `deltaInstruction` (string, optional) — domain-specific guidance injected by `GetArtifactInstruction` alongside the format-level delta instructions when `delta: true`. Describes which domain concepts to add, modify, or remove (e.g. requirements, scenarios) without repeating the technical delta format, which is provided automatically by the `ArtifactParser` adapter. Only valid when `delta: true`.
+    - `deltaValidations` (array, optional) — structural validation rules checked against the normalized YAML AST of the delta file before application; see Requirement: Delta validation rules. Only valid when `delta: true`.
+    - `validations` (array, optional) — structural validation rules for the base artifact (after delta application); see Requirement: Validation rules
+    - `metadataExtraction` (object, optional) — top-level declaration of how to extract metadata fields from artifact content; see Requirement: Metadata extraction
+    - `rules` (object, optional) — constraint blocks injected by `GetArtifactInstruction` around the artifact's `instruction`. Rules exist as a **schema composition mechanism**: they allow extending schemas and schema plugins to wrap an artifact's instruction with additional constraints without overriding the `instruction` field itself. A base schema defines the core instruction; child schemas or plugins add `rules.pre`/`rules.post` entries to augment it.
+      - `pre` (array, optional) — entries injected **before** the instruction. Each entry: `{ id: string, instruction: string }`.
+      - `post` (array, optional) — entries injected **after** the instruction. Each entry: `{ id: string, instruction: string }`.
+        `id` follows the standard array entry identity format. `instruction` is injected verbatim as a constraint block.
+    - `preHashCleanup` (array, optional) — list of regex substitutions applied to the artifact content before computing any hash (both `validatedHash` for `ArtifactStatus` and the approval hash). Each entry has `id` (string, required — standard array entry identity format), `pattern` (regex string), and `replacement` (string, may be empty). Substitutions are applied in declaration order. Use this to normalize progress markers or other volatile content that should not affect hash comparisons.
+    - `taskCompletionCheck` (object, optional) — declares patterns for detecting checkboxes; see Requirement: taskCompletionCheck.

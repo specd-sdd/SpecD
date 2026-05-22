@@ -200,6 +200,13 @@
 - **THEN** the focused target files are reopened
 - **AND** all DAG descendants of that target set are reopened
 
+#### Scenario: Downstream policy uses artifactDag descendants
+
+- **GIVEN** schema-std `artifactDag` where invalidating `specs` expands to `verify` and `tasks`
+- **WHEN** `Change.invalidate()` is called with effective policy `downstream`, focused targets under `specs`, and that `artifactDag`
+- **THEN** files under `verify` and `tasks` are reopened according to policy
+- **AND** expansion does not depend on persisted artifact `requires` maps on the change
+
 ### Requirement: Per-file drift tracking
 
 #### Scenario: Artifact-drift sets hasDrift on only the affected files

@@ -74,7 +74,7 @@ Each entry in `artifacts` must include:
 - `description` (string, optional) — human-readable summary for tooling
 - `template` (string, optional) — path to a template file, relative to the schema directory; see Requirement: Template resolution
 - `instruction` (string, optional) — AI instruction text assembled by `GetArtifactInstruction`
-- `requires` (array of artifact IDs, optional) — artifacts that must be resolved before this one; used to compute `Change.effectiveStatus()`. A dependency is resolved when its status is `complete` or `skipped`. `skipped` is only reachable for `optional: true` artifacts. Any other state (`missing`, `in-progress`) blocks the dependent artifact.
+- `requires` (array of artifact IDs, optional) — artifacts that must be resolved before this one; used to compute `Change.effectiveStatus()` and to build `Schema.artifactDag()`. A dependency is resolved when its status is `complete` or `skipped`. `skipped` is only reachable for `optional: true` artifacts. Any other state (`missing`, `in-progress`) blocks the dependent artifact.
 - `format` (`markdown` | `json` | `yaml` | `plaintext`, optional) — declares the file format of this artifact. Used by `GetArtifactInstruction` to select the correct `ArtifactParser` adapter when injecting delta instructions. If omitted, the format is inferred from the file extension of the derived output filename (`.md` → `markdown`, `.json` → `json`, `.yaml` / `.yml` → `yaml`); any other extension defaults to `plaintext`. Must be declared explicitly when the extension is ambiguous or non-standard.
 - `delta` (boolean, optional, default `false`) — declares that this artifact supports delta files. Only valid when `scope: spec`; `SchemaRegistry.resolve()` must throw a `SchemaValidationError` if `delta: true` is combined with `scope: change`. When `true`, a delta file for this artifact (`deltas/<workspace>/<capability-path>/<filename>.delta.yaml`) may be present in the change directory. When `false`, delta files for this artifact are rejected at validation time.
 - `deltaInstruction` (string, optional) — domain-specific guidance injected by `GetArtifactInstruction` alongside the format-level delta instructions when `delta: true`. Describes which domain concepts to add, modify, or remove (e.g. requirements, scenarios) without repeating the technical delta format, which is provided automatically by the `ArtifactParser` adapter. Only valid when `delta: true`.
@@ -87,6 +87,31 @@ Each entry in `artifacts` must include:
     `id` follows the standard array entry identity format. `instruction` is injected verbatim as a constraint block.
 - `preHashCleanup` (array, optional) — list of regex substitutions applied to the artifact content before computing any hash (both `validatedHash` for `ArtifactStatus` and the approval hash). Each entry has `id` (string, required — standard array entry identity format), `pattern` (regex string), and `replacement` (string, may be empty). Substitutions are applied in declaration order. Use this to normalize progress markers or other volatile content that should not affect hash comparisons.
 - `taskCompletionCheck` (object, optional) — declares patterns for detecting checkboxes; see Requirement: taskCompletionCheck.
+
+### Requirement: Schema artifact DAG API
+
+A resolved `Schema` MUST expose `artifactDag(): ArtifactDag` — the single canonical runtime API for artifact dependency structure derived only from `artifacts[].requires`.
+
+`artifactDag()` MUST return the same cached `ArtifactDag` instance for the lifetime of the `Schema` object.
+
+`ArtifactDag` MUST provide:
+
+- `roots()` — artifact ids whose `requires` list is empty
+- `childrenOf(id)` — direct dependents (artifacts that list `id` in `requires`), ordered with stable tie-break using schema declaration order among children
+- `topologicalOrder()` — every artifact id exactly once, parents before children, stable tie-break using schema declaration order
+- `descendantsOf(ids)` — transitive dependents of the given ids, deduplicated, ordered with the same stable tie-break
+
+Cycle detection at schema load remains owned by schema build/validation; `ArtifactDag` assumes the graph is acyclic.
+
+### Requirement: Canonical artifact DAG derivation
+
+Runtime code that needs artifact DAG structure (roots, children, topological order, descendants, or equivalent adjacency) MUST obtain it through `schema.artifactDag()` and MUST NOT rebuild parallel graphs from `requires` via local `includes` filters, private BFS/DFS helpers, or declaration-order scans used as a proxy for dependency order.
+
+This constraint applies to validation batching, lifecycle next-artifact selection, invalidation downstream expansion, status DAG rendering, affected-set reporting order, and **`EditChange.updateSpecIds`** (scope edits that trigger invalidation).
+
+Non-exhaustive consumers that MUST use `schema.artifactDag()` (or receive it from a caller that resolved the active schema): `ValidateArtifacts`, `InvalidateChange`, `TransitionChange`, `ArchiveChange`, `ChangeRepository` mutation paths, `LifecycleEngine`, `EditChange`, and CLI commands that emit DAG structure when the active `Schema` is available.
+
+`artifactDagFromChangeArtifacts()` remains a test/helper for building a DAG from persisted change artifacts only; production use cases MUST NOT use it when an active schema is available.
 
 ### Requirement: preHashCleanup
 

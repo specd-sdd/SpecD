@@ -15,41 +15,15 @@
   ],
   "implementation": [
     {
+      "file": "core:src/application/use-cases/edit-change.ts",
+      "symbols": ["EditChange"]
+    },
+    {
       "file": "core:src/domain/entities/change.ts",
-      "symbols": [
-        "Change",
-        "Change.getHistoricalImplementationAt",
-        "Change.trackImplementationFile",
-        "Change.addImplementationLink",
-        "Change.removeImplementationLink",
-        "Change.removeImplementationSymbol",
-        "TrackedImplementationFile",
-        "ImplementationLink"
-      ]
+      "symbols": ["Change"]
     },
     {
-      "file": "core:src/application/errors/implementation-links-exist-error.ts",
-      "symbols": ["ImplementationLinksExistError"]
-    },
-    {
-      "file": "core:src/application/use-cases/_shared/implementation-tracking.ts",
-      "symbols": ["ImplementationTrackingProjection", "projectImplementationTracking"]
-    },
-    {
-      "file": "core:src/application/use-cases/get-implementation-review.ts",
-      "symbols": [
-        "GetImplementationReview",
-        "GetImplementationReview.execute",
-        "GetImplementationReviewResult"
-      ]
-    },
-    {
-      "file": "core:src/application/use-cases/update-implementation-tracking.ts",
-      "symbols": [
-        "UpdateImplementationTracking",
-        "UpdateImplementationTracking.execute",
-        "UpdateImplementationTrackingResult"
-      ]
+      "file": "core:src/composition/kernel.ts"
     }
   ]
 }

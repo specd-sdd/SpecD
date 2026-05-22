@@ -120,7 +120,7 @@
     {
       "requirement": "Policy-aware invalidation",
       "rules": [
-        "`Change.invalidate()` SHALL remain the entity-owned authority for change-level invalidation and artifact/file-state consequences.\n\nIt SHALL accept:\n\n- a domain invalidation cause\n- a human-readable message\n- a focused `affectedArtifacts` payload identifying the concrete artifact/file entries that triggered invalidation\n- an optional `invalidationPolicyOverride`\n\nThe effective invalidation policy is resolved from the override when present, otherwise from the change's persisted `invalidationPolicy`.\n\nRegardless of policy, invalidation SHALL append an `invalidated` history event and return the change to `designing` when the change was previously in another lifecycle state.\n\nArtifact/file-state consequences follow the effective policy:\n\n- `none` — no artifact/file enters a reopened review state solely because of invalidation\n- `surgical` — only the normalized affected target set is reopened\n- `downstream` — the normalized affected target set and its DAG descendants are reopened\n- `global` — every artifact/file in the change is reopened\n\nThe entity SHALL deduplicate the final affected set before applying reopened state transitions."
+        "`Change.invalidate()` SHALL accept:\n\n- a domain invalidation cause\n- a human-readable message\n- a focused `affectedArtifacts` payload identifying the concrete artifact/file entries that triggered invalidation\n- an optional `invalidationPolicyOverride`\n- a required `artifactDag: ArtifactDag` argument supplying schema-derived DAG structure for policy expansion\n\nThe effective invalidation policy is resolved from the override when present, otherwise from the change's persisted `invalidationPolicy`.\n\nRegardless of policy, invalidation SHALL append an `invalidated` history event and return the change to `designing` when the change was previously in another lifecycle state.\n\nArtifact/file-state consequences follow the effective policy:\n\n- `none` — no artifact/file enters a reopened review state solely because of invalidation\n- `surgical` — only the normalized affected target set is reopened\n- `downstream` — the normalized affected target set and all artifact ids returned by `artifactDag.descendantsOf()` for the normalized target artifact types are reopened\n- `global` — every artifact/file in the change is reopened\n\nThe entity SHALL deduplicate the final affected set before applying reopened state transitions.\n\n`Change` MUST NOT derive DAG edges from persisted artifact `requires` maps or private BFS helpers; downstream expansion MUST use the supplied `artifactDag`."
       ]
     },
     {
@@ -419,6 +419,18 @@
       "then": [
         "the focused target files are reopened",
         "AND all DAG descendants of that target set are reopened"
+      ]
+    },
+    {
+      "requirement": "Policy-aware invalidation",
+      "name": "Downstream policy uses artifactDag descendants",
+      "given": ["schema-std artifactDag where invalidating specs expands to verify and tasks"],
+      "when": [
+        "Change.invalidate() is called with effective policy downstream, focused targets under specs, and that artifactDag"
+      ],
+      "then": [
+        "files under verify and tasks are reopened according to policy",
+        "AND expansion does not depend on persisted artifact requires maps on the change"
       ]
     },
     {
@@ -745,97 +757,28 @@
     }
   ],
   "implementation": {
+    "files": [
+      {
+        "specId": "core:change",
+        "file": "core:src/composition/kernel.ts"
+      }
+    ],
     "symbols": [
+      {
+        "specId": "core:change",
+        "file": "core:src/application/use-cases/edit-change.ts",
+        "symbol": "EditChange"
+      },
       {
         "specId": "core:change",
         "file": "core:src/domain/entities/change.ts",
         "symbol": "Change"
-      },
-      {
-        "specId": "core:change",
-        "file": "core:src/domain/entities/change.ts",
-        "symbol": "Change.getHistoricalImplementationAt"
-      },
-      {
-        "specId": "core:change",
-        "file": "core:src/domain/entities/change.ts",
-        "symbol": "Change.trackImplementationFile"
-      },
-      {
-        "specId": "core:change",
-        "file": "core:src/domain/entities/change.ts",
-        "symbol": "Change.addImplementationLink"
-      },
-      {
-        "specId": "core:change",
-        "file": "core:src/domain/entities/change.ts",
-        "symbol": "Change.removeImplementationLink"
-      },
-      {
-        "specId": "core:change",
-        "file": "core:src/domain/entities/change.ts",
-        "symbol": "Change.removeImplementationSymbol"
-      },
-      {
-        "specId": "core:change",
-        "file": "core:src/domain/entities/change.ts",
-        "symbol": "TrackedImplementationFile"
-      },
-      {
-        "specId": "core:change",
-        "file": "core:src/domain/entities/change.ts",
-        "symbol": "ImplementationLink"
-      },
-      {
-        "specId": "core:change",
-        "file": "core:src/application/errors/implementation-links-exist-error.ts",
-        "symbol": "ImplementationLinksExistError"
-      },
-      {
-        "specId": "core:change",
-        "file": "core:src/application/use-cases/_shared/implementation-tracking.ts",
-        "symbol": "ImplementationTrackingProjection"
-      },
-      {
-        "specId": "core:change",
-        "file": "core:src/application/use-cases/_shared/implementation-tracking.ts",
-        "symbol": "projectImplementationTracking"
-      },
-      {
-        "specId": "core:change",
-        "file": "core:src/application/use-cases/get-implementation-review.ts",
-        "symbol": "GetImplementationReview"
-      },
-      {
-        "specId": "core:change",
-        "file": "core:src/application/use-cases/get-implementation-review.ts",
-        "symbol": "GetImplementationReview.execute"
-      },
-      {
-        "specId": "core:change",
-        "file": "core:src/application/use-cases/get-implementation-review.ts",
-        "symbol": "GetImplementationReviewResult"
-      },
-      {
-        "specId": "core:change",
-        "file": "core:src/application/use-cases/update-implementation-tracking.ts",
-        "symbol": "UpdateImplementationTracking"
-      },
-      {
-        "specId": "core:change",
-        "file": "core:src/application/use-cases/update-implementation-tracking.ts",
-        "symbol": "UpdateImplementationTracking.execute"
-      },
-      {
-        "specId": "core:change",
-        "file": "core:src/application/use-cases/update-implementation-tracking.ts",
-        "symbol": "UpdateImplementationTrackingResult"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:12c08377b55a825effb14b25b98ffdaaa4120d2de46c86f243b54c352e3ab842",
-    "verify.md": "sha256:3bbbec2688212f61a62d826858e482147a741ca6c386d0107476dcd3e6236b8c"
+    "spec.md": "sha256:c4d22258983736702da8235137d22d7b894cc6dcdcb542257a2e036265c110d0",
+    "verify.md": "sha256:5e5d7a8c47eaa171e28cff34c7a71bb2bb66fbd73b49c4738a61bfb126887f4d"
   },
   "generatedBy": "core"
 }

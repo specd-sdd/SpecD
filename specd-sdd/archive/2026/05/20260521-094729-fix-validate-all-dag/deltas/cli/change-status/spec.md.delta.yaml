@@ -1,0 +1,37 @@
+- op: modified
+  description: 'DAG children from schema.artifactDag()'
+  selector:
+    type: section
+    matches: 'Requirement: Schema-derived fields'
+  content: |
+    When the change uses any schema (not just schema-std), the JSON output MUST include a nested schema object with derived fields:
+
+    ```
+    schema:
+      name: "..."
+      version: 1
+      artifactDag:
+        - id: "..."
+          scope: "change|spec"
+          optional: true|false
+          requires: ["..."]
+          children: ["..."]
+          hasTasks: true|false
+          output: "..."
+    ```
+
+    `artifactDag` entries MUST be emitted in `schema.artifactDag().topologicalOrder()`.
+
+    For each entry, `requires` comes from the schema artifact definition and `children` MUST be `schema.artifactDag().childrenOf(id)` — the CLI MUST NOT derive children with local `requires.includes(id)` filters.
+
+    `hasTasks` is true when the artifact has `hasTasks: true` explicitly or has a `taskCompletionCheck` declaration.
+
+    Text-mode `artifacts (DAG):` tree rendering MUST use the same roots (`artifactDag().roots()`) and child ordering (`childrenOf`) as structured output.
+
+    Text-mode DAG node labels MUST use each artifact's **display status** from `GetStatus` (for example `complete-with-drift`), not raw `effectiveStatus`, so drift is visible without reading the details section.
+
+    When the DAG has convergent edges (one artifact required by multiple parents), the text tree MUST render each artifact type id **at most once**. Dependents reached again via another branch MUST NOT repeat the full subtree; the renderer MAY omit duplicate child expansion or annotate with a short reference (for example `└── (see <id> above)`).
+
+    When the CLI has resolved the active `Schema` instance, structured and text DAG derivation MUST use `schema.artifactDag()` (cached) rather than rebuilding `ArtifactDag.from` on a detached artifact list, so ordering matches every other consumer.
+
+    This allows design/implement skills to replace `schema show` calls.

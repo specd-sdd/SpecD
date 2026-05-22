@@ -2,12 +2,12 @@
   "title": "GetArtifactInstruction",
   "description": "When an agent is creating or modifying a specific artifact during the designing step, it needs the artifact's instruction along with its composition rules and delta guidance — but this is instruction content, not context. `CompileContext` handles context (specs, metadata, available steps); `GetArtifactInstruction` handles the artifact-specific instructions: the schema instruction, composition rules (`rules.pre`/`rules.post`), and delta instructions with existing artifact outlines. The skill retrieves these at the right moment — after loading context but before doing the work.",
   "dependsOn": [
-    "core:schema-format",
     "core:delta-format",
     "core:change",
     "core:schema-merge",
     "core:template-variables",
-    "core:lifecycle-engine"
+    "core:lifecycle-engine",
+    "core:schema-format"
   ],
   "context": [
     "When an agent is creating or modifying a specific artifact during the designing step, it needs the artifact's instruction along with its composition rules and delta guidance — but this is instruction content, not context. `CompileContext` handles context (specs, metadata, available steps); `GetArtifactInstruction` handles the artifact-specific instructions: the schema instruction, composition rules (`rules.pre`/`rules.post`), and delta instructions with existing artifact outlines. The skill retrieves these at the right moment — after loading context but before doing the work."
@@ -22,7 +22,7 @@
     {
       "requirement": "Input",
       "rules": [
-        "`GetArtifactInstruction.execute` receives:\n\n- `name` (string, required) — the change name\n- `artifactId` (string, optional) — the artifact ID from the schema (e.g. `specs`, `verify`, `tasks`). When omitted, the use case auto-resolves the next artifact to work on using `LifecycleEngine`: the first artifact in schema declaration order whose dependencies are effectively satisfied (`complete` or `skipped`) but that is itself not yet effectively complete or skipped. If all artifacts are already complete/skipped, it throws `ArtifactNotFoundError`."
+        "`GetArtifactInstruction.execute` receives:\n\n- `name` (string, required) — the change name\n- `artifactId` (string, optional) — the artifact ID from the schema (e.g. `specs`, `verify`, `tasks`). When omitted, the use case auto-resolves the next artifact to work on using `LifecycleEngine.nextArtifact`, which selects the first artifact in `schema.artifactDag().topologicalOrder()` whose dependencies are effectively satisfied (`complete` or `skipped`) but that is itself not yet effectively complete or skipped. If all artifacts are already complete/skipped, it throws `ArtifactNotFoundError`."
       ]
     },
     {
@@ -163,7 +163,7 @@
       "given": [
         "proposal is effectively complete",
         "AND specs is not effectively complete",
-        "AND LifecycleEngine.evaluate reports specs as the first effectively ready incomplete artifact"
+        "AND LifecycleEngine.nextArtifact reports specs as the first incomplete artifact in artifactDag().topologicalOrder() with satisfied dependencies"
       ],
       "when": ["GetArtifactInstruction.execute is called without artifactId"],
       "then": ["the returned artifactId is specs"]
@@ -177,11 +177,27 @@
       ],
       "when": ["GetArtifactInstruction.execute is called without artifactId"],
       "then": ["that artifact is not selected as complete/resolved by auto-resolution"]
+    },
+    {
+      "requirement": "Input",
+      "name": "All artifacts complete throws ArtifactNotFoundError",
+      "given": ["every artifact is effectively complete or skipped"],
+      "when": ["GetArtifactInstruction.execute is called without artifactId"],
+      "then": ["ArtifactNotFoundError is thrown"]
     }
   ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "core:get-artifact-instruction",
+        "file": "core:src/application/use-cases/get-artifact-instruction.ts",
+        "symbol": "GetArtifactInstruction"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:d78fef66624cde3606e7987d50297a368ac3b1d18ac2a40397eebae40047636d",
-    "verify.md": "sha256:cf55690591b8b1d4d73a4f4a84cd812526890f5a16b8fb313ac9233f66f277de"
+    "spec.md": "sha256:440689a93012fa89b495eb722c24a5067aad381db40c8a1808b452b29caccc1d",
+    "verify.md": "sha256:c57b9ce4b041d9a3c7f2404668e54f11ab54271f985478acce0906b8afda8d32"
   },
   "generatedBy": "core"
 }

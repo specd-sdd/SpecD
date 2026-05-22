@@ -5,6 +5,7 @@ import { CorruptedManifestError } from '../errors/corrupted-manifest-error.js'
 import { HistoricalImplementationGuardError } from '../errors/historical-implementation-guard-error.js'
 import { ChangeArtifact } from './change-artifact.js'
 import { ArtifactFile } from '../value-objects/artifact-file.js'
+import { type ArtifactDag } from '../value-objects/artifact-dag.js'
 import { type ArtifactType } from '../value-objects/artifact-type.js'
 import {
   type InvalidationPolicy,
@@ -660,6 +661,7 @@ export class Change {
    * @param actor - Identity of the actor triggering the change
    * @param message - Human-readable invalidation summary
    * @param affectedArtifacts - Artifact/file payload that triggered the invalidation
+   * @param artifactDag - Schema-derived DAG used for `downstream` expansion
    * @param invalidationPolicyOverride - Override the persisted policy for this execution
    * @returns The final deduplicated affected set after policy expansion
    */
@@ -673,10 +675,11 @@ export class Change {
         files: [...artifact.files.keys()],
       }),
     ),
+    artifactDag: ArtifactDag,
     invalidationPolicyOverride?: InvalidationPolicy,
   ): readonly InvalidatedArtifactEntry[] {
     const effectivePolicy = this._resolveInvalidationPolicy(invalidationPolicyOverride)
-    const expanded = this._expandAffectedArtifacts(affectedArtifacts, effectivePolicy)
+    const expanded = this._expandAffectedArtifacts(affectedArtifacts, effectivePolicy, artifactDag)
 
     const from = this.state
     const now = new Date()
@@ -769,11 +772,13 @@ export class Change {
    *
    * @param base - The initially targeted artifact/file entries
    * @param policy - The effective invalidation policy
+   * @param artifactDag - Schema-derived DAG for `downstream` expansion
    * @returns The expanded affected set
    */
   private _expandAffectedArtifacts(
     base: readonly InvalidatedArtifactEntry[],
     policy: InvalidationPolicy,
+    artifactDag: ArtifactDag,
   ): readonly InvalidatedArtifactEntry[] {
     if (policy === 'none' || policy === 'surgical') {
       const seen = new Map<string, Set<string>>()
@@ -797,7 +802,7 @@ export class Change {
 
     // downstream: targets + DAG descendants
     const baseTypes = new Set(base.map((e) => e.type))
-    const descendants = this._findDagDescendants(baseTypes)
+    const descendants = artifactDag.descendantsOf([...baseTypes])
 
     const seen = new Map<string, Set<string>>()
     for (const entry of base) {
@@ -818,41 +823,6 @@ export class Change {
     }
 
     return [...seen.entries()].map(([type, files]) => ({ type, files: [...files] }))
-  }
-
-  /**
-   * Performs a BFS from `roots` over the artifact DAG to discover all descendants.
-   *
-   * @param roots - Starting artifact type IDs
-   * @returns Descendant type IDs (excludes the roots themselves)
-   */
-  private _findDagDescendants(roots: Set<string>): string[] {
-    const children = new Map<string, Set<string>>()
-    for (const [typeId, artifact] of this._artifacts) {
-      for (const dep of artifact.requires) {
-        let set = children.get(dep)
-        if (set === undefined) {
-          set = new Set<string>()
-          children.set(dep, set)
-        }
-        set.add(typeId)
-      }
-    }
-
-    const visited = new Set<string>()
-    const queue = [...roots]
-    while (queue.length > 0) {
-      const current = queue.pop()!
-      const kids = children.get(current)
-      if (kids === undefined) continue
-      for (const kid of kids) {
-        if (!visited.has(kid) && !roots.has(kid)) {
-          visited.add(kid)
-          queue.push(kid)
-        }
-      }
-    }
-    return [...visited]
   }
 
   /**
@@ -997,8 +967,9 @@ export class Change {
    *
    * @param specIds - The new spec paths
    * @param actor - Identity of the actor making the change
+   * @param artifactDag - Schema-derived DAG for invalidation expansion
    */
-  updateSpecIds(specIds: readonly string[], actor: ActorIdentity): void {
+  updateSpecIds(specIds: readonly string[], actor: ActorIdentity, artifactDag: ArtifactDag): void {
     this._specIds = [...new Set(specIds)]
     const newIds = new Set(this._specIds)
     for (const key of this._specDependsOn.keys()) {
@@ -1012,6 +983,7 @@ export class Change {
         type: artifact.type,
         files: [...artifact.files.keys()],
       })),
+      artifactDag,
     )
   }
 

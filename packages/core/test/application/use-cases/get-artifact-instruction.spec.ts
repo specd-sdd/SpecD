@@ -6,6 +6,8 @@ import { SchemaMismatchError } from '../../../src/application/errors/schema-mism
 import { ArtifactNotFoundError } from '../../../src/application/errors/artifact-not-found-error.js'
 import { TemplateExpander } from '../../../src/application/template-expander.js'
 import { Change, type ChangeEvent } from '../../../src/domain/entities/change.js'
+import { ChangeArtifact } from '../../../src/domain/entities/change-artifact.js'
+import { ArtifactFile } from '../../../src/domain/value-objects/artifact-file.js'
 import {
   makeChangeRepository,
   makeSpecRepository,
@@ -224,6 +226,95 @@ describe('GetArtifactInstruction', () => {
 
       expect(result.rulesPre).toEqual(['Before my-change'])
       expect(result.rulesPost).toEqual(['After my-change'])
+    })
+  })
+
+  describe('auto artifact selection', () => {
+    it('selects the first incomplete artifact in topological order when artifactId is omitted', async () => {
+      const change = makeChange('my-change', { schemaName: 'test-schema' })
+      change.setArtifact(
+        new ChangeArtifact({
+          type: 'proposal',
+          files: new Map([
+            [
+              'proposal',
+              new ArtifactFile({
+                key: 'proposal',
+                filename: 'proposal.md',
+                status: 'complete',
+                validatedHash: 'sha256:p',
+              }),
+            ],
+          ]),
+        }),
+      )
+      change.setArtifact(
+        new ChangeArtifact({
+          type: 'design',
+          requires: ['proposal', 'specs', 'verify'],
+          files: new Map([
+            [
+              'design',
+              new ArtifactFile({ key: 'design', filename: 'design.md', status: 'in-progress' }),
+            ],
+          ]),
+        }),
+      )
+      change.setArtifact(
+        new ChangeArtifact({
+          type: 'specs',
+          requires: ['proposal'],
+          files: new Map([
+            [
+              'specs',
+              new ArtifactFile({ key: 'specs', filename: 'spec.md', status: 'in-progress' }),
+            ],
+          ]),
+        }),
+      )
+
+      const schema = makeSchema({
+        name: 'test-schema',
+        artifacts: [
+          makeArtifactType('design', { requires: ['proposal', 'specs', 'verify'] }),
+          makeArtifactType('proposal'),
+          makeArtifactType('specs', { requires: ['proposal'] }),
+          makeArtifactType('verify', { requires: ['specs'] }),
+        ],
+      })
+      const { sut } = makeSut({ change, schema })
+
+      const result = await sut.execute({ name: 'my-change' })
+
+      expect(result.artifactId).toBe('specs')
+    })
+
+    it('throws ArtifactNotFoundError when every artifact is complete or skipped', async () => {
+      const change = makeChange('my-change', { schemaName: 'test-schema' })
+      const complete = new ChangeArtifact({
+        type: 'proposal',
+        files: new Map([
+          [
+            'proposal',
+            new ArtifactFile({
+              key: 'proposal',
+              filename: 'proposal.md',
+              status: 'complete',
+              validatedHash: 'sha256:p',
+            }),
+          ],
+        ]),
+      })
+      complete.markComplete('proposal', 'sha256:p')
+      change.setArtifact(complete)
+
+      const schema = makeSchema({
+        name: 'test-schema',
+        artifacts: [makeArtifactType('proposal')],
+      })
+      const { sut } = makeSut({ change, schema })
+
+      await expect(sut.execute({ name: 'my-change' })).rejects.toThrow(ArtifactNotFoundError)
     })
   })
 

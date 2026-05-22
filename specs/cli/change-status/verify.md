@@ -125,7 +125,8 @@
 - **GIVEN** a change using a schema where one artifact has `hasTasks: true`
 - **WHEN** `specd change status <name> --format json` is run
 - **THEN** the JSON output includes `schema.artifactDag` array
-- **AND** each entry includes id, scope, optional, requires, hasTasks, output
+- **AND** each entry includes id, scope, optional, requires, children, hasTasks, output
+- **AND** `children` equals `schema.artifactDag().childrenOf(id)` for that entry
 - **AND** the `hasTasks` boolean reflects the schema definition
 
 #### Scenario: JSON output for non-schema-std also includes artifactDag
@@ -133,6 +134,26 @@
 - **GIVEN** a change using a custom schema
 - **WHEN** `specd change status <name> --format json` is run
 - **THEN** the JSON output includes `schema.artifactDag` array
+- **AND** `children` on each entry matches `childrenOf` from that schema's `artifactDag()`
+
+#### Scenario: Text DAG tree uses schema artifactDag roots and children
+
+- **GIVEN** a change using schema-std
+- **WHEN** `specd change status <name>` is run in text mode
+- **THEN** stdout includes an `artifacts (DAG):` section
+- **AND** the tree's root and child ordering matches `artifactDag().roots()` and `childrenOf()` (not declaration order alone)
+
+#### Scenario: Text DAG uses display status for drift
+
+- **GIVEN** an artifact file with canonical status `complete` and `hasDrift: true`
+- **WHEN** `specd change status <name>` is run in text mode
+- **THEN** the DAG line for that artifact shows display status `complete-with-drift` (or equivalent display projection), not only raw `complete`
+
+#### Scenario: Text DAG does not repeat convergent nodes
+
+- **GIVEN** schema-std where `design` is a direct child of both `proposal` and `specs`
+- **WHEN** `specd change status <name>` is run in text mode
+- **THEN** the `design` subtree appears once in the DAG section (not duplicated under every parent path)
 
 #### Scenario: Text output shows overlap entries when reason is spec-overlap-conflict
 
@@ -141,33 +162,6 @@
 - **WHEN** `specd change status <name>` is run
 - **THEN** the review section shows `reason: spec-overlap-conflict`
 - **AND** an `overlap:` subsection lists both entries as bullets
-
-#### Scenario: Text output with single overlap entry
-
-- **GIVEN** `GetStatus` returns `review.required: true` with `reason: 'spec-overlap-conflict'`
-- **AND** `review.overlapDetail` has one entry
-- **WHEN** `specd change status <name>` is run
-- **THEN** the overlap subsection shows one bullet with the archived change name and specs
-
-#### Scenario: JSON output includes overlapDetail array when reason is spec-overlap-conflict
-
-- **GIVEN** `GetStatus` returns `review.required: true` with `reason: 'spec-overlap-conflict'`
-- **AND** `review.overlapDetail` has two entries
-- **WHEN** `specd change status <name> --format json` is run
-- **THEN** `review.overlapDetail` is an array with two entries ordered newest-first
-- **AND** each entry has `archivedChangeName` and `overlappingSpecIds`
-
-#### Scenario: JSON output has empty overlapDetail array for other reasons
-
-- **GIVEN** `GetStatus` returns `review.required: true` with `reason: 'artifact-drift'`
-- **WHEN** `specd change status <name> --format json` is run
-- **THEN** `review.overlapDetail` is `[]`
-
-#### Scenario: Overlap subsection omitted in text when reason is not spec-overlap-conflict
-
-- **GIVEN** `GetStatus` returns `review.required: true` with `reason: 'artifact-review-required'`
-- **WHEN** `specd change status <name>` is run
-- **THEN** no `overlap:` subsection appears in the review section
 
 ### Requirement: Implementation section
 

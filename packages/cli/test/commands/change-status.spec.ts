@@ -274,6 +274,74 @@ describe('Output format', () => {
     expect(parsed.lifecycle.schemaInfo).toEqual({ name: '@specd/schema-std', version: 1 })
   })
 
+  it('JSON artifactDag children match schema DAG childrenOf', async () => {
+    const { kernel, stdout } = setup()
+    const change = makeMockChange({ name: 'dag-change', state: 'designing' })
+    kernel.changes.status.execute.mockResolvedValue({
+      change,
+      artifactStatuses: [
+        {
+          type: 'proposal',
+          state: 'complete',
+          effectiveStatus: 'complete',
+          displayStatus: 'complete',
+          files: [],
+        },
+        {
+          type: 'specs',
+          state: 'missing',
+          effectiveStatus: 'missing',
+          displayStatus: 'missing',
+          files: [],
+        },
+        {
+          type: 'verify',
+          state: 'missing',
+          effectiveStatus: 'missing',
+          displayStatus: 'missing',
+          files: [],
+        },
+      ],
+      lifecycle: {
+        ...defaultLifecycle,
+        schemaInfo: {
+          name: '@specd/schema-std',
+          version: 1,
+          artifacts: [
+            { id: 'proposal', scope: 'change', requires: [] },
+            { id: 'specs', scope: 'spec', requires: ['proposal'] },
+            { id: 'verify', scope: 'spec', requires: ['specs'] },
+          ],
+        },
+      },
+      blockers: [],
+      nextAction: defaultNextAction,
+    })
+
+    const program = makeProgram()
+    registerChangeStatus(program.command('change'))
+    await program.parseAsync([
+      'node',
+      'specd',
+      'change',
+      'status',
+      'dag-change',
+      '--format',
+      'json',
+    ])
+
+    const result = JSON.parse(stdout())
+    const proposal = result.artifactDag.find((entry: { id: string }) => entry.id === 'proposal')
+    const specs = result.artifactDag.find((entry: { id: string }) => entry.id === 'specs')
+    expect(proposal.children).toEqual(['specs'])
+    expect(specs.children).toEqual(['verify'])
+    expect(result.artifactDag.map((entry: { id: string }) => entry.id)).toEqual([
+      'proposal',
+      'specs',
+      'verify',
+    ])
+  })
+
   it('JSON output includes hasTasks and drift-aware state in artifactDag', async () => {
     const { kernel, stdout } = setup()
     const change = makeMockChange({

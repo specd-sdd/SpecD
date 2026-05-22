@@ -7,6 +7,7 @@ import { SpecNotInChangeError } from '../errors/spec-not-in-change-error.js'
 import { type InvalidationPolicy } from '../../domain/value-objects/invalidation-policy.js'
 import { parseSpecId } from '../../domain/services/parse-spec-id.js'
 import { SpecPath } from '../../domain/value-objects/spec-path.js'
+import { type SchemaProvider } from '../ports/schema-provider.js'
 import { loadPersistedSpecDependsOn } from './_shared/load-persisted-spec-depends-on.js'
 
 /** Input for the {@link EditChange} use case. */
@@ -43,6 +44,7 @@ export class EditChange {
   private readonly _changes: ChangeRepository
   private readonly _specs: ReadonlyMap<string, SpecRepository>
   private readonly _actor: ActorResolver
+  private readonly _schemaProvider: SchemaProvider
 
   /**
    * Creates a new `EditChange` use case instance.
@@ -50,15 +52,18 @@ export class EditChange {
    * @param changes - Repository for loading and persisting the change
    * @param specs - Spec repositories keyed by workspace name
    * @param actor - Resolver for the actor identity
+   * @param schemaProvider - Provider for the active schema DAG
    */
   constructor(
     changes: ChangeRepository,
     specs: ReadonlyMap<string, SpecRepository>,
     actor: ActorResolver,
+    schemaProvider: SchemaProvider,
   ) {
     this._changes = changes
     this._specs = specs
     this._actor = actor
+    this._schemaProvider = schemaProvider
   }
 
   /**
@@ -121,7 +126,8 @@ export class EditChange {
 
         if (specIdsChanged) {
           removedSpecIds = currentSpecIds.filter((id) => !specIds.includes(id))
-          freshChange.updateSpecIds(specIds, actor)
+          const schema = await this._schemaProvider.get()
+          freshChange.updateSpecIds(specIds, actor, schema.artifactDag())
           for (const specId of addedSpecIds) {
             if (freshChange.specDependsOn.get(specId) !== undefined) continue
             const persistedDeps = await loadPersistedSpecDependsOn(this._specs, specId)

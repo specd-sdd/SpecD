@@ -209,6 +209,48 @@ reviewing the merged output that would be archived.
 
 Structured output (`json` / `toon`) includes a `notes` array for non-blocking hints and a `files` array for each result entry.
 
+#### Batch mode (`--all`)
+
+With `--all`, validation walks the active schema artifact DAG in topological order (parents before children). Change-scoped artifacts (`scope: change`, e.g. `proposal`, `design`, `tasks`) are validated once per batch step. Spec-scoped artifacts (`scope: spec`, e.g. `specs`, `verify`) are validated once per `(artifact, specId)` pair. `--artifact <id>` filters steps but keeps the same DAG walk order.
+
+Within each `ValidateArtifacts` execution, files already marked `complete` or `skipped` are not re-read or re-marked; drifted or review-pending files are still validated.
+
+Text output uses one block per batch step, for example:
+
+- `validated <change>/<specId> [artifact:<id>]: ...` for spec-scoped steps
+- `validated <change> [artifact:<id>]: ...` for change-scoped steps
+
+The closing summary reports `validated <passed>/<total> steps` (not `validated N/M specs`).
+
+JSON / TOON batch output shape:
+
+```json
+{
+  "passed": true,
+  "total": 3,
+  "results": [
+    {
+      "spec": null,
+      "artifact": "proposal",
+      "passed": true,
+      "failures": [],
+      "notes": [],
+      "files": []
+    },
+    {
+      "spec": "default:auth/login",
+      "artifact": "specs",
+      "passed": true,
+      "failures": [],
+      "notes": [],
+      "files": []
+    }
+  ]
+}
+```
+
+`spec` is `null` for change-scoped steps. Each `results[]` entry includes the same `files`, `failures`, and `notes` fields as single-spec validation.
+
 Dependency-blocked failures are status-aware. When validation is blocked by an upstream artifact, the failure description includes the blocking dependency status (for example `missing`, `in-progress`, `pending-review`, `drifted-pending-review`, or `pending-parent-artifact-review`). For recursive review propagation, parent blocker context is also included.
 
 | Option                      | Description                                     |

@@ -4,6 +4,7 @@ import { Change, SYSTEM_ACTOR } from '../../domain/entities/change.js'
 import { type ChangeEvent } from '../../domain/entities/change.js'
 import { ChangeArtifact } from '../../domain/entities/change-artifact.js'
 import { ArtifactFile, SKIPPED_SENTINEL } from '../../domain/value-objects/artifact-file.js'
+import { ArtifactDag } from '../../domain/value-objects/artifact-dag.js'
 import { type ArtifactType } from '../../domain/value-objects/artifact-type.js'
 import { type ArtifactStatus } from '../../domain/value-objects/artifact-status.js'
 import { type ChangeState, VALID_TRANSITIONS } from '../../domain/value-objects/change-state.js'
@@ -1086,6 +1087,7 @@ export class FsChangeRepository extends ChangeRepository {
           .map((artifact) => `${artifact.type} [${artifact.files.join(', ')}]`)
           .join('; ')}`,
         affectedArtifacts,
+        ArtifactDag.from(artifactTypes),
       )
       await this._writeManifestAtomic(dir, changeToManifest(change))
     }

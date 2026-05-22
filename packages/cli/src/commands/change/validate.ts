@@ -249,7 +249,7 @@ async function executeSingle(
   const result = toValidateResult(
     await kernel.changes.validate.execute({
       name,
-      specPath: fullSpecPath,
+      ...(isChangeScopedArtifact ? {} : { specPath: fullSpecPath }),
       ...(opts.artifact !== undefined ? { artifactId: opts.artifact } : {}),
     }),
   )
@@ -338,82 +338,114 @@ async function executeBatch(
     return
   }
 
+  const activeSchema = await kernel.specs.getActiveSchema.execute()
+  if (activeSchema.raw) {
+    cliError('Active schema resolution returned raw data unexpectedly', opts.format)
+  }
+  const schema = activeSchema.schema
+  const dag = schema.artifactDag()
+
   const results: Array<{
-    spec: string
+    spec: string | null
+    artifact: string
     passed: boolean
     failures: ValidateFailure[]
-    notes: ValidateNote[]
+    warnings: ValidateNote[]
     files: readonly ValidationFileEntry[]
   }> = []
-  let totalPassed = 0
 
-  for (const specId of specIds) {
-    const result = toValidateResult(
-      await kernel.changes.validate.execute({
-        name,
-        specPath: specId,
-        ...(opts.artifact !== undefined ? { artifactId: opts.artifact } : {}),
-      }),
-    )
+  for (const artifactId of dag.topologicalOrder()) {
+    if (opts.artifact !== undefined && artifactId !== opts.artifact) continue
 
-    const passed = result.failures.length === 0
-    if (passed) totalPassed++
-    results.push({
-      spec: specId,
-      passed,
-      failures: result.failures,
-      notes: result.notes,
-      files: result.files,
-    })
+    const artifactType = schema.artifact(artifactId)
+    if (artifactType === null) continue
+
+    if (artifactType.scope === 'change') {
+      const result = toValidateResult(
+        await kernel.changes.validate.execute({
+          name,
+          artifactId,
+        }),
+      )
+      results.push({
+        spec: null,
+        artifact: artifactId,
+        passed: result.failures.length === 0,
+        failures: result.failures,
+        warnings: result.notes,
+        files: result.files,
+      })
+      continue
+    }
+
+    for (const specId of specIds) {
+      const result = toValidateResult(
+        await kernel.changes.validate.execute({
+          name,
+          specPath: specId,
+          artifactId,
+        }),
+      )
+      results.push({
+        spec: specId,
+        artifact: artifactId,
+        passed: result.failures.length === 0,
+        failures: result.failures,
+        warnings: result.notes,
+        files: result.files,
+      })
+    }
   }
 
-  const allPassed = totalPassed === specIds.length
+  const allPassed = results.every((r) => r.passed)
   const fmt = parseFormat(opts.format)
 
   if (fmt === 'text') {
     const isChangeScopedArtifact =
       opts.artifact !== undefined && requestedArtifactScope === 'change'
     for (const r of results) {
+      const target =
+        r.spec === null
+          ? `${name} [artifact:${r.artifact}]`
+          : `${name}/${r.spec} [artifact:${r.artifact}]`
       const fileLines = r.files.map((file) =>
         file.status === 'missing' ? `missing: ${file.filename}` : `file: ${file.filename}`,
       )
       const structuralNote =
         'note: validation is structural; review artifact content separately before relying on it'
-      const previewNote = isChangeScopedArtifact
-        ? null
-        : `note: verify merged output with: ${buildPreviewCommand(
-            name,
-            r.spec,
-            requestedArtifactScope === 'spec' ? opts.artifact : undefined,
-          )}`
+      const previewNote =
+        isChangeScopedArtifact || r.spec === null
+          ? null
+          : `note: verify merged output with: ${buildPreviewCommand(name, r.spec, r.artifact)}`
       const sharedLines = previewNote === null ? [structuralNote] : [structuralNote, previewNote]
 
       if (r.passed) {
-        if (r.notes.length > 0) {
-          const noteLines = r.notes.map((n) => `note: ${n.artifactId} — ${n.description}`)
+        if (r.warnings.length > 0) {
+          const noteLines = r.warnings.map((n) => `note: ${n.artifactId} — ${n.description}`)
           output(
-            `validated ${name}/${r.spec}: pass (${r.notes.length} note(s))\n${[...fileLines, ...noteLines, ...sharedLines].join('\n')}`,
+            `validated ${target}: pass (${r.warnings.length} note(s))\n${[...fileLines, ...noteLines, ...sharedLines].join('\n')}`,
             'text',
           )
         } else {
           output(
-            `validated ${name}/${r.spec}: all artifacts pass\n${[...fileLines, ...sharedLines].join('\n')}`,
+            `validated ${target}: all artifacts pass\n${[...fileLines, ...sharedLines].join('\n')}`,
             'text',
           )
         }
       } else {
         const errorLines = r.failures.map((f) => `  error: ${f.artifactId} — ${f.description}`)
-        const noteLines = r.notes.map((n) => `  note: ${n.artifactId} — ${n.description}`)
+        const noteLines = r.warnings.map((n) => `  note: ${n.artifactId} — ${n.description}`)
         const allLines = [...fileLines, ...errorLines, ...noteLines, ...sharedLines]
-        output(`validation failed ${name}/${r.spec}:\n${allLines.join('\n')}`, 'text')
+        output(`validation failed ${target}:\n${allLines.join('\n')}`, 'text')
       }
     }
-    output(`validated ${totalPassed}/${specIds.length} specs`, 'text')
+    const passedSteps = results.filter((r) => r.passed).length
+    output(`validated ${passedSteps}/${results.length} steps`, 'text')
   } else {
     output(
       {
         passed: allPassed,
-        total: specIds.length,
+        total: results.length,
         results,
       },
       fmt,

@@ -307,6 +307,7 @@ export class ArchiveChange {
                     type: a.type,
                     files: [...a.files.keys()],
                   })),
+              schema.artifactDag(),
             )
             return freshOverlapping
           })

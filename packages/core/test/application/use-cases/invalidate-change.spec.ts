@@ -315,7 +315,7 @@ describe('InvalidateChange', () => {
       expect(result.affected.find((a) => a.artifactId === 'tasks')?.expansion).toBe('downstream')
     })
 
-    it('reports affected artifacts in linear DAG-forest traversal order', async () => {
+    it('reports downstream affected artifacts in schema topological order', async () => {
       const schemaWithBranches = makeSchema([
         makeArtifactType('proposal'),
         makeArtifactType('design', { requires: ['proposal'] }),
