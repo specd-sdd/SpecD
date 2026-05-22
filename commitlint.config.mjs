@@ -33,7 +33,7 @@ export default {
     {
       rules: {
         'no-ai-coauthor': ({ raw }) => {
-          const forbidden = ['@anthropic.com', '@openai.com']
+          const forbidden = ['@anthropic.com', '@openai.com', '@cursor.com']
           const coAuthorLines = raw
             .split('\n')
             .filter((line) => line.toLowerCase().startsWith('co-authored-by:'))
