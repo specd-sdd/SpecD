@@ -30,6 +30,14 @@ specd change context <name> <step>
 
 When none of `--rules`, `--constraints`, or `--scenarios` are passed, all available full-mode sections are included. When one or more are passed, only those sections appear in each full-mode spec's content block. Section flags have no effect on list-mode or summary-mode entries.
 
+### Requirement: Implementation tracking refresh before context compilation
+
+Before invoking `CompileContext`, the command MUST call `RefreshImplementationTracking` for the same change name.
+
+The CLI MUST NOT invoke `ImplementationDetector` directly and MUST NOT duplicate detection merge logic.
+
+When `--fingerprint` short-circuits the command with an unchanged context response, refresh MUST still run before the fingerprint comparison so tracked implementation state is current for that check.
+
 ### Requirement: Behaviour
 
 The command invokes the `CompileContext` use case. The `CompileContextConfig`, `includeChangeSpecs`, `followDeps`, `depth`, `sections`, and `fingerprint` fields are populated from the loaded `SpecdConfig` and the corresponding CLI flags.
@@ -98,9 +106,10 @@ specd change context add-oauth-login implementing --follow-deps --depth 1
 
 ## Spec Dependencies
 
-- [`cli:entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
-- [`cli:change-spec-preview`](../change-spec-preview/spec.md) — command users are directed to for merged full spec content
+- [`cli:entrypoint`](../entrypoint/spec.md) — CLI config discovery, exit codes, and output conventions
+- [`cli:change-spec-preview`](../change-spec-preview/spec.md) — optional spec preview integration
 - [`core:compile-context`](../../core/compile-context/spec.md) — `CompileContext` use case, `CompileContextResult` structured shape, `ContextSpecEntry` type
-- [`core:config`](../../core/config/spec.md) — `contextMode` field
-- [`core:get-artifact-instruction`](../../core/get-artifact-instruction/spec.md) — artifact instructions (separate concern)
-- [`core:get-hook-instructions`](../../core/get-hook-instructions/spec.md) — step hook instructions (separate concern)
+- [`core:config`](../../core/config/spec.md) — project context configuration
+- [`core:get-artifact-instruction`](../../core/get-artifact-instruction/spec.md) — separate artifact instruction retrieval
+- [`core:get-hook-instructions`](../../core/get-hook-instructions/spec.md) — separate hook instruction retrieval
+- [`core:refresh-implementation-tracking`](../../core/refresh-implementation-tracking/spec.md) — VCS-backed refresh before context compilation

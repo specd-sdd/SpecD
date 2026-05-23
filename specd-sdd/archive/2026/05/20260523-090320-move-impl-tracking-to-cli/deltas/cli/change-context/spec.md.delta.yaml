@@ -1,0 +1,31 @@
+- op: added
+  description: CLI orchestrates refresh before CompileContext
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Command signature'
+  content: |
+    ### Requirement: Implementation tracking refresh before context compilation
+
+    Before invoking `CompileContext`, the command MUST call `RefreshImplementationTracking` for the same change name.
+
+    The CLI MUST NOT invoke `ImplementationDetector` directly and MUST NOT duplicate detection merge logic.
+
+    When `--fingerprint` short-circuits the command with an unchanged context response, refresh MUST still run before the fingerprint comparison so tracked implementation state is current for that check.
+
+- op: modified
+  description: Add refresh use case dependency
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`cli:entrypoint`](../entrypoint/spec.md) — CLI config discovery, exit codes, and output conventions
+    - [`cli:change-spec-preview`](../change-spec-preview/spec.md) — optional spec preview integration
+    - [`core:compile-context`](../../core/compile-context/spec.md) — `CompileContext` use case, `CompileContextResult` structured shape, `ContextSpecEntry` type
+    - [`core:config`](../../core/config/spec.md) — project context configuration
+    - [`core:get-artifact-instruction`](../../core/get-artifact-instruction/spec.md) — separate artifact instruction retrieval
+    - [`core:get-hook-instructions`](../../core/get-hook-instructions/spec.md) — separate hook instruction retrieval
+    - [`core:refresh-implementation-tracking`](../../core/refresh-implementation-tracking/spec.md) — VCS-backed refresh before context compilation

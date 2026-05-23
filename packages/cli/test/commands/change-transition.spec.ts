@@ -68,6 +68,12 @@ describe('Command signature', () => {
     registerChangeTransition(program.command('change'))
     await program.parseAsync(['node', 'specd', 'change', 'transition', 'my-change', '--next'])
 
+    expect(kernel.changes.refreshImplementationTracking.execute).toHaveBeenCalledBefore(
+      kernel.changes.status.execute,
+    )
+    expect(kernel.changes.refreshImplementationTracking.execute).toHaveBeenCalledWith({
+      name: 'my-change',
+    })
     expect(kernel.changes.transition.execute).toHaveBeenCalledWith(
       expect.objectContaining({ to: 'designing' }),
       expect.any(Function),
@@ -281,6 +287,7 @@ describe('Invalid transition error', () => {
     expect(err).toContain('target:  designing')
     expect(err).toContain('command: /specd-design')
     expect(err).toContain('reason:  Missing specs')
+    expect(kernel.changes.refreshImplementationTracking.execute).toHaveBeenCalledTimes(1)
   })
 
   it('surfaces approval-required message for blocked signoff transition', async () => {

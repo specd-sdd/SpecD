@@ -1,7 +1,7 @@
 {
   "title": "core:implementation-detector-port",
   "description": "Change lifecycle entry points need a backend-agnostic way to discover potentially relevant implementation files without binding themselves directly to VCS tools or future alternative detectors. `ImplementationDetector` is the application-layer port that exposes that detection capability.",
-  "dependsOn": ["core:change"],
+  "dependsOn": ["core:change", "core:refresh-implementation-tracking"],
   "context": [
     "Change lifecycle entry points need a backend-agnostic way to discover potentially relevant implementation files without binding themselves directly to VCS tools or future alternative detectors. `ImplementationDetector` is the application-layer port that exposes that detection capability."
   ],
@@ -15,7 +15,7 @@
     {
       "requirement": "Targeted lifecycle use",
       "rules": [
-        "Implementation detection MUST be demand-driven rather than background-driven.\n\nThe port is intended to be invoked by lifecycle entry points such as status loading, context compilation, and pre-transition refresh, not by the `Change` entity itself."
+        "Implementation detection MUST be demand-driven rather than background-driven.\n\nThe port MUST be invoked by `RefreshImplementationTracking` when VCS-backed candidate discovery is required.\n\nThe port MUST NOT be invoked directly by `GetStatus`, `TransitionChange`, or `CompileContext`.\n\nThe `Change` entity itself MUST NOT invoke the port."
       ]
     },
     {
@@ -43,7 +43,7 @@
     {
       "requirement": "Detector interface",
       "name": "Callers provide change context instead of raw baseline refs",
-      "given": ["a lifecycle use case wants to refresh implementation tracking"],
+      "given": ["RefreshImplementationTracking needs candidate paths"],
       "when": ["it calls the detector port"],
       "then": [
         "it passes the change context itself",
@@ -52,13 +52,22 @@
     },
     {
       "requirement": "Targeted lifecycle use",
-      "name": "Lifecycle use case invokes detector instead of Change entity",
-      "given": ["implementation refresh is triggered from a lifecycle entry point"],
+      "name": "Refresh use case invokes detector instead of Change entity",
+      "given": [
+        "RefreshImplementationTracking runs with the historical implementing guard satisfied"
+      ],
       "when": ["modified files are requested"],
       "then": [
-        "the lifecycle use case calls the detector port",
+        "RefreshImplementationTracking calls the detector port",
         "AND the Change entity itself does not perform detection"
       ]
+    },
+    {
+      "requirement": "Targeted lifecycle use",
+      "name": "Read and transition use cases do not invoke detector",
+      "given": ["GetStatus, TransitionChange, or CompileContext executes"],
+      "when": ["implementation tracking is needed"],
+      "then": ["those use cases do not call ImplementationDetector directly"]
     },
     {
       "requirement": "Backend independence",
@@ -71,23 +80,10 @@
       ]
     }
   ],
-  "implementation": {
-    "symbols": [
-      {
-        "specId": "core:implementation-detector-port",
-        "file": "core:src/application/ports/implementation-detector.ts",
-        "symbol": "ImplementationDetector"
-      },
-      {
-        "specId": "core:implementation-detector-port",
-        "file": "core:src/application/ports/implementation-detector.ts",
-        "symbol": "ImplementationDetector.detectModifiedFiles"
-      }
-    ]
-  },
+  "implementation": {},
   "contentHashes": {
-    "spec.md": "sha256:644160ab8e1820d1c6e4e91cea1ddf0786f1d9fd376b6794460fff00a1587fd8",
-    "verify.md": "sha256:98290075233a08be880c67bb32419f3fc52707c0d6f0cbd86babc53a4d31be04"
+    "spec.md": "sha256:4f27a8213f279855aad024788ada4724b900032bfc8c37cd97bea1c5dc0250bd",
+    "verify.md": "sha256:94dc13b2e08529adf0e15e353bf0a827449271f64e07f41c4ce4c2b958cc45ae"
   },
   "generatedBy": "core"
 }

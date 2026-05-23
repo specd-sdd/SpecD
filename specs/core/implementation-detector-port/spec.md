@@ -20,7 +20,11 @@ The returned paths are candidate inputs for tracked implementation review. The d
 
 Implementation detection MUST be demand-driven rather than background-driven.
 
-The port is intended to be invoked by lifecycle entry points such as status loading, context compilation, and pre-transition refresh, not by the `Change` entity itself.
+The port MUST be invoked by `RefreshImplementationTracking` when VCS-backed candidate discovery is required.
+
+The port MUST NOT be invoked directly by `GetStatus`, `TransitionChange`, or `CompileContext`.
+
+The `Change` entity itself MUST NOT invoke the port.
 
 ### Requirement: Backend independence
 
@@ -37,3 +41,4 @@ VCS-backed detection is the first implementation, but future implementations MAY
 ## Spec Dependencies
 
 - [`core:change`](../change/spec.md) — change context supplied to the detector
+- [`core:refresh-implementation-tracking`](../refresh-implementation-tracking/spec.md) — application use case that invokes this port

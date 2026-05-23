@@ -163,6 +163,19 @@
 - **THEN** the review section shows `reason: spec-overlap-conflict`
 - **AND** an `overlap:` subsection lists both entries as bullets
 
+### Requirement: Implementation tracking refresh before status load
+
+#### Scenario: Status command refreshes before GetStatus
+
+- **GIVEN** `specd change status <name>` is executed
+- **WHEN** the command handler runs
+- **THEN** it calls `RefreshImplementationTracking` before `GetStatus`
+
+#### Scenario: Status command does not call detector directly
+
+- **WHEN** `specd change status <name>` runs
+- **THEN** the CLI does not invoke `ImplementationDetector` outside `RefreshImplementationTracking`
+
 ### Requirement: Implementation section
 
 #### Scenario: Status renders tracked implementation files by review state

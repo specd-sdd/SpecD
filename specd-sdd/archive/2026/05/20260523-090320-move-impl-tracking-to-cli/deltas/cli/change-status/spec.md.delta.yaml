@@ -1,0 +1,28 @@
+- op: added
+  description: CLI orchestrates refresh before GetStatus
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    before:
+      type: section
+      matches: 'Requirement: Implementation section'
+  content: |
+    ### Requirement: Implementation tracking refresh before status load
+
+    Before invoking `GetStatus`, the command MUST call `RefreshImplementationTracking` for the same change name.
+
+    The CLI MUST NOT invoke `ImplementationDetector` directly and MUST NOT duplicate detection merge logic.
+
+    After refresh, the command MUST call `GetStatus` and serialize its result, including implementation-tracking projection when requested.
+
+- op: modified
+  description: Add refresh use case dependency
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`cli:entrypoint`](../entrypoint/spec.md) — CLI config discovery, exit codes, and output conventions
+    - [`core:change`](../../core/change/spec.md) — change and artifact state model
+    - [`core:get-status`](../../core/get-status/spec.md) — status payload returned by core
+    - [`core:refresh-implementation-tracking`](../../core/refresh-implementation-tracking/spec.md) — VCS-backed refresh before status load

@@ -73,12 +73,6 @@ Each review file entry inside `affectedArtifacts` MUST contain:
 
 `GetStatus` MUST resolve `review.affectedArtifacts` against the current artifact file entries so agent-facing consumers can inspect the actual file directly. The outward-facing review summary MUST prioritize `filename` and `path`; consumers must not need to understand manifest-internal file keys in order to locate the affected artifact.
 
-### Requirement: Implementation autodetection on status load
-
-When the change has entered `implementing` at least once in its history, `GetStatus` MUST trigger targeted implementation autodetection before finalizing the returned status view.
-
-Detection updates the persisted tracked implementation state for that change, then `GetStatus` returns the refreshed tracked files and confirmed implementation links as part of the status result.
-
 ### Requirement: Implementation status projection
 
 `GetStatusResult` SHALL include implementation-tracking data for delivery layers.
@@ -87,6 +81,12 @@ That projection MUST include:
 
 - tracked implementation files with review state
 - confirmed implementation links, including file-level links and symbol-level refinements
+
+### Requirement: Read-only implementation tracking
+
+`GetStatus` MUST project implementation-tracking data from the change loaded by `ChangeRepository` without mutating tracked implementation files or invoking `ImplementationDetector`.
+
+Callers that require refreshed tracked files MUST invoke `RefreshImplementationTracking` before `GetStatus`.
 
 ### Requirement: Drift-aware display status
 
@@ -130,10 +130,11 @@ If no change with the given name exists in the repository, `execute()` MUST thro
 - `changes: ChangeRepository` — for loading changes by name
 - `schemaProvider: SchemaProvider` — for obtaining the fully-resolved active schema
 - `lifecycle: LifecycleEngine` — for deriving effective artifact status, blockers, routing, and next-action guidance from the change plus active schema
-- `implementationDetector: ImplementationDetector` — for targeted implementation autodetection when implementation tracking is active
 - `approvals: { readonly spec: boolean; readonly signoff: boolean }` — whether approval gates are active
 
 It MUST delegate to `ChangeRepository.get(name)` to load the change. `SchemaProvider` replaces the previous `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths` triple, providing the fully-resolved schema with plugins and overrides applied.
+
+`GetStatus` MUST NOT accept `ImplementationDetector` and MUST NOT invoke implementation autodetection.
 
 ### Requirement: Reports effective status for every artifact
 
@@ -210,4 +211,4 @@ The use case MUST NOT throw when schema resolution fails — it degrades the lif
 - [`core:schema-format`](../schema-format/spec.md) — `SchemaProvider`, workflow, and artifact definitions
 - [`core:config`](../config/spec.md) — project approval configuration
 - [`core:lifecycle-engine`](../lifecycle-engine/spec.md) — authoritative schema-aware lifecycle interpretation reused by status, validation, and transition flows
-- [`core:implementation-detector-port`](../implementation-detector-port/spec.md) — targeted autodetection before status projection
+- [`core:refresh-implementation-tracking`](../refresh-implementation-tracking/spec.md) — optional upstream refresh before status load; not invoked by `GetStatus` itself

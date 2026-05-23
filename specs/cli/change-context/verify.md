@@ -30,6 +30,20 @@
 - **WHEN** `specd change context my-change designing --include-change-specs` is run
 - **THEN** the command proceeds normally and requests direct change-spec seeding
 
+### Requirement: Implementation tracking refresh before context compilation
+
+#### Scenario: Context command refreshes before CompileContext
+
+- **GIVEN** `specd change context <name> <step>` is executed
+- **WHEN** the command handler runs
+- **THEN** it calls `RefreshImplementationTracking` before `CompileContext`
+
+#### Scenario: Fingerprint short-circuit still refreshes first
+
+- **GIVEN** `--fingerprint` is provided
+- **WHEN** the command handler runs
+- **THEN** it calls `RefreshImplementationTracking` before comparing fingerprints
+
 ### Requirement: Output
 
 #### Scenario: Text output begins with fingerprint before context sections

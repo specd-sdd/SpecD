@@ -1,0 +1,30 @@
+- op: removed
+  description: Remove CompileContext autodetection scenarios
+  selector:
+    type: section
+    matches: 'Requirement: Implementation autodetection before context compilation'
+
+- op: removed
+  description: Remove ImplementationDetector constructor scenario
+  selector:
+    type: section
+    matches: 'CompileContext is constructed with ImplementationDetector'
+
+- op: added
+  description: Verify caller-owned refresh
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Input'
+  content: |
+    ### Requirement: Caller-owned implementation tracking refresh
+
+    #### Scenario: CompileContext does not invoke detector
+
+    - **GIVEN** a change has entered `implementing` at least once
+    - **WHEN** `CompileContext.execute()` runs
+    - **THEN** it does not invoke `ImplementationDetector`
+    - **AND** it does not merge detected files before assembling context

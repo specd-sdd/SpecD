@@ -23,9 +23,6 @@ function makeGetStatus(
     schema?: ReturnType<typeof makeSchema> | null
     approvals?: { spec: boolean; signoff: boolean }
     failSchema?: boolean
-    implementationDetector?: {
-      detectModifiedFiles: (change: ReturnType<typeof makeChange>) => Promise<readonly string[]>
-    }
   } = {},
 ) {
   const schema = opts.schema === undefined ? makeStdSchema() : opts.schema
@@ -36,15 +33,7 @@ function makeGetStatus(
         },
       }
     : makeSchemaProvider(schema)
-  return new GetStatus(
-    changes,
-    schemaProvider,
-    (opts.implementationDetector ??
-      ({
-        detectModifiedFiles: async () => [],
-      } as const)) as never,
-    opts.approvals ?? defaultApprovals,
-  )
+  return new GetStatus(changes, schemaProvider, opts.approvals ?? defaultApprovals)
 }
 
 function makeStdSchema() {
@@ -482,22 +471,20 @@ describe('GetStatus', () => {
       })
     })
 
-    it('runs implementation autodetection after the change has entered implementing', async () => {
+    it('projects persisted implementation tracking without autodetection', async () => {
       const change = makeChange('implementation-status')
       change.transition('designing', testActor)
       change.transition('ready', testActor)
       change.transition('implementing', testActor)
+      change.trackImplementationFile(
+        'packages/core/src/application/use-cases/get-status.ts',
+        'open',
+      )
       const repo = makeChangeRepository([change])
-      const implementationDetector = {
-        detectModifiedFiles: vi
-          .fn()
-          .mockResolvedValue(['packages/core/src/application/use-cases/get-status.ts']),
-      }
-      const uc = makeGetStatus(repo, { implementationDetector })
+      const uc = makeGetStatus(repo)
 
       const result = await uc.execute({ name: 'implementation-status' })
 
-      expect(implementationDetector.detectModifiedFiles).toHaveBeenCalledTimes(1)
       expect(result.implementationTracking.trackedFiles).toEqual([
         {
           file: 'packages/core/src/application/use-cases/get-status.ts',

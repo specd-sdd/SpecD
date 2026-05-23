@@ -1,0 +1,52 @@
+- op: removed
+  description: Remove embedded implementation autodetection from GetStatus
+  selector:
+    type: section
+    matches: 'Requirement: Implementation autodetection on status load'
+
+- op: modified
+  description: GetStatus no longer accepts ImplementationDetector
+  selector:
+    type: section
+    matches: 'Requirement: Constructor dependencies'
+  content: |
+    `GetStatus` MUST accept the following constructor arguments:
+
+    - `changes: ChangeRepository` — for loading changes by name
+    - `schemaProvider: SchemaProvider` — for obtaining the fully-resolved active schema
+    - `lifecycle: LifecycleEngine` — for deriving effective artifact status, blockers, routing, and next-action guidance from the change plus active schema
+    - `approvals: { readonly spec: boolean; readonly signoff: boolean }` — whether approval gates are active
+
+    It MUST delegate to `ChangeRepository.get(name)` to load the change. `SchemaProvider` replaces the previous `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths` triple, providing the fully-resolved schema with plugins and overrides applied.
+
+    `GetStatus` MUST NOT accept `ImplementationDetector` and MUST NOT invoke implementation autodetection.
+
+- op: added
+  description: Clarify read-only implementation tracking projection
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Implementation status projection'
+  content: |
+    ### Requirement: Read-only implementation tracking
+
+    `GetStatus` MUST project implementation-tracking data from the change loaded by `ChangeRepository` without mutating tracked implementation files or invoking `ImplementationDetector`.
+
+    Callers that require refreshed tracked files MUST invoke `RefreshImplementationTracking` before `GetStatus`.
+
+- op: modified
+  description: Remove implementation-detector-port dependency
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`core:change`](../change/spec.md) — change entity and artifact state model
+    - [`core:kernel`](../kernel/spec.md) — kernel wiring for `GetStatus`
+    - [`core:transition-change`](../transition-change/spec.md) — lifecycle gating and transition rules
+    - [`core:schema-format`](../schema-format/spec.md) — `SchemaProvider`, workflow, and artifact definitions
+    - [`core:config`](../config/spec.md) — project approval configuration
+    - [`core:lifecycle-engine`](../lifecycle-engine/spec.md) — authoritative schema-aware lifecycle interpretation reused by status, validation, and transition flows
+    - [`core:refresh-implementation-tracking`](../refresh-implementation-tracking/spec.md) — optional upstream refresh before status load; not invoked by `GetStatus` itself

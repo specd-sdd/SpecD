@@ -1,0 +1,22 @@
+- op: modified
+  description: Port is invoked by RefreshImplementationTracking, not lifecycle read/transition use cases
+  selector:
+    type: section
+    matches: 'Requirement: Targeted lifecycle use'
+  content: |
+    Implementation detection MUST be demand-driven rather than background-driven.
+
+    The port MUST be invoked by `RefreshImplementationTracking` when VCS-backed candidate discovery is required.
+
+    The port MUST NOT be invoked directly by `GetStatus`, `TransitionChange`, or `CompileContext`.
+
+    The `Change` entity itself MUST NOT invoke the port.
+
+- op: modified
+  description: Add refresh use case dependency
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`core:change`](../change/spec.md) — change context supplied to the detector
+    - [`core:refresh-implementation-tracking`](../refresh-implementation-tracking/spec.md) — application use case that invokes this port

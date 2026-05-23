@@ -1,0 +1,45 @@
+- op: removed
+  description: Remove embedded implementation autodetection from TransitionChange
+  selector:
+    type: section
+    matches: 'Requirement: Implementation autodetection before transition'
+
+- op: modified
+  description: TransitionChange no longer depends on ImplementationDetector
+  selector:
+    type: section
+    matches: 'Requirement: Dependencies'
+  content: |
+    `TransitionChange` depends on `ChangeRepository`, `ActorResolver`, `SchemaProvider`, `LifecycleEngine`, and `RunStepHooks`.
+
+    `TransitionChange` MUST NOT depend on `ImplementationDetector` or invoke implementation autodetection.
+
+- op: added
+  description: Caller-owned refresh before transition
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Change must exist'
+  content: |
+    ### Requirement: Caller-owned implementation tracking refresh
+
+    `TransitionChange` MUST evaluate lifecycle rules against the tracked implementation state already persisted on the change.
+
+    It MUST NOT invoke `ImplementationDetector` or merge detected files during transition execution. Callers that require fresh tracked files MUST invoke `RefreshImplementationTracking` before `TransitionChange`.
+
+- op: modified
+  description: Update spec dependencies
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`core:change`](../change/spec.md) — lifecycle state machine and artifact review downgrade semantics
+    - [`core:run-step-hooks`](../run-step-hooks/spec.md) — hook execution entry point
+    - [`core:hook-execution-model`](../hook-execution-model/spec.md) — hook ordering and failure semantics
+    - [`core:workflow-model`](../workflow-model/spec.md) — workflow `requires` and verification routing
+    - [`default:_global/architecture`](../../../_global/architecture/spec.md) — application ownership and port boundaries
+    - [`core:lifecycle-engine`](../lifecycle-engine/spec.md) — authoritative lifecycle routing and dependency interpretation used before hook execution and persistence
+    - [`core:refresh-implementation-tracking`](../refresh-implementation-tracking/spec.md) — optional upstream refresh before transition; not invoked by `TransitionChange` itself

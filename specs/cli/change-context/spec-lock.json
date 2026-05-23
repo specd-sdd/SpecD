@@ -1,0 +1,20 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "cli:entrypoint",
+    "cli:change-spec-preview",
+    "core:compile-context",
+    "core:config",
+    "core:get-artifact-instruction",
+    "core:get-hook-instructions",
+    "core:refresh-implementation-tracking"
+  ],
+  "implementation": [
+    {
+      "file": "cli:src/commands/change/context.ts"
+    }
+  ]
+}

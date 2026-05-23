@@ -1,0 +1,30 @@
+- op: removed
+  description: Remove GetStatus autodetection scenarios
+  selector:
+    type: section
+    matches: 'Requirement: Implementation autodetection on status load'
+
+- op: removed
+  description: Remove ImplementationDetector constructor scenario
+  selector:
+    type: section
+    matches: 'GetStatus receives ImplementationDetector through construction'
+
+- op: added
+  description: Verify read-only implementation tracking
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Implementation status projection'
+  content: |
+    ### Requirement: Read-only implementation tracking
+
+    #### Scenario: GetStatus does not invoke detector
+
+    - **GIVEN** a change has entered `implementing` at least once
+    - **WHEN** `GetStatus.execute()` is called
+    - **THEN** it does not invoke `ImplementationDetector`
+    - **AND** it does not mutate tracked implementation files

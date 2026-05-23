@@ -22,11 +22,11 @@ The `implementingTaskChecks` and `implementingRequires` fields are removed. Task
 
 The use case MUST load the change from the `ChangeRepository` by name. If no change exists with the given name, it MUST throw `ChangeNotFoundError`.
 
-### Requirement: Implementation autodetection before transition
+### Requirement: Caller-owned implementation tracking refresh
 
-Before evaluating lifecycle transition rules, `TransitionChange` MUST trigger targeted implementation autodetection when the change has entered `implementing` at least once in its history.
+`TransitionChange` MUST evaluate lifecycle rules against the tracked implementation state already persisted on the change.
 
-This refresh occurs before requires enforcement, task-completion checks, and transition execution so lifecycle decisions see current tracked implementation-file review state.
+It MUST NOT invoke `ImplementationDetector` or merge detected files during transition execution. Callers that require fresh tracked files MUST invoke `RefreshImplementationTracking` before `TransitionChange`.
 
 ### Requirement: Approval-gate routing for spec approval
 
@@ -170,7 +170,9 @@ The previous `postHookFailures` field is removed because both hook phases are no
 
 ### Requirement: Dependencies
 
-`TransitionChange` depends on `ChangeRepository`, `ActorResolver`, `SchemaProvider`, `LifecycleEngine`, `RunStepHooks`, and `ImplementationDetector`.
+`TransitionChange` depends on `ChangeRepository`, `ActorResolver`, `SchemaProvider`, `LifecycleEngine`, and `RunStepHooks`.
+
+`TransitionChange` MUST NOT depend on `ImplementationDetector` or invoke implementation autodetection.
 
 ## Constraints
 
@@ -193,4 +195,4 @@ The previous `postHookFailures` field is removed because both hook phases are no
 - [`core:workflow-model`](../workflow-model/spec.md) — workflow `requires` and verification routing
 - [`default:_global/architecture`](../../../_global/architecture/spec.md) — application ownership and port boundaries
 - [`core:lifecycle-engine`](../lifecycle-engine/spec.md) — authoritative lifecycle routing and dependency interpretation used before hook execution and persistence
-- [`core:implementation-detector-port`](../implementation-detector-port/spec.md) — targeted autodetection before lifecycle transitions
+- [`core:refresh-implementation-tracking`](../refresh-implementation-tracking/spec.md) — optional upstream refresh before transition; not invoked by `TransitionChange` itself

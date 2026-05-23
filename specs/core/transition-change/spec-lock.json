@@ -10,15 +10,12 @@
     "core:workflow-model",
     "default:_global/architecture",
     "core:lifecycle-engine",
-    "core:implementation-detector-port"
+    "core:refresh-implementation-tracking"
   ],
   "implementation": [
     {
       "file": "core:src/application/use-cases/transition-change.ts",
-      "symbols": ["TransitionChange", "TransitionChange.execute", "TransitionChangeResult"]
-    },
-    {
-      "file": "core:src/composition/kernel.ts"
+      "symbols": ["TransitionChange", "TransitionChange.execute"]
     },
     {
       "file": "core:src/composition/use-cases/transition-change.ts"

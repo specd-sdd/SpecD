@@ -127,6 +127,8 @@ When status is 'unchanged', projectContext and specs are omitted from the struct
             ...(Object.keys(workspacesConfig).length > 0 ? { workspaces: workspacesConfig } : {}),
           }
 
+          await kernel.changes.refreshImplementationTracking.execute({ name })
+
           const result = await kernel.changes.compile.execute({
             name,
             step,

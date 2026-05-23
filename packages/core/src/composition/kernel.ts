@@ -41,6 +41,7 @@ import { DetectOverlap } from '../application/use-cases/detect-overlap.js'
 import { PreviewSpec } from '../application/use-cases/preview-spec.js'
 import { GetSpecOutline } from '../application/use-cases/get-spec-outline.js'
 import { UpdateImplementationTracking } from '../application/use-cases/update-implementation-tracking.js'
+import { RefreshImplementationTracking } from '../application/use-cases/refresh-implementation-tracking.js'
 import { GetImplementationReview } from '../application/use-cases/get-implementation-review.js'
 import { createArchiveWorkspaceImplementationConfig } from '../application/use-cases/archive-change.js'
 import { buildSchema } from '../domain/services/build-schema.js'
@@ -123,6 +124,8 @@ export interface Kernel {
     getArtifactInstruction: GetArtifactInstruction
     /** Applies add/remove/ignore/resolve mutations to implementation tracking. */
     updateImplementationTracking: UpdateImplementationTracking
+    /** Refreshes tracked implementation files from VCS-backed autodetection. */
+    refreshImplementationTracking: RefreshImplementationTracking
     /** Returns raw implementation-tracking review projection. */
     getImplementationReview: GetImplementationReview
     /** Detects specs targeted by multiple active changes. */
@@ -257,21 +260,13 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
       status: new GetStatus(
         i.changes,
         schemaProvider,
-        implementationDetector,
         {
           spec: config.approvals.spec,
           signoff: config.approvals.signoff,
         },
         lifecycle,
       ),
-      transition: new TransitionChange(
-        i.changes,
-        i.actor,
-        schemaProvider,
-        implementationDetector,
-        runStepHooks,
-        lifecycle,
-      ),
+      transition: new TransitionChange(i.changes, i.actor, schemaProvider, runStepHooks, lifecycle),
       draft: new DraftChange(i.changes, i.actor),
       restore: new RestoreChange(i.changes, i.actor),
       discard: new DiscardChange(i.changes, i.actor),
@@ -312,7 +307,6 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
         i.changes,
         i.specs,
         schemaProvider,
-        implementationDetector,
         i.files,
         i.parsers,
         i.hasher,
@@ -340,6 +334,10 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
       detectOverlap: new DetectOverlap(i.changes),
       preview: previewSpec,
       updateImplementationTracking: new UpdateImplementationTracking(i.changes),
+      refreshImplementationTracking: new RefreshImplementationTracking(
+        i.changes,
+        implementationDetector,
+      ),
       getImplementationReview: new GetImplementationReview(i.changes),
       getArtifactInstruction: new GetArtifactInstruction(
         i.changes,

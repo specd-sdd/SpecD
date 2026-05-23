@@ -41,9 +41,6 @@ function makeUseCase(
     repo,
     makeActorResolver(),
     makeSchemaProvider(overrides?.schema !== undefined ? overrides.schema : makeSchema()),
-    {
-      detectModifiedFiles: async () => [],
-    } as never,
     overrides?.runStepHooks ?? makeRunStepHooks(),
   )
 }

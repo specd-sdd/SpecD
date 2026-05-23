@@ -1,0 +1,23 @@
+- op: added
+  description: Verify CLI refresh orchestration before context
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Command signature'
+  content: |
+    ### Requirement: Implementation tracking refresh before context compilation
+
+    #### Scenario: Context command refreshes before CompileContext
+
+    - **GIVEN** `specd change context <name> <step>` is executed
+    - **WHEN** the command handler runs
+    - **THEN** it calls `RefreshImplementationTracking` before `CompileContext`
+
+    #### Scenario: Fingerprint short-circuit still refreshes first
+
+    - **GIVEN** `--fingerprint` is provided
+    - **WHEN** the command handler runs
+    - **THEN** it calls `RefreshImplementationTracking` before comparing fingerprints

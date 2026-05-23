@@ -217,6 +217,7 @@ JSON/TOON output schema:
 
           const { config, kernel } = await resolveCliContext({ configPath: opts.config })
 
+          await kernel.changes.refreshImplementationTracking.execute({ name })
           const { change: statusBefore } = await kernel.changes.status.execute({ name })
           const fromState = statusBefore.state
           const requestedTarget = resolveRequestedTarget(

@@ -12,19 +12,25 @@
 
 #### Scenario: Callers provide change context instead of raw baseline refs
 
-- **GIVEN** a lifecycle use case wants to refresh implementation tracking
+- **GIVEN** `RefreshImplementationTracking` needs candidate paths
 - **WHEN** it calls the detector port
 - **THEN** it passes the change context itself
 - **AND** it does not compute or pass a raw VCS baseline reference
 
 ### Requirement: Targeted lifecycle use
 
-#### Scenario: Lifecycle use case invokes detector instead of Change entity
+#### Scenario: Refresh use case invokes detector instead of Change entity
 
-- **GIVEN** implementation refresh is triggered from a lifecycle entry point
+- **GIVEN** `RefreshImplementationTracking` runs with the historical implementing guard satisfied
 - **WHEN** modified files are requested
-- **THEN** the lifecycle use case calls the detector port
+- **THEN** `RefreshImplementationTracking` calls the detector port
 - **AND** the `Change` entity itself does not perform detection
+
+#### Scenario: Read and transition use cases do not invoke detector
+
+- **GIVEN** `GetStatus`, `TransitionChange`, or `CompileContext` executes
+- **WHEN** implementation tracking is needed
+- **THEN** those use cases do not call `ImplementationDetector` directly
 
 ### Requirement: Backend independence
 

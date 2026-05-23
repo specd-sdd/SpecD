@@ -39,6 +39,14 @@ After resolving the target, the command MUST execute the normal `TransitionChang
 - `pending-signoff` — waiting for human signoff
 - `archivable` — the next action is archive execution, not another lifecycle transition
 
+### Requirement: Implementation tracking refresh before transition
+
+Before invoking `TransitionChange`, the command MUST call `RefreshImplementationTracking` for the same change name.
+
+The CLI MUST NOT invoke `ImplementationDetector` directly and MUST NOT duplicate detection merge logic.
+
+When the command fetches `GetStatus` after a failed transition to render a repair guide, it MUST NOT call `RefreshImplementationTracking` again solely for that diagnostic read unless the repair flow explicitly requires a second refresh.
+
 ### Requirement: Approval-gate routing
 
 The CLI passes the `approvalsSpec` and `approvalsSignoff` flags from the loaded `SpecdConfig` to the `TransitionChange` use case. The use case, via `LifecycleEngine`, applies smart routing:
@@ -127,7 +135,8 @@ specd change transition add-login --skip-hooks all
 
 ## Spec Dependencies
 
-- [`cli:entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
-- [`core:change`](../../core/change/spec.md) — lifecycle states, approval gates, task completion check
-- [`core:transition-change`](../../core/transition-change/spec.md) — requires enforcement, hook execution, skipHooks, progress
-- [`core:hook-execution-model`](../../core/hook-execution-model/spec.md) — hook execution and skipping model
+- [`cli:entrypoint`](../entrypoint/spec.md) — CLI config discovery, exit codes, and output conventions
+- [`core:change`](../../core/change/spec.md) — lifecycle states and transitions
+- [`core:transition-change`](../../core/transition-change/spec.md) — transition execution, hooks, and requires enforcement
+- [`core:hook-execution-model`](../../core/hook-execution-model/spec.md) — `--skip-hooks` semantics
+- [`core:refresh-implementation-tracking`](../../core/refresh-implementation-tracking/spec.md) — VCS-backed refresh before transition

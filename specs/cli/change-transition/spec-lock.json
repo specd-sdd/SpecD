@@ -1,0 +1,18 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "cli:entrypoint",
+    "core:change",
+    "core:transition-change",
+    "core:hook-execution-model",
+    "core:refresh-implementation-tracking"
+  ],
+  "implementation": [
+    {
+      "file": "cli:src/commands/change/transition.ts"
+    }
+  ]
+}

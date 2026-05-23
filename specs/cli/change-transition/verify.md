@@ -58,6 +58,20 @@
 - **THEN** the command exits with code 1
 - **AND** stderr contains an `error:` message explaining that archiving is not a lifecycle transition
 
+### Requirement: Implementation tracking refresh before transition
+
+#### Scenario: Transition command refreshes before TransitionChange
+
+- **GIVEN** `specd change transition <name> <step>` is executed
+- **WHEN** the command handler runs
+- **THEN** it calls `RefreshImplementationTracking` before `TransitionChange`
+
+#### Scenario: Repair guide GetStatus does not double-refresh
+
+- **GIVEN** a transition attempt failed after refresh already ran
+- **WHEN** the command fetches `GetStatus` for the repair guide
+- **THEN** it does not call `RefreshImplementationTracking` again solely for diagnostics
+
 ### Requirement: Approval-gate routing
 
 #### Scenario: Spec approval gate active

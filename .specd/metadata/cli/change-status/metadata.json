@@ -1,7 +1,12 @@
 {
   "title": "Change Status",
   "description": "Users and agents need a quick way to see where a change stands — its lifecycle state and which artifacts are done, in progress, or missing. `specd change status <name>` reports the current lifecycle state and artifact statuses of a named change.",
-  "dependsOn": ["cli:entrypoint", "core:change", "core:get-status"],
+  "dependsOn": [
+    "cli:entrypoint",
+    "core:change",
+    "core:get-status",
+    "core:refresh-implementation-tracking"
+  ],
   "context": [
     "Users and agents need a quick way to see where a change stands — its lifecycle state and which artifacts are done, in progress, or missing. `specd change status <name>` reports the current lifecycle state and artifact statuses of a named change."
   ],
@@ -46,6 +51,12 @@
       "requirement": "Schema-derived fields",
       "rules": [
         "When the change uses any schema (not just schema-std), the JSON output MUST include a nested schema object with derived fields:\n\n```\nschema:\n  name: \"...\"\n  version: 1\n  artifactDag:\n    - id: \"...\"\n      scope: \"change|spec\"\n      optional: true|false\n      requires: [\"...\"]\n      children: [\"...\"]\n      hasTasks: true|false\n      output: \"...\"\n```\n\n`artifactDag` entries MUST be emitted in `schema.artifactDag().topologicalOrder()`.\n\nFor each entry, `requires` comes from the schema artifact definition and `children` MUST be `schema.artifactDag().childrenOf(id)` — the CLI MUST NOT derive children with local `requires.includes(id)` filters.\n\n`hasTasks` is true when the artifact has `hasTasks: true` explicitly or has a `taskCompletionCheck` declaration.\n\nText-mode `artifacts (DAG):` tree rendering MUST use the same roots (`artifactDag().roots()`) and child ordering (`childrenOf`) as structured output.\n\nText-mode DAG node labels MUST use each artifact's **display status** from `GetStatus` (for example `complete-with-drift`), not raw `effectiveStatus`, so drift is visible without reading the details section.\n\nWhen the DAG has convergent edges (one artifact required by multiple parents), the text tree MUST render each artifact type id **at most once**. Dependents reached again via another branch MUST NOT repeat the full subtree; the renderer MAY omit duplicate child expansion or annotate with a short reference (for example `└── (see <id> above)`).\n\nWhen the CLI has resolved the active `Schema` instance, structured and text DAG derivation MUST use `schema.artifactDag()` (cached) rather than rebuilding `ArtifactDag.from` on a detached artifact list, so ordering matches every other consumer.\n\nThis allows design/implement skills to replace `schema show` calls."
+      ]
+    },
+    {
+      "requirement": "Implementation tracking refresh before status load",
+      "rules": [
+        "Before invoking `GetStatus`, the command MUST call `RefreshImplementationTracking` for the same change name.\n\nThe CLI MUST NOT invoke `ImplementationDetector` directly and MUST NOT duplicate detection merge logic.\n\nAfter refresh, the command MUST call `GetStatus` and serialize its result, including implementation-tracking projection when requested."
       ]
     },
     {
@@ -277,6 +288,21 @@
       ]
     },
     {
+      "requirement": "Implementation tracking refresh before status load",
+      "name": "Status command refreshes before GetStatus",
+      "given": ["specd change status <name> is executed"],
+      "when": ["the command handler runs"],
+      "then": ["it calls RefreshImplementationTracking before GetStatus"]
+    },
+    {
+      "requirement": "Implementation tracking refresh before status load",
+      "name": "Status command does not call detector directly",
+      "when": ["specd change status <name> runs"],
+      "then": [
+        "the CLI does not invoke ImplementationDetector outside RefreshImplementationTracking"
+      ]
+    },
+    {
       "requirement": "Implementation section",
       "name": "Status renders tracked implementation files by review state",
       "given": [
@@ -373,22 +399,20 @@
     }
   ],
   "implementation": {
-    "symbols": [
+    "files": [
       {
         "specId": "cli:change-status",
-        "file": "cli:src/commands/change/status.ts",
-        "symbol": "resolveStatusSchemaDag"
+        "file": "cli:src/commands/change/status.ts"
       },
       {
         "specId": "cli:change-status",
-        "file": "cli:src/commands/change/status.ts",
-        "symbol": "renderDag"
+        "file": "cli:test/commands/helpers.ts"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:72d9383747539faa8f8d47e0be7b0cda1b90ff29e36373e1a65f32d560ae93d0",
-    "verify.md": "sha256:166e12d701dda636b426839853c9c4416e5e862e34a7aad76f5e896c4d53639f"
+    "spec.md": "sha256:9e5d1e83912ce2c6f37a33baa07f3514451130e7edf6eb62c4efa411f967b156",
+    "verify.md": "sha256:ab1c98fcd6f853f8e87102bf783aae03ee2e09c482ace3b9adbe61026bd7e67b"
   },
   "generatedBy": "core"
 }

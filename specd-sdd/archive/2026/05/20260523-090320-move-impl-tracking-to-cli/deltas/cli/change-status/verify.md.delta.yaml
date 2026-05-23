@@ -1,0 +1,22 @@
+- op: added
+  description: Verify CLI refresh orchestration before status
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    before:
+      type: section
+      matches: 'Requirement: Implementation section'
+  content: |
+    ### Requirement: Implementation tracking refresh before status load
+
+    #### Scenario: Status command refreshes before GetStatus
+
+    - **GIVEN** `specd change status <name>` is executed
+    - **WHEN** the command handler runs
+    - **THEN** it calls `RefreshImplementationTracking` before `GetStatus`
+
+    #### Scenario: Status command does not call detector directly
+
+    - **WHEN** `specd change status <name>` runs
+    - **THEN** the CLI does not invoke `ImplementationDetector` outside `RefreshImplementationTracking`

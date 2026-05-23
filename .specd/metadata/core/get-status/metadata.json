@@ -8,7 +8,7 @@
     "core:schema-format",
     "core:config",
     "core:lifecycle-engine",
-    "core:implementation-detector-port"
+    "core:refresh-implementation-tracking"
   ],
   "context": [
     "Users and tooling need a quick way to see where a change stands — both its lifecycle state and which artifacts are actually ready — without loading file content. The `GetStatus` use case loads a single change by name and reports its current lifecycle state along with the effective status of each artifact, cascading through dependency chains so that an artifact whose hashes match may still show `in-progress` if any of its required dependencies are not `complete`."
@@ -27,15 +27,15 @@
       ]
     },
     {
-      "requirement": "Implementation autodetection on status load",
-      "rules": [
-        "When the change has entered `implementing` at least once in its history, `GetStatus` MUST trigger targeted implementation autodetection before finalizing the returned status view.\n\nDetection updates the persisted tracked implementation state for that change, then `GetStatus` returns the refreshed tracked files and confirmed implementation links as part of the status result."
-      ]
-    },
-    {
       "requirement": "Implementation status projection",
       "rules": [
         "`GetStatusResult` SHALL include implementation-tracking data for delivery layers.\n\nThat projection MUST include:\n\n- tracked implementation files with review state\n- confirmed implementation links, including file-level links and symbol-level refinements"
+      ]
+    },
+    {
+      "requirement": "Read-only implementation tracking",
+      "rules": [
+        "`GetStatus` MUST project implementation-tracking data from the change loaded by `ChangeRepository` without mutating tracked implementation files or invoking `ImplementationDetector`.\n\nCallers that require refreshed tracked files MUST invoke `RefreshImplementationTracking` before `GetStatus`."
       ]
     },
     {
@@ -59,7 +59,7 @@
     {
       "requirement": "Constructor dependencies",
       "rules": [
-        "`GetStatus` MUST accept the following constructor arguments:\n\n- `changes: ChangeRepository` — for loading changes by name\n- `schemaProvider: SchemaProvider` — for obtaining the fully-resolved active schema\n- `lifecycle: LifecycleEngine` — for deriving effective artifact status, blockers, routing, and next-action guidance from the change plus active schema\n- `implementationDetector: ImplementationDetector` — for targeted implementation autodetection when implementation tracking is active\n- `approvals: { readonly spec: boolean; readonly signoff: boolean }` — whether approval gates are active\n\nIt MUST delegate to `ChangeRepository.get(name)` to load the change. `SchemaProvider` replaces the previous `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths` triple, providing the fully-resolved schema with plugins and overrides applied."
+        "`GetStatus` MUST accept the following constructor arguments:\n\n- `changes: ChangeRepository` — for loading changes by name\n- `schemaProvider: SchemaProvider` — for obtaining the fully-resolved active schema\n- `lifecycle: LifecycleEngine` — for deriving effective artifact status, blockers, routing, and next-action guidance from the change plus active schema\n- `approvals: { readonly spec: boolean; readonly signoff: boolean }` — whether approval gates are active\n\nIt MUST delegate to `ChangeRepository.get(name)` to load the change. `SchemaProvider` replaces the previous `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths` triple, providing the fully-resolved schema with plugins and overrides applied.\n\n`GetStatus` MUST NOT accept `ImplementationDetector` and MUST NOT invoke implementation autodetection."
       ]
     },
     {
@@ -147,20 +147,6 @@
       ]
     },
     {
-      "requirement": "Implementation autodetection on status load",
-      "name": "Historical implementing state triggers targeted autodetection",
-      "given": ["a change has entered implementing at least once in its history"],
-      "when": ["GetStatus.execute() is called"],
-      "then": ["it invokes the implementation detector before finalizing the result"]
-    },
-    {
-      "requirement": "Implementation autodetection on status load",
-      "name": "Change without historical implementing state skips autodetection",
-      "given": ["a change has never entered implementing"],
-      "when": ["GetStatus.execute() is called"],
-      "then": ["it does not invoke implementation autodetection"]
-    },
-    {
       "requirement": "Implementation status projection",
       "name": "Result includes tracked files and links",
       "given": ["implementation tracking is active for a change"],
@@ -168,6 +154,16 @@
       "then": [
         "the result includes tracked implementation files with review state",
         "AND confirmed implementation links including file-level links and symbol-level refinements"
+      ]
+    },
+    {
+      "requirement": "Read-only implementation tracking",
+      "name": "GetStatus does not invoke detector",
+      "given": ["a change has entered implementing at least once"],
+      "when": ["GetStatus.execute() is called"],
+      "then": [
+        "it does not invoke ImplementationDetector",
+        "AND it does not mutate tracked implementation files"
       ]
     },
     {
@@ -397,15 +393,6 @@
       "then": ["it receives ChangeRepository, SchemaProvider, approval config, and LifecycleEngine"]
     },
     {
-      "requirement": "Constructor dependencies",
-      "name": "GetStatus receives ImplementationDetector through construction",
-      "given": ["GetStatus is assembled by the kernel"],
-      "when": ["the use case is constructed"],
-      "then": [
-        "it receives ImplementationDetector alongside ChangeRepository, SchemaProvider, approval config, and LifecycleEngine"
-      ]
-    },
-    {
       "requirement": "Identifies blockers",
       "name": "Blockers are surfaced from lifecycle interpretation",
       "given": ["lifecycle interpretation finds artifact drift or missing required artifacts"],
@@ -416,16 +403,17 @@
     }
   ],
   "implementation": {
+    "files": [
+      {
+        "specId": "core:get-status",
+        "file": "core:src/composition/use-cases/get-status.ts"
+      }
+    ],
     "symbols": [
       {
         "specId": "core:get-status",
         "file": "core:src/application/use-cases/get-status.ts",
-        "symbol": "ArtifactStatusEntry"
-      },
-      {
-        "specId": "core:get-status",
-        "file": "core:src/application/use-cases/get-status.ts",
-        "symbol": "TaskCompletionStatus"
+        "symbol": "GetStatus"
       },
       {
         "specId": "core:get-status",
@@ -435,8 +423,8 @@
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:e84196c33c774b01ad93269e18025db228986a79767b7ef9df49d4f347c9d7dd",
-    "verify.md": "sha256:489bdcf3207623540207c19a668d42ee1f1165312dd899fff8051a7f30a20622"
+    "spec.md": "sha256:7e26a81666000342a5f36fbb893c9dca3d46d4df074e048517c4a37e2a958536",
+    "verify.md": "sha256:4329f7cf61a9dd78fc5f68ca4826e28673a072dfbefeb930622e01b87f3573a2"
   },
   "generatedBy": "core"
 }

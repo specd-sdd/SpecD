@@ -10,12 +10,15 @@
     "core:schema-format",
     "core:config",
     "core:lifecycle-engine",
-    "core:implementation-detector-port"
+    "core:refresh-implementation-tracking"
   ],
   "implementation": [
     {
       "file": "core:src/application/use-cases/get-status.ts",
-      "symbols": ["ArtifactStatusEntry", "TaskCompletionStatus", "GetStatus.execute"]
+      "symbols": ["GetStatus", "GetStatus.execute"]
+    },
+    {
+      "file": "core:src/composition/use-cases/get-status.ts"
     }
   ]
 }

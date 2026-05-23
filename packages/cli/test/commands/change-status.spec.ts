@@ -94,6 +94,13 @@ describe('Output format', () => {
     registerChangeStatus(program.command('change'))
     await program.parseAsync(['node', 'specd', 'change', 'status', 'add-login'])
 
+    expect(kernel.changes.refreshImplementationTracking.execute).toHaveBeenCalledBefore(
+      kernel.changes.status.execute,
+    )
+    expect(kernel.changes.refreshImplementationTracking.execute).toHaveBeenCalledWith({
+      name: 'add-login',
+    })
+
     const out = stdout()
     expect(out).toContain('change:')
     expect(out).toContain('add-login')

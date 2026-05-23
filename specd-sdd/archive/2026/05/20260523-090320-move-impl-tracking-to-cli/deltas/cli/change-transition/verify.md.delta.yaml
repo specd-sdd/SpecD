@@ -1,0 +1,23 @@
+- op: added
+  description: Verify CLI refresh orchestration before transition
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Next-transition resolution'
+  content: |
+    ### Requirement: Implementation tracking refresh before transition
+
+    #### Scenario: Transition command refreshes before TransitionChange
+
+    - **GIVEN** `specd change transition <name> <step>` is executed
+    - **WHEN** the command handler runs
+    - **THEN** it calls `RefreshImplementationTracking` before `TransitionChange`
+
+    #### Scenario: Repair guide GetStatus does not double-refresh
+
+    - **GIVEN** a transition attempt failed after refresh already ran
+    - **WHEN** the command fetches `GetStatus` for the repair guide
+    - **THEN** it does not call `RefreshImplementationTracking` again solely for diagnostics

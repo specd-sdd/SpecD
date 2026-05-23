@@ -8,7 +8,7 @@ AI agents entering a lifecycle step need relevant spec content and project conte
 
 ### Requirement: Ports and constructor
 
-`CompileContext` receives at construction time: `ChangeRepository`, a map of `SpecRepository` instances (one per configured workspace), `SchemaProvider`, `FileReader`, `ArtifactParserRegistry`, `ContentHasher`, `PreviewSpec`, `LifecycleEngine`, and `ImplementationDetector`.
+`CompileContext` receives at construction time: `ChangeRepository`, a map of `SpecRepository` instances (one per configured workspace), `SchemaProvider`, `FileReader`, `ArtifactParserRegistry`, `ContentHasher`, `PreviewSpec`, and `LifecycleEngine`.
 
 ```typescript
 class CompileContext {
@@ -21,14 +21,15 @@ class CompileContext {
     hasher: ContentHasher,
     previewSpec: PreviewSpec,
     lifecycle: LifecycleEngine,
-    implementationDetector: ImplementationDetector,
   )
 }
 ```
 
 `SchemaProvider` is a lazy, caching port that returns the fully-resolved schema (with plugins and overrides applied). It replaces the previous `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths` triple. All are injected at kernel composition time, not passed per invocation.
 
-`PreviewSpec` is the use case `CompileContext` delegates to when it needs a materialized merged view of a spec with validated deltas applied. `ContentHasher` is used for metadata freshness checks and context fingerprint inputs. `LifecycleEngine` provides the schema-aware lifecycle interpretation needed for step availability and available-step diagnostics. `ImplementationDetector` provides the targeted implementation-file refresh used when implementation tracking is active.
+`PreviewSpec` is the use case `CompileContext` delegates to when it needs a materialized merged view of a spec with validated deltas applied. `ContentHasher` is used for metadata freshness checks and context fingerprint inputs. `LifecycleEngine` provides the schema-aware lifecycle interpretation needed for step availability and available-step diagnostics.
+
+`CompileContext` MUST NOT accept `ImplementationDetector` or invoke implementation autodetection.
 
 ### Requirement: Input
 
@@ -43,11 +44,11 @@ class CompileContext {
 - `sections` (optional) — when present, restricts the metadata-derived content rendered for each full-mode spec in the output to the listed sections (`'rules'`, `'constraints'`, `'scenarios'`). When absent, full-mode specs are rendered from their artifact files rather than from metadata sections. `sections` applies only to full-mode spec content — it does not affect list-mode specs, summary-mode specs, project context entries, or available steps.
 - `fingerprint` (optional) — when provided, `CompileContext` compares this value against the fingerprint it calculates from the current context inputs. If they match, the result's `status` field is set to `'unchanged'` and the full context is not assembled. If omitted or the fingerprint does not match, `status` is `'changed'` and the full context is returned with the new fingerprint.
 
-### Requirement: Implementation autodetection before context compilation
+### Requirement: Caller-owned implementation tracking refresh
 
-When the change has entered `implementing` at least once in its history, `CompileContext` MUST trigger targeted implementation autodetection before it assembles the final context result.
+`CompileContext` MUST assemble context from the tracked implementation state already persisted on the change.
 
-This refresh updates the tracked implementation-file state used by downstream workflow consumers before context is emitted.
+It MUST NOT invoke `ImplementationDetector` or merge detected files during context compilation. Callers that require fresh tracked files MUST invoke `RefreshImplementationTracking` before `CompileContext`.
 
 ### Requirement: Schema name guard
 
@@ -306,4 +307,4 @@ const result = await compileContext.execute({
 - [`core:get-hook-instructions`](../get-hook-instructions/spec.md) — step hook instructions (separate concern)
 - [`core:preview-spec`](../preview-spec/spec.md) — delta merge for materialized spec views in context
 - [`core:lifecycle-engine`](../lifecycle-engine/spec.md) — shared schema-aware lifecycle interpretation for step availability and blocker diagnostics
-- [`core:implementation-detector-port`](../implementation-detector-port/spec.md) — targeted autodetection before context compilation
+- [`core:refresh-implementation-tracking`](../refresh-implementation-tracking/spec.md) — optional upstream refresh before context compilation; not invoked by `CompileContext` itself

@@ -43,20 +43,6 @@
 - **THEN** the result includes a `blockers` array
 - **AND** it contains at least one entry with `code: 'ARTIFACT_DRIFT'`
 
-### Requirement: Implementation autodetection on status load
-
-#### Scenario: Historical implementing state triggers targeted autodetection
-
-- **GIVEN** a change has entered `implementing` at least once in its history
-- **WHEN** `GetStatus.execute()` is called
-- **THEN** it invokes the implementation detector before finalizing the result
-
-#### Scenario: Change without historical implementing state skips autodetection
-
-- **GIVEN** a change has never entered `implementing`
-- **WHEN** `GetStatus.execute()` is called
-- **THEN** it does not invoke implementation autodetection
-
 ### Requirement: Implementation status projection
 
 #### Scenario: Result includes tracked files and links
@@ -65,6 +51,15 @@
 - **WHEN** `GetStatus.execute()` returns
 - **THEN** the result includes tracked implementation files with review state
 - **AND** confirmed implementation links including file-level links and symbol-level refinements
+
+### Requirement: Read-only implementation tracking
+
+#### Scenario: GetStatus does not invoke detector
+
+- **GIVEN** a change has entered `implementing` at least once
+- **WHEN** `GetStatus.execute()` is called
+- **THEN** it does not invoke `ImplementationDetector`
+- **AND** it does not mutate tracked implementation files
 
 ### Requirement: Drift-aware display status
 
@@ -241,12 +236,6 @@
 - **GIVEN** `GetStatus` is assembled by the kernel
 - **WHEN** the use case is constructed
 - **THEN** it receives `ChangeRepository`, `SchemaProvider`, approval config, and `LifecycleEngine`
-
-#### Scenario: GetStatus receives ImplementationDetector through construction
-
-- **GIVEN** `GetStatus` is assembled by the kernel
-- **WHEN** the use case is constructed
-- **THEN** it receives `ImplementationDetector` alongside `ChangeRepository`, `SchemaProvider`, approval config, and `LifecycleEngine`
 
 ### Requirement: Identifies blockers
 

@@ -16,15 +16,12 @@
     "core:get-hook-instructions",
     "core:preview-spec",
     "core:lifecycle-engine",
-    "core:implementation-detector-port"
+    "core:refresh-implementation-tracking"
   ],
   "implementation": [
     {
       "file": "core:src/application/use-cases/compile-context.ts",
-      "symbols": ["CompileContext", "CompileContext.execute", "CompileContextResult"]
-    },
-    {
-      "file": "core:src/composition/kernel.ts"
+      "symbols": ["CompileContext", "CompileContext.execute"]
     },
     {
       "file": "core:src/composition/use-cases/compile-context.ts"

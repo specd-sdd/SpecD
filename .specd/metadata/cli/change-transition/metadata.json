@@ -5,7 +5,8 @@
     "cli:entrypoint",
     "core:change",
     "core:transition-change",
-    "core:hook-execution-model"
+    "core:hook-execution-model",
+    "core:refresh-implementation-tracking"
   ],
   "context": [
     "Changes must progress through a governed lifecycle so that validations, approval gates, requires enforcement, and hooks fire at the right time. `specd change transition <name> <step>` advances a change to the next lifecycle state, transparently routing through approval gates when enabled, enforcing workflow `requires`, and executing `run:` hooks at step boundaries by default."
@@ -21,6 +22,12 @@
       "requirement": "Next-transition resolution",
       "rules": [
         "When `--next` is used, the CLI MUST load the current change state and resolve the same logical forward target a human would normally choose for the next workflow step:\n\n- `drafting` → `designing`\n- `designing` → `ready`\n- `ready` → `implementing`\n- `spec-approved` → `implementing`\n- `implementing` → `verifying`\n- `verifying` → `done`\n- `done` → `archivable`\n\nAfter resolving the target, the command MUST execute the normal `TransitionChange` flow for that resolved state. Approval-gate routing, requires enforcement, hook execution, and error handling remain unchanged.\n\n`--next` is unavailable when the current state does not have a transition-driven next action through `change transition`. In those cases, the command MUST exit with code 1 and print an explanatory `error:` message to stderr instead of inventing a synthetic transition target. This includes at least:\n\n- `pending-spec-approval` — waiting for human spec approval\n- `pending-signoff` — waiting for human signoff\n- `archivable` — the next action is archive execution, not another lifecycle transition"
+      ]
+    },
+    {
+      "requirement": "Implementation tracking refresh before transition",
+      "rules": [
+        "Before invoking `TransitionChange`, the command MUST call `RefreshImplementationTracking` for the same change name.\n\nThe CLI MUST NOT invoke `ImplementationDetector` directly and MUST NOT duplicate detection merge logic.\n\nWhen the command fetches `GetStatus` after a failed transition to render a repair guide, it MUST NOT call `RefreshImplementationTracking` again solely for that diagnostic read unless the repair flow explicitly requires a second refresh."
       ]
     },
     {
@@ -148,6 +155,20 @@
         "the command exits with code 1",
         "AND stderr contains an error: message explaining that archiving is not a lifecycle transition"
       ]
+    },
+    {
+      "requirement": "Implementation tracking refresh before transition",
+      "name": "Transition command refreshes before TransitionChange",
+      "given": ["specd change transition <name> <step> is executed"],
+      "when": ["the command handler runs"],
+      "then": ["it calls RefreshImplementationTracking before TransitionChange"]
+    },
+    {
+      "requirement": "Implementation tracking refresh before transition",
+      "name": "Repair guide GetStatus does not double-refresh",
+      "given": ["a transition attempt failed after refresh already ran"],
+      "when": ["the command fetches GetStatus for the repair guide"],
+      "then": ["it does not call RefreshImplementationTracking again solely for diagnostics"]
     },
     {
       "requirement": "Approval-gate routing",
@@ -298,9 +319,17 @@
       ]
     }
   ],
+  "implementation": {
+    "files": [
+      {
+        "specId": "cli:change-transition",
+        "file": "cli:src/commands/change/transition.ts"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:4695aebcb64d7a62565bb7d403ab0287e6474c97e8457c7847e604f023a19110",
-    "verify.md": "sha256:a9e624ebd5b19ce79edd1e6d9cd49daf0ed22004c3e92b259e6abe5fc531ba6a"
+    "spec.md": "sha256:4eaefe5a84081fd97aefafbb974646a0ccc18e5511f4bc9930b9525144b5c9f6",
+    "verify.md": "sha256:ca375fc8701b01ba72315a6e4c4e291340836c0d4b6123001d29b0f5c20c1935"
   },
   "generatedBy": "core"
 }

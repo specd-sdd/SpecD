@@ -75,6 +75,11 @@ export {
   type UpdateImplementationTrackingResult,
 } from './update-implementation-tracking.js'
 export {
+  type RefreshImplementationTracking,
+  type RefreshImplementationTrackingInput,
+  type RefreshImplementationTrackingResult,
+} from './refresh-implementation-tracking.js'
+export {
   type HookPhaseSelector,
   type TransitionChange,
   type TransitionChangeInput,

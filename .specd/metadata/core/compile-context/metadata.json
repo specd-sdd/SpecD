@@ -14,7 +14,7 @@
     "core:get-hook-instructions",
     "core:preview-spec",
     "core:lifecycle-engine",
-    "core:implementation-detector-port"
+    "core:refresh-implementation-tracking"
   ],
   "context": [
     "AI agents entering a lifecycle step need relevant spec content and project context to understand the codebase they're working with — assembling this from scattered sources manually would be error-prone and inconsistent. `CompileContext` automates this assembly: it collects context specs according to the project's include/exclude configuration, reads structured metadata via `SpecRepository.metadata()`, evaluates step availability, and combines project context entries, spec content, and available steps into a single structured output. Artifact instructions and step hooks are separate concerns retrieved via `GetArtifactInstruction` and `GetHookInstructions` respectively."
@@ -23,7 +23,7 @@
     {
       "requirement": "Ports and constructor",
       "rules": [
-        "`CompileContext` receives at construction time: `ChangeRepository`, a map of `SpecRepository` instances (one per configured workspace), `SchemaProvider`, `FileReader`, `ArtifactParserRegistry`, `ContentHasher`, `PreviewSpec`, `LifecycleEngine`, and `ImplementationDetector`.\n\n```typescript\nclass CompileContext {\n  constructor(\n    changes: ChangeRepository,\n    specs: ReadonlyMap<string, SpecRepository>,\n    schemaProvider: SchemaProvider,\n    files: FileReader,\n    parsers: ArtifactParserRegistry,\n    hasher: ContentHasher,\n    previewSpec: PreviewSpec,\n    lifecycle: LifecycleEngine,\n    implementationDetector: ImplementationDetector,\n  )\n}\n```\n\n`SchemaProvider` is a lazy, caching port that returns the fully-resolved schema (with plugins and overrides applied). It replaces the previous `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths` triple. All are injected at kernel composition time, not passed per invocation.\n\n`PreviewSpec` is the use case `CompileContext` delegates to when it needs a materialized merged view of a spec with validated deltas applied. `ContentHasher` is used for metadata freshness checks and context fingerprint inputs. `LifecycleEngine` provides the schema-aware lifecycle interpretation needed for step availability and available-step diagnostics. `ImplementationDetector` provides the targeted implementation-file refresh used when implementation tracking is active."
+        "`CompileContext` receives at construction time: `ChangeRepository`, a map of `SpecRepository` instances (one per configured workspace), `SchemaProvider`, `FileReader`, `ArtifactParserRegistry`, `ContentHasher`, `PreviewSpec`, and `LifecycleEngine`.\n\n```typescript\nclass CompileContext {\n  constructor(\n    changes: ChangeRepository,\n    specs: ReadonlyMap<string, SpecRepository>,\n    schemaProvider: SchemaProvider,\n    files: FileReader,\n    parsers: ArtifactParserRegistry,\n    hasher: ContentHasher,\n    previewSpec: PreviewSpec,\n    lifecycle: LifecycleEngine,\n  )\n}\n```\n\n`SchemaProvider` is a lazy, caching port that returns the fully-resolved schema (with plugins and overrides applied). It replaces the previous `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths` triple. All are injected at kernel composition time, not passed per invocation.\n\n`PreviewSpec` is the use case `CompileContext` delegates to when it needs a materialized merged view of a spec with validated deltas applied. `ContentHasher` is used for metadata freshness checks and context fingerprint inputs. `LifecycleEngine` provides the schema-aware lifecycle interpretation needed for step availability and available-step diagnostics.\n\n`CompileContext` MUST NOT accept `ImplementationDetector` or invoke implementation autodetection."
       ]
     },
     {
@@ -33,9 +33,9 @@
       ]
     },
     {
-      "requirement": "Implementation autodetection before context compilation",
+      "requirement": "Caller-owned implementation tracking refresh",
       "rules": [
-        "When the change has entered `implementing` at least once in its history, `CompileContext` MUST trigger targeted implementation autodetection before it assembles the final context result.\n\nThis refresh updates the tracked implementation-file state used by downstream workflow consumers before context is emitted."
+        "`CompileContext` MUST assemble context from the tracked implementation state already persisted on the change.\n\nIt MUST NOT invoke `ImplementationDetector` or merge detected files during context compilation. Callers that require fresh tracked files MUST invoke `RefreshImplementationTracking` before `CompileContext`."
       ]
     },
     {
@@ -503,14 +503,6 @@
       ]
     },
     {
-      "requirement": "Ports and constructor",
-      "name": "CompileContext is constructed with ImplementationDetector",
-      "when": ["CompileContext is assembled"],
-      "then": [
-        "it receives ImplementationDetector alongside PreviewSpec, LifecycleEngine, and its existing repositories and utilities"
-      ]
-    },
-    {
       "requirement": "Input",
       "name": "Input includes step, config, and optional traversal controls",
       "when": ["CompileContext.execute is called"],
@@ -519,12 +511,13 @@
       ]
     },
     {
-      "requirement": "Implementation autodetection before context compilation",
-      "name": "Historical implementing state refreshes tracked implementation files before context assembly",
-      "given": ["a change has entered implementing at least once in its history"],
-      "when": ["CompileContext.execute() is called"],
+      "requirement": "Caller-owned implementation tracking refresh",
+      "name": "CompileContext does not invoke detector",
+      "given": ["a change has entered implementing at least once"],
+      "when": ["CompileContext.execute() runs"],
       "then": [
-        "it triggers implementation autodetection before assembling the final context result"
+        "it does not invoke ImplementationDetector",
+        "AND it does not merge detected files before assembling context"
       ]
     },
     {
@@ -611,10 +604,6 @@
     "files": [
       {
         "specId": "core:compile-context",
-        "file": "core:src/composition/kernel.ts"
-      },
-      {
-        "specId": "core:compile-context",
         "file": "core:src/composition/use-cases/compile-context.ts"
       }
     ],
@@ -628,17 +617,12 @@
         "specId": "core:compile-context",
         "file": "core:src/application/use-cases/compile-context.ts",
         "symbol": "CompileContext.execute"
-      },
-      {
-        "specId": "core:compile-context",
-        "file": "core:src/application/use-cases/compile-context.ts",
-        "symbol": "CompileContextResult"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:2a35339bef004415dfa82a2493f25fa403b446aeb798d46292f0704d1df4cc09",
-    "verify.md": "sha256:1d980c6b1841ce16f32d8feebedc7d0cf97d0e14078abddf929a735f3ed6cb13"
+    "spec.md": "sha256:a231d02a567157e77a53a9ca633443889c608f800b492c3c21e64511ce32dc12",
+    "verify.md": "sha256:b771573a997ccf140f671a1e8c8122a4096ef3400d1d0b3d34463b5859b0a69a"
   },
   "generatedBy": "core"
 }

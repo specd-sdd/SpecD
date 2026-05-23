@@ -1,0 +1,29 @@
+- op: added
+  description: CLI orchestrates refresh before TransitionChange
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Next-transition resolution'
+  content: |
+    ### Requirement: Implementation tracking refresh before transition
+
+    Before invoking `TransitionChange`, the command MUST call `RefreshImplementationTracking` for the same change name.
+
+    The CLI MUST NOT invoke `ImplementationDetector` directly and MUST NOT duplicate detection merge logic.
+
+    When the command fetches `GetStatus` after a failed transition to render a repair guide, it MUST NOT call `RefreshImplementationTracking` again solely for that diagnostic read unless the repair flow explicitly requires a second refresh.
+
+- op: modified
+  description: Add refresh use case dependency
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`cli:entrypoint`](../entrypoint/spec.md) — CLI config discovery, exit codes, and output conventions
+    - [`core:change`](../../core/change/spec.md) — lifecycle states and transitions
+    - [`core:transition-change`](../../core/transition-change/spec.md) — transition execution, hooks, and requires enforcement
+    - [`core:hook-execution-model`](../../core/hook-execution-model/spec.md) — `--skip-hooks` semantics
+    - [`core:refresh-implementation-tracking`](../../core/refresh-implementation-tracking/spec.md) — VCS-backed refresh before transition

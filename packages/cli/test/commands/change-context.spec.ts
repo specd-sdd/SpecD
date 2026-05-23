@@ -70,12 +70,18 @@ afterEach(() => vi.restoreAllMocks())
 
 describe('change context', () => {
   it('prints project context and spec content in text format', async () => {
-    const { stdout } = setup()
+    const { kernel, stdout } = setup()
 
     const program = makeProgram()
     registerChangeContext(program.command('change'))
     await program.parseAsync(['node', 'specd', 'change', 'context', 'my-change', 'designing'])
 
+    expect(kernel.changes.refreshImplementationTracking.execute).toHaveBeenCalledBefore(
+      kernel.changes.compile.execute,
+    )
+    expect(kernel.changes.refreshImplementationTracking.execute).toHaveBeenCalledWith({
+      name: 'my-change',
+    })
     expect(stdout().startsWith('Context Fingerprint: sha256:test-context')).toBe(true)
     expect(stdout()).toContain('# Designing step instructions')
     expect(stdout()).toContain('Do this.')
@@ -135,6 +141,9 @@ describe('change context', () => {
 
     expect(stdout()).toBe(
       'Context Fingerprint: sha256:test-context\n\nContext unchanged since last call.\n',
+    )
+    expect(kernel.changes.refreshImplementationTracking.execute).toHaveBeenCalledBefore(
+      kernel.changes.compile.execute,
     )
   })
 

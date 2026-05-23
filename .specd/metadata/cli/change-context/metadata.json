@@ -7,7 +7,8 @@
     "core:compile-context",
     "core:config",
     "core:get-artifact-instruction",
-    "core:get-hook-instructions"
+    "core:get-hook-instructions",
+    "core:refresh-implementation-tracking"
   ],
   "context": [
     "AI agents need a single command to retrieve all relevant context — spec content, project context entries, and step availability — so they can operate on a change without manual assembly. `specd change context <name> <step>` compiles and prints the context block an agent receives when entering a lifecycle step for a named change. Artifact instructions and step hook instructions are separate concerns retrieved via `specd change artifact-instruction` and `specd change hook-instruction` respectively."
@@ -17,6 +18,12 @@
       "requirement": "Command signature",
       "rules": [
         "```\nspecd change context <name> <step>\n  [--rules] [--constraints] [--scenarios]\n  [--include-change-specs]\n  [--follow-deps [--depth <n>]]\n  [--fingerprint <hash>]\n  [--format text|json|toon]\n```\n\n- `<name>` — required positional; the name of the change to compile context for\n- `<step>` — required positional; the lifecycle step being entered (e.g. `designing`, `implementing`, `verifying`)\n- `--rules` — when present, includes only the rules sections of full-mode spec content in the output\n- `--constraints` — when present, includes only the constraints sections of full-mode spec content in the output\n- `--scenarios` — when present, includes only the scenarios sections of full-mode spec content in the output\n- `--include-change-specs` — when present, directly includes the change's `specIds` in the collected context. By default, direct `specIds` inclusion is disabled; those specs may still appear if selected by include patterns or dependency traversal.\n- `--follow-deps` — when present, follows `dependsOn` links from `.specd-metadata.yaml` transitively to discover additional specs. By default (without this flag) `dependsOn` traversal is **not** performed.\n- `--depth <n>` — optional; only valid with `--follow-deps`; limits dependency traversal to N levels (1 = direct deps only); defaults to unlimited when `--follow-deps` is passed without `--depth`\n- `--fingerprint <hash>` — optional; when provided, the CLI compares this value against the current context fingerprint. If the fingerprint matches, returns `status: \"unchanged\"` without the full context. If omitted or the fingerprint does not match, returns the full context with the new fingerprint.\n- `--format text|json|toon` — optional; output format, defaults to `text`\n\nWhen none of `--rules`, `--constraints`, or `--scenarios` are passed, all available full-mode sections are included. When one or more are passed, only those sections appear in each full-mode spec's content block. Section flags have no effect on list-mode or summary-mode entries."
+      ]
+    },
+    {
+      "requirement": "Implementation tracking refresh before context compilation",
+      "rules": [
+        "Before invoking `CompileContext`, the command MUST call `RefreshImplementationTracking` for the same change name.\n\nThe CLI MUST NOT invoke `ImplementationDetector` directly and MUST NOT duplicate detection merge logic.\n\nWhen `--fingerprint` short-circuits the command with an unchanged context response, refresh MUST still run before the fingerprint comparison so tracked implementation state is current for that check."
       ]
     },
     {
@@ -93,6 +100,20 @@
       "name": "--include-change-specs flag accepted",
       "when": ["specd change context my-change designing --include-change-specs is run"],
       "then": ["the command proceeds normally and requests direct change-spec seeding"]
+    },
+    {
+      "requirement": "Implementation tracking refresh before context compilation",
+      "name": "Context command refreshes before CompileContext",
+      "given": ["specd change context <name> <step> is executed"],
+      "when": ["the command handler runs"],
+      "then": ["it calls RefreshImplementationTracking before CompileContext"]
+    },
+    {
+      "requirement": "Implementation tracking refresh before context compilation",
+      "name": "Fingerprint short-circuit still refreshes first",
+      "given": ["--fingerprint is provided"],
+      "when": ["the command handler runs"],
+      "then": ["it calls RefreshImplementationTracking before comparing fingerprints"]
     },
     {
       "requirement": "Output",
@@ -233,9 +254,17 @@
       ]
     }
   ],
+  "implementation": {
+    "files": [
+      {
+        "specId": "cli:change-context",
+        "file": "cli:src/commands/change/context.ts"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:b7dfabed4acfd408bf5a094678dac80ae5dbb4cd91826015f317b7a644cad116",
-    "verify.md": "sha256:7f10126b59476c8f063b222d1d6c0355dc55f3e00d07cf9923369f7d1d99adf7"
+    "spec.md": "sha256:92ae1bb8e73b6edb22704bfc5807da5e27117601691b72d4d70a706cca7f3de5",
+    "verify.md": "sha256:26d622a0e866f087ea47d9329b0b82b7ab3c954a0d5c577907260195ef46535a"
   },
   "generatedBy": "core"
 }

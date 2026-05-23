@@ -1,0 +1,70 @@
+- op: removed
+  description: Remove embedded implementation autodetection from CompileContext
+  selector:
+    type: section
+    matches: 'Requirement: Implementation autodetection before context compilation'
+
+- op: modified
+  description: CompileContext no longer accepts ImplementationDetector
+  selector:
+    type: section
+    matches: 'Requirement: Ports and constructor'
+  content: |
+    `CompileContext` receives at construction time: `ChangeRepository`, a map of `SpecRepository` instances (one per configured workspace), `SchemaProvider`, `FileReader`, `ArtifactParserRegistry`, `ContentHasher`, `PreviewSpec`, and `LifecycleEngine`.
+
+    ```typescript
+    class CompileContext {
+      constructor(
+        changes: ChangeRepository,
+        specs: ReadonlyMap<string, SpecRepository>,
+        schemaProvider: SchemaProvider,
+        files: FileReader,
+        parsers: ArtifactParserRegistry,
+        hasher: ContentHasher,
+        previewSpec: PreviewSpec,
+        lifecycle: LifecycleEngine,
+      )
+    }
+    ```
+
+    `SchemaProvider` is a lazy, caching port that returns the fully-resolved schema (with plugins and overrides applied). It replaces the previous `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths` triple. All are injected at kernel composition time, not passed per invocation.
+
+    `PreviewSpec` is the use case `CompileContext` delegates to when it needs a materialized merged view of a spec with validated deltas applied. `ContentHasher` is used for metadata freshness checks and context fingerprint inputs. `LifecycleEngine` provides the schema-aware lifecycle interpretation needed for step availability and available-step diagnostics.
+
+    `CompileContext` MUST NOT accept `ImplementationDetector` or invoke implementation autodetection.
+
+- op: added
+  description: Caller-owned refresh before context compilation
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Input'
+  content: |
+    ### Requirement: Caller-owned implementation tracking refresh
+
+    `CompileContext` MUST assemble context from the tracked implementation state already persisted on the change.
+
+    It MUST NOT invoke `ImplementationDetector` or merge detected files during context compilation. Callers that require fresh tracked files MUST invoke `RefreshImplementationTracking` before `CompileContext`.
+
+- op: modified
+  description: Swap implementation-detector-port for refresh use case in dependencies
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`core:change`](../change/spec.md) — Change entity, `effectiveStatus`, active workspaces
+    - [`core:config`](../config/spec.md) — 5-step context spec resolution, include/exclude patterns, workspace-level patterns
+    - [`core:spec-metadata`](../spec-metadata/spec.md) — `.specd-metadata.yaml` format, `dependsOn` traversal, staleness detection
+    - [`core:schema-format`](../schema-format/spec.md) — `metadataExtraction` (fallback path), `workflow`
+    - [`core:delta-format`](../delta-format/spec.md) — `ArtifactParser` port (for metadataExtraction fallback)
+    - [`core:selector-model`](../selector-model/spec.md) — selector fields used in `metadataExtraction` extractors
+    - [`core:spec-id-format`](../spec-id-format/spec.md) — canonical `workspace:capabilityPath` format, parsing rules for `specIds`
+    - [`core:workspace`](../workspace/spec.md) — active workspace determination, workspace-level context patterns, port-per-workspace pattern
+    - [`core:get-artifact-instruction`](../get-artifact-instruction/spec.md) — artifact instructions (separate concern)
+    - [`core:get-hook-instructions`](../get-hook-instructions/spec.md) — step hook instructions (separate concern)
+    - [`core:preview-spec`](../preview-spec/spec.md) — delta merge for materialized spec views in context
+    - [`core:lifecycle-engine`](../lifecycle-engine/spec.md) — shared schema-aware lifecycle interpretation for step availability and blocker diagnostics
+    - [`core:refresh-implementation-tracking`](../refresh-implementation-tracking/spec.md) — optional upstream refresh before context compilation; not invoked by `CompileContext` itself
