@@ -14,7 +14,8 @@ const DEFAULT_PORT = 4400
 /**
  * Resolves the default built `@specd/ui` dist directory relative to the CLI package.
  *
- * @returns Absolute path to the UI dist folder.
+ * @returns Absolute path to the UI dist folder
+ * @throws {Error} When no built `index.html` is found under known dist paths
  */
 function defaultUiDistPath(): string {
   const fromCwd = path.join(process.cwd(), 'apps/specd-studio-web/dist')
@@ -39,8 +40,7 @@ function defaultUiDistPath(): string {
  */
 function openBrowser(url: string): void {
   const platform = process.platform
-  const command =
-    platform === 'darwin' ? 'open' : platform === 'win32' ? 'start' : 'xdg-open'
+  const command = platform === 'darwin' ? 'open' : platform === 'win32' ? 'start' : 'xdg-open'
   spawn(command, [url], { detached: true, stdio: 'ignore' }).unref()
 }
 
@@ -99,9 +99,12 @@ export function registerServeUi(uiCmd: Command): void {
 
           await new Promise<void>((resolve) => {
             const shutdown = () => {
-              void server.close().then(resolve).catch((err: unknown) => {
-                handleError(err, 'text')
-              })
+              void server
+                .close()
+                .then(resolve)
+                .catch((err: unknown) => {
+                  handleError(err, 'text')
+                })
             }
             process.once('SIGINT', shutdown)
             process.once('SIGTERM', shutdown)
