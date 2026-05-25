@@ -6,6 +6,7 @@ import { RestoreChange } from '../application/use-cases/restore-change.js'
 import { DiscardChange } from '../application/use-cases/discard-change.js'
 import { ArchiveChange } from '../application/use-cases/archive-change.js'
 import { ValidateArtifacts } from '../application/use-cases/validate-artifacts.js'
+import { ValidateChangeBatch } from '../application/use-cases/validate-change-batch.js'
 import { CompileContext } from '../application/use-cases/compile-context.js'
 import { ApproveSpec } from '../application/use-cases/approve-spec.js'
 import { ApproveSignoff } from '../application/use-cases/approve-signoff.js'
@@ -38,11 +39,15 @@ import { GetHookInstructions } from '../application/use-cases/get-hook-instructi
 import { GetArtifactInstruction } from '../application/use-cases/get-artifact-instruction.js'
 import { ValidateSchema } from '../application/use-cases/validate-schema.js'
 import { DetectOverlap } from '../application/use-cases/detect-overlap.js'
+import { OutlineChangeArtifact } from '../application/use-cases/outline-change-artifact.js'
 import { PreviewSpec } from '../application/use-cases/preview-spec.js'
 import { GetSpecOutline } from '../application/use-cases/get-spec-outline.js'
 import { UpdateImplementationTracking } from '../application/use-cases/update-implementation-tracking.js'
 import { RefreshImplementationTracking } from '../application/use-cases/refresh-implementation-tracking.js'
 import { GetImplementationReview } from '../application/use-cases/get-implementation-review.js'
+import { SaveChangeArtifact } from '../application/use-cases/save-change-artifact.js'
+import { GetChangeArtifact } from '../application/use-cases/get-change-artifact.js'
+import { ReadLog } from '../application/use-cases/read-log.js'
 import { createArchiveWorkspaceImplementationConfig } from '../application/use-cases/archive-change.js'
 import { buildSchema } from '../domain/services/build-schema.js'
 import { LifecycleEngine } from '../domain/services/lifecycle-engine.js'
@@ -52,6 +57,7 @@ import { type SpecRepository } from '../application/ports/spec-repository.js'
 import { type SpecdConfig } from '../application/specd-config.js'
 import { Logger } from '../application/logger.js'
 import { type LogDestination } from '../application/ports/logger.port.js'
+import { type LogRingBuffer } from '../infrastructure/logging/log-ring-buffer.js'
 import { createBuiltinKernelRegistry, createKernelInternals } from './kernel-internals.js'
 import {
   createKernelRegistryView,
@@ -84,6 +90,10 @@ export interface Kernel {
     create: CreateChange
     /** Reports the current lifecycle state and artifact statuses. */
     status: GetStatus
+    /** Loads tracked artifact content and optimistic-concurrency hash. */
+    getArtifact: GetChangeArtifact
+    /** Saves tracked artifact content with revision and drift reconciliation. */
+    saveArtifact: SaveChangeArtifact
     /** Performs a lifecycle state transition with approval-gate routing. */
     transition: TransitionChange
     /** Shelves a change to `drafts/`. */
@@ -96,6 +106,8 @@ export interface Kernel {
     archive: ArchiveChange
     /** Validates artifact files against the active schema. */
     validate: ValidateArtifacts
+    /** Validates a change by walking the schema artifact DAG (batch / `--all`). */
+    validateBatch: ValidateChangeBatch
     /** Assembles the instruction block for the current lifecycle step. */
     compile: CompileContext
     /** Lists all active (non-drafted, non-discarded) changes. */
@@ -132,6 +144,8 @@ export interface Kernel {
     detectOverlap: DetectOverlap
     /** Previews a spec with deltas applied from a change. */
     preview: PreviewSpec
+    /** Outlines one change-directory artifact (saved or draft content). */
+    outlineArtifact: OutlineChangeArtifact
   }
   /** Use cases that operate on specs and approval gates. */
   specs: {
@@ -177,6 +191,11 @@ export interface Kernel {
     /** Compiles the project-level context block without a specific change or step. */
     getProjectContext: GetProjectContext
   }
+  /** In-memory log readback when a {@link LogRingBuffer} was wired at bootstrap. */
+  readonly logs?: {
+    /** Returns recent entries from the in-memory ring (no file reads). */
+    read: ReadLog
+  }
 }
 
 /** Options for {@link createKernel}. */
@@ -192,6 +211,11 @@ export interface KernelOptions extends KernelRegistryInput {
   readonly graphStoreId?: string
   /** Additional logging destinations registered by delivery adapters (for example CLI). */
   readonly additionalDestinations?: readonly LogDestination[]
+  /**
+   * When set, registers a callback destination that feeds this buffer and exposes
+   * {@link Kernel.logs.read}.
+   */
+  readonly logRing?: LogRingBuffer
 }
 
 /**
@@ -226,6 +250,16 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
     },
     ...(options?.additionalDestinations ?? []),
   ]
+  if (options?.logRing !== undefined) {
+    destinations.push({
+      target: 'callback',
+      level: 'trace',
+      format: 'json',
+      onLog: (entry) => {
+        options.logRing!.push(entry)
+      },
+    })
+  }
   Logger.setImplementation(createDefaultLogger(destinations))
 
   // Shared ResolveSchema + LazySchemaProvider — resolves once with plugins and overrides
@@ -250,6 +284,17 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
   const previewSpec = new PreviewSpec(i.changes, i.specs, schemaProvider, i.parsers)
   const lifecycle = new LifecycleEngine(Logger.debug.bind(Logger))
   const implementationDetector = new VcsImplementationDetector(config.projectRoot, i.vcs)
+  const validateArtifacts = new ValidateArtifacts(
+    i.changes,
+    i.specs,
+    schemaProvider,
+    i.parsers,
+    i.actor,
+    i.hasher,
+    i.registry.extractorTransforms,
+    workspaceRoutes,
+    lifecycle,
+  )
 
   return {
     registry,
@@ -266,6 +311,8 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
         },
         lifecycle,
       ),
+      getArtifact: new GetChangeArtifact(i.changes),
+      saveArtifact: new SaveChangeArtifact(i.changes, schemaProvider, i.hasher),
       transition: new TransitionChange(i.changes, i.actor, schemaProvider, runStepHooks, lifecycle),
       draft: new DraftChange(i.changes, i.actor),
       restore: new RestoreChange(i.changes, i.actor),
@@ -292,17 +339,8 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
         config.projectRoot,
         createArchiveWorkspaceImplementationConfig(config.workspaces),
       ),
-      validate: new ValidateArtifacts(
-        i.changes,
-        i.specs,
-        schemaProvider,
-        i.parsers,
-        i.actor,
-        i.hasher,
-        i.registry.extractorTransforms,
-        workspaceRoutes,
-        lifecycle,
-      ),
+      validate: validateArtifacts,
+      validateBatch: new ValidateChangeBatch(i.changes, schemaProvider, validateArtifacts),
       compile: new CompileContext(
         i.changes,
         i.specs,
@@ -333,6 +371,7 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
       ),
       detectOverlap: new DetectOverlap(i.changes),
       preview: previewSpec,
+      outlineArtifact: new OutlineChangeArtifact(i.changes, i.parsers),
       updateImplementationTracking: new UpdateImplementationTracking(i.changes),
       refreshImplementationTracking: new RefreshImplementationTracking(
         i.changes,
@@ -386,6 +425,9 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
         workspaceRoutes,
       ),
     },
+    ...(options?.logRing !== undefined
+      ? { logs: { read: new ReadLog(options.logRing) } }
+      : {}),
   }
 }
 import fs from 'node:fs/promises'
