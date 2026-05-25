@@ -77,6 +77,10 @@ import { registerGraphImpact } from './commands/graph/impact.js'
 import { registerGraphSearch } from './commands/graph/search.js'
 import { registerGraphHotspots } from './commands/graph/hotspots.js'
 
+// serve
+import { registerServeApi } from './commands/serve/serve-api.js'
+import { registerServeUi } from './commands/serve/serve-ui.js'
+
 // plugins
 import { registerPluginsInstall } from './commands/plugins/install.js'
 import { registerPluginsList } from './commands/plugins/list.js'
@@ -204,6 +208,15 @@ registerSchemaShow(schemaCmd)
 registerSchemaFork(schemaCmd)
 registerSchemaExtend(schemaCmd)
 registerSchemaValidate(schemaCmd)
+
+// ---- serve ----
+registerServeApi(program)
+
+// ---- ui ----
+const uiCmd = program
+  .command('ui')
+  .description('SpecD Studio UI commands (embedded and static hosting).')
+registerServeUi(uiCmd)
 
 // ---- plugins ----
 const pluginsCmd = program
