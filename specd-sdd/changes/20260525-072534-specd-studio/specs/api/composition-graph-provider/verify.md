@@ -1,0 +1,48 @@
+# Verification: Composition Graph Provider
+
+## Requirements
+
+### Requirement: provider is created from project configuration
+
+#### Scenario: Provider binds to project graph paths
+
+- **GIVEN** `specd.yaml` declares workspaces
+- **WHEN** API server bootstrap creates graph provider
+- **THEN** provider reads project root from config
+- **AND** index paths match workspace layout
+
+#### Scenario: Missing graph index yields empty provider state
+
+- **GIVEN** no `.specd/graph` index on disk
+- **WHEN** provider is constructed
+- **THEN** provider reports not indexed
+- **AND** handlers can still expose status DTO
+
+#### Scenario: Reconfigured project rebuilds provider
+
+- **WHEN** server restarts after config change
+- **THEN** new provider instance uses updated paths
+- **AND** old in-memory graph is not reused
+
+### Requirement: stale state is observable
+
+#### Scenario: Stale flag true when index older than sources
+
+- **GIVEN** source file newer than graph index mtime
+- **WHEN** `GET /v1/graph/status` runs
+- **THEN** `stale: true` in response
+- **AND** CLI-equivalent freshness message available
+
+#### Scenario: Fresh index reports stale false
+
+- **GIVEN** graph index rebuilt after last edit
+- **WHEN** status endpoint is queried
+- **THEN** `stale: false`
+- **AND** last indexed timestamp is exposed
+
+#### Scenario: POST index clears stale after success
+
+- **GIVEN** status was stale
+- **WHEN** `POST /v1/graph/index` completes
+- **THEN** subsequent status shows `stale: false`
+- **AND** indexedAt advances
