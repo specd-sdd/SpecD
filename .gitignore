@@ -3,6 +3,12 @@ node_modules/
 
 # Build output
 dist/
+
+# Playwright (studio-web e2e)
+apps/specd-studio-web/test-results/
+apps/specd-studio-web/playwright-report/
+apps/specd-studio-web/blob-report/
+apps/specd-studio-web/.playwright/
 .turbo/
 apps/public-web/build/
 apps/public-web/.docusaurus/
