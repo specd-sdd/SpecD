@@ -88,6 +88,7 @@ class StubChangeRepository extends ChangeRepository {
   }
 
   override async save(change: Change): Promise<void> {
+    change.touchUpdatedAt()
     this.store.set(change.name, cloneChange(change))
   }
 
@@ -144,6 +145,13 @@ class StubChangeRepository extends ChangeRepository {
   override async unscaffold(_change: Change, _specIds: readonly string[]): Promise<void> {
     // no-op in tests
   }
+
+  override async reconcileArtifactDrift(
+    _change: Change,
+    _options?: { readonly excludeFileKeys?: readonly string[] },
+  ): Promise<boolean> {
+    return false
+  }
 }
 
 /**
@@ -197,6 +205,7 @@ function cloneChange(change: Change): Change {
   return new Change({
     name: change.name,
     createdAt: change.createdAt,
+    updatedAt: change.updatedAt,
     ...(change.description !== undefined ? { description: change.description } : {}),
     specIds: change.specIds,
     history: change.history.map((event) => cloneChangeEvent(event)),
