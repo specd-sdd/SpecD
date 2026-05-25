@@ -1,0 +1,25 @@
+/** Confirmed implementation link in implementation-review responses. */
+export interface ImplementationLinkDto {
+  readonly specId: string
+  readonly file: string
+  readonly fileLinkExplicit: boolean
+  readonly symbols?: readonly string[]
+}
+
+/** Tracked implementation file in implementation-review responses. */
+export interface TrackedImplementationFileDto {
+  readonly file: string
+  readonly state: 'open' | 'resolved' | 'ignored'
+}
+
+/** Manifest implementation-tracking projection. */
+export interface ImplementationTrackingDto {
+  readonly trackedFiles: readonly TrackedImplementationFileDto[]
+  readonly links: readonly ImplementationLinkDto[]
+}
+
+/** `GET /v1/changes/{name}/implementation-review` wire shape. */
+export interface ImplementationReviewDto {
+  readonly implementationTracking: ImplementationTrackingDto
+  readonly specIds: readonly string[]
+}
