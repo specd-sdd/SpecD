@@ -22,6 +22,7 @@
   },
   "dependencies": {
     "@clack/prompts": "^0.9.1",
+    "@specd/api": "workspace:*",
     "@specd/code-graph": "workspace:*",
     "@specd/core": "workspace:*",
     "@specd/plugin-agent-claude": "workspace:*",
