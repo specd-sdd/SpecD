@@ -56,6 +56,8 @@ export class ValidateChangeBatch {
   private readonly _validateArtifacts: ValidateArtifacts
 
   /**
+   * Creates the batch validator with its dependencies.
+   *
    * @param changes - Repository for loading the change
    * @param schemaProvider - Provider for the fully-resolved schema
    * @param validateArtifacts - Single-artifact validation use case
@@ -71,6 +73,8 @@ export class ValidateChangeBatch {
   }
 
   /**
+   * Runs DAG-ordered validation steps for the change.
+   *
    * @param input - Batch validation parameters
    * @returns Aggregated batch result
    * @throws {ChangeNotFoundError} If no change with the given name exists
@@ -102,10 +106,14 @@ export class ValidateChangeBatch {
 
       if (artifactType.scope === 'change') {
         results.push(
-          this._toStepResult(null, artifactId, await this._validateArtifacts.execute({
-            name: input.name,
+          this._toStepResult(
+            null,
             artifactId,
-          })),
+            await this._validateArtifacts.execute({
+              name: input.name,
+              artifactId,
+            }),
+          ),
         )
         continue
       }
@@ -133,6 +141,14 @@ export class ValidateChangeBatch {
     }
   }
 
+  /**
+   * Maps a single-artifact validation result to a batch step entry.
+   *
+   * @param spec - Spec id for spec-scoped steps, or null for change-scoped
+   * @param artifact - Artifact type id
+   * @param result - Outcome from {@link ValidateArtifacts}
+   * @returns One batch step result
+   */
   private _toStepResult(
     spec: string | null,
     artifact: string,

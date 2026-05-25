@@ -1,8 +1,5 @@
 import { ParserNotRegisteredError } from '../errors/parser-not-registered-error.js'
-import {
-  type ArtifactParserRegistry,
-  type OutlineEntry,
-} from '../ports/artifact-parser.js'
+import { type ArtifactParserRegistry, type OutlineEntry } from '../ports/artifact-parser.js'
 import { inferFormat } from '../../domain/services/format-inference.js'
 
 /** Result of outlining a single artifact file from raw content. */
@@ -17,10 +14,14 @@ export interface OutlineArtifactContentResult {
 /**
  * Parses artifact content and returns a navigable outline (no workspace or change I/O).
  *
- * @param content - Raw file body.
- * @param filename - Change-relative or workspace filename (used for format inference).
- * @param parsers - Parser registry.
- * @param options - Outline options.
+ * @param content - Raw file body
+ * @param filename - Change-relative or workspace filename (used for format inference)
+ * @param parsers - Parser registry
+ * @param options - Outline options
+ * @param options.full - When true, include full outline depth
+ * @param options.hints - When true, include selector hints
+ * @returns Outline entries and optional selector hints
+ * @throws {ParserNotRegisteredError} When format is unknown or no parser is registered
  */
 export function outlineArtifactContent(
   content: string,
@@ -30,10 +31,7 @@ export function outlineArtifactContent(
 ): OutlineArtifactContentResult {
   const format = inferFormat(filename)
   if (!format) {
-    throw new ParserNotRegisteredError(
-      'unknown',
-      `unrecognised extension for file '${filename}'`,
-    )
+    throw new ParserNotRegisteredError('unknown', `unrecognised extension for file '${filename}'`)
   }
 
   const parser = parsers.get(format)
@@ -43,8 +41,7 @@ export function outlineArtifactContent(
 
   const ast = parser.parse(content)
   const outline = parser.outline(ast, { full: options.full === true })
-  const selectorHints =
-    options.hints === true ? parser.selectorHints(outline) : undefined
+  const selectorHints = options.hints === true ? parser.selectorHints(outline) : undefined
 
   return {
     filename,

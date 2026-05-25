@@ -20,14 +20,23 @@ export interface OutlineChangeArtifactInput {
  * Outlines a single change-directory artifact (saved or draft).
  */
 export class OutlineChangeArtifact {
+  /**
+   * Creates the use case with change storage and parsers.
+   *
+   * @param changes - Change repository
+   * @param parsers - Artifact parser registry
+   */
   constructor(
     private readonly changes: ChangeRepository,
     private readonly parsers: ArtifactParserRegistry,
   ) {}
 
   /**
-   * @param input - Change name, filename, optional draft content.
-   * @returns Outline for the artifact file.
+   * Outlines a change artifact from disk or draft content.
+   *
+   * @param input - Change name, filename, optional draft content
+   * @returns Outline for the artifact file
+   * @throws {ChangeNotFoundError} When the change or artifact file is missing
    */
   async execute(input: OutlineChangeArtifactInput): Promise<OutlineArtifactContentResult> {
     const change = await this.changes.get(input.name)
