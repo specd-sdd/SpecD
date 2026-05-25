@@ -22,6 +22,72 @@ import { SaveSpecMetadata } from '../../application/use-cases/save-spec-metadata
 import { createBuiltinExtractorTransforms } from '../extractor-transforms/index.js'
 import { createSpecWorkspaceRoutes } from '../spec-workspace-routes.js'
 import { type SpecWorkspaceRoute } from '../../application/use-cases/_shared/spec-reference-resolver.js'
+import {
+  FsArchiveBatchSnapshot,
+  type ArchiveBatchSnapshotWorkspaceLayout,
+} from '../../infrastructure/fs/archive-batch-snapshot.js'
+import { createNoopArchiveBatchSnapshot } from '../../application/archive-batch-snapshot-noop.js'
+import { type ArchiveBatchSnapshotPort } from '../../application/ports/archive-batch-snapshot.js'
+import { FsSpecRepository } from '../../infrastructure/fs/spec-repository.js'
+
+/**
+ * Builds workspace spec layout map for {@link FsArchiveBatchSnapshot}.
+ *
+ * @param entries - Workspace name and specs root path per workspace
+ * @returns Layout map keyed by workspace name
+ */
+export function buildWorkspaceSpecLayouts(
+  entries: readonly {
+    readonly name: string
+    readonly specsPath: string
+    readonly prefix?: string
+  }[],
+): ReadonlyMap<string, ArchiveBatchSnapshotWorkspaceLayout> {
+  return new Map(
+    entries.map((entry) => [
+      entry.name,
+      {
+        specsPath: entry.specsPath,
+        ...(entry.prefix !== undefined ? { prefix: entry.prefix } : {}),
+      },
+    ]),
+  )
+}
+
+/**
+ * Resolves the batch snapshot port for archive composition.
+ *
+ * Uses explicit layouts when provided; otherwise derives from {@link FsSpecRepository}
+ * instances in the spec repository map; falls back to a no-op adapter for stub-only tests.
+ *
+ * @param specRepositories - Spec repositories keyed by workspace
+ * @param layouts - Optional explicit workspace layouts
+ * @returns Batch snapshot port for {@link ArchiveChange}
+ */
+export function resolveArchiveBatchSnapshotPort(
+  specRepositories: ReadonlyMap<string, SpecRepository>,
+  layouts?: ReadonlyMap<string, ArchiveBatchSnapshotWorkspaceLayout>,
+): ArchiveBatchSnapshotPort {
+  if (layouts !== undefined && layouts.size > 0) {
+    return new FsArchiveBatchSnapshot(layouts)
+  }
+
+  const derived = new Map<string, ArchiveBatchSnapshotWorkspaceLayout>()
+  for (const [workspace, repo] of specRepositories) {
+    if (repo instanceof FsSpecRepository) {
+      derived.set(workspace, {
+        specsPath: repo.specsPath,
+        ...(repo.prefix !== undefined ? { prefix: repo.prefix } : {}),
+      })
+    }
+  }
+
+  if (derived.size > 0) {
+    return new FsArchiveBatchSnapshot(derived)
+  }
+
+  return createNoopArchiveBatchSnapshot()
+}
 
 /**
  * Domain context for the primary (default) workspace used by `ArchiveChange`.
@@ -73,6 +139,8 @@ export interface FsArchiveChangeOptions {
     string,
     { readonly codeRoot: string; readonly excludePaths: readonly string[] }
   >
+  /** Workspace spec directory layouts for batch snapshot restore. */
+  readonly workspaceSpecLayouts?: ReadonlyMap<string, ArchiveBatchSnapshotWorkspaceLayout>
 }
 
 /**
@@ -181,6 +249,15 @@ export function createArchiveChange(
         schemaRepositories: schemaRepos,
         projectRoot: config.projectRoot,
         workspaceRoutes: createSpecWorkspaceRoutes(config.workspaces),
+        workspaceSpecLayouts: new Map(
+          config.workspaces.map((ws) => [
+            ws.name,
+            {
+              specsPath: ws.specsPath,
+              ...(ws.prefix !== undefined ? { prefix: ws.prefix } : {}),
+            },
+          ]),
+        ),
       },
     )
   }
@@ -218,6 +295,10 @@ export function createArchiveChange(
   )
   const saveMetadata = new SaveSpecMetadata(opts.specRepositories)
   const runStepHooks = new RunStepHooks(changeRepo, archiveRepo, hooks, new Map(), schemaProvider)
+  const batchSnapshot = resolveArchiveBatchSnapshotPort(
+    opts.specRepositories,
+    opts.workspaceSpecLayouts,
+  )
   return new ArchiveChange(
     changeRepo,
     opts.specRepositories,
@@ -232,5 +313,6 @@ export function createArchiveChange(
     opts.workspaceRoutes ?? [],
     opts.projectRoot,
     opts.workspaceImplementationConfigs ?? new Map(),
+    batchSnapshot,
   )
 }

@@ -1,0 +1,773 @@
+{
+  "name": "fix-archiving-lifecycle-trap",
+  "createdAt": "2026-05-24T10:37:31.686Z",
+  "description": "Defer archivable→archiving until preflight passes; add escape transitions from archiving to archivable and designing.",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "core:change",
+    "core:archive-change",
+    "core:lifecycle-engine",
+    "core:transition-change"
+  ],
+  "specDependsOn": {
+    "core:change": [
+      "core:change-manifest",
+      "core:workflow-model",
+      "core:spec-metadata",
+      "core:spec-id-format",
+      "default:_global/architecture",
+      "core:lifecycle-engine",
+      "default:_global/logging",
+      "core:implementation-detector-port"
+    ],
+    "core:archive-change": [
+      "core:change",
+      "core:schema-format",
+      "core:delta-format",
+      "core:validate-artifacts",
+      "core:storage",
+      "core:run-step-hooks",
+      "core:hook-execution-model",
+      "core:template-variables",
+      "core:spec-metadata",
+      "core:content-extraction",
+      "default:_global/architecture",
+      "core:workspace",
+      "core:spec-id-format",
+      "core:spec-overlap",
+      "default:_global/logging",
+      "core:spec-lock",
+      "default:_global/error-handling-conventions"
+    ],
+    "core:lifecycle-engine": [
+      "core:change",
+      "core:workflow-model",
+      "default:_global/architecture",
+      "core:schema-format"
+    ],
+    "core:transition-change": [
+      "core:change",
+      "core:run-step-hooks",
+      "core:hook-execution-model",
+      "core:workflow-model",
+      "default:_global/architecture",
+      "core:lifecycle-engine",
+      "core:refresh-implementation-tracking"
+    ]
+  },
+  "invalidationPolicy": "downstream",
+  "trackedImplementationFiles": [
+    {
+      "file": "packages/core/src/domain/value-objects/change-state.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/archive-change.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/infrastructure/fs/archive-batch-snapshot.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/domain/services/lifecycle-engine.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/transition-change.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/archive-change.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/archive-change.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/transition-change.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/domain/services/lifecycle-engine.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/domain/value-objects/change-state.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/archive-batch-snapshot-noop.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/ports/archive-batch-snapshot.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/domain/errors/archive-batch-restore-error.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/domain/errors/archive-orphan-backup-error.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/infrastructure/fs/archive-batch-snapshot.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "specd-sdd/changes/20260524-103731-fix-archiving-lifecycle-trap/.specd-exploration.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260524-103731-fix-archiving-lifecycle-trap/deltas/core/archive-change/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260524-103731-fix-archiving-lifecycle-trap/deltas/core/archive-change/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260524-103731-fix-archiving-lifecycle-trap/deltas/core/change/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260524-103731-fix-archiving-lifecycle-trap/deltas/core/change/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260524-103731-fix-archiving-lifecycle-trap/deltas/core/lifecycle-engine/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260524-103731-fix-archiving-lifecycle-trap/deltas/core/lifecycle-engine/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260524-103731-fix-archiving-lifecycle-trap/deltas/core/transition-change/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260524-103731-fix-archiving-lifecycle-trap/deltas/core/transition-change/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260524-103731-fix-archiving-lifecycle-trap/design.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260524-103731-fix-archiving-lifecycle-trap/manifest.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260524-103731-fix-archiving-lifecycle-trap/proposal.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260524-103731-fix-archiving-lifecycle-trap/tasks.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260524-103731-fix-archiving-lifecycle-trap/reports/20260525-064204/_partial-core-archive-change.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260524-103731-fix-archiving-lifecycle-trap/reports/20260525-064204/_partial-core-lifecycle.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260524-103731-fix-archiving-lifecycle-trap/reports/20260525-064204/specs-compliance-change-fix-archiving-lifecycle-trap-20260525-064204.md",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/infrastructure/fs/spec-repository.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/archive-change-batch-restore.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/composition/archive-batch-snapshot-port.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/cli/cli-reference.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/core/domain-model.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/guide/_sections/getting-started/lifecycle.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/guide/workflow.md",
+      "state": "resolved"
+    }
+  ],
+  "implementationLinks": [
+    {
+      "specId": "core:change",
+      "file": "packages/core/src/domain/value-objects/change-state.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["VALID_TRANSITIONS"]
+    },
+    {
+      "specId": "core:archive-change",
+      "file": "packages/core/src/application/use-cases/archive-change.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["ArchiveChange", "_handleCommitFailure"]
+    },
+    {
+      "specId": "core:archive-change",
+      "file": "packages/core/src/infrastructure/fs/archive-batch-snapshot.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["FsArchiveBatchSnapshot"]
+    },
+    {
+      "specId": "core:lifecycle-engine",
+      "file": "packages/core/src/domain/services/lifecycle-engine.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["LifecycleEngine"]
+    },
+    {
+      "specId": "core:transition-change",
+      "file": "packages/core/src/application/use-cases/transition-change.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["TransitionChange"]
+    },
+    {
+      "specId": "core:archive-change",
+      "file": "packages/core/src/composition/use-cases/archive-change.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["resolveArchiveBatchSnapshotPort", "buildWorkspaceSpecLayouts"]
+    },
+    {
+      "specId": "core:archive-change",
+      "file": "packages/core/src/infrastructure/fs/spec-repository.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["specsPath"]
+    },
+    {
+      "specId": "core:archive-change",
+      "file": "packages/core/test/application/use-cases/archive-change-batch-restore.spec.ts",
+      "fileLinkExplicit": true
+    }
+  ],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:a3db7f5a6e454b042b7c4df538b2042913db140d20483898ca376737a12de1be"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:change",
+          "filename": "deltas/core/change/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:b29d3106054682ff258be04b23f4710be8db17ad7246e027b6c94a7a857bc8e6"
+        },
+        {
+          "key": "core:archive-change",
+          "filename": "deltas/core/archive-change/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:5ded5b4cdf996b4d9924ebfcabb115f46887f23806940f412b156f7760a4f46b"
+        },
+        {
+          "key": "core:lifecycle-engine",
+          "filename": "deltas/core/lifecycle-engine/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:cda96141435bde296cf531dc3df4f58b3d9b7592145e483a11eddcf5f6004c72"
+        },
+        {
+          "key": "core:transition-change",
+          "filename": "deltas/core/transition-change/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:491c5deca9ce4895ca4c0bcf86b58dc985fc3980221d87af8181801e7803a8a0"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:change",
+          "filename": "deltas/core/change/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:aeabf3ce92561c3c89e036c8b84c8e736501ea520c2c29510319da1422a1b90e"
+        },
+        {
+          "key": "core:archive-change",
+          "filename": "deltas/core/archive-change/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:bf2a24418d6aa3221f4ed2ee5ea191edc64a478281a10f57c8a8250e49987113"
+        },
+        {
+          "key": "core:lifecycle-engine",
+          "filename": "deltas/core/lifecycle-engine/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:84574b19f6119ed45af61b3dba703c11b5823c26666de11b521fed24e536050c"
+        },
+        {
+          "key": "core:transition-change",
+          "filename": "deltas/core/transition-change/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:ba63a37a135c3332ee38cbc79f5de840f404cda66a6a59568ec13fef8de8533d"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:a97e01a76e9bc37ef7836581e6d790a9e93fbf5022b3894c65869e93779bc479"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:0c85f0d649a11eae621b99e9a477393fcdef366a3359e07ac3ed577d1c1b388b"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-05-24T10:37:31.686Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": [
+        "core:change",
+        "core:archive-change",
+        "core:lifecycle-engine",
+        "core:transition-change"
+      ],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-05-24T10:37:31.709Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "core:change"
+        },
+        {
+          "type": "specs",
+          "key": "core:archive-change"
+        },
+        {
+          "type": "specs",
+          "key": "core:lifecycle-engine"
+        },
+        {
+          "type": "specs",
+          "key": "core:transition-change"
+        },
+        {
+          "type": "verify",
+          "key": "core:change"
+        },
+        {
+          "type": "verify",
+          "key": "core:archive-change"
+        },
+        {
+          "type": "verify",
+          "key": "core:lifecycle-engine"
+        },
+        {
+          "type": "verify",
+          "key": "core:transition-change"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-24T10:39:58.974Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-24T11:15:06.432Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:change",
+            "core:archive-change",
+            "core:lifecycle-engine",
+            "core:transition-change"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:change",
+            "core:archive-change",
+            "core:lifecycle-engine",
+            "core:transition-change"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-24T20:34:58.322Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:change",
+            "core:archive-change",
+            "core:lifecycle-engine",
+            "core:transition-change"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:change",
+            "core:archive-change",
+            "core:lifecycle-engine",
+            "core:transition-change"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-24T20:42:01.631Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [core:change]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:change"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:change",
+            "core:archive-change",
+            "core:lifecycle-engine",
+            "core:transition-change"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-24T20:42:22.031Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: verify [core:archive-change]",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": ["core:archive-change"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-24T20:50:05.411Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-24T20:53:04.594Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [core:archive-change]; verify [core:archive-change]; design [design]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:archive-change"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:archive-change"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-24T20:53:04.594Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-24T20:54:29.745Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-24T20:54:33.637Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-25T04:41:01.857Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-25T04:45:55.209Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-25T04:57:53.207Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-25T04:58:28.176Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-25T04:58:31.417Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-05-25T04:59:52.822Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Tracked implementation files remain open for change \"fix-archiving-lifecycle-trap\". Resolve or ignore them first.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-05-25T05:07:17.478Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Tracked implementation files remain open for change \"fix-archiving-lifecycle-trap\". Resolve or ignore them first.",
+      "commitStarted": false
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-25T05:07:28.518Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-05-25T05:07:28.587Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "1***i@u***.com",
+    "provider": "git"
+  }
+}

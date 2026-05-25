@@ -88,6 +88,26 @@
 - **AND** the active spec approval remains valid
 - **AND** a `transitioned` event with `from: 'designing'` and `to: 'designing'` is appended
 
+### Requirement: Archiving escape transitions
+
+#### Scenario: Archiving allows transition to archivable
+
+- **GIVEN** a change in `archiving` state
+- **WHEN** `TransitionChange` is invoked with target `archivable`
+- **THEN** the transition succeeds
+
+#### Scenario: Archiving allows transition to designing
+
+- **GIVEN** a change in `archiving` state
+- **WHEN** `TransitionChange` is invoked with target `designing`
+- **THEN** the transition succeeds and artifact files are downgraded for review
+
+#### Scenario: Archiving rejects transition to implementing
+
+- **GIVEN** a change in `archiving` state
+- **WHEN** `TransitionChange` is invoked with target `implementing`
+- **THEN** `InvalidStateTransitionError` is thrown
+
 ### Requirement: Implementation and verification loop
 
 #### Scenario: implementation-failure returns to implementing without downgrading unchanged artifacts
@@ -335,10 +355,26 @@
 
 #### Scenario: Failed archive attempt appends archive-failed event
 
-- **GIVEN** a change has entered archive execution
+- **GIVEN** a change has entered archive commit execution
 - **AND** archive fails before completion
 - **WHEN** the change history is inspected
 - **THEN** it includes an `archive-failed` event with phase diagnostics for that attempt
+
+#### Scenario: Successful batch restore rolls lifecycle back to archivable
+
+- **GIVEN** a change in `archiving` state
+- **AND** a commit-phase archive failure occurs
+- **AND** batch canonical restore completes successfully
+- **WHEN** the change is reloaded
+- **THEN** the change is in `archivable` state
+
+#### Scenario: Failed batch restore leaves change in archiving
+
+- **GIVEN** a change in `archiving` state
+- **AND** a commit-phase archive failure occurs
+- **AND** batch canonical restore fails for at least one spec
+- **WHEN** the change is reloaded
+- **THEN** the change remains in `archiving` state
 
 #### Scenario: Successful archive does not append a new active-change success event
 

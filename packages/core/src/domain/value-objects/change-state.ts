@@ -38,7 +38,7 @@ export const VALID_TRANSITIONS: Record<ChangeState, readonly ChangeState[]> = {
   'pending-signoff': ['signed-off', 'designing'],
   'signed-off': ['archivable', 'designing'],
   archivable: ['archiving', 'designing'],
-  archiving: [],
+  archiving: ['archivable', 'designing'],
 }
 
 /**

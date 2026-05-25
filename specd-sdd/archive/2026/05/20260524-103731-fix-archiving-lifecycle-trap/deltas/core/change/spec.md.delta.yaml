@@ -1,0 +1,83 @@
+- op: modified
+  description: Document archiving state and escape transitions in lifecycle table
+  selector:
+    type: section
+    matches: '^Requirement: Lifecycle$'
+  content: |-
+    A Change progresses through the following states. Two approval gates are configurable in `specd.yaml` (`approvals.spec` and `approvals.signoff`, both default `false`); the dashed paths are only active when the corresponding gate is enabled:
+
+    ```
+    drafting → designing → ready ──────────────────────────────────────── → implementing ⇄ verifying → done ──────────────────── → archivable → archiving
+                                 ╌→ pending-spec-approval → spec-approved ┘                            ╌→ pending-signoff → signed-off ┘
+                                   (if approvals.spec: true)                                              (if approvals.signoff: true)
+    ```
+
+    | State                   | Meaning                                                                                            |
+    | ----------------------- | -------------------------------------------------------------------------------------------------- |
+    | `drafting`              | Initial state; the change has been created but no design work has started                          |
+    | `designing`             | The agent is elaborating or revising the change artifacts                                          |
+    | `ready`                 | The design artifact set is complete; awaiting implementation (or spec approval if gate is enabled) |
+    | `pending-spec-approval` | Waiting for human approval of the spec before implementation may begin                             |
+    | `spec-approved`         | Spec has been approved; implementation may begin                                                   |
+    | `implementing`          | Code is being written against the current artifacts and task set                                   |
+    | `verifying`             | The implementation is being verified against the current verify scenarios                          |
+    | `done`                  | Verification is complete; the change is ready to archive                                           |
+    | `pending-signoff`       | Waiting for human sign-off on the completed work before archiving                                  |
+    | `signed-off`            | Work has been signed off; the change may be archived                                               |
+    | `archivable`            | Final archival checks have passed; the change may enter archive commit                           |
+    | `archiving`             | Archive commit in progress — canonical publication and archive move underway                     |
+
+    Valid transitions are defined in `VALID_TRANSITIONS`. From `archiving`, the only permitted targets are `archivable` and `designing`.
+
+    - `archiving → archivable` MAY occur automatically when an archive commit fails and batch canonical restore completes successfully, or when a pre-commit archive guard fails before commit begins (change never entered `archiving`).
+    - `archiving → designing` MUST remain available as a manual escape when spec or delta revision is required, or when batch restore itself fails.
+
+    Transitions from `archiving` to `implementing`, `verifying`, `done`, or other states are invalid.
+
+    The `implementing ↔ verifying` loop may repeat any number of times. The transition `implementing → verifying` is only valid when all tasks in the `tasks` artifact are complete. The transition `verifying → implementing` is valid only for implementation-only failures: the current artifacts still describe the intended behavior and the required fix fits within the already-defined tasks. If verification concludes that the artifacts themselves must be revised, or that new tasks are required before implementation can resume, the change returns to `designing` instead.
+
+    Every state except `drafting` MAY return to `designing`. This includes `archiving`. However, when the change is already in `designing` (a `designing → designing` transition), this is a state-preserving re-entry and MUST NOT trigger approval invalidation or artifact downgrade.
+
+    Returning to `designing` from a later state (e.g. `implementing → designing`, `ready → designing`, `archiving → designing`) does not imply that artifacts drifted; it means the artifact set must be reviewed again before work can proceed.
+
+- op: added
+  description: Explicit archiving escape transition requirement
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: '^Requirement: Lifecycle$'
+  content: |
+    ### Requirement: Archiving escape transitions
+
+    From `archiving`, the only valid lifecycle escape targets are `archivable` and `designing`.
+
+    - `archiving → archivable` MAY occur automatically after a failed archive commit when batch canonical restore succeeds.
+    - `archiving → designing` MUST remain available as a manual recovery path, including when batch restore fails.
+    - Transitions from `archiving` to any other state MUST throw `InvalidStateTransitionError`.
+
+- op: modified
+  description: Clarify archive-failed semantics and rollback boundary
+  selector:
+    type: section
+    matches: '^Requirement: Archive outcome history$'
+  content: |-
+    A failed archive attempt MUST be traceable through change history without making a failed pre-commit attempt appear as a completed archive.
+
+    The `archive-failed` event records that an archive attempt failed while the change was still active. It MUST capture at minimum:
+
+    - `step` — the failing phase (`prepare`, `commit`, or `archive`)
+    - `message` — human-readable failure summary
+    - `commitStarted` — whether canonical publication or archive move had begun
+
+    `archive-failed` captures diagnostics for the failed attempt. It does not by itself advance the external archive lifecycle outcome.
+
+    Lifecycle rollback rules:
+
+    - Failures before archive commit begins (hooks, preflight, guards while still in `archivable`) MUST leave the change in `archivable`.
+    - Failures during archive commit (publish or archive move) MUST attempt batch canonical restore first. When restore succeeds, the change MUST transition from `archiving` to `archivable`. When restore fails, the change MUST remain in `archiving` until manual escape to `designing`.
+    - After a successful archive move, no lifecycle rollback occurs. Metadata generation failures and post-archive hook failures do not undo archive completion.
+
+    Successful archive completion is not represented by appending another event to the active change's history after the change has ceased to be an active change. Success traceability belongs to the archived record and archived manifest metadata.

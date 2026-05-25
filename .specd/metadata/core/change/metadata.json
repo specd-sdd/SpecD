@@ -30,7 +30,13 @@
     {
       "requirement": "Lifecycle",
       "rules": [
-        "A Change progresses through the following states. Two approval gates are configurable in `specd.yaml` (`approvals.spec` and `approvals.signoff`, both default `false`); the dashed paths are only active when the corresponding gate is enabled:\n\n```\ndrafting → designing → ready ──────────────────────────────────────── → implementing ⇄ verifying → done ──────────────────── → archivable\n                             ╌→ pending-spec-approval → spec-approved ┘                            ╌→ pending-signoff → signed-off ┘\n                               (if approvals.spec: true)                                              (if approvals.signoff: true)\n```\n\n| State                   | Meaning                                                                                            |\n| ----------------------- | -------------------------------------------------------------------------------------------------- |\n| `drafting`              | Initial state; the change has been created but no design work has started                          |\n| `designing`             | The agent is elaborating or revising the change artifacts                                          |\n| `ready`                 | The design artifact set is complete; awaiting implementation (or spec approval if gate is enabled) |\n| `pending-spec-approval` | Waiting for human approval of the spec before implementation may begin                             |\n| `spec-approved`         | Spec has been approved; implementation may begin                                                   |\n| `implementing`          | Code is being written against the current artifacts and task set                                   |\n| `verifying`             | The implementation is being verified against the current verify scenarios                          |\n| `done`                  | Verification is complete; the change is ready to archive                                           |\n| `pending-signoff`       | Waiting for human sign-off on the completed work before archiving                                  |\n| `signed-off`            | Work has been signed off; the change may be archived                                               |\n| `archivable`            | Final archival checks have passed and the change may be moved to the archive                       |\n\nOnly the transitions shown above are valid. Any attempt to transition to a state not reachable from the current state throws `InvalidStateTransitionError`.\n\nThe `implementing ↔ verifying` loop may repeat any number of times. The transition `implementing → verifying` is only valid when all tasks in the `tasks` artifact are complete. The transition `verifying → implementing` is valid only for implementation-only failures: the current artifacts still describe the intended behavior and the required fix fits within the already-defined tasks. If verification concludes that the artifacts themselves must be revised, or that new tasks are required before implementation can resume, the change returns to `designing` instead.\n\nEvery state except `drafting` MAY return to `designing`. However, when the change is already in `designing` (a `designing → designing` transition), this is a state-preserving re-entry and MUST NOT trigger approval invalidation or artifact downgrade.\n\nReturning to `designing` from a later state (e.g. `implementing → designing`, `ready → designing`) does not imply that artifacts drifted; it means the artifact set must be reviewed again before work can proceed."
+        "A Change progresses through the following states. Two approval gates are configurable in `specd.yaml` (`approvals.spec` and `approvals.signoff`, both default `false`); the dashed paths are only active when the corresponding gate is enabled:\n\n```\ndrafting → designing → ready ──────────────────────────────────────── → implementing ⇄ verifying → done ──────────────────── → archivable → archiving\n                             ╌→ pending-spec-approval → spec-approved ┘                            ╌→ pending-signoff → signed-off ┘\n                               (if approvals.spec: true)                                              (if approvals.signoff: true)\n```\n\n| State                   | Meaning                                                                                            |\n| ----------------------- | -------------------------------------------------------------------------------------------------- |\n| `drafting`              | Initial state; the change has been created but no design work has started                          |\n| `designing`             | The agent is elaborating or revising the change artifacts                                          |\n| `ready`                 | The design artifact set is complete; awaiting implementation (or spec approval if gate is enabled) |\n| `pending-spec-approval` | Waiting for human approval of the spec before implementation may begin                             |\n| `spec-approved`         | Spec has been approved; implementation may begin                                                   |\n| `implementing`          | Code is being written against the current artifacts and task set                                   |\n| `verifying`             | The implementation is being verified against the current verify scenarios                          |\n| `done`                  | Verification is complete; the change is ready to archive                                           |\n| `pending-signoff`       | Waiting for human sign-off on the completed work before archiving                                  |\n| `signed-off`            | Work has been signed off; the change may be archived                                               |\n| `archivable`            | Final archival checks have passed; the change may enter archive commit                           |\n| `archiving`             | Archive commit in progress — canonical publication and archive move underway                     |\n\nValid transitions are defined in `VALID_TRANSITIONS`. From `archiving`, the only permitted targets are `archivable` and `designing`.\n\n- `archiving → archivable` MAY occur automatically when an archive commit fails and batch canonical restore completes successfully, or when a pre-commit archive guard fails before commit begins (change never entered `archiving`).\n- `archiving → designing` MUST remain available as a manual escape when spec or delta revision is required, or when batch restore itself fails.\n\nTransitions from `archiving` to `implementing`, `verifying`, `done`, or other states are invalid.\n\nThe `implementing ↔ verifying` loop may repeat any number of times. The transition `implementing → verifying` is only valid when all tasks in the `tasks` artifact are complete. The transition `verifying → implementing` is valid only for implementation-only failures: the current artifacts still describe the intended behavior and the required fix fits within the already-defined tasks. If verification concludes that the artifacts themselves must be revised, or that new tasks are required before implementation can resume, the change returns to `designing` instead.\n\nEvery state except `drafting` MAY return to `designing`. This includes `archiving`. However, when the change is already in `designing` (a `designing → designing` transition), this is a state-preserving re-entry and MUST NOT trigger approval invalidation or artifact downgrade.\n\nReturning to `designing` from a later state (e.g. `implementing → designing`, `ready → designing`, `archiving → designing`) does not imply that artifacts drifted; it means the artifact set must be reviewed again before work can proceed."
+      ]
+    },
+    {
+      "requirement": "Archiving escape transitions",
+      "rules": [
+        "From `archiving`, the only valid lifecycle escape targets are `archivable` and `designing`.\n\n- `archiving → archivable` MAY occur automatically after a failed archive commit when batch canonical restore succeeds.\n- `archiving → designing` MUST remain available as a manual recovery path, including when batch restore fails.\n- Transitions from `archiving` to any other state MUST throw `InvalidStateTransitionError`."
       ]
     },
     {
@@ -90,7 +96,7 @@
     {
       "requirement": "Archive outcome history",
       "rules": [
-        "A failed archive attempt MUST be traceable through change history without making a failed pre-commit attempt appear as a completed archive.\n\nThe `archive-failed` event records that an archive attempt failed while the change was still active.\n\n`archive-failed` captures diagnostics for the failed attempt. It does not by itself advance the external archive lifecycle outcome. If the failure occurs before the archive commit succeeds, the change remains pending archive from an external workflow perspective.\n\nSuccessful archive completion is not represented by appending another event to the active change's history after the change has ceased to be an active change. Success traceability belongs to the archived record and archived manifest metadata."
+        "A failed archive attempt MUST be traceable through change history without making a failed pre-commit attempt appear as a completed archive.\n\nThe `archive-failed` event records that an archive attempt failed while the change was still active. It MUST capture at minimum:\n\n- `step` — the failing phase (`prepare`, `commit`, or `archive`)\n- `message` — human-readable failure summary\n- `commitStarted` — whether canonical publication or archive move had begun\n\n`archive-failed` captures diagnostics for the failed attempt. It does not by itself advance the external archive lifecycle outcome.\n\nLifecycle rollback rules:\n\n- Failures before archive commit begins (hooks, preflight, guards while still in `archivable`) MUST leave the change in `archivable`.\n- Failures during archive commit (publish or archive move) MUST attempt batch canonical restore first. When restore succeeds, the change MUST transition from `archiving` to `archivable`. When restore fails, the change MUST remain in `archiving` until manual escape to `designing`.\n- After a successful archive move, no lifecycle rollback occurs. Metadata generation failures and post-archive hook failures do not undo archive completion.\n\nSuccessful archive completion is not represented by appending another event to the active change's history after the change has ceased to be an active change. Success traceability belongs to the archived record and archived manifest metadata."
       ]
     },
     {
@@ -273,6 +279,27 @@
         "AND the active spec approval remains valid",
         "AND a transitioned event with from: 'designing' and to: 'designing' is appended"
       ]
+    },
+    {
+      "requirement": "Archiving escape transitions",
+      "name": "Archiving allows transition to archivable",
+      "given": ["a change in archiving state"],
+      "when": ["TransitionChange is invoked with target archivable"],
+      "then": ["the transition succeeds"]
+    },
+    {
+      "requirement": "Archiving escape transitions",
+      "name": "Archiving allows transition to designing",
+      "given": ["a change in archiving state"],
+      "when": ["TransitionChange is invoked with target designing"],
+      "then": ["the transition succeeds and artifact files are downgraded for review"]
+    },
+    {
+      "requirement": "Archiving escape transitions",
+      "name": "Archiving rejects transition to implementing",
+      "given": ["a change in archiving state"],
+      "when": ["TransitionChange is invoked with target implementing"],
+      "then": ["InvalidStateTransitionError is thrown"]
     },
     {
       "requirement": "Implementation and verification loop",
@@ -581,9 +608,34 @@
     {
       "requirement": "Archive outcome history",
       "name": "Failed archive attempt appends archive-failed event",
-      "given": ["a change has entered archive execution", "AND archive fails before completion"],
+      "given": [
+        "a change has entered archive commit execution",
+        "AND archive fails before completion"
+      ],
       "when": ["the change history is inspected"],
       "then": ["it includes an archive-failed event with phase diagnostics for that attempt"]
+    },
+    {
+      "requirement": "Archive outcome history",
+      "name": "Successful batch restore rolls lifecycle back to archivable",
+      "given": [
+        "a change in archiving state",
+        "AND a commit-phase archive failure occurs",
+        "AND batch canonical restore completes successfully"
+      ],
+      "when": ["the change is reloaded"],
+      "then": ["the change is in archivable state"]
+    },
+    {
+      "requirement": "Archive outcome history",
+      "name": "Failed batch restore leaves change in archiving",
+      "given": [
+        "a change in archiving state",
+        "AND a commit-phase archive failure occurs",
+        "AND batch canonical restore fails for at least one spec"
+      ],
+      "when": ["the change is reloaded"],
+      "then": ["the change remains in archiving state"]
     },
     {
       "requirement": "Archive outcome history",
@@ -757,28 +809,17 @@
     }
   ],
   "implementation": {
-    "files": [
-      {
-        "specId": "core:change",
-        "file": "core:src/composition/kernel.ts"
-      }
-    ],
     "symbols": [
       {
         "specId": "core:change",
-        "file": "core:src/application/use-cases/edit-change.ts",
-        "symbol": "EditChange"
-      },
-      {
-        "specId": "core:change",
-        "file": "core:src/domain/entities/change.ts",
-        "symbol": "Change"
+        "file": "core:src/domain/value-objects/change-state.ts",
+        "symbol": "VALID_TRANSITIONS"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:84d9b0996aaea2bd94823209ed82f003f66e933d96329d1bebfc524070421bf1",
-    "verify.md": "sha256:5e5d7a8c47eaa171e28cff34c7a71bb2bb66fbd73b49c4738a61bfb126887f4d"
+    "spec.md": "sha256:850384649a8d9f64a6ae8836c5294568eea5453f2fa3d6bd078c6db6d3437e59",
+    "verify.md": "sha256:33bec56b0e3392162cdac1f653d430535cb2afbe079272eeeae8d3a0c33582c2"
   },
   "generatedBy": "core"
 }

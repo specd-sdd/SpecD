@@ -51,25 +51,31 @@
     {
       "requirement": "Archivable guard",
       "rules": [
-        "The first persisted-state mutation step of `ArchiveChange.execute` after the schema name guard MUST be a call to `ChangeRepository.mutate(name, fn)`.\n\nInside the mutation callback, the repository supplies the fresh persisted `Change` for `name`. The use case MUST call `change.assertArchivable()` on that instance. If the change is not in `archivable` state, the callback throws and the archive is aborted without running any hooks or modifying any files.\n\nAfter the guard passes, the callback MUST transition the change to `archiving` via `change.transition('archiving', actor)` when the fresh change is not already in `archiving`, then return the updated change. When the callback resolves, the repository persists the updated manifest before any hooks execute or files are modified.\n\nThe rest of the archive flow operates on the change returned by that serialized mutation step."
+        "After the schema name guard, `ArchiveChange.execute()` MUST verify the change is archivable without yet transitioning lifecycle state.\n\nThe use case MUST call `change.assertArchivable()` on the loaded change. If the change is not in `archivable` or `archiving` state, it MUST throw `InvalidStateTransitionError` and abort before any hooks, snapshots, or file modifications.\n\nThis guard MAY run outside `ChangeRepository.mutate` when no lifecycle mutation is required. When the change is already in `archiving` from a prior failed commit, `assertArchivable()` MUST still pass so a retry can proceed."
+      ]
+    },
+    {
+      "requirement": "Deferred transition to archiving",
+      "rules": [
+        "After full-batch preflight succeeds and batch canonical snapshots are written, `ArchiveChange` MUST transition the change to `archiving` inside a serialized `ChangeRepository.mutate(name, fn)` immediately before the first canonical `SpecRepository.publish()` call.\n\nInside the mutation callback, the use case MUST:\n\n1. Obtain the fresh persisted `Change`.\n2. Call `change.assertArchivable()`.\n3. Call `change.transition('archiving', actor)` when the fresh change is not already in `archiving`.\n4. Return the updated change.\n\nOverlap guard, readOnly guard, pre-archive hooks, and preflight MUST complete while the change remains in `archivable`. Pre-archive hooks use workflow step `'archiving'`; they do not require lifecycle state `archiving`."
       ]
     },
     {
       "requirement": "ReadOnly workspace guard",
       "rules": [
-        "After the archivable guard passes and the change transitions to `archiving`, `ArchiveChange` MUST check every spec ID in `change.specIds` against the `SpecRepository` map. For each spec ID, it MUST look up the corresponding `SpecRepository` by workspace name and check `repository.ownership()`.\n\nIf any spec belongs to a workspace with `readOnly` ownership, `ArchiveChange` MUST throw `ReadOnlyWorkspaceError` with a message listing all affected specs and their workspaces. The error message format:\n\n```text\nCannot archive change \"<name>\" — it contains specs from readOnly workspaces:\n\n  - <specId>  →  workspace \"<workspace>\" (readOnly)\n\nArchiving would write deltas into protected specs.\n```\n\nThis check MUST occur before any hooks execute or any spec files are written. It is a defense-in-depth guard — upstream guards at `change create` and `change edit` should prevent readOnly specs from entering a change, but the archive MUST NOT silently merge deltas into protected specs if those guards are bypassed."
+        "After the archivable guard passes and before canonical snapshots or publication, `ArchiveChange` MUST check every spec ID in `change.specIds` against the `SpecRepository` map. For each spec ID, it MUST look up the corresponding `SpecRepository` by workspace name and check `repository.ownership()`.\n\nIf any spec belongs to a workspace with `readOnly` ownership, `ArchiveChange` MUST throw `ReadOnlyWorkspaceError` with a message listing all affected specs and their workspaces. The error message format:\n\n```text\nCannot archive change \"<name>\" — it contains specs from readOnly workspaces:\n\n  - <specId>  →  workspace \"<workspace>\" (readOnly)\n\nArchiving would write deltas into protected specs.\n```\n\nThis check MUST occur before any hooks execute or any spec files are written. The change MUST remain in `archivable` when this guard throws."
       ]
     },
     {
       "requirement": "Overlap guard",
       "rules": [
-        "After the archivable guard passes and the change transitions to `archiving`, but before pre-archive hooks execute, `ArchiveChange` MUST check for spec overlap with other active changes and handle invalidation when `allowOverlap` is `true`.\n\nThe check MUST:\n\n1. Call `ChangeRepository.list()` to retrieve all active changes\n2. Exclude the change being archived from the list\n3. Call the `detectSpecOverlap` domain service with the remaining changes plus the change being archived\n4. Filter the result to entries where the change being archived participates\n\n**When `allowOverlap` is `false`:** If the filtered report has overlap, `ArchiveChange` MUST throw `SpecOverlapError` with the overlap entries. The error message MUST list the overlapping spec IDs and the names of the other changes targeting them.\n\n**When `allowOverlap` is `true`:** If the filtered report has overlap, `ArchiveChange` MUST invalidate each overlapping change:\n\n1. For each overlapping change, call `ChangeRepository.mutate(name, fn)` with a callback that:\n   a. Obtains the fresh `Change` instance\n   b. Calls `change.invalidate('spec-overlap-conflict', message, affectedArtifacts)` with:\n   - `message`: `\"Invalidated because change '<archivedName>' was archived with overlapping specs: <specId1>, <specId2>, ...\"`\n   - `affectedArtifacts`: all artifacts in the change that contain files for the overlapping spec IDs\n     c. Returns the updated change\n2. Collect each invalidated change's name and the overlapping spec IDs into the result's `invalidatedChanges` array\n\nIf the filtered report has no overlap, the archive proceeds normally regardless of the `allowOverlap` flag."
+        "After the archivable guard passes and before pre-archive hooks execute, `ArchiveChange` MUST check for spec overlap with other active changes and handle invalidation when `allowOverlap` is `true`. The change MUST still be in `archivable` during this check.\n\nThe check MUST:\n\n1. Call `ChangeRepository.list()` to retrieve all active changes\n2. Exclude the change being archived from the list\n3. Call the `detectSpecOverlap` domain service with the remaining changes plus the change being archived\n4. Filter the result to entries where the change being archived participates\n\n**When `allowOverlap` is `false`:** If the filtered report has overlap, `ArchiveChange` MUST throw `SpecOverlapError` with the overlap entries. The error message MUST list the overlapping spec IDs and the names of the other changes targeting them.\n\n**When `allowOverlap` is `true`:** If the filtered report has overlap, `ArchiveChange` MUST invalidate each overlapping change as defined in the existing overlap invalidation rules.\n\nIf the filtered report has no overlap, the archive proceeds normally regardless of the `allowOverlap` flag."
       ]
     },
     {
       "requirement": "Pre-archive hooks",
       "rules": [
-        "After the archivable guard passes, when `'all'` and `'pre'` are both absent from `skipHookPhases`, `ArchiveChange` must execute pre-archive hooks by delegating to `RunStepHooks.execute({ name, step: 'archiving', phase: 'pre' })`.\n\nIf any pre-archive `run:` hook fails, `ArchiveChange` must throw `HookFailedError` with the hook command, exit code, and stderr. No files are modified before a failed pre-archive hook.\n\nWhen `'all'` or `'pre'` is in `skipHookPhases`, pre-archive hook execution is skipped entirely."
+        "After the archivable guard passes and while the change is still in `archivable`, when `'all'` and `'pre'` are both absent from `skipHookPhases`, `ArchiveChange` must execute pre-archive hooks by delegating to `RunStepHooks.execute({ name, step: 'archiving', phase: 'pre' })`.\n\nIf any pre-archive `run:` hook fails, `ArchiveChange` must throw `HookFailedError` with the hook command, exit code, and stderr. No lifecycle transition to `archiving`, no canonical snapshots, and no spec files are modified before a failed pre-archive hook.\n\nWhen `'all'` or `'pre'` is in `skipHookPhases`, pre-archive hook execution is skipped entirely."
       ]
     },
     {
@@ -87,13 +93,37 @@
     {
       "requirement": "Staged archive commit and failed-attempt visibility",
       "rules": [
-        "Canonical publication begins only after the full archive-batch preflight has succeeded.\n\nA failure that occurs during preflight MUST leave canonical storage unchanged for every spec in the archive batch.\n\nAfter canonical publication begins, failures are limited to the staged publication or archive-finalization phases. Those failures MUST preserve the existing guarantee that canonical storage does not expose a partially written version of an individual published spec.\n\nMulti-spec archive therefore has two distinct safety boundaries:\n\n- full-batch preflight atomicity before any canonical publication begins\n- per-spec publication atomicity once staged canonical publication has started\n\nThe archive contract still does not promise one indivisible filesystem transaction for the whole multi-spec batch."
+        "Canonical publication begins only after the full archive-batch preflight has succeeded and batch canonical snapshots have been written for every spec in the batch.\n\nA failure that occurs during preflight MUST leave canonical storage unchanged for every spec in the archive batch.\n\nAfter canonical publication begins, failures are limited to the staged publication or archive-finalization phases. Those failures MUST preserve the existing guarantee that canonical storage does not expose a partially written version of an individual published spec.\n\nMulti-spec archive has three safety boundaries:\n\n- full-batch preflight atomicity before any canonical publication begins\n- per-spec publication atomicity once staged canonical publication has started\n- batch canonical snapshot and restore so a failed multi-spec commit attempt does not leave merged specs from earlier publications in the batch\n\nOn commit-phase failure after snapshots were taken, `ArchiveChange` MUST restore every spec in the batch to its pre-attempt canonical state before returning control to the caller."
+      ]
+    },
+    {
+      "requirement": "Batch canonical snapshot before publication",
+      "rules": [
+        "Immediately after full-batch preflight succeeds and before the deferred transition to `archiving`, `ArchiveChange` MUST write a canonical snapshot for every spec in the archive batch.\n\nFor each spec:\n\n1. Determine whether the canonical spec directory already existed.\n2. Record every pre-existing canonical file path, including `spec-lock.json` when present.\n3. Copy each pre-existing canonical file into `<specDir>/.specd-archive-backup/`.\n4. Write `<specDir>/.specd-archive-backup/manifest.json` containing at minimum:\n   - `changeName`\n   - `specDirExisted: boolean`\n   - `existingFiles: string[]`\n   - `createdFiles: string[]` — initially empty; populated as publication proceeds\n\nSnapshotting MUST NOT include `.specd/metadata/.../metadata.json`. That file is generated output and is not part of the commit contract."
+      ]
+    },
+    {
+      "requirement": "Batch canonical restore on commit failure",
+      "rules": [
+        "When any commit-phase step fails after batch snapshots were written — including `SpecRepository.publish()` or `archiveRepository.archive()` — `ArchiveChange` MUST restore canonical storage for every spec in the batch before rethrowing the error.\n\nRestore MUST run in reverse publication order. For each spec:\n\n- If `manifest.specDirExisted` is `false` and the spec directory was created during this attempt, remove the entire spec directory.\n- If `manifest.specDirExisted` is `true`, restore every path listed in `manifest.existingFiles` from `.specd-archive-backup/`.\n- Delete every path listed in `manifest.createdFiles` that is not listed in `manifest.existingFiles`.\n\nRestore MUST NOT delete or overwrite pre-existing canonical files that were not created or modified by this archive attempt.\n\nAfter successful restore for all specs, `ArchiveChange` MUST delete each `.specd-archive-backup/` directory.\n\nIf restore itself fails for one or more specs, `ArchiveChange` MUST record the partial-restore outcome in the thrown error or repair guidance, leave the change in `archiving`, and MUST NOT auto-transition to `archivable`."
+      ]
+    },
+    {
+      "requirement": "Orphan archive backup detection",
+      "rules": [
+        "Before writing new batch snapshots, `ArchiveChange` MUST detect an existing `.specd-archive-backup/` directory under any spec directory targeted by the archive batch.\n\n- When `manifest.changeName` matches the current change name, `ArchiveChange` MUST auto-restore from that backup, delete the backup directory, and abort the current archive attempt with guidance to review the restored state and retry.\n- When `manifest.changeName` differs or the manifest is unreadable, `ArchiveChange` MUST abort with repair guidance and MUST NOT begin publication."
+      ]
+    },
+    {
+      "requirement": "Lifecycle rollback after failed commit",
+      "rules": [
+        "When a commit-phase failure occurs and batch canonical restore completes successfully for every spec in the batch, `ArchiveChange` MUST:\n\n1. Append an `archive-failed` event with `commitStarted: true`.\n2. Transition the change from `archiving` to `archivable` inside `ChangeRepository.mutate`.\n\nWhen batch restore does not complete successfully, the change MUST remain in `archiving`."
       ]
     },
     {
       "requirement": "Archive debug logging",
       "rules": [
-        "`ArchiveChange` MUST emit debug-level logs for archive preparation and commit diagnostics, including:\n\n- the tracked artifact file selected for each spec-scoped artifact\n- whether the artifact is treated as direct or delta-backed\n- prepare-plan construction progress\n- staged commit start and completion\n- archive failure points before or during commit\n\nThese logs MUST follow the project's global logging conventions."
+        "`ArchiveChange` and the batch snapshot adapter (`FsArchiveBatchSnapshot` or equivalent) MUST emit debug-level logs at each meaningful archive step so operators can trace preparation, commit, recovery, and completion without enabling trace-level noise.\n\n**Pre-commit (`ArchiveChange`):**\n\n- archivable guard pass — change name and current state\n- overlap and readOnly guard outcomes — spec IDs checked; overlap entries or readOnly workspaces when relevant\n- pre-archive hooks — start and completion (step, phase, skipped phases)\n- prepare-plan construction — publication count, stale specs, out-of-scope implementation counts\n- full-batch preflight completion — publication count\n- orphan backup detection — per spec: none found, matching orphan auto-restored, or foreign orphan abort\n- batch snapshot — start and completion per spec (`specId`, `specDirExisted`, `existingFiles` count)\n- deferred transition to `archiving` — change name and actor identity\n- tracked artifact selection per spec-scoped artifact — direct vs delta-backed\n\n**Commit phase:**\n\n- staged publication start and completion per spec (`specId`, artifact count)\n- each newly created canonical path recorded in the batch manifest (`recordCreatedFile`)\n- archive repository call start and completion\n- backup cleanup after successful archive move — spec IDs cleaned\n\n**Recovery phase:**\n\n- commit failure — failure step, `commitStarted`, and error message summary\n- batch restore start and completion — reverse publish order, `restoredSpecIds`, `failedSpecIds`\n- lifecycle rollback to `archivable` when restore succeeds\n- partial restore — change remains in `archiving`; log lists specs that failed restore\n\n**Post-commit:**\n\n- persisted metadata generation start and completion per spec (or skip reason)\n- post-archive hooks start and completion\n\n**Failure diagnostics (all phases):**\n\n- failure step (`prepare`, `commit`, `archive`, `metadata`)\n- spec ID and artifact basename when failure is spec-scoped\n- restore outcome when `commitStarted` is true\n\nEach entry MUST use structured context fields (`change`, `specId`, `step`, `phase`, and other step-specific keys) per [`default:_global/logging`](../../_global/logging/spec.md). Debug logs MUST NOT include full file contents, hook stderr, or secrets."
       ]
     },
     {
@@ -105,7 +135,7 @@
     {
       "requirement": "Archive repository call",
       "rules": [
-        "After syncing all specs, `ArchiveChange` MUST resolve the actor via `ActorResolver.identity()` before calling `archiveRepository.archive()`. If `identity()` throws or cannot provide an actor, the archive MUST fail; there is no anonymous fallback archive path.\n\nWhen actor resolution succeeds, `ArchiveChange` MUST call `archiveRepository.archive(change, { actor })`. The `ArchiveRepository` port is responsible for constructing the `ArchivedChange` record — the use case never builds it directly, because `archivedAt` can only be set by the operation that performs the archive, and `archivedName` is an infrastructure naming concern.\n\nThe port's contract requires:\n\n- `archivedName` — the full timestamped directory name: `YYYYMMDD-HHmmss-<name>` where the timestamp is derived from `change.createdAt` (zero-padded), never from wall-clock time at execution\n- `archivedAt` — the timestamp when the archive operation completes, set by the repository\n- `archivedBy` — the git identity of the actor who performed the archive\n- `artifacts` — artifact metadata tracked by the repository\n\nThe `FsArchiveRepository` implementation additionally moves the change directory from its current location (`changes/` or `drafts/`) to the archive directory using the configured pattern, then appends an entry to `index.jsonl`. The use case has no knowledge of these implementation details.\n\n`ArchivedChange` has no `approval` field and no `wasStructural` flag — these were removed from the domain model.\n\nNote: The `workspace` property is no longer stored in `ArchivedChange`. It is derived at runtime from the first entry in `archivedChange.specIds`, matching how `Change.workspaces` works."
+        "After all canonical publications succeed, `ArchiveChange` MUST resolve the actor via `ActorResolver.identity()` before calling `archiveRepository.archive()`. If `identity()` throws or cannot provide an actor, the archive MUST fail and batch restore MUST run; there is no anonymous fallback archive path.\n\nWhen actor resolution succeeds, `ArchiveChange` MUST call `archiveRepository.archive(change, { actor })`. The `ArchiveRepository` port is responsible for constructing the `ArchivedChange` record — the use case never builds it directly.\n\nImmediately after a successful archive move, `ArchiveChange` MUST delete every `.specd-archive-backup/` directory written for this batch. Metadata generation and post-archive hooks run only after this cleanup.\n\nThe port's contract requires:\n\n- `archivedName` — the full timestamped directory name: `YYYYMMDD-HHmmss-<name>` where the timestamp is derived from `change.createdAt` (zero-padded), never from wall-clock time at execution\n- `archivedAt` — the timestamp when the archive operation completes, set by the repository\n- `archivedBy` — the git identity of the actor who performed the archive\n- `artifacts` — artifact metadata tracked by the repository\n\nThe `FsArchiveRepository` implementation additionally moves the change directory from its current location (`changes/` or `drafts/`) to the archive directory using the configured pattern, then appends an entry to `index.jsonl`. The use case has no knowledge of these implementation details."
       ]
     },
     {
@@ -117,7 +147,7 @@
     {
       "requirement": "Spec metadata generation",
       "rules": [
-        "`metadata.json` remains a derived archive-time projection, but sidecar consistency MUST be determined before canonical publication begins for each spec.\n\nFor each modified spec, `ArchiveChange` MUST:\n\n1. Determine the final persisted `dependsOn` set for the archive attempt.\n2. Determine the final `spec-lock.json` content that would be published for that spec.\n3. Run `extractMetadata(...)` against the already-prepared merged artifact content in memory.\n4. If `metadataExtraction.dependsOn` is present, compare it against the final persisted `dependsOn` set being sealed for that spec.\n5. Abort publication for that spec if the extracted and final persisted `dependsOn` values do not match.\n6. After canonical publication succeeds, run `GenerateSpecMetadata` against the canonical persisted spec and persist `metadata.json`.\n\n`metadata.json.dependsOn` remains a supported read surface for existing consumers, but at archive time its value MUST be aligned with the sidecar-owned persisted dependency set:\n\n- If `change.specDependsOn` has an entry for the spec, that value MUST be treated as the final persisted `dependsOn` set for this archive.\n- If `metadataExtraction.dependsOn` is present, it MUST match that final persisted `dependsOn` set or the archive MUST fail for that spec.\n- This mismatch rule applies both when a canonical `spec-lock.json` already exists and when the archive is creating `spec-lock.json` for the first time.\n- If `metadataExtraction.dependsOn` is omitted, archive MUST still persist `metadata.json.dependsOn` from the final persisted dependency set rather than treating extraction as the only source.\n- Outside archive, legacy specs without sidecar MAY still remain on extraction-backed metadata flows until opportunistic backfill succeeds.\n\nMetadata generation failures that are unrelated to sidecar consistency (for example missing extracted title or invalid generated metadata structure) do not abort the archive; the spec path is reported in `staleMetadataSpecPaths`.\n\nSidecar consistency failures are different: if the archive cannot determine a valid final persisted dependency set, or if extracted `dependsOn` contradicts the value being sealed for the spec, the archive MUST fail before canonical publication for that spec begins."
+        "`metadata.json` remains a derived archive-time projection. Sidecar consistency MUST still be determined in memory before canonical publication begins for each spec.\n\nFor each modified spec, preflight MUST:\n\n1. Determine the final persisted `dependsOn` set for the archive attempt.\n2. Determine the final `spec-lock.json` content that would be published for that spec.\n3. Run `extractMetadata(...)` against the already-prepared merged artifact content in memory.\n4. If `metadataExtraction.dependsOn` is present, compare it against the final persisted `dependsOn` set being sealed for that spec.\n5. Abort publication for that spec if the extracted and final persisted `dependsOn` values do not match.\n\nPersisted `metadata.json` generation MUST occur only after `archiveRepository.archive()` succeeds and after all `.specd-archive-backup/` directories for the batch have been deleted.\n\nFor each modified spec, `ArchiveChange` MUST then run `GenerateSpecMetadata` against the canonical persisted spec and persist `metadata.json` best-effort. Failures do not abort the archive; affected spec paths are reported in `staleMetadataSpecPaths`.\n\nSidecar consistency failures during preflight remain fatal before publication begins. Metadata generation failures after archive completion are non-fatal."
       ]
     },
     {
@@ -164,15 +194,14 @@
     }
   ],
   "constraints": [
-    "change.assertArchivable() must be called before any hooks or file modifications",
-    "ReadOnly workspace guard must run after archivable guard and state transition, before any hooks or file modifications",
-    "Pre-archive hook failures abort the archive and throw — no partial state is written",
-    "Post-archive hook failures are returned in the result; the archive is not rolled back",
-    "ArchiveChange must not call change.invalidate() or any mutation on the Change entity — the change is already at its terminal state",
+    "change.assertArchivable() must be called before any hooks, snapshots, or file modifications",
+    "ReadOnly workspace guard and overlap guard must run while the change is in archivable, before snapshots or lifecycle transition to archiving",
+    "Pre-archive hook failures abort the archive and throw — no lifecycle transition, no snapshots, and no partial canonical writes",
+    "Transition to archiving must occur only after preflight succeeds and batch snapshots are written, immediately before the first canonical publication",
+    "Commit-phase failures must run batch restore before returning; lifecycle rollback to archivable occurs only after successful batch restore",
+    "Post-archive hook failures and metadata generation failures are returned or reported; the archive is not rolled back after a successful archive move",
+    "ArchiveChange must not call change.invalidate() on the change being archived",
     "ArchiveChange never constructs ArchivedChange directly — it is always returned by archiveRepository.archive(change, { actor })",
-    "archivedName must be derived from change.createdAt by the repository — never from wall-clock time at archive execution",
-    "ArchiveChange does not delete the change from ChangeRepository — FsArchiveRepository.archive() moves the directory as part of the archive operation",
-    "Metadata generation failures do not abort the archive — the spec was already synced successfully; failures are collected in staleMetadataSpecPaths",
     "Hook execution is delegated to RunStepHooks — ArchiveChange does not call HookRunner directly"
   ],
   "scenarios": [
@@ -212,24 +241,59 @@
     {
       "requirement": "Archivable guard",
       "name": "Change not in archivable state",
-      "given": ["a change that is not in archivable state"],
+      "given": ["a change that is not in archivable or archiving state"],
       "when": ["ArchiveChange.execute is called"],
       "then": [
-        "InvalidStateTransitionError is thrown from inside ChangeRepository.mutate(input.name, fn)",
+        "InvalidStateTransitionError is thrown from assertArchivable()",
         "AND no hooks are executed and no files are modified"
       ]
     },
     {
       "requirement": "Archivable guard",
-      "name": "Change in archivable state transitions to archiving",
+      "name": "Pre-archive hooks run while change remains archivable",
       "given": ["the change is in archivable state"],
-      "when": ["ArchiveChange.execute is called"],
+      "when": ["ArchiveChange.execute runs pre-archive hooks"],
+      "then": ["the change is still in archivable state during hook execution"]
+    },
+    {
+      "requirement": "Archivable guard",
+      "name": "Change transitions to archiving immediately before publication",
+      "given": [
+        "the change is in archivable state",
+        "AND full-batch preflight succeeds",
+        "AND batch snapshots are written"
+      ],
+      "when": ["canonical publication is about to begin"],
       "then": [
-        "the archivable guard passes inside the serialized mutation callback",
-        "AND the change transitions to archiving via change.transition('archiving', actor)",
-        "AND the updated manifest is persisted before pre-archive hooks execute",
-        "AND execution proceeds to pre-archive hooks using the change returned by that mutation"
+        "the change transitions to archiving via change.transition('archiving', actor) inside ChangeRepository.mutate",
+        "AND the updated manifest is persisted before the first SpecRepository.publish() call"
       ]
+    },
+    {
+      "requirement": "Archivable guard",
+      "name": "Pre-hook failure leaves change in archivable",
+      "given": ["a pre-archive hook fails"],
+      "when": ["ArchiveChange.execute aborts"],
+      "then": [
+        "the change remains in archivable state",
+        "AND no .specd-archive-backup/ directories are created"
+      ]
+    },
+    {
+      "requirement": "Deferred transition to archiving",
+      "name": "Transition occurs only after preflight and snapshots",
+      "given": ["full-batch preflight succeeds", "AND batch snapshots are written"],
+      "when": ["canonical publication begins"],
+      "then": [
+        "the change transitions to archiving inside ChangeRepository.mutate before the first publish"
+      ]
+    },
+    {
+      "requirement": "Deferred transition to archiving",
+      "name": "Preflight failure never transitions to archiving",
+      "given": ["full-batch preflight fails"],
+      "when": ["ArchiveChange.execute aborts"],
+      "then": ["the change remains in archivable state"]
     },
     {
       "requirement": "ReadOnly workspace guard",
@@ -542,73 +606,19 @@
     },
     {
       "requirement": "Spec metadata generation",
-      "name": "Pre-publication extraction validates the final persisted dependsOn set",
-      "given": [
-        "a change with specIds [\"default:auth/login\"] is archived",
-        "AND archive has already prepared the merged artifact content for default:auth/login"
-      ],
-      "when": ["ArchiveChange determines the final persisted dependsOn set for that spec"],
+      "name": "Persisted metadata generation runs after archive move",
+      "given": ["canonical publication and archive move succeed"],
+      "when": ["ArchiveChange.execute generates persisted metadata.json"],
+      "then": ["GenerateSpecMetadata runs after archiveRepository.archive()"]
+    },
+    {
+      "requirement": "Spec metadata generation",
+      "name": "Metadata failure does not roll back archive",
+      "given": ["archive move succeeds", "AND persisted metadata generation fails for one spec"],
+      "when": ["ArchiveChange.execute completes"],
       "then": [
-        "it runs extractMetadata(...) against the prepared merged content before canonical publication begins"
-      ]
-    },
-    {
-      "requirement": "Spec metadata generation",
-      "name": "Mismatch fails even on first sidecar creation",
-      "given": [
-        "a change has specDependsOn: { \"default:auth/login\": [\"default:auth/shared\"] }",
-        "AND default:auth/login has no canonical spec-lock.json yet",
-        "AND the spec's extracted dependsOn from the prepared merged content resolves to a different value"
-      ],
-      "when": [
-        "ArchiveChange.execute attempts to seal the final persisted dependency set for default:auth/login"
-      ],
-      "then": ["the archive fails for that spec before canonical publication begins"]
-    },
-    {
-      "requirement": "Spec metadata generation",
-      "name": "Missing extraction still writes metadata dependsOn from the final persisted dependency set",
-      "given": [
-        "a modified spec is being archived",
-        "AND the schema has no metadataExtraction.dependsOn rule",
-        "AND the change has a final specDependsOn value for that spec"
-      ],
-      "when": ["archive generates metadata after canonical publication"],
-      "then": ["metadata.json.dependsOn is written from the final persisted dependency set"]
-    },
-    {
-      "requirement": "Spec metadata generation",
-      "name": "Legacy spec without sidecar may keep extracted metadata dependsOn",
-      "given": [
-        "a modified legacy spec has no spec-lock.json",
-        "AND the schema's metadata extraction yields dependsOn"
-      ],
-      "when": [
-        "a non-archive metadata flow regenerates metadata before opportunistic backfill succeeds"
-      ],
-      "then": [
-        "metadata.json.dependsOn may still be written from the extracted value until sidecar backfill succeeds"
-      ]
-    },
-    {
-      "requirement": "Spec metadata generation",
-      "name": "Metadata is generated after successful publication",
-      "given": [
-        "a change with specIds [\"default:auth/login\"] is archived successfully for a spec"
-      ],
-      "when": ["the archive process runs post-publication metadata generation"],
-      "then": ["SaveSpecMetadata is called with JSON-serialized content for that spec"]
-    },
-    {
-      "requirement": "Spec metadata generation",
-      "name": "Metadata generation failure does not abort archive",
-      "given": [
-        "a spec has no # Title heading and the schema's metadata extraction for title matches nothing"
-      ],
-      "when": ["ArchiveChange.execute runs metadata generation for that spec"],
-      "then": [
-        "the archive is not rolled back",
-        "AND the spec path appears in staleMetadataSpecPaths"
+        "the change is archived",
+        "AND the failed spec path is listed in staleMetadataSpecPaths"
       ]
     },
     {
@@ -772,6 +782,86 @@
       ]
     },
     {
+      "requirement": "Batch canonical snapshot before publication",
+      "name": "Snapshot includes pre-existing spec-lock.json",
+      "given": ["a spec already has canonical spec-lock.json"],
+      "when": ["batch snapshots are written before publication"],
+      "then": [
+        "spec-lock.json is copied into .specd-archive-backup/",
+        "AND manifest.existingFiles includes spec-lock.json"
+      ]
+    },
+    {
+      "requirement": "Batch canonical snapshot before publication",
+      "name": "New spec records specDirExisted false",
+      "given": ["a spec directory does not exist before archive"],
+      "when": ["batch snapshots are written"],
+      "then": [
+        "manifest.specDirExisted is false",
+        "AND no canonical files are copied into the backup directory"
+      ]
+    },
+    {
+      "requirement": "Batch canonical restore on commit failure",
+      "name": "Later publish failure restores earlier published spec",
+      "given": ["a multi-spec archive batch", "AND publication succeeds for the first spec"],
+      "when": ["publication fails for a later spec"],
+      "then": [
+        "the first spec is restored to its pre-attempt canonical state",
+        "AND .specd-archive-backup/ is deleted after successful restore"
+      ]
+    },
+    {
+      "requirement": "Batch canonical restore on commit failure",
+      "name": "New spec directory is removed on restore",
+      "given": [
+        "a spec directory did not exist before archive",
+        "AND publication created the spec directory"
+      ],
+      "when": ["commit-phase restore runs"],
+      "then": ["the created spec directory is removed"]
+    },
+    {
+      "requirement": "Batch canonical restore on commit failure",
+      "name": "Only created files are deleted for existing spec",
+      "given": [
+        "a spec directory existed before archive with spec.md only",
+        "AND archive created verify.md during publication"
+      ],
+      "when": ["commit-phase restore runs"],
+      "then": ["spec.md is restored from backup", "AND verify.md is deleted"]
+    },
+    {
+      "requirement": "Batch canonical restore on commit failure",
+      "name": "Retry after restore does not duplicate delta merge",
+      "given": [
+        "an archive attempt failed after partial publication",
+        "AND batch restore completed successfully"
+      ],
+      "when": ["archive is retried"],
+      "then": ["delta merge runs against the pre-attempt canonical base"]
+    },
+    {
+      "requirement": "Orphan archive backup detection",
+      "name": "Matching orphan backup auto-restores and aborts",
+      "given": [".specd-archive-backup/manifest.json exists for the same change name"],
+      "when": ["ArchiveChange.execute starts commit preparation"],
+      "then": [
+        "canonical storage is restored from the orphan backup",
+        "AND the archive attempt aborts with guidance to review and retry"
+      ]
+    },
+    {
+      "requirement": "Lifecycle rollback after failed commit",
+      "name": "Successful restore transitions to archivable",
+      "given": [
+        "commit-phase archive failure after transition to archiving",
+        "AND batch restore succeeds"
+      ],
+      "when": ["the use case completes error handling"],
+      "then": ["the change is in archivable state"]
+    },
+    {
       "requirement": "spec-lock sidecar persistence",
       "name": "First archive creates spec-lock sidecar with schema and dependsOn",
       "given": [
@@ -827,12 +917,35 @@
     },
     {
       "requirement": "Archive debug logging",
+      "name": "Snapshot and restore phases emit debug diagnostics",
+      "given": ["full-batch preflight succeeds"],
+      "when": [
+        "ArchiveChange.execute runs orphan detection, batch snapshot, publication, archive move, or commit-phase restore"
+      ],
+      "then": [
+        "debug logs cover orphan detection outcome, per-spec snapshot start and completion, deferred transition to archiving, backup cleanup, and batch restore with restored vs failed spec IDs"
+      ]
+    },
+    {
+      "requirement": "Archive debug logging",
+      "name": "Post-commit phases emit debug diagnostics",
+      "given": ["canonical publication and archive move succeed"],
+      "when": ["persisted metadata generation and post-archive hooks run"],
+      "then": [
+        "debug logs cover metadata generation per spec and post-archive hook start and completion"
+      ]
+    },
+    {
+      "requirement": "Archive debug logging",
       "name": "Archive failure emits debug diagnostics",
       "given": [
-        "archive fails during tracked artifact resolution, delta application, or staged commit"
+        "archive fails during tracked artifact resolution, delta application, staged commit, archive move, or metadata generation"
       ],
       "when": ["the failure is reported"],
-      "then": ["debug logs include the failure phase and the artifact being processed"]
+      "then": [
+        "debug logs include the failure step, commitStarted when applicable, and the spec ID or artifact being processed",
+        "AND when commitStarted is true, debug logs include batch restore outcome and whether lifecycle rolled back to archivable"
+      ]
     },
     {
       "requirement": "Opportunistic sidecar backfill",
@@ -946,32 +1059,48 @@
     }
   ],
   "implementation": {
+    "files": [
+      {
+        "specId": "core:archive-change",
+        "file": "core:test/application/use-cases/archive-change-batch-restore.spec.ts"
+      }
+    ],
     "symbols": [
-      {
-        "specId": "core:archive-change",
-        "file": "core:src/domain/errors/archive-dependency-mismatch-error.ts",
-        "symbol": "ArchiveDependencyMismatchError"
-      },
-      {
-        "specId": "core:archive-change",
-        "file": "core:src/domain/errors/archive-artifact-missing-error.ts",
-        "symbol": "ArchiveArtifactMissingError"
-      },
-      {
-        "specId": "core:archive-change",
-        "file": "core:src/domain/errors/archive-implementation-state-error.ts",
-        "symbol": "ArchiveImplementationStateError"
-      },
       {
         "specId": "core:archive-change",
         "file": "core:src/application/use-cases/archive-change.ts",
         "symbol": "ArchiveChange"
+      },
+      {
+        "specId": "core:archive-change",
+        "file": "core:src/application/use-cases/archive-change.ts",
+        "symbol": "_handleCommitFailure"
+      },
+      {
+        "specId": "core:archive-change",
+        "file": "core:src/infrastructure/fs/archive-batch-snapshot.ts",
+        "symbol": "FsArchiveBatchSnapshot"
+      },
+      {
+        "specId": "core:archive-change",
+        "file": "core:src/composition/use-cases/archive-change.ts",
+        "symbol": "resolveArchiveBatchSnapshotPort"
+      },
+      {
+        "specId": "core:archive-change",
+        "file": "core:src/composition/use-cases/archive-change.ts",
+        "symbol": "buildWorkspaceSpecLayouts"
+      },
+      {
+        "specId": "core:archive-change",
+        "file": "core:src/infrastructure/fs/spec-repository.ts",
+        "symbol": "specsPath"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:a266c28d0bf2c6ef0e2d90fc377e6e9b57f99ae25ddd6363adf1acc0d16180dc",
-    "verify.md": "sha256:806d14bbaa8aca9ee196d40c2de37da020b1d50ae270db84ee3bc99a046b1813"
+    "spec.md": "sha256:995913eabb7220ac7abf5568eb8ef730c66d071ddfb535cc5a3858169f17c287",
+    "verify.md": "sha256:8e413e761f81f366166b2d0fd99e5e67bc064dfb0c8ace9a098729f4d74d9ebe"
   },
   "generatedBy": "core"
 }

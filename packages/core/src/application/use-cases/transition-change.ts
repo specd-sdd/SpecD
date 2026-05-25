@@ -201,8 +201,10 @@ export class TransitionChange {
       })
     }
 
+    const isArchivingRecovery = fromState === 'archiving' && effectiveTarget === 'archivable'
+
     // --- Enforce workflow requires ---
-    if (workflowStep !== null && workflowStep.requires.length > 0) {
+    if (!isArchivingRecovery && workflowStep !== null && workflowStep.requires.length > 0) {
       for (const artifactId of workflowStep.requires) {
         const verdict = lifecycle.artifacts.find((artifact) => artifact.type === artifactId)
         const status = verdict?.effectiveStatus ?? 'missing'
@@ -221,7 +223,11 @@ export class TransitionChange {
     }
 
     // --- Task completion gating (requiresTaskCompletion) ---
-    if (workflowStep !== null && workflowStep.requiresTaskCompletion.length > 0) {
+    if (
+      !isArchivingRecovery &&
+      workflowStep !== null &&
+      workflowStep.requiresTaskCompletion.length > 0
+    ) {
       for (const artifactId of workflowStep.requiresTaskCompletion) {
         const artifactType = schema.artifact(artifactId)
 
@@ -251,12 +257,12 @@ export class TransitionChange {
 
     // --- Source post-hooks (fail-fast) — finishing the previous step ---
     const fromWorkflowStep = schema?.workflowStep(fromState) ?? null
-    if (!skipAll && !skip.has('source.post') && fromWorkflowStep !== null) {
+    if (!isArchivingRecovery && !skipAll && !skip.has('source.post') && fromWorkflowStep !== null) {
       await this._executeHooks(input.name, fromState, 'post', onProgress)
     }
 
     // --- Target pre-hooks (fail-fast) — preparing the new step ---
-    if (!skipAll && !skip.has('target.pre') && workflowStep !== null) {
+    if (!isArchivingRecovery && !skipAll && !skip.has('target.pre') && workflowStep !== null) {
       await this._executeHooks(input.name, effectiveTarget, 'pre', onProgress)
     }
 

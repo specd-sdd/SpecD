@@ -77,7 +77,13 @@
     {
       "requirement": "Transition to designing from any state",
       "rules": [
-        "Every state except `drafting` SHALL include `designing` as a valid transition target. This allows the user to return to the design phase at any point in the lifecycle when issues are discovered.\n\nWhen the effective target is `designing` and the change is **not already in** `designing` or `drafting`, the use case MUST:\n\n1. Invalidate the active spec approval if one exists.\n2. Invalidate the active signoff if one exists — the first invalidation already clears both.\n3. Downgrade every artifact file to `pending-review`, except files already marked `drifted-pending-review`, which keep that more specific state.\n4. Recompute every artifact's aggregate persisted `state`.\n5. Proceed with the transition via `change.transition('designing', actor)`.\n\nWhen the change is **already in** `designing` (a `designing → designing` transition) or in `drafting` (the natural first entry), the use case MUST NOT invalidate approvals, downgrade artifacts, or call `invalidate()`. It MUST proceed directly with the transition via `change.transition('designing', actor)`.\n\nDrift detection (artifact content changes) is handled independently at the repository layer and is not affected by this rule."
+        "Every state except `drafting` SHALL include `designing` as a valid transition target. This includes `archiving`. This allows the user to return to the design phase at any point in the lifecycle when issues are discovered, including after a failed archive commit or incomplete batch restore.\n\nWhen the effective target is `designing` and the change is **not already in** `designing` or `drafting`, the use case MUST:\n\n1. Invalidate the active spec approval if one exists.\n2. Invalidate the active signoff if one exists — the first invalidation already clears both.\n3. Downgrade every artifact file to `pending-review`, except files already marked `drifted-pending-review`, which keep that more specific state.\n4. Recompute every artifact's aggregate persisted `state`.\n5. Proceed with the transition via `change.transition('designing', actor)`.\n\nWhen the change is **already in** `designing` (a `designing → designing` transition) or in `drafting` (the natural first entry), the use case MUST NOT invalidate approvals, downgrade artifacts, or call `invalidate()`. It MUST proceed directly with the transition via `change.transition('designing', actor)`.\n\nDrift detection (artifact content changes) is handled independently at the repository layer and is not affected by this rule."
+      ]
+    },
+    {
+      "requirement": "Transition from archiving to archivable",
+      "rules": [
+        "`TransitionChange` MUST permit `archiving → archivable` when the transition is valid in `VALID_TRANSITIONS`.\n\nThis transition is primarily used for manual recovery after a failed archive attempt once canonical storage has been restored to a known-good state. It MUST NOT run archive hooks or workflow `requires` checks associated with the `archivable` step — it is a lifecycle rollback, not re-entry into archive preparation.\n\nAutomatic invocation of this transition after failed archive commits is owned by `ArchiveChange`, not by callers of `TransitionChange`."
       ]
     },
     {
@@ -408,6 +414,26 @@
       ]
     },
     {
+      "requirement": "Transition from archiving to archivable",
+      "name": "Manual transition from archiving to archivable succeeds",
+      "given": ["a change in archiving state"],
+      "when": ["TransitionChange.execute is called with to: 'archivable'"],
+      "then": [
+        "the change transitions to archivable",
+        "AND archive workflow hooks for archivable are not executed"
+      ]
+    },
+    {
+      "requirement": "Transition from archiving to archivable",
+      "name": "Transition from archiving to designing downgrades artifacts",
+      "given": ["a change in archiving state with validated artifacts"],
+      "when": ["TransitionChange.execute is called with to: 'designing'"],
+      "then": [
+        "the change transitions to designing",
+        "AND artifact files are downgraded for review"
+      ]
+    },
+    {
       "requirement": "Post-hook execution",
       "name": "Post hooks run for the source state, not the target",
       "given": [
@@ -565,28 +591,17 @@
     }
   ],
   "implementation": {
-    "files": [
-      {
-        "specId": "core:transition-change",
-        "file": "core:src/composition/use-cases/transition-change.ts"
-      }
-    ],
     "symbols": [
       {
         "specId": "core:transition-change",
         "file": "core:src/application/use-cases/transition-change.ts",
         "symbol": "TransitionChange"
-      },
-      {
-        "specId": "core:transition-change",
-        "file": "core:src/application/use-cases/transition-change.ts",
-        "symbol": "TransitionChange.execute"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:986f58c6c583e2e198fe4ffd68eba2f29becf01b8acb469a49b3832498bb830a",
-    "verify.md": "sha256:f9a8cddcfe7fe03f4f5ad6da3c0b5a0b18742720307a65d8a53990417111e884"
+    "spec.md": "sha256:ffa80b8cbdc9cd10a924d9ca06937d6b1161d9ac476144a209b096a7110bff5b",
+    "verify.md": "sha256:782a1a13599f470cf13fdbc1399ff1dd5829d6a017987ed6ea9d7d60181a0869"
   },
   "generatedBy": "core"
 }

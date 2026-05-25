@@ -1,0 +1,45 @@
+- op: modified
+  description: Next action and transitions from archiving state
+  selector:
+    type: section
+    matches: 'Requirement: Available steps and next action'
+  content: |-
+    The engine MUST derive the set of `AvailableStep` entries and the authoritative `EffectiveTarget` based on the current change state, project configuration (approval gates), and active bypass flags.
+
+    **Approval Gate Routing:**
+
+    - If a transition to a gated step (e.g., `implementing`) is requested and the corresponding gate is active (e.g., `approvals.spec: true`), the engine MUST route the transition to the intermediate pending state (e.g., `pending-spec-approval`).
+    - If a gate is disabled, any attempt to reach its corresponding pending or approved states MUST be blocked with an `INVALID_TRANSITION` code.
+
+    **Step Availability:**
+
+    - `isReady`: Whether all required artifacts for the step are logically complete/skipped.
+    - `isPermitted`: Whether the lifecycle protocol allows the transition. This check MUST combine the static `VALID_TRANSITIONS` graph with the dynamic approval status and active skippable blockers.
+
+    Based on the current state and blockers, the engine MUST recommend a single `NextAction` (cognitive or mechanical) to guide the user or agent toward the next valid state.
+
+    **Archiving state guidance:**
+
+    When `change.state` is `archiving`:
+
+    - `validTransitions` MUST include `archivable` and `designing`.
+    - If the most recent `archive-failed` event has `commitStarted: true` and batch restore did not complete, `nextAction` MUST recommend manual review and transition to `designing` rather than retrying archive blindly.
+    - If no blocking restore failure is recorded, `nextAction` MAY recommend retrying archive (`specd change archive <name>`) or transitioning to `designing` when artifact revision is required.
+
+- op: added
+  description: Archiving transitions exposed in lifecycle verdict
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Available steps and next action'
+  content: |
+    ### Requirement: Archiving escape transitions in lifecycle verdict
+
+    When evaluating a change in `archiving` state, `LifecycleEngine` MUST expose `archivable` and `designing` in both `validTransitions` and `availableTransitions` unless a non-skippable blocker unrelated to lifecycle validity prevents the target step.
+
+    Transition blockers for `archiving → archivable` MUST NOT include workflow `requires` checks — returning to `archivable` after a failed commit is a lifecycle recovery move, not entry into a workflow step.
+
+    Transition blockers for `archiving → designing` MUST follow the same invalidation semantics enforced by `TransitionChange` when entering `designing` from other states.

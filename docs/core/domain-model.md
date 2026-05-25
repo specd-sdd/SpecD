@@ -76,7 +76,7 @@ type ChangeState =
   | 'archiving'
 ```
 
-The permitted transitions are defined in `VALID_TRANSITIONS`. Almost every active state can transition back to `'designing'` — this is the redesign path that allows rework at any point. The terminal state is `'archiving'` — no transitions are valid from it.
+The permitted transitions are defined in `VALID_TRANSITIONS`. Almost every active state can transition back to `'designing'` — this is the redesign path that allows rework at any point. From `'archiving'`, recovery transitions to `'archivable'` and `'designing'` are valid while the change is still active; a successful archive removes the change from the active set (archived record, not a lifecycle transition).
 
 ```
 drafting → designing ⇄ ready ──────────────────────────── → implementing ⇄ verifying → done ──────────────────── → archivable → archiving
@@ -101,14 +101,16 @@ Full transition table from `VALID_TRANSITIONS`:
 | `pending-signoff`       | `signed-off`, `designing`                            |
 | `signed-off`            | `archivable`, `designing`                            |
 | `archivable`            | `archiving`, `designing`                             |
-| `archiving`             | _(terminal — no valid transitions)_                  |
+| `archiving`             | `archivable`, `designing`                            |
 
 ```typescript
 import { VALID_TRANSITIONS, isValidTransition } from '@specd/core'
 
 // Check whether a transition is permitted
 isValidTransition('ready', 'implementing') // true
-isValidTransition('archiving', 'designing') // false
+isValidTransition('archiving', 'designing') // true
+isValidTransition('archiving', 'archivable') // true
+isValidTransition('archiving', 'implementing') // false
 
 // Inspect valid targets from a given state
 VALID_TRANSITIONS['done'] // ['archivable', 'pending-signoff', 'designing']

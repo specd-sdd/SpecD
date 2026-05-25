@@ -143,6 +143,9 @@ export class LifecycleEngine {
 
     const transitionBlockers: LifecycleTransitionBlocker[] = validTransitions.flatMap(
       (transition) => {
+        if (change.state === 'archiving' && transition === 'archivable') {
+          return []
+        }
         const workflowStep = schema.workflowStep(transition)
         if (workflowStep === null) return []
         const blocking = workflowStep.requires.filter((artifactId) => {
@@ -154,6 +157,12 @@ export class LifecycleEngine {
     )
 
     const availableTransitions = validTransitions.filter((transition) => {
+      if (
+        change.state === 'archiving' &&
+        (transition === 'archivable' || transition === 'designing')
+      ) {
+        return this._isStepPermitted(change.state, transition, approvals)
+      }
       const stepVerdict = availableSteps.find((step) => step.step === transition)
       if (stepVerdict === undefined) {
         return this._isStepPermitted(change.state, transition, approvals)
@@ -175,7 +184,7 @@ export class LifecycleEngine {
 
     const blockers = this._dedupeBlockers([...reviewBlockers, ...requestedBlockers])
     const nextArtifact = this._nextArtifact(schema, verdictByArtifact)
-    const nextAction = this._nextAction(change.state, review, availableTransitions)
+    const nextAction = this._nextAction(change, review, availableTransitions)
 
     this._debug('LifecycleEngine evaluated change lifecycle', {
       change: change.name,
@@ -505,6 +514,10 @@ export class LifecycleEngine {
     }
 
     const workflowStep = schema.workflowStep(effectiveTarget)
+    if (change.state === 'archiving' && effectiveTarget === 'archivable') {
+      return this._dedupeBlockers([...blockers, ...reviewBlockers])
+    }
+
     if (workflowStep === null) {
       return this._dedupeBlockers([...blockers, ...reviewBlockers])
     }
@@ -674,10 +687,12 @@ export class LifecycleEngine {
   }
 
   private _nextAction(
-    state: ChangeState,
+    change: Change,
     review: LifecycleReviewSummary,
     availableTransitions: readonly ChangeState[],
   ): LifecycleNextAction {
+    const state = change.state
+
     if (review.required) {
       return {
         targetStep: state,
@@ -720,6 +735,31 @@ export class LifecycleEngine {
         actionType: 'mechanical',
         reason: 'Verifying implementation against scenarios',
         command: '/specd-verify',
+      }
+    }
+
+    if (state === 'archiving') {
+      const lastArchiveFailure = [...change.history]
+        .reverse()
+        .find((event) => event.type === 'archive-failed')
+      if (
+        lastArchiveFailure?.type === 'archive-failed' &&
+        lastArchiveFailure.commitStarted &&
+        change.state === 'archiving'
+      ) {
+        return {
+          targetStep: 'designing',
+          actionType: 'cognitive',
+          reason:
+            'Archive commit failed with incomplete restore — review and transition to designing',
+          command: '/specd-design',
+        }
+      }
+      return {
+        targetStep: 'archiving',
+        actionType: 'mechanical',
+        reason: 'Retry archive after reviewing canonical files',
+        command: 'specd change archive',
       }
     }
 

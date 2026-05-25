@@ -25,7 +25,7 @@ A change moves through a series of named states from creation to completion:
 
 **Discarding** a change moves it to `.specd/discarded/`. The work is retained for reference but the change is no longer active.
 
-**Archiving** applies the spec deltas to the live specs directory and moves the completed change to `.specd/archive/`.
+**Archiving** applies spec deltas to the live specs directory and moves the completed change to `.specd/archive/`. The change stays in `archivable` until preflight passes; it enters `archiving` only for the commit phase (publication and archive move). If that phase fails, batch restore may roll the change back to `archivable` for retry, or leave it in `archiving` with escape transitions to `archivable` or `designing`. See [Change Lifecycle Guide](../../workflow.md#archiving).
 
 ### Approval gates
 

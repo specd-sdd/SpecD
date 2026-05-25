@@ -283,4 +283,64 @@ describe('LifecycleEngine', () => {
     expect(proposal?.state).toBe('missing')
     expect(proposal?.effectiveStatus).toBe('missing')
   })
+
+  it('exposes archiving escape transitions without archivable requires blockers', () => {
+    const createdAt = new Date('2024-01-01T00:00:00Z')
+    const change = new Change({
+      name: 'my-change',
+      createdAt,
+      specIds: ['default:auth/login'],
+      history: [
+        {
+          type: 'created',
+          at: createdAt,
+          by: testActor,
+          specIds: ['default:auth/login'],
+          schemaName: '@specd/schema-std',
+          schemaVersion: 1,
+        },
+        { type: 'transitioned', from: 'done', to: 'archivable', at: createdAt, by: testActor },
+        { type: 'transitioned', from: 'archivable', to: 'archiving', at: createdAt, by: testActor },
+      ],
+    })
+
+    const verdict = new LifecycleEngine().evaluate(change, makeSchema())
+    expect(verdict.validTransitions).toEqual(['archivable', 'designing'])
+    expect(verdict.availableTransitions).toContain('archivable')
+    expect(verdict.transitionBlockers.some((blocker) => blocker.transition === 'archivable')).toBe(
+      false,
+    )
+  })
+
+  it('recommends designing when archive commit failed and change remains archiving', () => {
+    const createdAt = new Date('2024-01-01T00:00:00Z')
+    const change = new Change({
+      name: 'my-change',
+      createdAt,
+      specIds: ['default:auth/login'],
+      history: [
+        {
+          type: 'created',
+          at: createdAt,
+          by: testActor,
+          specIds: ['default:auth/login'],
+          schemaName: '@specd/schema-std',
+          schemaVersion: 1,
+        },
+        { type: 'transitioned', from: 'archivable', to: 'archiving', at: createdAt, by: testActor },
+        {
+          type: 'archive-failed',
+          at: createdAt,
+          by: testActor,
+          step: 'commit',
+          message: 'partial restore',
+          commitStarted: true,
+        },
+      ],
+    })
+
+    const verdict = new LifecycleEngine().evaluate(change, makeSchema())
+    expect(verdict.nextAction.targetStep).toBe('designing')
+    expect(verdict.nextAction.command).toBe('/specd-design')
+  })
 })

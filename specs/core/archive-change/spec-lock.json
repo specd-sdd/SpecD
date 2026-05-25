@@ -24,20 +24,23 @@
   ],
   "implementation": [
     {
-      "file": "core:src/domain/errors/archive-dependency-mismatch-error.ts",
-      "symbols": ["ArchiveDependencyMismatchError"]
-    },
-    {
-      "file": "core:src/domain/errors/archive-artifact-missing-error.ts",
-      "symbols": ["ArchiveArtifactMissingError"]
-    },
-    {
-      "file": "core:src/domain/errors/archive-implementation-state-error.ts",
-      "symbols": ["ArchiveImplementationStateError"]
-    },
-    {
       "file": "core:src/application/use-cases/archive-change.ts",
-      "symbols": ["ArchiveChange"]
+      "symbols": ["ArchiveChange", "_handleCommitFailure"]
+    },
+    {
+      "file": "core:src/infrastructure/fs/archive-batch-snapshot.ts",
+      "symbols": ["FsArchiveBatchSnapshot"]
+    },
+    {
+      "file": "core:src/composition/use-cases/archive-change.ts",
+      "symbols": ["resolveArchiveBatchSnapshotPort", "buildWorkspaceSpecLayouts"]
+    },
+    {
+      "file": "core:src/infrastructure/fs/spec-repository.ts",
+      "symbols": ["specsPath"]
+    },
+    {
+      "file": "core:test/application/use-cases/archive-change-batch-restore.spec.ts"
     }
   ]
 }

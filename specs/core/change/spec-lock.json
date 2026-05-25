@@ -15,15 +15,8 @@
   ],
   "implementation": [
     {
-      "file": "core:src/application/use-cases/edit-change.ts",
-      "symbols": ["EditChange"]
-    },
-    {
-      "file": "core:src/domain/entities/change.ts",
-      "symbols": ["Change"]
-    },
-    {
-      "file": "core:src/composition/kernel.ts"
+      "file": "core:src/domain/value-objects/change-state.ts",
+      "symbols": ["VALID_TRANSITIONS"]
     }
   ]
 }

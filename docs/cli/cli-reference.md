@@ -499,9 +499,13 @@ specd changes archive <name> [options]
 
 Archive a completed change. Scope-`spec` artifacts are synced into the spec repository, and the change is moved to the archive directory. The change must be in the `archivable` state.
 
+While archive runs, the change remains `archivable` through guards, pre-archive hooks, orphan detection, and preflight. It transitions to `archiving` immediately before canonical publication. On commit-phase failure, batch restore may return the change to `archivable` (retry) or leave it in `archiving` (use `specd changes transition` to `archivable` or `designing`). See [Change Lifecycle Guide](../guide/workflow.md#archiving).
+
 If other active changes target the same specs, the archive is blocked by default. Use `--allow-overlap` to proceed despite the overlap.
 
 If implementation sidecar maintenance would update `spec-lock.json` for specs outside the change scope, archive is also blocked by default. Use `--allow-out-of-scope` only when those extra sidecar updates are intentional.
+
+Tracked implementation files must be resolved or ignored before archive succeeds.
 
 | Option                      | Description                                                                  |
 | --------------------------- | ---------------------------------------------------------------------------- |

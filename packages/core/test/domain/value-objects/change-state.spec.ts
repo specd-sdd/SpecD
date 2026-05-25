@@ -47,6 +47,8 @@ describe('ChangeState', () => {
       ['signed-off', 'designing'],
       ['archivable', 'designing'],
       ['archivable', 'archiving'],
+      ['archiving', 'archivable'],
+      ['archiving', 'designing'],
     ] as [ChangeState, ChangeState][])('allows %s → %s', (from, to) => {
       expect(isValidTransition(from, to)).toBe(true)
     })
@@ -61,9 +63,13 @@ describe('ChangeState', () => {
       }
     })
 
-    it('archiving has no valid transitions', () => {
+    it('archiving allows transition to archivable and designing only', () => {
       for (const to of ALL_STATES) {
-        expect(isValidTransition('archiving', to)).toBe(false)
+        if (to === 'archivable' || to === 'designing') {
+          expect(isValidTransition('archiving', to)).toBe(true)
+        } else {
+          expect(isValidTransition('archiving', to)).toBe(false)
+        }
       }
     })
 
@@ -102,8 +108,8 @@ describe('ChangeState', () => {
       expect(VALID_TRANSITIONS['archivable']).toEqual(['archiving', 'designing'])
     })
 
-    it('archiving has no valid transitions', () => {
-      expect(VALID_TRANSITIONS['archiving']).toEqual([])
+    it('archiving allows archivable and designing escape transitions', () => {
+      expect(VALID_TRANSITIONS['archiving']).toEqual(['archivable', 'designing'])
     })
 
     it('ready has two valid transitions (free path and spec approval gate)', () => {

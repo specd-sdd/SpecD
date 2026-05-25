@@ -87,6 +87,16 @@ export class FsSpecRepository extends SpecRepository {
       config.prefix !== undefined ? config.prefix.split('/').filter((s) => s.length > 0) : []
   }
 
+  /** Canonical specs root path for this workspace repository. */
+  get specsPath(): string {
+    return this._specsPath
+  }
+
+  /** Logical prefix for specs in this workspace, when configured. */
+  get prefix(): string | undefined {
+    return this._prefixSegments.length > 0 ? this._prefixSegments.join('/') : undefined
+  }
+
   /**
    * Returns the spec at the given path, or `null` if no such directory exists.
    *

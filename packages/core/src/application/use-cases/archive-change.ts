@@ -28,6 +28,9 @@ import { type GenerateSpecMetadata } from './generate-spec-metadata.js'
 import { type SaveSpecMetadata } from './save-spec-metadata.js'
 import { type RunStepHooks } from './run-step-hooks.js'
 import { Logger } from '../logger.js'
+import { type ArchiveBatchSnapshotPort } from '../ports/archive-batch-snapshot.js'
+import { createNoopArchiveBatchSnapshot } from '../archive-batch-snapshot-noop.js'
+import { ArchiveBatchRestoreError } from '../../domain/errors/archive-batch-restore-error.js'
 import { type SpecLockData } from '../../domain/services/parse-spec-lock.js'
 import { DependsOnOverwriteError } from '../../domain/errors/depends-on-overwrite-error.js'
 import { ArchiveArtifactMissingError } from '../../domain/errors/archive-artifact-missing-error.js'
@@ -175,6 +178,7 @@ export class ArchiveChange {
   private readonly _workspaceRoutes: readonly SpecWorkspaceRoute[]
   private readonly _projectRoot: string
   private readonly _workspaceConfigs: ReadonlyMap<string, ArchiveWorkspaceImplementationConfig>
+  private readonly _batchSnapshot: ArchiveBatchSnapshotPort
 
   /**
    * Creates a new `ArchiveChange` use case instance.
@@ -192,6 +196,7 @@ export class ArchiveChange {
    * @param workspaceRoutes - Workspace routing metadata for cross-workspace spec reference resolution
    * @param projectRoot - Project root used to canonicalize raw implementation paths
    * @param workspaceConfigs - Workspace codeRoot and exclusion config for archive materialization
+   * @param batchSnapshot - Batch canonical snapshot adapter for commit rollback
    */
   constructor(
     changes: ChangeRepository,
@@ -207,6 +212,7 @@ export class ArchiveChange {
     workspaceRoutes: readonly SpecWorkspaceRoute[] = [],
     projectRoot = process.cwd(),
     workspaceConfigs: ReadonlyMap<string, ArchiveWorkspaceImplementationConfig> = new Map(),
+    batchSnapshot: ArchiveBatchSnapshotPort = createNoopArchiveBatchSnapshot(),
   ) {
     this._changes = changes
     this._specs = specs
@@ -221,6 +227,7 @@ export class ArchiveChange {
     this._workspaceRoutes = workspaceRoutes
     this._projectRoot = projectRoot
     this._workspaceConfigs = workspaceConfigs
+    this._batchSnapshot = batchSnapshot
   }
 
   /**
@@ -245,15 +252,20 @@ export class ArchiveChange {
       throw new SchemaMismatchError(loadedChange.name, loadedChange.schemaName, schema.name())
     }
 
-    // --- Archivable guard + transition to archiving ---
-    const archivingActor = await this._actor.identity()
-    const change = await this._changes.mutate(input.name, (freshChange) => {
-      freshChange.assertArchivable()
-      if (freshChange.state !== 'archiving') {
-        freshChange.transition('archiving', archivingActor)
-      }
-      return freshChange
+    Logger.debug('ArchiveChange passed schema guard', {
+      change: loadedChange.name,
+      schema: schema.name(),
     })
+
+    // --- Archivable guard (no lifecycle transition yet) ---
+    loadedChange.assertArchivable()
+    Logger.debug('ArchiveChange passed archivable guard', {
+      change: loadedChange.name,
+      state: loadedChange.state,
+    })
+
+    let change = loadedChange
+    const archivingActor = await this._actor.identity()
 
     // --- Overlap guard ---
     const invalidatedChanges: InvalidatedChangesEntry[] = []
@@ -315,6 +327,11 @@ export class ArchiveChange {
         }
       }
     }
+    Logger.debug('ArchiveChange overlap guard complete', {
+      change: change.name,
+      overlapCount: invalidatedChanges.length,
+      invalidatedChanges: invalidatedChanges.map((entry) => entry.name),
+    })
 
     // --- ReadOnly workspace guard ---
     const readOnlySpecs: Array<{ specId: string; workspace: string }> = []
@@ -333,10 +350,19 @@ export class ArchiveChange {
         `Cannot archive change "${change.name}" — it contains specs from readOnly workspaces:\n\n${lines.join('\n')}\n\nArchiving would write deltas into protected specs.`,
       )
     }
+    Logger.debug('ArchiveChange readOnly guard complete', {
+      change: change.name,
+      specCount: change.specIds.length,
+    })
 
     // --- Pre-archive hooks (delegated to RunStepHooks) ---
     const skip = input.skipHookPhases ?? new Set<ArchiveHookPhaseSelector>()
     if (!skip.has('all') && !skip.has('pre')) {
+      Logger.debug('ArchiveChange pre-archive hooks started', {
+        change: change.name,
+        phase: 'pre',
+        skipped: false,
+      })
       const preResult = await this._runStepHooks.execute({
         name: input.name,
         step: 'archiving',
@@ -349,6 +375,10 @@ export class ArchiveChange {
           preResult.failedHook.stderr,
         )
       }
+      Logger.debug('ArchiveChange pre-archive hooks completed', {
+        change: change.name,
+        phase: 'pre',
+      })
     }
 
     let preparedPlan: PreparedArchivePlan
@@ -379,6 +409,36 @@ export class ArchiveChange {
       throw error
     }
 
+    const batchSpecIds = [
+      ...new Set([
+        ...change.specIds,
+        ...preparedPlan.publications.map((publication) => publication.specId),
+      ]),
+    ]
+    const publishOrder: string[] = preparedPreflight.map((publication) => publication.specId)
+
+    try {
+      await this._batchSnapshot.detectOrphans(batchSpecIds, change.name)
+      for (const specId of publishOrder) {
+        await this._batchSnapshot.snapshot(specId, change.name)
+      }
+    } catch (error) {
+      await this._recordArchiveFailure(input.name, 'prepare', error, archivingActor, false)
+      throw error
+    }
+
+    change = await this._changes.mutate(input.name, (freshChange) => {
+      freshChange.assertArchivable()
+      if (freshChange.state !== 'archiving') {
+        freshChange.transition('archiving', archivingActor)
+      }
+      return freshChange
+    })
+    Logger.debug('ArchiveChange transitioning to archiving', {
+      change: change.name,
+      actor: archivingActor.name,
+    })
+
     const postPublicationStates = new Map<
       string,
       {
@@ -405,6 +465,12 @@ export class ArchiveChange {
             ? { specLock: publication.publicationSpecLock }
             : {}),
         })
+        for (const write of publication.writes) {
+          await this._batchSnapshot.recordCreatedFile(publication.specId, write.outputFilename)
+        }
+        if (publication.publicationSpecLock !== undefined) {
+          await this._batchSnapshot.recordCreatedFile(publication.specId, 'spec-lock.json')
+        }
         Logger.debug('ArchiveChange completed staged spec publication', {
           change: change.name,
           specId: publication.specId,
@@ -418,11 +484,44 @@ export class ArchiveChange {
         })
       }
     } catch (error) {
-      await this._recordArchiveFailure(input.name, 'commit', error, archivingActor, true)
-      throw error
+      return await this._handleCommitFailure(
+        input.name,
+        error,
+        archivingActor,
+        batchSpecIds,
+        publishOrder,
+        'commit',
+      )
     }
 
-    // --- Spec metadata generation + sidecar reconciliation ---
+    // --- Archive ---
+    let archivedChange: ArchivedChange
+    let archiveDirPath: string
+    try {
+      Logger.debug('ArchiveChange archive repository call started', { change: change.name })
+      const archived = await this._archive.archive(change, {
+        actor: archivingActor,
+      })
+      archivedChange = archived.archivedChange
+      archiveDirPath = archived.archiveDirPath
+      Logger.debug('ArchiveChange archive repository call completed', {
+        change: change.name,
+        archivedName: archivedChange.archivedName,
+      })
+    } catch (error) {
+      return await this._handleCommitFailure(
+        input.name,
+        error,
+        archivingActor,
+        batchSpecIds,
+        publishOrder,
+        'archive',
+      )
+    }
+
+    await this._batchSnapshot.cleanup(batchSpecIds)
+
+    // --- Spec metadata generation + sidecar reconciliation (post-archive) ---
     const failedMetadataSpecPaths: string[] = []
 
     for (const specId of preparedPlan.staleSpecIds) {
@@ -432,9 +531,15 @@ export class ArchiveChange {
         const specRepo = this._specs.get(publishedState.workspace)
         if (specRepo === undefined) continue
 
+        Logger.debug('ArchiveChange metadata generation started', { change: change.name, specId })
         const result = await this._generateMetadata.execute({ specId })
         if (!result.hasExtraction || Object.keys(result.metadata).length === 0) {
           failedMetadataSpecPaths.push(specId)
+          Logger.debug('ArchiveChange metadata generation skipped', {
+            change: change.name,
+            specId,
+            skipped: 'no-extraction',
+          })
           continue
         }
 
@@ -451,28 +556,21 @@ export class ArchiveChange {
             '\n',
           force: true,
         })
+        Logger.debug('ArchiveChange metadata generation completed', { change: change.name, specId })
       } catch {
         failedMetadataSpecPaths.push(specId)
+        Logger.debug('ArchiveChange metadata generation failed', { change: change.name, specId })
       }
     }
 
-    // --- Archive ---
-    let archivedChange: ArchivedChange
-    let archiveDirPath: string
-    try {
-      const archived = await this._archive.archive(change, {
-        actor: archivingActor,
-      })
-      archivedChange = archived.archivedChange
-      archiveDirPath = archived.archiveDirPath
-    } catch (error) {
-      await this._recordArchiveFailure(input.name, 'archive', error, archivingActor, true)
-      throw error
-    }
-
     // --- Post-archive hooks (delegated to RunStepHooks) ---
+
     const postHookFailures: string[] = []
     if (!skip.has('all') && !skip.has('post')) {
+      Logger.debug('ArchiveChange post-archive hooks started', {
+        change: change.name,
+        phase: 'post',
+      })
       const postResult = await this._runStepHooks.execute({
         name: input.name,
         step: 'archiving',
@@ -483,6 +581,11 @@ export class ArchiveChange {
           postHookFailures.push(hook.command)
         }
       }
+      Logger.debug('ArchiveChange post-archive hooks completed', {
+        change: change.name,
+        phase: 'post',
+        failureCount: postHookFailures.length,
+      })
     }
 
     return {
@@ -771,6 +874,55 @@ export class ArchiveChange {
       publicationSpecLock,
       sidecarActive,
     }
+  }
+
+  /**
+   * Restores canonical storage and rolls lifecycle back after commit-phase failure.
+   *
+   * @param changeName - Change being archived
+   * @param error - Original failure
+   * @param actor - Archive actor
+   * @param specIds - Batch spec IDs included in the archive attempt
+   * @param publishOrder - Publication order for reverse restore
+   * @param step - Archive failure step
+   */
+  private async _handleCommitFailure(
+    changeName: string,
+    error: unknown,
+    actor: ActorIdentity,
+    specIds: readonly string[],
+    publishOrder: readonly string[],
+    step: 'commit' | 'archive',
+  ): Promise<never> {
+    const restoreResult = await this._batchSnapshot.restoreBatch(specIds, publishOrder)
+    const restoreCompleted = restoreResult.failedSpecIds.length === 0
+    await this._recordArchiveFailure(changeName, step, error, actor, true)
+
+    if (restoreCompleted) {
+      try {
+        await this._changes.mutate(changeName, (freshChange) => {
+          if (freshChange.state === 'archiving') {
+            freshChange.transition('archivable', actor)
+          }
+          return freshChange
+        })
+      } catch {
+        // Change may already have been moved during archive failure.
+      }
+      Logger.debug('ArchiveChange lifecycle rollback to archivable', {
+        change: changeName,
+        restoreCompleted: true,
+        restoredSpecIds: restoreResult.restoredSpecIds,
+      })
+      throw error
+    }
+
+    Logger.debug('ArchiveChange partial restore — staying in archiving', {
+      change: changeName,
+      restoredSpecIds: restoreResult.restoredSpecIds,
+      failedSpecIds: restoreResult.failedSpecIds,
+    })
+    throw new ArchiveBatchRestoreError(restoreResult.restoredSpecIds, restoreResult.failedSpecIds)
   }
 
   /**

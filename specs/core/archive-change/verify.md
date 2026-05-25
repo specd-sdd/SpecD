@@ -37,19 +37,47 @@
 
 #### Scenario: Change not in archivable state
 
-- **GIVEN** a change that is not in `archivable` state
+- **GIVEN** a change that is not in `archivable` or `archiving` state
 - **WHEN** `ArchiveChange.execute` is called
-- **THEN** `InvalidStateTransitionError` is thrown from inside `ChangeRepository.mutate(input.name, fn)`
+- **THEN** `InvalidStateTransitionError` is thrown from `assertArchivable()`
 - **AND** no hooks are executed and no files are modified
 
-#### Scenario: Change in archivable state transitions to archiving
+#### Scenario: Pre-archive hooks run while change remains archivable
 
 - **GIVEN** the change is in `archivable` state
-- **WHEN** `ArchiveChange.execute` is called
-- **THEN** the archivable guard passes inside the serialized mutation callback
-- **AND** the change transitions to `archiving` via `change.transition('archiving', actor)`
-- **AND** the updated manifest is persisted before pre-archive hooks execute
-- **AND** execution proceeds to pre-archive hooks using the change returned by that mutation
+- **WHEN** `ArchiveChange.execute` runs pre-archive hooks
+- **THEN** the change is still in `archivable` state during hook execution
+
+#### Scenario: Change transitions to archiving immediately before publication
+
+- **GIVEN** the change is in `archivable` state
+- **AND** full-batch preflight succeeds
+- **AND** batch snapshots are written
+- **WHEN** canonical publication is about to begin
+- **THEN** the change transitions to `archiving` via `change.transition('archiving', actor)` inside `ChangeRepository.mutate`
+- **AND** the updated manifest is persisted before the first `SpecRepository.publish()` call
+
+#### Scenario: Pre-hook failure leaves change in archivable
+
+- **GIVEN** a pre-archive hook fails
+- **WHEN** `ArchiveChange.execute` aborts
+- **THEN** the change remains in `archivable` state
+- **AND** no `.specd-archive-backup/` directories are created
+
+### Requirement: Deferred transition to archiving
+
+#### Scenario: Transition occurs only after preflight and snapshots
+
+- **GIVEN** full-batch preflight succeeds
+- **AND** batch snapshots are written
+- **WHEN** canonical publication begins
+- **THEN** the change transitions to `archiving` inside `ChangeRepository.mutate` before the first publish
+
+#### Scenario: Preflight failure never transitions to archiving
+
+- **GIVEN** full-batch preflight fails
+- **WHEN** `ArchiveChange.execute` aborts
+- **THEN** the change remains in `archivable` state
 
 ### Requirement: ReadOnly workspace guard
 
@@ -293,48 +321,19 @@
 
 ### Requirement: Spec metadata generation
 
-#### Scenario: Pre-publication extraction validates the final persisted dependsOn set
+#### Scenario: Persisted metadata generation runs after archive move
 
-- **GIVEN** a change with specIds \["default:auth/login"] is archived
-- **AND** archive has already prepared the merged artifact content for `default:auth/login`
-- **WHEN** `ArchiveChange` determines the final persisted `dependsOn` set for that spec
-- **THEN** it runs `extractMetadata(...)` against the prepared merged content before canonical publication begins
+- **GIVEN** canonical publication and archive move succeed
+- **WHEN** `ArchiveChange.execute` generates persisted `metadata.json`
+- **THEN** `GenerateSpecMetadata` runs after `archiveRepository.archive()`
 
-#### Scenario: Mismatch fails even on first sidecar creation
+#### Scenario: Metadata failure does not roll back archive
 
-- **GIVEN** a change has `specDependsOn: { "default:auth/login": ["default:auth/shared"] }`
-- **AND** `default:auth/login` has no canonical `spec-lock.json` yet
-- **AND** the spec's extracted `dependsOn` from the prepared merged content resolves to a different value
-- **WHEN** `ArchiveChange.execute` attempts to seal the final persisted dependency set for `default:auth/login`
-- **THEN** the archive fails for that spec before canonical publication begins
-
-#### Scenario: Missing extraction still writes metadata dependsOn from the final persisted dependency set
-
-- **GIVEN** a modified spec is being archived
-- **AND** the schema has no `metadataExtraction.dependsOn` rule
-- **AND** the change has a final `specDependsOn` value for that spec
-- **WHEN** archive generates metadata after canonical publication
-- **THEN** `metadata.json.dependsOn` is written from the final persisted dependency set
-
-#### Scenario: Legacy spec without sidecar may keep extracted metadata dependsOn
-
-- **GIVEN** a modified legacy spec has no `spec-lock.json`
-- **AND** the schema's metadata extraction yields `dependsOn`
-- **WHEN** a non-archive metadata flow regenerates metadata before opportunistic backfill succeeds
-- **THEN** `metadata.json.dependsOn` may still be written from the extracted value until sidecar backfill succeeds
-
-#### Scenario: Metadata is generated after successful publication
-
-- **GIVEN** a change with specIds \["default:auth/login"] is archived successfully for a spec
-- **WHEN** the archive process runs post-publication metadata generation
-- **THEN** `SaveSpecMetadata` is called with JSON-serialized content for that spec
-
-#### Scenario: Metadata generation failure does not abort archive
-
-- **GIVEN** a spec has no `# Title` heading and the schema's metadata extraction for `title` matches nothing
-- **WHEN** `ArchiveChange.execute` runs metadata generation for that spec
-- **THEN** the archive is not rolled back
-- **AND** the spec path appears in `staleMetadataSpecPaths`
+- **GIVEN** archive move succeeds
+- **AND** persisted metadata generation fails for one spec
+- **WHEN** `ArchiveChange.execute` completes
+- **THEN** the change is archived
+- **AND** the failed spec path is listed in `staleMetadataSpecPaths`
 
 ### Requirement: Result shape
 
@@ -448,6 +447,72 @@
 - **AND** it guarantees atomic publication per spec once staged canonical publication has started
 - **AND** it does not promise one indivisible filesystem transaction for the whole batch
 
+### Requirement: Batch canonical snapshot before publication
+
+#### Scenario: Snapshot includes pre-existing spec-lock.json
+
+- **GIVEN** a spec already has canonical `spec-lock.json`
+- **WHEN** batch snapshots are written before publication
+- **THEN** `spec-lock.json` is copied into `.specd-archive-backup/`
+- **AND** `manifest.existingFiles` includes `spec-lock.json`
+
+#### Scenario: New spec records specDirExisted false
+
+- **GIVEN** a spec directory does not exist before archive
+- **WHEN** batch snapshots are written
+- **THEN** `manifest.specDirExisted` is `false`
+- **AND** no canonical files are copied into the backup directory
+
+### Requirement: Batch canonical restore on commit failure
+
+#### Scenario: Later publish failure restores earlier published spec
+
+- **GIVEN** a multi-spec archive batch
+- **AND** publication succeeds for the first spec
+- **WHEN** publication fails for a later spec
+- **THEN** the first spec is restored to its pre-attempt canonical state
+- **AND** `.specd-archive-backup/` is deleted after successful restore
+
+#### Scenario: New spec directory is removed on restore
+
+- **GIVEN** a spec directory did not exist before archive
+- **AND** publication created the spec directory
+- **WHEN** commit-phase restore runs
+- **THEN** the created spec directory is removed
+
+#### Scenario: Only created files are deleted for existing spec
+
+- **GIVEN** a spec directory existed before archive with `spec.md` only
+- **AND** archive created `verify.md` during publication
+- **WHEN** commit-phase restore runs
+- **THEN** `spec.md` is restored from backup
+- **AND** `verify.md` is deleted
+
+#### Scenario: Retry after restore does not duplicate delta merge
+
+- **GIVEN** an archive attempt failed after partial publication
+- **AND** batch restore completed successfully
+- **WHEN** archive is retried
+- **THEN** delta merge runs against the pre-attempt canonical base
+
+### Requirement: Orphan archive backup detection
+
+#### Scenario: Matching orphan backup auto-restores and aborts
+
+- **GIVEN** `.specd-archive-backup/manifest.json` exists for the same change name
+- **WHEN** `ArchiveChange.execute` starts commit preparation
+- **THEN** canonical storage is restored from the orphan backup
+- **AND** the archive attempt aborts with guidance to review and retry
+
+### Requirement: Lifecycle rollback after failed commit
+
+#### Scenario: Successful restore transitions to archivable
+
+- **GIVEN** commit-phase archive failure after transition to `archiving`
+- **AND** batch restore succeeds
+- **WHEN** the use case completes error handling
+- **THEN** the change is in `archivable` state
+
 ### Requirement: spec-lock sidecar persistence
 
 #### Scenario: First archive creates spec-lock sidecar with schema and dependsOn
@@ -488,11 +553,24 @@
 - **WHEN** `ArchiveChange.execute` runs with debug logging enabled
 - **THEN** debug logs cover tracked artifact selection, archive-plan preparation, staged commit start, and staged commit completion
 
+#### Scenario: Snapshot and restore phases emit debug diagnostics
+
+- **GIVEN** full-batch preflight succeeds
+- **WHEN** `ArchiveChange.execute` runs orphan detection, batch snapshot, publication, archive move, or commit-phase restore
+- **THEN** debug logs cover orphan detection outcome, per-spec snapshot start and completion, deferred transition to `archiving`, backup cleanup, and batch restore with restored vs failed spec IDs
+
+#### Scenario: Post-commit phases emit debug diagnostics
+
+- **GIVEN** canonical publication and archive move succeed
+- **WHEN** persisted metadata generation and post-archive hooks run
+- **THEN** debug logs cover metadata generation per spec and post-archive hook start and completion
+
 #### Scenario: Archive failure emits debug diagnostics
 
-- **GIVEN** archive fails during tracked artifact resolution, delta application, or staged commit
+- **GIVEN** archive fails during tracked artifact resolution, delta application, staged commit, archive move, or metadata generation
 - **WHEN** the failure is reported
-- **THEN** debug logs include the failure phase and the artifact being processed
+- **THEN** debug logs include the failure step, `commitStarted` when applicable, and the spec ID or artifact being processed
+- **AND** when `commitStarted` is true, debug logs include batch restore outcome and whether lifecycle rolled back to `archivable`
 
 ### Requirement: Opportunistic sidecar backfill
 

@@ -1,0 +1,25 @@
+- op: added
+  description: Archiving recovery transition scenarios
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Transition to designing from any state'
+  content: |
+    ### Requirement: Transition from archiving to archivable
+
+    #### Scenario: Manual transition from archiving to archivable succeeds
+
+    - **GIVEN** a change in `archiving` state
+    - **WHEN** `TransitionChange.execute` is called with `to: 'archivable'`
+    - **THEN** the change transitions to `archivable`
+    - **AND** archive workflow hooks for `archivable` are not executed
+
+    #### Scenario: Transition from archiving to designing downgrades artifacts
+
+    - **GIVEN** a change in `archiving` state with validated artifacts
+    - **WHEN** `TransitionChange.execute` is called with `to: 'designing'`
+    - **THEN** the change transitions to `designing`
+    - **AND** artifact files are downgraded for review

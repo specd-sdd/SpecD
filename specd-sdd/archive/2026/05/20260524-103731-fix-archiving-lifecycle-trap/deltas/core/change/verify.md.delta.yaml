@@ -1,0 +1,65 @@
+- op: added
+  description: Archiving state and escape transitions scenarios
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: '^Requirement: Lifecycle$'
+  content: |
+    ### Requirement: Archiving escape transitions
+
+    #### Scenario: Archiving allows transition to archivable
+
+    - **GIVEN** a change in `archiving` state
+    - **WHEN** `TransitionChange` is invoked with target `archivable`
+    - **THEN** the transition succeeds
+
+    #### Scenario: Archiving allows transition to designing
+
+    - **GIVEN** a change in `archiving` state
+    - **WHEN** `TransitionChange` is invoked with target `designing`
+    - **THEN** the transition succeeds and artifact files are downgraded for review
+
+    #### Scenario: Archiving rejects transition to implementing
+
+    - **GIVEN** a change in `archiving` state
+    - **WHEN** `TransitionChange` is invoked with target `implementing`
+    - **THEN** `InvalidStateTransitionError` is thrown
+
+- op: modified
+  description: Archive outcome rollback scenarios
+  selector:
+    type: section
+    matches: '^Requirement: Archive outcome history$'
+  content: |-
+    #### Scenario: Failed archive attempt appends archive-failed event
+
+    - **GIVEN** a change has entered archive commit execution
+    - **AND** archive fails before completion
+    - **WHEN** the change history is inspected
+    - **THEN** it includes an `archive-failed` event with phase diagnostics for that attempt
+
+    #### Scenario: Successful batch restore rolls lifecycle back to archivable
+
+    - **GIVEN** a change in `archiving` state
+    - **AND** a commit-phase archive failure occurs
+    - **AND** batch canonical restore completes successfully
+    - **WHEN** the change is reloaded
+    - **THEN** the change is in `archivable` state
+
+    #### Scenario: Failed batch restore leaves change in archiving
+
+    - **GIVEN** a change in `archiving` state
+    - **AND** a commit-phase archive failure occurs
+    - **AND** batch canonical restore fails for at least one spec
+    - **WHEN** the change is reloaded
+    - **THEN** the change remains in `archiving` state
+
+    #### Scenario: Successful archive does not append a new active-change success event
+
+    - **GIVEN** a change archives successfully
+    - **WHEN** active-change history is considered
+    - **THEN** no new success event is appended there
+    - **AND** archive completion is represented by the archived record instead

@@ -84,6 +84,22 @@ The engine MUST derive the set of `AvailableStep` entries and the authoritative 
 
 Based on the current state and blockers, the engine MUST recommend a single `NextAction` (cognitive or mechanical) to guide the user or agent toward the next valid state.
 
+**Archiving state guidance:**
+
+When `change.state` is `archiving`:
+
+- `validTransitions` MUST include `archivable` and `designing`.
+- If the most recent `archive-failed` event has `commitStarted: true` and batch restore did not complete, `nextAction` MUST recommend manual review and transition to `designing` rather than retrying archive blindly.
+- If no blocking restore failure is recorded, `nextAction` MAY recommend retrying archive (`specd change archive <name>`) or transitioning to `designing` when artifact revision is required.
+
+### Requirement: Archiving escape transitions in lifecycle verdict
+
+When evaluating a change in `archiving` state, `LifecycleEngine` MUST expose `archivable` and `designing` in both `validTransitions` and `availableTransitions` unless a non-skippable blocker unrelated to lifecycle validity prevents the target step.
+
+Transition blockers for `archiving → archivable` MUST NOT include workflow `requires` checks — returning to `archivable` after a failed commit is a lifecycle recovery move, not entry into a workflow step.
+
+Transition blockers for `archiving → designing` MUST follow the same invalidation semantics enforced by `TransitionChange` when entering `designing` from other states.
+
 ### Requirement: Review summary integration
 
 The engine MUST detect and report **Drift** (physical content changes since last validation) and **Overlap** (conflicts with specs targeted by other archived changes) as part of the blocking diagnostics.

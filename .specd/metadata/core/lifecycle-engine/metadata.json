@@ -38,7 +38,13 @@
     {
       "requirement": "Available steps and next action",
       "rules": [
-        "The engine MUST derive the set of `AvailableStep` entries and the authoritative `EffectiveTarget` based on the current change state, project configuration (approval gates), and active bypass flags.\n\n**Approval Gate Routing:**\n\n- If a transition to a gated step (e.g., `implementing`) is requested and the corresponding gate is active (e.g., `approvals.spec: true`), the engine MUST route the transition to the intermediate pending state (e.g., `pending-spec-approval`).\n- If a gate is disabled, any attempt to reach its corresponding pending or approved states MUST be blocked with an `INVALID_TRANSITION` code.\n\n**Step Availability:**\n\n- `isReady`: Whether all required artifacts for the step are logically complete/skipped.\n- `isPermitted`: Whether the lifecycle protocol allows the transition. This check MUST combine the static `VALID_TRANSITIONS` graph with the dynamic approval status and active skippable blockers.\n\nBased on the current state and blockers, the engine MUST recommend a single `NextAction` (cognitive or mechanical) to guide the user or agent toward the next valid state."
+        "The engine MUST derive the set of `AvailableStep` entries and the authoritative `EffectiveTarget` based on the current change state, project configuration (approval gates), and active bypass flags.\n\n**Approval Gate Routing:**\n\n- If a transition to a gated step (e.g., `implementing`) is requested and the corresponding gate is active (e.g., `approvals.spec: true`), the engine MUST route the transition to the intermediate pending state (e.g., `pending-spec-approval`).\n- If a gate is disabled, any attempt to reach its corresponding pending or approved states MUST be blocked with an `INVALID_TRANSITION` code.\n\n**Step Availability:**\n\n- `isReady`: Whether all required artifacts for the step are logically complete/skipped.\n- `isPermitted`: Whether the lifecycle protocol allows the transition. This check MUST combine the static `VALID_TRANSITIONS` graph with the dynamic approval status and active skippable blockers.\n\nBased on the current state and blockers, the engine MUST recommend a single `NextAction` (cognitive or mechanical) to guide the user or agent toward the next valid state.\n\n**Archiving state guidance:**\n\nWhen `change.state` is `archiving`:\n\n- `validTransitions` MUST include `archivable` and `designing`.\n- If the most recent `archive-failed` event has `commitStarted: true` and batch restore did not complete, `nextAction` MUST recommend manual review and transition to `designing` rather than retrying archive blindly.\n- If no blocking restore failure is recorded, `nextAction` MAY recommend retrying archive (`specd change archive <name>`) or transitioning to `designing` when artifact revision is required."
+      ]
+    },
+    {
+      "requirement": "Archiving escape transitions in lifecycle verdict",
+      "rules": [
+        "When evaluating a change in `archiving` state, `LifecycleEngine` MUST expose `archivable` and `designing` in both `validTransitions` and `availableTransitions` unless a non-skippable blocker unrelated to lifecycle validity prevents the target step.\n\nTransition blockers for `archiving → archivable` MUST NOT include workflow `requires` checks — returning to `archivable` after a failed commit is a lifecycle recovery move, not entry into a workflow step.\n\nTransition blockers for `archiving → designing` MUST follow the same invalidation semantics enforced by `TransitionChange` when entering `designing` from other states."
       ]
     },
     {
@@ -130,6 +136,27 @@
       ]
     },
     {
+      "requirement": "Archiving escape transitions in lifecycle verdict",
+      "name": "Archiving exposes archivable and designing transitions",
+      "given": ["a change in archiving state with no blocking restore failure"],
+      "when": ["LifecycleEngine.evaluate runs"],
+      "then": [
+        "validTransitions includes archivable and designing",
+        "AND availableTransitions includes archivable and designing"
+      ]
+    },
+    {
+      "requirement": "Archiving escape transitions in lifecycle verdict",
+      "name": "Incomplete restore recommends designing escape",
+      "given": [
+        "a change in archiving state",
+        "AND the latest archive-failed event has commitStarted: true",
+        "AND batch restore did not complete successfully"
+      ],
+      "when": ["LifecycleEngine.evaluate runs"],
+      "then": ["nextAction recommends transition to designing for manual recovery"]
+    },
+    {
       "requirement": "Review summary integration",
       "name": "Overlap conflict detection from history",
       "given": [
@@ -181,8 +208,8 @@
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:9f3b3d415aa2a0f3af252fd2abc5005cab89b6542c288cd60ba20c22669253b9",
-    "verify.md": "sha256:f6bfaf4c2d33feb1afaf5a1e0ecdce642ba1ee2a08645072d6acb7c0423e6400"
+    "spec.md": "sha256:55f5980387125a4f5647c5d3f534404d8068c2ff4dce35ac5605cbdd7e3071c9",
+    "verify.md": "sha256:5cd035c7607622ac483c5cf53c50f70eb37369d2c4a3681ab486ef6b4f3c9658"
   },
   "generatedBy": "core"
 }

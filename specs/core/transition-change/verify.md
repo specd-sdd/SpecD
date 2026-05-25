@@ -210,6 +210,22 @@
 - **AND** all artifact files are downgraded to `pending-review`
 - **AND** any active spec approval is cleared
 
+### Requirement: Transition from archiving to archivable
+
+#### Scenario: Manual transition from archiving to archivable succeeds
+
+- **GIVEN** a change in `archiving` state
+- **WHEN** `TransitionChange.execute` is called with `to: 'archivable'`
+- **THEN** the change transitions to `archivable`
+- **AND** archive workflow hooks for `archivable` are not executed
+
+#### Scenario: Transition from archiving to designing downgrades artifacts
+
+- **GIVEN** a change in `archiving` state with validated artifacts
+- **WHEN** `TransitionChange.execute` is called with `to: 'designing'`
+- **THEN** the change transitions to `designing`
+- **AND** artifact files are downgraded for review
+
 ### Requirement: Post-hook execution
 
 #### Scenario: Post hooks run for the source state, not the target

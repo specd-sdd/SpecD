@@ -59,6 +59,23 @@
 - **THEN** the blocker is downgraded to a warning
 - **AND** `isPermitted` for the target step is `true`
 
+### Requirement: Archiving escape transitions in lifecycle verdict
+
+#### Scenario: Archiving exposes archivable and designing transitions
+
+- **GIVEN** a change in `archiving` state with no blocking restore failure
+- **WHEN** `LifecycleEngine.evaluate` runs
+- **THEN** `validTransitions` includes `archivable` and `designing`
+- **AND** `availableTransitions` includes `archivable` and `designing`
+
+#### Scenario: Incomplete restore recommends designing escape
+
+- **GIVEN** a change in `archiving` state
+- **AND** the latest `archive-failed` event has `commitStarted: true`
+- **AND** batch restore did not complete successfully
+- **WHEN** `LifecycleEngine.evaluate` runs
+- **THEN** `nextAction` recommends transition to `designing` for manual recovery
+
 ### Requirement: Review summary integration
 
 #### Scenario: Overlap conflict detection from history

@@ -1869,4 +1869,79 @@ describe('TransitionChange', () => {
       expect(result.change.activeSpecApproval).toBeDefined()
     })
   })
+
+  describe('given a change in archiving state', () => {
+    it('transitions to archivable without running archive hooks', async () => {
+      const createdAt = new Date('2024-01-01T00:00:00Z')
+      const change = makeChangeInState('my-change', [
+        {
+          type: 'created',
+          at: createdAt,
+          by: actor,
+          specIds: ['auth/login'],
+          schemaName: 'test-schema',
+          schemaVersion: 1,
+        },
+        { type: 'transitioned', from: 'archivable', to: 'archiving', at: createdAt, by: actor },
+      ])
+      const hooks = makeRunStepHooks({
+        execute: vi.fn().mockResolvedValue({ hooks: [], success: true, failedHook: null }),
+      })
+      const uc = makeUseCase(makeChangeRepository([change]), { runStepHooks: hooks })
+
+      const result = await uc.execute({
+        name: 'my-change',
+        to: 'archivable',
+        approvalsSpec: false,
+        approvalsSignoff: false,
+      })
+
+      expect(result.change.state).toBe('archivable')
+      expect(hooks.execute).not.toHaveBeenCalled()
+    })
+
+    it('transitions from archiving to designing and downgrades artifacts', async () => {
+      const createdAt = new Date('2024-01-01T00:00:00Z')
+      const change = makeChangeInState('my-change', [
+        {
+          type: 'created',
+          at: createdAt,
+          by: actor,
+          specIds: ['auth/login'],
+          schemaName: 'test-schema',
+          schemaVersion: 1,
+        },
+        { type: 'transitioned', from: 'archivable', to: 'archiving', at: createdAt, by: actor },
+      ])
+      change.setArtifact(
+        new ChangeArtifact({
+          type: 'proposal',
+          files: new Map([
+            [
+              'proposal',
+              new ArtifactFile({
+                key: 'proposal',
+                filename: 'proposal.md',
+                status: 'complete',
+              }),
+            ],
+          ]),
+        }),
+      )
+      const repo = makeChangeRepository([change])
+      const uc = makeUseCase(repo)
+
+      const result = await uc.execute({
+        name: 'my-change',
+        to: 'designing',
+        approvalsSpec: false,
+        approvalsSignoff: false,
+      })
+
+      expect(result.change.state).toBe('designing')
+      expect(result.change.getArtifact('proposal')?.files.get('proposal')?.status).toBe(
+        'pending-review',
+      )
+    })
+  })
 })

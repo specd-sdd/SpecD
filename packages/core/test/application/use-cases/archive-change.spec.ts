@@ -1045,11 +1045,14 @@ describe('ArchiveChange', () => {
       expect(archiveSpy).not.toHaveBeenCalled()
 
       const persisted = await repo.get('my-change')
-      const lastEvent = persisted?.history.at(-1)
-      expect(lastEvent?.type).toBe('archive-failed')
-      if (lastEvent?.type === 'archive-failed') {
-        expect(lastEvent.step).toBe('commit')
-        expect(lastEvent.commitStarted).toBe(true)
+      expect(persisted?.state).toBe('archivable')
+      const lastArchiveFailure = persisted?.history
+        .filter((event) => event.type === 'archive-failed')
+        .at(-1)
+      expect(lastArchiveFailure?.type).toBe('archive-failed')
+      if (lastArchiveFailure?.type === 'archive-failed') {
+        expect(lastArchiveFailure.step).toBe('commit')
+        expect(lastArchiveFailure.commitStarted).toBe(true)
       }
     })
   })
@@ -2554,13 +2557,15 @@ describe('ArchiveChange', () => {
   })
 
   describe('archiving state transition', () => {
-    it('transitions change to archiving before pre-hooks execute', async () => {
+    it('keeps change archivable during pre-hooks', async () => {
       const change = makeArchivableChange('my-change')
       const repo = makeChangeRepository([change])
       let stateAtHookTime: string | undefined
       const hookSpy = makeRunStepHooks({
-        execute: async (_input: RunStepHooksInput): Promise<RunStepHooksResult> => {
-          stateAtHookTime = repo.store.get('my-change')?.state
+        execute: async (input: RunStepHooksInput): Promise<RunStepHooksResult> => {
+          if (input.phase === 'pre') {
+            stateAtHookTime = repo.store.get('my-change')?.state
+          }
           return { hooks: [], success: true, failedHook: null }
         },
       })
@@ -2578,10 +2583,10 @@ describe('ArchiveChange', () => {
       )
 
       await uc.execute({ name: 'my-change' })
-      expect(stateAtHookTime).toBe('archiving')
+      expect(stateAtHookTime).toBe('archivable')
     })
 
-    it('persists the initial archiving transition through ChangeRepository.mutate', async () => {
+    it('transitions to archiving via mutate after preflight and before publication', async () => {
       const change = makeArchivableChange('my-change')
       const repo = makeChangeRepository([change])
       const mutateSpy = vi.spyOn(repo, 'mutate')
@@ -2600,8 +2605,13 @@ describe('ArchiveChange', () => {
 
       await uc.execute({ name: 'my-change' })
 
-      expect(mutateSpy).toHaveBeenCalledOnce()
-      expect(mutateSpy).toHaveBeenCalledWith('my-change', expect.any(Function))
+      expect(mutateSpy.mock.calls.some((call) => call[0] === 'my-change')).toBe(true)
+      const archivingMutate = mutateSpy.mock.calls.find((call) => {
+        const draft = makeArchivableChange('my-change')
+        const updated = call[1](draft) as Change
+        return updated.state === 'archiving'
+      })
+      expect(archivingMutate).toBeDefined()
     })
   })
 

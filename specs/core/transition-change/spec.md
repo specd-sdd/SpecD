@@ -104,7 +104,7 @@ If verification concludes that the artifacts must change, or that new tasks are 
 
 ### Requirement: Transition to designing from any state
 
-Every state except `drafting` SHALL include `designing` as a valid transition target. This allows the user to return to the design phase at any point in the lifecycle when issues are discovered.
+Every state except `drafting` SHALL include `designing` as a valid transition target. This includes `archiving`. This allows the user to return to the design phase at any point in the lifecycle when issues are discovered, including after a failed archive commit or incomplete batch restore.
 
 When the effective target is `designing` and the change is **not already in** `designing` or `drafting`, the use case MUST:
 
@@ -117,6 +117,14 @@ When the effective target is `designing` and the change is **not already in** `d
 When the change is **already in** `designing` (a `designing → designing` transition) or in `drafting` (the natural first entry), the use case MUST NOT invalidate approvals, downgrade artifacts, or call `invalidate()`. It MUST proceed directly with the transition via `change.transition('designing', actor)`.
 
 Drift detection (artifact content changes) is handled independently at the repository layer and is not affected by this rule.
+
+### Requirement: Transition from archiving to archivable
+
+`TransitionChange` MUST permit `archiving → archivable` when the transition is valid in `VALID_TRANSITIONS`.
+
+This transition is primarily used for manual recovery after a failed archive attempt once canonical storage has been restored to a known-good state. It MUST NOT run archive hooks or workflow `requires` checks associated with the `archivable` step — it is a lifecycle rollback, not re-entry into archive preparation.
+
+Automatic invocation of this transition after failed archive commits is owned by `ArchiveChange`, not by callers of `TransitionChange`.
 
 ### Requirement: Pre-hook execution
 

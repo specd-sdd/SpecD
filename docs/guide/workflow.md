@@ -29,7 +29,8 @@ In practice, you type `/specd` and the skill figures out where you are, what to 
 ```
                         ┌──────────────────────────────────────────────────────┐
                         │    redesign — transition back to designing            │
-                        │    available from any active state except archiving   │
+                        │    available from any active state (including        │
+                        │    archiving when recovery is needed)               │
                         └──────────────────────────────────────────────────────┘
                                               ↑
 drafting → designing ⇄ ready ─────────────────────────────────── → implementing ⇄ verifying → done ──────────────────────── → archivable → archiving
@@ -167,39 +168,39 @@ A human has reviewed and signed off the completed change.
 
 The change is ready to be archived.
 
-- **What it means:** All gates have been passed. The change is queued for the archive operation.
+- **What it means:** All gates have been passed. The change can run the archive operation.
 - **What you do:** Run `specd changes archive <name>` to perform the archive.
-- **Transition out:** `archiving` (via the archive command), or back to `designing` (redesign — last chance before permanent record).
-- **What can block it:** Nothing prevents the transition to `archiving` at this point.
+- **Transition out:** `archiving` (only after archive preflight succeeds and canonical publication is about to start — see [Archiving](#archiving)), or back to `designing` (redesign).
+- **What can block it:** Archive pre-hooks, overlap/read-only guards, or preflight failures keep the change here (the archive command does not transition to `archiving` until commit preparation has passed).
 
 ---
 
 ### `archiving`
 
-The archive operation is in progress or has completed. This is the terminal state.
+The change is in the archive **commit phase** (canonical publication, archive move, and post-archive work), or it completed successfully and was moved to the archive directory.
 
-- **What it means:** Spec artifacts have been synced to the spec repository, metadata has been generated, and the change directory has been moved to the archive. The change is now a permanent historical record.
-- **What you do:** Nothing — this is the end of the lifecycle. The archived change becomes an `ArchivedChange` record and is not modified further.
-- **Transition out:** None. `archiving` is terminal. No transitions out are valid.
+- **What it means:** While `specd changes archive` is running, the change transitions to `archiving` immediately before the first spec publication, after guards, pre-archive hooks, orphan detection, and batch snapshot. If publication or the archive move fails and batch restore succeeds, the change returns to `archivable` so you can fix the problem and retry. If restore is incomplete, the change stays in `archiving` until you recover manually.
+- **What you do:** If archive failed and the change is back in `archivable`, review restored specs and run `specd changes archive <name>` again. If the change is stuck in `archiving` after a partial restore, use `specd changes transition <name> designing` to revise artifacts, or `specd changes transition <name> archivable` after you have manually restored canonical specs (lifecycle rollback only — no archive hooks).
+- **Transition out:** `archivable` (recovery after a failed commit when canonical storage was restored), `designing` (manual escape to revise specs/deltas), or none after a **successful** archive (the change directory is moved to the archive and is no longer an active change).
 
 ---
 
 ## Full transition table
 
-| From                    | To                                                   |
-| ----------------------- | ---------------------------------------------------- |
-| `drafting`              | `designing`                                          |
-| `designing`             | `ready`, `designing`                                 |
-| `ready`                 | `implementing`, `pending-spec-approval`, `designing` |
-| `pending-spec-approval` | `spec-approved`, `designing`                         |
-| `spec-approved`         | `implementing`, `designing`                          |
-| `implementing`          | `verifying`, `designing`                             |
-| `verifying`             | `implementing`, `done`, `designing`                  |
-| `done`                  | `archivable`, `pending-signoff`, `designing`         |
-| `pending-signoff`       | `signed-off`, `designing`                            |
-| `signed-off`            | `archivable`, `designing`                            |
-| `archivable`            | `archiving`, `designing`                             |
-| `archiving`             | _(terminal — no valid transitions)_                  |
+| From                    | To                                                                                                          |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `drafting`              | `designing`                                                                                                 |
+| `designing`             | `ready`, `designing`                                                                                        |
+| `ready`                 | `implementing`, `pending-spec-approval`, `designing`                                                        |
+| `pending-spec-approval` | `spec-approved`, `designing`                                                                                |
+| `spec-approved`         | `implementing`, `designing`                                                                                 |
+| `implementing`          | `verifying`, `designing`                                                                                    |
+| `verifying`             | `implementing`, `done`, `designing`                                                                         |
+| `done`                  | `archivable`, `pending-signoff`, `designing`                                                                |
+| `pending-signoff`       | `signed-off`, `designing`                                                                                   |
+| `signed-off`            | `archivable`, `designing`                                                                                   |
+| `archivable`            | `archiving`, `designing`                                                                                    |
+| `archiving`             | `archivable`, `designing` _(active change only; successful archive removes the change from the active set)_ |
 
 ---
 
@@ -246,7 +247,7 @@ When a redesign transition occurs:
 
 Redesign also happens automatically when spec IDs are updated (`cause: 'spec-change'`) or when artifact content changes after an approval was recorded (`cause: 'artifact-change'`).
 
-The only state from which redesign is not possible is `archiving` — once archiving has begun, the change is a permanent record.
+Redesign from `archiving` is allowed via `specd changes transition <name> designing` (artifacts are downgraded for review). Use this when batch restore failed partially or you need to change deltas before retrying archive. After a **successful** archive, the change is no longer active — create a new change instead.
 
 ---
 
@@ -438,22 +439,58 @@ specd changes discard add-auth --reason "No longer needed" --force
 
 ## Archiving
 
-Archiving is the final operation in the lifecycle. When you run:
+Archiving is the final operation in the lifecycle. The change must be in `archivable`. When you run:
 
 ```bash
 specd changes archive <name>
 ```
 
-specd performs the following steps:
+### Phases and lifecycle state
 
-1. **Spec sync:** For every new spec file in the change's `specs/` directory, the file is copied to the spec repository. For every delta file in `deltas/`, the delta operations are applied to the existing spec in the repository.
-2. **Metadata generation:** Spec metadata (`metadata.yaml`) is generated from the spec content — extracting titles, descriptions, requirements, and scenarios defined by the schema's `metadataExtraction` configuration.
-3. **Archive record:** The change directory is moved to the archive. An `ArchivedChange` record is created with the change name, the archiving timestamp, and the spec IDs that were part of the change.
-4. **History preserved:** The complete change history — all events including transitions, approvals, and artifact hashes — is preserved in the archive as a permanent audit trail.
+The change stays in **`archivable`** through early archive work (schema guard, overlap/read-only checks, pre-archive hooks, and full-batch preflight). It moves to **`archiving`** only immediately before the first canonical spec publication, after orphan backup detection and a per-spec batch snapshot under `.specd-archive-backup/` in each affected spec directory.
 
-After archiving, the specs in the spec repository reflect the new requirements introduced or modified by the change. Downstream consumers, other changes, and AI agents reading the spec repository will see the updated content.
+| Phase                                | Lifecycle state | On failure                                                                                |
+| ------------------------------------ | --------------- | ----------------------------------------------------------------------------------------- |
+| Guards, pre-archive hooks, preflight | `archivable`    | Stays `archivable`; no backup dirs                                                        |
+| Orphan detection + batch snapshot    | `archivable`    | Stays `archivable` (matching orphan: auto-restore + abort with guidance)                  |
+| Canonical publication + archive move | `archiving`     | Batch restore; `→ archivable` if restore succeeds, stay `archiving` if restore is partial |
+| Metadata + post-archive hooks        | `archiving`     | Archive already committed; failures are reported but do not roll back specs               |
 
-The `archiving` state is terminal. Once a change reaches `archiving`, it cannot be transitioned to any other state. If you realise you need to rework something after archiving, you create a new change.
+Pre-archive hooks use the workflow step name `archiving`; they do **not** require the change to already be in lifecycle state `archiving`.
+
+### Commit steps (after transition to `archiving`)
+
+1. **Canonical publication:** For each spec in the batch, delta artifacts are merged into the base spec in the repository (or full spec files are copied). Publication is staged per spec; created files are recorded for restore.
+2. **Archive move:** The change directory is moved to the archive. An `ArchivedChange` record is created with the change name, timestamp, and spec IDs.
+3. **Backup cleanup:** `.specd-archive-backup/` directories are removed after a successful commit.
+4. **Metadata generation:** Persisted `metadata.json` is written **after** the archive move (in-memory preflight checks still run earlier).
+5. **Post-archive hooks:** Optional hooks configured for the `archiving` workflow step.
+
+### Batch restore and retry
+
+If publication fails partway through a multi-spec batch, specd restores already-published specs from the batch backup (reverse publication order) and rolls the change back to **`archivable`** when restore completes. Retry archive merges deltas against the restored canonical base — not against partially merged content.
+
+If restore cannot complete for every spec, the change remains in **`archiving`**. `specd changes status` recommends transitioning to **`designing`** for manual recovery.
+
+### Orphan backups
+
+If `.specd-archive-backup/` already exists when archive starts:
+
+- **Same change name** in the manifest: canonical specs are auto-restored, the backup is removed, and the current archive attempt aborts (review and retry).
+- **Different change name**: archive aborts with a repair message; live files are not overwritten.
+
+### Recovery transitions from `archiving`
+
+| Transition               | Purpose                                                                                                             |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------- |
+| `archiving → archivable` | Lifecycle rollback after you fixed canonical specs manually; does not re-run archive hooks                          |
+| `archiving → designing`  | Revise change artifacts (downgrades files to `pending-review`); use after partial restore or when specs need rework |
+
+Transitions to `implementing`, `verifying`, or `done` from `archiving` are not valid.
+
+### After a successful archive
+
+Specs in the repository reflect the merged requirements. The change history is preserved under `.specd/archive/`. To rework merged specs, open a **new** change — the archived record is not transitioned back.
 
 ---
 
