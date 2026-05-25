@@ -1,0 +1,53 @@
+- op: added
+  description: Scenarios for conditional status and updatedAt exposure
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Accepts a change name as input'
+  content: |
+    ### Requirement: Optional ifModifiedSince short-circuit
+
+    #### Scenario: Matching revision returns unchanged
+
+    - **GIVEN** change `foo` has `updatedAt` `2026-05-25T10:00:00.000Z`
+    - **WHEN** `GetStatus` runs with `ifModifiedSince` equal to that timestamp
+    - **THEN** result includes `unchanged: true`
+    - **AND** full artifact DAG is not built
+
+    #### Scenario: Newer change returns full status
+
+    - **GIVEN** disk manifest `updatedAt` is newer than client `ifModifiedSince`
+    - **WHEN** `GetStatus` executes
+    - **THEN** `unchanged` is false or omitted
+    - **AND** full status payload including artifact DAG is returned
+
+    #### Scenario: Omitted ifModifiedSince always builds DAG
+
+    - **WHEN** `GetStatus` runs without `ifModifiedSince`
+    - **THEN** full status is computed
+    - **AND** `unchanged` is not set to true
+
+    ### Requirement: Exposes updatedAt
+
+    #### Scenario: Status projection includes updatedAt
+
+    - **WHEN** `GetStatus` returns a full status payload
+    - **THEN** change projection includes ISO `updatedAt`
+    - **AND** value matches manifest revision clock
+
+    #### Scenario: Short-circuit still returns updatedAt
+
+    - **GIVEN** `ifModifiedSince` matches current revision
+    - **WHEN** short-circuit path runs
+    - **THEN** result still includes `updatedAt`
+    - **AND** client can store it for next poll
+
+    #### Scenario: API presenter forwards updatedAt unchanged
+
+    - **GIVEN** kernel status includes `updatedAt`
+    - **WHEN** API maps to change status DTO
+    - **THEN** DTO `updatedAt` equals kernel value
+    - **AND** Studio tab poll can compare revisions

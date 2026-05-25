@@ -1,0 +1,21 @@
+- op: added
+  description: Conditional status poll via updatedAt
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Accepts a change name as input'
+  content: |
+    ### Requirement: Optional ifModifiedSince short-circuit
+
+    `GetStatusInput` MAY include **`ifModifiedSince`** (ISO 8601).
+
+    When provided and it is greater than or equal to the change's current **`updatedAt`**, `execute()` MUST return a result that includes at least `updatedAt` and **`unchanged: true`** without building the full artifact DAG.
+
+    When the change is newer than `ifModifiedSince`, `unchanged` MUST be false or omitted and the full status payload MUST be returned.
+
+    ### Requirement: Exposes updatedAt
+
+    `GetStatusResult` MUST expose the change's **`updatedAt`** on the change projection so API, CLI, and Studio share one revision clock for tab polling.
