@@ -1,0 +1,198 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+    --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+    --radius: 0.375rem;
+
+    --studio-bg-primary: #0d1117;
+    --studio-bg-secondary: #161b22;
+    --studio-bg-elevated: #1c2128;
+    --studio-border: #30363d;
+    --studio-text: #e6edf3;
+    --studio-text-muted: #8b949e;
+    --studio-text-disabled: #6e7681;
+    --studio-accent-selection: #58a6ff;
+    --studio-accent-focus: #1f6feb;
+    --studio-success: #3fb950;
+    --studio-warning: #d29922;
+    --studio-error: #f85149;
+    --studio-lifecycle: #a371f7;
+    --studio-info: #39c5cf;
+    --studio-editor: #111827;
+    --studio-radius-sm: 4px;
+    --studio-radius-md: 8px;
+    --studio-motion-fast: 150ms;
+
+    --background: 220 13% 9%;
+    --foreground: 210 17% 82%;
+    --muted: 220 10% 14%;
+    --muted-foreground: 215 10% 55%;
+    --border: 220 10% 18%;
+    --input: 220 10% 16%;
+    --ring: 212 92% 55%;
+    --primary: 212 92% 55%;
+    --primary-foreground: 210 40% 98%;
+    --accent: 220 10% 16%;
+    --accent-foreground: 210 17% 82%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 210 40% 98%;
+    --panel: 220 13% 11%;
+    --panel-header: 220 12% 13%;
+    --editor: 220 15% 7%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans text-base antialiased;
+  }
+}
+
+@layer components {
+  .studio-panel {
+    @apply bg-panel flex min-h-0 min-w-0 flex-col;
+  }
+
+  .studio-sidebar-stack {
+    @apply flex min-h-0 flex-1 flex-col gap-2 p-2;
+  }
+
+  .studio-sidebar-pane {
+    @apply bg-background/35 flex min-h-0 flex-col overflow-hidden rounded-md border border-border;
+  }
+
+  .studio-panel-header {
+    @apply border-b border-border bg-panel-header px-2 py-1 text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground;
+  }
+
+  .studio-tab {
+    @apply border-r border-border px-2 py-1 text-xs text-muted-foreground transition-colors duration-150 hover:bg-background/60 hover:text-foreground;
+  }
+
+  .studio-tab-active {
+    @apply studio-tab bg-background/70 text-foreground;
+  }
+
+  .studio-resize-handle {
+    @apply bg-border/60 transition-colors duration-150 hover:bg-primary/40;
+  }
+
+  .studio-sidebar-row {
+    @apply flex w-full items-center gap-2 rounded-md border-l-2 border-transparent px-2 py-1.5 text-left text-xs text-muted-foreground transition-colors duration-150 hover:bg-background/60 hover:text-foreground;
+  }
+
+  .studio-sidebar-row-active {
+    @apply border-l-[color:var(--studio-accent-selection)] bg-background/80 text-foreground;
+  }
+
+  .studio-card {
+    @apply rounded-md border border-border bg-background/40;
+  }
+
+  .studio-badge {
+    @apply inline-flex items-center rounded-sm border border-border bg-background/60 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground;
+  }
+
+  .studio-bottom-tab {
+    @apply border-r border-border px-2 py-1 text-xs text-muted-foreground transition-colors duration-150 hover:bg-background/60 hover:text-foreground;
+  }
+
+  .studio-bottom-tab-active {
+    @apply studio-bottom-tab bg-background/70 text-foreground;
+  }
+
+  .studio-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(139, 148, 158, 0.42) transparent;
+  }
+
+  .studio-scrollbar::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  .studio-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .studio-scrollbar::-webkit-scrollbar-thumb {
+    border: 2px solid transparent;
+    border-radius: 999px;
+    background-clip: padding-box;
+    background-color: rgba(139, 148, 158, 0.42);
+  }
+
+  .studio-scrollbar::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(139, 148, 158, 0.62);
+  }
+
+  .studio-scrollbar::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  .studio-markdown-preview h1 {
+    @apply mb-3 mt-4 text-2xl font-semibold text-foreground;
+  }
+
+  .studio-markdown-preview h2 {
+    @apply mb-2 mt-3 text-xl font-semibold text-foreground;
+  }
+
+  .studio-markdown-preview h3 {
+    @apply mb-2 mt-2 text-lg font-semibold text-foreground;
+  }
+
+  .studio-markdown-preview p {
+    @apply mb-2 leading-relaxed text-muted-foreground;
+  }
+
+  .studio-markdown-preview ul,
+  .studio-markdown-preview ol {
+    @apply mb-2 ml-4 list-outside text-muted-foreground;
+  }
+
+  .studio-markdown-preview ul {
+    @apply list-disc;
+  }
+
+  .studio-markdown-preview ol {
+    @apply list-decimal;
+  }
+
+  .studio-markdown-preview code {
+    @apply rounded bg-background/80 px-1 py-0.5 font-mono text-[11px] text-foreground;
+  }
+
+  .studio-markdown-preview pre {
+    @apply mb-2 overflow-x-auto rounded border border-border bg-background/60 p-2;
+  }
+
+  .studio-markdown-preview pre code {
+    @apply bg-transparent p-0;
+  }
+
+  .studio-markdown-preview a {
+    @apply text-primary underline-offset-2 hover:underline;
+  }
+
+  .studio-markdown-preview table {
+    @apply mb-2 w-full border-collapse text-xs;
+  }
+
+  .studio-markdown-preview th,
+  .studio-markdown-preview td {
+    @apply border border-border px-2 py-1 text-left;
+  }
+}
