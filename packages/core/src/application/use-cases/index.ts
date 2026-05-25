@@ -62,6 +62,16 @@ export {
   type ReviewSummary,
   type ReviewOverlapEntry,
 } from './get-status.js'
+export {
+  type SaveChangeArtifact,
+  type SaveChangeArtifactInput,
+  type SaveChangeArtifactResult,
+} from './save-change-artifact.js'
+export {
+  type GetChangeArtifact,
+  type GetChangeArtifactInput,
+  type GetChangeArtifactResult,
+} from './get-change-artifact.js'
 export { type ImplementationTrackingProjection } from './_shared/implementation-tracking.js'
 export {
   type GetImplementationReview,
@@ -108,6 +118,12 @@ export {
   type ValidationFileStatus,
   type ValidationWarning,
 } from './validate-artifacts.js'
+export {
+  type ValidateChangeBatch,
+  type ValidateChangeBatchInput,
+  type ValidateChangeBatchResult,
+  type ValidateChangeBatchStepResult,
+} from './validate-change-batch.js'
 export {
   type CompileContext,
   type CompileContextInput,
@@ -172,3 +188,17 @@ export {
   type PreviewSpecResult,
   type PreviewSpecFileEntry,
 } from './preview-spec.js'
+export {
+  outlineArtifactContent,
+  type OutlineArtifactContentResult,
+} from './outline-artifact-content.js'
+export {
+  OutlineChangeArtifact,
+  type OutlineChangeArtifactInput,
+} from './outline-change-artifact.js'
+export {
+  ReadLog,
+  type ReadLogInput,
+  type ReadLogResult,
+  type ReadLogEntryDto,
+} from './read-log.js'
