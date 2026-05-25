@@ -1,14 +1,11 @@
-import { SpecNotFoundError, SpecPath } from '@specd/core'
+import { type Change, SpecNotFoundError, SpecPath } from '@specd/core'
 import { type FastifyInstance, type FastifyRequest } from 'fastify'
-import { type ApiContext } from '../../composition/create-api-context.js'
+import { type ApiContext } from '../../../composition/create-api-context.js'
 import { apiHandler } from '../handler-utils.js'
 import { toSpecDetailDto, toSpecSummaryDto } from '../presenters/presenter-spec.js'
 import { toArtifactContentDto } from '../presenters/presenter-artifact.js'
 
-async function handleWorkspaceSpecWildcard(
-  ctx: ApiContext,
-  req: FastifyRequest,
-): Promise<unknown> {
+async function handleWorkspaceSpecWildcard(ctx: ApiContext, req: FastifyRequest): Promise<unknown> {
   const { ws } = req.params as { ws: string }
   const wildcard = (req.params as { '*': string })['*']
   const segments = wildcard.split('/').filter(Boolean)
@@ -58,9 +55,7 @@ async function handleWorkspaceSpecWildcard(
     const path = segments.slice(0, -1).join('/')
     const query = req.query as { filename?: string; artifactId?: string }
     const body =
-      req.method === 'POST'
-        ? ((req.body ?? {}) as { content?: string; filename?: string })
-        : {}
+      req.method === 'POST' ? ((req.body ?? {}) as { content?: string; filename?: string }) : {}
     const filename = body.filename ?? query.filename
     return ctx.kernel.specs.getOutline.execute({
       workspace: ws,
@@ -92,7 +87,7 @@ async function handleWorkspaceSpecWildcard(
   }
   const { spec, artifacts } = got
   const active = await ctx.kernel.changes.list.execute()
-  const linked = active.filter((c) => c.specIds.includes(specId)).map((c) => c.name)
+  const linked = active.filter((c: Change) => c.specIds.includes(specId)).map((c: Change) => c.name)
   const meta = await ctx.kernel.specs.repos.get(ws)?.metadata(spec)
   return toSpecDetailDto(
     {
