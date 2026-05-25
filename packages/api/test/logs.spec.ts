@@ -40,9 +40,7 @@ describe('project logs and studio output', () => {
   })
 
   it('POST /v1/logs does not append to studio output', async () => {
-    const { data: before } = await apiJson<{ entries: { id: string }[] }>(
-      '/studio/output?limit=50',
-    )
+    const { data: before } = await apiJson<{ entries: { id: string }[] }>('/studio/output?limit=50')
     const countBefore = before.entries.length
 
     const { res: postRes } = await apiJson<{ ok: true }>('/logs', {
@@ -56,9 +54,9 @@ describe('project logs and studio output', () => {
     })
     expect(postRes.status).toBe(200)
 
-    const { data: after } = await apiJson<{ entries: { id: string }[] }>(
-      '/studio/output?limit=50',
-    )
+    const { data: after } = await apiJson<{
+      entries: { id: string; message: string }[]
+    }>('/studio/output?limit=50')
     expect(after.entries.length).toBe(countBefore)
     expect(after.entries.some((e) => e.message === 'only-in-logs')).toBe(false)
   })

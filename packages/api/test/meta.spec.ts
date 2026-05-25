@@ -14,7 +14,8 @@ describe('API meta', () => {
     expect(res.ok).toBe(true)
     expect(data.openapi).toBe('3.1.0')
     expect(data.info).toBeDefined()
-    const paths = data.paths as Record<string, unknown>
+    type OpenApiPathItem = { post?: unknown }
+    const paths = data.paths as Record<string, OpenApiPathItem | undefined>
     expect(paths['/changes/{name}/preview']?.post).toBeDefined()
     expect(paths['/changes/{name}/artifacts/{filename}/outline']?.post).toBeDefined()
     expect(paths['/workspaces/{ws}/specs/{specPath}/outline']?.post).toBeDefined()
