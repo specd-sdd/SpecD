@@ -1,0 +1,36 @@
+{
+  "name": "@specd/studio-desktop",
+  "version": "0.0.0",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "main": "dist/main/index.js",
+  "scripts": {
+    "build:main": "tsup src/main/index.ts --format esm --platform node --target node20 --out-dir dist/main --clean",
+    "build:preload": "tsup src/preload/bridge.ts --format cjs --platform node --target node20 --out-dir dist/preload --no-dts",
+    "build:renderer": "vite build -c vite.renderer.config.ts",
+    "build": "pnpm build:main && pnpm build:preload && pnpm build:renderer",
+    "dev:renderer": "vite dev -c vite.renderer.config.ts",
+    "start": "electron .",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.renderer.json",
+    "test": "vitest run --passWithNoTests",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@specd/client": "workspace:*",
+    "@specd/core": "workspace:*",
+    "@specd/ui": "workspace:*",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.23",
+    "@types/react-dom": "^18.3.7",
+    "@vitejs/plugin-react": "^4.5.2",
+    "electron": "^36.4.0",
+    "tsup": "^8.4.0",
+    "typescript": "^5.7.0",
+    "vite": "^6.3.5",
+    "vitest": "^3.0.0"
+  }
+}
