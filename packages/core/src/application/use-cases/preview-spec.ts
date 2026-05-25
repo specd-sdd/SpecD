@@ -15,6 +15,11 @@ export interface PreviewSpecInput {
   readonly name: string
   /** The fully-qualified spec ID to preview (e.g. `core:core/compile-context`). */
   readonly specId: string
+  /**
+   * Unsaved change-directory filenames → content.
+   * Overrides disk content for matching files during preview (Studio draft).
+   */
+  readonly artifactOverrides?: Readonly<Record<string, string>>
 }
 
 /** A single artifact file in the preview result. */
@@ -132,7 +137,11 @@ export class PreviewSpec {
           continue
         }
 
-        const content = await this._changes.artifact(change, file.filename)
+        const override = input.artifactOverrides?.[file.filename]
+        const content =
+          override !== undefined
+            ? { content: override }
+            : await this._changes.artifact(change, file.filename)
         if (content === null) {
           const baseArtifact =
             spec !== null && specRepo !== undefined
