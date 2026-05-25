@@ -32,6 +32,7 @@ modified.
 - Every meaningful change must go through a specd change workflow; there is no "code-only" path
 - Specs are the source of truth and implementation follows specs, not the other way around
 - Do not write directly into `specs/` as an ad hoc edit; create or continue a change and let the workflow own the spec artifacts
+- Add or remove specs from a change scope **only** via CLI: `node packages/cli/dist/index.js change edit <name> --add-spec <workspace:path>` (repeat `--add-spec` per id). Do not edit `manifest.json` `specIds` by hand for scope changes
 - Before implementing, confirm whether an existing spec already covers the behaviour; if not, create or extend the relevant spec as part of the change
 - When project or change context is available through specd, load it and follow it before making decisions
 
