@@ -338,66 +338,24 @@ async function executeBatch(
     return
   }
 
-  const activeSchema = await kernel.specs.getActiveSchema.execute()
-  if (activeSchema.raw) {
-    cliError('Active schema resolution returned raw data unexpectedly', opts.format)
-  }
-  const schema = activeSchema.schema
-  const dag = schema.artifactDag()
+  const batch = await kernel.changes.validateBatch.execute({
+    name,
+    ...(opts.artifact !== undefined ? { artifactId: opts.artifact } : {}),
+  })
 
-  const results: Array<{
-    spec: string | null
-    artifact: string
-    passed: boolean
-    failures: ValidateFailure[]
-    warnings: ValidateNote[]
-    files: readonly ValidationFileEntry[]
-  }> = []
+  const results = batch.results.map((step) => ({
+    spec: step.spec,
+    artifact: step.artifact,
+    passed: step.passed,
+    failures: step.failures,
+    warnings: step.warnings.map((w) => ({
+      artifactId: w.artifactId,
+      description: w.description,
+    })),
+    files: step.files,
+  }))
 
-  for (const artifactId of dag.topologicalOrder()) {
-    if (opts.artifact !== undefined && artifactId !== opts.artifact) continue
-
-    const artifactType = schema.artifact(artifactId)
-    if (artifactType === null) continue
-
-    if (artifactType.scope === 'change') {
-      const result = toValidateResult(
-        await kernel.changes.validate.execute({
-          name,
-          artifactId,
-        }),
-      )
-      results.push({
-        spec: null,
-        artifact: artifactId,
-        passed: result.failures.length === 0,
-        failures: result.failures,
-        warnings: result.notes,
-        files: result.files,
-      })
-      continue
-    }
-
-    for (const specId of specIds) {
-      const result = toValidateResult(
-        await kernel.changes.validate.execute({
-          name,
-          specPath: specId,
-          artifactId,
-        }),
-      )
-      results.push({
-        spec: specId,
-        artifact: artifactId,
-        passed: result.failures.length === 0,
-        failures: result.failures,
-        warnings: result.notes,
-        files: result.files,
-      })
-    }
-  }
-
-  const allPassed = results.every((r) => r.passed)
+  const allPassed = batch.passed
   const fmt = parseFormat(opts.format)
 
   if (fmt === 'text') {
