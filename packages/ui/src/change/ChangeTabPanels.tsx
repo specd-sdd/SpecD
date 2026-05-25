@@ -1,0 +1,502 @@
+import type {
+  ChangeDetailDto,
+  ChangeHistoryEventDto,
+  ChangeStatusDto,
+} from '@specd/client'
+import { ChevronDown, ChevronRight } from 'lucide-react'
+import * as React from 'react'
+import { cn } from '../lib/cn.js'
+import { useChangeArtifact } from '../hooks/use-change-artifact.js'
+import { useChangeContext } from '../hooks/use-change-context.js'
+import { useChangeGraphView } from '../hooks/use-change-graph-view.js'
+import { useImplementationReview } from '../hooks/use-implementation-review.js'
+import { useTabScopedPollKey } from '../hooks/use-tab-scoped-poll-key.js'
+import { buildImpactViewModel, type ImpactSpecTracked } from './merge-impact-view.js'
+
+function formatHistoryActor(by: ChangeHistoryEventDto['by']): string {
+  if (by === undefined) return ''
+  if (typeof by === 'string') return by
+  if (typeof by === 'object' && 'name' in by) {
+    return by.email ? `${by.name} <${by.email}>` : by.name
+  }
+  return ''
+}
+
+const HISTORY_HEADER_KEYS = new Set(['type', 'at', 'by'])
+
+function historyEventDetailEntries(
+  event: ChangeHistoryEventDto,
+): ReadonlyArray<readonly [string, unknown]> {
+  return Object.entries(event).filter(([key]) => !HISTORY_HEADER_KEYS.has(key))
+}
+
+function formatHistoryDetailValue(value: unknown): string {
+  if (value === null || value === undefined) return '—'
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+    return String(value)
+  }
+  return JSON.stringify(value, null, 2)
+}
+
+function ChangeHistoryEventRow({
+  event,
+  index,
+  expanded,
+  onToggle,
+}: {
+  event: ChangeHistoryEventDto
+  index: number
+  expanded: boolean
+  onToggle: () => void
+}): React.ReactElement {
+  const details = historyEventDetailEntries(event)
+  const actor = formatHistoryActor(event.by)
+
+  return (
+    <li className="studio-card overflow-hidden" data-testid={`studio-event-row-${index}`}>
+      <button
+        type="button"
+        className="flex w-full items-start gap-2 px-3 py-2 text-left transition-colors duration-150 hover:bg-muted/30"
+        onClick={onToggle}
+        aria-expanded={expanded}
+      >
+        {expanded ? (
+          <ChevronDown className="mt-0.5 h-3 w-3 shrink-0 text-muted-foreground" />
+        ) : (
+          <ChevronRight className="mt-0.5 h-3 w-3 shrink-0 text-muted-foreground" />
+        )}
+        <span className="min-w-0 flex-1">
+          <span className="font-mono text-foreground">{event.type}</span>
+          <span className="text-muted-foreground"> · {event.at}</span>
+          {actor ? (
+            <span className="mt-0.5 block truncate text-[10px] text-muted-foreground">{actor}</span>
+          ) : null}
+        </span>
+      </button>
+
+      {expanded ? (
+        <div className="border-t border-border/60 bg-muted/15 px-3 py-2">
+          {event.by !== undefined ? (
+            <dl className="mb-2 grid gap-1 sm:grid-cols-[7rem_1fr]">
+              <dt className="text-muted-foreground">by</dt>
+              <dd className="font-mono text-foreground">{actor || '—'}</dd>
+            </dl>
+          ) : null}
+          {details.length === 0 ? (
+            <p className="text-[10px] text-muted-foreground">No additional fields on this event.</p>
+          ) : (
+            <dl className="space-y-2">
+              {details.map(([key, value]) => {
+                const formatted = formatHistoryDetailValue(value)
+                const multiline = formatted.includes('\n')
+                return (
+                  <div key={key}>
+                    <dt className="mb-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+                      {key}
+                    </dt>
+                    <dd
+                      className={cn(
+                        'font-mono text-foreground/90',
+                        multiline &&
+                          'studio-scrollbar max-h-40 overflow-auto whitespace-pre-wrap rounded border border-border/50 bg-background px-2 py-1 text-[10px]',
+                      )}
+                    >
+                      {formatted}
+                    </dd>
+                  </div>
+                )
+              })}
+            </dl>
+          )}
+        </div>
+      ) : null}
+    </li>
+  )
+}
+
+export function ChangeTasksTab({
+  changeName,
+  status,
+  refreshKey,
+  tabActive,
+}: {
+  changeName: string
+  status: ChangeStatusDto | undefined
+  refreshKey: number
+  tabActive: boolean
+}): React.ReactElement {
+  const pollKey = useTabScopedPollKey(tabActive, refreshKey)
+  const tasksArtifact = useChangeArtifact(changeName, 'tasks.md', pollKey, {
+    poll: tabActive,
+  })
+
+  const tasksEntry = status?.artifacts?.find((a) => a.type === 'tasks')
+
+  return (
+    <div className="min-h-0 flex-1 overflow-auto p-4 text-xs">
+      {tasksEntry ? (
+        <section className="mb-4 studio-card p-3">
+          <h2 className="mb-2 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+            Tasks artifact
+          </h2>
+          <p>
+            Status: <span className="text-foreground">{tasksEntry.displayStatus}</span>
+            {' · '}
+            {tasksEntry.files.length} file(s)
+          </p>
+          <ul className="mt-2 space-y-0.5 font-mono text-muted-foreground">
+            {tasksEntry.files.map((f) => (
+              <li key={f.key}>
+                {f.filename}
+                {f.hasDrift ? ' · drift' : ''}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      {tasksArtifact.isLoading && !tasksArtifact.data ? (
+        <div className="text-muted-foreground">Loading tasks.md…</div>
+      ) : tasksArtifact.error ? (
+        <div className="text-destructive">{tasksArtifact.error.message}</div>
+      ) : tasksArtifact.data?.content ? (
+        <pre className="studio-card overflow-auto whitespace-pre-wrap p-3 font-mono text-xs text-foreground/90">
+          {tasksArtifact.data.content}
+        </pre>
+      ) : (
+        <p className="text-muted-foreground">No tasks.md for this change yet.</p>
+      )}
+    </div>
+  )
+}
+
+export function ChangeEventsTab({
+  detail,
+  loading,
+  error,
+}: {
+  detail: ChangeDetailDto | undefined
+  loading: boolean
+  error?: Error
+}): React.ReactElement {
+  const events = detail !== undefined ? [...detail.history].reverse() : []
+  const [expandedKeys, setExpandedKeys] = React.useState<ReadonlySet<string>>(() => new Set())
+
+  const toggleEvent = (key: string) => {
+    setExpandedKeys((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
+
+  if (error) {
+    return <div className="p-3 text-xs text-destructive">{error.message}</div>
+  }
+  if (loading && !detail) {
+    return (
+      <div className="flex flex-1 items-center justify-center text-xs text-muted-foreground">
+        Loading history…
+      </div>
+    )
+  }
+  if (!detail) {
+    return (
+      <div className="flex flex-1 items-center justify-center text-xs text-muted-foreground">
+        No change detail
+      </div>
+    )
+  }
+
+  return (
+    <div
+      className="studio-scrollbar min-h-0 flex-1 overflow-auto p-4 text-xs"
+      data-testid="studio-events-tab"
+    >
+      <div className="mb-3 text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+        Lifecycle events ({events.length})
+      </div>
+      <ul className="space-y-1.5">
+        {events.map((event, i) => {
+          const rowKey = `${event.type}-${event.at}-${i}`
+          return (
+            <ChangeHistoryEventRow
+              key={rowKey}
+              event={event}
+              index={i}
+              expanded={expandedKeys.has(rowKey)}
+              onToggle={() => toggleEvent(rowKey)}
+            />
+          )
+        })}
+      </ul>
+    </div>
+  )
+}
+
+function TrackedFileList({
+  files,
+}: {
+  files: readonly { readonly file: string }[]
+}): React.ReactElement {
+  return (
+    <ul className="space-y-1 font-mono text-[10px] text-foreground/90">
+      {files.map((entry) => (
+        <li key={entry.file} className="truncate rounded border border-border/60 bg-muted/20 px-2 py-1">
+          {entry.file}
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+export function ChangeImpactTab({
+  changeName,
+  refreshKey,
+  tabActive,
+}: {
+  changeName: string
+  refreshKey: number
+  tabActive: boolean
+}): React.ReactElement {
+  const pollKey = useTabScopedPollKey(tabActive, refreshKey)
+  const graph = useChangeGraphView(changeName, { poll: tabActive, refreshKey: pollKey })
+  const review = useImplementationReview(changeName, { poll: tabActive, refreshKey: pollKey })
+
+  const loading =
+    (graph.isLoading && !graph.data) || (review.isLoading && !review.data)
+  const error = graph.error ?? review.error
+
+  if (loading) {
+    return (
+      <div className="flex flex-1 items-center justify-center text-xs text-muted-foreground">
+        Loading implementation impact…
+      </div>
+    )
+  }
+  if (error) {
+    return <div className="p-3 text-xs text-destructive">{error.message}</div>
+  }
+
+  const tracking = review.data?.implementationTracking ?? {
+    trackedFiles: [],
+    links: [],
+  }
+  const model = buildImpactViewModel(
+    tracking,
+    graph.data,
+    review.data?.specIds ?? graph.data?.specIds,
+  )
+
+  const unassignedCount =
+    model.trackedUnassigned.resolved.length +
+    model.trackedUnassigned.open.length +
+    model.trackedUnassigned.ignored.length
+
+  if (model.bySpec.length === 0 && unassignedCount === 0) {
+    return (
+      <div className="flex flex-1 items-center justify-center p-4 text-xs text-muted-foreground">
+        No implementation links, graph coverage, or tracked files for this change.
+      </div>
+    )
+  }
+
+  return (
+    <div
+      className="studio-scrollbar min-h-0 flex-1 overflow-auto p-4 text-xs"
+      data-testid="studio-impact-tab"
+    >
+      <ul className="space-y-3">
+        {model.bySpec.map((group) => (
+          <li
+            key={group.specId}
+            className="studio-card overflow-hidden"
+            data-testid={`studio-impact-spec-${group.specId.replace(/:/g, '-')}`}
+          >
+            <div className="border-b border-border bg-muted/30 px-3 py-2 font-mono text-sm text-foreground">
+              {group.specId}
+            </div>
+            <div className="space-y-3 p-3">
+              <ImpactSubsection
+                title="Accepted links"
+                count={group.accepted.length}
+                empty="No accepted links for this spec."
+              >
+                <ul className="space-y-2">
+                  {group.accepted.map((row) => (
+                    <li
+                      key={`${row.link.file}`}
+                      className="rounded border border-border/60 bg-background px-2 py-1.5"
+                    >
+                      <div className="font-mono text-foreground">{row.link.file}</div>
+                      {row.link.symbols && row.link.symbols.length > 0 ? (
+                        <p className="mt-0.5 text-[10px] text-muted-foreground">
+                          Symbols: {row.link.symbols.join(', ')}
+                        </p>
+                      ) : (
+                        <p className="mt-0.5 text-[10px] text-muted-foreground">File-level link</p>
+                      )}
+                      {row.graphFiles.length > 0 || row.graphSymbols.length > 0 ? (
+                        <p className="mt-1 text-[10px] text-muted-foreground">
+                          <span className="text-foreground/80">Graph: </span>
+                          {row.graphFiles.length > 0 ? row.graphFiles.join(', ') : null}
+                          {row.graphSymbols.length > 0
+                            ? `${row.graphFiles.length > 0 ? ' · ' : ''}${row.graphSymbols.slice(0, 12).join(', ')}${row.graphSymbols.length > 12 ? ` (+${row.graphSymbols.length - 12})` : ''}`
+                            : null}
+                        </p>
+                      ) : (
+                        <p className="mt-1 text-[10px] text-amber-600/90">No graph match</p>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </ImpactSubsection>
+
+              {(group.graphOnlyFiles.length > 0 || group.graphOnlySymbols.length > 0) ? (
+                <ImpactSubsection
+                  title="Graph (not linked)"
+                  count={group.graphOnlyFiles.length}
+                  empty=""
+                >
+                  {group.graphOnlyFiles.length > 0 ? (
+                    <ul className="max-h-24 space-y-0.5 overflow-auto font-mono text-[10px] text-muted-foreground">
+                      {group.graphOnlyFiles.map((f) => (
+                        <li key={f} className="truncate">
+                          {f}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                  {group.graphOnlySymbols.length > 0 ? (
+                    <p className="mt-1 text-[10px] text-muted-foreground">
+                      Symbols: {group.graphOnlySymbols.slice(0, 16).join(', ')}
+                      {group.graphOnlySymbols.length > 16
+                        ? ` (+${group.graphOnlySymbols.length - 16})`
+                        : ''}
+                    </p>
+                  ) : null}
+                </ImpactSubsection>
+              ) : null}
+
+              <ImpactTrackedSubsections tracked={group.tracked} />
+            </div>
+          </li>
+        ))}
+      </ul>
+
+      {unassignedCount > 0 ? (
+        <section className="mt-4" data-testid="studio-impact-tracked-unassigned">
+          <h2 className="mb-2 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+            Tracked files (unassigned)
+            <span className="ml-2 studio-badge">{unassignedCount}</span>
+          </h2>
+          <p className="mb-2 text-[10px] text-muted-foreground">
+            Files not uniquely tied to one spec via links or graph paths.
+          </p>
+          <ImpactTrackedSubsections tracked={model.trackedUnassigned} />
+        </section>
+      ) : null}
+    </div>
+  )
+}
+
+function ImpactSubsection({
+  title,
+  count,
+  empty,
+  children,
+}: {
+  title: string
+  count: number
+  empty: string
+  children: React.ReactNode
+}): React.ReactElement {
+  return (
+    <div>
+      <h3 className="mb-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+        {title}
+        {count > 0 ? <span className="ml-1 studio-badge">{count}</span> : null}
+      </h3>
+      {count === 0 && empty ? (
+        <p className="text-[10px] text-muted-foreground">{empty}</p>
+      ) : (
+        children
+      )}
+    </div>
+  )
+}
+
+function ImpactTrackedSubsections({
+  tracked,
+}: {
+  tracked: ImpactSpecTracked
+}): React.ReactElement {
+  const total = tracked.resolved.length + tracked.open.length + tracked.ignored.length
+  if (total === 0) return <></>
+
+  return (
+    <div className="space-y-2">
+      {tracked.resolved.length > 0 ? (
+        <ImpactSubsection title="Tracked · resolved" count={tracked.resolved.length} empty="">
+          <TrackedFileList files={tracked.resolved} />
+        </ImpactSubsection>
+      ) : null}
+      {tracked.open.length > 0 ? (
+        <ImpactSubsection title="Tracked · open" count={tracked.open.length} empty="">
+          <TrackedFileList files={tracked.open} />
+        </ImpactSubsection>
+      ) : null}
+      {tracked.ignored.length > 0 ? (
+        <ImpactSubsection title="Tracked · ignored" count={tracked.ignored.length} empty="">
+          <TrackedFileList files={tracked.ignored} />
+        </ImpactSubsection>
+      ) : null}
+    </div>
+  )
+}
+
+export function ChangeContextTab({
+  changeName,
+  changeStep,
+  refreshKey,
+  tabActive,
+}: {
+  changeName: string
+  /** Change lifecycle state for compile step (e.g. `designing`). */
+  changeStep?: string
+  refreshKey: number
+  tabActive: boolean
+}): React.ReactElement {
+  const pollKey = useTabScopedPollKey(tabActive, refreshKey)
+  const ctx = useChangeContext(changeName, {
+    poll: tabActive,
+    refreshKey: pollKey,
+    step: changeStep,
+  })
+
+  if (ctx.isLoading && !ctx.data) {
+    return (
+      <div className="flex flex-1 items-center justify-center text-xs text-muted-foreground">
+        Loading compiled context…
+      </div>
+    )
+  }
+  if (ctx.error) {
+    return <div className="p-3 text-xs text-destructive">{ctx.error.message}</div>
+  }
+
+  const body =
+    ctx.data?.content ??
+    ctx.data?.entries
+      ?.map((e) => e.content ?? '')
+      .filter(Boolean)
+      .join('\n\n') ??
+    ''
+
+  return (
+    <pre className="studio-scrollbar min-h-0 flex-1 overflow-auto p-3 font-mono text-xs text-foreground/90">
+      {body || 'No compiled context for this change.'}
+    </pre>
+  )
+}
