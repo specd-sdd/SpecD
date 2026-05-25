@@ -40,6 +40,7 @@ export {
   type LogLevel,
   type LoggerPort,
 } from './logger.port.js'
+export { type LogReadBuffer } from './log-read-buffer.port.js'
 export {
   type ConfigWriter,
   type InitProjectOptions,
