@@ -156,6 +156,46 @@ workspaces:
     codeRoot: apps/public-web
     ownership: owned
 
+  api:
+    specs:
+      adapter: fs
+      fs:
+        path: specs/api
+    codeRoot: packages/api
+    ownership: owned
+
+  client:
+    specs:
+      adapter: fs
+      fs:
+        path: specs/client
+    codeRoot: packages/client
+    ownership: owned
+
+  ui:
+    specs:
+      adapter: fs
+      fs:
+        path: specs/ui
+    codeRoot: packages/ui
+    ownership: owned
+
+  studio-web:
+    specs:
+      adapter: fs
+      fs:
+        path: specs/studio-web
+    codeRoot: apps/specd-studio-web
+    ownership: owned
+
+  studio-desktop:
+    specs:
+      adapter: fs
+      fs:
+        path: specs/studio-desktop
+    codeRoot: apps/specd-studio-desktop
+    ownership: owned
+
 storage:
   changes:
     adapter: fs
@@ -178,6 +218,8 @@ storage:
 approvals:
   spec: false
   signoff: false
+
+invalidationPolicy: none
 
 # Global constraints always in context regardless of change scope
 contextIncludeSpecs:
