@@ -1,0 +1,20 @@
+- op: added
+  description: 'Verify --all uses kernel validateBatch'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Batch mode \(--all\)'
+  content: |
+    #### Scenario: --all uses kernel validateBatch
+
+    - **WHEN** `specd changes validate <name> --all` runs
+    - **THEN** CLI calls `kernel.changes.validateBatch.execute({ name })` once
+    - **AND** does not loop `specIds` with `ValidateArtifacts` directly in the CLI layer
+
+    #### Scenario: --all --artifact forwards filter
+
+    - **WHEN** `specd changes validate <name> --all --artifact specs` runs
+    - **THEN** `validateBatch.execute` receives `{ name, artifactId: 'specs' }`
