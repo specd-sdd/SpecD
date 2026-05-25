@@ -298,6 +298,7 @@ export class FsChangeRepository extends ChangeRepository {
    * @param change - The change whose manifest should be persisted
    */
   override async save(change: Change): Promise<void> {
+    change.touchUpdatedAt()
     const artifactTypes = await this._ensureArtifactTypes()
     const specExistence = await this._buildSpecExistenceMap(change.specIds)
     if (artifactTypes.length > 0) {
@@ -982,6 +983,7 @@ export class FsChangeRepository extends ChangeRepository {
     const change = new Change({
       name: manifest.name,
       createdAt: new Date(manifest.createdAt),
+      updatedAt: deriveManifestUpdatedAt(manifest),
       ...(manifest.description !== undefined ? { description: manifest.description } : {}),
       specIds: manifest.specIds,
       ...(manifest.trackedImplementationFiles !== undefined
@@ -1004,7 +1006,6 @@ export class FsChangeRepository extends ChangeRepository {
       const changed = change.syncArtifacts(artifactTypes, specExistence)
 
       // Re-derive status for files added by sync (they default to 'missing' but may exist on disk)
-      const artifactTypeMap = new Map(artifactTypes.map((t) => [t.id, t]))
 
       for (const [typeId, artifact] of change.artifacts) {
         const artType = artifactTypeMap.get(typeId)
@@ -1039,10 +1040,53 @@ export class FsChangeRepository extends ChangeRepository {
       }
     }
 
-    // Auto-invalidate if any previously validated file drifted from its stored hash.
+    await this._reconcileArtifactDrift(change, dir, artifactTypeMap, artifactTypes)
+
+    return change
+  }
+
+  /**
+   * Reconciles validated artifact files against disk and invalidates when drift is detected.
+   *
+   * @param change - Change to inspect
+   * @param options - Reconciliation options
+   * @param options.excludeFileKeys - File keys to skip during reconciliation
+   * @returns `true` when an invalidation event was appended
+   */
+  override async reconcileArtifactDrift(
+    change: Change,
+    options?: { readonly excludeFileKeys?: readonly string[] },
+  ): Promise<boolean> {
+    const dir = await this._resolveDir(change.name)
+    if (dir === null) return false
+    const artifactTypes = await this._ensureArtifactTypes()
+    const artifactTypeMap = new Map(artifactTypes.map((t) => [t.id, t]))
+    return this._reconcileArtifactDrift(change, dir, artifactTypeMap, artifactTypes, options)
+  }
+
+  /**
+   * Shared drift reconciliation used by `get()` and `SaveChangeArtifact`.
+   *
+   * @param change - Change to inspect
+   * @param dir - Absolute change directory path
+   * @param artifactTypeMap - Schema artifact types keyed by id
+   * @param artifactTypes - Full artifact type list for DAG construction
+   * @param options - Reconciliation options
+   * @param options.excludeFileKeys - File keys to skip (e.g. the file just saved)
+   * @returns `true` when drift triggered an invalidation event
+   */
+  private async _reconcileArtifactDrift(
+    change: Change,
+    dir: string,
+    artifactTypeMap: Map<string, ArtifactType>,
+    artifactTypes: readonly ArtifactType[],
+    options?: { readonly excludeFileKeys?: readonly string[] },
+  ): Promise<boolean> {
+    const excluded = new Set(options?.excludeFileKeys ?? [])
     const driftedFilesByArtifact = new Map<string, Set<string>>()
     for (const [, artifact] of change.artifacts) {
       for (const [, file] of artifact.files) {
+        if (excluded.has(file.key)) continue
         if (file.validatedHash === undefined || file.validatedHash === SKIPPED_SENTINEL) continue
         if (
           file.status === 'pending-review' ||
@@ -1075,24 +1119,23 @@ export class FsChangeRepository extends ChangeRepository {
         }
       }
     }
-    if (driftedFilesByArtifact.size > 0) {
-      const affectedArtifacts = [...driftedFilesByArtifact.entries()].map(([type, files]) => ({
-        type,
-        files: [...files].sort(),
-      }))
-      change.invalidate(
-        'artifact-drift',
-        SYSTEM_ACTOR,
-        `Invalidated because validated artifacts drifted: ${affectedArtifacts
-          .map((artifact) => `${artifact.type} [${artifact.files.join(', ')}]`)
-          .join('; ')}`,
-        affectedArtifacts,
-        ArtifactDag.from(artifactTypes),
-      )
-      await this._writeManifestAtomic(dir, changeToManifest(change))
-    }
+    if (driftedFilesByArtifact.size === 0) return false
 
-    return change
+    const affectedArtifacts = [...driftedFilesByArtifact.entries()].map(([type, files]) => ({
+      type,
+      files: [...files].sort(),
+    }))
+    change.invalidate(
+      'artifact-drift',
+      SYSTEM_ACTOR,
+      `Invalidated because validated artifacts drifted: ${affectedArtifacts
+        .map((artifact) => `${artifact.type} [${artifact.files.join(', ')}]`)
+        .join('; ')}`,
+      affectedArtifacts,
+      ArtifactDag.from(artifactTypes),
+    )
+    await this._writeManifestAtomic(dir, changeToManifest(change))
+    return true
   }
 
   /**
@@ -1134,6 +1177,24 @@ export class FsChangeRepository extends ChangeRepository {
 // ---- Serialization helpers ----
 
 /**
+ * Derives `updatedAt` for legacy manifests missing the field.
+ *
+ * @param manifest - Persisted manifest JSON
+ * @returns Revision timestamp
+ */
+function deriveManifestUpdatedAt(manifest: ChangeManifest): Date {
+  if (manifest.updatedAt !== undefined) {
+    return new Date(manifest.updatedAt)
+  }
+  let max = new Date(manifest.createdAt).getTime()
+  for (const event of manifest.history) {
+    const at = new Date(event.at).getTime()
+    if (at > max) max = at
+  }
+  return new Date(max)
+}
+
+/**
  * Serializes a `Change` entity into the `ChangeManifest` JSON structure.
  *
  * @param change - The change to serialize
@@ -1167,6 +1228,7 @@ function changeToManifest(change: Change): ChangeManifest {
   return {
     name: change.name,
     createdAt: change.createdAt.toISOString(),
+    updatedAt: change.updatedAt.toISOString(),
     ...(change.description !== undefined ? { description: change.description } : {}),
     schema,
     specIds: [...change.specIds],
