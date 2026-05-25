@@ -22,6 +22,8 @@ import {
 export interface GetStatusInput {
   /** The change name to look up. */
   readonly name: string
+  /** When set and still current, returns a short-circuit unchanged payload. */
+  readonly ifModifiedSince?: string
 }
 
 /** Per-file status detail within an artifact. */
@@ -184,6 +186,8 @@ export interface LifecycleContext {
 
 /** Result returned by the {@link GetStatus} use case. */
 export interface GetStatusResult {
+  /** When true, artifact DAG and lifecycle details were omitted as unchanged. */
+  readonly unchanged?: boolean
   /** The loaded change with its current artifact state. */
   readonly change: Change
   /** Effective status for each artifact attached to the change. */
@@ -248,6 +252,44 @@ export class GetStatus {
     }
 
     const changePath = this._changes.changePath(change)
+
+    if (input.ifModifiedSince !== undefined) {
+      const clientRevision = Date.parse(input.ifModifiedSince)
+      if (
+        !Number.isNaN(clientRevision) &&
+        clientRevision >= change.updatedAt.getTime()
+      ) {
+        return {
+          change,
+          unchanged: true,
+          artifactStatuses: [],
+          lifecycle: {
+            validTransitions: VALID_TRANSITIONS[change.state],
+            availableTransitions: [],
+            blockers: [],
+            approvals: this._approvals,
+            nextArtifact: null,
+            changePath,
+            schemaInfo: null,
+          },
+          implementationTracking: projectImplementationTracking(change),
+          review: {
+            required: false,
+            route: null,
+            reason: null,
+            affectedArtifacts: [],
+            overlapDetail: [],
+          },
+          blockers: [],
+          nextAction: {
+            targetStep: change.state,
+            actionType: 'cognitive',
+            reason: 'No change since last status poll',
+            command: null,
+          },
+        }
+      }
+    }
     const artifactStatuses: ArtifactStatusEntry[] = []
     let schemaInfo: LifecycleContext['schemaInfo'] = null
     let review: ReviewSummary = {
