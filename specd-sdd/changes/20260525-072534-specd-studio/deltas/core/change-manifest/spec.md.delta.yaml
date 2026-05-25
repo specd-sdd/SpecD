@@ -1,0 +1,19 @@
+- op: added
+  description: Add updatedAt field to manifest contract
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Manifest structure'
+  content: |
+    ### Requirement: updatedAt revision clock
+
+    Each manifest MUST include **`updatedAt`** (ISO 8601).
+
+    - On **create**, `updatedAt` MUST equal `createdAt`.
+    - On **every** manifest persist (`save`), `updatedAt` MUST be set to the save timestamp (validate-only writes, artifact saves, transitions, edit, scaffold sync, draft/discard paths that rewrite the manifest).
+    - `createdAt` remains immutable.
+
+    Legacy manifests without `updatedAt` MUST be accepted on load; the repository MUST derive an initial value once (for example max of `createdAt` and latest `history[].at`) and persist it on the next save.
