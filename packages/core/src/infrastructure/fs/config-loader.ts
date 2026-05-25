@@ -275,6 +275,24 @@ const SpecdYamlZodSchema = z
     schemaOverrides: SchemaOverridesZodSchema.optional(),
     invalidationPolicy: z.enum(['none', 'surgical', 'downstream', 'global']).optional(),
     plugins: PluginsZodSchema.optional(),
+    api: z
+      .object({
+        auth: z
+          .object({
+            type: z.literal('disabled'),
+            config: z.record(z.unknown()).optional(),
+          })
+          .strict()
+          .optional(),
+        cors: z
+          .object({
+            origins: z.array(z.string()).optional(),
+          })
+          .strict()
+          .optional(),
+      })
+      .strict()
+      .optional(),
   })
   .strict()
 
@@ -1271,6 +1289,18 @@ export class FsConfigLoader implements ConfigLoader {
             },
           }
         : {}),
+      api: {
+        auth: { type: 'disabled' as const, ...(data.api?.auth?.config !== undefined ? { config: data.api.auth.config } : {}) },
+        ...(data.api?.cors !== undefined
+          ? {
+              cors: {
+                ...(data.api.cors.origins !== undefined
+                  ? { origins: data.api.cors.origins as readonly string[] }
+                  : {}),
+              },
+            }
+          : {}),
+      },
     }
   }
 }
