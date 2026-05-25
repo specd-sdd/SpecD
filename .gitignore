@@ -44,3 +44,6 @@ specd.local.yaml
 .history/
 
 gha-creds-*.json
+
+# Editor / tool backups
+*.bak
