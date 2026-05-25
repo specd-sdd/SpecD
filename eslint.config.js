@@ -170,6 +170,44 @@ export default tseslint.config(
     },
   },
 
+  // SpecD Studio UI hosts — relax JSDoc until components are documented to core standard
+  {
+    files: [
+      'packages/api/src/**/*.ts',
+      'packages/ui/src/**/*.{ts,tsx}',
+      'packages/client/src/**/*.ts',
+      'apps/specd-studio-web/src/**/*.{ts,tsx}',
+      'apps/specd-studio-desktop/src/**/*.{ts,tsx}',
+    ],
+    rules: {
+      'jsdoc/require-jsdoc': 'off',
+      'jsdoc/require-description': 'off',
+      'jsdoc/require-param': 'off',
+      'jsdoc/require-returns': 'off',
+      'jsdoc/require-param-description': 'off',
+      'jsdoc/require-returns-description': 'off',
+      'jsdoc/require-throws': 'off',
+      'jsdoc/check-param-names': 'off',
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: 'ExportDefaultDeclaration',
+          message: 'Default exports are forbidden. Use named exports.',
+        },
+      ],
+    },
+  },
+
+  // Playwright e2e (studio-web)
+  {
+    files: ['apps/specd-studio-web/e2e/**/*.ts'],
+    rules: {
+      'jsdoc/require-jsdoc': 'off',
+      'jsdoc/require-description': 'off',
+      '@typescript-eslint/explicit-module-boundary-types': 'off',
+    },
+  },
+
   // Test files (specs and helpers) — relax all quality rules
   {
     files: ['packages/*/test/**/*.ts', 'apps/*/test/**/*.ts', 'apps/*/test/**/*.tsx'],
