@@ -1,5 +1,5 @@
 import type { LogLevel } from '../ports/logger.port.js'
-import type { LogRingBuffer } from '../../infrastructure/logging/log-ring-buffer.js'
+import type { LogReadBuffer } from '../ports/log-read-buffer.port.js'
 
 /** Input for {@link ReadLog}. */
 export interface ReadLogInput {
@@ -23,25 +23,38 @@ export interface ReadLogResult {
   readonly lines?: readonly string[]
 }
 
+/**
+ * Formats one entry as a single log line.
+ *
+ * @param entry - Structured log entry
+ * @returns Human-readable line
+ */
 function formatPrettyLine(entry: ReadLogEntryDto): string {
-  const ctx =
-    Object.keys(entry.context).length > 0 ? ` ${JSON.stringify(entry.context)}` : ''
+  const ctx = Object.keys(entry.context).length > 0 ? ` ${JSON.stringify(entry.context)}` : ''
   return `${entry.timestamp} ${entry.level} ${entry.message}${ctx}`
 }
 
 /**
- * Reads recent in-memory log entries from a {@link LogRingBuffer}.
+ * Reads recent in-memory log entries from a {@link LogReadBuffer}.
  * Does not read log files from disk.
  */
 export class ReadLog {
-  constructor(private readonly ring: LogRingBuffer) {}
+  /**
+   * Creates the use case with an in-memory log buffer.
+   *
+   * @param buffer - Ring or buffer exposing recent entries
+   */
+  constructor(private readonly buffer: LogReadBuffer) {}
 
   /**
+   * Returns recent log entries or pretty-printed lines.
+   *
    * @param input - Limit and output shape
+   * @returns Structured entries or formatted lines
    */
   execute(input: ReadLogInput = {}): ReadLogResult {
     const limit = input.limit ?? 500
-    const raw = this.ring.readLast(limit)
+    const raw = this.buffer.readLast(limit)
     const entries: ReadLogEntryDto[] = raw.map((e) => ({
       timestamp: e.timestamp.toISOString(),
       level: e.level,
