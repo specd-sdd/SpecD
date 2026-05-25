@@ -348,6 +348,7 @@ export const rawChangeEventSchema = z
 export const changeManifestSchema = z.object({
   name: z.string(),
   createdAt: z.string(),
+  updatedAt: z.string().optional(),
   description: z.string().optional(),
   archivedAt: z.string().optional(),
   archivedBy: actorIdentitySchema.optional(),
@@ -371,6 +372,8 @@ export interface ChangeManifest {
   readonly name: string
   /** ISO 8601 creation timestamp; immutable after creation. */
   readonly createdAt: string
+  /** ISO 8601 timestamp of the last manifest persist. */
+  readonly updatedAt?: string
   /** Optional free-text description of the change's purpose. */
   readonly description?: string
   /**
