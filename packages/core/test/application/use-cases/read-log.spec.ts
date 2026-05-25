@@ -1,0 +1,42 @@
+import { describe, expect, it } from 'vitest'
+import { ReadLog } from '../../../src/application/use-cases/read-log.js'
+import { LogRingBuffer } from '../../../src/infrastructure/logging/log-ring-buffer.js'
+import type { LogEntry } from '../../../src/application/ports/logger.port.js'
+
+function entry(message: string, level: LogEntry['level'] = 'info'): LogEntry {
+  return {
+    timestamp: new Date('2026-05-25T12:00:00.000Z'),
+    level,
+    message,
+    context: { source: 'test' },
+  }
+}
+
+describe('ReadLog', () => {
+  it('returns newest-first structured entries', () => {
+    const ring = new LogRingBuffer(10)
+    ring.push(entry('first'))
+    ring.push(entry('second', 'warn'))
+    const result = new ReadLog(ring).execute({ limit: 2 })
+    expect(result.entries).toHaveLength(2)
+    expect(result.entries?.[0]?.message).toBe('second')
+    expect(result.entries?.[1]?.message).toBe('first')
+  })
+
+  it('returns prettier lines when requested', () => {
+    const ring = new LogRingBuffer(5)
+    ring.push(entry('hello'))
+    const result = new ReadLog(ring).execute({ prettier: true })
+    expect(result.lines?.[0]).toContain('hello')
+    expect(result.entries).toBeUndefined()
+  })
+
+  it('evicts oldest entries when over capacity', () => {
+    const ring = new LogRingBuffer(2)
+    ring.push(entry('a'))
+    ring.push(entry('b'))
+    ring.push(entry('c'))
+    const result = new ReadLog(ring).execute({ limit: 10 })
+    expect(result.entries?.map((e) => e.message)).toEqual(['c', 'b'])
+  })
+})
