@@ -203,6 +203,19 @@ export abstract class ChangeRepository extends Repository {
    * @param specIds - The spec IDs whose directories to remove
    */
   abstract unscaffold(change: Change, specIds: readonly string[]): Promise<void>
+
+  /**
+   * Compares tracked artifact files against disk and invalidates on drift.
+   *
+   * @param change - Change loaded from the manifest
+   * @param options - Reconciliation options
+   * @param options.excludeFileKeys - File keys to skip (e.g. the file just saved)
+   * @returns `true` when drift triggered an invalidation event
+   */
+  abstract reconcileArtifactDrift(
+    change: Change,
+    options?: { readonly excludeFileKeys?: readonly string[] },
+  ): Promise<boolean>
 }
 
 export type { ArtifactConflictError }
