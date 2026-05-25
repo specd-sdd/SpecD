@@ -4,10 +4,9 @@ import { type SpecRepository } from '../ports/spec-repository.js'
 import { type SpecPath } from '../../domain/value-objects/spec-path.js'
 import { type SchemaProvider } from '../ports/schema-provider.js'
 import { type Schema } from '../../domain/value-objects/schema.js'
-import { inferFormat } from '../../domain/services/format-inference.js'
+import { outlineArtifactContent } from './outline-artifact-content.js'
 import { WorkspaceNotFoundError } from '../errors/workspace-not-found-error.js'
 import { SpecNotFoundError } from '../errors/spec-not-found-error.js'
-import { ParserNotRegisteredError } from '../errors/parser-not-registered-error.js'
 
 /** Input for the {@link GetSpecOutline} use case. */
 export interface GetSpecOutlineInput {
@@ -15,6 +14,8 @@ export interface GetSpecOutlineInput {
   readonly specPath: SpecPath
   readonly artifactId?: string
   readonly filename?: string
+  /** When set with `filename`, outlines draft content instead of workspace file bytes. */
+  readonly content?: string
   readonly full?: boolean
   readonly hints?: boolean
 }
@@ -52,6 +53,22 @@ export class GetSpecOutline {
    * @returns Parsed outlines grouped by filename.
    */
   async execute(input: GetSpecOutlineInput): Promise<readonly SpecOutlineResult[]> {
+    if (input.content !== undefined) {
+      if (input.filename === undefined) {
+        throw new SpecNotFoundError('filename is required when content is provided for outline')
+      }
+      const outlined = outlineArtifactContent(
+        input.content,
+        input.filename,
+        this.parsers,
+        {
+          ...(input.full === true ? { full: true } : {}),
+          ...(input.hints === true ? { hints: true } : {}),
+        },
+      )
+      return [outlined]
+    }
+
     const specRepo = this.specs.get(input.workspace)
     if (!specRepo) {
       throw new WorkspaceNotFoundError(input.workspace)
@@ -79,27 +96,16 @@ export class GetSpecOutline {
         continue
       }
 
-      const format = inferFormat(filename)
-      if (!format) {
-        throw new ParserNotRegisteredError(
-          `unknown`,
-          `unrecognised extension for file '${filename}'`,
-        )
-      }
-
-      const parser = this.parsers.get(format)
-      if (!parser) {
-        throw new ParserNotRegisteredError(format, `file: ${filename}`)
-      }
-
-      const ast = parser.parse(artifact.content)
-      const outline = parser.outline(ast, { full: input.full === true })
-      const selectorHints = input.hints === true ? parser.selectorHints(outline) : undefined
-      results.push({
+      const outlined = outlineArtifactContent(
+        artifact.content,
         filename,
-        outline,
-        ...(selectorHints !== undefined ? { selectorHints } : {}),
-      })
+        this.parsers,
+        {
+          ...(input.full === true ? { full: true } : {}),
+          ...(input.hints === true ? { hints: true } : {}),
+        },
+      )
+      results.push(outlined)
     }
 
     return results
