@@ -189,6 +189,11 @@ export interface ChangeProps {
   readonly name: string
   /** Timestamp when the change was created; immutable. */
   readonly createdAt: Date
+  /**
+   * Manifest revision clock; defaults to `createdAt` when omitted.
+   * Must be greater than or equal to `createdAt`.
+   */
+  readonly updatedAt?: Date
   /** Optional free-text description of the change's purpose. */
   readonly description?: string
   /** Current snapshot of spec paths being modified. */
@@ -247,6 +252,7 @@ export interface ImplementationLink {
 export class Change {
   private readonly _name: string
   private readonly _createdAt: Date
+  private _updatedAt: Date
   private _description: string | undefined
   private _specIds: string[]
   private _history: ChangeEvent[]
@@ -269,6 +275,11 @@ export class Change {
     }
     this._name = props.name
     this._createdAt = new Date(props.createdAt.getTime())
+    const updatedAt = props.updatedAt ?? props.createdAt
+    if (updatedAt.getTime() < this._createdAt.getTime()) {
+      throw new InvalidChangeError('updatedAt must not be before createdAt')
+    }
+    this._updatedAt = new Date(updatedAt.getTime())
     this._description = props.description
     this._specIds = [...new Set(props.specIds)]
     this._history = [...props.history]
@@ -303,6 +314,24 @@ export class Change {
   /** Timestamp when the change was created. */
   get createdAt(): Date {
     return new Date(this._createdAt.getTime())
+  }
+
+  /** Manifest revision clock updated on every persist. */
+  get updatedAt(): Date {
+    return new Date(this._updatedAt.getTime())
+  }
+
+  /**
+   * Sets the manifest revision clock to the given timestamp.
+   *
+   * @param at - Timestamp to record; defaults to now
+   * @throws {InvalidChangeError} When `at` is before `createdAt`.
+   */
+  touchUpdatedAt(at: Date = new Date()): void {
+    if (at.getTime() < this._createdAt.getTime()) {
+      throw new InvalidChangeError('updatedAt must not be before createdAt')
+    }
+    this._updatedAt = new Date(at.getTime())
   }
 
   /** Optional free-text description of the change's purpose. */
