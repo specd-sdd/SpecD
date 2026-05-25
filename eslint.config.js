@@ -17,6 +17,7 @@ export default tseslint.config(
       'packages/schema-std/**',
       'packages/mcp/**',
       'dev/scripts/**',
+      'packages/api/test/fixtures/**',
     ],
   },
 
