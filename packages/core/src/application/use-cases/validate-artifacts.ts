@@ -182,7 +182,10 @@ export class ValidateArtifacts {
       }
     } else if (input.artifactId !== undefined) {
       if (targetArtifactType?.scope === 'spec') {
-        throw new SpecNotInChangeError('<specPath required>', input.name)
+        throw new SpecNotInChangeError(
+          `specId is required when validating spec-scoped artifact '${input.artifactId}'`,
+          input.name,
+        )
       }
     }
 
@@ -247,7 +250,10 @@ export class ValidateArtifacts {
       input.specPath === undefined &&
       artifactTypesToValidate.some((artifactType) => artifactType.scope === 'spec')
     ) {
-      throw new SpecNotInChangeError('<specPath required>', input.name)
+      throw new SpecNotInChangeError(
+        'specId is required when the schema includes spec-scoped artifacts (pass specId per spec or validate each artifact with specId and artifactId)',
+        input.name,
+      )
     }
 
     Logger.debug('ValidateArtifacts projected lifecycle engine dependency state', {
