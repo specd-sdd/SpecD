@@ -1,0 +1,32 @@
+- op: added
+  description: Scenarios for shared drift reconciliation hook
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Auto-invalidation on get when artifact files drift'
+  content: |
+    ### Requirement: Shared drift reconciliation hook
+
+    #### Scenario: Save excludes just-written file key
+
+    - **GIVEN** `SaveChangeArtifact` wrote `proposal.md`
+    - **WHEN** drift reconciliation runs after save
+    - **THEN** `proposal.md` is excluded from hash comparison
+    - **AND** sibling artifacts are still checked
+
+    #### Scenario: Drift on sibling invalidates artifact state
+
+    - **GIVEN** another artifact file changed on disk without validatedHash update
+    - **WHEN** reconciliation runs after save
+    - **THEN** drifted file is marked invalidated
+    - **AND** same semantics as load-time auto-invalidation apply
+
+    #### Scenario: Get path uses same hook before return
+
+    - **GIVEN** on-disk content differs from stored `validatedHash`
+    - **WHEN** repository `get()` loads the change
+    - **THEN** shared hook runs before returning entity
+    - **AND** invalidation matches post-save reconciliation rules

@@ -1,0 +1,21 @@
+- op: added
+  description: Shared drift reconciliation for get and SaveChangeArtifact
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Auto-invalidation on get when artifact files drift'
+  content: |
+    ### Requirement: Shared drift reconciliation hook
+
+    `FsChangeRepository` MUST expose a single drift-reconciliation algorithm used by both `get()` (before return) and **`SaveChangeArtifact`** (after a successful artifact write).
+
+    The hook MUST:
+
+    - Compare on-disk content to `validatedHash` for tracked artifact files
+    - Support excluding one or more file keys (the just-saved file during human save)
+    - Apply the same invalidation semantics as auto-invalidation on drift (`artifact-drift`, `designing`, file states)
+
+    `SaveChangeArtifact` MUST invoke this hook after writing file bytes and before final `save(change)` so agent edits to sibling artifacts are detected in the same pass as load-time drift.
