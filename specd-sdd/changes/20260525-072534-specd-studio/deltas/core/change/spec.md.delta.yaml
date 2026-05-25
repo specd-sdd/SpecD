@@ -1,0 +1,15 @@
+- op: modified
+  description: Expose updatedAt on Change entity
+  selector:
+    type: section
+    matches: 'Requirement: Identity'
+  content: |
+    A Change has a unique, user-defined slug name (e.g. `add-auth-flow`), a `createdAt` timestamp recorded at creation time, and an **`updatedAt`** revision timestamp loaded from the manifest. `name` and `createdAt` are immutable. `updatedAt` MUST satisfy `updatedAt >= createdAt`.
+
+    Identities in specd are represented by the `ActorIdentity` interface:
+
+    - **`name`** — human-readable name of the actor
+    - **`email`** — unique identifier (often a real email, but may be a hash or masked value)
+    - **`provider`** — optional identifier of the identity source (e.g. 'git', 'ldap')
+    - **`providerId`** — optional unique ID within that provider (e.g. LDAP DN)
+    - **`metadata`** — optional bag of arbitrary string-valued metadata (`Record<string, string>`)
