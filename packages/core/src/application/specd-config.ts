@@ -40,6 +40,21 @@ export interface SpecdLoggingConfig {
   readonly level: SpecdLogLevel
 }
 
+/** HTTP API authentication settings from `specd.yaml`. */
+export interface SpecdApiAuthConfig {
+  /** v1 allows only `disabled`. */
+  readonly type: 'disabled'
+  /** Reserved for future verifier-specific settings. */
+  readonly config?: Record<string, unknown>
+}
+
+/** Optional HTTP API section in `specd.yaml`. */
+export interface SpecdApiConfig {
+  readonly auth: SpecdApiAuthConfig
+  /** Optional CORS allowlist for standalone web clients. */
+  readonly cors?: { readonly origins?: readonly string[] }
+}
+
 /** Identity privacy configuration. */
 export interface PrivacyConfig {
   /** Obfuscation mode. */
@@ -217,6 +232,8 @@ export interface SpecdConfig {
   readonly privacy?: PrivacyConfig | undefined
   /** Schema plugin references from `specd.yaml`, in declaration order. */
   readonly schemaPlugins?: readonly string[] | undefined
+  /** HTTP API delivery settings (`specd serve`, Studio remote API). */
+  readonly api?: SpecdApiConfig
   /** Inline schema override operations from `specd.yaml`. */
   readonly schemaOverrides?: SchemaOperations | undefined
   /** Default invalidation policy for new changes. Defaults to `'downstream'`. */
