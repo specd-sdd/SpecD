@@ -26,7 +26,7 @@ function parseLimit(raw: string | undefined, fallback: number, max: number): num
 export function registerProjectLogsRoutes(app: FastifyInstance): void {
   app.get(
     '/logs',
-    apiHandler(async (ctx, req) => {
+    apiHandler((ctx, req) => {
       const read = ctx.kernel.logs?.read
       if (read === undefined) {
         throw new Error('Log ring is not configured on this server')
@@ -35,13 +35,13 @@ export function registerProjectLogsRoutes(app: FastifyInstance): void {
       const limit = parseLimit(query.limit, 500, 500)
       const prettier = query.prettier === 'true' || query.prettier === '1'
       const result = read.execute({ limit, prettier })
-      return result as LogReadDto
+      return Promise.resolve(result as LogReadDto)
     }),
   )
 
   app.post(
     '/logs',
-    apiHandler(async (ctx, req) => {
+    apiHandler((ctx, req) => {
       const body = req.body as {
         level?: string
         message?: string
@@ -73,23 +73,23 @@ export function registerProjectLogsRoutes(app: FastifyInstance): void {
         default:
           break
       }
-      return { ok: true as const }
+      return Promise.resolve({ ok: true as const })
     }),
   )
 
   app.get(
     '/studio/output',
-    apiHandler(async (ctx, req) => {
+    apiHandler((ctx, req) => {
       const query = req.query as { limit?: string }
       const limit = parseLimit(query.limit, 200, 500)
       const entries = ctx.studioOutput.list(limit)
-      return { entries } satisfies StudioOutputListDto
+      return Promise.resolve({ entries } satisfies StudioOutputListDto)
     }),
   )
 
   app.post(
     '/studio/output',
-    apiHandler(async (ctx, req) => {
+    apiHandler((ctx, req) => {
       const body = req.body as {
         level?: string
         message?: string
@@ -110,7 +110,7 @@ export function registerProjectLogsRoutes(app: FastifyInstance): void {
         ...(body.action !== undefined ? { action: body.action } : {}),
         ...(body.context !== undefined ? { context: body.context } : {}),
       })
-      return entry
+      return Promise.resolve(entry)
     }),
   )
 }
