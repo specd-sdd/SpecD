@@ -24,7 +24,20 @@ Overview MUST embed `getChangeStatus` results for the open change: next action, 
 
 ### Requirement: overview hosts change metadata editor
 
-Overview MUST delegate description, invalidation policy, read-only specs/deps, and scope dialog to [`ui:change-metadata-editor`](../change-metadata-editor/spec.md). Layout order: title → metadata block → summary cards → workflow → specs & dependencies → recent events.
+Overview MUST delegate description, invalidation policy, read-only specs/deps, and scope dialog to [`ui:change-metadata-editor`](../change-metadata-editor/spec.md). Layout order: title → lifecycle actions → metadata block → summary cards → workflow → specs & dependencies → recent events.
+
+### Requirement: overview surfaces lifecycle actions
+
+The Overview header MUST render a `ChangeLifecycleActions` block immediately below the change title. The block's content depends on which sidebar list the open change belongs to:
+
+- **active** — shows **Shelf to drafts**, **Discard** (destructive), and **Archive** (only when state is `archivable` or `signed-off`).
+- **draft** — shows **Restore to active** and **Discard** (destructive).
+- **discarded** — shows a read-only notice ("permanently discarded, cannot be restored").
+- **archived** or `null` — no lifecycle block is rendered.
+
+Each lifecycle action MUST open a Studio confirmation modal (`ChangeLifecycleConfirmDialog`) before calling the port. Discard MUST use a destructive-styled modal that states the action is irreversible. Lifecycle actions MUST be disabled while `lifecycleBusy` is true to prevent double-submission. After each action the shell MUST refetch both `getChange` detail and `getChangeStatus` for the open change.
+
+The **Discard permanently** control MUST be visually separated from reversible actions (right-aligned with a divider when other actions are present).
 
 ## Spec Dependencies
 

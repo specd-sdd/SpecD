@@ -1,4 +1,5 @@
 import type { ChangeDetailDto, ChangeStatusDto } from '@specd/client'
+import type { ChangeListSection } from './change-list-section.js'
 import { ChevronDown, ChevronRight, FileText, ShieldCheck } from 'lucide-react'
 import * as React from 'react'
 import { ChangeTabs, type ChangeView } from '../tabs/ChangeTabs.js'
@@ -43,6 +44,12 @@ export type ChangeMainViewProps = {
   onScopeInvalidated?: () => void
   onInvalidationPolicySaved?: (detail: ChangeDetailDto) => void
   specSuggestions?: readonly string[]
+  changeListSection?: ChangeListSection | null
+  lifecycleBusy?: boolean
+  onShelfToDrafts?: () => void
+  onRestoreToActive?: () => void
+  onDiscardChange?: () => void
+  onArchiveChange?: () => void
 }
 
 export function ChangeMainView({
@@ -65,6 +72,12 @@ export function ChangeMainView({
   onScopeInvalidated,
   onInvalidationPolicySaved,
   specSuggestions = [],
+  changeListSection = null,
+  lifecycleBusy = false,
+  onShelfToDrafts,
+  onRestoreToActive,
+  onDiscardChange,
+  onArchiveChange,
 }: ChangeMainViewProps): React.ReactElement {
   const artifactsTabActive = changeView === 'Artifacts'
   const artifactsPollKey = useTabScopedPollKey(artifactsTabActive, refreshKey)
@@ -113,6 +126,12 @@ export function ChangeMainView({
             onScopeSaved={onScopeSaved}
             onScopeInvalidated={onScopeInvalidated}
             onInvalidationPolicySaved={onInvalidationPolicySaved}
+            listSection={changeListSection}
+            lifecycleBusy={lifecycleBusy}
+            onShelfToDrafts={onShelfToDrafts}
+            onRestoreToActive={onRestoreToActive}
+            onDiscardChange={onDiscardChange}
+            onArchiveChange={onArchiveChange}
           />
         ) : null
       ) : null}

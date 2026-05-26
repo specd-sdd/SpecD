@@ -1,5 +1,5 @@
 import type { ChangeSummaryDto } from '@specd/client'
-import { AlertCircle, Circle, RotateCcw, Trash2 } from 'lucide-react'
+import { AlertCircle, Circle } from 'lucide-react'
 import * as React from 'react'
 import { cn } from '../lib/cn.js'
 
@@ -22,8 +22,6 @@ export function ChangesSidebar({
   selected,
   onSelect,
   onSelectArchived,
-  onRestore,
-  onDiscard,
 }: {
   active: readonly ChangeSummaryDto[]
   drafts: readonly ChangeSummaryDto[]
@@ -33,8 +31,6 @@ export function ChangesSidebar({
   selected: string | undefined
   onSelect: (name: string) => void
   onSelectArchived?: (name: string) => void
-  onRestore?: (name: string) => void
-  onDiscard?: (name: string) => void
 }): React.ReactElement {
   return (
     <div className="flex flex-col text-xs">
@@ -52,15 +48,7 @@ export function ChangesSidebar({
         onSelect={onSelect}
         rowTestIdPrefix="studio-active-change"
       />
-      <Section
-        title="Drafts"
-        items={drafts}
-        selected={selected}
-        onSelect={onSelect}
-        actionLabel="Discard"
-        actionIcon={<Trash2 className="h-3 w-3" />}
-        onAction={onDiscard}
-      />
+      <Section title="Drafts" items={drafts} selected={selected} onSelect={onSelect} />
       {archived !== undefined ? (
         <Section
           title="Archive"
@@ -71,15 +59,7 @@ export function ChangesSidebar({
         />
       ) : null}
       {discarded !== undefined && discarded.length > 0 ? (
-        <Section
-          title="Discarded"
-          items={discarded}
-          selected={selected}
-          onSelect={onSelect}
-          actionLabel="Restore"
-          actionIcon={<RotateCcw className="h-3 w-3" />}
-          onAction={onRestore}
-        />
+        <Section title="Discarded" items={discarded} selected={selected} onSelect={onSelect} />
       ) : null}
     </div>
   )
@@ -90,9 +70,6 @@ function Section({
   items,
   selected,
   onSelect,
-  onAction,
-  actionLabel,
-  actionIcon,
   showState = true,
   rowTestIdPrefix,
 }: {
@@ -100,12 +77,7 @@ function Section({
   items: readonly ChangeSummaryDto[]
   selected: string | undefined
   onSelect: (name: string) => void
-  onAction?: (name: string) => void
-  actionLabel?: string
-  actionIcon?: React.ReactNode
-  /** When false, omit per-row state (e.g. Archive section — section title is enough). */
   showState?: boolean
-  /** Prefix for Playwright rows, e.g. `studio-active-change` → `studio-active-change-specd-studio`. */
   rowTestIdPrefix?: string
 }): React.ReactElement {
   if (items.length === 0) {
@@ -128,47 +100,32 @@ function Section({
       <ul>
         {items.map((item) => (
           <li key={item.name}>
-            <div className="group flex items-center gap-2">
-              <button
-                type="button"
-                data-testid={
-                  rowTestIdPrefix !== undefined
-                    ? `${rowTestIdPrefix}-${item.name}`
-                    : undefined
-                }
-                className={cn(
-                  'studio-sidebar-row flex-1 border-l-2',
-                  selected === item.name && 'studio-sidebar-row-active',
-                )}
-                onClick={() => onSelect(item.name)}
-              >
-                <Circle className="h-2 w-2 shrink-0 fill-current stroke-none" />
-                <span className="min-w-0 flex-1 truncate font-medium text-foreground">
-                  {item.name}
-                </span>
-                {showState ? (
-                  <span
-                    className={cn(
-                      'capitalize',
-                      STATE_BADGE[item.state ?? ''] ?? 'text-muted-foreground',
-                    )}
-                  >
-                    {item.state ?? '—'}
-                  </span>
-                ) : null}
-              </button>
-              {onAction ? (
-                <button
-                  type="button"
-                  className="hidden rounded-md border border-border bg-background/60 p-1 text-muted-foreground transition-colors hover:text-foreground group-hover:inline-flex"
-                  aria-label={`${actionLabel} ${item.name}`}
-                  title={actionLabel}
-                  onClick={() => onAction(item.name)}
+            <button
+              type="button"
+              data-testid={
+                rowTestIdPrefix !== undefined ? `${rowTestIdPrefix}-${item.name}` : undefined
+              }
+              className={cn(
+                'studio-sidebar-row w-full border-l-2',
+                selected === item.name && 'studio-sidebar-row-active',
+              )}
+              onClick={() => onSelect(item.name)}
+            >
+              <Circle className="h-2 w-2 shrink-0 fill-current stroke-none" />
+              <span className="min-w-0 flex-1 truncate font-medium text-foreground">
+                {item.name}
+              </span>
+              {showState ? (
+                <span
+                  className={cn(
+                    'capitalize',
+                    STATE_BADGE[item.state ?? ''] ?? 'text-muted-foreground',
+                  )}
                 >
-                  {actionIcon}
-                </button>
+                  {item.state ?? '—'}
+                </span>
               ) : null}
-            </div>
+            </button>
           </li>
         ))}
       </ul>

@@ -84,3 +84,52 @@
 - **WHEN** user opens Overview
 - **THEN** `studio-change-specs-readonly` lists specs and dependencies
 - **AND** inline scope chips are not on Overview
+
+### Requirement: overview surfaces lifecycle actions
+
+#### Scenario: Active change shows shelf and discard
+
+- **GIVEN** an active in-progress change is open
+- **WHEN** Overview renders
+- **THEN** "Shelf to drafts" and "Discard" buttons appear in the header area
+- **AND** "Restore to active" is not shown
+
+#### Scenario: Draft change shows restore and discard
+
+- **GIVEN** a drafted change is open
+- **WHEN** Overview renders
+- **THEN** "Restore to active" and "Discard" buttons appear
+- **AND** "Shelf to drafts" is not shown
+
+#### Scenario: Discarded change shows read-only notice
+
+- **GIVEN** a discarded change is open
+- **WHEN** Overview renders
+- **THEN** a read-only notice is shown instead of action buttons
+
+#### Scenario: Lifecycle actions require Studio confirmation modal
+
+- **GIVEN** an active change is open
+- **WHEN** user clicks "Shelf to drafts" or "Discard permanently"
+- **THEN** `studio-change-lifecycle-confirm-dialog` opens before the port call executes
+
+#### Scenario: Discard is separated from safe actions
+
+- **GIVEN** an active change with shelf and discard available
+- **WHEN** Overview renders lifecycle actions
+- **THEN** "Discard permanently" is right-aligned and separated from shelf/archive controls
+
+#### Scenario: Lifecycle actions disabled while busy
+
+- **GIVEN** a lifecycle action is in flight
+- **WHEN** the action is pending
+- **THEN** all lifecycle buttons are disabled
+- **AND** double-submission is prevented
+
+#### Scenario: Archive shown only when archivable
+
+- **GIVEN** an active change in state `archivable` or `signed-off`
+- **WHEN** Overview renders
+- **THEN** "Archive" button is shown
+- **GIVEN** active change in any other state
+- **THEN** "Archive" button is not shown

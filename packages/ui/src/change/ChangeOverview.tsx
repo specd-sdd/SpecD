@@ -5,6 +5,8 @@ import { ChangeDescriptionEditor } from './ChangeDescriptionEditor.js'
 import { ChangeInvalidationPolicyEditor } from './ChangeInvalidationPolicyEditor.js'
 import { ChangeScopeDialog } from './ChangeScopeDialog.js'
 import { ChangeSpecsReadonlyPanel } from './ChangeSpecsReadonlyPanel.js'
+import type { ChangeListSection } from './change-list-section.js'
+import { ChangeLifecycleActions } from './ChangeLifecycleActions.js'
 import { ChangeStatusPanel } from './ChangeStatusPanel.js'
 
 function formatHistoryActor(by: ChangeHistoryEventDto['by']): string {
@@ -27,6 +29,12 @@ export function ChangeOverview({
   onScopeSaved,
   onScopeInvalidated,
   onInvalidationPolicySaved,
+  listSection = null,
+  lifecycleBusy = false,
+  onShelfToDrafts,
+  onRestoreToActive,
+  onDiscardChange,
+  onArchiveChange,
 }: {
   change: ChangeDetailDto
   status?: ChangeStatusDto
@@ -34,10 +42,16 @@ export function ChangeOverview({
   statusError?: Error
   editable?: boolean
   specSuggestions?: readonly string[]
+  listSection?: ChangeListSection | null
+  lifecycleBusy?: boolean
   onDescriptionSaved?: (detail: ChangeDetailDto) => void
   onScopeSaved?: (detail: ChangeDetailDto) => void
   onScopeInvalidated?: () => void
   onInvalidationPolicySaved?: (detail: ChangeDetailDto) => void
+  onShelfToDrafts?: () => void
+  onRestoreToActive?: () => void
+  onDiscardChange?: () => void
+  onArchiveChange?: () => void
 }): React.ReactElement {
   const [scopeDialogOpen, setScopeDialogOpen] = React.useState(false)
 
@@ -54,6 +68,23 @@ export function ChangeOverview({
         <h1 className="text-2xl font-semibold tracking-tight">{change.name}</h1>
         {!editable && change.description ? (
           <p className="mt-2 max-w-3xl text-muted-foreground">{change.description}</p>
+        ) : null}
+        {listSection !== null ? (
+          <div className="mt-3">
+            <ChangeLifecycleActions
+              listSection={listSection}
+              state={change.state}
+              busy={lifecycleBusy}
+              onDraft={editable && listSection === 'active' ? onShelfToDrafts : undefined}
+              onRestore={editable && listSection === 'draft' ? onRestoreToActive : undefined}
+              onDiscard={
+                editable && (listSection === 'active' || listSection === 'draft')
+                  ? onDiscardChange
+                  : undefined
+              }
+              onArchive={editable && listSection === 'active' ? onArchiveChange : undefined}
+            />
+          </div>
         ) : null}
       </div>
 

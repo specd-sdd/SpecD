@@ -2,26 +2,20 @@
 
 ## Requirements
 
-### Requirement: sidebar renders global poll data and wires actions
+### Requirement: sidebar renders global poll data — navigation only
 
 #### Scenario: Sidebar lists refresh on global poll
 
 - **GIVEN** shell global poll is running
 - **WHEN** poll tick fires
-- **THEN** changes/drafts/discarded lists update
-- **AND** row actions stay wired to ports
+- **THEN** drafts list updates
+- **AND** no action buttons are rendered on sidebar rows
 
 #### Scenario: Open action calls read port
 
-- **WHEN** user clicks open on a change row
-- **THEN** `port-changes-read` opens the change tab
+- **WHEN** user clicks a draft row
+- **THEN** `port-changes-read` opens the change Overview tab
 - **AND** no direct core import
-
-#### Scenario: Discard calls mutate port
-
-- **WHEN** user discards a draft from sidebar
-- **THEN** `port-changes-mutate` discard runs
-- **AND** list refreshes on success
 
 ### Requirement: view uses SpecdDataPort hooks only
 

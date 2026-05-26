@@ -77,12 +77,21 @@
     @apply border-b border-border bg-panel-header px-2 py-1 text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground;
   }
 
+  .studio-tab-bar {
+    @apply flex flex-wrap items-center gap-1 border-b border-border bg-panel-header px-2 py-1.5;
+  }
+
   .studio-tab {
-    @apply border-r border-border px-2 py-1 text-xs text-muted-foreground transition-colors duration-150 hover:bg-background/60 hover:text-foreground;
+    @apply inline-flex items-center justify-center rounded-md border border-transparent px-2.5 py-1 text-xs font-medium text-muted-foreground transition-colors duration-150;
+    @apply hover:border-border hover:bg-accent/80 hover:text-accent-foreground;
   }
 
   .studio-tab-active {
-    @apply studio-tab bg-background/70 text-foreground;
+    @apply border-border bg-accent text-accent-foreground shadow-sm;
+  }
+
+  .studio-tab:disabled {
+    @apply cursor-not-allowed opacity-40 hover:border-transparent hover:bg-transparent hover:text-muted-foreground;
   }
 
   .studio-resize-handle {
@@ -106,11 +115,11 @@
   }
 
   .studio-bottom-tab {
-    @apply border-r border-border px-2 py-1 text-xs text-muted-foreground transition-colors duration-150 hover:bg-background/60 hover:text-foreground;
+    @apply studio-tab;
   }
 
   .studio-bottom-tab-active {
-    @apply studio-bottom-tab bg-background/70 text-foreground;
+    @apply studio-tab studio-tab-active;
   }
 
   .studio-scrollbar {

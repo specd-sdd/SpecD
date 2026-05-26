@@ -1,4 +1,5 @@
 import type {
+  ChangeDetailDto,
   ChangeSummaryDto,
   ProjectDto,
   ProjectStatusDto,
@@ -10,6 +11,10 @@ import {
   PanelGroup,
   PanelResizeHandle,
 } from 'react-resizable-panels'
+import {
+  ChangeLifecycleConfirmDialog,
+  type LifecycleConfirmKind,
+} from '../change/ChangeLifecycleConfirmDialog.js'
 import { ChangeMainView } from '../change/ChangeMainView.js'
 import { flattenWorkspaceSpecIds } from '../change/flatten-spec-ids.js'
 import { SpecMainView } from '../spec/SpecMainView.js'
@@ -143,6 +148,17 @@ export function ShellLayout({
 
   const changeName = centerCtx.kind === 'change' ? centerCtx.name : undefined
   const isArchivedChange = centerCtx.kind === 'change' && centerCtx.archived === true
+  const changeListSection = React.useMemo(() => {
+    if (!changeName || isArchivedChange) return null
+    if (changes.drafts.some((c) => c.name === changeName)) return 'draft' as const
+    if (changes.discarded.some((c) => c.name === changeName)) return 'discarded' as const
+    if (changes.active.some((c) => c.name === changeName)) return 'active' as const
+    return null
+  }, [changeName, changes.active, changes.drafts, changes.discarded, isArchivedChange])
+  const [lifecycleBusy, setLifecycleBusy] = React.useState(false)
+  const [lifecycleConfirm, setLifecycleConfirm] = React.useState<LifecycleConfirmKind | null>(
+    null,
+  )
   const specWorkspace = centerCtx.kind === 'spec' ? centerCtx.workspace : undefined
   const specPath = centerCtx.kind === 'spec' ? centerCtx.specPath : undefined
 
@@ -541,21 +557,61 @@ export function ShellLayout({
     return 'idle'
   }, [problems, validating])
 
-  const handleRestoreChange = React.useCallback(
-    async (name: string) => {
-      await port.restoreChange(name)
-      void pushOutput(`Restored ${name}`, 'restore-change')
-    },
-    [port, pushOutput],
-  )
+  const refetchOpenChange = React.useCallback(async () => {
+    if (!isArchivedChange) {
+      await Promise.all([changeRead.detail.refetch(), changeRead.status.refetch()])
+    }
+  }, [changeRead.detail, changeRead.status, isArchivedChange])
 
-  const handleDiscardChange = React.useCallback(
-    async (name: string) => {
-      await port.discardChange(name)
-      void pushOutput(`Discarded ${name}`, 'discard-change')
-    },
-    [port, pushOutput],
-  )
+  const executeLifecycleConfirm = React.useCallback(() => {
+    if (!changeName || lifecycleConfirm === null) return
+
+    const actionByKind: Record<
+      LifecycleConfirmKind,
+      { run: () => Promise<ChangeDetailDto>; outputAction: string }
+    > = {
+      draft: { run: () => port.draftChange(changeName), outputAction: 'draft-change' },
+      restore: { run: () => port.restoreChange(changeName), outputAction: 'restore-change' },
+      discard: { run: () => port.discardChange(changeName), outputAction: 'discard-change' },
+      archive: { run: () => port.archiveChange(changeName), outputAction: 'archive-change' },
+    }
+
+    const { run, outputAction } = actionByKind[lifecycleConfirm]
+    setLifecycleConfirm(null)
+    setLifecycleBusy(true)
+    void (async () => {
+      try {
+        await run()
+        await refetchOpenChange()
+        void pushOutput(`Lifecycle action completed for ${changeName}`, outputAction)
+      } catch (err: unknown) {
+        const text = err instanceof Error ? err.message : String(err)
+        void pushOutput(`✗ ${text}`, outputAction)
+      } finally {
+        setLifecycleBusy(false)
+      }
+    })()
+  }, [changeName, lifecycleConfirm, port, pushOutput, refetchOpenChange])
+
+  const handleShelfToDrafts = React.useCallback(() => {
+    if (!changeName) return
+    setLifecycleConfirm('draft')
+  }, [changeName])
+
+  const handleRestoreToActive = React.useCallback(() => {
+    if (!changeName) return
+    setLifecycleConfirm('restore')
+  }, [changeName])
+
+  const handleDiscardChange = React.useCallback(() => {
+    if (!changeName) return
+    setLifecycleConfirm('discard')
+  }, [changeName])
+
+  const handleArchiveChange = React.useCallback(() => {
+    if (!changeName) return
+    setLifecycleConfirm('archive')
+  }, [changeName])
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-background" data-testid="studio-shell">
@@ -588,8 +644,6 @@ export function ShellLayout({
                   selected={changeName}
                   onSelect={handleSelectChange}
                   onSelectArchived={handleSelectArchivedChange}
-                  onRestore={(name) => { void handleRestoreChange(name) }}
-                  onDiscard={(name) => { void handleDiscardChange(name) }}
                 />
               </div>
             </section>
@@ -691,6 +745,20 @@ export function ShellLayout({
                           )
                         }
                       }}
+                      changeListSection={changeListSection}
+                      lifecycleBusy={lifecycleBusy}
+                      onShelfToDrafts={
+                        isArchivedChange ? undefined : handleShelfToDrafts
+                      }
+                      onRestoreToActive={
+                        isArchivedChange ? undefined : handleRestoreToActive
+                      }
+                      onDiscardChange={
+                        isArchivedChange ? undefined : handleDiscardChange
+                      }
+                      onArchiveChange={
+                        isArchivedChange ? undefined : handleArchiveChange
+                      }
                     />
                   ) : centerCtx.kind === 'spec' ? (
                     <SpecMainView
@@ -735,7 +803,7 @@ export function ShellLayout({
                       </div>
 
                       {/* mode tabs */}
-                      <div className="flex shrink-0 border-b border-border bg-panel-header">
+                      <div className="studio-tab-bar shrink-0">
                         {inspectorModes.map((mode) => {
                             const disabled = mode === 'outline' && !canOutline
                             return (
@@ -744,10 +812,8 @@ export function ShellLayout({
                                 type="button"
                                 disabled={disabled}
                                 className={cn(
-                                  inspectorMode === mode
-                                    ? 'studio-bottom-tab-active'
-                                    : 'studio-bottom-tab',
-                                  disabled && 'cursor-not-allowed opacity-30',
+                                  'studio-bottom-tab',
+                                  inspectorMode === mode && 'studio-bottom-tab-active',
                                 )}
                                 onClick={() => !disabled && setInspectorMode(mode)}
                               >
@@ -920,12 +986,12 @@ export function ShellLayout({
 
             {/* bottom panel */}
             <Panel defaultSize={25} minSize={12} className="studio-panel">
-              <div className="flex border-b border-border bg-panel-header">
+              <div className="studio-tab-bar">
                 {(['Output', 'Problems', 'Logs'] as const).map((tab) => (
                   <button
                     key={tab}
                     type="button"
-                    className={bottomTab === tab ? 'studio-bottom-tab-active' : 'studio-bottom-tab'}
+                    className={cn('studio-bottom-tab', bottomTab === tab && 'studio-bottom-tab-active')}
                     onClick={() => setBottomTab(tab)}
                   >
                     {tab}
@@ -1010,6 +1076,15 @@ export function ShellLayout({
           setValidatePrompt(undefined)
           void executeValidate(scope)
         }}
+      />
+
+      <ChangeLifecycleConfirmDialog
+        open={lifecycleConfirm !== null}
+        kind={lifecycleConfirm}
+        changeName={changeName ?? ''}
+        busy={lifecycleBusy}
+        onCancel={() => setLifecycleConfirm(null)}
+        onConfirm={executeLifecycleConfirm}
       />
     </div>
   )

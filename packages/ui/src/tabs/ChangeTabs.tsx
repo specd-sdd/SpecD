@@ -29,7 +29,7 @@ export function ChangeTabs({
   }
 
   return (
-    <div className="flex items-center border-b border-border bg-panel-header">
+    <div className="studio-tab-bar">
       {CHANGE_VIEWS.map((view) => (
         <button
           key={view}

@@ -6,9 +6,9 @@ Studio UI for **Sidebar Changes Discarded**: user-visible layout and actions dri
 
 ## Requirements
 
-### Requirement: sidebar renders global poll data and wires actions
+### Requirement: sidebar renders global poll data — navigation only
 
-The sidebar MUST render lists from global poll hooks (`hooks-changes-collection`, `hooks-workspaces-specs`, etc.). Row actions (open, restore, discard) MUST call the appropriate mutate port methods.
+The sidebar MUST render a list of discarded changes from global poll hooks. Each row navigates to the change Overview — the sidebar MUST NOT expose per-row action buttons. A discarded change is permanently abandoned; its Overview shows a read-only notice to that effect.
 
 ### Requirement: view uses SpecdDataPort hooks only
 
@@ -16,7 +16,7 @@ Components MUST consume data through `SpecdDataPort` hooks and MUST NOT import `
 
 ### Requirement: view surfaces loading and error states
 
-While requests are in flight or fail, the UI MUST show loading indicators and human-readable errors (including HTTP 409 on save conflicts where applicable).
+While requests are in flight or fail, the UI MUST show loading indicators and human-readable errors.
 
 ## Spec Dependencies
 

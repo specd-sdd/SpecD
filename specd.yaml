@@ -380,4 +380,9 @@ plugins:
     - name: '@specd/plugin-agent-opencode'
     - name: '@specd/plugin-agent-standard'
   ui:
-    - name: '@specd/plugin-ui-studio'
+    - name: '@specd/studio-web'
+
+api:
+  cors:
+    origins:
+      - 'http://127.0.0.1:5174'

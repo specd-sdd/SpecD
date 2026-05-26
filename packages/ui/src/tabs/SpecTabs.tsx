@@ -26,7 +26,7 @@ export function SpecTabs({
   onActiveChange: (view: SpecView) => void
 }): React.ReactElement {
   return (
-    <div className="flex items-center border-b border-border bg-panel-header">
+    <div className="studio-tab-bar">
       {SPEC_VIEWS.map((view) => (
         <button
           key={view}
