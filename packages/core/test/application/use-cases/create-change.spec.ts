@@ -173,6 +173,24 @@ describe('CreateChange', () => {
     })
   })
 
+  describe('given a drafted change with that name already exists', () => {
+    it('throws ChangeAlreadyExistsError', async () => {
+      const existing = makeChange('add-oauth')
+      existing.draft(testActor)
+      const repo = makeChangeRepository([existing])
+      const uc = new CreateChange(repo, new Map(), makeActorResolver())
+
+      await expect(
+        uc.execute({
+          name: 'add-oauth',
+          specIds: ['auth/login'],
+          schemaName: 'specd-std',
+          schemaVersion: 1,
+        }),
+      ).rejects.toThrow(ChangeAlreadyExistsError)
+    })
+  })
+
   describe('given a change with that name already exists', () => {
     it('throws ChangeAlreadyExistsError', async () => {
       const existing = makeChange('add-oauth')

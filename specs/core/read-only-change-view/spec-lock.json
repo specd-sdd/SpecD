@@ -1,0 +1,13 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["core:change"],
+  "implementation": [
+    {
+      "file": "core:src/domain/read-only-change-view.ts",
+      "symbols": ["toDraftedChangeView", "toDiscardedChangeView"]
+    }
+  ]
+}

@@ -108,6 +108,32 @@ export function makeMockChange(overrides: Record<string, unknown> = {}): Record<
   }
 }
 
+/** Minimal {@link DiscardedChangeView}-shaped object for CLI list/show tests. */
+export function makeMockDiscardedView(
+  overrides: Record<string, unknown> = {},
+): Record<string, unknown> {
+  const discardedAt =
+    overrides.discardedAt instanceof Date
+      ? overrides.discardedAt
+      : new Date('2026-01-01T00:00:00.000Z')
+  const discardedBy = (overrides.discardedBy ?? {
+    name: 'bob',
+    email: 'b@test.com',
+  }) as { name: string; email: string }
+  return {
+    name: 'old-feat',
+    state: 'designing',
+    specIds: ['auth/login'],
+    schemaName: '@specd/schema-std',
+    schemaVersion: 1,
+    history: [],
+    discardedAt,
+    discardedBy,
+    discardReason: 'discarded',
+    ...overrides,
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Mock kernel factory
 // ---------------------------------------------------------------------------
@@ -115,6 +141,7 @@ export function makeMockChange(overrides: Record<string, unknown> = {}): Record<
 export function makeMockKernel(overrides: Record<string, unknown> = {}): Kernel & MockKernel {
   const changes = {
     repo: {
+      get: vi.fn().mockResolvedValue(makeMockChange()),
       artifactExists: vi.fn().mockResolvedValue(false),
       deltaExists: vi.fn().mockResolvedValue(false),
     } as unknown as ChangeRepository,
@@ -125,6 +152,8 @@ export function makeMockKernel(overrides: Record<string, unknown> = {}): Kernel 
     listArchived: { execute: vi.fn().mockResolvedValue([]) },
     getArchived: { execute: vi.fn() },
     status: { execute: vi.fn() },
+    getDraft: { execute: vi.fn() },
+    getDiscarded: { execute: vi.fn() },
     transition: { execute: vi.fn() },
     draft: { execute: vi.fn() },
     restore: { execute: vi.fn() },

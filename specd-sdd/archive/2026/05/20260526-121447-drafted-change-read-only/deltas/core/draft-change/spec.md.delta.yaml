@@ -1,0 +1,29 @@
+- op: modified
+  description: Load only from active storage.
+  selector:
+    type: section
+    matches: 'Requirement: Change must exist'
+  content: |
+    The use case MUST load the change from active storage via `ChangeRepository.get(name)`. If no active change exists with the given name, it MUST throw `ChangeNotFoundError`.
+
+    The use case MUST NOT load a change that exists only under `drafts/`.
+- op: modified
+  description: Return DraftedChangeView after shelving.
+  selector:
+    type: section
+    matches: 'Requirement: Persistence'
+  content: |
+    After appending the drafted event, the use case MUST persist the change through `ChangeRepository.mutate(name, fn)`.
+
+    Inside the mutation callback, the repository supplies the fresh persisted active `Change`; the use case calls `change.draft(actor, reason, force)` on that instance and returns it. When the callback resolves, the repository persists the updated manifest and performs the required directory relocation to `drafts/`.
+
+    `DraftChange.execute` MUST return a `DraftedChangeView` for the drafted change, produced from the persisted drafted state (via `getDraft(name)` or an equivalent repository mapper). It MUST NOT return a mutable `Change` to callers.
+- op: modified
+  description: Add drafted-change-view dependency.
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`core:change`](../change/spec.md)
+    - [`core:drafted-change-view`](../drafted-change-view/spec.md)
+    - [`default:_global/architecture`](../../_global/architecture/spec.md)

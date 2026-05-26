@@ -53,10 +53,32 @@
 
 #### Scenario: Change is persisted through serialized mutation
 
-- **WHEN** `DiscardChange.execute` completes successfully
+- **GIVEN** a change exists under `changes/`
+- **WHEN** `DiscardChange.execute` completes successfully for that name
 - **THEN** `ChangeRepository.mutate(input.name, fn)` is called
 - **AND** the callback records the discarded event on the fresh persisted `Change`
 - **AND** the resulting change is relocated to the discarded area by the repository
+
+#### Scenario: Drafted change uses mutateDraft
+
+- **GIVEN** a change exists only under `drafts/`
+- **WHEN** `DiscardChange.execute` completes successfully
+- **THEN** `ChangeRepository.mutateDraft` was called for that name
+- **AND** the directory is under `discarded/`
+
+#### Scenario: Active discard does not call mutateDraft
+
+- **GIVEN** a change exists only under `changes/`
+- **WHEN** `DiscardChange.execute` completes successfully
+- **THEN** `ChangeRepository.mutate` was called
+- **AND** `ChangeRepository.mutateDraft` was not called
+
+#### Scenario: Discarded change is not loadable via get or getDraft
+
+- **GIVEN** `DiscardChange.execute` completed for name `old-experiment`
+- **WHEN** `ChangeRepository.get('old-experiment')` and `getDraft('old-experiment')` are called
+- **THEN** both return `null`
+- **AND** `getDiscarded('old-experiment')` returns a `DiscardedChangeView`
 
 ### Requirement: Input contract
 

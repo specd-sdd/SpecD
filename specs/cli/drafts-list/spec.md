@@ -20,6 +20,14 @@ specd draft list [--format text|json|toon]
 
 No positional arguments. The `--format` flag controls output encoding; defaults to `text`.
 
+### Requirement: Uses ListDrafts read model
+
+The command MUST invoke `ListDrafts.execute()` and treat each entry as a `DraftedChangeView`.
+
+The command MUST read `history` from each view to extract the latest `drafted` event for `draftedAt`, `draftedBy`, and `reason`.
+
+The command MUST NOT assume entries are mutable `Change` instances.
+
 ### Requirement: Output format — text
 
 The command prints a human-readable table to stdout. Changes are sorted by `createdAt` ascending (oldest first).
@@ -76,5 +84,6 @@ $ specd drafts list --format json
 ## Spec Dependencies
 
 - [`cli:entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
-- [`core:change`](../../core/change/spec.md) — drafting semantics
+- [`core:list-drafts`](../../core/list-drafts/spec.md) — lists drafted changes as views
+- [`core:drafted-change-view`](../../core/drafted-change-view/spec.md) — entry shape
 - [`cli:command-resource-naming`](../command-resource-naming/spec.md) — canonical plural naming and singular alias policy

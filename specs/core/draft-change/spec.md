@@ -16,7 +16,9 @@ Users need to pause work on a change without losing its state or history — for
 
 ### Requirement: Change must exist
 
-The use case MUST load the change from the `ChangeRepository` by name. If no change exists with the given name, it MUST throw `ChangeNotFoundError`.
+The use case MUST load the change from active storage via `ChangeRepository.get(name)`. If no active change exists with the given name, it MUST throw `ChangeNotFoundError`.
+
+The use case MUST NOT load a change that exists only under `drafts/`.
 
 ### Requirement: Actor resolution
 
@@ -43,9 +45,9 @@ The use case MUST call `change.draft(actor, reason, force)` to append a `drafted
 
 After appending the drafted event, the use case MUST persist the change through `ChangeRepository.mutate(name, fn)`.
 
-Inside the mutation callback, the repository supplies the fresh persisted `Change` for `name`; the use case calls `change.draft(actor, reason)` on that instance and returns it. When the callback resolves, the repository persists the updated manifest and performs any required directory relocation to `drafts/`.
+Inside the mutation callback, the repository supplies the fresh persisted active `Change`; the use case calls `change.draft(actor, reason, force)` on that instance and returns it. When the callback resolves, the repository persists the updated manifest and performs the required directory relocation to `drafts/`.
 
-`DraftChange.execute` returns the updated `Change` instance produced by that serialized mutation.
+`DraftChange.execute` MUST return a `DraftedChangeView` for the drafted change, produced from the persisted drafted state (via `getDraft(name)` or an equivalent repository mapper). It MUST NOT return a mutable `Change` to callers.
 
 ### Requirement: Dependencies
 
@@ -63,4 +65,5 @@ Inside the mutation callback, the repository supplies the fresh persisted `Chang
 ## Spec Dependencies
 
 - [`core:change`](../change/spec.md)
+- [`core:drafted-change-view`](../drafted-change-view/spec.md)
 - [`default:_global/architecture`](../../_global/architecture/spec.md)

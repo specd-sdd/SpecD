@@ -1,0 +1,13 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["core:change", "default:_global/architecture"],
+  "implementation": [
+    {
+      "file": "core:src/application/use-cases/discard-change.ts",
+      "symbols": ["DiscardChange"]
+    }
+  ]
+}

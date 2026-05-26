@@ -3,6 +3,7 @@ import { CommanderError } from 'commander'
 import { ChangeNotFoundError } from '@specd/core'
 import {
   makeMockConfig,
+  makeMockDiscardedView,
   makeMockKernel,
   makeProgram,
   mockProcessExit,
@@ -45,22 +46,14 @@ describe('Command signature', () => {
 describe('Output format — text', () => {
   it('Normal text output includes reason', async () => {
     const { kernel, stdout } = setup()
-    kernel.changes.status.execute.mockResolvedValue({
-      change: {
+    kernel.changes.getDiscarded.execute.mockResolvedValue({
+      view: makeMockDiscardedView({
         name: 'old-experiment',
-        specIds: new Set(['auth/legacy']),
+        specIds: ['auth/legacy'],
         schemaName: 'schema-std',
         schemaVersion: 1,
-        history: [
-          {
-            type: 'discarded',
-            at: new Date('2024-01-10T09:00:00Z'),
-            by: { name: 'alice', email: 'alice@test.com' },
-            reason: 'approach superseded by new-design',
-          },
-        ],
-      },
-      artifactStatuses: [],
+        discardReason: 'approach superseded by new-design',
+      }),
     })
 
     const program = makeProgram()
@@ -82,22 +75,14 @@ describe('Output format — text', () => {
 describe('Output format — JSON', () => {
   it('JSON format output', async () => {
     const { kernel, stdout } = setup()
-    kernel.changes.status.execute.mockResolvedValue({
-      change: {
+    kernel.changes.getDiscarded.execute.mockResolvedValue({
+      view: makeMockDiscardedView({
         name: 'old-experiment',
-        specIds: new Set(['auth/legacy']),
+        specIds: ['auth/legacy'],
         schemaName: 'schema-std',
         schemaVersion: 1,
-        history: [
-          {
-            type: 'discarded',
-            at: new Date('2024-01-10T09:00:00Z'),
-            by: { name: 'alice', email: 'alice@test.com' },
-            reason: 'approach superseded by new-design',
-          },
-        ],
-      },
-      artifactStatuses: [],
+        discardReason: 'approach superseded by new-design',
+      }),
     })
 
     const program = makeProgram()
@@ -127,7 +112,7 @@ describe('Output format — JSON', () => {
 describe('Error cases', () => {
   it('Change not found in discarded', async () => {
     const { kernel, stderr } = setup()
-    kernel.changes.status.execute.mockRejectedValue(new ChangeNotFoundError('nonexistent'))
+    kernel.changes.getDiscarded.execute.mockRejectedValue(new ChangeNotFoundError('nonexistent'))
 
     const program = makeProgram()
     registerDiscardedShow(program.command('discarded'))

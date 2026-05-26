@@ -51,6 +51,12 @@ import {
 import { type ActorResolver } from '../../../src/application/ports/actor-resolver.js'
 import { SpecArtifact } from '../../../src/domain/value-objects/spec-artifact.js'
 import { ChangeNotFoundError } from '../../../src/application/errors/change-not-found-error.js'
+import {
+  toDiscardedChangeView,
+  toDraftedChangeView,
+  type DiscardedChangeView,
+  type DraftedChangeView,
+} from '../../../src/domain/read-only-change-view.js'
 
 /** Default identity for test actors. */
 export const testActor: ActorIdentity = { name: 'Test User', email: 'test@example.com' }
@@ -72,23 +78,60 @@ class StubChangeRepository extends ChangeRepository {
 
   override async get(name: string): Promise<Change | null> {
     const change = this.store.get(name)
-    return change === undefined ? null : cloneChange(change)
+    if (change === undefined) return null
+    const cloned = cloneChange(change)
+    if (cloned.isDrafted) return null
+    if (isDiscardedStub(cloned)) return null
+    return cloned
+  }
+
+  override async getDraft(name: string): Promise<DraftedChangeView | null> {
+    const change = this.store.get(name)
+    if (change === undefined) return null
+    const cloned = cloneChange(change)
+    if (!cloned.isDrafted || isDiscardedStub(cloned)) return null
+    return toDraftedChangeView(cloned)
+  }
+
+  override async getDiscarded(name: string): Promise<DiscardedChangeView | null> {
+    const change = this.store.get(name)
+    if (change === undefined) return null
+    const cloned = cloneChange(change)
+    if (!isDiscardedStub(cloned)) return null
+    return toDiscardedChangeView(cloned)
   }
 
   override async list(): Promise<Change[]> {
-    return [...this.store.values()].map((change) => cloneChange(change))
+    return [...this.store.values()]
+      .map((change) => cloneChange(change))
+      .filter((change) => !change.isDrafted && !isDiscardedStub(change))
   }
 
-  override async listDrafts(): Promise<Change[]> {
-    throw new Error('not implemented')
+  override async listDrafts(): Promise<DraftedChangeView[]> {
+    return [...this.store.values()]
+      .filter((change) => change.isDrafted && !isDiscardedStub(change))
+      .map((change) => toDraftedChangeView(cloneChange(change)))
   }
 
-  override async listDiscarded(): Promise<Change[]> {
-    throw new Error('not implemented')
+  override async listDiscarded(): Promise<DiscardedChangeView[]> {
+    return [...this.store.values()]
+      .filter((change) => isDiscardedStub(change))
+      .map((change) => toDiscardedChangeView(cloneChange(change)))
   }
 
-  override async save(change: Change): Promise<void> {
-    this.store.set(change.name, cloneChange(change))
+  override async mutateDraft<T>(name: string, fn: (change: Change) => Promise<T> | T): Promise<T> {
+    const change = await this.getDraft(name)
+    if (change === null) {
+      throw new ChangeNotFoundError(name)
+    }
+    const stored = this.store.get(name)
+    if (stored === undefined) {
+      throw new ChangeNotFoundError(name)
+    }
+    const working = cloneChange(stored)
+    const result = await fn(working)
+    await this.save(working)
+    return result
   }
 
   override async mutate<T>(name: string, fn: (change: Change) => Promise<T> | T): Promise<T> {
@@ -100,6 +143,10 @@ class StubChangeRepository extends ChangeRepository {
     const result = await fn(change)
     await this.save(change)
     return result
+  }
+
+  override async save(change: Change): Promise<void> {
+    this.store.set(change.name, cloneChange(change))
   }
 
   override async delete(change: Change): Promise<void> {
@@ -120,6 +167,10 @@ class StubChangeRepository extends ChangeRepository {
 
   override changePath(change: Change): string {
     return `/test/changes/${change.name}`
+  }
+
+  override draftChangePath(view: DraftedChangeView): string {
+    return `/test/drafts/${view.name}`
   }
 
   override async artifactExists(_change: Change, _filename: string): Promise<boolean> {
@@ -153,6 +204,15 @@ export function makeChangeRepository(
   initial: Change[] = [],
 ): ChangeRepository & { store: Map<string, Change> } {
   return new StubChangeRepository(initial)
+}
+
+/**
+ * @param change - Change to inspect
+ * @returns Whether the latest history event is `discarded`
+ */
+function isDiscardedStub(change: Change): boolean {
+  const last = change.history[change.history.length - 1]
+  return last?.type === 'discarded'
 }
 
 /**

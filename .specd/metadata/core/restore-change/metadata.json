@@ -15,7 +15,7 @@
     {
       "requirement": "Change must exist",
       "rules": [
-        "The use case MUST load the change from the `ChangeRepository` by name. If no change exists with the given name, it MUST throw `ChangeNotFoundError`."
+        "The use case MUST verify the change exists in drafted storage via `ChangeRepository.getDraft(name)`. If `getDraft` returns `null`, it MUST throw `ChangeNotFoundError`.\n\nThe use case MUST NOT use `ChangeRepository.get(name)` for loading."
       ]
     },
     {
@@ -33,7 +33,7 @@
     {
       "requirement": "Persistence",
       "rules": [
-        "After appending the restored event, the use case MUST persist the change through `ChangeRepository.mutate(name, fn)`.\n\nInside the mutation callback, the repository supplies the fresh persisted `Change` for `name`; the use case calls `change.restore(actor)` on that instance and returns it. When the callback resolves, the repository persists the updated manifest and performs any required directory relocation back to `changes/`.\n\n`RestoreChange.execute` returns the updated `Change` instance produced by that serialized mutation."
+        "After resolving the actor, the use case MUST persist through `ChangeRepository.mutateDraft(name, fn)`.\n\nInside the mutation callback, the repository supplies the fresh persisted drafted `Change`; the use case calls `change.restore(actor)` on that instance and returns it. When the callback resolves, the repository persists the updated manifest and moves the directory from `drafts/` to `changes/`.\n\n`RestoreChange.execute` returns the updated active `Change` instance (`isDrafted === false`) produced by that serialized mutation."
       ]
     },
     {
@@ -51,8 +51,22 @@
   "scenarios": [
     {
       "requirement": "Change must exist",
-      "name": "Non-existent change is rejected",
-      "when": ["RestoreChange.execute is called with a name that does not exist in the repository"],
+      "name": "Non-existent drafted change is rejected",
+      "when": ["RestoreChange.execute is called with a name that does not exist under drafts/"],
+      "then": ["it throws ChangeNotFoundError"]
+    },
+    {
+      "requirement": "Change must exist",
+      "name": "Active-only name is rejected",
+      "given": ["a change exists only under changes/ (not drafted)"],
+      "when": ["RestoreChange.execute is called with its name"],
+      "then": ["it throws ChangeNotFoundError"]
+    },
+    {
+      "requirement": "Change must exist",
+      "name": "Discarded-only name is rejected",
+      "given": ["a change exists only under discarded/"],
+      "when": ["RestoreChange.execute is called with its name"],
       "then": ["it throws ChangeNotFoundError"]
     },
     {
@@ -81,9 +95,9 @@
       "name": "Change is persisted through serialized mutation",
       "when": ["RestoreChange.execute completes successfully"],
       "then": [
-        "ChangeRepository.mutate(input.name, fn) is called",
-        "AND the callback records the restored event on the fresh persisted Change",
-        "AND the resulting change is relocated back to the active changes area by the repository"
+        "ChangeRepository.mutateDraft(input.name, fn) is called",
+        "AND the callback records the restored event on the fresh persisted drafted Change",
+        "AND the resulting change is relocated back to changes/ with isDrafted === false"
       ]
     },
     {
@@ -105,9 +119,18 @@
       "then": ["it requires an ActorResolver port in its constructor"]
     }
   ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "core:restore-change",
+        "file": "core:src/application/use-cases/restore-change.ts",
+        "symbol": "RestoreChange"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:7abeb8679afa1f1532f92a84366bce5c822bb4b577f844d79ea7c9b00788960a",
-    "verify.md": "sha256:976d95d15fb4e076508433f033ef660808942717f5264e42ba089d5526e8687b"
+    "spec.md": "sha256:bea0a1e842538d86c016b6ce88e9bd86baefda0cb41c19b6f622d720aa9d02c1",
+    "verify.md": "sha256:6d76763d828250e775424124d13bf52cc53c72642deb28a19d6303102b06d407"
   },
   "generatedBy": "core"
 }

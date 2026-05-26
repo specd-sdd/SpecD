@@ -1,27 +1,27 @@
 {
   "title": "ListDrafts",
-  "description": "Users who shelve changes need visibility into what is parked so they can decide what to resume. The `ListDrafts` use case retrieves all drafted (shelved) changes from the default workspace — those temporarily set aside that can be restored to active status later.",
+  "description": "Users who draft changes need visibility into what is parked so they can decide what to resume. The `ListDrafts` use case retrieves all drafted changes from the default workspace — those temporarily set aside that can be restored to active status later.",
   "dependsOn": ["core:change", "core:kernel"],
   "context": [
-    "Users who shelve changes need visibility into what is parked so they can decide what to resume. The `ListDrafts` use case retrieves all drafted (shelved) changes from the default workspace — those temporarily set aside that can be restored to active status later."
+    "Users who draft changes need visibility into what is parked so they can decide what to resume. The `ListDrafts` use case retrieves all drafted changes from the default workspace — those temporarily set aside that can be restored to active status later."
   ],
   "rules": [
     {
       "requirement": "Returns all drafted changes",
       "rules": [
-        "`ListDrafts.execute()` MUST return all changes that are in the drafted (shelved) lifecycle state. The result MUST be sorted by creation order, oldest first."
+        "`ListDrafts.execute()` MUST return all changes that are in the drafted lifecycle state. The result MUST be sorted by creation order, oldest first."
       ]
     },
     {
-      "requirement": "Returns Change entities without content",
+      "requirement": "Returns DraftedChangeView without content",
       "rules": [
-        "The returned `Change[]` MUST contain artifact state (status, validated hashes) but MUST NOT include artifact file content. Content is loaded on demand through separate use cases."
+        "`ListDrafts.execute()` MUST return `DraftedChangeView[]`. Each view MUST expose artifact state (status, validated hashes) and any fields required for listing (including `history` for the latest `drafted` event) but MUST NOT include artifact file content.\n\nCallers MUST NOT receive a `Change` aggregate from this use case."
       ]
     },
     {
       "requirement": "Constructor accepts a ChangeRepository",
       "rules": [
-        "`ListDrafts` MUST accept a `ChangeRepository` as its sole constructor argument. It MUST delegate to `ChangeRepository.listDrafts()` to retrieve drafted changes."
+        "`ListDrafts` MUST accept a `ChangeRepository` as its sole constructor argument. It MUST delegate to `ChangeRepository.listDrafts()` and return the resulting `DraftedChangeView[]` without wrapping in mutable `Change` instances."
       ]
     },
     {
@@ -57,13 +57,37 @@
       "then": ["the result contains only alpha"]
     },
     {
-      "requirement": "Returns Change entities without content",
-      "name": "Changes have artifact state but no content",
-      "when": ["execute() returns a list of changes"],
+      "requirement": "Returns DraftedChangeView without content",
+      "name": "Views have artifact state but no content",
+      "when": ["execute() returns a list"],
       "then": [
-        "each Change has its artifact map populated with status and validated hashes",
+        "each entry satisfies DraftedChangeView with isDrafted === true",
+        "AND artifact statuses are populated",
         "AND no artifact file content is loaded"
       ]
+    },
+    {
+      "requirement": "Returns DraftedChangeView without content",
+      "name": "Views are not Change instances",
+      "when": ["execute() returns a non-empty list"],
+      "then": ["entries do not expose transition or other Change mutators"]
+    },
+    {
+      "requirement": "Returns DraftedChangeView without content",
+      "name": "Empty drafts directory returns empty list",
+      "given": ["no directories exist under drafts/"],
+      "when": ["ListDrafts.execute() is called"],
+      "then": ["it returns an empty array"]
+    },
+    {
+      "requirement": "Returns DraftedChangeView without content",
+      "name": "Active changes are excluded",
+      "given": [
+        "parked-feature exists only under changes/",
+        "AND old-work exists only under drafts/"
+      ],
+      "when": ["ListDrafts.execute() is called"],
+      "then": ["the result contains old-work only", "AND no entry has name === 'parked-feature'"]
     },
     {
       "requirement": "Returns an empty array when no drafted changes exist",
@@ -80,9 +104,18 @@
       "then": ["the result is an empty array"]
     }
   ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "core:list-drafts",
+        "file": "core:src/application/use-cases/list-drafts.ts",
+        "symbol": "ListDrafts"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:c68900817b846f2139526f96b31aea5ea013246e7b8b4eb0420d9ab792c00daa",
-    "verify.md": "sha256:96d330894a13e7afe81ecd3ce72b75ea1e2619189da08a35d50ce3c1f2ca47fe"
+    "spec.md": "sha256:7b5627d8b6d5af2089948cef5e09029a54834030e9de58f7e92105c4db14bd24",
+    "verify.md": "sha256:8a12ffbf30962286b1e1eb1ef7af277d23c767a78ae57b8a7b6201cb88523578"
   },
   "generatedBy": "core"
 }

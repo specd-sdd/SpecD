@@ -5,6 +5,10 @@
     "core:repository-port",
     "default:_global/architecture",
     "core:change",
+    "core:read-only-change-view",
+    "core:drafted-change-view",
+    "core:discarded-change-view",
+    "core:drafted-change-read-only-error",
     "core:storage",
     "core:change-manifest",
     "default:_global/logging"
@@ -22,13 +26,31 @@
     {
       "requirement": "get returns a Change or null",
       "rules": [
-        "`get(name)` MUST accept a change name string and return the `Change` with that name, or `null` if no change with that name exists. The returned `Change` MUST load artifact and file states from the persisted manifest. If an artifact or file entry omits `state`, the repository defaults that missing value to `missing` while loading.\n\n`validatedHash` is still loaded with the artifact data, but hash comparison is not the sole source of truth for steady-state status. The repository MAY detect drift and persist updated file and artifact states before returning (see Requirement: Auto-invalidation on get when artifact files drift).\n\n`get()` is a snapshot read for callers. It MAY auto-invalidate and persist drifted artifacts before returning, but it MUST NOT be the repository's serialized mutation primitive. Callers that need a coordinated read-modify-write section for an existing persisted change MUST use `mutate(name, fn)` instead of relying on a later `save()` against a stale snapshot."
+        "`get(name)` MUST resolve the change name **only** under active storage (`changes/`). It MUST NOT search `drafts/` or `discarded/`.\n\nWhen a change with the given name exists only as drafted, `get(name)` MUST return `null`.\n\nWhen a change exists in active storage, `get(name)` MUST return the `Change` with artifact and file states loaded from the persisted manifest. If an artifact or file entry omits `state`, the repository defaults that missing value to `missing` while loading.\n\n`validatedHash` is still loaded with the artifact data, but hash comparison is not the sole source of truth for steady-state status. The repository MAY detect drift and persist updated file and artifact states before returning (see Requirement: Auto-invalidation on get when artifact files drift).\n\n`get()` is a snapshot read for **active** changes. It MAY auto-invalidate and persist drifted artifacts before returning, but it MUST NOT be the repository's serialized mutation primitive. Callers that need a coordinated read-modify-write section for an existing active change MUST use `mutate(name, fn)` instead of relying on a later `save()` against a stale snapshot."
+      ]
+    },
+    {
+      "requirement": "getDraft returns a DraftedChangeView or null",
+      "rules": [
+        "`getDraft(name)` MUST resolve the change name **only** under drafted storage (`drafts/`). It MUST NOT search `changes/` or `discarded/`.\n\nWhen a drafted change exists, `getDraft(name)` MUST return a `DraftedChangeView` constructed from the persisted manifest. The view MUST satisfy [`core:drafted-change-view`](../drafted-change-view/spec.md).\n\nWhen no drafted change exists with the given name, `getDraft(name)` MUST return `null`.\n\n`getDraft()` MUST NOT auto-invalidate or persist manifest updates. Drift detection for drafted changes is out of scope for the active working set until the change is restored."
+      ]
+    },
+    {
+      "requirement": "getDiscarded returns a DiscardedChangeView or null",
+      "rules": [
+        "`getDiscarded(name)` MUST resolve the change name **only** under discarded storage (`discarded/`). It MUST NOT search `changes/` or `drafts/`.\n\nWhen a discarded change exists, `getDiscarded(name)` MUST return a `DiscardedChangeView` built via `toDiscardedChangeView` from the shared inspection facade ([`core:read-only-change-view`](../read-only-change-view/spec.md)).\n\nWhen no discarded change exists with the given name, `getDiscarded(name)` MUST return `null`.\n\n`getDiscarded()` MUST NOT auto-invalidate or persist manifest updates."
       ]
     },
     {
       "requirement": "mutate serializes persisted change updates",
       "rules": [
-        "`mutate(name, fn)` MUST provide serialized read-modify-write semantics for one existing persisted change.\n\nFor a given change name, the repository MUST:\n\n1. Acquire exclusive mutation access scoped to that persisted change\n2. Reload the freshest persisted `Change` state after the exclusive access is acquired\n3. Invoke `fn(change)` with that fresh `Change`\n4. Persist the updated change manifest if `fn` resolves successfully\n5. Release the exclusive access before returning or throwing\n\nIf no change with the given name exists, `mutate()` MUST throw `ChangeNotFoundError`.\n\nIf `fn` throws, `mutate()` MUST release the exclusive access and MUST NOT persist a partial manifest update produced by the failed callback.\n\nThe serialized section MUST cover the full persisted mutation window — fresh load, callback execution, and manifest persistence. Locking only the final manifest write is insufficient.\n\nExclusive access is per change, not global. Mutations targeting different change names MAY proceed concurrently."
+        "`mutate(name, fn)` MUST provide serialized read-modify-write semantics for one existing **active** persisted change.\n\nResolution MUST use the same rules as `get(name)` — only `changes/`. If the name exists only under `drafts/`, `mutate()` MUST throw `ChangeNotFoundError`.\n\nFor a given active change name, the repository MUST:\n\n1. Acquire exclusive mutation access scoped to that persisted change\n2. Reload the freshest persisted `Change` state from active storage after the exclusive access is acquired\n3. Invoke `fn(change)` with that fresh `Change` where `change.isDrafted === false`\n4. Persist the updated change manifest if `fn` resolves successfully\n5. Release the exclusive access before returning or throwing\n\nIf no active change with the given name exists, `mutate()` MUST throw `ChangeNotFoundError`.\n\nIf `fn` throws, `mutate()` MUST release the exclusive access and MUST NOT persist a partial manifest update produced by the failed callback.\n\nThe serialized section MUST cover the full persisted mutation window — fresh load, callback execution, and manifest persistence. Locking only the final manifest write is insufficient.\n\nExclusive access is per change name, not global. Mutations targeting different change names MAY proceed concurrently."
+      ]
+    },
+    {
+      "requirement": "mutateDraft serializes drafted change updates",
+      "rules": [
+        "`mutateDraft(name, fn)` MUST provide serialized read-modify-write semantics for one existing **drafted** persisted change.\n\nResolution MUST use the same rules as `getDraft(name)` — only `drafts/`. If the name exists only under active storage, `mutateDraft()` MUST throw `ChangeNotFoundError`.\n\nThe callback MUST receive a fresh mutable `Change` with `isDrafted === true` before any transforming operation in the callback. Only `RestoreChange` and `DiscardChange` (and repository internals) MAY call `mutateDraft` in production code.\n\nOn success, the repository MUST persist the manifest and perform any required directory move (`drafts/` ↔ `changes/` or `drafts/` → `discarded/`).\n\nIf `fn` throws, `mutateDraft()` MUST NOT persist partial updates, matching `mutate` failure semantics."
       ]
     },
     {
@@ -46,19 +68,19 @@
     {
       "requirement": "listDrafts returns drafted changes in creation order",
       "rules": [
-        "`listDrafts()` MUST return all drafted (shelved) changes sorted by creation order, oldest first. Each returned `Change` MUST include artifact state but MUST NOT include artifact content."
+        "`listDrafts()` MUST return all drafted changes sorted by creation order, oldest first. Each entry MUST be a `DraftedChangeView` with artifact state (derived statuses) but MUST NOT include artifact content. The repository MUST NOT return mutable `Change` instances to callers."
       ]
     },
     {
       "requirement": "listDiscarded returns discarded changes in creation order",
       "rules": [
-        "`listDiscarded()` MUST return all discarded changes sorted by creation order, oldest first. Each returned `Change` MUST include artifact state but MUST NOT include artifact content."
+        "`listDiscarded()` MUST return all discarded changes sorted by creation order, oldest first. Each entry MUST be a `DiscardedChangeView` built via the shared inspection facade. The repository MUST NOT return mutable `Change` instances to callers."
       ]
     },
     {
       "requirement": "save persists the change manifest only",
       "rules": [
-        "`save(change)` MUST persist the change manifest — state, artifact statuses, validated hashes, history events, and approvals. It MUST NOT write artifact file content. Artifact content is written exclusively via `saveArtifact()`. The write MUST be atomic (e.g. temp file + rename) to prevent partial reads.\n\n`save()` is a low-level persistence operation. Atomic manifest writing prevents partial-file corruption, but `save()` alone does not serialize a caller's earlier snapshot read. Use cases that mutate an existing persisted change and need concurrency safety MUST perform that mutation through `mutate(name, fn)`."
+        "`save(change)` MUST persist the change manifest — state, artifact statuses, validated hashes, history events, and approvals. It MUST NOT write artifact file content. Artifact content is written exclusively via `saveArtifact()`. The write MUST be atomic (e.g. temp file + rename) to prevent partial reads.\n\nIf `change.isDrafted === true`, `save(change)` MUST throw `DraftedChangeReadOnlyError` unless the call originates from the serialized `mutateDraft` window for that change name.\n\n`save()` is a low-level persistence operation. Atomic manifest writing prevents partial-file corruption, but `save()` alone does not serialize a caller's earlier snapshot read. Use cases that mutate an existing active persisted change and need concurrency safety MUST perform that mutation through `mutate(name, fn)`."
       ]
     },
     {
@@ -76,7 +98,7 @@
     {
       "requirement": "saveArtifact with optimistic concurrency",
       "rules": [
-        "`saveArtifact(change, artifact, options?)` MUST write an artifact file within a change directory. If `artifact.originalHash` is set, the implementation MUST compare it against the current hash of the file on disk before writing. If the hashes differ, the save MUST be rejected by throwing `ArtifactConflictError` — this prevents silently overwriting concurrent modifications. When `options.force` is `true`, the conflict check MUST be skipped and the file MUST be overwritten unconditionally. After a successful write, the corresponding `ChangeArtifact` status in the change manifest MUST be reset to `in-progress`; the caller is responsible for calling `save(change)` to persist this state change."
+        "`saveArtifact(change, artifact, options?)` MUST write an artifact file within a change directory. If `change.isDrafted === true`, `saveArtifact` MUST throw `DraftedChangeReadOnlyError` before any filesystem write.\n\nIf `artifact.originalHash` is set, the implementation MUST compare it against the current hash of the file on disk before writing. If the hashes differ, the save MUST be rejected by throwing `ArtifactConflictError` — this prevents silently overwriting concurrent modifications. When `options.force` is `true`, the conflict check MUST be skipped and the file MUST be overwritten unconditionally. After a successful write, the corresponding `ChangeArtifact` status in the change manifest MUST be reset to `in-progress`; the caller is responsible for calling `save(change)` to persist this state change."
       ]
     },
     {
@@ -98,6 +120,12 @@
       ]
     },
     {
+      "requirement": "draftChangePath returns the drafted directory path",
+      "rules": [
+        "`draftChangePath(view)` MUST accept a `DraftedChangeView` (or the internal drafted `Change` during `mutateDraft`) and return the absolute filesystem path under `drafts/` for template variables and CLI display.\n\n`changePath(change)` MUST continue to resolve paths under `changes/` for active changes only."
+      ]
+    },
+    {
       "requirement": "scaffold creates artifact directories",
       "rules": [
         "`scaffold(change, specExists)` MUST create the directory structure needed for the change's\nartifacts. For `scope: spec` artifacts, it creates `specs/<ws>/<capPath>/` or\n`deltas/<ws>/<capPath>/` directories under the change directory. For `scope: change`\nartifacts, the root directory already exists. The `specExists` callback is an async function\nthat returns whether a spec already exists in the repository, used to determine whether\nto create spec-scoped or delta-scoped directories."
@@ -112,7 +140,7 @@
     {
       "requirement": "Abstract class with abstract methods",
       "rules": [
-        "`ChangeRepository` MUST be defined as an `abstract class`, not an `interface`. All storage\noperations (`get`, `list`, `listDrafts`, `listDiscarded`, `save`, `delete`, `artifact`,\n`saveArtifact`, `artifactExists`, `deltaExists`, `changePath`, `scaffold`, `unscaffold`)\nMUST be declared as `abstract` methods. This follows the architecture spec requirement that\nports with shared construction are abstract classes."
+        "`ChangeRepository` MUST be defined as an `abstract class`, not an `interface`. All storage operations (`get`, `getDraft`, `getDiscarded`, `mutate`, `mutateDraft`, `list`, `listDrafts`, `listDiscarded`, `save`, `delete`, `artifact`, `saveArtifact`, `artifactExists`, `deltaExists`, `changePath`, `draftChangePath`, `scaffold`, `unscaffold`) MUST be declared as `abstract` methods. This follows the architecture spec requirement that ports with shared construction are abstract classes."
       ]
     },
     {
@@ -147,40 +175,127 @@
   "scenarios": [
     {
       "requirement": "get returns a Change or null",
-      "name": "Change exists",
-      "when": ["get(\"add-oauth-login\") is called and a change with that name exists"],
+      "name": "Active change exists",
+      "when": [
+        "get(\"add-oauth-login\") is called and a change with that name exists under changes/"
+      ],
       "then": [
         "a Change is returned with persisted artifact and file state loaded from the manifest"
       ]
     },
     {
       "requirement": "get returns a Change or null",
+      "name": "Drafted-only name returns null",
+      "given": ["a change exists only under drafts/"],
+      "when": ["get(name) is called"],
+      "then": ["it returns null"]
+    },
+    {
+      "requirement": "get returns a Change or null",
+      "name": "Discarded-only name returns null",
+      "given": ["a change exists only under discarded/"],
+      "when": ["get(name) is called"],
+      "then": ["it returns null"]
+    },
+    {
+      "requirement": "get returns a Change or null",
       "name": "Missing state defaults to missing on load",
       "given": ["a manifest entry without a state field"],
-      "when": ["get() loads that change"],
+      "when": ["get() loads that active change"],
       "then": ["the missing artifact or file state defaults to missing"]
     },
     {
       "requirement": "get returns a Change or null",
       "name": "get returns a snapshot, not a serialized mutation context",
-      "given": [
-        "two callers both loaded the same change via get()",
-        "AND one caller later updates that change through mutate()"
-      ],
-      "when": ["the other caller keeps using the previously returned Change"],
-      "then": ["that object remains a stale snapshot until the caller reloads it"]
+      "given": ["two callers both loaded the same active change via get()"],
+      "when": ["each caller mutates its in-memory instance and only one uses mutate()"],
+      "then": [
+        "the unsynchronized caller must not rely on save() alone for a safe persisted update"
+      ]
+    },
+    {
+      "requirement": "getDraft returns a DraftedChangeView or null",
+      "name": "Drafted change returns view",
+      "when": ["getDraft(name) is called and the change exists under drafts/"],
+      "then": ["a DraftedChangeView is returned with isDrafted === true"]
+    },
+    {
+      "requirement": "getDraft returns a DraftedChangeView or null",
+      "name": "Active-only name returns null",
+      "given": ["a change exists only under changes/"],
+      "when": ["getDraft(name) is called"],
+      "then": ["it returns null"]
+    },
+    {
+      "requirement": "getDraft returns a DraftedChangeView or null",
+      "name": "Discarded-only name returns null",
+      "given": ["a change exists only under discarded/"],
+      "when": ["getDraft(name) is called"],
+      "then": ["it returns null"]
+    },
+    {
+      "requirement": "getDraft returns a DraftedChangeView or null",
+      "name": "View has no artifact file bodies",
+      "given": ["a drafted change with on-disk proposal.md"],
+      "when": ["getDraft(name) returns a view"],
+      "then": ["the view exposes artifact statuses without embedding file content"]
+    },
+    {
+      "requirement": "getDiscarded returns a DiscardedChangeView or null",
+      "name": "Discarded change returns view",
+      "when": ["getDiscarded(name) is called and the change exists under discarded/"],
+      "then": [
+        "a DiscardedChangeView is returned with discardReason from the latest discarded event"
+      ]
+    },
+    {
+      "requirement": "getDiscarded returns a DiscardedChangeView or null",
+      "name": "Active-only name returns null",
+      "given": ["a change exists only under changes/"],
+      "when": ["getDiscarded(name) is called"],
+      "then": ["it returns null"]
+    },
+    {
+      "requirement": "getDiscarded returns a DiscardedChangeView or null",
+      "name": "Drafted-only name returns null",
+      "given": ["a change exists only under drafts/"],
+      "when": ["getDiscarded(name) is called"],
+      "then": ["it returns null"]
+    },
+    {
+      "requirement": "getDiscarded returns a DiscardedChangeView or null",
+      "name": "View exposes supersededBy when present",
+      "given": ["a discarded change whose discarded event includes supersededBy: ['replacement']"],
+      "when": ["getDiscarded(name) is called"],
+      "then": ["the returned view's supersededBy equals ['replacement']"]
     },
     {
       "requirement": "mutate serializes persisted change updates",
-      "name": "Missing change is rejected",
-      "when": ["mutate(\"missing-change\", fn) is called and no change with that name exists"],
+      "name": "Missing active change is rejected",
+      "when": [
+        "mutate(\"missing-change\", fn) is called and no active change with that name exists"
+      ],
+      "then": ["ChangeNotFoundError is thrown"]
+    },
+    {
+      "requirement": "mutate serializes persisted change updates",
+      "name": "Drafted-only name is rejected",
+      "given": ["a change exists only under drafts/"],
+      "when": ["mutate(name, fn) is called"],
+      "then": ["ChangeNotFoundError is thrown"]
+    },
+    {
+      "requirement": "mutate serializes persisted change updates",
+      "name": "Discarded-only name is rejected",
+      "given": ["a change exists only under discarded/"],
+      "when": ["mutate(name, fn) is called"],
       "then": ["ChangeNotFoundError is thrown"]
     },
     {
       "requirement": "mutate serializes persisted change updates",
       "name": "Second mutation sees the first mutation's persisted result",
       "given": [
-        "two callers both request mutate() for the same change name",
+        "two callers both request mutate() for the same active change name",
         "AND the first callback appends a history event and resolves"
       ],
       "when": ["the second callback starts executing"],
@@ -191,19 +306,35 @@
     {
       "requirement": "mutate serializes persisted change updates",
       "name": "Failing callback does not persist a partial manifest update",
-      "given": ["a mutate() callback modifies the provided Change"],
-      "when": ["the callback throws before returning"],
-      "then": [
-        "the repository does not persist that partial manifest update",
-        "AND a later mutate() call for the same change can proceed normally"
-      ]
+      "when": ["mutate(name, fn) is called and fn throws after mutating the in-memory change"],
+      "then": ["the on-disk manifest is unchanged from before the mutate call began"]
     },
     {
-      "requirement": "mutate serializes persisted change updates",
-      "name": "Different changes can mutate independently",
-      "given": ["one caller mutates change-a and another mutates change-b"],
-      "when": ["both operations execute at the same time"],
-      "then": ["neither operation waits on a global lock for unrelated change names"]
+      "requirement": "mutateDraft serializes drafted change updates",
+      "name": "Restore uses mutateDraft",
+      "when": ["RestoreChange.execute completes successfully"],
+      "then": ["ChangeRepository.mutateDraft was used for that name"]
+    },
+    {
+      "requirement": "mutateDraft serializes drafted change updates",
+      "name": "Active name is rejected",
+      "given": ["a change exists only under changes/"],
+      "when": ["mutateDraft(name, fn) is called"],
+      "then": ["ChangeNotFoundError is thrown"]
+    },
+    {
+      "requirement": "mutateDraft serializes drafted change updates",
+      "name": "Discarded name is rejected",
+      "given": ["a change exists only under discarded/"],
+      "when": ["mutateDraft(name, fn) is called"],
+      "then": ["ChangeNotFoundError is thrown"]
+    },
+    {
+      "requirement": "mutateDraft serializes drafted change updates",
+      "name": "Callback receives fresh drafted Change",
+      "given": ["mutateDraft(name, fn) is invoked for a drafted change"],
+      "when": ["the callback runs"],
+      "then": ["it receives a freshly loaded Change with isDrafted === true"]
     },
     {
       "requirement": "Auto-invalidation on get when artifact files drift",
@@ -295,6 +426,27 @@
       ]
     },
     {
+      "requirement": "save persists the change manifest only",
+      "name": "save on drafted change outside mutateDraft throws",
+      "given": ["a persisted change with isDrafted === true"],
+      "when": ["save(change) is called outside an active mutateDraft window"],
+      "then": ["DraftedChangeReadOnlyError is thrown"]
+    },
+    {
+      "requirement": "save persists the change manifest only",
+      "name": "save inside mutateDraft succeeds",
+      "given": ["mutateDraft(name, fn) is executing for a drafted change"],
+      "when": ["the callback triggers an internal save(change) for that same name"],
+      "then": ["DraftedChangeReadOnlyError is not thrown"]
+    },
+    {
+      "requirement": "save persists the change manifest only",
+      "name": "save on active change is unchanged",
+      "given": ["a change exists under changes/ with isDrafted === false"],
+      "when": ["save(change) is called outside mutate"],
+      "then": ["persistence proceeds per existing optimistic concurrency rules"]
+    },
+    {
       "requirement": "artifact loads content with originalHash",
       "name": "Artifact exists",
       "given": ["a change with an artifact file proposal.md on disk"],
@@ -379,6 +531,27 @@
       "then": ["the file is written without conflict check"]
     },
     {
+      "requirement": "saveArtifact with optimistic concurrency",
+      "name": "saveArtifact on drafted change throws",
+      "given": ["a change with isDrafted === true"],
+      "when": ["saveArtifact(change, artifact) is called outside mutateDraft"],
+      "then": ["DraftedChangeReadOnlyError is thrown before any filesystem write"]
+    },
+    {
+      "requirement": "saveArtifact with optimistic concurrency",
+      "name": "saveArtifact inside mutateDraft may succeed",
+      "given": ["mutateDraft(name, fn) is executing for a drafted change"],
+      "when": ["the callback calls saveArtifact for that change"],
+      "then": ["DraftedChangeReadOnlyError is not thrown for the drafted guard alone"]
+    },
+    {
+      "requirement": "saveArtifact with optimistic concurrency",
+      "name": "saveArtifact on active change is unchanged",
+      "given": ["a change under changes/ with isDrafted === false"],
+      "when": ["saveArtifact(change, artifact) is called with a valid hash"],
+      "then": ["existing optimistic concurrency behaviour applies"]
+    },
+    {
       "requirement": "artifactExists checks file presence without loading",
       "name": "File exists",
       "given": ["a change with artifact file tasks.md on disk"],
@@ -452,6 +625,27 @@
       "then": ["it returns the absolute path to the change directory"]
     },
     {
+      "requirement": "draftChangePath returns the drafted directory path",
+      "name": "Path resolves under drafts",
+      "given": ["a DraftedChangeView for change parked-feature"],
+      "when": ["draftChangePath(view) is called"],
+      "then": ["the returned path is under the configured drafts/ directory"]
+    },
+    {
+      "requirement": "draftChangePath returns the drafted directory path",
+      "name": "Path ends with change name segment",
+      "given": ["a DraftedChangeView with name: 'parked-feature'"],
+      "when": ["draftChangePath(view) is called"],
+      "then": ["the returned path basename is parked-feature"]
+    },
+    {
+      "requirement": "draftChangePath returns the drafted directory path",
+      "name": "Active changePath is not used for drafted view",
+      "given": ["a DraftedChangeView for a drafted change"],
+      "when": ["resolving filesystem location for inspection tooling"],
+      "then": ["callers use draftChangePath(view) rather than changePath with an active Change"]
+    },
+    {
       "requirement": "scaffold creates artifact directories",
       "name": "Scaffold creates spec directories",
       "given": ["a change with specIds including core:edit-change"],
@@ -465,9 +659,23 @@
       "then": ["it is an abstract class with abstract methods for get, list, save, mutate"]
     }
   ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "core:change-repository-port",
+        "file": "core:src/application/ports/change-repository.ts",
+        "symbol": "ChangeRepository"
+      },
+      {
+        "specId": "core:change-repository-port",
+        "file": "core:src/infrastructure/fs/change-repository.ts",
+        "symbol": "FsChangeRepository"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:39bf9751c8fa54d3c3166cae3bec9713794e32d6ad2eef91178240ed2f9e5c7b",
-    "verify.md": "sha256:dc4917a952a109a256c858d1162fa88c62381a738a4be1922ea3398f471ce260"
+    "spec.md": "sha256:0e4cd726e40c61afd562c14c9456d4e1bb89bc41542806841a94eb2166083592",
+    "verify.md": "sha256:00b95e59b0567d46f1b3d83f4f2c4cc789a20015aeec63690501e5f55394be5a"
   },
   "generatedBy": "core"
 }

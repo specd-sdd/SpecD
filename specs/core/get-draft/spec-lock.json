@@ -1,0 +1,17 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["core:drafted-change-view", "core:change-repository-port", "core:change"],
+  "implementation": [
+    {
+      "file": "core:src/application/use-cases/get-draft.ts",
+      "symbols": ["GetDraft"]
+    },
+    {
+      "file": "core:src/composition/kernel.ts",
+      "symbols": ["createKernel"]
+    }
+  ]
+}

@@ -21,6 +21,14 @@ specd draft show <name> [--format text|json|toon]
 - `<name>` — required positional; the name of the drafted change to show
 - `--format` — controls output encoding; defaults to `text`
 
+### Requirement: Loads drafted change via GetDraft
+
+The command MUST invoke `GetDraft.execute({ name })` (or the kernel equivalent) to load the drafted change.
+
+The command MUST NOT invoke `GetStatus` or `ChangeRepository.get` for this command.
+
+Displayed fields (`name`, `state`, `specIds`, `schema`) MUST be read from the returned `DraftedChangeView`.
+
 ### Requirement: Output format — text
 
 The command prints metadata for the change to stdout:
@@ -46,8 +54,8 @@ When `--format toon` is passed, the command writes the same data model as JSON e
 
 ### Requirement: Error cases
 
-- If no change with the given name exists in `drafts/`, the command exits with code 1 and prints an `error:` message to stderr.
-- If a change with the given name exists but is not in `drafts/` (i.e. it is active in `changes/` or in `discarded/`), the command exits with code 1 and prints an `error:` message to stderr.
+- If `GetDraft` throws `ChangeNotFoundError`, the command exits with code 1 and prints an `error:` message to stderr indicating the change is not in `drafts/`.
+- If a change with the given name exists only under active storage, the command exits with code 1 and prints an `error:` message to stderr.
 
 ## Constraints
 
@@ -71,5 +79,6 @@ $ specd drafts show old-experiment --format json
 ## Spec Dependencies
 
 - [`cli:entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
-- [`core:change`](../../core/change/spec.md) — Change entity, drafting semantics
+- [`core:get-draft`](../../core/get-draft/spec.md) — load drafted change by name
+- [`core:drafted-change-view`](../../core/drafted-change-view/spec.md) — read model returned to the command
 - [`cli:command-resource-naming`](../command-resource-naming/spec.md) — canonical plural naming and singular alias policy

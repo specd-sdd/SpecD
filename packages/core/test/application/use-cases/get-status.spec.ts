@@ -454,6 +454,21 @@ describe('GetStatus', () => {
     })
   })
 
+  describe('given a drafted change only', () => {
+    it('returns draftView without active change', async () => {
+      const change = makeChange('parked')
+      change.draft(testActor)
+      const repo = makeChangeRepository([change])
+      const uc = makeGetStatus(repo)
+
+      const result = await uc.execute({ name: 'parked' })
+
+      expect(result.change).toBeUndefined()
+      expect(result.draftView?.name).toBe('parked')
+      expect(result.lifecycle.availableTransitions).toEqual([])
+    })
+  })
+
   describe('given no change with that name', () => {
     it('throws ChangeNotFoundError', async () => {
       const repo = makeChangeRepository()

@@ -88,6 +88,12 @@ export {
   type OnTransitionProgress,
 } from './transition-change.js'
 export { type DraftChange, type DraftChangeInput } from './draft-change.js'
+export { type GetDraft, type GetDraftInput, type GetDraftResult } from './get-draft.js'
+export {
+  type GetDiscarded,
+  type GetDiscardedInput,
+  type GetDiscardedResult,
+} from './get-discarded.js'
 export { type RestoreChange, type RestoreChangeInput } from './restore-change.js'
 export { type DiscardChange, type DiscardChangeInput } from './discard-change.js'
 export { type ApproveSpec, type ApproveSpecInput } from './approve-spec.js'

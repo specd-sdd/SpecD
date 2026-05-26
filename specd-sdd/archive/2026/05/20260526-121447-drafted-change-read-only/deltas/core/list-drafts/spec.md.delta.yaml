@@ -1,0 +1,31 @@
+- op: modified
+  description: Use drafted terminology in Purpose section.
+  selector:
+    type: section
+    matches: 'Purpose'
+  content: |
+    Users who draft changes need visibility into what is parked so they can decide what to resume. The `ListDrafts` use case retrieves all drafted changes from the default workspace — those temporarily set aside that can be restored to active status later.
+- op: modified
+  description: Use drafted-only terminology in list requirement.
+  selector:
+    type: section
+    matches: 'Requirement: Returns all drafted changes'
+  content: |
+    `ListDrafts.execute()` MUST return all changes that are in the drafted lifecycle state. The result MUST be sorted by creation order, oldest first.
+- op: modified
+  description: Return DraftedChangeView instead of Change.
+  selector:
+    type: section
+    matches: 'Requirement: Returns Change entities without content'
+  rename: 'Requirement: Returns DraftedChangeView without content'
+  content: |
+    `ListDrafts.execute()` MUST return `DraftedChangeView[]`. Each view MUST expose artifact state (status, validated hashes) and any fields required for listing (including `history` for the latest `drafted` event) but MUST NOT include artifact file content.
+
+    Callers MUST NOT receive a `Change` aggregate from this use case.
+- op: modified
+  description: Delegate to repository listDrafts views.
+  selector:
+    type: section
+    matches: 'Requirement: Constructor accepts a ChangeRepository'
+  content: |
+    `ListDrafts` MUST accept a `ChangeRepository` as its sole constructor argument. It MUST delegate to `ChangeRepository.listDrafts()` and return the resulting `DraftedChangeView[]` without wrapping in mutable `Change` instances.

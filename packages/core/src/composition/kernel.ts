@@ -12,6 +12,8 @@ import { ApproveSignoff } from '../application/use-cases/approve-signoff.js'
 import { ListChanges } from '../application/use-cases/list-changes.js'
 import { ListDrafts } from '../application/use-cases/list-drafts.js'
 import { ListDiscarded } from '../application/use-cases/list-discarded.js'
+import { GetDraft } from '../application/use-cases/get-draft.js'
+import { GetDiscarded } from '../application/use-cases/get-discarded.js'
 import { ListArchived } from '../application/use-cases/list-archived.js'
 import { GetArchivedChange } from '../application/use-cases/get-archived-change.js'
 import { EditChange } from '../application/use-cases/edit-change.js'
@@ -102,8 +104,12 @@ export interface Kernel {
     list: ListChanges
     /** Lists all drafted (shelved) changes. */
     listDrafts: ListDrafts
+    /** Loads a drafted change by name. */
+    getDraft: GetDraft
     /** Lists all discarded changes. */
     listDiscarded: ListDiscarded
+    /** Loads a discarded change by name. */
+    getDiscarded: GetDiscarded
     /** Edits the spec scope of an existing change. */
     edit: EditChange
     /** Manual targeted invalidation of artifacts. */
@@ -317,7 +323,9 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
       ),
       list: new ListChanges(i.changes),
       listDrafts: new ListDrafts(i.changes),
+      getDraft: new GetDraft(i.changes),
       listDiscarded: new ListDiscarded(i.changes),
+      getDiscarded: new GetDiscarded(i.changes),
       edit: new EditChange(i.changes, i.specs, i.actor, schemaProvider),
       invalidate: new InvalidateChange(i.changes, i.actor, schemaProvider),
       skipArtifact: new SkipArtifact(i.changes, i.actor),

@@ -1,7 +1,12 @@
 {
   "title": "Discarded List",
   "description": "Discarded changes serve as an audit trail of abandoned work — without a listing command, users would have to inspect the filesystem directly. `specd discarded list` lists all discarded changes in `discarded/`, sorted by discard date descending (most recently discarded first).",
-  "dependsOn": ["cli:entrypoint", "core:change"],
+  "dependsOn": [
+    "cli:entrypoint",
+    "core:list-discarded",
+    "core:discarded-change-view",
+    "cli:command-resource-naming"
+  ],
   "context": [
     "Discarded changes serve as an audit trail of abandoned work — without a listing command, users would have to inspect the filesystem directly. `specd discarded list` lists all discarded changes in `discarded/`, sorted by discard date descending (most recently discarded first)."
   ],
@@ -10,6 +15,12 @@
       "requirement": "Command signature",
       "rules": [
         "```\nspecd discarded list [--format text|json|toon]\n```\n\nNo positional arguments. The `--format` flag controls output encoding; defaults to `text`."
+      ]
+    },
+    {
+      "requirement": "Uses ListDiscarded read model",
+      "rules": [
+        "The command MUST invoke `ListDiscarded.execute()` and treat each entry as `DiscardedChangeView`.\n\nDiscard metadata (`discardReason`, `discardedAt`, `discardedBy`, `supersededBy`) MUST be read from the view, not by scanning raw `Change` history in the command."
       ]
     },
     {
@@ -56,6 +67,26 @@
         "the command proceeds without positional arguments",
         "AND output format defaults to text"
       ]
+    },
+    {
+      "requirement": "Uses ListDiscarded read model",
+      "name": "Invokes ListDiscarded",
+      "when": ["specd discarded list runs"],
+      "then": ["ListDiscarded.execute is called"]
+    },
+    {
+      "requirement": "Uses ListDiscarded read model",
+      "name": "Does not invoke GetStatus per row",
+      "given": ["two discarded changes exist"],
+      "when": ["specd discarded list runs"],
+      "then": ["GetStatus is not invoked for each listed name"]
+    },
+    {
+      "requirement": "Uses ListDiscarded read model",
+      "name": "Text output includes discard reason per row",
+      "given": ["ListDiscarded returns a view with discardReason: 'superseded'"],
+      "when": ["specd discarded list runs in text mode"],
+      "then": ["stdout includes that reason for the listed change"]
     },
     {
       "requirement": "Output format — toon",
@@ -132,9 +163,17 @@
       "then": ["the command exits with code 3", "AND stderr contains an error: message"]
     }
   ],
+  "implementation": {
+    "files": [
+      {
+        "specId": "cli:discarded-list",
+        "file": "cli:src/commands/discarded/list.ts"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:c8d653553e5613f445aa52b7131e2124f8e23ea2983888087e93402d50286e46",
-    "verify.md": "sha256:0479913613fd8ee8ba60cca95f0d8ce842bd73a5d6ca99dfee2d63fc631d4524"
+    "spec.md": "sha256:11941f57ceb1544b8803f1fcfec6795ac71aabafc94d0667adf068b5846dd152",
+    "verify.md": "sha256:3ead2e4f57f7ed657f96390d2f5252c3ba7bebdaceb47f04493d940fe7486e09"
   },
   "generatedBy": "core"
 }

@@ -4,9 +4,21 @@
 
 ### Requirement: Change must exist
 
-#### Scenario: Non-existent change is rejected
+#### Scenario: Non-existent drafted change is rejected
 
-- **WHEN** `RestoreChange.execute` is called with a name that does not exist in the repository
+- **WHEN** `RestoreChange.execute` is called with a name that does not exist under `drafts/`
+- **THEN** it throws `ChangeNotFoundError`
+
+#### Scenario: Active-only name is rejected
+
+- **GIVEN** a change exists only under `changes/` (not drafted)
+- **WHEN** `RestoreChange.execute` is called with its name
+- **THEN** it throws `ChangeNotFoundError`
+
+#### Scenario: Discarded-only name is rejected
+
+- **GIVEN** a change exists only under `discarded/`
+- **WHEN** `RestoreChange.execute` is called with its name
 - **THEN** it throws `ChangeNotFoundError`
 
 ### Requirement: Actor resolution
@@ -34,9 +46,9 @@
 #### Scenario: Change is persisted through serialized mutation
 
 - **WHEN** `RestoreChange.execute` completes successfully
-- **THEN** `ChangeRepository.mutate(input.name, fn)` is called
-- **AND** the callback records the restored event on the fresh persisted `Change`
-- **AND** the resulting change is relocated back to the active changes area by the repository
+- **THEN** `ChangeRepository.mutateDraft(input.name, fn)` is called
+- **AND** the callback records the restored event on the fresh persisted drafted `Change`
+- **AND** the resulting change is relocated back to `changes/` with `isDrafted === false`
 
 ### Requirement: Input contract
 

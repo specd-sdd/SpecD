@@ -14,7 +14,9 @@ Drafted changes are only useful if they can be brought back into the active work
 
 ### Requirement: Change must exist
 
-The use case MUST load the change from the `ChangeRepository` by name. If no change exists with the given name, it MUST throw `ChangeNotFoundError`.
+The use case MUST verify the change exists in drafted storage via `ChangeRepository.getDraft(name)`. If `getDraft` returns `null`, it MUST throw `ChangeNotFoundError`.
+
+The use case MUST NOT use `ChangeRepository.get(name)` for loading.
 
 ### Requirement: Actor resolution
 
@@ -30,11 +32,11 @@ The use case MUST call `change.restore(actor)` to append a `restored` event to t
 
 ### Requirement: Persistence
 
-After appending the restored event, the use case MUST persist the change through `ChangeRepository.mutate(name, fn)`.
+After resolving the actor, the use case MUST persist through `ChangeRepository.mutateDraft(name, fn)`.
 
-Inside the mutation callback, the repository supplies the fresh persisted `Change` for `name`; the use case calls `change.restore(actor)` on that instance and returns it. When the callback resolves, the repository persists the updated manifest and performs any required directory relocation back to `changes/`.
+Inside the mutation callback, the repository supplies the fresh persisted drafted `Change`; the use case calls `change.restore(actor)` on that instance and returns it. When the callback resolves, the repository persists the updated manifest and moves the directory from `drafts/` to `changes/`.
 
-`RestoreChange.execute` returns the updated `Change` instance produced by that serialized mutation.
+`RestoreChange.execute` returns the updated active `Change` instance (`isDrafted === false`) produced by that serialized mutation.
 
 ### Requirement: Dependencies
 

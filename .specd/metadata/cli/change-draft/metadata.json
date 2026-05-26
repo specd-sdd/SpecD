@@ -125,6 +125,7 @@
       ]
     }
   ],
+  "implementation": {},
   "contentHashes": {
     "spec.md": "sha256:c129b1cbee961842ad4787b82877749b7832aa85bf33e5489159b4dabbc4ec3f",
     "verify.md": "sha256:30d316377358fde405f2a872dac9a8f8d74e0663deec76a7d6905a105649145e"

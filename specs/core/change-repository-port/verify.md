@@ -4,50 +4,140 @@
 
 ### Requirement: get returns a Change or null
 
-#### Scenario: Change exists
+#### Scenario: Active change exists
 
-- **WHEN** `get("add-oauth-login")` is called and a change with that name exists
+- **WHEN** `get("add-oauth-login")` is called and a change with that name exists under `changes/`
 - **THEN** a `Change` is returned with persisted artifact and file state loaded from the manifest
+
+#### Scenario: Drafted-only name returns null
+
+- **GIVEN** a change exists only under `drafts/`
+- **WHEN** `get(name)` is called
+- **THEN** it returns `null`
+
+#### Scenario: Discarded-only name returns null
+
+- **GIVEN** a change exists only under `discarded/`
+- **WHEN** `get(name)` is called
+- **THEN** it returns `null`
 
 #### Scenario: Missing state defaults to missing on load
 
 - **GIVEN** a manifest entry without a `state` field
-- **WHEN** `get()` loads that change
+- **WHEN** `get()` loads that active change
 - **THEN** the missing artifact or file state defaults to `missing`
 
 #### Scenario: get returns a snapshot, not a serialized mutation context
 
-- **GIVEN** two callers both loaded the same change via `get()`
-- **AND** one caller later updates that change through `mutate()`
-- **WHEN** the other caller keeps using the previously returned `Change`
-- **THEN** that object remains a stale snapshot until the caller reloads it
+- **GIVEN** two callers both loaded the same active change via `get()`
+- **WHEN** each caller mutates its in-memory instance and only one uses `mutate()`
+- **THEN** the unsynchronized caller must not rely on `save()` alone for a safe persisted update
+
+### Requirement: getDraft returns a DraftedChangeView or null
+
+#### Scenario: Drafted change returns view
+
+- **WHEN** `getDraft(name)` is called and the change exists under `drafts/`
+- **THEN** a `DraftedChangeView` is returned with `isDrafted === true`
+
+#### Scenario: Active-only name returns null
+
+- **GIVEN** a change exists only under `changes/`
+- **WHEN** `getDraft(name)` is called
+- **THEN** it returns `null`
+
+#### Scenario: Discarded-only name returns null
+
+- **GIVEN** a change exists only under `discarded/`
+- **WHEN** `getDraft(name)` is called
+- **THEN** it returns `null`
+
+#### Scenario: View has no artifact file bodies
+
+- **GIVEN** a drafted change with on-disk `proposal.md`
+- **WHEN** `getDraft(name)` returns a view
+- **THEN** the view exposes artifact statuses without embedding file content
+
+### Requirement: getDiscarded returns a DiscardedChangeView or null
+
+#### Scenario: Discarded change returns view
+
+- **WHEN** `getDiscarded(name)` is called and the change exists under `discarded/`
+- **THEN** a `DiscardedChangeView` is returned with `discardReason` from the latest `discarded` event
+
+#### Scenario: Active-only name returns null
+
+- **GIVEN** a change exists only under `changes/`
+- **WHEN** `getDiscarded(name)` is called
+- **THEN** it returns `null`
+
+#### Scenario: Drafted-only name returns null
+
+- **GIVEN** a change exists only under `drafts/`
+- **WHEN** `getDiscarded(name)` is called
+- **THEN** it returns `null`
+
+#### Scenario: View exposes supersededBy when present
+
+- **GIVEN** a discarded change whose `discarded` event includes `supersededBy: ['replacement']`
+- **WHEN** `getDiscarded(name)` is called
+- **THEN** the returned view's `supersededBy` equals `['replacement']`
 
 ### Requirement: mutate serializes persisted change updates
 
-#### Scenario: Missing change is rejected
+#### Scenario: Missing active change is rejected
 
-- **WHEN** `mutate("missing-change", fn)` is called and no change with that name exists
+- **WHEN** `mutate("missing-change", fn)` is called and no active change with that name exists
+- **THEN** `ChangeNotFoundError` is thrown
+
+#### Scenario: Drafted-only name is rejected
+
+- **GIVEN** a change exists only under `drafts/`
+- **WHEN** `mutate(name, fn)` is called
+- **THEN** `ChangeNotFoundError` is thrown
+
+#### Scenario: Discarded-only name is rejected
+
+- **GIVEN** a change exists only under `discarded/`
+- **WHEN** `mutate(name, fn)` is called
 - **THEN** `ChangeNotFoundError` is thrown
 
 #### Scenario: Second mutation sees the first mutation's persisted result
 
-- **GIVEN** two callers both request `mutate()` for the same change name
+- **GIVEN** two callers both request `mutate()` for the same active change name
 - **AND** the first callback appends a history event and resolves
 - **WHEN** the second callback starts executing
 - **THEN** it receives a freshly reloaded `Change` that already includes the first callback's persisted update
 
 #### Scenario: Failing callback does not persist a partial manifest update
 
-- **GIVEN** a `mutate()` callback modifies the provided `Change`
-- **WHEN** the callback throws before returning
-- **THEN** the repository does not persist that partial manifest update
-- **AND** a later `mutate()` call for the same change can proceed normally
+- **WHEN** `mutate(name, fn)` is called and `fn` throws after mutating the in-memory change
+- **THEN** the on-disk manifest is unchanged from before the `mutate` call began
 
-#### Scenario: Different changes can mutate independently
+### Requirement: mutateDraft serializes drafted change updates
 
-- **GIVEN** one caller mutates `change-a` and another mutates `change-b`
-- **WHEN** both operations execute at the same time
-- **THEN** neither operation waits on a global lock for unrelated change names
+#### Scenario: Restore uses mutateDraft
+
+- **WHEN** `RestoreChange.execute` completes successfully
+- **THEN** `ChangeRepository.mutateDraft` was used for that name
+
+#### Scenario: Active name is rejected
+
+- **GIVEN** a change exists only under `changes/`
+- **WHEN** `mutateDraft(name, fn)` is called
+- **THEN** `ChangeNotFoundError` is thrown
+
+#### Scenario: Discarded name is rejected
+
+- **GIVEN** a change exists only under `discarded/`
+- **WHEN** `mutateDraft(name, fn)` is called
+- **THEN** `ChangeNotFoundError` is thrown
+
+#### Scenario: Callback receives fresh drafted Change
+
+- **GIVEN** `mutateDraft(name, fn)` is invoked for a drafted change
+- **WHEN** the callback runs
+- **THEN** it receives a freshly loaded `Change` with `isDrafted === true`
 
 ### Requirement: Auto-invalidation on get when artifact files drift
 
@@ -125,6 +215,24 @@
 - **THEN** `save()` still behaves as a low-level manifest write
 - **AND** callers that need concurrency-safe read-modify-write behavior must use `mutate()`
 
+#### Scenario: save on drafted change outside mutateDraft throws
+
+- **GIVEN** a persisted change with `isDrafted === true`
+- **WHEN** `save(change)` is called outside an active `mutateDraft` window
+- **THEN** `DraftedChangeReadOnlyError` is thrown
+
+#### Scenario: save inside mutateDraft succeeds
+
+- **GIVEN** `mutateDraft(name, fn)` is executing for a drafted change
+- **WHEN** the callback triggers an internal `save(change)` for that same name
+- **THEN** `DraftedChangeReadOnlyError` is not thrown
+
+#### Scenario: save on active change is unchanged
+
+- **GIVEN** a change exists under `changes/` with `isDrafted === false`
+- **WHEN** `save(change)` is called outside `mutate`
+- **THEN** persistence proceeds per existing optimistic concurrency rules
+
 ### Requirement: artifact loads content with originalHash
 
 #### Scenario: Artifact exists
@@ -198,6 +306,24 @@
 - **WHEN** `saveArtifact(change, artifact)` is called
 - **THEN** the file is written without conflict check
 
+#### Scenario: saveArtifact on drafted change throws
+
+- **GIVEN** a change with `isDrafted === true`
+- **WHEN** `saveArtifact(change, artifact)` is called outside `mutateDraft`
+- **THEN** `DraftedChangeReadOnlyError` is thrown before any filesystem write
+
+#### Scenario: saveArtifact inside mutateDraft may succeed
+
+- **GIVEN** `mutateDraft(name, fn)` is executing for a drafted change
+- **WHEN** the callback calls `saveArtifact` for that change
+- **THEN** `DraftedChangeReadOnlyError` is not thrown for the drafted guard alone
+
+#### Scenario: saveArtifact on active change is unchanged
+
+- **GIVEN** a change under `changes/` with `isDrafted === false`
+- **WHEN** `saveArtifact(change, artifact)` is called with a valid hash
+- **THEN** existing optimistic concurrency behaviour applies
+
 ### Requirement: artifactExists checks file presence without loading
 
 #### Scenario: File exists
@@ -267,6 +393,26 @@
 - **GIVEN** a change with name "my-change"
 - **WHEN** `changePath(change)` is called
 - **THEN** it returns the absolute path to the change directory
+
+### Requirement: draftChangePath returns the drafted directory path
+
+#### Scenario: Path resolves under drafts
+
+- **GIVEN** a `DraftedChangeView` for change `parked-feature`
+- **WHEN** `draftChangePath(view)` is called
+- **THEN** the returned path is under the configured `drafts/` directory
+
+#### Scenario: Path ends with change name segment
+
+- **GIVEN** a `DraftedChangeView` with `name: 'parked-feature'`
+- **WHEN** `draftChangePath(view)` is called
+- **THEN** the returned path basename is `parked-feature`
+
+#### Scenario: Active changePath is not used for drafted view
+
+- **GIVEN** a `DraftedChangeView` for a drafted change
+- **WHEN** resolving filesystem location for inspection tooling
+- **THEN** callers use `draftChangePath(view)` rather than `changePath` with an active `Change`
 
 ### Requirement: scaffold creates artifact directories
 

@@ -1,7 +1,7 @@
 {
   "title": "DraftChange",
   "description": "Users need to pause work on a change without losing its state or history — for example, to context-switch or wait on a dependency. The `DraftChange` use case shelves an existing change by appending a `drafted` event to its history, and the repository implementation moves the change directory from `changes/` to `drafts/` when persisted.",
-  "dependsOn": ["core:change", "default:_global/architecture"],
+  "dependsOn": ["core:change", "default:_global/architecture", "core:drafted-change-view"],
   "context": [
     "Users need to pause work on a change without losing its state or history — for example, to context-switch or wait on a dependency. The `DraftChange` use case shelves an existing change by appending a `drafted` event to its history, and the repository implementation moves the change directory from `changes/` to `drafts/` when persisted."
   ],
@@ -15,7 +15,7 @@
     {
       "requirement": "Change must exist",
       "rules": [
-        "The use case MUST load the change from the `ChangeRepository` by name. If no change exists with the given name, it MUST throw `ChangeNotFoundError`."
+        "The use case MUST load the change from active storage via `ChangeRepository.get(name)`. If no active change exists with the given name, it MUST throw `ChangeNotFoundError`.\n\nThe use case MUST NOT load a change that exists only under `drafts/`."
       ]
     },
     {
@@ -39,7 +39,7 @@
     {
       "requirement": "Persistence",
       "rules": [
-        "After appending the drafted event, the use case MUST persist the change through `ChangeRepository.mutate(name, fn)`.\n\nInside the mutation callback, the repository supplies the fresh persisted `Change` for `name`; the use case calls `change.draft(actor, reason)` on that instance and returns it. When the callback resolves, the repository persists the updated manifest and performs any required directory relocation to `drafts/`.\n\n`DraftChange.execute` returns the updated `Change` instance produced by that serialized mutation."
+        "After appending the drafted event, the use case MUST persist the change through `ChangeRepository.mutate(name, fn)`.\n\nInside the mutation callback, the repository supplies the fresh persisted active `Change`; the use case calls `change.draft(actor, reason, force)` on that instance and returns it. When the callback resolves, the repository persists the updated manifest and performs the required directory relocation to `drafts/`.\n\n`DraftChange.execute` MUST return a `DraftedChangeView` for the drafted change, produced from the persisted drafted state (via `getDraft(name)` or an equivalent repository mapper). It MUST NOT return a mutable `Change` to callers."
       ]
     },
     {
@@ -58,7 +58,21 @@
     {
       "requirement": "Change must exist",
       "name": "Non-existent change is rejected",
-      "when": ["DraftChange.execute is called with a name that does not exist in the repository"],
+      "when": ["DraftChange.execute is called with a name that does not exist in active storage"],
+      "then": ["it throws ChangeNotFoundError"]
+    },
+    {
+      "requirement": "Change must exist",
+      "name": "Drafted-only name is rejected",
+      "given": ["a change exists only under drafts/"],
+      "when": ["DraftChange.execute is called with its name"],
+      "then": ["it throws ChangeNotFoundError"]
+    },
+    {
+      "requirement": "Change must exist",
+      "name": "Discarded-only name is rejected",
+      "given": ["a change exists only under discarded/"],
+      "when": ["DraftChange.execute is called with its name"],
       "then": ["it throws ChangeNotFoundError"]
     },
     {
@@ -105,8 +119,8 @@
     {
       "requirement": "Drafted event appended to history",
       "name": "Change becomes drafted after execution",
-      "when": ["DraftChange.execute returns a change"],
-      "then": ["change.isDrafted === true"]
+      "when": ["DraftChange.execute returns"],
+      "then": ["the result satisfies DraftedChangeView", "AND result.isDrafted === true"]
     },
     {
       "requirement": "Persistence",
@@ -116,6 +130,30 @@
         "ChangeRepository.mutate(input.name, fn) is called",
         "AND the callback records the drafted event on the fresh persisted Change",
         "AND the resulting change is relocated to the drafts area by the repository"
+      ]
+    },
+    {
+      "requirement": "Persistence",
+      "name": "Result is not a mutable Change",
+      "given": ["an active change is drafted successfully"],
+      "when": ["DraftChange.execute returns"],
+      "then": ["the return value is not an instance of domain Change"]
+    },
+    {
+      "requirement": "Persistence",
+      "name": "Result is loadable via getDraft after execute",
+      "given": ["DraftChange.execute returns a view for name parked-feature"],
+      "when": ["ChangeRepository.getDraft('parked-feature') is called"],
+      "then": ["a DraftedChangeView is returned with isDrafted === true"]
+    },
+    {
+      "requirement": "Persistence",
+      "name": "mutate relocates before view mapping",
+      "given": ["an active change named parked-feature"],
+      "when": ["DraftChange.execute completes"],
+      "then": [
+        "ChangeRepository.mutate was called for that name",
+        "AND the change directory exists under drafts/ after completion"
       ]
     },
     {
@@ -139,9 +177,18 @@
       "then": ["it requires an ActorResolver port in its constructor"]
     }
   ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "core:draft-change",
+        "file": "core:src/application/use-cases/draft-change.ts",
+        "symbol": "DraftChange"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:29e32ee99723ccf9c74b4f2b4ab6369aa9bc6d503dd3aa908431b87745aba26a",
-    "verify.md": "sha256:e6c5509a8967db3ddb9cfb87cc3f9bd2e04833aa0e94a89e705313a734440ccd"
+    "spec.md": "sha256:aad623324259d102e16a2897bd5301d5ba19f396eec35817045ff50e6db011f9",
+    "verify.md": "sha256:eaf34977a91b1fa58ffca27cf3d9b49bcb697e9c2ae3fc647b8f50e5e290cdfd"
   },
   "generatedBy": "core"
 }

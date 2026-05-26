@@ -1,0 +1,137 @@
+{
+  "title": "DraftedChangeReadOnlyError",
+  "description": "When a caller attempts to transform a drafted change through an API that only permits active changes, the system must fail with a machine-readable, consistent error. `DraftedChangeReadOnlyError` is the domain error for that case — a secondary guard when low-level persistence primitives are invoked incorrectly.",
+  "dependsOn": ["core:change", "default:_global/error-handling-conventions"],
+  "context": [
+    "When a caller attempts to transform a drafted change through an API that only permits active changes, the system must fail with a machine-readable, consistent error. `DraftedChangeReadOnlyError` is the domain error for that case — a secondary guard when low-level persistence primitives are invoked incorrectly."
+  ],
+  "rules": [
+    {
+      "requirement": "Error type",
+      "rules": [
+        "The core package MUST export `DraftedChangeReadOnlyError` extending the project `DomainError` base class."
+      ]
+    },
+    {
+      "requirement": "When thrown",
+      "rules": [
+        "Implementations MUST throw `DraftedChangeReadOnlyError` when:\n\n- `ChangeRepository.save(change)` or `saveArtifact(change, …)` is invoked for a change with `isDrafted === true`, or\n- `ChangeRepository.mutate(name, fn)` is invoked and the resolved change is drafted (this SHOULD NOT occur if `mutate` is restricted to active storage — the error remains a safety net), or\n- A `Change` entity mutator is invoked directly while `isDrafted === true` when entity-level guards are enabled\n\nThe error MUST NOT be thrown for `mutateDraft`, `RestoreChange`, or `DiscardChange` when those operations are correctly scoped to drafted storage."
+      ]
+    },
+    {
+      "requirement": "Payload",
+      "rules": [
+        "`DraftedChangeReadOnlyError` MUST expose at minimum:\n\n- `changeName` — the affected change slug\n- `operation` — a short machine-readable label (for example `mutate`, `save`, `saveArtifact`, `transition`)\n\nThe error `message` MUST state that the change is drafted and read-only until restored. Messages MUST use **draft** / **drafted** terminology, not \"shelved\"."
+      ]
+    },
+    {
+      "requirement": "Error code",
+      "rules": [
+        "The error MUST use a stable `code` string suitable for CLI and MCP mapping (for example `DRAFTED_CHANGE_READ_ONLY`)."
+      ]
+    }
+  ],
+  "constraints": [
+    "Prefer preventing the call via get / mutate active-only resolution so this error is exceptional, not the common path.",
+    "Follow [default:_global/error-handling-conventions](../../../../specs/_global/error-handling-conventions/spec.md) for presentation at the CLI boundary."
+  ],
+  "scenarios": [
+    {
+      "requirement": "Error type",
+      "name": "Extends DomainError",
+      "when": ["DraftedChangeReadOnlyError is constructed with changeName and operation"],
+      "then": ["it is an instance of DomainError"]
+    },
+    {
+      "requirement": "Error type",
+      "name": "Is throwable and catchable as DomainError",
+      "when": ["save throws DraftedChangeReadOnlyError"],
+      "then": ["catch (err) with DomainError type guard succeeds"]
+    },
+    {
+      "requirement": "Error type",
+      "name": "Distinct from ChangeNotFoundError",
+      "when": ["save throws for a drafted change outside mutateDraft"],
+      "then": ["the error is not ChangeNotFoundError"]
+    },
+    {
+      "requirement": "When thrown",
+      "name": "save on drafted change throws",
+      "given": ["a persisted change with isDrafted === true outside an active mutateDraft window"],
+      "when": ["ChangeRepository.save(change) is called"],
+      "then": ["DraftedChangeReadOnlyError is thrown"]
+    },
+    {
+      "requirement": "When thrown",
+      "name": "saveArtifact on drafted change throws",
+      "given": ["a persisted change with isDrafted === true"],
+      "when": ["ChangeRepository.saveArtifact(change, artifact) is called outside mutateDraft"],
+      "then": ["DraftedChangeReadOnlyError is thrown before any filesystem write"]
+    },
+    {
+      "requirement": "When thrown",
+      "name": "mutateDraft does not throw read-only error on success path",
+      "given": ["a drafted change exists under drafts/"],
+      "when": ["RestoreChange.execute completes successfully"],
+      "then": ["DraftedChangeReadOnlyError is not thrown"]
+    },
+    {
+      "requirement": "When thrown",
+      "name": "save allowed inside mutateDraft callback",
+      "given": ["mutateDraft(name, fn) is executing its callback for a drafted change"],
+      "when": ["the callback triggers an internal save(change) for that same name"],
+      "then": ["DraftedChangeReadOnlyError is not thrown"]
+    },
+    {
+      "requirement": "Payload",
+      "name": "Error includes change name and operation for save",
+      "when": ["save throws DraftedChangeReadOnlyError for change parked-feature"],
+      "then": ["changeName === 'parked-feature'", "AND operation identifies save or equivalent"]
+    },
+    {
+      "requirement": "Payload",
+      "name": "Error includes operation for saveArtifact",
+      "when": ["saveArtifact throws DraftedChangeReadOnlyError"],
+      "then": ["operation identifies saveArtifact or equivalent"]
+    },
+    {
+      "requirement": "Payload",
+      "name": "Message uses drafted terminology",
+      "when": ["DraftedChangeReadOnlyError is thrown"],
+      "then": ["message mentions draft or drafted", "AND message does not use the term shelved"]
+    },
+    {
+      "requirement": "Error code",
+      "name": "Stable code is DRAFTED_CHANGE_READ_ONLY",
+      "when": ["DraftedChangeReadOnlyError is thrown"],
+      "then": ["code === 'DRAFTED_CHANGE_READ_ONLY'"]
+    },
+    {
+      "requirement": "Error code",
+      "name": "CLI maps code to stderr guidance",
+      "given": ["CLI error handling is wired for domain errors"],
+      "when": ["a command surfaces DraftedChangeReadOnlyError"],
+      "then": ["stderr explains the change is drafted and must be restored first"]
+    },
+    {
+      "requirement": "Error code",
+      "name": "Code is stable across save and saveArtifact",
+      "when": ["save and saveArtifact each throw for the same drafted change"],
+      "then": ["both errors share the same code value"]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "core:drafted-change-read-only-error",
+        "file": "core:src/domain/errors/drafted-change-read-only-error.ts",
+        "symbol": "DraftedChangeReadOnlyError"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:5ade877b45c99ae35e21a74a80605a39bf83502435d8f20ff9cc275877285427",
+    "verify.md": "sha256:6aca359cade3469b29311ad2aa6636058f8c236fd52a53fac05160d6b520d3f7"
+  },
+  "generatedBy": "core"
+}

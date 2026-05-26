@@ -1,4 +1,4 @@
-import { type Change } from '../../domain/entities/change.js'
+import { type DiscardedChangeView } from '../../domain/read-only-change-view.js'
 import { type ChangeRepository } from '../ports/change-repository.js'
 
 /**
@@ -21,7 +21,7 @@ export class ListDiscarded {
    *
    * @returns All discarded changes, oldest first
    */
-  async execute(): Promise<Change[]> {
+  async execute(): Promise<DiscardedChangeView[]> {
     return this._changes.listDiscarded()
   }
 }

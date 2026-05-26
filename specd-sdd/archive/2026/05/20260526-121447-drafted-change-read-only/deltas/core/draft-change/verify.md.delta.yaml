@@ -1,0 +1,66 @@
+- op: modified
+  description: Return type is DraftedChangeView.
+  selector:
+    type: section
+    matches: 'Scenario: Change becomes drafted after execution'
+  content: |
+    - **WHEN** `DraftChange.execute` returns
+    - **THEN** the result satisfies `DraftedChangeView`
+    - **AND** `result.isDrafted === true`
+- op: modified
+  description: Active-only load.
+  selector:
+    type: section
+    matches: 'Scenario: Non-existent change is rejected'
+  content: |
+    - **WHEN** `DraftChange.execute` is called with a name that does not exist in active storage
+    - **THEN** it throws `ChangeNotFoundError`
+- op: added
+  description: Drafted-only name rejected at load.
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Change must exist'
+    after:
+      type: section
+      matches: 'Scenario: Non-existent change is rejected'
+  content: |
+    #### Scenario: Drafted-only name is rejected
+
+    - **GIVEN** a change exists only under `drafts/`
+    - **WHEN** `DraftChange.execute` is called with its name
+    - **THEN** it throws `ChangeNotFoundError`
+
+    #### Scenario: Discarded-only name is rejected
+
+    - **GIVEN** a change exists only under `discarded/`
+    - **WHEN** `DraftChange.execute` is called with its name
+    - **THEN** it throws `ChangeNotFoundError`
+- op: added
+  description: Return type scenarios under Persistence.
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Persistence'
+    after:
+      type: section
+      matches: 'Scenario: Change is persisted through serialized mutation'
+  content: |
+    #### Scenario: Result is not a mutable Change
+
+    - **GIVEN** an active change is drafted successfully
+    - **WHEN** `DraftChange.execute` returns
+    - **THEN** the return value is not an instance of domain `Change`
+
+    #### Scenario: Result is loadable via getDraft after execute
+
+    - **GIVEN** `DraftChange.execute` returns a view for name `parked-feature`
+    - **WHEN** `ChangeRepository.getDraft('parked-feature')` is called
+    - **THEN** a `DraftedChangeView` is returned with `isDrafted === true`
+
+    #### Scenario: mutate relocates before view mapping
+
+    - **GIVEN** an active change named `parked-feature`
+    - **WHEN** `DraftChange.execute` completes
+    - **THEN** `ChangeRepository.mutate` was called for that name
+    - **AND** the change directory exists under `drafts/` after completion

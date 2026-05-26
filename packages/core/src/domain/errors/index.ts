@@ -33,3 +33,4 @@ export {
   type GuardedChangeOperation,
 } from './historical-implementation-guard-error.js'
 export { InvalidInputError } from './invalid-input-error.js'
+export { DraftedChangeReadOnlyError } from './drafted-change-read-only-error.js'

@@ -1,0 +1,158 @@
+{
+  "title": "GetDiscarded",
+  "description": "Callers need to load a single discarded change by name for audit and CLI display. `GetDiscarded` resolves a name in `discarded/` only. It exists because `ChangeRepository.get` and `GetStatus` intentionally exclude discarded storage (so discarded names may be reused and terminal changes are not mutable via `mutate`).",
+  "dependsOn": ["core:discarded-change-view", "core:change", "core:change-repository-port"],
+  "context": [
+    "Callers need to load a single discarded change by name for audit and CLI display. `GetDiscarded` resolves a name in `discarded/` only. It exists because `ChangeRepository.get` and `GetStatus` intentionally exclude discarded storage (so discarded names may be reused and terminal changes are not mutable via `mutate`)."
+  ],
+  "rules": [
+    {
+      "requirement": "Input contract",
+      "rules": [
+        "`GetDiscarded.execute` SHALL accept a `GetDiscardedInput` with:\n\n- `name` (string, required) — the discarded change slug to load"
+      ]
+    },
+    {
+      "requirement": "Resolution",
+      "rules": [
+        "The use case MUST call `ChangeRepository.getDiscarded(name)`.\n\n- If a discarded change exists, the use case MUST return `{ view: DiscardedChangeView }`.\n- If no discarded change exists with that name, the use case MUST throw `ChangeNotFoundError`.\n\nThe use case MUST NOT fall back to `ChangeRepository.get(name)` or `getDraft(name)`."
+      ]
+    },
+    {
+      "requirement": "Read-only",
+      "rules": [
+        "`GetDiscarded` MUST NOT mutate persistence, append history events, or invoke `mutate`, `mutateDraft`, `save`, or `saveArtifact`."
+      ]
+    },
+    {
+      "requirement": "Dependencies",
+      "rules": ["`GetDiscarded` depends on `ChangeRepository` injected via constructor."]
+    }
+  ],
+  "constraints": [
+    "Listing all discarded changes remains ListDiscarded.",
+    "This use case does not validate that a name is unused for CreateChange; name reuse is governed by active and drafted collision checks only."
+  ],
+  "scenarios": [
+    {
+      "requirement": "Input contract",
+      "name": "execute accepts GetDiscardedInput with name",
+      "when": ["GetDiscarded.execute({ name: 'old-experiment' }) is called"],
+      "then": ["it accepts the input without type errors"]
+    },
+    {
+      "requirement": "Input contract",
+      "name": "execute rejects missing name at type level",
+      "when": ["application code constructs GetDiscardedInput"],
+      "then": ["name is a required string field"]
+    },
+    {
+      "requirement": "Input contract",
+      "name": "execute propagates repository errors",
+      "given": ["ChangeRepository.getDiscarded throws an unexpected storage error"],
+      "when": ["GetDiscarded.execute({ name }) is called"],
+      "then": ["the same error propagates to the caller"]
+    },
+    {
+      "requirement": "Resolution",
+      "name": "Discarded change returns view",
+      "given": [
+        "a change exists only under discarded/ named old-experiment discarded with reason obsolete"
+      ],
+      "when": ["GetDiscarded.execute({ name: 'old-experiment' }) is called"],
+      "then": [
+        "it returns { view } where view is a DiscardedChangeView",
+        "AND view.discardReason is obsolete"
+      ]
+    },
+    {
+      "requirement": "Resolution",
+      "name": "Active-only name is not found",
+      "given": ["a change exists only under changes/"],
+      "when": ["GetDiscarded.execute({ name }) is called"],
+      "then": ["it throws ChangeNotFoundError"]
+    },
+    {
+      "requirement": "Resolution",
+      "name": "Drafted-only name is not found",
+      "given": ["a change exists only under drafts/"],
+      "when": ["GetDiscarded.execute({ name }) is called"],
+      "then": ["it throws ChangeNotFoundError"]
+    },
+    {
+      "requirement": "Resolution",
+      "name": "Discarded-only name does not fall back to get or getDraft",
+      "given": ["a change exists only under discarded/"],
+      "when": ["GetDiscarded.execute({ name }) is called"],
+      "then": [
+        "getDiscarded(name) is invoked",
+        "AND get(name) and getDraft(name) are not used to return a load result"
+      ]
+    },
+    {
+      "requirement": "Resolution",
+      "name": "Missing name throws",
+      "when": ["GetDiscarded.execute({ name: 'does-not-exist' }) is called"],
+      "then": ["it throws ChangeNotFoundError"]
+    },
+    {
+      "requirement": "Read-only",
+      "name": "No repository mutation on success",
+      "given": ["a discarded change exists"],
+      "when": ["GetDiscarded.execute({ name }) completes successfully"],
+      "then": [
+        "ChangeRepository.mutate was not called",
+        "AND ChangeRepository.mutateDraft was not called"
+      ]
+    },
+    {
+      "requirement": "Read-only",
+      "name": "No save or saveArtifact on success",
+      "given": ["a discarded change exists"],
+      "when": ["GetDiscarded.execute({ name }) completes successfully"],
+      "then": [
+        "ChangeRepository.save was not called",
+        "AND ChangeRepository.saveArtifact was not called"
+      ]
+    },
+    {
+      "requirement": "Read-only",
+      "name": "View returned is not a mutable Change",
+      "given": ["a discarded change exists"],
+      "when": ["GetDiscarded.execute({ name }) returns { view }"],
+      "then": ["view is not an instance of domain Change"]
+    },
+    {
+      "requirement": "Dependencies",
+      "name": "Uses ChangeRepository port",
+      "when": ["GetDiscarded is constructed without a ChangeRepository"],
+      "then": ["construction fails or execute cannot run"]
+    },
+    {
+      "requirement": "Dependencies",
+      "name": "Does not require ActorResolver",
+      "when": ["GetDiscarded is instantiated"],
+      "then": ["only ChangeRepository is required in its constructor"]
+    },
+    {
+      "requirement": "Dependencies",
+      "name": "Does not require SchemaProvider",
+      "when": ["GetDiscarded.execute runs"],
+      "then": ["SchemaProvider is not consulted"]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "core:get-discarded",
+        "file": "core:src/application/use-cases/get-discarded.ts",
+        "symbol": "GetDiscarded"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:a4f652d5e3d5faa5fe816acee21fa9630044588eb51b70a432635ef55c0b74f8",
+    "verify.md": "sha256:9c844a1c18b7058766cc23e8a50c45fbbe2a19659dfec1cf07890df380ce6f5e"
+  },
+  "generatedBy": "core"
+}

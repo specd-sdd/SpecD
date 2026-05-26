@@ -1,0 +1,153 @@
+{
+  "title": "DiscardedChangeView",
+  "description": "Callers that inspect a discarded change need read access to persisted state without receiving a mutable `Change` aggregate. `DiscardedChangeView` extends [`core:read-only-change-view`](read-only-change-view/spec.md) for terminal changes stored under `discarded/`. It is constructed by the repository or `GetDiscarded` and MUST NOT expose mutating `Change` methods.",
+  "dependsOn": ["core:read-only-change-view", "core:change", "core:change-repository-port"],
+  "context": [
+    "Callers that inspect a discarded change need read access to persisted state without receiving a mutable `Change` aggregate. `DiscardedChangeView` extends [`core:read-only-change-view`](read-only-change-view/spec.md) for terminal changes stored under `discarded/`. It is constructed by the repository or `GetDiscarded` and MUST NOT expose mutating `Change` methods."
+  ],
+  "rules": [
+    {
+      "requirement": "Extends ReadOnlyChangeView",
+      "rules": [
+        "`DiscardedChangeView` MUST extend `ReadOnlyChangeView` with all shared read accessors defined there."
+      ]
+    },
+    {
+      "requirement": "Discarded-specific surface",
+      "rules": [
+        "`DiscardedChangeView` MUST additionally expose read accessors derived from the terminal `discarded` history event, including at minimum:\n\n- `discardReason` — the `reason` from the latest `discarded` event\n- `discardedAt` — the `at` timestamp from that event\n- `discardedBy` — the `by` actor from that event\n- `supersededBy` — optional `supersededBy` from that event when present\n\nEvery `DiscardedChangeView` instance MUST correspond to a change whose latest history event is `discarded`."
+      ]
+    },
+    {
+      "requirement": "Construction",
+      "rules": [
+        "Only `ChangeRepository` (or test doubles of the port) and `GetDiscarded` MAY construct `DiscardedChangeView` instances from a persisted discarded change, using `toDiscardedChangeView` from the shared inspection module.\n\nCallers MUST obtain views through `getDiscarded`, `listDiscarded`, or `GetDiscarded.execute`, not by instantiating the type against arbitrary in-memory `Change` objects in production code."
+      ]
+    },
+    {
+      "requirement": "No mutation path",
+      "rules": [
+        "There is no `mutateDiscarded`. Discarded changes are irreversible. `DiscardedChangeView` exists for audit and CLI display only."
+      ]
+    }
+  ],
+  "constraints": [
+    "Terminology uses Discard / Discarded, consistent with [core:change](../../../../specs/core/change/spec.md).",
+    "Name reuse for new active changes is unaffected; collision checks do not consult discarded storage."
+  ],
+  "scenarios": [
+    {
+      "requirement": "Extends ReadOnlyChangeView",
+      "name": "Shared fields available from getDiscarded",
+      "given": ["a discarded change old-experiment with specIds ['auth/legacy']"],
+      "when": ["getDiscarded('old-experiment') returns a view"],
+      "then": [
+        "view.name is old-experiment",
+        "AND view.specIds equals ['auth/legacy']",
+        "AND view.schemaName and view.schemaVersion are readable"
+      ]
+    },
+    {
+      "requirement": "Extends ReadOnlyChangeView",
+      "name": "Shared fields available from listDiscarded",
+      "when": ["listDiscarded() returns one or more entries"],
+      "then": [
+        "each entry satisfies ReadOnlyChangeView",
+        "AND each entry exposes name, specIds, and schema fields"
+      ]
+    },
+    {
+      "requirement": "Extends ReadOnlyChangeView",
+      "name": "Mutating Change methods are not on the view type",
+      "when": ["TypeScript types for DiscardedChangeView are inspected"],
+      "then": ["transition and discard are not members of the interface"]
+    },
+    {
+      "requirement": "Discarded-specific surface",
+      "name": "View exposes discard metadata with supersededBy",
+      "given": [
+        "a change discarded with reason superseded and supersededBy: ['new-auth'] at 2026-05-01T12:00:00Z by actor { name: 'Ada' }"
+      ],
+      "when": ["toDiscardedChangeView(change) is called"],
+      "then": [
+        "discardReason is superseded",
+        "AND supersededBy equals ['new-auth']",
+        "AND discardedAt matches the event timestamp",
+        "AND discardedBy.name is Ada"
+      ]
+    },
+    {
+      "requirement": "Discarded-specific surface",
+      "name": "View exposes discard metadata without supersededBy",
+      "given": ["a change discarded with reason abandoned and no supersededBy"],
+      "when": ["toDiscardedChangeView(change) is called"],
+      "then": ["discardReason is abandoned", "AND supersededBy is undefined"]
+    },
+    {
+      "requirement": "Discarded-specific surface",
+      "name": "Non-discarded change is rejected by factory",
+      "given": ["an active change whose latest event is not discarded"],
+      "when": ["toDiscardedChangeView(change) is called"],
+      "then": ["it throws a domain error"]
+    },
+    {
+      "requirement": "Construction",
+      "name": "GetDiscarded returns a view",
+      "given": ["a change exists only under discarded/"],
+      "when": ["GetDiscarded.execute({ name }) is called"],
+      "then": ["result.view satisfies DiscardedChangeView"]
+    },
+    {
+      "requirement": "Construction",
+      "name": "getDiscarded returns null for active-only name",
+      "given": ["a change exists only under changes/"],
+      "when": ["ChangeRepository.getDiscarded(name) is called"],
+      "then": ["it returns null"]
+    },
+    {
+      "requirement": "Construction",
+      "name": "getDiscarded returns null for drafted-only name",
+      "given": ["a change exists only under drafts/"],
+      "when": ["ChangeRepository.getDiscarded(name) is called"],
+      "then": ["it returns null"]
+    },
+    {
+      "requirement": "No mutation path",
+      "name": "No mutateDiscarded on repository port",
+      "when": ["the ChangeRepository abstract class is inspected"],
+      "then": ["there is no mutateDiscarded method"]
+    },
+    {
+      "requirement": "No mutation path",
+      "name": "Discarded view cannot be saved via save",
+      "given": ["a DiscardedChangeView obtained from getDiscarded"],
+      "when": [
+        "a test calls ChangeRepository.save with a domain Change rebuilt from view data outside repository internals"
+      ],
+      "then": [
+        "either the operation is impossible without internal Change access or persistence does not treat the view as an active mutation target"
+      ]
+    },
+    {
+      "requirement": "No mutation path",
+      "name": "GetDiscarded does not invoke mutating repository methods",
+      "given": ["spies on mutate, mutateDraft, save, and saveArtifact"],
+      "when": ["GetDiscarded.execute completes successfully"],
+      "then": ["none of the mutating methods were called"]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "core:discarded-change-view",
+        "file": "core:src/domain/read-only-change-view.ts",
+        "symbol": "toDiscardedChangeView"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:460025326a9da29998ab5569b07eeb3ba205c5de34515c991bc9d10980daa3bb",
+    "verify.md": "sha256:4ea63423c8cfb4a64326f94c15d5cf55c2467aaeb6ff48bbef75690bd06988c7"
+  },
+  "generatedBy": "core"
+}

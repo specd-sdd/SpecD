@@ -1,5 +1,6 @@
 import * as path from 'node:path'
 import { type Change } from '../../domain/entities/change.js'
+import { type DraftedChangeView } from '../../domain/read-only-change-view.js'
 import { type ArtifactStatus } from '../../domain/value-objects/artifact-status.js'
 import { type ArtifactDisplayStatus } from '../../domain/value-objects/artifact-display-status.js'
 import { type ArtifactType } from '../../domain/value-objects/artifact-type.js'
@@ -184,8 +185,10 @@ export interface LifecycleContext {
 
 /** Result returned by the {@link GetStatus} use case. */
 export interface GetStatusResult {
-  /** The loaded change with its current artifact state. */
-  readonly change: Change
+  /** The loaded active change; absent when only a draft exists. */
+  readonly change?: Change
+  /** The drafted read model; absent for active changes. */
+  readonly draftView?: DraftedChangeView
   /** Effective status for each artifact attached to the change. */
   readonly artifactStatuses: ArtifactStatusEntry[]
   /** Pre-computed lifecycle context. */
@@ -244,7 +247,11 @@ export class GetStatus {
   async execute(input: GetStatusInput): Promise<GetStatusResult> {
     const change = await this._changes.get(input.name)
     if (change === null) {
-      throw new ChangeNotFoundError(input.name)
+      const draftView = await this._changes.getDraft(input.name)
+      if (draftView === null) {
+        throw new ChangeNotFoundError(input.name)
+      }
+      return this._buildDraftedResult(draftView)
     }
 
     const changePath = this._changes.changePath(change)
@@ -400,6 +407,70 @@ export class GetStatus {
       review,
       blockers,
       nextAction,
+    }
+  }
+
+  /**
+   * Builds a read-only status result for a drafted change.
+   *
+   * @param draftView - Drafted change loaded via `getDraft`
+   * @returns Status without lifecycle transitions or mutable `Change`
+   */
+  private _buildDraftedResult(draftView: DraftedChangeView): GetStatusResult {
+    const changePath = this._changes.draftChangePath(draftView)
+    const artifactStatuses: ArtifactStatusEntry[] = []
+
+    for (const [type, artifact] of draftView.artifacts) {
+      const files: ArtifactFileStatus[] = [...artifact.files.values()].map((file) => ({
+        key: file.key,
+        filename: file.filename,
+        state: file.status,
+        ...(file.validatedHash !== undefined ? { validatedHash: file.validatedHash } : {}),
+        hasDrift: file.hasDrift,
+        displayStatus: file.displayStatus(),
+      }))
+      artifactStatuses.push({
+        type,
+        state: artifact.status,
+        effectiveStatus: artifact.status,
+        displayStatus: aggregateDisplayStatus(files),
+        files,
+      })
+    }
+
+    const lifecycle: LifecycleContext = {
+      validTransitions: [],
+      availableTransitions: [],
+      blockers: [],
+      approvals: this._approvals,
+      nextArtifact: null,
+      changePath,
+      schemaInfo: {
+        name: draftView.schemaName,
+        version: draftView.schemaVersion,
+        artifacts: [],
+      },
+    }
+
+    return {
+      draftView,
+      artifactStatuses,
+      lifecycle,
+      implementationTracking: { trackedFiles: [], links: [] },
+      review: {
+        required: false,
+        route: null,
+        reason: null,
+        affectedArtifacts: [],
+        overlapDetail: [],
+      },
+      blockers: [],
+      nextAction: {
+        targetStep: draftView.state,
+        actionType: 'cognitive',
+        reason: 'Change is drafted; restore before lifecycle transitions',
+        command: null,
+      },
     }
   }
 

@@ -1,0 +1,38 @@
+- op: added
+  description: Read-only drafted rendering.
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Command signature'
+  content: |
+    ### Requirement: Drafted change status is read-only
+
+    #### Scenario: Drafted change does not list transition commands in next action
+
+    - **GIVEN** `GetStatus` returns `draftView` for the requested name
+    - **WHEN** `specd change status <name>` runs in text mode
+    - **THEN** output indicates the change is drafted
+    - **AND** output does not suggest `specd change transition` as the next action
+
+    #### Scenario: JSON output includes isDrafted for drafted name
+
+    - **GIVEN** `GetStatus` returns `draftView` and no `change`
+    - **WHEN** `specd change status <name> --format json` runs
+    - **THEN** stdout includes `isDrafted: true` or equivalent drafted marker
+    - **AND** `availableTransitions` is empty or omitted
+
+    #### Scenario: Active change behaviour unchanged
+
+    - **GIVEN** `GetStatus` returns `change` and no `draftView`
+    - **WHEN** `specd change status <name>` runs
+    - **THEN** lifecycle transitions may still appear when the core use case provides them
+
+    #### Scenario: Discarded name is not found via change status
+
+    - **GIVEN** a change exists only under `discarded/`
+    - **WHEN** `specd change status <name>` runs
+    - **THEN** the command exits with code 1
+    - **AND** stderr contains an `error:` message

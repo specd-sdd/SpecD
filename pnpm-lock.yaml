@@ -20,9 +20,24 @@ importers:
       '@commitlint/types':
         specifier: ^19.8.1
         version: 19.8.1
+      '@specd/plugin-agent-claude':
+        specifier: workspace:^
+        version: link:packages/plugin-agent-claude
+      '@specd/plugin-agent-codex':
+        specifier: workspace:^
+        version: link:packages/plugin-agent-codex
       '@specd/plugin-agent-copilot':
         specifier: workspace:^
         version: link:packages/plugin-agent-copilot
+      '@specd/plugin-agent-opencode':
+        specifier: workspace:^
+        version: link:packages/plugin-agent-opencode
+      '@specd/plugin-agent-standard':
+        specifier: workspace:^
+        version: link:packages/plugin-agent-standard
+      '@specd/schema-std':
+        specifier: workspace:^
+        version: link:packages/schema-std
       '@types/node':
         specifier: ^22.19.17
         version: 22.19.17

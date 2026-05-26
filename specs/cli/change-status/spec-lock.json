@@ -12,9 +12,6 @@
   "implementation": [
     {
       "file": "cli:src/commands/change/status.ts"
-    },
-    {
-      "file": "cli:test/commands/helpers.ts"
     }
   ]
 }

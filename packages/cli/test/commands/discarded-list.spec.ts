@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import {
   makeMockConfig,
+  makeMockDiscardedView,
   makeMockKernel,
   makeProgram,
   mockProcessExit,
@@ -32,29 +33,19 @@ describe('Output format — text', () => {
   it('Discarded changes listed with correct fields', async () => {
     const { kernel, stdout } = setup()
     kernel.changes.listDiscarded.execute.mockResolvedValue([
-      {
+      makeMockDiscardedView({
         name: 'old-experiment',
-        history: [
-          {
-            type: 'discarded',
-            at: new Date('2024-01-10T09:00:00Z'),
-            by: { name: 'alice', email: 'alice@test.com' },
-            reason: 'no longer needed',
-          },
-        ],
-      },
-      {
+        discardedAt: new Date('2024-01-10T09:00:00Z'),
+        discardedBy: { name: 'alice', email: 'alice@test.com' },
+        discardReason: 'no longer needed',
+      }),
+      makeMockDiscardedView({
         name: 'bad-idea',
-        history: [
-          {
-            type: 'discarded',
-            at: new Date('2024-01-08T09:00:00Z'),
-            by: { name: 'bob', email: 'bob@test.com' },
-            reason: 'duplicate effort',
-            supersededBy: ['new-approach'],
-          },
-        ],
-      },
+        discardedAt: new Date('2024-01-08T09:00:00Z'),
+        discardedBy: { name: 'bob', email: 'bob@test.com' },
+        discardReason: 'duplicate effort',
+        supersededBy: ['new-approach'],
+      }),
     ])
 
     const program = makeProgram()
@@ -75,29 +66,19 @@ describe('Output format — text', () => {
   it('Discarded changes listed with supersededBy indicator', async () => {
     const { kernel, stdout } = setup()
     kernel.changes.listDiscarded.execute.mockResolvedValue([
-      {
+      makeMockDiscardedView({
         name: 'old-experiment',
-        history: [
-          {
-            type: 'discarded',
-            at: new Date('2024-01-10T09:00:00Z'),
-            by: { name: 'alice', email: 'alice@test.com' },
-            reason: 'no longer needed',
-          },
-        ],
-      },
-      {
+        discardedAt: new Date('2024-01-10T09:00:00Z'),
+        discardedBy: { name: 'alice', email: 'alice@test.com' },
+        discardReason: 'no longer needed',
+      }),
+      makeMockDiscardedView({
         name: 'bad-idea',
-        history: [
-          {
-            type: 'discarded',
-            at: new Date('2024-01-08T09:00:00Z'),
-            by: { name: 'bob', email: 'bob@test.com' },
-            reason: 'duplicate effort',
-            supersededBy: ['new-approach'],
-          },
-        ],
-      },
+        discardedAt: new Date('2024-01-08T09:00:00Z'),
+        discardedBy: { name: 'bob', email: 'bob@test.com' },
+        discardReason: 'duplicate effort',
+        supersededBy: ['new-approach'],
+      }),
     ])
 
     const program = makeProgram()
@@ -113,28 +94,18 @@ describe('Output format — text', () => {
   it('Rows sorted by discard date descending', async () => {
     const { kernel, stdout } = setup()
     kernel.changes.listDiscarded.execute.mockResolvedValue([
-      {
+      makeMockDiscardedView({
         name: 'older-discard',
-        history: [
-          {
-            type: 'discarded',
-            at: new Date('2024-01-01T00:00:00Z'),
-            by: { name: 'alice', email: 'alice@test.com' },
-            reason: 'old',
-          },
-        ],
-      },
-      {
+        discardedAt: new Date('2024-01-01T00:00:00Z'),
+        discardedBy: { name: 'alice', email: 'alice@test.com' },
+        discardReason: 'old',
+      }),
+      makeMockDiscardedView({
         name: 'newer-discard',
-        history: [
-          {
-            type: 'discarded',
-            at: new Date('2024-02-01T00:00:00Z'),
-            by: { name: 'bob', email: 'bob@test.com' },
-            reason: 'new',
-          },
-        ],
-      },
+        discardedAt: new Date('2024-02-01T00:00:00Z'),
+        discardedBy: { name: 'bob', email: 'bob@test.com' },
+        discardReason: 'new',
+      }),
     ])
 
     const program = makeProgram()
@@ -154,17 +125,12 @@ describe('Output format — JSON', () => {
   it('JSON format output', async () => {
     const { kernel, stdout } = setup()
     kernel.changes.listDiscarded.execute.mockResolvedValue([
-      {
+      makeMockDiscardedView({
         name: 'old-experiment',
-        history: [
-          {
-            type: 'discarded',
-            at: new Date('2024-01-10T09:00:00.000Z'),
-            by: { name: 'alice', email: 'alice@test.com' },
-            reason: 'no longer needed',
-          },
-        ],
-      },
+        discardedAt: new Date('2024-01-10T09:00:00.000Z'),
+        discardedBy: { name: 'alice', email: 'alice@test.com' },
+        discardReason: 'no longer needed',
+      }),
     ])
 
     const program = makeProgram()
@@ -185,18 +151,13 @@ describe('Output format — JSON', () => {
   it('JSON format output — supersededBy present', async () => {
     const { kernel, stdout } = setup()
     kernel.changes.listDiscarded.execute.mockResolvedValue([
-      {
+      makeMockDiscardedView({
         name: 'bad-idea',
-        history: [
-          {
-            type: 'discarded',
-            at: new Date('2024-01-08T09:00:00.000Z'),
-            by: { name: 'bob', email: 'bob@test.com' },
-            reason: 'duplicate effort',
-            supersededBy: ['new-approach'],
-          },
-        ],
-      },
+        discardedAt: new Date('2024-01-08T09:00:00.000Z'),
+        discardedBy: { name: 'bob', email: 'bob@test.com' },
+        discardReason: 'duplicate effort',
+        supersededBy: ['new-approach'],
+      }),
     ])
 
     const program = makeProgram()

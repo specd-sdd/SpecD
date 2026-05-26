@@ -1,7 +1,12 @@
 {
   "title": "ListDiscarded",
   "description": "Discarded changes remain in storage for audit purposes, and teams need to review them — for example, to confirm a superseded change was properly replaced. The `ListDiscarded` use case retrieves all discarded changes from the default workspace, providing visibility into abandoned work that has not been permanently deleted.",
-  "dependsOn": ["core:change", "core:kernel"],
+  "dependsOn": [
+    "core:change",
+    "core:kernel",
+    "core:discarded-change-view",
+    "core:change-repository-port"
+  ],
   "context": [
     "Discarded changes remain in storage for audit purposes, and teams need to review them — for example, to confirm a superseded change was properly replaced. The `ListDiscarded` use case retrieves all discarded changes from the default workspace, providing visibility into abandoned work that has not been permanently deleted."
   ],
@@ -13,15 +18,15 @@
       ]
     },
     {
-      "requirement": "Returns Change entities without content",
+      "requirement": "Returns DiscardedChangeView without content",
       "rules": [
-        "The returned `Change[]` MUST contain artifact state (status, validated hashes) but MUST NOT include artifact file content. Content is loaded on demand through separate use cases."
+        "`ListDiscarded.execute()` MUST return `DiscardedChangeView[]`. Each view MUST expose artifact state (status, validated hashes), shared inspection fields, and discard metadata (`discardReason`, `discardedAt`, `discardedBy`, optional `supersededBy`) but MUST NOT include artifact file content.\n\nCallers MUST NOT receive a `Change` aggregate from this use case."
       ]
     },
     {
       "requirement": "Constructor accepts a ChangeRepository",
       "rules": [
-        "`ListDiscarded` MUST accept a `ChangeRepository` as its sole constructor argument. It MUST delegate to `ChangeRepository.listDiscarded()` to retrieve discarded changes."
+        "`ListDiscarded` MUST accept a `ChangeRepository` as its sole constructor argument. It MUST delegate to `ChangeRepository.listDiscarded()` and return the resulting `DiscardedChangeView[]` without wrapping in mutable `Change` instances."
       ]
     },
     {
@@ -57,13 +62,37 @@
       "then": ["the result contains only alpha"]
     },
     {
-      "requirement": "Returns Change entities without content",
-      "name": "Changes have artifact state but no content",
-      "when": ["execute() returns a list of changes"],
+      "requirement": "Returns DiscardedChangeView without content",
+      "name": "Views have artifact state but no content",
+      "when": ["execute() returns a list"],
       "then": [
-        "each Change has its artifact map populated with status and validated hashes",
+        "each entry satisfies DiscardedChangeView with discardReason from the terminal discarded event",
+        "AND artifact statuses are populated",
         "AND no artifact file content is loaded"
       ]
+    },
+    {
+      "requirement": "Returns DiscardedChangeView without content",
+      "name": "Views are not Change instances",
+      "when": ["execute() returns a non-empty list"],
+      "then": ["entries do not expose transition or other Change mutators"]
+    },
+    {
+      "requirement": "Returns DiscardedChangeView without content",
+      "name": "Empty discarded directory returns empty list",
+      "given": ["no directories exist under discarded/"],
+      "when": ["ListDiscarded.execute() is called"],
+      "then": ["it returns an empty array"]
+    },
+    {
+      "requirement": "Returns DiscardedChangeView without content",
+      "name": "Drafted and active changes are excluded",
+      "given": [
+        "old-experiment exists only under discarded/",
+        "AND parked-feature exists only under drafts/"
+      ],
+      "when": ["ListDiscarded.execute() is called"],
+      "then": ["the result contains old-experiment only"]
     },
     {
       "requirement": "Returns an empty array when no discarded changes exist",
@@ -80,9 +109,18 @@
       "then": ["the result is an empty array"]
     }
   ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "core:list-discarded",
+        "file": "core:src/application/use-cases/list-discarded.ts",
+        "symbol": "ListDiscarded"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:72a115c74d2aced6b77fb5edf026e8c6e3df0737773d0e587e281c556481d554",
-    "verify.md": "sha256:4bfc57ef17273e7a69d8d83e05d2ddf2d10a89fab08e1faabf178804d05bf93e"
+    "spec.md": "sha256:e4d4ce1005f733043466194839134a3d853e8ccb18acb10c894dd0ff3a330525",
+    "verify.md": "sha256:a41016b2cbecd5c5c42f0558707d9c0e0e53353941d1ace79ca46738d77e8d4d"
   },
   "generatedBy": "core"
 }

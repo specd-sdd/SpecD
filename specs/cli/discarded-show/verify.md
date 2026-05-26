@@ -9,6 +9,27 @@
 - **WHEN** `specd discarded show` is run without a name
 - **THEN** the command exits with code 1 and prints a usage error to stderr
 
+### Requirement: Loads discarded change via GetDiscarded
+
+#### Scenario: Uses GetDiscarded not GetStatus
+
+- **WHEN** `specd discarded show my-change` runs successfully
+- **THEN** `GetDiscarded.execute` was invoked with `{ name: 'my-change' }`
+- **AND** `GetStatus` was not invoked
+
+#### Scenario: Does not call ChangeRepository.get
+
+- **GIVEN** a change exists only under `discarded/`
+- **WHEN** `specd discarded show my-change` runs successfully
+- **THEN** `ChangeRepository.get` was not used to load the change for display
+
+#### Scenario: Text output includes discard reason from view
+
+- **GIVEN** `GetDiscarded` returns a view with `discardReason: 'obsolete'`
+- **WHEN** `specd discarded show my-change` runs in text mode
+- **THEN** stdout contains `reason: obsolete`
+- **AND** the process exits with code 0
+
 ### Requirement: Output format — toon
 
 #### Scenario: TOON format output
@@ -40,5 +61,12 @@
 #### Scenario: Change not found in discarded
 
 - **WHEN** `specd discarded show nonexistent` is run and no change named `nonexistent` exists in `discarded/`
+- **THEN** the command exits with code 1
+- **AND** stderr contains an `error:` message
+
+#### Scenario: Drafted-only name exits with error
+
+- **GIVEN** `my-change` exists only under `drafts/`
+- **WHEN** `specd discarded show my-change` runs
 - **THEN** the command exits with code 1
 - **AND** stderr contains an `error:` message

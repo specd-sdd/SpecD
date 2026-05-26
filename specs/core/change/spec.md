@@ -223,7 +223,7 @@ The change manifest contains an **append-only `history` array** of typed events.
 
 The **current lifecycle state** of a Change is derived entirely from its history: the `to` field of the most recent `transitioned` event. If no `transitioned` event exists, the state is `drafting`. No separate state snapshot is stored. The JSON serialization of these events in `manifest.json` is defined in [`core:change-manifest` — Requirement: Manifest structure](../change-manifest/spec.md).
 
-The **current draft/active status** is derived from history: if the most recent `drafted` or `restored` event is of type `drafted`, the change is currently shelved in `drafts/`; otherwise it is active in `changes/`.
+The **current draft/active status** is derived from history: if the most recent `drafted` or `restored` event is of type `drafted`, the change is currently stored under `drafts/` and outside the active working set; otherwise it is active under `changes/`.
 
 The **active approval** for each gate is the most recent `spec-approved` or `signed-off` event that has not been superseded by a subsequent `invalidated` event.
 
@@ -231,7 +231,7 @@ All events share common fields:
 
 - **`type`** — identifies the event kind
 - **`at`** — ISO 8601 timestamp
-- **`by`** — git identity (`name` + `email`) of the actor, mandatory on all events by — the `ActorIdentity` of the person or system performing the operation, mandatory on all events
+- **`by`** — the `ActorIdentity` of the person or system performing the operation, mandatory on all events
 
 Event types:
 
@@ -242,7 +242,7 @@ Event types:
 | `spec-approved`       | `reason: string`, `artifactHashes: Record<string, string>` | When the spec approval gate is passed                                        |
 | `signed-off`          | `reason: string`, `artifactHashes: Record<string, string>` | When the signoff gate is passed                                              |
 | `invalidated`         | `cause`, `message`, `affectedArtifacts`                    | When scope or artifact review invalidates prior approvals                    |
-| `drafted`             | `reason?: string`                                          | When a change is shelved to `drafts/`                                        |
+| `drafted`             | `reason?: string`                                          | When a change is moved to `drafts/`                                          |
 | `restored`            | _(none beyond common fields)_                              | When a drafted change is moved back to `changes/`                            |
 | `artifact-skipped`    | `artifactId: string`, `reason?: string`                    | When an optional artifact is explicitly marked as not produced               |
 | `artifacts-synced`    | `typesAdded`, `typesRemoved`, `filesAdded`, `filesRemoved` | When artifact sync reconciles the artifact map against schema                |
@@ -312,16 +312,35 @@ A **`schemaVersion` mismatch** within the same schema name is advisory. When a c
 
 A change may be moved between storage locations without affecting its lifecycle state. All operations are recorded as events in history.
 
-- **Draft** (changes/ → drafts/) — shelves the change. Appends a `drafted` event. If the change has ever reached `implementing`, drafting SHALL fail by default.
-  - **`by`** — mandatory `ActorIdentity` of the person shelving
+- **Draft** (`changes/` → `drafts/`) — moves the change to drafted storage. Appends a `drafted` event. If the change has ever reached `implementing`, drafting SHALL fail by default.
+  - **`by`** — mandatory `ActorIdentity`
   - **`at`** — timestamp
   - **`reason`** — optional explanation
-- **Restore** (drafts/ → changes/) — recovers a drafted change. Appends a `restored` event.
-- **Discard** (changes/ or drafts/ → discarded/) — permanently abandons the change. Appends a `discarded` event. If the change has ever reached `implementing`, discarding SHALL fail by default.
+- **Restore** (`drafts/` → `changes/`) — returns a drafted change to the active working set. Appends a `restored` event. Only `RestoreChange` (via `mutateDraft`) may perform this while the change is drafted.
+- **Discard** (`changes/` or `drafts/` → `discarded/`) — permanently abandons the change. Appends a `discarded` event. If the change has ever reached `implementing`, discarding SHALL fail by default.
   - **`reason`** — mandatory human-provided explanation
-  - **`by`** — mandatory `ActorIdentity` of the person discarding
+  - **`by`** — mandatory `ActorIdentity`
   - **`at`** — timestamp
   - **`supersededBy`** — optional list of change names that replace this one
+
+### Requirement: Drafted read-only semantics
+
+When `isDrafted === true`, the change is outside the active working set and MUST be treated as read-only.
+
+While drafted, the change MUST NOT:
+
+- receive lifecycle `transitioned` events
+- persist artifact validation outcomes, scope edits, approvals, invalidations, or implementation-tracking updates
+- have artifact files written via transforming use cases
+
+While drafted, the only transforming operations permitted are:
+
+- **Restore** — via `RestoreChange` and `ChangeRepository.mutateDraft`
+- **Discard** — via `DiscardChange` and `ChangeRepository.mutateDraft`
+
+Read-only inspection MUST use `ChangeRepository.getDraft` or `GetDraft` and MUST return `DraftedChangeView`, not a mutable `Change` exposed to application callers.
+
+Attempts to transform a drafted change through active-change APIs MUST fail with `ChangeNotFoundError` when resolution is active-only, or `DraftedChangeReadOnlyError` when a low-level persistence primitive is invoked incorrectly.
 
 ### Requirement: Lifecycle interpretation authority
 

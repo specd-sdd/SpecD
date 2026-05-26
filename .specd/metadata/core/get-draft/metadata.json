@@ -1,0 +1,165 @@
+{
+  "title": "GetDraft",
+  "description": "Callers need to load a single drafted change by name for inspection without receiving a mutable aggregate or searching the active working set. `GetDraft` is the application use case that resolves a name in `drafts/` and returns a `DraftedChangeView`.",
+  "dependsOn": ["core:drafted-change-view", "core:change-repository-port", "core:change"],
+  "context": [
+    "Callers need to load a single drafted change by name for inspection without receiving a mutable aggregate or searching the active working set. `GetDraft` is the application use case that resolves a name in `drafts/` and returns a `DraftedChangeView`."
+  ],
+  "rules": [
+    {
+      "requirement": "Input contract",
+      "rules": [
+        "`GetDraft.execute` SHALL accept a `GetDraftInput` with:\n\n- `name` (string, required) — the drafted change slug to load"
+      ]
+    },
+    {
+      "requirement": "Resolution",
+      "rules": [
+        "The use case MUST call `ChangeRepository.getDraft(name)`.\n\n- If a drafted change exists, the use case MUST return `{ view: DraftedChangeView }`.\n- If no drafted change exists with that name, the use case MUST throw `ChangeNotFoundError`.\n\nThe use case MUST NOT fall back to `ChangeRepository.get(name)` (active storage)."
+      ]
+    },
+    {
+      "requirement": "Read-only",
+      "rules": [
+        "`GetDraft` MUST NOT mutate persistence, append history events, or invoke `mutate` / `mutateDraft`."
+      ]
+    },
+    {
+      "requirement": "Dependencies",
+      "rules": ["`GetDraft` depends on `ChangeRepository` injected via constructor."]
+    }
+  ],
+  "constraints": [
+    "This use case is for single-draft inspection. Listing all drafts remains ListDrafts.",
+    "Terminology uses Draft / Drafted, not \"shelved\"."
+  ],
+  "scenarios": [
+    {
+      "requirement": "Input contract",
+      "name": "execute accepts GetDraftInput with name",
+      "when": ["GetDraft.execute({ name: 'parked-feature' }) is called"],
+      "then": ["it accepts the input without type errors"]
+    },
+    {
+      "requirement": "Input contract",
+      "name": "execute rejects missing name at type level",
+      "when": ["application code constructs GetDraftInput"],
+      "then": ["name is a required string field"]
+    },
+    {
+      "requirement": "Input contract",
+      "name": "execute propagates repository errors",
+      "given": ["ChangeRepository.getDraft throws an unexpected storage error"],
+      "when": ["GetDraft.execute({ name }) is called"],
+      "then": ["the same error propagates to the caller"]
+    },
+    {
+      "requirement": "Resolution",
+      "name": "Drafted change returns view",
+      "given": ["a change exists only under drafts/ named parked-feature"],
+      "when": ["GetDraft.execute({ name: 'parked-feature' }) is called"],
+      "then": [
+        "it returns { view } where view is a DraftedChangeView",
+        "AND view.name is parked-feature",
+        "AND view.isDrafted === true"
+      ]
+    },
+    {
+      "requirement": "Resolution",
+      "name": "Active-only name is not found",
+      "given": ["a change exists only under changes/ with the same slug"],
+      "when": ["GetDraft.execute({ name }) is called"],
+      "then": ["it throws ChangeNotFoundError"]
+    },
+    {
+      "requirement": "Resolution",
+      "name": "Drafted-only name does not fall back to get",
+      "given": [
+        "a change exists only under drafts/",
+        "AND ChangeRepository.get(name) returns null"
+      ],
+      "when": ["GetDraft.execute({ name }) is called"],
+      "then": [
+        "getDraft(name) is invoked",
+        "AND get(name) is not used to synthesize a Change return value"
+      ]
+    },
+    {
+      "requirement": "Resolution",
+      "name": "Discarded-only name is not found",
+      "given": ["a change exists only under discarded/"],
+      "when": ["GetDraft.execute({ name }) is called"],
+      "then": ["it throws ChangeNotFoundError"]
+    },
+    {
+      "requirement": "Resolution",
+      "name": "Missing name throws",
+      "when": [
+        "GetDraft.execute({ name: 'does-not-exist' }) is called and the name exists in none of changes/, drafts/, or discarded/"
+      ],
+      "then": ["it throws ChangeNotFoundError"]
+    },
+    {
+      "requirement": "Read-only",
+      "name": "No repository mutation on success",
+      "given": ["a drafted change exists"],
+      "when": ["GetDraft.execute({ name }) completes successfully"],
+      "then": [
+        "ChangeRepository.mutate was not called",
+        "AND ChangeRepository.mutateDraft was not called",
+        "AND ChangeRepository.save was not called"
+      ]
+    },
+    {
+      "requirement": "Read-only",
+      "name": "No artifact writes on success",
+      "given": ["a drafted change exists"],
+      "when": ["GetDraft.execute({ name }) completes successfully"],
+      "then": ["ChangeRepository.saveArtifact was not called"]
+    },
+    {
+      "requirement": "Read-only",
+      "name": "View returned is not a mutable Change",
+      "given": ["a drafted change exists"],
+      "when": ["GetDraft.execute({ name }) returns { view }"],
+      "then": ["view is not an instance of domain Change"]
+    },
+    {
+      "requirement": "Dependencies",
+      "name": "Uses ChangeRepository port",
+      "when": ["GetDraft is constructed without a ChangeRepository"],
+      "then": ["construction fails or execute cannot run"]
+    },
+    {
+      "requirement": "Dependencies",
+      "name": "Does not require ActorResolver",
+      "when": ["GetDraft is instantiated"],
+      "then": ["only ChangeRepository is required in its constructor"]
+    },
+    {
+      "requirement": "Dependencies",
+      "name": "Does not require SchemaProvider",
+      "when": ["GetDraft.execute runs"],
+      "then": ["SchemaProvider is not consulted"]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "core:get-draft",
+        "file": "core:src/application/use-cases/get-draft.ts",
+        "symbol": "GetDraft"
+      },
+      {
+        "specId": "core:get-draft",
+        "file": "core:src/composition/kernel.ts",
+        "symbol": "createKernel"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:97166bdca6620f7fedbaf7a3e0a255c81128709949520eb6c15f6ee15a91e039",
+    "verify.md": "sha256:8c78c4459b040818119dc4c3b253fb8bc51dafa7ee5c230393899a53ae84f11a"
+  },
+  "generatedBy": "core"
+}

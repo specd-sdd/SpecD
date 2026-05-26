@@ -1,0 +1,2 @@
+- op: no-op
+  description: Already uses listDrafts for counts only; core return type change does not require CLI spec changes.

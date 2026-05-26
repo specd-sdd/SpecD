@@ -1,7 +1,12 @@
 {
   "title": "Drafts List",
   "description": "Shelved work is invisible to the active change list, so users need a dedicated view to see what has been parked. `specd drafts list` lists all changes currently in `drafts/`, sorted by `createdAt` ascending.",
-  "dependsOn": ["cli:entrypoint", "core:change", "cli:command-resource-naming"],
+  "dependsOn": [
+    "cli:entrypoint",
+    "core:list-drafts",
+    "core:drafted-change-view",
+    "cli:command-resource-naming"
+  ],
   "context": [
     "Shelved work is invisible to the active change list, so users need a dedicated view to see what has been parked. `specd drafts list` lists all changes currently in `drafts/`, sorted by `createdAt` ascending."
   ],
@@ -10,6 +15,12 @@
       "requirement": "Command signature",
       "rules": [
         "```\nspecd drafts list [--format text|json|toon]\n```\n\nAlias:\n\n```\nspecd draft list [--format text|json|toon]\n```\n\nNo positional arguments. The `--format` flag controls output encoding; defaults to `text`."
+      ]
+    },
+    {
+      "requirement": "Uses ListDrafts read model",
+      "rules": [
+        "The command MUST invoke `ListDrafts.execute()` and treat each entry as a `DraftedChangeView`.\n\nThe command MUST read `history` from each view to extract the latest `drafted` event for `draftedAt`, `draftedBy`, and `reason`.\n\nThe command MUST NOT assume entries are mutable `Change` instances."
       ]
     },
     {
@@ -55,6 +66,29 @@
       "then": [
         "the command proceeds without positional arguments",
         "AND output format defaults to text"
+      ]
+    },
+    {
+      "requirement": "Uses ListDrafts read model",
+      "name": "Invokes ListDrafts",
+      "when": ["specd drafts list runs"],
+      "then": ["ListDrafts.execute is called"]
+    },
+    {
+      "requirement": "Uses ListDrafts read model",
+      "name": "Does not invoke GetStatus per row",
+      "given": ["two drafted changes exist"],
+      "when": ["specd drafts list runs"],
+      "then": ["GetStatus is not invoked for each listed name"]
+    },
+    {
+      "requirement": "Uses ListDrafts read model",
+      "name": "JSON output serializes view fields",
+      "given": ["ListDrafts returns views with name and isDrafted === true"],
+      "when": ["specd drafts list --format json runs"],
+      "then": [
+        "stdout is a JSON array whose objects include name",
+        "AND entries do not include mutable Change internals"
       ]
     },
     {
@@ -143,9 +177,17 @@
       "then": ["the command exits with code 3", "AND stderr contains an error: message"]
     }
   ],
+  "implementation": {
+    "files": [
+      {
+        "specId": "cli:drafts-list",
+        "file": "cli:src/commands/drafts/list.ts"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:be61effca3973b6468bfdfaff679a4bdb2049e3f8b94d553d253676ec53ea0a9",
-    "verify.md": "sha256:8d97f8721e4121700f073edce05079e7a93462e4e210283cdfde0584fa9de951"
+    "spec.md": "sha256:35ed882e1876bf3fdc1fc5365200d4b64dd9a62a7f41cb142cc3670a13673c53",
+    "verify.md": "sha256:74d36fcc8b6eab9a8ef9ead571d7c7eedf480ddc5ccc2c09f2568ae5f63be5b5"
   },
   "generatedBy": "core"
 }

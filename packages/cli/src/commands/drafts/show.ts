@@ -1,7 +1,7 @@
 import { type Command } from 'commander'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat } from '../../formatter.js'
-import { handleError, cliError } from '../../handle-error.js'
+import { handleError } from '../../handle-error.js'
 
 /**
  * Registers the `drafts show` subcommand on the given parent command.
@@ -32,29 +32,25 @@ JSON/TOON output schema:
     .action(async (name: string, opts: { format: string; config?: string }) => {
       try {
         const { kernel } = await resolveCliContext({ configPath: opts.config })
-        const { change } = await kernel.changes.status.execute({ name })
-
-        if (!change.isDrafted) {
-          cliError(`change '${name}' is not in drafts`, opts.format)
-        }
+        const { view } = await kernel.changes.getDraft.execute({ name })
 
         const fmt = parseFormat(opts.format)
 
         if (fmt === 'text') {
           const lines = [
-            `name:    ${change.name}`,
-            `state:   ${change.state}`,
-            `specs:   ${[...change.specIds].join(', ') || '(none)'}`,
-            `schema:  ${change.schemaName}@${change.schemaVersion}`,
+            `name:    ${view.name}`,
+            `state:   ${view.state}`,
+            `specs:   ${[...view.specIds].join(', ') || '(none)'}`,
+            `schema:  ${view.schemaName}@${view.schemaVersion}`,
           ]
           output(lines.join('\n'), 'text')
         } else {
           output(
             {
-              name: change.name,
-              state: change.state,
-              specIds: [...change.specIds],
-              schema: { name: change.schemaName, version: change.schemaVersion },
+              name: view.name,
+              state: view.state,
+              specIds: [...view.specIds],
+              schema: { name: view.schemaName, version: view.schemaVersion },
             },
             fmt,
           )

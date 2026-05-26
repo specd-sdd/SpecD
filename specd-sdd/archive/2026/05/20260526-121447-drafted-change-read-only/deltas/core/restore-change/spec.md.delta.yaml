@@ -1,0 +1,20 @@
+- op: modified
+  description: Load and persist only via drafted mutation API.
+  selector:
+    type: section
+    matches: 'Requirement: Change must exist'
+  content: |
+    The use case MUST verify the change exists in drafted storage via `ChangeRepository.getDraft(name)`. If `getDraft` returns `null`, it MUST throw `ChangeNotFoundError`.
+
+    The use case MUST NOT use `ChangeRepository.get(name)` for loading.
+- op: modified
+  description: Use mutateDraft for serialized persistence.
+  selector:
+    type: section
+    matches: 'Requirement: Persistence'
+  content: |
+    After resolving the actor, the use case MUST persist through `ChangeRepository.mutateDraft(name, fn)`.
+
+    Inside the mutation callback, the repository supplies the fresh persisted drafted `Change`; the use case calls `change.restore(actor)` on that instance and returns it. When the callback resolves, the repository persists the updated manifest and moves the directory from `drafts/` to `changes/`.
+
+    `RestoreChange.execute` returns the updated active `Change` instance (`isDrafted === false`) produced by that serialized mutation.

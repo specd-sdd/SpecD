@@ -1,0 +1,13 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["core:change", "core:draft-change", "default:_global/architecture"],
+  "implementation": [
+    {
+      "file": "core:src/application/use-cases/restore-change.ts",
+      "symbols": ["RestoreChange"]
+    }
+  ]
+}

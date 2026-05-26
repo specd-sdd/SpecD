@@ -10,6 +10,25 @@
 - **THEN** the command proceeds without positional arguments
 - **AND** output format defaults to text
 
+### Requirement: Uses ListDiscarded read model
+
+#### Scenario: Invokes ListDiscarded
+
+- **WHEN** `specd discarded list` runs
+- **THEN** `ListDiscarded.execute` is called
+
+#### Scenario: Does not invoke GetStatus per row
+
+- **GIVEN** two discarded changes exist
+- **WHEN** `specd discarded list` runs
+- **THEN** `GetStatus` is not invoked for each listed name
+
+#### Scenario: Text output includes discard reason per row
+
+- **GIVEN** `ListDiscarded` returns a view with `discardReason: 'superseded'`
+- **WHEN** `specd discarded list` runs in text mode
+- **THEN** stdout includes that reason for the listed change
+
 ### Requirement: Output format — toon
 
 #### Scenario: TOON format output

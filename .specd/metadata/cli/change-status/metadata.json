@@ -18,6 +18,12 @@
       ]
     },
     {
+      "requirement": "Drafted change status is read-only",
+      "rules": [
+        "When `GetStatus` returns `draftView` for the requested name, the command MUST render status in read-only form:\n\n- MUST NOT print actionable lifecycle transitions that would mutate the drafted change\n- MUST indicate the change is drafted (for example in text headers or JSON `isDrafted: true`)\n- MAY still show artifact effective statuses for inspection\n\nWhen `GetStatus` returns an active `change`, behaviour is unchanged."
+      ]
+    },
+    {
       "requirement": "Output format",
       "rules": [
         "In `json` or `toon` mode, the `artifactDag` array MUST include the `hasTasks` field for every entry.\n\nThe `state` field in the top-level `artifactDag` MUST reflect the drift-aware display state projection (e.g., `complete-with-drift`) rather than the raw canonical state, ensuring that agents can detect drift without manually comparing hashes."
@@ -87,6 +93,40 @@
       "name": "Missing name argument",
       "when": ["specd change status is run without a positional name"],
       "then": ["the command exits with code 1 and prints a usage error to stderr"]
+    },
+    {
+      "requirement": "Drafted change status is read-only",
+      "name": "Drafted change does not list transition commands in next action",
+      "given": ["GetStatus returns draftView for the requested name"],
+      "when": ["specd change status <name> runs in text mode"],
+      "then": [
+        "output indicates the change is drafted",
+        "AND output does not suggest specd change transition as the next action"
+      ]
+    },
+    {
+      "requirement": "Drafted change status is read-only",
+      "name": "JSON output includes isDrafted for drafted name",
+      "given": ["GetStatus returns draftView and no change"],
+      "when": ["specd change status <name> --format json runs"],
+      "then": [
+        "stdout includes isDrafted: true or equivalent drafted marker",
+        "AND availableTransitions is empty or omitted"
+      ]
+    },
+    {
+      "requirement": "Drafted change status is read-only",
+      "name": "Active change behaviour unchanged",
+      "given": ["GetStatus returns change and no draftView"],
+      "when": ["specd change status <name> runs"],
+      "then": ["lifecycle transitions may still appear when the core use case provides them"]
+    },
+    {
+      "requirement": "Drafted change status is read-only",
+      "name": "Discarded name is not found via change status",
+      "given": ["a change exists only under discarded/"],
+      "when": ["specd change status <name> runs"],
+      "then": ["the command exits with code 1", "AND stderr contains an error: message"]
     },
     {
       "requirement": "Output format",
@@ -403,16 +443,12 @@
       {
         "specId": "cli:change-status",
         "file": "cli:src/commands/change/status.ts"
-      },
-      {
-        "specId": "cli:change-status",
-        "file": "cli:test/commands/helpers.ts"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:9e5d1e83912ce2c6f37a33baa07f3514451130e7edf6eb62c4efa411f967b156",
-    "verify.md": "sha256:ab1c98fcd6f853f8e87102bf783aae03ee2e09c482ace3b9adbe61026bd7e67b"
+    "spec.md": "sha256:0dceb4ec9f50042f66e96bc778cae084d00f813190c83887bb032cb9bd884a17",
+    "verify.md": "sha256:e4f57e1f7e26e390ac3c3448ccbd72f8a534775331281b0e3fc5a5c611051e3d"
   },
   "generatedBy": "core"
 }

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import {
   makeMockConfig,
+  makeMockChange,
   makeMockKernel,
   makeProgram,
   mockProcessExit,
@@ -41,17 +42,15 @@ describe('Command signature', () => {
 describe('Output format — text', () => {
   it('Normal text output', async () => {
     const { kernel, stdout } = setup()
-    kernel.changes.status.execute.mockResolvedValue({
-      change: {
+    kernel.changes.getDraft.execute.mockResolvedValue({
+      view: makeMockChange({
         name: 'old-experiment',
         state: 'drafting',
         isDrafted: true,
-        specIds: new Set(['auth/legacy']),
+        specIds: ['auth/legacy'],
         schemaName: 'schema-std',
         schemaVersion: 1,
-        history: [],
-      },
-      artifactStatuses: [],
+      }),
     })
 
     const program = makeProgram()
@@ -73,17 +72,15 @@ describe('Output format — text', () => {
 describe('Output format — JSON', () => {
   it('JSON format output', async () => {
     const { kernel, stdout } = setup()
-    kernel.changes.status.execute.mockResolvedValue({
-      change: {
+    kernel.changes.getDraft.execute.mockResolvedValue({
+      view: makeMockChange({
         name: 'old-experiment',
         state: 'drafting',
         isDrafted: true,
-        specIds: new Set(['auth/legacy']),
+        specIds: ['auth/legacy'],
         schemaName: 'schema-std',
         schemaVersion: 1,
-        history: [],
-      },
-      artifactStatuses: [],
+      }),
     })
 
     const program = makeProgram()
@@ -109,7 +106,7 @@ describe('Output format — JSON', () => {
 describe('Error cases', () => {
   it('Change not found', async () => {
     const { kernel, stderr } = setup()
-    kernel.changes.status.execute.mockRejectedValue(new ChangeNotFoundError('nonexistent'))
+    kernel.changes.getDraft.execute.mockRejectedValue(new ChangeNotFoundError('nonexistent'))
 
     const program = makeProgram()
     registerDraftsShow(program.command('drafts'))
@@ -121,18 +118,7 @@ describe('Error cases', () => {
 
   it('Change not in drafts', async () => {
     const { kernel, stderr } = setup()
-    kernel.changes.status.execute.mockResolvedValue({
-      change: {
-        name: 'my-change',
-        state: 'designing',
-        isDrafted: false,
-        specIds: new Set(['auth/login']),
-        schemaName: '@specd/schema-std',
-        schemaVersion: 1,
-        history: [],
-      },
-      artifactStatuses: [],
-    })
+    kernel.changes.getDraft.execute.mockRejectedValue(new ChangeNotFoundError('my-change'))
 
     const program = makeProgram()
     registerDraftsShow(program.command('drafts'))

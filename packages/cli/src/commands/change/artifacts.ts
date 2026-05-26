@@ -1,7 +1,7 @@
 import { type Command } from 'commander'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat } from '../../formatter.js'
-import { handleError } from '../../handle-error.js'
+import { handleError, cliError } from '../../handle-error.js'
 import { vlen, pad } from '../../helpers/table.js'
 
 /**
@@ -40,9 +40,11 @@ JSON/TOON output schema:
     .action(async (name: string, opts: { format: string; config?: string }) => {
       try {
         const { kernel } = await resolveCliContext({ configPath: opts.config })
-        const { change, artifactStatuses, lifecycle } = await kernel.changes.status.execute({
-          name,
-        })
+        const statusResult = await kernel.changes.status.execute({ name })
+        if (statusResult.change === undefined) {
+          cliError(`change '${name}' is drafted; restore it before listing artifacts`, opts.format)
+        }
+        const { change, artifactStatuses, lifecycle } = statusResult
         const changeDir =
           typeof kernel.changes.repo.changePath === 'function'
             ? kernel.changes.repo.changePath(change)

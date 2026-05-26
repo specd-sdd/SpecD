@@ -2,21 +2,23 @@
 
 ## Purpose
 
-Users who shelve changes need visibility into what is parked so they can decide what to resume. The `ListDrafts` use case retrieves all drafted (shelved) changes from the default workspace — those temporarily set aside that can be restored to active status later.
+Users who draft changes need visibility into what is parked so they can decide what to resume. The `ListDrafts` use case retrieves all drafted changes from the default workspace — those temporarily set aside that can be restored to active status later.
 
 ## Requirements
 
 ### Requirement: Returns all drafted changes
 
-`ListDrafts.execute()` MUST return all changes that are in the drafted (shelved) lifecycle state. The result MUST be sorted by creation order, oldest first.
+`ListDrafts.execute()` MUST return all changes that are in the drafted lifecycle state. The result MUST be sorted by creation order, oldest first.
 
-### Requirement: Returns Change entities without content
+### Requirement: Returns DraftedChangeView without content
 
-The returned `Change[]` MUST contain artifact state (status, validated hashes) but MUST NOT include artifact file content. Content is loaded on demand through separate use cases.
+`ListDrafts.execute()` MUST return `DraftedChangeView[]`. Each view MUST expose artifact state (status, validated hashes) and any fields required for listing (including `history` for the latest `drafted` event) but MUST NOT include artifact file content.
+
+Callers MUST NOT receive a `Change` aggregate from this use case.
 
 ### Requirement: Constructor accepts a ChangeRepository
 
-`ListDrafts` MUST accept a `ChangeRepository` as its sole constructor argument. It MUST delegate to `ChangeRepository.listDrafts()` to retrieve drafted changes.
+`ListDrafts` MUST accept a `ChangeRepository` as its sole constructor argument. It MUST delegate to `ChangeRepository.listDrafts()` and return the resulting `DraftedChangeView[]` without wrapping in mutable `Change` instances.
 
 ### Requirement: Returns an empty array when no drafted changes exist
 

@@ -14,11 +14,23 @@ Users and tooling need a quick way to see where a change stands — both its lif
 
 On success, `execute()` MUST return a `GetStatusResult` containing:
 
-- `change` — the loaded `Change` entity with its current artifact state
+- `change` — the loaded active `Change` when the name resolves under `changes/`; MUST be absent when only a draft exists
+- `draftView` — a `DraftedChangeView` when the name resolves only under `drafts/`; MUST be absent for active changes
 - `artifactStatuses` — an array of `ArtifactStatusEntry` objects, one per artifact attached to the change
 - `review` — a derived review summary for agents and CLI serializers
 - `blockers` — an array of active blockers preventing progress
 - `nextAction` — a recommended next action to guide the actor
+
+Resolution order:
+
+1. `ChangeRepository.get(name)` for active storage
+2. If null, `ChangeRepository.getDraft(name)` for drafted storage
+
+If both are null, the use case MUST throw `ChangeNotFoundError`.
+
+`GetStatus` MUST NOT call `ChangeRepository.getDiscarded` or load `discarded/` storage. Discarded changes MUST be inspected via `GetDiscarded` (for example `specd discarded show`).
+
+When `draftView` is present, the use case MUST compute artifact and lifecycle projections for inspection only. It MUST NOT expose a mutable `Change` to callers and MUST NOT surface transitions that would mutate the drafted change (`availableTransitions` MUST be empty; `nextAction.command` MUST NOT recommend transition or validate commands).
 
 Each `ArtifactStatusEntry` MUST contain:
 
@@ -72,6 +84,14 @@ Each review file entry inside `affectedArtifacts` MUST contain:
 `review.route` is `'designing'` whenever `review.required` is `true`, otherwise `null`.
 
 `GetStatus` MUST resolve `review.affectedArtifacts` against the current artifact file entries so agent-facing consumers can inspect the actual file directly. The outward-facing review summary MUST prioritize `filename` and `path`; consumers must not need to understand manifest-internal file keys in order to locate the affected artifact.
+
+### Requirement: Drafted change read-only status
+
+When `GetStatus` loads a change exclusively via `getDraft`, the result MUST satisfy [`core:drafted-change-view`](../drafted-change-view/spec.md).
+
+The use case MAY use an internal `Change` loaded from drafted storage to compute artifact effective statuses, but that instance MUST NOT appear on `GetStatusResult`.
+
+Drafted status responses MUST be suitable for `drafts show` and read-only CLI inspection without enabling lifecycle mutation.
 
 ### Requirement: Implementation status projection
 
@@ -132,7 +152,9 @@ If no change with the given name exists in the repository, `execute()` MUST thro
 - `lifecycle: LifecycleEngine` — for deriving effective artifact status, blockers, routing, and next-action guidance from the change plus active schema
 - `approvals: { readonly spec: boolean; readonly signoff: boolean }` — whether approval gates are active
 
-It MUST delegate to `ChangeRepository.get(name)` to load the change. `SchemaProvider` replaces the previous `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths` triple, providing the fully-resolved schema with plugins and overrides applied.
+It MUST load the change via `ChangeRepository.get(name)` and, when that returns `null`, via `ChangeRepository.getDraft(name)`. It MUST NOT use `getDiscarded`.
+
+`SchemaProvider` replaces the previous `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths` triple, providing the fully-resolved schema with plugins and overrides applied.
 
 `GetStatus` MUST NOT accept `ImplementationDetector` and MUST NOT invoke implementation autodetection.
 
