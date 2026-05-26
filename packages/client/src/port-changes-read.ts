@@ -12,6 +12,12 @@ import type {
   PreviewChangeQuery,
 } from './inputs.js'
 
+/**
+ * Non-active change storage for read-only Studio routes.
+ * `archived` is reserved for when archived changes share the same read model.
+ */
+export type ReadOnlyChangeOrigin = 'draft' | 'discarded' | 'archived'
+
 /** Change artifact row in list response. */
 export interface ChangeArtifactListItemDto {
   readonly filename: string
@@ -30,6 +36,14 @@ export interface PortChangesRead {
   getChangeArtifact(
     name: string,
     filename: string,
+    signal?: AbortSignal,
+  ): Promise<ArtifactContentDto>
+
+  /** Read-only change artifact body (`/drafts`, `/discarded`, future `/archived`). */
+  getReadOnlyChangeArtifact(
+    name: string,
+    filename: string,
+    readOnlyOrigin: ReadOnlyChangeOrigin,
     signal?: AbortSignal,
   ): Promise<ArtifactContentDto>
 

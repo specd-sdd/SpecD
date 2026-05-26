@@ -2,6 +2,7 @@ import { type Change } from '../../domain/entities/change.js'
 import {
   type DiscardedChangeView,
   type DraftedChangeView,
+  type ReadOnlyChangeOrigin,
 } from '../../domain/read-only-change-view.js'
 import { type SpecArtifact } from '../../domain/value-objects/spec-artifact.js'
 import { type ArtifactConflictError } from '../../domain/errors/artifact-conflict-error.js'
@@ -69,24 +70,19 @@ export abstract class ChangeRepository extends Repository {
   abstract getDiscarded(name: string): Promise<DiscardedChangeView | null>
 
   /**
-   * Loads a drafted change as a {@link Change} for read-only artifact I/O.
+   * Loads tracked artifact bytes for a {@link ReadOnlyChangeView} storage (same semantics as
+   * {@link artifact} for active changes) without returning a mutable {@link Change} aggregate.
    *
-   * Does not acquire mutation locks or persist.
-   *
-   * @param name - The change name to look up under `drafts/`
-   * @returns The change entity, or `null` if not found
+   * @param readOnlyOrigin - Storage backing the view (`draft`, `discarded`; `archived` when wired)
+   * @param name - Change name within that storage
+   * @param filename - Tracked artifact filename within the change directory
+   * @returns Artifact content and hash, or `null` when the change or file is missing
    */
-  abstract getDraftChange(name: string): Promise<Change | null>
-
-  /**
-   * Loads a discarded change as a {@link Change} for read-only artifact I/O.
-   *
-   * Does not acquire mutation locks or persist.
-   *
-   * @param name - The change name to look up under `discarded/`
-   * @returns The change entity, or `null` if not found
-   */
-  abstract getDiscardedChange(name: string): Promise<Change | null>
+  abstract artifactReadOnly(
+    readOnlyOrigin: ReadOnlyChangeOrigin,
+    name: string,
+    filename: string,
+  ): Promise<SpecArtifact | null>
 
   /**
    * Runs a serialized persisted mutation for one existing change.

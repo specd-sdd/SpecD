@@ -72,6 +72,11 @@ export {
   type GetChangeArtifactInput,
   type GetChangeArtifactResult,
 } from './get-change-artifact.js'
+export {
+  type GetReadOnlyChangeArtifact,
+  type GetReadOnlyChangeArtifactInput,
+  type GetReadOnlyChangeArtifactResult,
+} from './get-read-only-change-artifact.js'
 export { type ImplementationTrackingProjection } from './_shared/implementation-tracking.js'
 export {
   type GetImplementationReview,

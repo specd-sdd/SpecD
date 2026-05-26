@@ -1,4 +1,4 @@
-import { ChangeNotFoundError, type Change, type ChangeRepository } from '@specd/core'
+import { ChangeNotFoundError } from '@specd/core'
 import { buildCompileContextConfig } from '../compile-config.js'
 import {
   formatCompiledContextMarkdown,
@@ -8,24 +8,12 @@ import { type FastifyInstance } from 'fastify'
 import { apiHandler } from '../handler-utils.js'
 import {
   toArtifactListDto,
+  toArtifactListDtoFromView,
   toChangeDetailDto,
   toChangeStatusDto,
 } from '../presenters/presenter-change.js'
 import { toArtifactContentDto } from '../presenters/presenter-artifact.js'
 import { toImplementationReviewDto } from '../presenters/presenter-change.js'
-
-async function loadReadOnlyAggregate(
-  repo: ChangeRepository,
-  kind: 'draft' | 'discarded',
-  name: string,
-): Promise<Change> {
-  const change =
-    kind === 'draft' ? await repo.getDraftChange(name) : await repo.getDiscardedChange(name)
-  if (change === null) {
-    throw new ChangeNotFoundError(name)
-  }
-  return change
-}
 
 /**
  * Registers read routes for a single change under `/v1`.
@@ -117,8 +105,11 @@ export function registerChangesReadRoutes(app: FastifyInstance): void {
     '/drafts/:name/artifacts',
     apiHandler(async (ctx, req) => {
       const { name } = req.params as { name: string }
-      const change = await loadReadOnlyAggregate(ctx.kernel.changes.repo, 'draft', name)
-      return toArtifactListDto(change)
+      const view = await ctx.kernel.changes.repo.getDraft(name)
+      if (view === null) {
+        throw new ChangeNotFoundError(name)
+      }
+      return toArtifactListDtoFromView(view)
     }),
   )
 
@@ -126,8 +117,11 @@ export function registerChangesReadRoutes(app: FastifyInstance): void {
     '/discarded/:name/artifacts',
     apiHandler(async (ctx, req) => {
       const { name } = req.params as { name: string }
-      const change = await loadReadOnlyAggregate(ctx.kernel.changes.repo, 'discarded', name)
-      return toArtifactListDto(change)
+      const view = await ctx.kernel.changes.repo.getDiscarded(name)
+      if (view === null) {
+        throw new ChangeNotFoundError(name)
+      }
+      return toArtifactListDtoFromView(view)
     }),
   )
 
@@ -147,15 +141,12 @@ export function registerChangesReadRoutes(app: FastifyInstance): void {
     '/drafts/:name/artifacts/:filename',
     apiHandler(async (ctx, req) => {
       const { name, filename } = req.params as { name: string; filename: string }
-      const change = await loadReadOnlyAggregate(ctx.kernel.changes.repo, 'draft', name)
-      const artifact = await ctx.kernel.changes.repo.artifact(change, filename)
-      if (artifact === null) {
-        throw new ChangeNotFoundError(name)
-      }
-      return toArtifactContentDto({
-        content: artifact.content,
-        originalHash: artifact.originalHash ?? '',
+      const result = await ctx.kernel.changes.getReadOnlyChangeArtifact.execute({
+        readOnlyOrigin: 'draft',
+        name,
+        filename,
       })
+      return toArtifactContentDto(result)
     }),
   )
 
@@ -163,15 +154,12 @@ export function registerChangesReadRoutes(app: FastifyInstance): void {
     '/discarded/:name/artifacts/:filename',
     apiHandler(async (ctx, req) => {
       const { name, filename } = req.params as { name: string; filename: string }
-      const change = await loadReadOnlyAggregate(ctx.kernel.changes.repo, 'discarded', name)
-      const artifact = await ctx.kernel.changes.repo.artifact(change, filename)
-      if (artifact === null) {
-        throw new ChangeNotFoundError(name)
-      }
-      return toArtifactContentDto({
-        content: artifact.content,
-        originalHash: artifact.originalHash ?? '',
+      const result = await ctx.kernel.changes.getReadOnlyChangeArtifact.execute({
+        readOnlyOrigin: 'discarded',
+        name,
+        filename,
       })
+      return toArtifactContentDto(result)
     }),
   )
 

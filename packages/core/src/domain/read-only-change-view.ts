@@ -8,6 +8,12 @@ import { type ChangeArtifact } from './entities/change-artifact.js'
 import { type ChangeState } from './value-objects/change-state.js'
 import { InvalidChangeError } from './errors/invalid-change-error.js'
 
+/**
+ * Non-active change storage backing a {@link ReadOnlyChangeView}.
+ * `archived` is reserved for when archived changes use the same read model.
+ */
+export type ReadOnlyChangeOrigin = 'draft' | 'discarded' | 'archived'
+
 /** Shared read-only fields for drafted and discarded display. */
 export interface ReadOnlyChangeView {
   readonly name: string

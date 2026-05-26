@@ -26,9 +26,11 @@ All paths MUST be under `/v1`. Responses MUST use `application/json` unless retu
 
 When `refreshImplementation=true`, the handler MUST run implementation refresh before `GetStatus`, matching CLI semantics.
 
-### Requirement: artifact list and body routes use GetChangeArtifact
+### Requirement: artifact list and body routes use dedicated core use cases
 
-`GET .../artifacts` lists tracked filenames and aggregate states. `GET .../artifacts/{filename}` MUST return `ArtifactContentDto` via `GetChangeArtifact`, not direct repository access.
+`GET /changes/{name}/artifacts` lists tracked filenames and aggregate states from the active change. `GET /changes/{name}/artifacts/{filename}` MUST return `ArtifactContentDto` via `GetChangeArtifact`, not direct repository access.
+
+`GET /drafts/{name}/artifacts` and `GET /discarded/{name}/artifacts` MUST list metadata from `DraftedChangeView` / `DiscardedChangeView` without inline bodies. `GET /drafts/{name}/artifacts/{filename}` and `GET /discarded/{name}/artifacts/{filename}` MUST return `ArtifactContentDto` via `GetReadOnlyChangeArtifact` with `readOnlyOrigin` `draft` or `discarded`, not `GetChangeArtifact` and not direct `ChangeRepository` calls.
 
 ### Requirement: context preview and instruction routes delegate to kernel
 
@@ -75,7 +77,7 @@ Discarded routes MUST NOT allow any lifecycle mutation or artifact writes.
 
 - HTTP handlers MUST NOT import `@specd/core` from `@specd/ui` or `@specd/client`.
 - v1 server auth: `api.auth.type` from `specd.yaml` (never `studio.*`); registry registers only `disabled`; no server-side Bearer enforcement on loopback or `specd ui serve`.
-- Artifact save/load MUST use `core:save-change-artifact` and `core:get-change-artifact` — not raw `ChangeRepository.saveArtifact` from HTTP handlers.
+- Artifact save/load for **active** changes MUST use `core:save-change-artifact` and `core:get-change-artifact`. Read-only draft/discarded artifact bodies MUST use `core:get-read-only-change-artifact` — not raw `ChangeRepository` methods from HTTP handlers.
 - There is no `GET /changes/{name}/validation` resource; use `GET .../status` and `POST .../validate`.
 - Canonical workspace spec artifacts are read-only in Studio v1.
 

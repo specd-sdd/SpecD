@@ -49,6 +49,7 @@ import { RefreshImplementationTracking } from '../application/use-cases/refresh-
 import { GetImplementationReview } from '../application/use-cases/get-implementation-review.js'
 import { SaveChangeArtifact } from '../application/use-cases/save-change-artifact.js'
 import { GetChangeArtifact } from '../application/use-cases/get-change-artifact.js'
+import { GetReadOnlyChangeArtifact } from '../application/use-cases/get-read-only-change-artifact.js'
 import { ReadLog } from '../application/use-cases/read-log.js'
 import { createArchiveWorkspaceImplementationConfig } from '../application/use-cases/archive-change.js'
 import { buildSchema } from '../domain/services/build-schema.js'
@@ -96,6 +97,8 @@ export interface Kernel {
     status: GetStatus
     /** Loads tracked artifact content and optimistic-concurrency hash. */
     getArtifact: GetChangeArtifact
+    /** Loads tracked artifact content for a {@link ReadOnlyChangeView} (draft, discarded, archived). */
+    getReadOnlyChangeArtifact: GetReadOnlyChangeArtifact
     /** Saves tracked artifact content with revision and drift reconciliation. */
     saveArtifact: SaveChangeArtifact
     /** Performs a lifecycle state transition with approval-gate routing. */
@@ -323,6 +326,7 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
         lifecycle,
       ),
       getArtifact: new GetChangeArtifact(i.changes),
+      getReadOnlyChangeArtifact: new GetReadOnlyChangeArtifact(i.changes),
       saveArtifact: new SaveChangeArtifact(i.changes, schemaProvider, i.hasher),
       transition: new TransitionChange(i.changes, i.actor, schemaProvider, runStepHooks, lifecycle),
       draft: new DraftChange(i.changes, i.actor),

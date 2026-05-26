@@ -3,6 +3,7 @@ export * from './value-objects/index.js'
 export * from './errors/index.js'
 export * from './services/index.js'
 export {
+  type ReadOnlyChangeOrigin,
   type ReadOnlyChangeView,
   type DraftedChangeView,
   type DiscardedChangeView,

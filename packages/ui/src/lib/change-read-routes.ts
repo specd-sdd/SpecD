@@ -4,11 +4,20 @@ import type {
   ChangeDetailDto,
   ChangeStatusDto,
   GetChangeStatusOptions,
+  ReadOnlyChangeOrigin,
   SpecdDataPort,
 } from '@specd/client'
 import type { ChangeListSection } from '../change/change-list-section.js'
 
 export type ChangeReadSection = ChangeListSection | null | undefined
+
+/** Maps shell list section to read-only storage when applicable. */
+export function readOnlyOriginFromListSection(
+  section: ChangeReadSection,
+): ReadOnlyChangeOrigin | null {
+  if (section === 'draft' || section === 'discarded') return section
+  return null
+}
 
 export function loadChangeDetail(
   port: SpecdDataPort,
@@ -47,8 +56,10 @@ export function loadChangeArtifactForSection(
   filename: string,
   section: ChangeReadSection,
 ): Promise<ArtifactContentDto> {
-  if (section === 'draft') return port.getDraftArtifact(name, filename)
-  if (section === 'discarded') return port.getDiscardedArtifact(name, filename)
+  const readOnlyOrigin = readOnlyOriginFromListSection(section)
+  if (readOnlyOrigin !== null) {
+    return port.getReadOnlyChangeArtifact(name, filename, readOnlyOrigin)
+  }
   return port.getChangeArtifact(name, filename)
 }
 

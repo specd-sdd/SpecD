@@ -36,7 +36,7 @@ import type {
   ValidateChangeBatchInput,
   ValidateChangeInput,
 } from './inputs.js'
-import type { ChangeArtifactListItemDto } from './port-changes-read.js'
+import type { ChangeArtifactListItemDto, ReadOnlyChangeOrigin } from './port-changes-read.js'
 import type { AppendProjectLogInput, AppendStudioOutputInput } from './port-studio-panel.js'
 import type { LogReadDto } from './dto/log-read.js'
 import type { StudioOutputEntryDto } from './dto/studio-output.js'
@@ -225,16 +225,31 @@ export class RemoteSpecdDataAdapter implements SpecdDataPort {
     })
   }
 
+  getReadOnlyChangeArtifact(
+    name: string,
+    filename: string,
+    readOnlyOrigin: ReadOnlyChangeOrigin,
+    signal?: AbortSignal,
+  ): Promise<ArtifactContentDto> {
+    const base =
+      readOnlyOrigin === 'draft'
+        ? 'drafts'
+        : readOnlyOrigin === 'discarded'
+          ? 'discarded'
+          : 'archived'
+    return this._transport.request({
+      method: 'GET',
+      path: `/${base}/${enc(name)}/artifacts/${enc(filename)}`,
+      signal,
+    })
+  }
+
   getDraftArtifact(
     name: string,
     filename: string,
     signal?: AbortSignal,
   ): Promise<ArtifactContentDto> {
-    return this._transport.request({
-      method: 'GET',
-      path: `/drafts/${enc(name)}/artifacts/${enc(filename)}`,
-      signal,
-    })
+    return this.getReadOnlyChangeArtifact(name, filename, 'draft', signal)
   }
 
   getDiscardedArtifact(
@@ -242,11 +257,7 @@ export class RemoteSpecdDataAdapter implements SpecdDataPort {
     filename: string,
     signal?: AbortSignal,
   ): Promise<ArtifactContentDto> {
-    return this._transport.request({
-      method: 'GET',
-      path: `/discarded/${enc(name)}/artifacts/${enc(filename)}`,
-      signal,
-    })
+    return this.getReadOnlyChangeArtifact(name, filename, 'discarded', signal)
   }
 
   getChangeContext(name: string, query?: ChangeContextQuery): Promise<CompiledContextDto> {

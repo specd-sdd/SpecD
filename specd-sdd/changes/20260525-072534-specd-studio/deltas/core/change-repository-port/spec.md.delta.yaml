@@ -19,3 +19,19 @@
     - Apply the same invalidation semantics as auto-invalidation on drift (`artifact-drift`, `designing`, file states)
 
     `SaveChangeArtifact` MUST invoke this hook after writing file bytes and before final `save(change)` so agent edits to sibling artifacts are detected in the same pass as load-time drift.
+
+- op: added
+  description: artifactReadOnly for ReadOnlyChangeView storage
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: artifact loads content with originalHash'
+  content: |
+    ### Requirement: artifactReadOnly loads bytes without returning Change
+
+    `artifactReadOnly(readOnlyOrigin, name, filename)` MUST load tracked artifact file content for a {@link ReadOnlyChangeView} storage location (`draft`, `discarded`; `archived` when wired). It MUST use the same confinement and `originalHash` semantics as `artifact(change, filename)` but MUST NOT return a mutable `Change` aggregate to callers.
+
+    `readOnlyOrigin` MUST be a {@link ReadOnlyChangeOrigin} value. Implementations MUST resolve the change directory from `drafts/` or `discarded/` only for the matching origin.

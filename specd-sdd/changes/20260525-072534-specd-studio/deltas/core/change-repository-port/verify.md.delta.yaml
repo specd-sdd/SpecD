@@ -30,3 +30,34 @@
     - **WHEN** repository `get()` loads the change
     - **THEN** shared hook runs before returning entity
     - **AND** invalidation matches post-save reconciliation rules
+
+- op: added
+  description: Scenarios for artifactReadOnly
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: artifact loads content with originalHash'
+  content: |
+    ### Requirement: artifactReadOnly loads bytes without returning Change
+
+    #### Scenario: Draft origin reads from drafts directory
+
+    - **GIVEN** change `parked` exists only under `drafts/`
+    - **WHEN** `artifactReadOnly('draft', 'parked', 'proposal.md')` runs
+    - **THEN** returns `SpecArtifact` with content and `originalHash`
+    - **AND** caller does not receive a `Change` instance
+
+    #### Scenario: Discarded origin reads from discarded directory
+
+    - **GIVEN** change `gone` exists only under `discarded/`
+    - **WHEN** `artifactReadOnly('discarded', 'gone', 'proposal.md')` runs
+    - **THEN** returns `SpecArtifact` with content and `originalHash`
+
+    #### Scenario: Missing change returns null
+
+    - **GIVEN** no drafted change named `missing`
+    - **WHEN** `artifactReadOnly('draft', 'missing', 'proposal.md')` runs
+    - **THEN** returns `null`

@@ -17,12 +17,11 @@ The interface MUST declare asynchronous methods equivalent to the HTTP routes in
 
 Drafted and discarded changes are read-only and MUST use dedicated read entry points:
 
-- `getDraft(name)`, `getDraftStatus(name, { ifModifiedSince? })`
-- `listDraftArtifacts(name)`, `getDraftArtifact(name, filename)`
-- `getDiscarded(name)`, `getDiscardedStatus(name, { ifModifiedSince? })`
-- `listDiscardedArtifacts(name)`, `getDiscardedArtifact(name, filename)`
+- `getDraft(name)`, `getDraftStatus(name, { ifModifiedSince? })`, `listDraftArtifacts(name)`
+- `getDiscarded(name)`, `getDiscardedStatus(name, { ifModifiedSince? })`, `listDiscardedArtifacts(name)`
+- `getReadOnlyChangeArtifact(name, filename, readOnlyOrigin)` where `readOnlyOrigin` is `draft` | `discarded` | `archived` (reserved)
 
-These methods map to the `/drafts/{name}/*` and `/discarded/{name}/*` routes and MUST NOT call active `/changes/{name}/*` routes.
+`getDraftArtifact` and `getDiscardedArtifact` MAY delegate to `getReadOnlyChangeArtifact` with the matching origin. These methods map to `/drafts/{name}/*` and `/discarded/{name}/*` and MUST NOT call active `/changes/{name}/*` routes.
 
 ### Requirement: port signatures are identical for HTTP and IPC adapters
 
@@ -36,7 +35,7 @@ HTTP failures MUST be translated by `adapter-problem-json-errors` into errors th
 
 - HTTP handlers MUST NOT import `@specd/core` from `@specd/ui` or `@specd/client`.
 - v1 server auth: `api.auth.type` from `specd.yaml` (never `studio.*`); registry registers only `disabled`; no server-side Bearer enforcement on loopback or `specd ui serve`.
-- Artifact save/load MUST use `core:save-change-artifact` and `core:get-change-artifact` — not raw `ChangeRepository.saveArtifact` from HTTP handlers.
+- Active artifact save/load MUST use `core:save-change-artifact` and `core:get-change-artifact`. Read-only draft/discarded bodies MUST use `core:get-read-only-change-artifact` via `getReadOnlyChangeArtifact` — not `getChangeArtifact` or raw repository access.
 - There is no `GET /changes/{name}/validation` resource; use `GET .../status` and `POST .../validate`.
 - Canonical workspace spec artifacts are read-only in Studio v1.
 

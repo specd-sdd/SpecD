@@ -17,6 +17,7 @@ import {
   toDraftedChangeView,
   type DiscardedChangeView,
   type DraftedChangeView,
+  type ReadOnlyChangeOrigin,
 } from '../../domain/read-only-change-view.js'
 import { CorruptedManifestError } from '../../domain/errors/corrupted-manifest-error.js'
 import { ChangeAlreadyExistsError } from '../../application/errors/change-already-exists-error.js'
@@ -277,21 +278,22 @@ export class FsChangeRepository extends ChangeRepository {
   }
 
   /** @inheritdoc */
-  override async getDraftChange(name: string): Promise<Change | null> {
-    const dir = await this._resolveDraftDir(name)
+  override async artifactReadOnly(
+    readOnlyOrigin: ReadOnlyChangeOrigin,
+    name: string,
+    filename: string,
+  ): Promise<SpecArtifact | null> {
+    const dir =
+      readOnlyOrigin === 'draft'
+        ? await this._resolveDraftDir(name)
+        : readOnlyOrigin === 'discarded'
+          ? await this._resolveDiscardedDir(name)
+          : null
     if (dir === null) return null
 
     const manifest = await this._loadManifest(dir)
-    return this._manifestToChange(manifest, dir)
-  }
-
-  /** @inheritdoc */
-  override async getDiscardedChange(name: string): Promise<Change | null> {
-    const dir = await this._resolveDiscardedDir(name)
-    if (dir === null) return null
-
-    const manifest = await this._loadManifest(dir)
-    return this._manifestToChange(manifest, dir)
+    const change = await this._manifestToChange(manifest, dir)
+    return this.artifact(change, filename)
   }
 
   /**

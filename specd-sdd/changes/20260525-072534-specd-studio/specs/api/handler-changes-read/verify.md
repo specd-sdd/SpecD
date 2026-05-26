@@ -36,6 +36,18 @@
 - **THEN** `GetChangeArtifact` runs inside @specd/core
 - **AND** handler does not reimplement lifecycle or validation rules
 
+#### Scenario: Handler invokes GetReadOnlyChangeArtifact for draft artifact GET
+
+- **WHEN** `GET /v1/drafts/{name}/artifacts/{filename}` succeeds
+- **THEN** `GetReadOnlyChangeArtifact` runs with `readOnlyOrigin` `draft`
+- **AND** handler does not call `ChangeRepository` directly
+
+#### Scenario: Handler invokes GetReadOnlyChangeArtifact for discarded artifact GET
+
+- **WHEN** `GET /v1/discarded/{name}/artifacts/{filename}` succeeds
+- **THEN** `GetReadOnlyChangeArtifact` runs with `readOnlyOrigin` `discarded`
+- **AND** handler does not call `GetChangeArtifact`
+
 #### Scenario: Handler invokes CompileContext
 
 - **WHEN** a valid request for this handler is processed

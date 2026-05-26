@@ -30,6 +30,19 @@
 - **WHEN** the same capability runs
 - **THEN** errors or skips are explicit and documented
 
+### Requirement: port exposes read-only artifact by origin
+
+#### Scenario: getReadOnlyChangeArtifact maps to draft route
+
+- **WHEN** adapter receives `getReadOnlyChangeArtifact(name, filename, 'draft')`
+- **THEN** HTTP `GET /v1/drafts/{name}/artifacts/{filename}` is called
+- **AND** `GET /v1/changes/{name}/artifacts/{filename}` is not called
+
+#### Scenario: getReadOnlyChangeArtifact maps to discarded route
+
+- **WHEN** adapter receives `getReadOnlyChangeArtifact(name, filename, 'discarded')`
+- **THEN** HTTP `GET /v1/discarded/{name}/artifacts/{filename}` is called
+
 ### Requirement: port failures surface as typed client errors
 
 #### Scenario: port failures surface as typed client errors — primary path

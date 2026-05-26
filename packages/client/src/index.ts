@@ -2,7 +2,11 @@ export type { SpecdDataPort } from './specd-data-port.js'
 
 export type { PortProject } from './port-project.js'
 export type { PortChangesCollection } from './port-changes-collection.js'
-export type { PortChangesRead, ChangeArtifactListItemDto } from './port-changes-read.js'
+export type {
+  PortChangesRead,
+  ChangeArtifactListItemDto,
+  ReadOnlyChangeOrigin,
+} from './port-changes-read.js'
 export type { PortChangesMutate } from './port-changes-mutate.js'
 export type { PortArchivedChanges } from './port-archived-changes.js'
 export type { PortWorkspacesSpecs } from './port-workspaces-specs.js'

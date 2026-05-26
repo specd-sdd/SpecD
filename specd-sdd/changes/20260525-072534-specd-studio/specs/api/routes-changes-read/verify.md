@@ -96,14 +96,29 @@
 - **THEN** status includes error or stale flag
 - **AND** HTTP still 200 with diagnostic fields
 
-### Requirement: artifact list and body routes use GetChangeArtifact
+### Requirement: artifact list and body routes use dedicated core use cases
 
-#### Scenario: Artifact body via use case
+#### Scenario: Active artifact body via GetChangeArtifact
 
-- **GIVEN** tracked artifact `proposal.md` exists on change `foo`
+- **GIVEN** tracked artifact `proposal.md` exists on active change `foo`
 - **WHEN** `GET /v1/changes/foo/artifacts/proposal.md`
 - **THEN** `GetChangeArtifact` is invoked
 - **AND** response includes `content` and `originalHash`
+
+#### Scenario: Draft artifact body via GetReadOnlyChangeArtifact
+
+- **GIVEN** tracked artifact `proposal.md` on drafted change `foo`
+- **WHEN** `GET /v1/drafts/foo/artifacts/proposal.md`
+- **THEN** `GetReadOnlyChangeArtifact` runs with `readOnlyOrigin` `draft`
+- **AND** response includes `content` and `originalHash`
+- **AND** `GetChangeArtifact` is not invoked
+
+#### Scenario: Discarded artifact body via GetReadOnlyChangeArtifact
+
+- **GIVEN** tracked artifact `proposal.md` on discarded change `foo`
+- **WHEN** `GET /v1/discarded/foo/artifacts/proposal.md`
+- **THEN** `GetReadOnlyChangeArtifact` runs with `readOnlyOrigin` `discarded`
+- **AND** `GetChangeArtifact` is not invoked
 
 #### Scenario: GET .../artifacts returns expected payload
 

@@ -1,6 +1,7 @@
 import * as path from 'node:path'
 import { type Change } from '../../../domain/entities/change.js'
 import { type ChangeArtifact } from '../../../domain/entities/change-artifact.js'
+import { type ReadOnlyChangeView } from '../../../domain/read-only-change-view.js'
 import { type ArtifactFile } from '../../../domain/value-objects/artifact-file.js'
 
 /**
@@ -30,8 +31,22 @@ export function findTrackedArtifactFile(
   change: Change,
   filename: string,
 ): TrackedArtifactFileLocation | undefined {
+  return findTrackedArtifactFileInView(change, filename)
+}
+
+/**
+ * Finds the artifact file entry for a read-only change view.
+ *
+ * @param view - Drafted or discarded view whose manifest defines tracked files
+ * @param filename - Relative filename within the change directory
+ * @returns The artifact and file entry, or `undefined` when untracked
+ */
+export function findTrackedArtifactFileInView(
+  view: ReadOnlyChangeView,
+  filename: string,
+): TrackedArtifactFileLocation | undefined {
   const normalized = normalizeFilename(filename)
-  for (const artifact of change.artifacts.values()) {
+  for (const artifact of view.artifacts.values()) {
     for (const file of artifact.files.values()) {
       if (normalizeFilename(file.filename) === normalized) {
         return { artifact, file }

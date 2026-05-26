@@ -35,7 +35,13 @@
 
 - **GIVEN** drafted change and user selects an artifact file
 - **WHEN** `useChangeArtifact` loads content
-- **THEN** port receives `getDraftArtifact(name, filename)`
+- **THEN** port receives `getReadOnlyChangeArtifact(name, filename, 'draft')`
+
+#### Scenario: Inspector artifact body uses discarded route when discarded
+
+- **GIVEN** discarded change and user selects an artifact file
+- **WHEN** `useChangeArtifact` loads content
+- **THEN** port receives `getReadOnlyChangeArtifact(name, filename, 'discarded')`
 
 ### Requirement: shelved and archived views do not poll change status or artifacts
 

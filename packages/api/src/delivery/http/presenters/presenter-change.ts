@@ -169,8 +169,16 @@ export function toChangeStatusDto(result: GetStatusResult): ChangeStatusDto {
  * @param change
  */
 export function toArtifactListDto(change: Change): ArtifactListDto {
+  return toArtifactListDtoFromView(change)
+}
+
+/**
+ * Lists tracked artifacts from a read-only change view (metadata only).
+ * @param view
+ */
+export function toArtifactListDtoFromView(view: ReadOnlyChangeView): ArtifactListDto {
   const entries: ArtifactListEntryDto[] = []
-  for (const artifact of change.artifacts.values()) {
+  for (const artifact of view.artifacts.values()) {
     for (const file of artifact.files.values()) {
       entries.push({
         filename: file.filename,

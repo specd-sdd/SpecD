@@ -17,6 +17,7 @@ import type {
   TransitionChangeInput,
 } from './inputs.js'
 import type { ArtifactContentDto } from './dto/artifact-content.js'
+import type { ReadOnlyChangeOrigin } from './port-changes-read.js'
 import type { ValidateBatchResultDto } from './dto/validate-batch-result.js'
 import type { ValidateResultDto } from './dto/validate-result.js'
 import type { CompiledContextDto } from './dto/compiled-context.js'
@@ -188,12 +189,29 @@ export class MemorySpecdDataAdapter implements SpecdDataPort {
     })
   }
 
+  getReadOnlyChangeArtifact(
+    name: string,
+    filename: string,
+    readOnlyOrigin: ReadOnlyChangeOrigin,
+  ): Promise<ArtifactContentDto> {
+    const originKey = `${readOnlyOrigin}:${name}:${filename}`
+    const existing = this._artifacts.get(originKey) ?? this._artifacts.get(`${name}:${filename}`)
+    if (existing !== undefined) {
+      return Promise.resolve(existing)
+    }
+    return Promise.resolve({
+      filename,
+      content: `# ${filename}\n\nFixture content (${readOnlyOrigin}).\n`,
+      originalHash: 'sha256:fixture',
+    })
+  }
+
   getDraftArtifact(name: string, filename: string): Promise<ArtifactContentDto> {
-    return this.getChangeArtifact(name, filename)
+    return this.getReadOnlyChangeArtifact(name, filename, 'draft')
   }
 
   getDiscardedArtifact(name: string, filename: string): Promise<ArtifactContentDto> {
-    return this.getChangeArtifact(name, filename)
+    return this.getReadOnlyChangeArtifact(name, filename, 'discarded')
   }
 
   getChangeContext(): Promise<CompiledContextDto> {

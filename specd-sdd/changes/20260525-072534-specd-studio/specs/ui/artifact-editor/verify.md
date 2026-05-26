@@ -10,11 +10,11 @@
 - **THEN** `getChangeArtifact` populates Monaco
 - **AND** `originalHash` is stored for save
 
-#### Scenario: Drafted change artifact uses getDraftArtifact
+#### Scenario: Drafted change artifact uses getReadOnlyChangeArtifact
 
 - **GIVEN** drafted change with `listSection` `draft`
 - **WHEN** user opens an artifact in the inspector
-- **THEN** `getDraftArtifact` populates Monaco
+- **THEN** `getReadOnlyChangeArtifact` with `readOnlyOrigin` `draft` populates Monaco
 - **AND** `getChangeArtifact` is not called
 
 #### Scenario: Save button disabled while in flight

@@ -10,7 +10,7 @@ Shelved drafts and discarded changes live outside the active change store; read 
 
 ### Requirement: read hooks route by sidebar list section
 
-`useChangesRead`, `useChangeArtifact`, and `useChangeArtifactList` MUST accept an optional `listSection` (`active` | `draft` | `discarded` | null). When `listSection` is `draft`, hooks MUST call `getDraft`, `getDraftStatus`, `listDraftArtifacts`, and `getDraftArtifact`. When `listSection` is `discarded`, hooks MUST call `getDiscarded`, `getDiscardedStatus`, `listDiscardedArtifacts`, and `getDiscardedArtifact`. Otherwise hooks MUST call the active-change methods (`getChange`, `getChangeStatus`, `listChangeArtifacts`, `getChangeArtifact`).
+`useChangesRead`, `useChangeArtifact`, and `useChangeArtifactList` MUST accept an optional `listSection` (`active` | `draft` | `discarded` | null). When `listSection` is `draft`, hooks MUST call `getDraft`, `getDraftStatus`, `listDraftArtifacts`, and `getReadOnlyChangeArtifact` with `readOnlyOrigin` `draft`. When `listSection` is `discarded`, hooks MUST call `getDiscarded`, `getDiscardedStatus`, `listDiscardedArtifacts`, and `getReadOnlyChangeArtifact` with `readOnlyOrigin` `discarded`. Otherwise hooks MUST call the active-change methods (`getChange`, `getChangeStatus`, `listChangeArtifacts`, `getChangeArtifact`).
 
 Shared routing logic MAY live in `change-read-routes` under `@specd/ui`. Cache keys MUST include the section bucket so switching lists does not reuse stale active-change data.
 

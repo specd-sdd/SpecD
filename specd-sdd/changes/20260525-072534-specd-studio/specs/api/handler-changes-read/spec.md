@@ -16,6 +16,7 @@ Business rules for lifecycle, validation, approvals, and conflicts MUST live in 
 
 - `GetStatus` (with optional `ifModifiedSince`)
 - `GetChangeArtifact`
+- `GetReadOnlyChangeArtifact` (draft and discarded artifact bodies)
 - `CompileContext`
 - `PreviewSpec` (GET and POST with optional `artifactOverrides`)
 - `OutlineChangeArtifact`
@@ -26,7 +27,7 @@ Business rules for lifecycle, validation, approvals, and conflicts MUST live in 
 
 ### Requirement: artifact GET and PUT use dedicated core use cases
 
-For `/changes/{name}/artifacts/{filename}`, `GET` MUST call `GetChangeArtifact` and `PUT` MUST call `SaveChangeArtifact`. The handler MUST NOT call `ChangeRepository.artifact` or `saveArtifact` directly.
+For `/changes/{name}/artifacts/{filename}`, `GET` MUST call `GetChangeArtifact` and `PUT` MUST call `SaveChangeArtifact`. For `/drafts/{name}/artifacts/{filename}` and `/discarded/{name}/artifacts/{filename}`, `GET` MUST call `GetReadOnlyChangeArtifact` with the matching `readOnlyOrigin`. The handler MUST NOT call `ChangeRepository.artifact` or `saveArtifact` directly.
 
 ### Requirement: successful responses use presenters and DTO wire shapes
 
@@ -44,7 +45,7 @@ Every mutating kernel call MUST receive the `actor` resolved in `createApiContex
 
 - HTTP handlers MUST NOT import `@specd/core` from `@specd/ui` or `@specd/client`.
 - v1 server auth: `api.auth.type` from `specd.yaml` (never `studio.*`); registry registers only `disabled`; no server-side Bearer enforcement on loopback or `specd ui serve`.
-- Artifact save/load MUST use `core:save-change-artifact` and `core:get-change-artifact` — not raw `ChangeRepository.saveArtifact` from HTTP handlers.
+- Active artifact save/load MUST use `core:save-change-artifact` and `core:get-change-artifact`. Draft/discarded artifact GET MUST use `core:get-read-only-change-artifact` — not raw `ChangeRepository` from HTTP handlers.
 - There is no `GET /changes/{name}/validation` resource; use `GET .../status` and `POST .../validate`.
 - Canonical workspace spec artifacts are read-only in Studio v1.
 
@@ -54,5 +55,6 @@ Every mutating kernel call MUST receive the `actor` resolved in `createApiContex
 - [`default:_global/conventions`](../../default/_global/conventions/spec.md) — naming and module conventions
 - [`api:routes-changes-read`](../routes-changes-read/spec.md) — HTTP contract
 - [`core:kernel`](../../core/kernel/spec.md) — kernel use cases
-- [`core:get-change-artifact`](../../core/get-change-artifact/spec.md) — GET artifact body
+- [`core:get-change-artifact`](../../core/get-change-artifact/spec.md) — GET active artifact body
+- [`core:get-read-only-change-artifact`](../../core/get-read-only-change-artifact/spec.md) — GET draft/discarded artifact bodies
 - [`core:get-status`](../../core/get-status/spec.md) — conditional status
