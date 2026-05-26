@@ -1,7 +1,7 @@
 {
   "name": "specd-studio",
   "createdAt": "2026-05-25T07:25:34.779Z",
-  "updatedAt": "2026-05-26T11:50:26.662Z",
+  "updatedAt": "2026-05-26T11:50:38.630Z",
   "description": "Deliver SpecD Studio as a layered product on top of @specd/core: an HTTP API (@specd/api), shared data client (@specd/client), React IDE (@specd/ui), web and desktop hosts, and CLI serve commands. The UI exposes change and spec workflows with explicit save/validate, preview/diff, and polling aligned with CLI honesty rules. Core gains manifest updatedAt and dedicated artifact load/save use cases so API and UI never duplicate repository rules.\n",
   "schema": {
     "name": "schema-std",
@@ -68955,7 +68955,2086 @@
     },
     {
       "type": "invalidated",
-      "at": "2026-05-26T11:50:29.074Z",
+      "at": "2026-05-26T11:50:29.089Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:serve-ui, core:config, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev, studio-web:vite-host]; verify [cli:serve-ui, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "cli:serve-ui",
+            "core:config",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev",
+            "studio-web:vite-host"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:serve-ui",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-26T11:50:29.570Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:serve-ui, core:config, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev, studio-web:vite-host]; verify [cli:serve-ui, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "cli:serve-ui",
+            "core:config",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev",
+            "studio-web:vite-host"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:serve-ui",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-26T11:50:31.074Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:serve-ui, core:config, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev, studio-web:vite-host]; verify [cli:serve-ui, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "cli:serve-ui",
+            "core:config",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev",
+            "studio-web:vite-host"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:serve-ui",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-26T11:50:32.370Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:serve-ui, core:config, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev, studio-web:vite-host]; verify [cli:serve-ui, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "cli:serve-ui",
+            "core:config",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev",
+            "studio-web:vite-host"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:serve-ui",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-26T11:50:33.322Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:serve-ui, core:config, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev, studio-web:vite-host]; verify [cli:serve-ui, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "cli:serve-ui",
+            "core:config",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev",
+            "studio-web:vite-host"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:serve-ui",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-26T11:50:33.490Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:serve-ui, core:config, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev, studio-web:vite-host]; verify [cli:serve-ui, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "cli:serve-ui",
+            "core:config",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev",
+            "studio-web:vite-host"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:serve-ui",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-26T11:50:34.540Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:serve-ui, core:config, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev, studio-web:vite-host]; verify [cli:serve-ui, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "cli:serve-ui",
+            "core:config",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev",
+            "studio-web:vite-host"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:serve-ui",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-26T11:50:35.580Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:serve-ui, core:config, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev, studio-web:vite-host]; verify [cli:serve-ui, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "cli:serve-ui",
+            "core:config",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev",
+            "studio-web:vite-host"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:serve-ui",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-26T11:50:37.052Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:serve-ui, core:config, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev, studio-web:vite-host]; verify [cli:serve-ui, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "cli:serve-ui",
+            "core:config",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev",
+            "studio-web:vite-host"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:serve-ui",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-26T11:50:38.165Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:serve-ui, core:config, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev, studio-web:vite-host]; verify [cli:serve-ui, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "cli:serve-ui",
+            "core:config",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev",
+            "studio-web:vite-host"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:serve-ui",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-26T11:50:38.574Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:serve-ui, core:config, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev, studio-web:vite-host]; verify [cli:serve-ui, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "cli:serve-ui",
+            "core:config",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev",
+            "studio-web:vite-host"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:serve-ui",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-26T11:50:39.665Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:serve-ui, core:config, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev, studio-web:vite-host]; verify [cli:serve-ui, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "cli:serve-ui",
+            "core:config",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev",
+            "studio-web:vite-host"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:serve-ui",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-26T11:50:40.937Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:serve-ui, core:config, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev, studio-web:vite-host]; verify [cli:serve-ui, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "cli:serve-ui",
+            "core:config",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev",
+            "studio-web:vite-host"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:serve-ui",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-26T11:50:41.229Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:serve-ui, core:config, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev, studio-web:vite-host]; verify [cli:serve-ui, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "cli:serve-ui",
+            "core:config",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev",
+            "studio-web:vite-host"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:serve-ui",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-26T11:50:42.024Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:serve-ui, core:config, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev, studio-web:vite-host]; verify [cli:serve-ui, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "cli:serve-ui",
+            "core:config",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev",
+            "studio-web:vite-host"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:serve-ui",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-26T11:50:43.125Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:serve-ui, core:config, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev, studio-web:vite-host]; verify [cli:serve-ui, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "cli:serve-ui",
+            "core:config",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev",
+            "studio-web:vite-host"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:serve-ui",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-26T11:50:44.476Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:serve-ui, core:config, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev, studio-web:vite-host]; verify [cli:serve-ui, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "cli:serve-ui",
+            "core:config",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev",
+            "studio-web:vite-host"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:serve-ui",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-26T11:50:45.363Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:serve-ui, core:config, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev, studio-web:vite-host]; verify [cli:serve-ui, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "cli:serve-ui",
+            "core:config",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev",
+            "studio-web:vite-host"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:serve-ui",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-26T11:50:46.963Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:serve-ui, core:config, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev, studio-web:vite-host]; verify [cli:serve-ui, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "cli:serve-ui",
+            "core:config",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev",
+            "studio-web:vite-host"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:serve-ui",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-26T11:50:47.999Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:serve-ui, core:config, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev, studio-web:vite-host]; verify [cli:serve-ui, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "cli:serve-ui",
+            "core:config",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev",
+            "studio-web:vite-host"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:serve-ui",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-26T11:50:49.493Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:serve-ui, core:config, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev, studio-web:vite-host]; verify [cli:serve-ui, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "cli:serve-ui",
+            "core:config",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev",
+            "studio-web:vite-host"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:serve-ui",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-26T11:50:50.458Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:serve-ui, core:config, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev, studio-web:vite-host]; verify [cli:serve-ui, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "cli:serve-ui",
+            "core:config",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev",
+            "studio-web:vite-host"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:serve-ui",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-26T11:50:52.008Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:serve-ui, core:config, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev, studio-web:vite-host]; verify [cli:serve-ui, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "cli:serve-ui",
+            "core:config",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev",
+            "studio-web:vite-host"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:serve-ui",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-26T11:50:53.011Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:serve-ui, core:config, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev, studio-web:vite-host]; verify [cli:serve-ui, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "cli:serve-ui",
+            "core:config",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev",
+            "studio-web:vite-host"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:serve-ui",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-26T11:50:54.478Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:serve-ui, core:config, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev, studio-web:vite-host]; verify [cli:serve-ui, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "cli:serve-ui",
+            "core:config",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev",
+            "studio-web:vite-host"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:serve-ui",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-26T11:50:56.672Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:serve-ui, core:config, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev, studio-web:vite-host]; verify [cli:serve-ui, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "cli:serve-ui",
+            "core:config",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev",
+            "studio-web:vite-host"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:serve-ui",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-26T11:51:00.136Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:serve-ui, core:config, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev, studio-web:vite-host]; verify [cli:serve-ui, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "cli:serve-ui",
+            "core:config",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev",
+            "studio-web:vite-host"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:serve-ui",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-26T11:51:01.161Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:serve-ui, core:config, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev, studio-web:vite-host]; verify [cli:serve-ui, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "cli:serve-ui",
+            "core:config",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev",
+            "studio-web:vite-host"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:serve-ui",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-26T11:51:02.629Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:serve-ui, core:config, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev, studio-web:vite-host]; verify [cli:serve-ui, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "cli:serve-ui",
+            "core:config",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev",
+            "studio-web:vite-host"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:serve-ui",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-26T11:51:03.531Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:serve-ui, core:config, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev, studio-web:vite-host]; verify [cli:serve-ui, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "cli:serve-ui",
+            "core:config",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev",
+            "studio-web:vite-host"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:serve-ui",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-26T11:51:05.136Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:serve-ui, core:config, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev, studio-web:vite-host]; verify [cli:serve-ui, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "cli:serve-ui",
+            "core:config",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev",
+            "studio-web:vite-host"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:serve-ui",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-26T11:51:06.360Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:serve-ui, core:config, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev, studio-web:vite-host]; verify [cli:serve-ui, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "cli:serve-ui",
+            "core:config",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev",
+            "studio-web:vite-host"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:serve-ui",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-26T11:51:07.823Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:serve-ui, core:config, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev, studio-web:vite-host]; verify [cli:serve-ui, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "cli:serve-ui",
+            "core:config",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev",
+            "studio-web:vite-host"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:serve-ui",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-26T11:51:08.871Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:serve-ui, core:config, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev, studio-web:vite-host]; verify [cli:serve-ui, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "cli:serve-ui",
+            "core:config",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev",
+            "studio-web:vite-host"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:serve-ui",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-26T11:51:10.147Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:serve-ui, core:config, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev, studio-web:vite-host]; verify [cli:serve-ui, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "cli:serve-ui",
+            "core:config",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev",
+            "studio-web:vite-host"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:serve-ui",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-26T11:51:11.219Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:serve-ui, core:config, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev, studio-web:vite-host]; verify [cli:serve-ui, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "cli:serve-ui",
+            "core:config",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev",
+            "studio-web:vite-host"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:serve-ui",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-26T11:51:12.745Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:serve-ui, core:config, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev, studio-web:vite-host]; verify [cli:serve-ui, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "cli:serve-ui",
+            "core:config",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev",
+            "studio-web:vite-host"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:serve-ui",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-26T11:51:13.747Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:serve-ui, core:config, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev, studio-web:vite-host]; verify [cli:serve-ui, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "cli:serve-ui",
+            "core:config",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev",
+            "studio-web:vite-host"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:serve-ui",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-26T11:51:15.732Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:serve-ui, core:config, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev, studio-web:vite-host]; verify [cli:serve-ui, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "cli:serve-ui",
+            "core:config",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev",
+            "studio-web:vite-host"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:serve-ui",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-26T11:51:16.755Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:serve-ui, core:config, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev, studio-web:vite-host]; verify [cli:serve-ui, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "cli:serve-ui",
+            "core:config",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev",
+            "studio-web:vite-host"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:serve-ui",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-26T11:51:17.737Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:serve-ui, core:config, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev, studio-web:vite-host]; verify [cli:serve-ui, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "cli:serve-ui",
+            "core:config",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev",
+            "studio-web:vite-host"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:serve-ui",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-26T11:51:18.725Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:serve-ui, core:config, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev, studio-web:vite-host]; verify [cli:serve-ui, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "cli:serve-ui",
+            "core:config",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev",
+            "studio-web:vite-host"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:serve-ui",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-26T11:51:20.735Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:serve-ui, core:config, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev, studio-web:vite-host]; verify [cli:serve-ui, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "cli:serve-ui",
+            "core:config",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev",
+            "studio-web:vite-host"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:serve-ui",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-26T11:51:21.823Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:serve-ui, core:config, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev, studio-web:vite-host]; verify [cli:serve-ui, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "cli:serve-ui",
+            "core:config",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev",
+            "studio-web:vite-host"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:serve-ui",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-26T11:51:22.689Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:serve-ui, core:config, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev, studio-web:vite-host]; verify [cli:serve-ui, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "cli:serve-ui",
+            "core:config",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev",
+            "studio-web:vite-host"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:serve-ui",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-26T11:51:23.614Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:serve-ui, core:config, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev, studio-web:vite-host]; verify [cli:serve-ui, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "cli:serve-ui",
+            "core:config",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev",
+            "studio-web:vite-host"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:serve-ui",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-26T11:51:25.173Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:serve-ui, core:config, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev, studio-web:vite-host]; verify [cli:serve-ui, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "cli:serve-ui",
+            "core:config",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev",
+            "studio-web:vite-host"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:serve-ui",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-26T11:51:26.401Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:serve-ui, core:config, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev, studio-web:vite-host]; verify [cli:serve-ui, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "cli:serve-ui",
+            "core:config",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev",
+            "studio-web:vite-host"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:serve-ui",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-26T11:51:27.996Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:serve-ui, core:config, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev, studio-web:vite-host]; verify [cli:serve-ui, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "cli:serve-ui",
+            "core:config",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev",
+            "studio-web:vite-host"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:serve-ui",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-26T11:51:28.901Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:serve-ui, core:config, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev, studio-web:vite-host]; verify [cli:serve-ui, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "cli:serve-ui",
+            "core:config",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev",
+            "studio-web:vite-host"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:serve-ui",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-26T11:51:30.141Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:serve-ui, core:config, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev, studio-web:vite-host]; verify [cli:serve-ui, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "cli:serve-ui",
+            "core:config",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev",
+            "studio-web:vite-host"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:serve-ui",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-26T11:51:31.111Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:serve-ui, core:config, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev, studio-web:vite-host]; verify [cli:serve-ui, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "cli:serve-ui",
+            "core:config",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev",
+            "studio-web:vite-host"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:serve-ui",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-26T11:51:32.931Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:serve-ui, core:config, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev, studio-web:vite-host]; verify [cli:serve-ui, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "cli:serve-ui",
+            "core:config",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev",
+            "studio-web:vite-host"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:serve-ui",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-26T11:51:33.909Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:serve-ui, core:config, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev, studio-web:vite-host]; verify [cli:serve-ui, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "cli:serve-ui",
+            "core:config",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev",
+            "studio-web:vite-host"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:serve-ui",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-26T11:51:35.181Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:serve-ui, core:config, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev, studio-web:vite-host]; verify [cli:serve-ui, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "cli:serve-ui",
+            "core:config",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev",
+            "studio-web:vite-host"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:serve-ui",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-26T11:51:36.753Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:serve-ui, core:config, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev, studio-web:vite-host]; verify [cli:serve-ui, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "cli:serve-ui",
+            "core:config",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev",
+            "studio-web:vite-host"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:serve-ui",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-26T11:51:37.658Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:serve-ui, core:config, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev, studio-web:vite-host]; verify [cli:serve-ui, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "cli:serve-ui",
+            "core:config",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev",
+            "studio-web:vite-host"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:serve-ui",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-26T11:51:39.076Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:serve-ui, core:config, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev, studio-web:vite-host]; verify [cli:serve-ui, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "cli:serve-ui",
+            "core:config",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev",
+            "studio-web:vite-host"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:serve-ui",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-26T11:51:40.119Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:serve-ui, core:config, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev, studio-web:vite-host]; verify [cli:serve-ui, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "cli:serve-ui",
+            "core:config",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev",
+            "studio-web:vite-host"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:serve-ui",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-26T11:51:41.071Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:serve-ui, core:config, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev, studio-web:vite-host]; verify [cli:serve-ui, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "cli:serve-ui",
+            "core:config",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev",
+            "studio-web:vite-host"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:serve-ui",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-26T11:51:42.613Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:serve-ui, core:config, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev, studio-web:vite-host]; verify [cli:serve-ui, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "cli:serve-ui",
+            "core:config",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev",
+            "studio-web:vite-host"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:serve-ui",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-26T11:51:43.630Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:serve-ui, core:config, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev, studio-web:vite-host]; verify [cli:serve-ui, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "cli:serve-ui",
+            "core:config",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev",
+            "studio-web:vite-host"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:serve-ui",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-26T11:51:45.134Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:serve-ui, core:config, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev, studio-web:vite-host]; verify [cli:serve-ui, core:ui-plugin-errors, plugin-manager:ui-plugin-type, studio-web:ui-plugin-dev]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "cli:serve-ui",
+            "core:config",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev",
+            "studio-web:vite-host"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:serve-ui",
+            "core:ui-plugin-errors",
+            "plugin-manager:ui-plugin-type",
+            "studio-web:ui-plugin-dev"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-26T11:51:46.571Z",
       "by": {
         "name": "specd",
         "email": "system@getspecd.dev",
