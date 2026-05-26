@@ -1,6 +1,6 @@
 # CLI Reference
 
-The `specd` CLI is the primary interface for managing the spec-driven development workflow. It provides commands for creating and progressing changes, browsing specs, inspecting configuration and schemas, and managing plugins.
+The `specd` CLI is the primary interface for managing the spec-driven development workflow. It provides commands for creating and progressing changes, browsing specs, inspecting configuration and schemas, managing plugins, and running SpecD Studio (`specd ui serve`).
 
 ## Invocation
 
@@ -1331,6 +1331,65 @@ specd schema validate --raw
 
 ---
 
+## serve
+
+Start the SpecD Studio **HTTP API only** (no UI). Default listen address: `http://127.0.0.1:4450`, API base path `/v1`.
+
+```
+specd serve [options]
+```
+
+| Option          | Description                      |
+| --------------- | -------------------------------- |
+| `-p, --port`    | Listen port (default `4450`).    |
+| `-h, --host`    | Bind host (default `127.0.0.1`). |
+| `-c, --config`  | Path to `specd.yaml`.            |
+| `--auth <type>` | v1 supports only `disabled`.     |
+
+See [serve](./serve.md) and [Configuration: `api`](../config/config-reference.md#api).
+
+---
+
+## ui
+
+SpecD Studio UI commands.
+
+### ui serve
+
+Start the Studio **API and active UI plugin** from `plugins.ui`.
+
+```
+specd ui serve [options]
+```
+
+| Option          | Description                              |
+| --------------- | ---------------------------------------- |
+| `-p, --port`    | API listen port (default `4450`).        |
+| `-h, --host`    | API bind host (default `127.0.0.1`).     |
+| `-c, --config`  | Path to `specd.yaml`.                    |
+| `--auth <type>` | v1 supports only `disabled`.             |
+| `-o, --open`    | Open the IDE URL in the default browser. |
+
+Requires a UI plugin installed via `specd plugins install` (for example `@specd/plugin-ui-studio` or `@specd/studio-web`).
+
+See [ui serve](./ui-serve.md) and [Studio documentation](../studio/index.md).
+
+---
+
+## plugins
+
+Install, list, show, update, and uninstall SpecD plugins (`agents` and `ui` buckets in `specd.yaml`).
+
+Dedicated pages:
+
+- [plugins install](./plugins-install.md)
+- [plugins list](./plugins-list.md)
+- [plugins show](./plugins-show.md)
+- [plugins update](./plugins-update.md)
+- [plugins uninstall](./plugins-uninstall.md)
+
+---
+
 ## Common workflows
 
 ### Start a new change
@@ -1393,5 +1452,8 @@ specd project init --schema @specd/schema-std --agent claude --agent copilot
 
 ## Related documentation
 
-- [Configuration reference](../config/config-reference.md) — `specd.yaml` fields, file discovery, workspace configuration, hooks
+- [SpecD Studio](../studio/index.md) — IDE packages, getting started, architecture
+- [Studio HTTP API](../api/index.md) — `/v1` REST reference
+- [Studio client](../client/index.md) — `@specd/client` and `SpecdDataPort`
+- [Configuration reference](../config/config-reference.md) — `specd.yaml` fields, file discovery, workspace configuration, hooks, `api`, `plugins.ui`
 - [Schema format reference](../schemas/schema-format.md) — artifact definitions, lifecycle steps, validation rules, delta files

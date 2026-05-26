@@ -11,12 +11,20 @@ import { cn } from '../lib/cn.js'
 
 export type ConnectPanelProps = {
   onConnected: (profile: RemoteConnectionProfile, project: ProjectDto) => void
+  /** Pre-filled API base when auto-connect failed (e.g. from `specd ui serve`). */
+  defaultApiBaseUrl?: string
   className?: string
 }
 
-export function ConnectPanel({ onConnected, className }: ConnectPanelProps): React.ReactElement {
-  const [apiBaseUrl, setApiBaseUrl] = React.useState(() =>
-    typeof window !== 'undefined' ? window.location.origin : 'http://127.0.0.1:4400',
+export function ConnectPanel({
+  onConnected,
+  defaultApiBaseUrl,
+  className,
+}: ConnectPanelProps): React.ReactElement {
+  const [apiBaseUrl, setApiBaseUrl] = React.useState(
+    () =>
+      defaultApiBaseUrl ??
+      (typeof window !== 'undefined' ? window.location.origin : 'http://127.0.0.1:4450'),
   )
   const [token, setToken] = React.useState('')
   const [error, setError] = React.useState<string | undefined>()
@@ -59,7 +67,9 @@ export function ConnectPanel({ onConnected, className }: ConnectPanelProps): Rea
       <div>
         <h1 className="text-sm font-semibold tracking-tight">Connect to SpecD API</h1>
         <p className="mt-1 text-xs text-muted-foreground">
-          Enter the remote API base URL. Connection is verified with GET /v1/project.
+          Enter the API base URL (host, or full URL including /v1). Verified with GET /v1/project.
+          For `specd ui serve` with Vite, use the API URL printed in the terminal (e.g.
+          http://127.0.0.1:4450) — the CLI adds the UI origin to CORS automatically.
         </p>
       </div>
 
@@ -68,7 +78,7 @@ export function ConnectPanel({ onConnected, className }: ConnectPanelProps): Rea
         <Input
           value={apiBaseUrl}
           onChange={(e) => setApiBaseUrl(e.target.value)}
-          placeholder="http://127.0.0.1:4400"
+          placeholder="http://127.0.0.1:4450"
           autoComplete="url"
         />
       </label>

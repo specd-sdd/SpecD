@@ -5,6 +5,14 @@
       "dependsOn": ["^build"],
       "outputs": ["dist/**", "build/**"]
     },
+    "@specd/plugin-ui-studio#build": {
+      "dependsOn": ["@specd/studio-web#build"],
+      "outputs": ["dist/**"]
+    },
+    "@specd/studio-web#build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**"]
+    },
     "dev": {
       "dependsOn": ["^build"],
       "persistent": true,

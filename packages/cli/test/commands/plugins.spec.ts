@@ -16,7 +16,11 @@ vi.mock('../../src/helpers/cli-context.js', () => ({
 
 vi.mock('@specd/plugin-manager', () => ({
   createPluginLoader: vi.fn().mockReturnValue({}),
+  isUiPlugin: vi.fn().mockReturnValue(false),
   InstallPlugin: vi.fn().mockImplementation(() => ({
+    execute: mockInstall,
+  })),
+  InstallUiPlugin: vi.fn().mockImplementation(() => ({
     execute: mockInstall,
   })),
   UpdatePlugin: vi.fn().mockImplementation(() => ({

@@ -5,8 +5,10 @@ import { output, parseFormat, type OutputFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'
 import {
   InstallPlugin,
+  InstallUiPlugin,
   LoadPlugin,
   createPluginLoader,
+  isUiPlugin,
   type InstallPluginOutput,
 } from '@specd/plugin-manager'
 
@@ -49,13 +51,9 @@ export async function installPluginsWithKernel(input: {
   readonly pluginNames: readonly string[]
 }): Promise<PluginInstallBatchResult> {
   const loader = createPluginLoader({ config: input.config })
-  const install = new InstallPlugin(loader)
+  const installAgent = new InstallPlugin(loader)
+  const installUi = new InstallUiPlugin(loader)
   const load = new LoadPlugin(loader)
-  const declared = await input.kernel.project.listPlugins.execute({
-    configPath: input.configPath,
-    type: 'agents',
-  })
-  const declaredSet = new Set(declared.map((entry) => entry.name))
 
   const plugins: PluginInstallEntry[] = []
   let hasErrors = false
@@ -71,30 +69,35 @@ export async function installPluginsWithKernel(input: {
       continue
     }
 
-    if (declaredSet.has(pluginName)) {
-      const detail = `${pluginName} already installed; use update to reinstall`
-      process.stderr.write(`warning: ${detail}\n`)
-      plugins.push({
-        name: pluginName,
-        status: 'skipped',
-        detail,
-      })
-      continue
-    }
-
     try {
       const loaded = await load.execute({ pluginName })
-      const installResult: InstallPluginOutput = await install.execute({
-        pluginName,
-        config: input.config,
-      })
       const pluginBucket = toPluginBucket(loaded.plugin.type)
+      const declared = await input.kernel.project.listPlugins.execute({
+        configPath: input.configPath,
+        type: pluginBucket,
+      })
+      if (declared.some((entry) => entry.name === pluginName)) {
+        const detail = `${pluginName} already installed; use update to reinstall`
+        process.stderr.write(`warning: ${detail}\n`)
+        plugins.push({
+          name: pluginName,
+          status: 'skipped',
+          detail,
+        })
+        continue
+      }
+
+      const installResult: InstallPluginOutput = isUiPlugin(loaded.plugin)
+        ? await installUi.execute({ pluginName, config: input.config })
+        : await installAgent.execute({
+            pluginName,
+            config: input.config,
+          })
       await input.kernel.project.addPlugin.execute({
         configPath: input.configPath,
         type: pluginBucket,
         name: pluginName,
       })
-      declaredSet.add(pluginName)
       plugins.push({
         name: pluginName,
         status: 'installed',
@@ -173,7 +176,9 @@ function renderInstallOutput(result: PluginInstallBatchResult, format: OutputFor
  * @returns Config bucket name under `plugins`.
  */
 function toPluginBucket(pluginType: string): string {
-  return pluginType === 'agent' ? 'agents' : `${pluginType}s`
+  if (pluginType === 'agent') return 'agents'
+  if (pluginType === 'ui') return 'ui'
+  return `${pluginType}s`
 }
 
 /**

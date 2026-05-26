@@ -15,3 +15,6 @@ export { InvalidInvalidateTargetError } from './invalid-invalidate-target-error.
 export { InvalidateRequiresForceError } from './invalidate-requires-force-error.js'
 export { ImplementationLinksExistError } from './implementation-links-exist-error.js'
 export { ImplementationFileNotFoundError } from './implementation-file-not-found-error.js'
+export { UiPluginNotConfiguredError } from './ui-plugin-not-configured-error.js'
+export { UiPluginTypeMismatchError } from './ui-plugin-type-mismatch-error.js'
+export { UiPluginBundleMissingError } from './ui-plugin-bundle-missing-error.js'

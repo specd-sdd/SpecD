@@ -1,6 +1,7 @@
 import type { SpecdConfig } from '@specd/core'
 import type { PluginLoader } from '../ports/plugin-loader.js'
 import { isAgentPlugin } from '../../domain/types/agent-plugin.js'
+import { isUiPlugin } from '../../domain/types/ui-plugin.js'
 import { PluginValidationError } from '../../domain/errors/plugin-validation.js'
 
 /**
@@ -62,14 +63,17 @@ export class InstallPlugin {
    */
   async execute(input: InstallPluginInput): Promise<InstallPluginOutput> {
     const plugin = await this.loader.load(input.pluginName)
-    if (!isAgentPlugin(plugin)) {
-      throw new PluginValidationError(input.pluginName, ['install'])
+    if (isAgentPlugin(plugin)) {
+      const data = await plugin.install(input.config, input.options)
+      return {
+        success: true,
+        message: `Installed '${input.pluginName}'`,
+        data,
+      }
     }
-    const data = await plugin.install(input.config, input.options)
-    return {
-      success: true,
-      message: `Installed '${input.pluginName}'`,
-      data,
+    if (isUiPlugin(plugin)) {
+      throw new PluginValidationError(input.pluginName, ['Use InstallUiPlugin for UI plugins'])
     }
+    throw new PluginValidationError(input.pluginName, ['install'])
   }
 }

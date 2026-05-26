@@ -1,0 +1,9 @@
+{
+  "label": "Studio client",
+  "position": 5,
+  "link": {
+    "type": "generated-index",
+    "title": "@specd/client",
+    "description": "SpecdDataPort, remote HTTP adapter, connection profiles, and errors."
+  }
+}

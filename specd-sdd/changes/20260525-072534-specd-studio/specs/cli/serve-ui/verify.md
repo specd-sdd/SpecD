@@ -2,65 +2,45 @@
 
 ## Requirements
 
-### Requirement: ui serve inherits serve-api flags plus open and ui-dist
+### Requirement: ui serve inherits serve-api flags plus open
 
-#### Scenario: ui serve accepts port host auth flags
+#### Scenario: ui-dist flag is not registered
 
-- **WHEN** `specd ui serve --port 4500 --auth disabled` runs
-- **THEN** API listens on 4500
-- **AND** auth behavior matches serve-api
+- **WHEN** `specd ui serve --help` is run
+- **THEN** output does not list `--ui-dist`
+- **AND** `--open` is listed
 
-#### Scenario: open flag launches default browser
+### Requirement: ui serve loads the configured UI plugin
 
-- **WHEN** `specd ui serve --open` runs
-- **THEN** browser opens served URL
-- **AND** process keeps serving
+#### Scenario: Missing plugins.ui throws UiPluginNotConfiguredError
 
-#### Scenario: ui-dist flag forwarded to static middleware
+- **GIVEN** `specd.yaml` has no `plugins.ui` entry
+- **WHEN** `specd ui serve` runs
+- **THEN** the command exits non-zero
+- **AND** stderr shows `error:` with `UI_PLUGIN_NOT_CONFIGURED` semantics via `UiPluginNotConfiguredError`
+- **AND** the message mentions `specd plugins install` with `@specd/plugin-ui-studio` or `@specd/studio-web`
+- **AND** the message does not instruct editing `plugins.ui` manually in `specd.yaml`
 
-- **WHEN** `specd ui serve --ui-dist ./dist` runs
-- **THEN** static handler reads ./dist
-- **AND** SPA fallback uses same root
+### Requirement: embedded plugins mount static dist on the API
 
-### Requirement: ui serve mounts static UI distribution
+#### Scenario: Bundle plugin passes uiDistPath
 
-#### Scenario: Root path serves Studio shell
+- **GIVEN** active UI plugin has `hasServer() === false`
+- **WHEN** `specd ui serve` starts
+- **THEN** `createApiServer` receives `uiDistPath` from `getStaticRoot()`
 
-- **WHEN** browser requests `/`
-- **THEN** `index.html` returned
-- **AND** asset links resolve under `/assets`
+### Requirement: own-server plugins start after API listen
 
-#### Scenario: API and static share process
+#### Scenario: Own-server plugin receives apiBaseUrl in init
 
-- **WHEN** `specd ui serve` is running
-- **THEN** `/v1/project` responds
-- **AND** static and API ports match
-
-#### Scenario: Missing ui-dist fails at startup
-
-- **GIVEN** `--ui-dist` points to empty directory
-- **WHEN** ui serve starts
-- **THEN** non-zero exit or warning
-- **AND** user told to build UI first
+- **GIVEN** active UI plugin has `hasServer() === true`
+- **WHEN** API is listening and `init` runs
+- **THEN** `UiServeContext.apiBaseUrl` ends with `/v1`
 
 ### Requirement: embedded Studio skips remote connect gate
 
-#### Scenario: Same-origin load mounts SpecdApp immediately
+#### Scenario: Bundle plugin uses same-origin API
 
-- **GIVEN** UI served from same host as API
-- **WHEN** browser opens served URL
-- **THEN** connect panel skipped
-- **AND** IDE layout visible
-
-#### Scenario: Remote profile still shows connect gate in web build
-
-- **GIVEN** standalone web bundle against remote API
-- **WHEN** app loads without stored profile
-- **THEN** connect panel shown
-- **AND** SpecdApp not mounted until health succeeds
-
-#### Scenario: Embedded profile uses relative /v1 base
-
-- **WHEN** hook fetches project
-- **THEN** fetch URL is same-origin `/v1/project`
-- **AND** no manual host entry required
+- **GIVEN** active UI plugin has `hasServer() === false`
+- **WHEN** the user opens the embedded Studio URL
+- **THEN** the client uses same-origin `/v1` without showing `ui:connect-panel` first

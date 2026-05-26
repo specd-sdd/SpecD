@@ -9,13 +9,21 @@ describe('API meta', () => {
     expect(data.auth.type).toBe('disabled')
   })
 
-  it('given api server, when GET /openapi.json, then returns OpenAPI stub', async () => {
+  it('given api server, when GET /openapi.json, then returns OpenAPI document', async () => {
     const { res, data } = await apiJson<Record<string, unknown>>('/openapi.json')
     expect(res.ok).toBe(true)
     expect(data.openapi).toBe('3.1.0')
     expect(data.info).toBeDefined()
-    type OpenApiPathItem = { post?: unknown }
+    const components = data.components as { schemas?: Record<string, unknown> }
+    expect(components.schemas?.ChangeSummaryDto).toBeDefined()
+    expect(components.schemas?.ProblemJson).toBeDefined()
+    type OpenApiPathItem = { get?: unknown; post?: unknown }
     const paths = data.paths as Record<string, OpenApiPathItem | undefined>
+    expect(Object.keys(paths).length).toBeGreaterThan(40)
+    expect(paths['/health']?.get).toBeDefined()
+    expect(paths['/changes']?.get).toBeDefined()
+    expect(paths['/changes']?.post).toBeDefined()
+    expect(paths['/graph/search']?.get).toBeDefined()
     expect(paths['/changes/{name}/preview']?.post).toBeDefined()
     expect(paths['/changes/{name}/artifacts/{filename}/outline']?.post).toBeDefined()
     expect(paths['/workspaces/{ws}/specs/{specPath}/outline']?.post).toBeDefined()

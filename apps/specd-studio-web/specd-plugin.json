@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "name": "@specd/studio-web",
+  "version": "0.0.0",
+  "description": "SpecD Studio web development shell (Vite dev server)",
+  "pluginType": "ui",
+  "minCoreVersion": "*"
+}

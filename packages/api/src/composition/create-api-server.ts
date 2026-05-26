@@ -29,6 +29,8 @@ export interface CreateApiServerOptions {
   readonly authRegistry?: AuthAdapterRegistry
   /** Built `@specd/ui` dist for SPA hosting at `/`. */
   readonly uiDistPath?: string
+  /** Extra allowed CORS origins merged with `specd.yaml` for this listen process. */
+  readonly corsOrigins?: readonly string[]
 }
 
 /** Listening HTTP server with lifecycle helpers. */
@@ -71,7 +73,7 @@ export async function createApiServer(options: CreateApiServerOptions): Promise<
 
   const app = Fastify({ logger: false })
 
-  await registerCorsMiddleware(app, config)
+  await registerCorsMiddleware(app, config, options.corsOrigins)
 
   await app.register(
     (v1) => {

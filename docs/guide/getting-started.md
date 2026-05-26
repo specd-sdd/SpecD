@@ -19,3 +19,4 @@ This guide opens with the philosophy behind spec-driven development. Understandi
 - [Usage in Practice](./_sections/getting-started/usage.md) — How SpecD is used with coding assistants
 - [Setting Up](./_sections/getting-started/setting-up.md) — Setting up a new project
 - [Local Site](./_sections/getting-started/local-site.md) — Viewing the public site locally
+- [SpecD Studio](../studio/index.md) — Browser IDE (`specd ui serve`)

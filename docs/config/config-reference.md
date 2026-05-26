@@ -1,6 +1,6 @@
 # specd.yaml Configuration Reference
 
-`specd.yaml` is the single project-level configuration file for SpecD. It is read by the CLI, the MCP server, and all agent plugins — every tool in the SpecD ecosystem derives its wiring from it.
+`specd.yaml` is the single project-level configuration file for SpecD. It is read by the CLI, the MCP server, agent plugins, and the Studio HTTP API — every tool in the SpecD ecosystem derives its wiring from it.
 
 For annotated, scenario-based examples see the [`examples/`](examples/) directory.
 
@@ -33,25 +33,26 @@ Bootstrap mode is intended for initial indexing and exploratory graph queries. I
 
 ## Top-level fields
 
-| Field                 | Type    | Required | Default         | Description                                                                                                          |
-| --------------------- | ------- | -------- | --------------- | -------------------------------------------------------------------------------------------------------------------- |
-| `configPath`          | string  | no       | `.specd/config` | Root directory for specd-owned runtime state such as graph backends and graph temp files.                            |
-| `schema`              | string  | yes      | —               | Schema reference. See [`schema`](#schema).                                                                           |
-| `workspaces`          | object  | yes      | —               | Workspace declarations. Must include `default`.                                                                      |
-| `storage`             | object  | yes      | —               | Storage paths for changes, drafts, discarded, and archive.                                                           |
-| `actorProvider`       | string  | no       | —               | Forced actor provider name (e.g. `'git'`, `'ldap'`). Bypasses auto-detection. See [`actorProvider`](#actorprovider). |
-| `privacy`             | object  | no       | —               | Identity obfuscation settings. See [`privacy`](#privacy).                                                            |
-| `context`             | array   | no       | `[]`            | Additional content injected into compiled context before spec content.                                               |
-| `contextIncludeSpecs` | array   | no       | —               | Spec patterns always included in compiled context. When absent, no project-level include patterns are applied.       |
-| `contextExcludeSpecs` | array   | no       | —               | Spec patterns always excluded from compiled context.                                                                 |
-| `contextMode`         | string  | no       | `'summary'`     | Context rendering mode: `'list'`, `'summary'`, `'full'`, or `'hybrid'`. See [`contextMode`](#contextmode).           |
-| `approvals`           | object  | no       | both `false`    | Approval gate configuration.                                                                                         |
-| `logging`             | object  | no       | `level: info`   | Project-level logging configuration.                                                                                 |
-| `llmOptimizedContext` | boolean | no       | `false`         | Opt in to LLM-enriched context operations.                                                                           |
-| `plugins`             | object  | no       | —               | Installed plugins grouped by type.                                                                                   |
-| `schemaPlugins`       | array   | no       | `[]`            | Schema plugin references loaded and merged into the active schema.                                                   |
-| `schemaOverrides`     | object  | no       | —               | Inline schema override operations applied after plugins. See [`schemaOverrides`](#schemaoverrides).                  |
-| `invalidationPolicy`  | string  | no       | `'downstream'`  | Default policy for automatic and manual artifact invalidation. See [`invalidationPolicy`](#invalidationpolicy).      |
+| Field                 | Type    | Required | Default           | Description                                                                                                          |
+| --------------------- | ------- | -------- | ----------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `configPath`          | string  | no       | `.specd/config`   | Root directory for specd-owned runtime state such as graph backends and graph temp files.                            |
+| `schema`              | string  | yes      | —                 | Schema reference. See [`schema`](#schema).                                                                           |
+| `workspaces`          | object  | yes      | —                 | Workspace declarations. Must include `default`.                                                                      |
+| `storage`             | object  | yes      | —                 | Storage paths for changes, drafts, discarded, and archive.                                                           |
+| `actorProvider`       | string  | no       | —                 | Forced actor provider name (e.g. `'git'`, `'ldap'`). Bypasses auto-detection. See [`actorProvider`](#actorprovider). |
+| `privacy`             | object  | no       | —                 | Identity obfuscation settings. See [`privacy`](#privacy).                                                            |
+| `context`             | array   | no       | `[]`              | Additional content injected into compiled context before spec content.                                               |
+| `contextIncludeSpecs` | array   | no       | —                 | Spec patterns always included in compiled context. When absent, no project-level include patterns are applied.       |
+| `contextExcludeSpecs` | array   | no       | —                 | Spec patterns always excluded from compiled context.                                                                 |
+| `contextMode`         | string  | no       | `'summary'`       | Context rendering mode: `'list'`, `'summary'`, `'full'`, or `'hybrid'`. See [`contextMode`](#contextmode).           |
+| `approvals`           | object  | no       | both `false`      | Approval gate configuration.                                                                                         |
+| `logging`             | object  | no       | `level: info`     | Project-level logging configuration.                                                                                 |
+| `llmOptimizedContext` | boolean | no       | `false`           | Opt in to LLM-enriched context operations.                                                                           |
+| `plugins`             | object  | no       | —                 | Installed plugins grouped by type (`agents`, `ui`).                                                                  |
+| `api`                 | object  | no       | see [`api`](#api) | HTTP API settings for `specd serve` and `specd ui serve`.                                                            |
+| `schemaPlugins`       | array   | no       | `[]`              | Schema plugin references loaded and merged into the active schema.                                                   |
+| `schemaOverrides`     | object  | no       | —                 | Inline schema override operations applied after plugins. See [`schemaOverrides`](#schemaoverrides).                  |
+| `invalidationPolicy`  | string  | no       | `'downstream'`    | Default policy for automatic and manual artifact invalidation. See [`invalidationPolicy`](#invalidationpolicy).      |
 
 ## Environment overrides
 
@@ -343,10 +344,57 @@ plugins:
     - name: '@specd/plugin-agent-codex'
       config:
         commandsDir: .codex/commands
+  ui:
+    - name: '@specd/plugin-ui-studio'
 ```
 
-For `plugins.agents`, each entry requires `name` and may include `config`.
-Unknown plugin types are rejected at startup validation.
+### `plugins.agents`
+
+Each entry requires `name` and may include `config` (plugin-specific). Agent plugins install skills and agent integrations via `specd plugins install`.
+
+### `plugins.ui`
+
+Each entry requires `name` and may include `config`. UI plugins power SpecD Studio (`specd ui serve`).
+
+- **`specd ui serve`** uses the **first** `plugins.ui` entry only.
+- Install UI plugins with `specd plugins install @specd/plugin-ui-studio` or `specd plugins install @specd/studio-web` — prefer the CLI over hand-editing this list.
+- Packages must ship `specd-plugin.json` with `"pluginType": "ui"`.
+- **Bundle plugins** (for example `@specd/plugin-ui-studio`) declare `"staticDir"` and are served from the API origin.
+- **Server plugins** (for example `@specd/studio-web`) run a separate dev server; the CLI merges their origin into API CORS and passes `apiBaseUrl` at init.
+
+See [Studio getting started](../studio/getting-started.md).
+
+Unknown plugin bucket keys are rejected at startup validation.
+
+## api
+
+`api` configures the Studio HTTP API started by `specd serve` and `specd ui serve`. When omitted from YAML, SpecD still applies defaults (`auth.type: disabled`, no extra CORS origins).
+
+```yaml
+api:
+  auth:
+    type: disabled
+  cors:
+    origins:
+      - http://127.0.0.1:5174
+```
+
+### `api.auth`
+
+| Field    | Type   | Required | Description                                     |
+| -------- | ------ | -------- | ----------------------------------------------- |
+| `type`   | string | yes      | v1 allows only `disabled`.                      |
+| `config` | object | no       | Reserved for future verifier-specific settings. |
+
+Bearer or JWT auth is planned for remote deployments; v1 local Studio runs with auth disabled on loopback.
+
+### `api.cors`
+
+| Field     | Type            | Required | Description                                                             |
+| --------- | --------------- | -------- | ----------------------------------------------------------------------- |
+| `origins` | array of string | no       | Additional allowed `Origin` values for browser clients calling the API. |
+
+Loopback API defaults do not require CORS for same-origin bundle UIs. Server UI plugins and standalone web apps need their UI origin listed here and/or merged automatically by `specd ui serve`.
 
 ## approvals
 

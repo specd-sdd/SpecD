@@ -1,37 +1,15 @@
 import { createApiServer, defaultAuthAdapterRegistry } from '@specd/api'
 import { type Command } from 'commander'
-import fs from 'node:fs'
 import { spawn } from 'node:child_process'
-import path from 'node:path'
-import { fileURLToPath } from 'node:url'
+import type { UiServeContext } from '@specd/plugin-manager'
 import { resolveCliContext } from '../../helpers/cli-context.js'
+import { resolveUiServeCorsOrigins } from '../../helpers/resolve-ui-serve-cors.js'
+import { loadActiveUiPlugin } from '../../helpers/resolve-ui-plugin.js'
 import { handleError } from '../../handle-error.js'
 import { resolveServeAuth } from './serve-api.js'
 
 const DEFAULT_HOST = '127.0.0.1'
-const DEFAULT_PORT = 4400
-
-/**
- * Resolves the default built `@specd/ui` dist directory relative to the CLI package.
- *
- * @returns Absolute path to the UI dist folder
- * @throws {Error} When no built `index.html` is found under known dist paths
- */
-function defaultUiDistPath(): string {
-  const fromCwd = path.join(process.cwd(), 'apps/specd-studio-web/dist')
-  if (fs.existsSync(path.join(fromCwd, 'index.html'))) {
-    return fromCwd
-  }
-  const cliDistDir = path.dirname(fileURLToPath(import.meta.url))
-  const fromCli = path.resolve(cliDistDir, '../../..', 'apps/specd-studio-web/dist')
-  if (fs.existsSync(path.join(fromCli, 'index.html'))) {
-    return fromCli
-  }
-  throw new Error(
-    `Studio web build not found. From repo root run: pnpm --filter @specd/studio-web build\n` +
-      `  Tried: ${fromCwd}\n  Tried: ${fromCli}`,
-  )
-}
+const DEFAULT_PORT = 4450
 
 /**
  * Opens a URL in the system default browser (best-effort, detached).
@@ -45,20 +23,19 @@ function openBrowser(url: string): void {
 }
 
 /**
- * Registers `specd ui serve` — API plus static `@specd/ui` on one origin.
+ * Registers `specd ui serve` — API plus UI from the configured UI plugin.
  *
  * @param uiCmd - Parent `ui` Commander command.
  */
 export function registerServeUi(uiCmd: Command): void {
   uiCmd
     .command('serve')
-    .description('Start embedded SpecD Studio (API + static UI on one origin).')
+    .description('Start embedded SpecD Studio (API + UI plugin on one or two origins).')
     .option('-p, --port <number>', 'listen port', String(DEFAULT_PORT))
     .option('-h, --host <host>', 'bind host', DEFAULT_HOST)
     .option('-c, --config <path>', 'path to specd.yaml')
     .option('--auth <type>', 'auth override (v1: disabled only)')
     .option('-o, --open', 'open the IDE in the default browser after start')
-    .option('--ui-dist <path>', 'path to built @specd/ui dist directory')
     .action(
       async (opts: {
         port: string
@@ -66,7 +43,6 @@ export function registerServeUi(uiCmd: Command): void {
         config?: string
         auth?: string
         open?: boolean
-        uiDist?: string
       }) => {
         try {
           const port = Number(opts.port)
@@ -76,7 +52,9 @@ export function registerServeUi(uiCmd: Command): void {
 
           const { config } = await resolveCliContext({ configPath: opts.config })
           const auth = resolveServeAuth(opts.auth, config.api?.auth.type ?? 'disabled')
-          const uiDistPath = opts.uiDist ?? defaultUiDistPath()
+          const uiPlugin = await loadActiveUiPlugin(config)
+
+          const corsOrigins = resolveUiServeCorsOrigins(config, uiPlugin)
 
           const server = await createApiServer({
             projectRoot: config.projectRoot,
@@ -84,27 +62,42 @@ export function registerServeUi(uiCmd: Command): void {
             port,
             auth,
             authRegistry: defaultAuthAdapterRegistry(),
-            uiDistPath,
+            ...(uiPlugin.hasServer() ? {} : { uiDistPath: uiPlugin.getStaticRoot() }),
+            ...(corsOrigins !== undefined ? { corsOrigins } : {}),
           })
 
           const appUrl = await server.listen()
-          process.stderr.write(`specd Studio listening at ${appUrl}\n`)
-          process.stderr.write(`API: ${appUrl}/v1\n`)
-          process.stderr.write(`UI dist: ${uiDistPath}\n`)
-          process.stderr.write('Press Ctrl+C to stop.\n')
+          const apiBaseUrl = `${appUrl}/v1`
+          const serveContext: UiServeContext = { config, apiBaseUrl }
+          await uiPlugin.init(serveContext)
 
-          if (opts.open === true) {
-            openBrowser(appUrl)
+          process.stderr.write(`specd API listening at ${appUrl}/v1\n`)
+          if (uiPlugin.hasServer()) {
+            const uiUrl = uiPlugin.getServerUrl?.() ?? '(unknown)'
+            process.stderr.write(`Studio UI (plugin server): ${uiUrl}\n`)
+            if (opts.open === true) {
+              openBrowser(uiUrl)
+            }
+          } else {
+            process.stderr.write(`Studio UI (embedded): ${appUrl}\n`)
+            process.stderr.write(`UI plugin: ${uiPlugin.name}\n`)
+            if (opts.open === true) {
+              openBrowser(appUrl)
+            }
           }
+          process.stderr.write('Press Ctrl+C to stop.\n')
 
           await new Promise<void>((resolve) => {
             const shutdown = () => {
-              void server
-                .close()
-                .then(resolve)
-                .catch((err: unknown) => {
+              void (async () => {
+                try {
+                  await uiPlugin.destroy()
+                  await server.close()
+                  resolve()
+                } catch (err: unknown) {
                   handleError(err, 'text')
-                })
+                }
+              })()
             }
             process.once('SIGINT', shutdown)
             process.once('SIGTERM', shutdown)

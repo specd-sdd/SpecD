@@ -5,7 +5,7 @@ import { resolveCliContext } from '../../helpers/cli-context.js'
 import { handleError } from '../../handle-error.js'
 
 const DEFAULT_HOST = '127.0.0.1'
-const DEFAULT_PORT = 4400
+const DEFAULT_PORT = 4450
 
 /**
  * Resolves effective API auth from CLI flag and project config.
@@ -65,9 +65,12 @@ export function registerServeApi(program: Command): void {
 
         await new Promise<void>((resolve) => {
           const shutdown = () => {
-            void server.close().then(resolve).catch((err: unknown) => {
-              handleError(err, 'text')
-            })
+            void server
+              .close()
+              .then(resolve)
+              .catch((err: unknown) => {
+                handleError(err, 'text')
+              })
           }
           process.once('SIGINT', shutdown)
           process.once('SIGTERM', shutdown)

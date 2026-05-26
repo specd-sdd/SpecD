@@ -1,0 +1,25 @@
+- op: modified
+  description: Route UI plugins to InstallUiPlugin; agent-only InstallPlugin
+  selector:
+    type: section
+    matches: 'Requirement: Behavior'
+  content: |
+    The use case MUST:
+
+    1. Load the plugin via `PluginLoader`
+    2. If the loaded plugin is an `AgentPlugin` (`isAgentPlugin`), call `install()` with the provided `SpecdConfig` and options and return `InstallPluginOutput`
+    3. If the loaded plugin is a `UiPlugin` (`isUiPlugin`), throw `PluginValidationError` directing callers to `InstallUiPlugin` — this use case MUST NOT install UI plugins
+    4. Otherwise throw `PluginValidationError` for an unknown plugin contract
+
+    UI plugin installation is specified by `plugin-manager:ui-plugin-type` (`InstallUiPlugin`).
+
+- op: modified
+  description: Validation errors cover UI mis-routing
+  selector:
+    type: section
+    matches: 'Requirement: Error handling'
+  content: |
+    On failure, the use case MUST throw an appropriate error:
+
+    - `PluginNotFoundError` — when the plugin package cannot be resolved
+    - `PluginValidationError` — when the plugin is not an `AgentPlugin`, when a UI plugin is passed to this use case, or when `install()` throws

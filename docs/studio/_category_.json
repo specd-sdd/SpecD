@@ -1,0 +1,9 @@
+{
+  "label": "Studio",
+  "position": 3,
+  "link": {
+    "type": "generated-index",
+    "title": "SpecD Studio",
+    "description": "The spec-work IDE: HTTP API, UI packages, plugins, and local development."
+  }
+}

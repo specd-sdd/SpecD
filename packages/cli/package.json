@@ -42,6 +42,8 @@
     "yaml": "^2.0.0"
   },
   "devDependencies": {
+    "@specd/plugin-ui-studio": "workspace:*",
+    "@specd/studio-web": "workspace:*",
     "@types/diff": "^8.0.0",
     "@types/figlet": "^1.7.0"
   }

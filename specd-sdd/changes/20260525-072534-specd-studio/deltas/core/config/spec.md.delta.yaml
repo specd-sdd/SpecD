@@ -22,3 +22,19 @@
     Startup validation (`Requirement: Startup validation`) MUST reject unknown `api.auth.type` values in v1 with a clear error before the HTTP server listens.
 
     CLI `specd serve` / `specd ui serve` `--auth` MAY override `api.auth.type` for that process only; v1 MUST reject any value other than `disabled`.
+
+- op: added
+  description: plugins.ui for Studio UI plugin declarations
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: API authentication settings'
+  content: |
+    ### Requirement: UI plugins
+
+    `specd.yaml` MAY declare **`plugins.ui`** as an array of `{ name, config? }` entries (same shape as `plugins.agents`). v1 uses the **first** entry as the active Studio UI plugin for `specd ui serve`.
+
+    Distribution installs SHOULD use `@specd/plugin-ui-studio` (`hasServer() === false`). Monorepo development MAY use `@specd/studio-web` (`hasServer() === true`).

@@ -18,9 +18,9 @@ Options:
 - Validates plugin package names before attempting install.
 - Skips plugins already declared in config and prints a warning containing `already installed` and `update`.
 - For non-declared plugins:
-  - Loads plugin runtime through plugin manager.
-  - Runs install use case.
-  - Persists declaration via `ConfigWriter.addPlugin()` under `plugins.agents`.
+  - Loads plugin runtime through plugin manager (`LoadPlugin`).
+  - Runs `InstallPlugin` for agent plugins or `InstallUiPlugin` for UI plugins (`pluginType: "ui"` in `specd-plugin.json`).
+  - Persists declaration via `ConfigWriter.addPlugin()` under `plugins.agents` or `plugins.ui`.
 - Continues after per-plugin failures.
 - Exits with code `1` if at least one plugin fails.
 
@@ -30,6 +30,13 @@ For agent plugins that install skills (`@specd/plugin-agent-codex`, `@specd/plug
 - Skill-local files are installed under the agent root at `<agent-skills-dir>/<skill-name>/`.
 - Files marked as shared are installed once under `<agent-skills-dir>/_specd-shared/`.
 - Shared markdown files are written as-is (no skill frontmatter injection).
+
+For UI plugins (SpecD Studio):
+
+- `@specd/plugin-ui-studio` — published static bundle; use with `specd ui serve` (embedded SPA).
+- `@specd/studio-web` — Vite dev-server plugin for local UI development.
+
+After install, run `specd ui serve` to start API + UI. See [ui serve](./ui-serve.md) and [Studio getting started](../studio/getting-started.md).
 
 ## Output
 

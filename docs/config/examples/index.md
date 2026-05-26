@@ -11,3 +11,4 @@ Concrete `specd.yaml` examples for common setups:
 - [Single Repo Local Schema](./single-repo-local-schema.md)
 - [Multi-Repo Coordinator](./multi-repo-coordinator.md)
 - [Approvals and Workflow Hooks](./approvals-and-workflow-hooks.md)
+- [Studio local development](./studio-local.md)

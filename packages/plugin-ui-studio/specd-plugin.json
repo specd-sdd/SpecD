@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "name": "@specd/plugin-ui-studio",
+  "version": "0.1.0",
+  "description": "Published SpecD Studio UI bundle for embedded specd ui serve",
+  "pluginType": "ui",
+  "staticDir": "dist",
+  "minCoreVersion": "*"
+}

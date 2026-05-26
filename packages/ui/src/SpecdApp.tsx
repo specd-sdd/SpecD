@@ -75,16 +75,20 @@ function RemoteStudioGate({
   )
 
   React.useEffect(() => {
-    if (initialProfile || profile || typeof window === 'undefined') {
+    if (typeof window === 'undefined') {
+      return
+    }
+    if (profile && project) {
       setAutoTrying(false)
       return
     }
-    const origin = window.location.origin
+
+    const apiBaseUrl = profile?.apiBaseUrl ?? initialProfile?.apiBaseUrl ?? window.location.origin
     let cancelled = false
-    void testRemoteConnection({ apiBaseUrl: origin })
+    void testRemoteConnection({ apiBaseUrl })
       .then((nextProject) => {
         if (cancelled) return
-        setProfile({ kind: 'remote', apiBaseUrl: origin })
+        setProfile({ kind: 'remote', apiBaseUrl })
         setProject(nextProject)
       })
       .catch(() => {
@@ -96,7 +100,7 @@ function RemoteStudioGate({
     return () => {
       cancelled = true
     }
-  }, [initialProfile, profile])
+  }, [initialProfile, profile, project])
 
   const port = React.useMemo(
     () =>
@@ -121,6 +125,7 @@ function RemoteStudioGate({
     return (
       <div className="flex min-h-screen items-center justify-center bg-background p-6">
         <ConnectPanel
+          defaultApiBaseUrl={initialProfile?.apiBaseUrl}
           onConnected={(nextProfile, nextProject) => {
             setProfile(nextProfile)
             setProject(nextProject)

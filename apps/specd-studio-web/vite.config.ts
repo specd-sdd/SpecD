@@ -7,6 +7,9 @@ const dirname = path.dirname(fileURLToPath(import.meta.url))
 
 export default defineConfig({
   plugins: [react()],
+  define: {
+    'import.meta.env.VITE_SPECD_API_BASE_URL': JSON.stringify(process.env.SPECD_API_BASE_URL ?? ''),
+  },
   resolve: {
     alias: {
       '@specd/ui/styles.css': path.resolve(dirname, '../../packages/ui/dist/styles.css'),
@@ -14,6 +17,7 @@ export default defineConfig({
   },
   server: {
     port: 5174,
+    strictPort: true,
   },
   build: {
     outDir: 'dist',

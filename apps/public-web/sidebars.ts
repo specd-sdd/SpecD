@@ -33,8 +33,38 @@ const sidebars: SidebarsConfig = {
     },
     {
       type: 'category',
+      label: 'Studio',
+      items: ['studio/index', 'studio/getting-started', 'studio/packages', 'studio/architecture'],
+    },
+    {
+      type: 'category',
+      label: 'Studio API',
+      items: [
+        'api/index',
+        'api/overview',
+        'api/authentication',
+        'api/errors',
+        'api/routes',
+        'api/dtos',
+        'api/openapi',
+      ],
+    },
+    {
+      type: 'category',
+      label: 'Studio client',
+      items: [
+        'client/index',
+        'client/specd-data-port',
+        'client/remote-adapter',
+        'client/connection-profiles',
+        'client/http-transport',
+        'client/errors',
+      ],
+    },
+    {
+      type: 'category',
       label: 'CLI',
-      items: ['cli/cli-reference'],
+      items: ['cli/cli-reference', 'cli/serve', 'cli/ui-serve', 'cli/plugins-install'],
     },
     {
       type: 'category',
@@ -68,6 +98,7 @@ const sidebars: SidebarsConfig = {
             'config/examples/single-repo-local-schema',
             'config/examples/multi-repo-coordinator',
             'config/examples/approvals-and-workflow-hooks',
+            'config/examples/studio-local',
           ],
         },
       ],

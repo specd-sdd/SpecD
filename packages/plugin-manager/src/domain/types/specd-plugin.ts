@@ -4,7 +4,7 @@ import type { SpecdConfig } from '@specd/core'
  * Known plugin types. Single source of truth for runtime validation
  * and compile-time type derivation. Add new types here.
  */
-export const PLUGIN_TYPES = ['agent'] as const
+export const PLUGIN_TYPES = ['agent', 'ui'] as const
 
 /**
  * Plugin type discriminator, derived from {@link PLUGIN_TYPES}.

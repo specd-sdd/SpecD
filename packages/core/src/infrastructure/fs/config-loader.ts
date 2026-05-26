@@ -219,6 +219,7 @@ const PluginEntryZodSchema = z
 const PluginsZodSchema = z
   .object({
     agents: z.array(PluginEntryZodSchema).optional(),
+    ui: z.array(PluginEntryZodSchema).optional(),
   })
   .strict()
 
@@ -1286,11 +1287,22 @@ export class FsConfigLoader implements ConfigLoader {
                     })),
                   }
                 : {}),
+              ...(data.plugins.ui !== undefined
+                ? {
+                    ui: data.plugins.ui.map((plugin) => ({
+                      name: plugin.name,
+                      ...(plugin.config !== undefined ? { config: plugin.config } : {}),
+                    })),
+                  }
+                : {}),
             },
           }
         : {}),
       api: {
-        auth: { type: 'disabled' as const, ...(data.api?.auth?.config !== undefined ? { config: data.api.auth.config } : {}) },
+        auth: {
+          type: 'disabled' as const,
+          ...(data.api?.auth?.config !== undefined ? { config: data.api.auth.config } : {}),
+        },
         ...(data.api?.cors !== undefined
           ? {
               cors: {

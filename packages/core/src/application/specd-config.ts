@@ -26,6 +26,7 @@ export interface SpecdConfigRemoval {
   }>
   readonly plugins?: {
     readonly agents?: Array<{ readonly name: string }>
+    readonly ui?: Array<{ readonly name: string }>
   }
 }
 
@@ -238,10 +239,14 @@ export interface SpecdConfig {
   readonly schemaOverrides?: SchemaOperations | undefined
   /** Default invalidation policy for new changes. Defaults to `'downstream'`. */
   readonly invalidationPolicy?: InvalidationPolicy | undefined
-  /** Declared plugins grouped by type (currently `agents`). */
+  /** Declared plugins grouped by type (`agents`, `ui`). */
   readonly plugins?:
     | {
         readonly agents?: readonly {
+          readonly name: string
+          readonly config?: Readonly<Record<string, unknown>>
+        }[]
+        readonly ui?: readonly {
           readonly name: string
           readonly config?: Readonly<Record<string, unknown>>
         }[]

@@ -1,6 +1,7 @@
 import type { SpecdConfig } from '@specd/core'
 import type { PluginLoader } from '../ports/plugin-loader.js'
 import { isAgentPlugin } from '../../domain/types/agent-plugin.js'
+import { isUiPlugin } from '../../domain/types/ui-plugin.js'
 import { PluginValidationError } from '../../domain/errors/plugin-validation.js'
 
 /**
@@ -42,9 +43,16 @@ export class UninstallPlugin {
    */
   async execute(input: UninstallPluginInput): Promise<void> {
     const plugin = await this.loader.load(input.pluginName)
-    if (!isAgentPlugin(plugin)) {
-      throw new PluginValidationError(input.pluginName, ['uninstall'])
+    if (isAgentPlugin(plugin)) {
+      await plugin.uninstall(input.config, input.options)
+      return
     }
-    await plugin.uninstall(input.config, input.options)
+    if (isUiPlugin(plugin)) {
+      if (plugin.uninstall !== undefined) {
+        await plugin.uninstall(input.config, input.options)
+      }
+      return
+    }
+    throw new PluginValidationError(input.pluginName, ['uninstall'])
   }
 }

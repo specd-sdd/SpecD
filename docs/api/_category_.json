@@ -1,0 +1,9 @@
+{
+  "label": "Studio API",
+  "position": 4,
+  "link": {
+    "type": "generated-index",
+    "title": "SpecD Studio HTTP API",
+    "description": "REST surface under /v1, errors, auth, and how to run the server."
+  }
+}

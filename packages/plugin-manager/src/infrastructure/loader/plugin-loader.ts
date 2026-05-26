@@ -8,6 +8,7 @@ import type { PluginLoader } from '../../application/ports/plugin-loader.js'
 import type { SpecdPlugin } from '../../domain/types/specd-plugin.js'
 import { isSpecdPlugin } from '../../domain/types/specd-plugin.js'
 import { isAgentPlugin } from '../../domain/types/agent-plugin.js'
+import { isUiPlugin } from '../../domain/types/ui-plugin.js'
 import { PluginNotFoundError } from '../../domain/errors/plugin-not-found.js'
 import { PluginValidationError } from '../../domain/errors/plugin-validation.js'
 
@@ -28,7 +29,8 @@ const manifestSchema = z.object({
   schemaVersion: z.number().int().min(1),
   name: z.string().min(1),
   version: z.string().min(1),
-  pluginType: z.enum(['agent']),
+  pluginType: z.enum(['agent', 'ui']),
+  staticDir: z.string().min(1).optional(),
   minCoreVersion: z.string().default('*'),
   description: z.string().optional(),
 })
@@ -141,6 +143,10 @@ class RuntimePluginLoader implements PluginLoader {
 
     if (pluginType === 'agent' && !isAgentPlugin(plugin)) {
       throw new PluginValidationError(pluginName, ['install', 'uninstall'])
+    }
+
+    if (pluginType === 'ui' && !isUiPlugin(plugin)) {
+      throw new PluginValidationError(pluginName, ['hasServer', 'getStaticRoot', 'getServerUrl'])
     }
   }
 

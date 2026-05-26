@@ -1,0 +1,36 @@
+{
+  "name": "@specd/plugin-ui-studio",
+  "version": "0.1.0",
+  "description": "Published SpecD Studio UI bundle (SPA synced from @specd/studio-web)",
+  "license": "MIT",
+  "private": false,
+  "repository": "https://github.com/specd-sdd/SpecD",
+  "type": "module",
+  "main": "./dist/index.js",
+  "files": [
+    "dist/",
+    "specd-plugin.json"
+  ],
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "node ./scripts/build-loader.mjs",
+    "build:bundle": "pnpm --filter @specd/studio-web build",
+    "dev": "tsup src/index.ts --format esm --dts --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@specd/plugin-manager": "workspace:*"
+  },
+  "devDependencies": {
+    "tsup": "^8.4.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
+  }
+}

@@ -1,6 +1,6 @@
 # Configuring Your SpecD Project
 
-`specd.yaml` is the single configuration file for a SpecD project. Every tool in the SpecD ecosystem — the CLI, the MCP server, and agent plugins — reads it to understand where your specs live, how changes are stored, and what rules govern your workflow.
+`specd.yaml` is the single configuration file for a SpecD project. Every tool in the SpecD ecosystem — the CLI, the MCP server, agent plugins, and SpecD Studio — reads it to understand where your specs live, how changes are stored, and what rules govern your workflow.
 
 This guide walks through the main configuration areas conceptually, with practical examples. For the complete field-by-field reference, see the [Configuration Reference](../config/config-reference.md).
 
@@ -206,13 +206,14 @@ remove:
       - name: '@specd/plugin-agent-copilot'
 ```
 
-| Removal target   | Keyed by                       | Effect                                |
-| ---------------- | ------------------------------ | ------------------------------------- |
-| `root`           | field name                     | Removes the named top-level field     |
-| `workspaces`     | workspace name                 | Removes the named workspace           |
-| `storage`        | storage key                    | Removes a storage binding             |
-| `context`        | `id`, `file`, or `instruction` | Removes matching context entries      |
-| `plugins.agents` | `name`                         | Removes a matching plugin declaration |
+| Removal target   | Keyed by                       | Effect                                   |
+| ---------------- | ------------------------------ | ---------------------------------------- |
+| `root`           | field name                     | Removes the named top-level field        |
+| `workspaces`     | workspace name                 | Removes the named workspace              |
+| `storage`        | storage key                    | Removes a storage binding                |
+| `context`        | `id`, `file`, or `instruction` | Removes matching context entries         |
+| `plugins.agents` | `name`                         | Removes a matching plugin declaration    |
+| `plugins.ui`     | `name`                         | Removes a matching UI plugin declaration |
 
 Removals are applied immediately after the layer that declares them is merged. A `remove` block without `extends` is an error.
 
@@ -699,6 +700,37 @@ schemaOverrides:
             - id: archiving-run-lint
               run: 'pnpm lint'
 ```
+
+---
+
+## SpecD Studio (`api` and `plugins.ui`)
+
+SpecD Studio is the browser IDE started with `specd ui serve`. Two optional config areas matter:
+
+**UI plugin** — declares which Studio front end to load:
+
+```yaml
+plugins:
+  ui:
+    - name: '@specd/plugin-ui-studio'
+```
+
+Install with `specd plugins install @specd/plugin-ui-studio` (embedded bundle) or `@specd/studio-web` (Vite dev server). Only the first `plugins.ui` entry is used.
+
+**HTTP API** — auth and CORS for `specd serve` / `specd ui serve`:
+
+```yaml
+api:
+  auth:
+    type: disabled
+  cors:
+    origins:
+      - http://127.0.0.1:5174
+```
+
+v1 supports only `auth.type: disabled`. CORS is needed when the UI runs on a different origin than the API (dev-server plugin); bundle mode on a single port usually does not need extra origins.
+
+See [Studio getting started](../studio/getting-started.md) and the [`api`](../config/config-reference.md#api) / [`plugins.ui`](../config/config-reference.md#plugins) reference sections.
 
 ---
 

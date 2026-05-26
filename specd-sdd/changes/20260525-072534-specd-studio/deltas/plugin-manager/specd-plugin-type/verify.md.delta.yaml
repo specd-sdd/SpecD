@@ -1,0 +1,2 @@
+- op: no-op
+  description: Existing PluginType scenarios remain valid after adding ui to PLUGIN_TYPES

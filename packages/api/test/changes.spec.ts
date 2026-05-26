@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { createEphemeralChange, discardEphemeralChange } from './helpers/ephemeral-change.js'
 import { apiJson, expectProblem } from './helpers/http-client.js'
 import { loadProjectSamples } from './helpers/project-samples.js'
 import { findRepoRoot } from './helpers/repo-root.js'
@@ -214,17 +215,13 @@ describe('Changes API', () => {
       if (!savedDelta.includes(uniquePhrase)) {
         return
       }
-      const draftOverride = savedDelta.replace(
-        uniquePhrase,
-        `${draftMarker} and ${uniquePhrase}`,
-      )
+      const draftOverride = savedDelta.replace(uniquePhrase, `${draftMarker} and ${uniquePhrase}`)
 
       const { data: baseline } = await apiJson<{
         specId: string
         files: Array<{ filename: string; merged?: string }>
       }>(`${changePath}/preview?specId=${encodeURIComponent(specId)}`)
-      const baseMerged =
-        baseline.files.find((f) => f.filename === 'spec.md')?.merged ?? ''
+      const baseMerged = baseline.files.find((f) => f.filename === 'spec.md')?.merged ?? ''
 
       const { res, data } = await apiJson<{
         specId: string
@@ -240,8 +237,7 @@ describe('Changes API', () => {
 
       expect(res.ok).toBe(true)
       expect(data.specId).toBe(specId)
-      const draftMerged =
-        data.files.find((f) => f.filename === 'spec.md')?.merged ?? ''
+      const draftMerged = data.files.find((f) => f.filename === 'spec.md')?.merged ?? ''
       expect(draftMerged).toContain(draftMarker)
       expect(baseMerged).not.toContain(draftMarker)
     })
@@ -288,76 +284,89 @@ describe('Changes API', () => {
       expect(body.code).toBe('INTERNAL_ERROR')
     })
 
-    it('given active change, when POST validate-all, then returns batch DTO', async () => {
-      const { activeChangeName } = await loadProjectSamples()
-      if (activeChangeName === null) {
-        return
-      }
-      const { res, data } = await apiJson<{
-        passed: boolean
-        total: number
-        results: Array<{
-          spec: string | null
-          artifact: string
+    it('given ephemeral change, when POST validate-all, then returns batch DTO', async () => {
+      const { workspace, specPath } = await loadProjectSamples()
+      const changeName = await createEphemeralChange({
+        specIds: [`${workspace}:${specPath}`],
+      })
+      try {
+        const { res, data } = await apiJson<{
           passed: boolean
-          failures: unknown[]
-          warnings: string[]
-          files: string[]
-        }>
-      }>(`/changes/${encodeURIComponent(activeChangeName)}/validate-all`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: '{}',
-      })
-      expect(res.ok).toBe(true)
-      expect(typeof data.passed).toBe('boolean')
-      expect(typeof data.total).toBe('number')
-      expect(Array.isArray(data.results)).toBe(true)
-      for (const step of data.results) {
-        expect(typeof step.artifact).toBe('string')
-        expect(step.spec === null || typeof step.spec === 'string').toBe(true)
-        expect(typeof step.passed).toBe('boolean')
-        expect(Array.isArray(step.failures)).toBe(true)
-        expect(Array.isArray(step.warnings)).toBe(true)
-        expect(Array.isArray(step.files)).toBe(true)
+          total: number
+          results: Array<{
+            spec: string | null
+            artifact: string
+            passed: boolean
+            failures: unknown[]
+            warnings: string[]
+            files: string[]
+          }>
+        }>(`/changes/${encodeURIComponent(changeName)}/validate-all`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: '{}',
+        })
+        expect(res.ok).toBe(true)
+        expect(typeof data.passed).toBe('boolean')
+        expect(typeof data.total).toBe('number')
+        expect(data.total).toBeGreaterThan(0)
+        expect(Array.isArray(data.results)).toBe(true)
+        for (const step of data.results) {
+          expect(typeof step.artifact).toBe('string')
+          expect(step.spec === null || typeof step.spec === 'string').toBe(true)
+          expect(typeof step.passed).toBe('boolean')
+          expect(Array.isArray(step.failures)).toBe(true)
+          expect(Array.isArray(step.warnings)).toBe(true)
+          expect(Array.isArray(step.files)).toBe(true)
+        }
+      } finally {
+        await discardEphemeralChange(changeName)
       }
     })
 
-    it('given active change, when POST validate-all with artifactId, then filters steps', async () => {
-      const { activeChangeName } = await loadProjectSamples()
-      if (activeChangeName === null) {
-        return
-      }
-      const { res, data } = await apiJson<{
-        total: number
-        results: Array<{ artifact: string }>
-      }>(`/changes/${encodeURIComponent(activeChangeName)}/validate-all`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ artifactId: 'proposal' }),
+    it('given ephemeral change, when POST validate-all with artifactId, then filters steps', async () => {
+      const { workspace, specPath } = await loadProjectSamples()
+      const changeName = await createEphemeralChange({
+        specIds: [`${workspace}:${specPath}`],
       })
-      expect(res.ok).toBe(true)
-      expect(data.results.every((step) => step.artifact === 'proposal')).toBe(true)
+      try {
+        const { res, data } = await apiJson<{
+          total: number
+          results: Array<{ artifact: string }>
+        }>(`/changes/${encodeURIComponent(changeName)}/validate-all`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ artifactId: 'proposal' }),
+        })
+        expect(res.ok).toBe(true)
+        expect(data.total).toBeGreaterThan(0)
+        expect(data.results.every((step) => step.artifact === 'proposal')).toBe(true)
+      } finally {
+        await discardEphemeralChange(changeName)
+      }
     })
 
-    it('given active change, when PATCH description, then persists on GET detail', async () => {
-      const { activeChangeName } = await loadProjectSamples()
-      if (activeChangeName === null) {
-        return
-      }
-      const path = `/changes/${encodeURIComponent(activeChangeName)}`
-      const marker = `studio-patch-${Date.now()}`
-      const { res: patchRes, data: patched } = await apiJson<{ description?: string }>(path, {
-        method: 'PATCH',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ description: marker }),
+    it('given ephemeral change, when PATCH description, then persists on GET detail', async () => {
+      const changeName = await createEphemeralChange({
+        description: 'fixture description before patch',
       })
-      expect(patchRes.ok).toBe(true)
-      expect(patched.description).toBe(marker)
+      try {
+        const path = `/changes/${encodeURIComponent(changeName)}`
+        const marker = `patched-description-${Date.now()}`
+        const { res: patchRes, data: patched } = await apiJson<{ description?: string }>(path, {
+          method: 'PATCH',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ description: marker }),
+        })
+        expect(patchRes.ok).toBe(true)
+        expect(patched.description).toBe(marker)
 
-      const { res: getRes, data: loaded } = await apiJson<{ description?: string }>(path)
-      expect(getRes.ok).toBe(true)
-      expect(loaded.description).toBe(marker)
+        const { res: getRes, data: loaded } = await apiJson<{ description?: string }>(path)
+        expect(getRes.ok).toBe(true)
+        expect(loaded.description).toBe(marker)
+      } finally {
+        await discardEphemeralChange(changeName)
+      }
     })
   })
 })

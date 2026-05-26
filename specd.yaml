@@ -188,6 +188,14 @@ workspaces:
     codeRoot: apps/specd-studio-web
     ownership: owned
 
+  plugin-ui-studio:
+    specs:
+      adapter: fs
+      fs:
+        path: specs/plugin-ui-studio
+    codeRoot: packages/plugin-ui-studio
+    ownership: owned
+
   studio-desktop:
     specs:
       adapter: fs
@@ -371,3 +379,5 @@ plugins:
     - name: '@specd/plugin-agent-copilot'
     - name: '@specd/plugin-agent-opencode'
     - name: '@specd/plugin-agent-standard'
+  ui:
+    - name: '@specd/plugin-ui-studio'
