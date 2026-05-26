@@ -10,11 +10,18 @@
 - **THEN** each row includes name, state, and `updatedAt`
 - **AND** blocker count is present when known
 
-#### Scenario: GET /changes returns expected payload
+### Requirement: drafts and discarded are read-only collections
 
-- **WHEN** client calls `GET /changes`
-- **THEN** HTTP status is 2xx
-- **AND** JSON body matches the documented DTO or envelope
+#### Scenario: GET /drafts returns sidebar summaries (read-only)
+
+- **WHEN** `GET /v1/drafts` is called
+- **THEN** each row includes name, state, and `updatedAt`
+- **AND** response is navigation-only (no per-row action fields)
+
+#### Scenario: GET /discarded returns sidebar summaries (read-only)
+
+- **WHEN** `GET /v1/discarded` is called
+- **THEN** each row includes name, state, and `updatedAt`
 
 #### Scenario: GET archived-changes returns name and archivedName
 

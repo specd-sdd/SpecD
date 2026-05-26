@@ -22,6 +22,15 @@
 - **THEN** JSON or structured body per contract
 - **AND** 404 problem+json when missing
 
+### Requirement: /changes read routes resolve active changes only
+
+#### Scenario: Drafted name under /changes returns 404
+
+- **GIVEN** a change named `foo` exists only under drafts
+- **WHEN** `GET /v1/changes/foo`
+- **THEN** HTTP 404 is returned
+- **AND** body is `application/problem+json`
+
 ### Requirement: GET change detail omits artifact bodies
 
 #### Scenario: Artifact body served via GetChangeArtifact
@@ -121,6 +130,29 @@
 - **WHEN** client requests a URL outside this routes contract
 - **THEN** HTTP 404 is returned
 - **AND** body is `application/problem+json`
+
+### Requirement: drafted change read routes are separate and read-only
+
+#### Scenario: GET /drafts/:name returns change detail
+
+- **GIVEN** drafted change `foo` exists
+- **WHEN** `GET /v1/drafts/foo`
+- **THEN** HTTP status is 2xx
+- **AND** JSON body matches `ChangeDetailDto`
+
+#### Scenario: Draft routes do not allow artifact writes
+
+- **WHEN** client calls `PUT /v1/drafts/foo/artifacts/proposal.md`
+- **THEN** HTTP 404 is returned (route not registered) or 405
+
+### Requirement: discarded change read routes are separate and read-only
+
+#### Scenario: GET /discarded/:name returns change detail
+
+- **GIVEN** discarded change `foo` exists
+- **WHEN** `GET /v1/discarded/foo`
+- **THEN** HTTP status is 2xx
+- **AND** JSON body matches `ChangeDetailDto`
 
 #### Scenario: GET .../context returns expected payload
 

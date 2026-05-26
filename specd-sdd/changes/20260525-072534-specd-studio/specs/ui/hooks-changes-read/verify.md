@@ -2,6 +2,55 @@
 
 ## Requirements
 
+### Requirement: read hooks route by sidebar list section
+
+#### Scenario: Drafted change loads via getDraft
+
+- **GIVEN** change `dummy-draft` exists only under drafts
+- **WHEN** shell opens it with `listSection` `draft`
+- **THEN** `useChangesRead` calls `getDraft("dummy-draft")`
+- **AND** does not call `getChange` for that name
+
+#### Scenario: Discarded change loads via getDiscarded
+
+- **GIVEN** change exists only under discarded
+- **WHEN** shell opens it with `listSection` `discarded`
+- **THEN** `useChangesRead` calls `getDiscarded`
+- **AND** does not call `getChange`
+
+#### Scenario: Active change still uses getChange
+
+- **GIVEN** change is in the active list
+- **WHEN** shell opens it with `listSection` `active` or null
+- **THEN** `useChangesRead` calls `getChange` and `getChangeStatus`
+
+#### Scenario: Draft artifact list uses listDraftArtifacts
+
+- **GIVEN** drafted change and Artifacts tab visible
+- **WHEN** `useChangeArtifactList` loads
+- **THEN** port receives `listDraftArtifacts(name)`
+- **AND** not `listChangeArtifacts`
+
+#### Scenario: Inspector artifact body uses draft route when drafted
+
+- **GIVEN** drafted change and user selects an artifact file
+- **WHEN** `useChangeArtifact` loads content
+- **THEN** port receives `getDraftArtifact(name, filename)`
+
+### Requirement: shelved and archived views do not poll change status or artifacts
+
+#### Scenario: Drafted detail loads once (no poll refreshKey)
+
+- **GIVEN** drafted change open in the shell
+- **WHEN** global poll ticks
+- **THEN** shell does not refetch drafted detail or status automatically
+
+#### Scenario: Discarded view does not poll status
+
+- **GIVEN** discarded change open in the shell
+- **WHEN** global poll ticks
+- **THEN** shell does not call `getDiscardedStatus` for that name
+
 ### Requirement: view uses SpecdDataPort hooks only
 
 #### Scenario: Component consumes SpecdDataPort hooks only

@@ -33,6 +33,26 @@
 - **THEN** UI calls `listChangeArtifacts`
 - **AND** renders grouped files even when status returns `unchanged: true`
 
+#### Scenario: Drafted change uses listDraftArtifacts
+
+- **GIVEN** drafted change open with `listSection` `draft`
+- **WHEN** user selects Artifacts tab
+- **THEN** UI calls `listDraftArtifacts`
+- **AND** does not call `listChangeArtifacts`
+
+#### Scenario: Discarded change uses listDiscardedArtifacts
+
+- **GIVEN** discarded change open with `listSection` `discarded`
+- **WHEN** user selects Artifacts tab
+- **THEN** UI calls `listDiscardedArtifacts`
+
+#### Scenario: Tasks tab skips fetch when tasks artifact is missing
+
+- **GIVEN** status shows `tasks` artifact as missing
+- **WHEN** user opens Tasks tab for a drafted change
+- **THEN** UI does not call `getChange` for `tasks.md`
+- **AND** shows a missing-tasks message instead of `Change '<name>' not found`
+
 #### Scenario: Artifacts grouped by scope change then spec
 
 - **GIVEN** active change with `proposal.md` and at least one `specs/.../spec.md`

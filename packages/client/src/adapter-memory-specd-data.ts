@@ -118,6 +118,14 @@ export class MemorySpecdDataAdapter implements SpecdDataPort {
     return Promise.resolve(change)
   }
 
+  getDraft(name: string): Promise<ChangeDetailDto> {
+    return this.getChange(name)
+  }
+
+  getDiscarded(name: string): Promise<ChangeDetailDto> {
+    return this.getChange(name)
+  }
+
   getChangeStatus(name: string, options?: GetChangeStatusOptions): Promise<ChangeStatusDto> {
     const change = this._changes.get(name)
     if (change === undefined) {
@@ -147,8 +155,24 @@ export class MemorySpecdDataAdapter implements SpecdDataPort {
     })
   }
 
+  getDraftStatus(name: string, options?: GetChangeStatusOptions): Promise<ChangeStatusDto> {
+    return this.getChangeStatus(name, options)
+  }
+
+  getDiscardedStatus(name: string, options?: GetChangeStatusOptions): Promise<ChangeStatusDto> {
+    return this.getChangeStatus(name, options)
+  }
+
   listChangeArtifacts(): Promise<readonly ChangeArtifactListItemDto[]> {
     return Promise.resolve([])
+  }
+
+  listDraftArtifacts(): Promise<readonly ChangeArtifactListItemDto[]> {
+    return this.listChangeArtifacts()
+  }
+
+  listDiscardedArtifacts(): Promise<readonly ChangeArtifactListItemDto[]> {
+    return this.listChangeArtifacts()
   }
 
   getChangeArtifact(name: string, filename: string): Promise<ArtifactContentDto> {
@@ -162,6 +186,14 @@ export class MemorySpecdDataAdapter implements SpecdDataPort {
       content: `# ${filename}\n\nFixture content.\n`,
       originalHash: 'sha256:fixture',
     })
+  }
+
+  getDraftArtifact(name: string, filename: string): Promise<ArtifactContentDto> {
+    return this.getChangeArtifact(name, filename)
+  }
+
+  getDiscardedArtifact(name: string, filename: string): Promise<ArtifactContentDto> {
+    return this.getChangeArtifact(name, filename)
   }
 
   getChangeContext(): Promise<CompiledContextDto> {

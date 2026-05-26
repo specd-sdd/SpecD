@@ -1,6 +1,13 @@
 import type { ChangeDetailDto, ChangeStatusDto } from '@specd/client'
 import * as React from 'react'
+import type { ChangeListSection } from '../change/change-list-section.js'
 import { useSpecdDataPort } from '../context/specd-data-context.js'
+import {
+  changeReadCacheKey,
+  loadChangeDetail,
+  loadChangeStatus,
+  type ChangeReadSection,
+} from '../lib/change-read-routes.js'
 import { useAsyncResource } from './use-async-resource.js'
 
 /**
@@ -9,6 +16,8 @@ import { useAsyncResource } from './use-async-resource.js'
  * @param options
  * @param options.ifModifiedSince
  * @param options.refreshKey
+ * @param options.listSection - Sidebar list (`draft` / `discarded` / `active`); defaults to active routes.
+ * @param options.pollStatus - When false, skips `getChangeStatus` / draft / discarded status polling.
  */
 export function useChangesRead(
   changeName: string | undefined,
@@ -17,6 +26,8 @@ export function useChangesRead(
     refreshKey?: number
     /** When set, detail refetches on this key; omit to load once per change. */
     detailRefreshKey?: number
+    listSection?: ChangeListSection | null
+    pollStatus?: boolean
   } = {},
 ): {
   detail: ReturnType<typeof useAsyncResource<ChangeDetailDto>>
@@ -24,29 +35,42 @@ export function useChangesRead(
   lastModified: string | undefined
 } {
   const port = useSpecdDataPort()
+  const listSection: ChangeReadSection = options.listSection ?? null
+  const pollStatus = options.pollStatus ?? true
   const enabled = Boolean(changeName)
   const [lastModified, setLastModified] = React.useState<string | undefined>(
     options.ifModifiedSince,
   )
 
-  const loadDetail = React.useCallback(() => port.getChange(changeName!), [port, changeName])
+  const loadDetail = React.useCallback(
+    () => loadChangeDetail(port, changeName!, listSection),
+    [port, changeName, listSection],
+  )
   const loadStatus = React.useCallback(
     () =>
-      port.getChangeStatus(changeName!, {
+      loadChangeStatus(port, changeName!, listSection, {
         ifModifiedSince: lastModified,
       }),
-    [port, changeName, lastModified],
+    [port, changeName, listSection, lastModified],
   )
 
-  const detail = useAsyncResource(`change-detail:${changeName ?? ''}`, loadDetail, {
-    enabled,
-    refreshKey: options.detailRefreshKey,
-  })
+  const detail = useAsyncResource(
+    changeReadCacheKey(listSection, `change-detail:${changeName ?? ''}`),
+    loadDetail,
+    {
+      enabled,
+      refreshKey: options.detailRefreshKey,
+    },
+  )
 
-  const statusResource = useAsyncResource(`change-status:${changeName ?? ''}`, loadStatus, {
-    enabled,
-    refreshKey: options.refreshKey,
-  })
+  const statusResource = useAsyncResource(
+    changeReadCacheKey(listSection, `change-status:${changeName ?? ''}`),
+    loadStatus,
+    {
+      enabled: enabled && pollStatus,
+      refreshKey: options.refreshKey,
+    },
+  )
 
   const [statusData, setStatusData] = React.useState<ChangeStatusDto | undefined>()
 

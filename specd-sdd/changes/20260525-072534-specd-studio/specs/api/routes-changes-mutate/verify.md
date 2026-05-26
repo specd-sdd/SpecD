@@ -45,6 +45,21 @@
 - **THEN** HTTP status is 2xx
 - **AND** JSON body matches the documented DTO or envelope
 
+### Requirement: draft and restore mutations use change lifecycle actions
+
+#### Scenario: Restore drafted change uses /changes route
+
+- **GIVEN** change `foo` is drafted
+- **WHEN** client calls `POST /v1/changes/foo/restore`
+- **THEN** HTTP status is 2xx
+- **AND** response is `ChangeDetailDto`
+
+#### Scenario: Draft routes do not allow transition
+
+- **GIVEN** change `foo` is drafted
+- **WHEN** client calls `POST /v1/changes/foo/transition`
+- **THEN** HTTP 404 problem+json is returned
+
 ### Requirement: PATCH routes edit metadata spec deps and implementation tracking
 
 #### Scenario: PATCH description updates without invalidation

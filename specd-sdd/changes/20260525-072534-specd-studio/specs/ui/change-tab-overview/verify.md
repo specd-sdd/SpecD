@@ -85,6 +85,13 @@
 - **THEN** `studio-change-specs-readonly` lists specs and dependencies
 - **AND** inline scope chips are not on Overview
 
+#### Scenario: Draft Overview shows specs without scope dialog affordances
+
+- **GIVEN** a drafted change with multiple specs
+- **WHEN** user opens Overview
+- **THEN** `studio-change-specs-readonly` lists specs and dependencies
+- **AND** `studio-edit-spec-scope` is not visible
+
 ### Requirement: overview surfaces lifecycle actions
 
 #### Scenario: Active change shows shelf and discard
@@ -106,6 +113,20 @@
 - **GIVEN** a discarded change is open
 - **WHEN** Overview renders
 - **THEN** a read-only notice is shown instead of action buttons
+
+#### Scenario: Discarded change shows workflow status unavailable
+
+- **GIVEN** a discarded change is open
+- **WHEN** Overview renders the Workflow & validation card
+- **THEN** UI does not call `getChangeStatus` for that name
+- **AND** shows **Workflow status unavailable.**
+
+#### Scenario: Archived change shows workflow status unavailable
+
+- **GIVEN** an archived change is open
+- **WHEN** Overview renders the Workflow & validation card
+- **THEN** UI does not call `getChangeStatus`
+- **AND** shows **Workflow status unavailable.**
 
 #### Scenario: Lifecycle actions require Studio confirmation modal
 

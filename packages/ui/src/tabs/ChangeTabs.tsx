@@ -14,10 +14,12 @@ export type ChangeView = (typeof CHANGE_VIEWS)[number]
 export function ChangeTabs({
   changeName,
   active,
+  views = CHANGE_VIEWS,
   onActiveChange,
 }: {
   changeName: string | undefined
   active: ChangeView
+  views?: readonly ChangeView[]
   onActiveChange: (view: ChangeView) => void
 }): React.ReactElement {
   if (!changeName) {
@@ -30,7 +32,7 @@ export function ChangeTabs({
 
   return (
     <div className="studio-tab-bar">
-      {CHANGE_VIEWS.map((view) => (
+      {views.map((view) => (
         <button
           key={view}
           type="button"

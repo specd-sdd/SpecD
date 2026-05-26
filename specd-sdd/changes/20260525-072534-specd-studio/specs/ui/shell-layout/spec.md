@@ -35,6 +35,14 @@ All data MUST flow through `SpecdDataPort` hooks; direct `@specd/core` imports a
 
 When the user opens a change from the Archive sidebar section, the shell MUST load detail via `getArchivedChange`, MUST skip active-change status polling, and MUST disable inspector save, validate, and `getChangeArtifact` loads.
 
+### Requirement: shell routes drafted and discarded changes through read-only ports
+
+When the open change name appears in the **Drafts** or **Discarded** sidebar collection (and not archived), the shell MUST set `listSection` to `draft` or `discarded` and MUST pass it to [`ui:hooks-changes-read`](../hooks-changes-read/spec.md) (`useChangesRead`, `useChangeArtifact`, and artifact list hooks). The shell MUST NOT call `getChange` or `getChangeStatus` for that name while it is shelved or discarded. Shelved read-only MUST mirror archived UX boundaries: banner in the center column, no Save/Validate in the inspector, Monaco `readOnly`, Overview editors disabled — without altering the existing archived snapshot flow (`getArchivedChange`, archived banner, archived artifact list).
+
+### Requirement: read-only change tabs load once (no per-change polling)
+
+Global sidebar polling continues to refresh the lists, but the open drafted/discarded/archived change views are static. The shell MUST NOT schedule per-change polling (status, artifacts, tab refresh keys) for these read-only sections. Drafted changes MAY load workflow status once on open, but MUST NOT poll while kept open.
+
 ### Requirement: validate requires drift confirmation
 
 **Validate** and **Validate All** MUST show [`ui:validate-confirm-dialog`](../validate-confirm-dialog/spec.md) before calling `validateChange`. Scoped validate MUST pass `specId` and `artifactId` derived from the open change artifact; **Validate All** MUST validate each spec in `change.specIds` and MUST be offered from the change **Artifacts** tab (not the global top bar). Change tabs that require live change APIs (Tasks, Impact, Context) MUST show read-only messaging for archived context. Workflow and validation status from `getChangeStatus` MUST appear on the Overview tab only (not a separate Validation tab).

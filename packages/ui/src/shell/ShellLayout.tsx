@@ -16,6 +16,7 @@ import {
   type LifecycleConfirmKind,
 } from '../change/ChangeLifecycleConfirmDialog.js'
 import { ChangeMainView } from '../change/ChangeMainView.js'
+import { isShelvedReadOnlySection } from '../change/change-list-section.js'
 import { flattenWorkspaceSpecIds } from '../change/flatten-spec-ids.js'
 import { SpecMainView } from '../spec/SpecMainView.js'
 import { useSpecdDataPort } from '../context/specd-data-context.js'
@@ -167,14 +168,17 @@ export function ShellLayout({
     () => flattenWorkspaceSpecIds(workspaceSpecs.data ?? []),
     [workspaceSpecs.data],
   )
-  const pollChangeDetail =
-    !isArchivedChange &&
-    centerCtx.kind === 'change' &&
-    (changeView === 'Overview' || changeView === 'Events')
+  const isOpenActiveChange =
+    !isArchivedChange && centerCtx.kind === 'change' && changeListSection === 'active'
+  const pollChangeDetail = isOpenActiveChange && (changeView === 'Overview' || changeView === 'Events')
   const detailPollKey = useTabScopedPollKey(pollChangeDetail, refreshKey)
+  const workflowStatusUnavailable =
+    isArchivedChange || changeListSection === 'discarded'
   const changeRead = useChangesRead(isArchivedChange ? undefined : changeName, {
-    refreshKey,
+    refreshKey: isOpenActiveChange ? refreshKey : undefined,
     detailRefreshKey: pollChangeDetail ? detailPollKey : undefined,
+    listSection: changeListSection,
+    pollStatus: !workflowStatusUnavailable,
   })
   const archivedRead = useArchivedChange(isArchivedChange ? changeName : undefined)
   const graphStatus = useGraphStatus(refreshKey)
@@ -187,6 +191,7 @@ export function ShellLayout({
     isArchivedChange ? undefined : changeArtifactName,
     isArchivedChange ? undefined : changeArtifactFile,
     refreshKey,
+    { listSection: changeListSection, poll: isOpenActiveChange },
   )
 
   const specArtifactFilename =
@@ -245,18 +250,21 @@ export function ShellLayout({
     setEditorBuffer(artifactContent)
   }, [artifactSelectionKey, artifactContent, artifactLoading])
 
-  const isChangeArtifact = selectedArtifact?.kind === 'change' && !isArchivedChange
+  const isShelvedReadOnly = isShelvedReadOnlySection(changeListSection)
+  const isOpenChangeArtifact =
+    selectedArtifact?.kind === 'change' && !isArchivedChange
+  const canEditChangeArtifact = isOpenChangeArtifact && !isShelvedReadOnly
   const artifactFilename = selectedArtifact?.filename
   const usesMergedPreview = Boolean(
-    isChangeArtifact && artifactFilename && usesSpecPreview(artifactFilename),
+    isOpenChangeArtifact && artifactFilename && usesSpecPreview(artifactFilename),
   )
 
   const isDirty = React.useMemo(() => {
-    if (!isChangeArtifact || artifactContent === undefined || editorBuffer === undefined) {
+    if (!canEditChangeArtifact || artifactContent === undefined || editorBuffer === undefined) {
       return false
     }
     return editorBuffer !== artifactContent
-  }, [isChangeArtifact, artifactContent, editorBuffer])
+  }, [canEditChangeArtifact, artifactContent, editorBuffer])
 
   const previewOverrides = React.useMemo(() => {
     if (!isDirty || !artifactFilename || editorBuffer === undefined) {
@@ -519,9 +527,20 @@ export function ShellLayout({
         })
         return
       }
+      if (isShelvedReadOnly) {
+        void appendOutput({
+          message: 'Drafted and discarded changes are read-only; validation is disabled.',
+          level: 'error',
+          action: 'validate',
+        }).then(() => {
+          refetchStudioOutput()
+          setBottomTab('Problems')
+        })
+        return
+      }
       setValidatePrompt(scope)
     },
-    [changeName, changes.active, isArchivedChange, appendOutput, refetchStudioOutput],
+    [changeName, changes.active, isArchivedChange, isShelvedReadOnly, appendOutput, refetchStudioOutput],
   )
 
   const paletteActions = React.useMemo(
@@ -572,7 +591,10 @@ export function ShellLayout({
     > = {
       draft: { run: () => port.draftChange(changeName), outputAction: 'draft-change' },
       restore: { run: () => port.restoreChange(changeName), outputAction: 'restore-change' },
-      discard: { run: () => port.discardChange(changeName), outputAction: 'discard-change' },
+      discard: {
+        run: () => port.discardChange(changeName),
+        outputAction: 'discard-change',
+      },
       archive: { run: () => port.archiveChange(changeName), outputAction: 'archive-change' },
     }
 
@@ -591,7 +613,7 @@ export function ShellLayout({
         setLifecycleBusy(false)
       }
     })()
-  }, [changeName, lifecycleConfirm, port, pushOutput, refetchOpenChange])
+  }, [changeListSection, changeName, lifecycleConfirm, port, pushOutput, refetchOpenChange])
 
   const handleShelfToDrafts = React.useCallback(() => {
     if (!changeName) return
@@ -695,9 +717,13 @@ export function ShellLayout({
                       detail={activeDetail.data}
                       detailError={activeDetail.error}
                       detailLoading={detailLoading}
-                      status={isArchivedChange ? undefined : changeRead.status.data}
-                      statusError={isArchivedChange ? undefined : changeRead.status.error}
-                      statusLoading={isArchivedChange ? false : changeRead.status.isLoading}
+                      status={workflowStatusUnavailable ? undefined : changeRead.status.data}
+                      statusError={
+                        workflowStatusUnavailable ? undefined : changeRead.status.error
+                      }
+                      statusLoading={
+                        workflowStatusUnavailable ? false : changeRead.status.isLoading
+                      }
                       refreshKey={refreshKey}
                       onSelectArtifact={handleSelectChangeArtifact}
                       selectedArtifactFile={
@@ -706,7 +732,9 @@ export function ShellLayout({
                           : undefined
                       }
                       onValidateAll={
-                        isArchivedChange ? undefined : () => requestValidate('all')
+                        isArchivedChange || isShelvedReadOnly
+                          ? undefined
+                          : () => requestValidate('all')
                       }
                       specSuggestions={workspaceSpecIdSuggestions}
                       onDescriptionSaved={(detail) => {
@@ -818,9 +846,11 @@ export function ShellLayout({
                                 onClick={() => !disabled && setInspectorMode(mode)}
                               >
                                 {mode === 'raw'
-                                  ? isChangeArtifact
+                                  ? canEditChangeArtifact
                                     ? 'Edit'
-                                    : 'Raw'
+                                    : isOpenChangeArtifact
+                                      ? 'View'
+                                      : 'Raw'
                                   : mode === 'preview'
                                     ? 'Preview'
                                     : mode === 'diff'
@@ -833,7 +863,7 @@ export function ShellLayout({
                           })}
 
                         {/* Save + Validate — only for change artifacts */}
-                        {isChangeArtifact ? (
+                        {canEditChangeArtifact ? (
                           <div className="ml-auto flex items-center gap-[5px]">
                             {isDirty ? (
                               <span title="Unsaved changes">
@@ -971,8 +1001,8 @@ export function ShellLayout({
                             key={artifactSelectionKey}
                             filename={selectedArtifact?.filename}
                             value={editorBuffer ?? ''}
-                            readOnly={!isChangeArtifact}
-                            onChange={isChangeArtifact ? setEditorBuffer : undefined}
+                            readOnly={!canEditChangeArtifact}
+                            onChange={canEditChangeArtifact ? setEditorBuffer : undefined}
                           />
                         )}
                       </div>

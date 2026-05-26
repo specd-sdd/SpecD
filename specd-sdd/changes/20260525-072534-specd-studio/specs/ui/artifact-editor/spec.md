@@ -6,9 +6,9 @@ Human review happens in Monaco: open a tracked artifact, edit, Save with optimis
 
 ## Requirements
 
-### Requirement: editor loads artifact via getChangeArtifact
+### Requirement: editor loads artifact via section-aware read hook
 
-Opening a file MUST fetch `{ content, originalHash }` through hooks and bind both to Monaco state.
+Opening a tracked change artifact MUST fetch `{ content, originalHash }` through `useChangeArtifact` (or equivalent), which MUST call `getChangeArtifact` for **active** changes, `getDraftArtifact` for **drafted**, and `getDiscardedArtifact` for **discarded**, matching the shell `listSection`. Content MUST bind to Monaco state.
 
 ### Requirement: save button uses inspector save hook
 

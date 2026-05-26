@@ -24,6 +24,12 @@
 - **THEN** UI does not call `getImplementationReview` or `getChangeGraphView`
 - **AND** shows read-only archived messaging
 
+#### Scenario: Drafted change hides Impact tab
+
+- **GIVEN** drafted change open in the shell
+- **WHEN** user inspects change tabs
+- **THEN** Impact is not shown as a selectable tab
+
 ### Requirement: impact is grouped by spec
 
 #### Scenario: One card per spec with accepted links inside

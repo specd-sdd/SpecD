@@ -101,6 +101,22 @@ class StubChangeRepository extends ChangeRepository {
     return toDiscardedChangeView(cloned)
   }
 
+  override async getDraftChange(name: string): Promise<Change | null> {
+    const change = this.store.get(name)
+    if (change === undefined) return null
+    const cloned = cloneChange(change)
+    if (!cloned.isDrafted || isDiscardedStub(cloned)) return null
+    return cloned
+  }
+
+  override async getDiscardedChange(name: string): Promise<Change | null> {
+    const change = this.store.get(name)
+    if (change === undefined) return null
+    const cloned = cloneChange(change)
+    if (!isDiscardedStub(cloned)) return null
+    return cloned
+  }
+
   override async list(): Promise<Change[]> {
     return [...this.store.values()]
       .map((change) => cloneChange(change))

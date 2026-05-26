@@ -1,4 +1,4 @@
-import { ChangeNotFoundError } from '@specd/core'
+import { ChangeNotFoundError, type Change, type ChangeRepository } from '@specd/core'
 import { buildCompileContextConfig } from '../compile-config.js'
 import {
   formatCompiledContextMarkdown,
@@ -11,16 +11,51 @@ import {
   toChangeDetailDto,
   toChangeStatusDto,
 } from '../presenters/presenter-change.js'
-import {
-  toArtifactContentDto,
-} from '../presenters/presenter-artifact.js'
+import { toArtifactContentDto } from '../presenters/presenter-artifact.js'
 import { toImplementationReviewDto } from '../presenters/presenter-change.js'
+
+async function loadReadOnlyAggregate(
+  repo: ChangeRepository,
+  kind: 'draft' | 'discarded',
+  name: string,
+): Promise<Change> {
+  const change =
+    kind === 'draft' ? await repo.getDraftChange(name) : await repo.getDiscardedChange(name)
+  if (change === null) {
+    throw new ChangeNotFoundError(name)
+  }
+  return change
+}
 
 /**
  * Registers read routes for a single change under `/v1`.
  * @param app
  */
 export function registerChangesReadRoutes(app: FastifyInstance): void {
+  app.get(
+    '/drafts/:name',
+    apiHandler(async (ctx, req) => {
+      const { name } = req.params as { name: string }
+      const view = await ctx.kernel.changes.repo.getDraft(name)
+      if (view === null) {
+        throw new ChangeNotFoundError(name)
+      }
+      return toChangeDetailDto(view)
+    }),
+  )
+
+  app.get(
+    '/discarded/:name',
+    apiHandler(async (ctx, req) => {
+      const { name } = req.params as { name: string }
+      const view = await ctx.kernel.changes.repo.getDiscarded(name)
+      if (view === null) {
+        throw new ChangeNotFoundError(name)
+      }
+      return toChangeDetailDto(view)
+    }),
+  )
+
   app.get(
     '/changes/:name',
     apiHandler(async (ctx, req) => {
@@ -30,6 +65,32 @@ export function registerChangesReadRoutes(app: FastifyInstance): void {
         throw new ChangeNotFoundError(name)
       }
       return toChangeDetailDto(change)
+    }),
+  )
+
+  app.get(
+    '/drafts/:name/status',
+    apiHandler(async (ctx, req) => {
+      const { name } = req.params as { name: string }
+      const query = req.query as { ifModifiedSince?: string }
+      const result = await ctx.kernel.changes.status.execute({
+        name,
+        ...(query.ifModifiedSince !== undefined ? { ifModifiedSince: query.ifModifiedSince } : {}),
+      })
+      return toChangeStatusDto(result)
+    }),
+  )
+
+  app.get(
+    '/discarded/:name/status',
+    apiHandler(async (ctx, req) => {
+      const { name } = req.params as { name: string }
+      const query = req.query as { ifModifiedSince?: string }
+      const result = await ctx.kernel.changes.status.execute({
+        name,
+        ...(query.ifModifiedSince !== undefined ? { ifModifiedSince: query.ifModifiedSince } : {}),
+      })
+      return toChangeStatusDto(result)
     }),
   )
 
@@ -46,11 +107,27 @@ export function registerChangesReadRoutes(app: FastifyInstance): void {
       }
       const result = await ctx.kernel.changes.status.execute({
         name,
-        ...(query.ifModifiedSince !== undefined
-          ? { ifModifiedSince: query.ifModifiedSince }
-          : {}),
+        ...(query.ifModifiedSince !== undefined ? { ifModifiedSince: query.ifModifiedSince } : {}),
       })
       return toChangeStatusDto(result)
+    }),
+  )
+
+  app.get(
+    '/drafts/:name/artifacts',
+    apiHandler(async (ctx, req) => {
+      const { name } = req.params as { name: string }
+      const change = await loadReadOnlyAggregate(ctx.kernel.changes.repo, 'draft', name)
+      return toArtifactListDto(change)
+    }),
+  )
+
+  app.get(
+    '/discarded/:name/artifacts',
+    apiHandler(async (ctx, req) => {
+      const { name } = req.params as { name: string }
+      const change = await loadReadOnlyAggregate(ctx.kernel.changes.repo, 'discarded', name)
+      return toArtifactListDto(change)
     }),
   )
 
@@ -63,6 +140,38 @@ export function registerChangesReadRoutes(app: FastifyInstance): void {
         throw new ChangeNotFoundError(name)
       }
       return toArtifactListDto(change)
+    }),
+  )
+
+  app.get(
+    '/drafts/:name/artifacts/:filename',
+    apiHandler(async (ctx, req) => {
+      const { name, filename } = req.params as { name: string; filename: string }
+      const change = await loadReadOnlyAggregate(ctx.kernel.changes.repo, 'draft', name)
+      const artifact = await ctx.kernel.changes.repo.artifact(change, filename)
+      if (artifact === null) {
+        throw new ChangeNotFoundError(name)
+      }
+      return toArtifactContentDto({
+        content: artifact.content,
+        originalHash: artifact.originalHash ?? '',
+      })
+    }),
+  )
+
+  app.get(
+    '/discarded/:name/artifacts/:filename',
+    apiHandler(async (ctx, req) => {
+      const { name, filename } = req.params as { name: string; filename: string }
+      const change = await loadReadOnlyAggregate(ctx.kernel.changes.repo, 'discarded', name)
+      const artifact = await ctx.kernel.changes.repo.artifact(change, filename)
+      if (artifact === null) {
+        throw new ChangeNotFoundError(name)
+      }
+      return toArtifactContentDto({
+        content: artifact.content,
+        originalHash: artifact.originalHash ?? '',
+      })
     }),
   )
 

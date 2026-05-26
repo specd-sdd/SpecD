@@ -69,6 +69,26 @@ export abstract class ChangeRepository extends Repository {
   abstract getDiscarded(name: string): Promise<DiscardedChangeView | null>
 
   /**
+   * Loads a drafted change as a {@link Change} for read-only artifact I/O.
+   *
+   * Does not acquire mutation locks or persist.
+   *
+   * @param name - The change name to look up under `drafts/`
+   * @returns The change entity, or `null` if not found
+   */
+  abstract getDraftChange(name: string): Promise<Change | null>
+
+  /**
+   * Loads a discarded change as a {@link Change} for read-only artifact I/O.
+   *
+   * Does not acquire mutation locks or persist.
+   *
+   * @param name - The change name to look up under `discarded/`
+   * @returns The change entity, or `null` if not found
+   */
+  abstract getDiscardedChange(name: string): Promise<Change | null>
+
+  /**
    * Runs a serialized persisted mutation for one existing change.
    *
    * The repository acquires exclusive mutation access for `name`, reloads the

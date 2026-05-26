@@ -23,16 +23,42 @@ export interface ChangeArtifactListItemDto {
 export interface PortChangesRead {
   getChange(name: string, signal?: AbortSignal): Promise<ChangeDetailDto>
   getChangeStatus(name: string, options?: GetChangeStatusOptions): Promise<ChangeStatusDto>
-  listChangeArtifacts(name: string, signal?: AbortSignal): Promise<readonly ChangeArtifactListItemDto[]>
+  listChangeArtifacts(
+    name: string,
+    signal?: AbortSignal,
+  ): Promise<readonly ChangeArtifactListItemDto[]>
   getChangeArtifact(
     name: string,
     filename: string,
     signal?: AbortSignal,
   ): Promise<ArtifactContentDto>
-  getChangeContext(
+
+  /** Drafted change read-only operations (must NOT call active `/changes/*` routes). */
+  getDraft(name: string, signal?: AbortSignal): Promise<ChangeDetailDto>
+  getDraftStatus(name: string, options?: GetChangeStatusOptions): Promise<ChangeStatusDto>
+  listDraftArtifacts(
     name: string,
-    query?: ChangeContextQuery,
-  ): Promise<CompiledContextDto>
+    signal?: AbortSignal,
+  ): Promise<readonly ChangeArtifactListItemDto[]>
+  getDraftArtifact(
+    name: string,
+    filename: string,
+    signal?: AbortSignal,
+  ): Promise<ArtifactContentDto>
+
+  /** Discarded change read-only operations (must NOT call active `/changes/*` routes). */
+  getDiscarded(name: string, signal?: AbortSignal): Promise<ChangeDetailDto>
+  getDiscardedStatus(name: string, options?: GetChangeStatusOptions): Promise<ChangeStatusDto>
+  listDiscardedArtifacts(
+    name: string,
+    signal?: AbortSignal,
+  ): Promise<readonly ChangeArtifactListItemDto[]>
+  getDiscardedArtifact(
+    name: string,
+    filename: string,
+    signal?: AbortSignal,
+  ): Promise<ArtifactContentDto>
+  getChangeContext(name: string, query?: ChangeContextQuery): Promise<CompiledContextDto>
   previewChange(name: string, query: PreviewChangeQuery): Promise<PreviewResultDto>
   previewChangeDraft(name: string, input: PreviewChangeDraftInput): Promise<PreviewResultDto>
   outlineChangeArtifact(

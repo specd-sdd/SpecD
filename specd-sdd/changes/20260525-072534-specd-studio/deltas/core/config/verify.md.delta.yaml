@@ -29,3 +29,21 @@
     - **WHEN** startup validation runs before listen
     - **THEN** validation fails with an error naming supported v1 types
     - **AND** HTTP server does not start
+
+- op: added
+  description: Scenarios for plugins.ui configuration
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: API authentication settings'
+  content: |
+    ### Requirement: UI plugins
+
+    #### Scenario: Omitted plugins.ui disables ui serve plugin selection
+
+    - **GIVEN** `specd.yaml` has no `plugins.ui`
+    - **WHEN** `specd ui serve` resolves the active UI plugin
+    - **THEN** it fails with `UI_PLUGIN_NOT_CONFIGURED`

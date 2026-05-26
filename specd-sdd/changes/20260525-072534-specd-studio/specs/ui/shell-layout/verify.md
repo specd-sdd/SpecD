@@ -122,6 +122,38 @@
 - **WHEN** global poll ticks
 - **THEN** shell does not call `getChange` or `getChangeStatus` for that name
 
+### Requirement: read-only change tabs load once (no per-change polling)
+
+#### Scenario: Drafted change does not poll status or artifacts
+
+- **GIVEN** drafted change open in the shell
+- **WHEN** global poll ticks
+- **THEN** shell does not call `getDraftStatus` repeatedly
+- **AND** change artifact list does not refetch on every tick
+
+### Requirement: shell routes drafted and discarded changes through read-only ports
+
+#### Scenario: Draft sidebar selection uses getDraft
+
+- **GIVEN** change `dummy-draft` is listed under Drafts only
+- **WHEN** user opens it from the sidebar
+- **THEN** shell passes `listSection` `draft` to `useChangesRead`
+- **AND** overview loads without `Change 'dummy-draft' not found`
+
+#### Scenario: Discarded sidebar selection uses getDiscarded
+
+- **GIVEN** change is listed under Discarded only
+- **WHEN** user opens it from the sidebar
+- **THEN** shell passes `listSection` `discarded`
+- **AND** does not call `getChange` for that name
+
+#### Scenario: Active change keeps getChange
+
+- **GIVEN** change is in the In progress list
+- **WHEN** user opens it
+- **THEN** shell passes `listSection` `active` or null
+- **AND** `useChangesRead` calls `getChange`
+
 ### Requirement: validate requires drift confirmation
 
 #### Scenario: validate requires drift confirmation — primary path

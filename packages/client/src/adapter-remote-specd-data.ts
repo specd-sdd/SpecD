@@ -142,6 +142,14 @@ export class RemoteSpecdDataAdapter implements SpecdDataPort {
     return this._transport.request({ method: 'GET', path: `/changes/${enc(name)}`, signal })
   }
 
+  getDraft(name: string, signal?: AbortSignal): Promise<ChangeDetailDto> {
+    return this._transport.request({ method: 'GET', path: `/drafts/${enc(name)}`, signal })
+  }
+
+  getDiscarded(name: string, signal?: AbortSignal): Promise<ChangeDetailDto> {
+    return this._transport.request({ method: 'GET', path: `/discarded/${enc(name)}`, signal })
+  }
+
   getChangeStatus(name: string, options?: GetChangeStatusOptions): Promise<ChangeStatusDto> {
     return this._transport.request({
       method: 'GET',
@@ -150,6 +158,24 @@ export class RemoteSpecdDataAdapter implements SpecdDataPort {
         ifModifiedSince: options?.ifModifiedSince,
         refreshImplementation: options?.refreshImplementation,
       },
+      signal: options?.signal,
+    })
+  }
+
+  getDraftStatus(name: string, options?: GetChangeStatusOptions): Promise<ChangeStatusDto> {
+    return this._transport.request({
+      method: 'GET',
+      path: `/drafts/${enc(name)}/status`,
+      query: { ifModifiedSince: options?.ifModifiedSince },
+      signal: options?.signal,
+    })
+  }
+
+  getDiscardedStatus(name: string, options?: GetChangeStatusOptions): Promise<ChangeStatusDto> {
+    return this._transport.request({
+      method: 'GET',
+      path: `/discarded/${enc(name)}/status`,
+      query: { ifModifiedSince: options?.ifModifiedSince },
       signal: options?.signal,
     })
   }
@@ -165,6 +191,28 @@ export class RemoteSpecdDataAdapter implements SpecdDataPort {
     })
   }
 
+  listDraftArtifacts(
+    name: string,
+    signal?: AbortSignal,
+  ): Promise<readonly ChangeArtifactListItemDto[]> {
+    return this._transport.request({
+      method: 'GET',
+      path: `/drafts/${enc(name)}/artifacts`,
+      signal,
+    })
+  }
+
+  listDiscardedArtifacts(
+    name: string,
+    signal?: AbortSignal,
+  ): Promise<readonly ChangeArtifactListItemDto[]> {
+    return this._transport.request({
+      method: 'GET',
+      path: `/discarded/${enc(name)}/artifacts`,
+      signal,
+    })
+  }
+
   getChangeArtifact(
     name: string,
     filename: string,
@@ -173,6 +221,30 @@ export class RemoteSpecdDataAdapter implements SpecdDataPort {
     return this._transport.request({
       method: 'GET',
       path: `/changes/${enc(name)}/artifacts/${enc(filename)}`,
+      signal,
+    })
+  }
+
+  getDraftArtifact(
+    name: string,
+    filename: string,
+    signal?: AbortSignal,
+  ): Promise<ArtifactContentDto> {
+    return this._transport.request({
+      method: 'GET',
+      path: `/drafts/${enc(name)}/artifacts/${enc(filename)}`,
+      signal,
+    })
+  }
+
+  getDiscardedArtifact(
+    name: string,
+    filename: string,
+    signal?: AbortSignal,
+  ): Promise<ArtifactContentDto> {
+    return this._transport.request({
+      method: 'GET',
+      path: `/discarded/${enc(name)}/artifacts/${enc(filename)}`,
       signal,
     })
   }

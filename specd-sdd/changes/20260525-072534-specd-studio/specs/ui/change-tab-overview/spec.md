@@ -20,7 +20,9 @@ While requests are in flight or fail, the UI MUST show loading indicators and hu
 
 ### Requirement: overview includes workflow and validation status
 
-Overview MUST embed `getChangeStatus` results for the open change: next action, blockers, and lifecycle transitions. Overview MUST NOT duplicate the Artifacts tab (no per-artifact file list on Overview).
+Overview MUST embed `getChangeStatus` results for the open **active** or **drafted** change: next action, blockers, and lifecycle transitions. Overview MUST NOT duplicate the Artifacts tab (no per-artifact file list on Overview).
+
+For **archived** and **discarded** changes, the shell MUST NOT poll workflow status. The **Workflow & validation** card MUST show the embedded message **Workflow status unavailable.** (same copy as archived), not an API error from `getChangeStatus`.
 
 ### Requirement: overview hosts change metadata editor
 
@@ -30,7 +32,8 @@ Overview MUST delegate description, invalidation policy, read-only specs/deps, a
 
 The Overview header MUST render a `ChangeLifecycleActions` block immediately below the change title. The block's content depends on which sidebar list the open change belongs to:
 
-- **active** — shows **Shelf to drafts**, **Discard** (destructive), and **Archive** (only when state is `archivable` or `signed-off`).
+- **active** — shows **Shelf to drafts**, **Discard** (destructive), and **Archive** (only when state is `archivable` or `signed-off`). Overview editors (description, scope, invalidation) are enabled.
+- **draft** / **discarded** — shelved read-only: same banner pattern as archived (distinct copy), no Overview editors, no Validate All, inspector Monaco read-only without Save/Validate, lifecycle actions only where applicable (restore/discard on draft; none on discarded).
 - **draft** — shows **Restore to active** and **Discard** (destructive).
 - **discarded** — shows a read-only notice ("permanently discarded, cannot be restored").
 - **archived** or `null` — no lifecycle block is rendered.

@@ -15,6 +15,8 @@ While this change tab is visible for an **active** change, the view MUST load:
 
 Both MUST refresh on tab-scoped poll ticks. Polling MUST pause when the tab is hidden or the window lacks focus. Archived changes MUST NOT call these endpoints (read-only messaging only).
 
+For **drafted**, **discarded**, and **archived** changes, implementation impact is not available in Studio v1. The Impact tab MUST be hidden (not selectable) for these sections.
+
 ### Requirement: impact is grouped by spec
 
 The UI MUST render one card per spec ID (union of change `specIds`, manifest links, and graph coverage), ordered per [`ui:design-system`](../design-system/spec.md). Within each card, subsections appear in order:

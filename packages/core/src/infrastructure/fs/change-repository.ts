@@ -276,6 +276,24 @@ export class FsChangeRepository extends ChangeRepository {
     return toDiscardedChangeView(change)
   }
 
+  /** @inheritdoc */
+  override async getDraftChange(name: string): Promise<Change | null> {
+    const dir = await this._resolveDraftDir(name)
+    if (dir === null) return null
+
+    const manifest = await this._loadManifest(dir)
+    return this._manifestToChange(manifest, dir)
+  }
+
+  /** @inheritdoc */
+  override async getDiscardedChange(name: string): Promise<Change | null> {
+    const dir = await this._resolveDiscardedDir(name)
+    if (dir === null) return null
+
+    const manifest = await this._loadManifest(dir)
+    return this._manifestToChange(manifest, dir)
+  }
+
   /**
    * Runs a serialized persisted mutation for one existing drafted change.
    *

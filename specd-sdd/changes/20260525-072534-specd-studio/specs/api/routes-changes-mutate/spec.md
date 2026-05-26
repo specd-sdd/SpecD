@@ -16,6 +16,16 @@ Authoritative HTTP contract (methods, paths, query, bodies, status codes) for **
 
 `POST .../validate-all` MUST accept optional `{ artifactId }` and MUST NOT loop `specIds` in the handler.
 
+### Requirement: draft and restore mutations use change lifecycle actions
+
+Drafted and discarded changes are read-only storage classes, but lifecycle mutations continue to be addressed by change name through the active mutation surface:
+
+- **Draft active change**: `POST /changes/{name}/draft` shelves an active change to drafts.
+- **Restore drafted change**: `POST /changes/{name}/restore` restores a drafted change back to the active list.
+- **Discard active or drafted change**: `POST /changes/{name}/discard` permanently discards a change (whether currently active or drafted).
+
+There is no restore from discarded; there MUST NOT be `POST /discarded/{name}/restore`.
+
 ### Requirement: PATCH routes edit metadata spec deps and implementation tracking
 
 `PATCH /changes/{name}` MUST support safe `description` updates and approval-invalidating `addSpecIds`/`removeSpecIds` plus `invalidationPolicy`. Response MUST be full `ChangeDetailDto` via `toChangeDetailDto`.

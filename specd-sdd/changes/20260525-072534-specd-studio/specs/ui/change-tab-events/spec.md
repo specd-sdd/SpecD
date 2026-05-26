@@ -8,7 +8,7 @@ Studio UI for **Change Tab Events**: lifecycle history from `ChangeDetailDto.his
 
 ### Requirement: events tab renders change detail history
 
-The Events tab MUST render `history[]` from the loaded `ChangeDetailDto` passed by the shell. It MUST NOT call artifact or graph endpoints. For **active** changes, while Events (or Overview) is visible, the shell MUST refetch detail via `getChange` when the global change poll tick advances (`useChangesRead` with `detailRefreshKey`). For **archived** changes, history MUST come from the archived snapshot (`getArchivedChange`) without live polling.
+The Events tab MUST render `history[]` from the loaded `ChangeDetailDto` passed by the shell. It MUST NOT call artifact or graph endpoints. For **active** changes, while Events (or Overview) is visible, the shell MUST refetch detail via `getChange` when the global change poll tick advances (`useChangesRead` with `detailRefreshKey`). For **drafted** and **discarded** changes, the shell MUST refetch via `getDraft` / `getDiscarded` through the same hook with the correct `listSection`. For **archived** changes, history MUST come from the archived snapshot (`getArchivedChange`) without live polling.
 
 ### Requirement: history list is newest first
 

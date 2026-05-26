@@ -2,13 +2,20 @@
 
 ## Requirements
 
-### Requirement: editor loads artifact via getChangeArtifact
+### Requirement: editor loads artifact via section-aware read hook
 
 #### Scenario: Open file fetches content and hash
 
-- **WHEN** user opens `proposal.md` in editor
+- **WHEN** user opens `proposal.md` on an active change
 - **THEN** `getChangeArtifact` populates Monaco
 - **AND** `originalHash` is stored for save
+
+#### Scenario: Drafted change artifact uses getDraftArtifact
+
+- **GIVEN** drafted change with `listSection` `draft`
+- **WHEN** user opens an artifact in the inspector
+- **THEN** `getDraftArtifact` populates Monaco
+- **AND** `getChangeArtifact` is not called
 
 #### Scenario: Save button disabled while in flight
 

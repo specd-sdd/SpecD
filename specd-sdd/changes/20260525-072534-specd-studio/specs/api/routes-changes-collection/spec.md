@@ -10,6 +10,10 @@ Authoritative HTTP contract (methods, paths, query, bodies, status codes) for **
 
 The API MUST expose `GET /changes`, `/drafts`, `/discarded`, `/archived-changes`, and `/changes/overlaps` mapping to the corresponding kernel list and overlap operations.
 
+### Requirement: drafts and discarded are read-only collections
+
+`GET /drafts` and `GET /discarded` MUST return read-only summaries backed by drafted/discarded views. These collections exist for navigation and inspection only; lifecycle mutation entry points for drafts live under `/drafts/{name}/*` and MUST NOT be mixed into `/changes/{name}/*`.
+
 ### Requirement: POST changes creates a new change
 
 `POST /changes` MUST accept a `CreateChange` input body and return the created change summary.

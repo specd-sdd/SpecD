@@ -42,3 +42,11 @@
 - **WHEN** health check runs
 - **THEN** connect panel shows error
 - **AND** process does not throw kernel init error
+
+### Requirement: Vite receives API base from ui serve
+
+#### Scenario: dev server uses injected API base URL
+
+- **GIVEN** studio-web is launched via `specd ui serve`
+- **WHEN** the app boots in the browser
+- **THEN** the connect default API URL matches the server-provided base

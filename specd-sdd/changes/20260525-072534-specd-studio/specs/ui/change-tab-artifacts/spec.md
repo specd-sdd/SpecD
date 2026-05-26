@@ -8,7 +8,7 @@ Studio UI for **Change Tab Artifacts**: user-visible layout and actions driven e
 
 ### Requirement: change tab refetches status (artifact DAG) when updatedAt advances
 
-While the Artifacts tab is visible for an **active** change, the view MUST load the artifact list via `listChangeArtifacts(name)` (not only `getChangeStatus` short-circuit) and MUST group the accordion in two top-level **scope** sections, in order: **Change**, then **Spec**.
+While the Artifacts tab is visible for an **active** change, the view MUST load the artifact list via `listChangeArtifacts(name)` (not only `getChangeStatus` short-circuit). For a **drafted** change it MUST use `listDraftArtifacts(name)`; for **discarded** it MUST use `listDiscardedArtifacts(name)`. The accordion MUST group in two top-level **scope** sections, in order: **Change**, then **Spec**.
 
 **Change scope:** files whose paths are not under `specs/` or `deltas/` (e.g. `proposal.md`, `design.md`, `tasks.md`). Within Change, group by artifact type (`proposal`, `design`, `tasks`, …). Each artifact type appears **once**, ordered by the schema artifact DAG topological order (`proposal` → `specs` → `verify` → `design` → `tasks`, change-scoped types only). Files within a type sort ascending by full path.
 

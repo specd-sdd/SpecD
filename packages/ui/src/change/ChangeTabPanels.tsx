@@ -6,7 +6,9 @@ import type {
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import * as React from 'react'
 import { cn } from '../lib/cn.js'
+import type { ChangeListSection } from './change-list-section.js'
 import { useChangeArtifact } from '../hooks/use-change-artifact.js'
+import { formatChangeArtifactError } from '../lib/change-read-routes.js'
 import { useChangeContext } from '../hooks/use-change-context.js'
 import { useChangeGraphView } from '../hooks/use-change-graph-view.js'
 import { useImplementationReview } from '../hooks/use-implementation-review.js'
@@ -116,21 +118,30 @@ function ChangeHistoryEventRow({
 
 export function ChangeTasksTab({
   changeName,
+  listSection = null,
   status,
   refreshKey,
   tabActive,
 }: {
   changeName: string
+  listSection?: ChangeListSection | null
   status: ChangeStatusDto | undefined
   refreshKey: number
   tabActive: boolean
 }): React.ReactElement {
   const pollKey = useTabScopedPollKey(tabActive, refreshKey)
+  const tasksEntry = status?.artifacts?.find((a) => a.type === 'tasks')
+  const tasksFileReady =
+    tasksEntry !== undefined &&
+    tasksEntry.state !== 'missing' &&
+    tasksEntry.displayStatus !== 'missing' &&
+    tasksEntry.files.some((f) => f.state !== 'missing')
+
   const tasksArtifact = useChangeArtifact(changeName, 'tasks.md', pollKey, {
     poll: tabActive,
+    listSection,
+    enabled: tasksFileReady,
   })
-
-  const tasksEntry = status?.artifacts?.find((a) => a.type === 'tasks')
 
   return (
     <div className="min-h-0 flex-1 overflow-auto p-4 text-xs">
@@ -157,8 +168,15 @@ export function ChangeTasksTab({
 
       {tasksArtifact.isLoading && !tasksArtifact.data ? (
         <div className="text-muted-foreground">Loading tasks.md…</div>
+      ) : !tasksFileReady ? (
+        <p className="text-muted-foreground">No tasks.md for this change yet.</p>
       ) : tasksArtifact.error ? (
-        <div className="text-destructive">{tasksArtifact.error.message}</div>
+        <div className="text-destructive">
+          {formatChangeArtifactError(tasksArtifact.error, {
+            changeName,
+            filename: 'tasks.md',
+          })}
+        </div>
       ) : tasksArtifact.data?.content ? (
         <pre className="studio-card overflow-auto whitespace-pre-wrap p-3 font-mono text-xs text-foreground/90">
           {tasksArtifact.data.content}

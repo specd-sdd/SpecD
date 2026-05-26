@@ -15,6 +15,15 @@ The interface MUST declare asynchronous methods equivalent to the HTTP routes in
 - `getChangeContext(name, query)`, `previewChange(name, query)`, `previewChangeDraft(name, input)`, `outlineChangeArtifact(name, filename, input?)`, instructions helpers
 - `getImplementationReview(name)` → [`client:dto-implementation-review`](dto-implementation-review/spec.md) (`implementationTracking.links`, `implementationTracking.trackedFiles`, `specIds`)
 
+Drafted and discarded changes are read-only and MUST use dedicated read entry points:
+
+- `getDraft(name)`, `getDraftStatus(name, { ifModifiedSince? })`
+- `listDraftArtifacts(name)`, `getDraftArtifact(name, filename)`
+- `getDiscarded(name)`, `getDiscardedStatus(name, { ifModifiedSince? })`
+- `listDiscardedArtifacts(name)`, `getDiscardedArtifact(name, filename)`
+
+These methods map to the `/drafts/{name}/*` and `/discarded/{name}/*` routes and MUST NOT call active `/changes/{name}/*` routes.
+
 ### Requirement: port signatures are identical for HTTP and IPC adapters
 
 Implementations (`adapter-remote-specd-data`, desktop IPC) MUST implement these methods without altering parameter or return types.

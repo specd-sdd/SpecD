@@ -12,9 +12,9 @@ For **active** changes, Overview MUST compose:
 
 - [`ui:change-description-editor`](../change-description-editor/spec.md)
 - [`ui:change-invalidation-policy-editor`](../change-invalidation-policy-editor/spec.md)
-- [`ui:change-specs-readonly-panel`](../change-specs-readonly-panel/spec.md) with **Edit spec scope…** opening [`ui:change-scope-dialog`](../change-scope-dialog/spec.md)
+- [`ui:change-specs-readonly-panel`](../change-specs-readonly-panel/spec.md) inside the **Specs & dependencies** card with helper copy **Read-only on Overview — use the dialog to edit scope safely.** and **Edit spec scope…** (`studio-edit-spec-scope`) opening [`ui:change-scope-dialog`](../change-scope-dialog/spec.md)
 
-**Archived** changes MUST show read-only description (if any) and read-only specs panel without edit controls.
+For **draft**, **discarded**, and **archived** changes, Overview MUST show read-only description (if any) and the read-only specs panel only. It MUST NOT render description or invalidation editors, MUST NOT render the scope-edit helper line, and MUST NOT render **Edit spec scope…** or open the scope dialog from Overview.
 
 ### Requirement: metadata saves append to Output panel
 

@@ -14,7 +14,8 @@
 #### Scenario: Open action calls read port
 
 - **WHEN** user clicks a draft row
-- **THEN** `port-changes-read` opens the change Overview tab
+- **THEN** shell opens the change Overview tab
+- **AND** `useChangesRead` loads detail via `getDraft` (not `getChange`)
 - **AND** no direct core import
 
 ### Requirement: view uses SpecdDataPort hooks only

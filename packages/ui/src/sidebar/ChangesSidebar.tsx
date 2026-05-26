@@ -59,7 +59,13 @@ export function ChangesSidebar({
         />
       ) : null}
       {discarded !== undefined && discarded.length > 0 ? (
-        <Section title="Discarded" items={discarded} selected={selected} onSelect={onSelect} />
+        <Section
+          title="Discarded"
+          items={discarded}
+          selected={selected}
+          onSelect={onSelect}
+          showState={false}
+        />
       ) : null}
     </div>
   )

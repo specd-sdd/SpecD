@@ -1,8 +1,8 @@
 import type { ChangeDetailDto, ChangeStatusDto } from '@specd/client'
-import type { ChangeListSection } from './change-list-section.js'
+import { isShelvedReadOnlySection, type ChangeListSection } from './change-list-section.js'
 import { ChevronDown, ChevronRight, FileText, ShieldCheck } from 'lucide-react'
 import * as React from 'react'
-import { ChangeTabs, type ChangeView } from '../tabs/ChangeTabs.js'
+import { CHANGE_VIEWS, ChangeTabs, type ChangeView } from '../tabs/ChangeTabs.js'
 import { Button } from '../components/ui/button.js'
 import { cn } from '../lib/cn.js'
 import { ChangeOverview } from './ChangeOverview.js'
@@ -82,6 +82,22 @@ export function ChangeMainView({
   const artifactsTabActive = changeView === 'Artifacts'
   const artifactsPollKey = useTabScopedPollKey(artifactsTabActive, refreshKey)
 
+  const shelvedReadOnly = isShelvedReadOnlySection(changeListSection)
+  const contentEditable = !isArchived && changeListSection === 'active'
+  const pollChangeData = contentEditable
+  const allowDeepReadTabs = !isArchived && !shelvedReadOnly
+
+  const visibleViews = React.useMemo((): readonly ChangeView[] => {
+    if (!changeName) return CHANGE_VIEWS
+    return allowDeepReadTabs ? CHANGE_VIEWS : (['Overview', 'Artifacts', 'Tasks', 'Events'] as const)
+  }, [allowDeepReadTabs, changeName])
+
+  React.useEffect(() => {
+    if (!allowDeepReadTabs && (changeView === 'Context' || changeView === 'Impact')) {
+      onChangeView('Overview')
+    }
+  }, [allowDeepReadTabs, changeView, onChangeView])
+
   if (!changeName) {
     return (
       <div className="flex min-h-0 flex-1 flex-col items-center justify-center text-xs text-muted-foreground">
@@ -92,7 +108,12 @@ export function ChangeMainView({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <ChangeTabs changeName={changeName} active={changeView} onActiveChange={onChangeView} />
+      <ChangeTabs
+        changeName={changeName}
+        active={changeView}
+        views={visibleViews}
+        onActiveChange={onChangeView}
+      />
 
       {isArchived ? (
         <div className="border-b border-border bg-muted/30 px-3 py-1.5 text-xs text-muted-foreground">
@@ -100,6 +121,12 @@ export function ChangeMainView({
           {detail?.archivedMeta
             ? ` · ${detail.archivedMeta.archivedName} · ${detail.archivedMeta.archivedAt}`
             : null}
+        </div>
+      ) : shelvedReadOnly ? (
+        <div className="border-b border-border bg-muted/30 px-3 py-1.5 text-xs text-muted-foreground">
+          {changeListSection === 'draft'
+            ? 'Read-only drafted change — restore to active to edit artifacts and metadata.'
+            : 'Read-only discarded change — permanently abandoned.'}
         </div>
       ) : null}
 
@@ -120,7 +147,7 @@ export function ChangeMainView({
             status={status}
             statusLoading={statusLoading}
             statusError={statusError}
-            editable={!isArchived}
+            editable={contentEditable}
             specSuggestions={specSuggestions}
             onDescriptionSaved={onDescriptionSaved}
             onScopeSaved={onScopeSaved}
@@ -145,11 +172,12 @@ export function ChangeMainView({
         ) : (
           <ArtifactsTabPanel
             changeName={changeName}
+            listSection={changeListSection}
             refreshKey={artifactsPollKey}
-            poll={artifactsTabActive}
+            poll={artifactsTabActive && pollChangeData}
             selected={selectedArtifactFile}
             onSelect={onSelectArtifact}
-            onValidateAll={onValidateAll}
+            onValidateAll={contentEditable ? onValidateAll : undefined}
           />
         )
       ) : null}
@@ -172,9 +200,10 @@ export function ChangeMainView({
       {changeView === 'Tasks' && !isArchived ? (
         <ChangeTasksTab
           changeName={changeName}
+          listSection={changeListSection}
           status={status}
           refreshKey={refreshKey}
-          tabActive
+          tabActive={pollChangeData}
         />
       ) : null}
 
@@ -371,6 +400,7 @@ function ArchivedArtifactsList({
 
 function ArtifactsTabPanel({
   changeName,
+  listSection = null,
   refreshKey = 0,
   poll = true,
   selected,
@@ -378,6 +408,7 @@ function ArtifactsTabPanel({
   onValidateAll,
 }: {
   changeName: string
+  listSection?: ChangeListSection | null
   refreshKey?: number
   poll?: boolean
   selected?: string
@@ -402,6 +433,7 @@ function ArtifactsTabPanel({
       ) : null}
       <ArtifactsAccordion
         changeName={changeName}
+        listSection={listSection}
         refreshKey={refreshKey}
         poll={poll}
         selected={selected}
@@ -413,18 +445,23 @@ function ArtifactsTabPanel({
 
 function ArtifactsAccordion({
   changeName,
+  listSection = null,
   refreshKey = 0,
   poll = true,
   selected,
   onSelect,
 }: {
   changeName: string
+  listSection?: ChangeListSection | null
   refreshKey?: number
   poll?: boolean
   selected?: string
   onSelect?: (filename: string) => void
 }): React.ReactElement {
-  const { scopeGroups, isLoading } = useChangeArtifactList(changeName, refreshKey, { poll })
+  const { scopeGroups, isLoading } = useChangeArtifactList(changeName, refreshKey, {
+    poll,
+    listSection,
+  })
 
   const [openTypeGroups, setOpenTypeGroups] = React.useState<Set<string>>(
     () => new Set(['proposal', 'design', 'tasks']),

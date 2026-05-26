@@ -33,6 +33,18 @@
 - **THEN** UI calls `getChangeContext`
 - **AND** renders compiled context text
 
+#### Scenario: Drafted change hides Context tab
+
+- **GIVEN** drafted change open in the shell
+- **WHEN** user inspects change tabs
+- **THEN** Context is not shown as a selectable tab
+
+#### Scenario: Archived change hides Context tab
+
+- **GIVEN** archived change open in the shell
+- **WHEN** user inspects change tabs
+- **THEN** Context is not shown as a selectable tab
+
 ### Requirement: view uses SpecdDataPort hooks only
 
 #### Scenario: Component consumes SpecdDataPort hooks only

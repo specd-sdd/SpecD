@@ -37,6 +37,14 @@
 - **WHEN** API is listening and `init` runs
 - **THEN** `UiServeContext.apiBaseUrl` ends with `/v1`
 
+### Requirement: own-server ui serve merges CORS origins
+
+#### Scenario: Own-server plugin origin is added to CORS allowlist
+
+- **GIVEN** active UI plugin has `hasServer() === true`
+- **WHEN** `specd ui serve` starts the plugin dev server on a different origin
+- **THEN** API CORS configuration allows that origin in addition to any configured origins
+
 ### Requirement: embedded Studio skips remote connect gate
 
 #### Scenario: Bundle plugin uses same-origin API

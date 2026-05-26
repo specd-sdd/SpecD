@@ -75,14 +75,12 @@ export function ChangeOverview({
               listSection={listSection}
               state={change.state}
               busy={lifecycleBusy}
-              onDraft={editable && listSection === 'active' ? onShelfToDrafts : undefined}
-              onRestore={editable && listSection === 'draft' ? onRestoreToActive : undefined}
+              onDraft={listSection === 'active' ? onShelfToDrafts : undefined}
+              onRestore={listSection === 'draft' ? onRestoreToActive : undefined}
               onDiscard={
-                editable && (listSection === 'active' || listSection === 'draft')
-                  ? onDiscardChange
-                  : undefined
+                listSection === 'active' || listSection === 'draft' ? onDiscardChange : undefined
               }
-              onArchive={editable && listSection === 'active' ? onArchiveChange : undefined}
+              onArchive={listSection === 'active' ? onArchiveChange : undefined}
             />
           </div>
         ) : null}
@@ -144,11 +142,11 @@ export function ChangeOverview({
         </Card>
 
         <Card title="Specs & dependencies" className="xl:col-span-3">
-          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-            <p className="text-[10px] text-muted-foreground">
-              Read-only on Overview — use the dialog to edit scope safely.
-            </p>
-            {editable ? (
+          {editable ? (
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <p className="text-[10px] text-muted-foreground">
+                Read-only on Overview — use the dialog to edit scope safely.
+              </p>
               <Button
                 type="button"
                 size="sm"
@@ -158,8 +156,8 @@ export function ChangeOverview({
               >
                 Edit spec scope…
               </Button>
-            ) : null}
-          </div>
+            </div>
+          ) : null}
           <ChangeSpecsReadonlyPanel change={change} />
         </Card>
 

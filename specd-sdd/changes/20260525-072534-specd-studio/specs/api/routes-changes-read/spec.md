@@ -10,6 +10,10 @@ Authoritative HTTP contract (methods, paths, query, bodies, status codes) for **
 
 All paths MUST be under `/v1`. Responses MUST use `application/json` unless returning raw artifact text.
 
+### Requirement: /changes read routes resolve active changes only
+
+`/changes/{name}` and all `/changes/{name}/*` read routes MUST treat drafted and discarded names as **not found**. When `name` exists only under `drafts/` or `discarded/`, handlers MUST return HTTP 404 `application/problem+json` rather than serving a read-only view through the active change routes.
+
 ### Requirement: GET change detail omits artifact bodies
 
 `GET /changes/{name}` MUST return metadata, `specIds`, schema, append-only `history`, and approval summaries and MUST NOT inline artifact file bodies.
@@ -45,6 +49,27 @@ When `refreshImplementation=true`, the handler MUST run implementation refresh b
 ### Requirement: unknown change returns 404 problem+json
 
 Requests for a non-existent change name MUST return HTTP 404 with `application/problem+json`. Malformed queries MUST return HTTP 400.
+
+### Requirement: drafted change read routes are separate and read-only
+
+The API MUST expose read-only drafted change routes under `/drafts/{name}`:
+
+- `GET /drafts/{name}` → drafted change detail (read-only) as `ChangeDetailDto` (no mutation fields implied).
+- `GET /drafts/{name}/status` → drafted status via `GetStatus`, returning a `ChangeStatusDto` that supports `unchanged` short-circuit but MUST NOT include lifecycle transitions that require mutation.
+- `GET /drafts/{name}/artifacts` and `GET /drafts/{name}/artifacts/{filename}` → allow reading tracked artifact content for inspection.
+- `GET /drafts/{name}/context`, `GET /drafts/{name}/preview`, instruction routes → identical shapes to the active `/changes/{name}` read routes.
+
+Drafted routes MUST NOT allow artifact writes: there is no `PUT /drafts/{name}/artifacts/{filename}`.
+
+### Requirement: discarded change read routes are separate and read-only
+
+The API MUST expose read-only discarded change routes under `/discarded/{name}`:
+
+- `GET /discarded/{name}` → discarded change detail (read-only) as `ChangeDetailDto`.
+- `GET /discarded/{name}/status` → discarded status via `GetStatus` (read-only view).
+- `GET /discarded/{name}/artifacts` and `GET /discarded/{name}/artifacts/{filename}` → allow reading tracked artifact content for inspection.
+
+Discarded routes MUST NOT allow any lifecycle mutation or artifact writes.
 
 ## Constraints
 

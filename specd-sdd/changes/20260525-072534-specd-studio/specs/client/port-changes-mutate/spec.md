@@ -16,6 +16,13 @@ The interface MUST declare asynchronous methods equivalent to the HTTP routes in
 - `transitionChange(...)`, lifecycle posts, `patchChange(...)`
 - `updateSpecDependencies(name, { specId, set | add | remove })` → `PATCH .../spec-dependencies`
 
+Drafted and discarded are read-only storage classes; lifecycle mutations are still addressed by change name:
+
+- `draftChange(name)` → `POST /changes/{name}/draft`
+- `restoreChange(name)` → `POST /changes/{name}/restore`
+- `discardChange(name)` → `POST /changes/{name}/discard`
+- `archiveChange(name)` → `POST /changes/{name}/archive`
+
 ### Requirement: port signatures are identical for HTTP and IPC adapters
 
 Implementations (`adapter-remote-specd-data`, desktop IPC) MUST implement these methods without altering parameter or return types.

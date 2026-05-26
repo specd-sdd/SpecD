@@ -14,8 +14,18 @@
 #### Scenario: Open action calls read port
 
 - **WHEN** user clicks a discarded change row
-- **THEN** `port-changes-read` opens the change Overview tab (read-only notice)
+- **THEN** shell opens the change Overview tab (read-only notice)
+- **AND** `useChangesRead` loads detail via `getDiscarded` (not `getChange`)
 - **AND** no direct core import
+
+### Requirement: discarded rows show name only without per-row state
+
+#### Scenario: Discarded row shows name without state badge
+
+- **GIVEN** Discarded section lists changes
+- **WHEN** sidebar renders each row
+- **THEN** row shows change name only
+- **AND** does not show per-row lifecycle `state` text
 
 ### Requirement: view uses SpecdDataPort hooks only
 
