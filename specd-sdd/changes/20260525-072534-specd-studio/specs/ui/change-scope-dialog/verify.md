@@ -50,6 +50,20 @@
 
 ### Requirement: dialog persists scope and dependsOn on save
 
+#### Scenario: Scope PATCH on confirm
+
+- **GIVEN** user confirmed a scope change on the confirm sub-step
+- **WHEN** user clicks **Apply scope change**
+- **THEN** `patchChange` runs with `addSpecIds` and `removeSpecIds`
+- **AND** dialog closes on success
+
+#### Scenario: Dependency PATCH without scope change
+
+- **GIVEN** only `dependsOn` values changed
+- **WHEN** user clicks **Save changes**
+- **THEN** `updateSpecDependencies` runs for each edited spec
+- **AND** scope PATCH is not invoked
+
 ### Requirement: scope save uses PATCH and confirm step
 
 #### Scenario: Scope change shows confirm sub-step
@@ -64,6 +78,20 @@
 - **GIVEN** scope unchanged and only `dependsOn` edited
 - **WHEN** user clicks **Save changes**
 - **THEN** `updateSpecDependencies` runs without confirm sub-step
+
+### Requirement: dialog uses StudioDialog chrome
+
+#### Scenario: dialog uses StudioDialog chrome — primary path
+
+- **WHEN** data-testid=studio-change-scope-dialog. Large layout (max-w-2xl) with scrollable body. Actions:
+- **THEN** behaviour matches the spec requirement
+- **AND** no forbidden side effects occur
+
+#### Scenario: dialog uses StudioDialog chrome — guard path
+
+- **GIVEN** inputs that stress the requirement boundary
+- **WHEN** the same capability runs
+- **THEN** errors or skips are explicit and documented
 
 ### Requirement: view uses SpecdDataPort hooks only
 

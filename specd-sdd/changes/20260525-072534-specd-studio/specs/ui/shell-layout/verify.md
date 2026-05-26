@@ -69,6 +69,45 @@
 - **WHEN** user shows hidden tab
 - **THEN** global poll remains paused until focus returns
 
+### Requirement: shell never imports @specd/core
+
+#### Scenario: Shell package has no core dependency
+
+- **WHEN** dependency graph of `@specd/ui` is inspected
+- **THEN** no import from `@specd/core`
+- **AND** ports used via hooks
+
+#### Scenario: Command palette uses hooks only
+
+- **WHEN** palette action runs
+- **THEN** invokes SpecdDataPort path
+- **AND** no direct kernel import
+
+#### Scenario: Adding core import fails boundary check
+
+- **WHEN** contributor adds `@specd/core` import to shell
+- **THEN** lint or architectural test fails
+
+### Requirement: shell applies design-system theme at application root
+
+#### Scenario: SpecdApp imports theme before chrome
+
+- **WHEN** `SpecdApp` mounts
+- **THEN** design-system theme module is loaded at root
+- **AND** `--studio-bg-primary` or equivalent tokens apply to the app shell
+
+#### Scenario: Shell regions use token backgrounds
+
+- **WHEN** sidebar and tab strip render
+- **THEN** backgrounds use secondary/elevated tokens from design-system
+- **AND** not hard-coded marketing card colors
+
+#### Scenario: Status bar uses design-system chrome
+
+- **WHEN** shell is complete
+- **THEN** status bar uses thin IDE strip styling from tokens
+- **AND** border separator uses `#30363D` token
+
 ### Requirement: shell routes archived changes through archived read port
 
 #### Scenario: Archive selection uses getArchivedChange
@@ -82,6 +121,29 @@
 - **GIVEN** archived center context
 - **WHEN** global poll ticks
 - **THEN** shell does not call `getChange` or `getChangeStatus` for that name
+
+### Requirement: validate requires drift confirmation
+
+#### Scenario: validate requires drift confirmation — primary path
+
+- **WHEN** Validate and Validate All MUST show [ui:validate-confirm-dialog](../validate-confirm-dialog/spec.md) before
+- **THEN** behaviour matches the spec requirement
+- **AND** no forbidden side effects occur
+
+#### Scenario: validate requires drift confirmation — guard path
+
+- **GIVEN** inputs that stress the requirement boundary
+- **WHEN** the same capability runs
+- **THEN** errors or skips are explicit and documented
+
+### Requirement: shell delegates tab-scoped polling to visible center tabs
+
+#### Scenario: Hidden change tab does not refetch on global tick
+
+- **GIVEN** user is on Overview tab only
+- **WHEN** global poll increments
+- **THEN** Artifacts tab hooks do not refetch
+- **AND** visible Overview may refetch detail when applicable
 
 ### Requirement: bottom panel polls only the visible channel
 
@@ -105,50 +167,30 @@
 - **WHEN** user toggles between **Output** and **Logs**
 - **THEN** entry count stays N until an explicit user action appends
 
-### Requirement: shell delegates tab-scoped polling to visible center tabs
+### Requirement: metadata and artifact saves log to Output
 
-#### Scenario: Hidden change tab does not refetch on global tick
+#### Scenario: metadata and artifact saves log to Output — primary path
 
-- **GIVEN** user is on Overview tab only
-- **WHEN** global poll increments
-- **THEN** Artifacts tab hooks do not refetch
-- **AND** visible Overview may refetch detail when applicable
+- **WHEN** Artifact save ([ui:hooks-inspector-save](../hooks-inspector-save/spec.md)), description/policy PATCH, successful scope dialog
+- **THEN** behaviour matches the spec requirement
+- **AND** no forbidden side effects occur
 
-### Requirement: shell applies design-system theme at application root
+#### Scenario: metadata and artifact saves log to Output — guard path
 
-#### Scenario: SpecdApp imports theme before chrome
+- **GIVEN** inputs that stress the requirement boundary
+- **WHEN** the same capability runs
+- **THEN** errors or skips are explicit and documented
 
-- **WHEN** `SpecdApp` mounts
-- **THEN** design-system theme module is loaded at root
-- **AND** `--studio-bg-primary` or equivalent tokens apply to the app shell
+### Requirement: graph sidebar does not append output lines
 
-#### Scenario: Shell regions use token backgrounds
+#### Scenario: graph sidebar does not append output lines — primary path
 
-- **WHEN** sidebar and tab strip render
-- **THEN** backgrounds use secondary/elevated tokens from design-system
-- **AND** not hard-coded marketing card colors
+- **WHEN** Opening the graph entry from the sidebar MUST
+- **THEN** behaviour matches the spec requirement
+- **AND** no forbidden side effects occur
 
-#### Scenario: Status bar uses design-system chrome
+#### Scenario: graph sidebar does not append output lines — guard path
 
-- **WHEN** shell is complete
-- **THEN** status bar uses thin IDE strip styling from tokens
-- **AND** border separator uses `#30363D` token
-
-### Requirement: shell never imports @specd/core
-
-#### Scenario: Shell package has no core dependency
-
-- **WHEN** dependency graph of `@specd/ui` is inspected
-- **THEN** no import from `@specd/core`
-- **AND** ports used via hooks
-
-#### Scenario: Command palette uses hooks only
-
-- **WHEN** palette action runs
-- **THEN** invokes SpecdDataPort path
-- **AND** no direct kernel import
-
-#### Scenario: Adding core import fails boundary check
-
-- **WHEN** contributor adds `@specd/core` import to shell
-- **THEN** lint or architectural test fails
+- **GIVEN** inputs that stress the requirement boundary
+- **WHEN** the same capability runs
+- **THEN** errors or skips are explicit and documented

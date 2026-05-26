@@ -1,4 +1,10 @@
-import { createKernel, type Kernel, type LogDestination, type SpecdConfig } from '@specd/core'
+import {
+  createKernel,
+  type Kernel,
+  type LogDestination,
+  type LogFormatter,
+  type SpecdConfig,
+} from '@specd/core'
 import { fileURLToPath } from 'node:url'
 import * as path from 'node:path'
 
@@ -32,6 +38,8 @@ const _cliSiblingNodeModules = path.resolve(_cliDir, '../../..')
 export interface CliKernelOptions {
   /** Extra logging destinations provided by the CLI layer. */
   readonly additionalDestinations?: readonly LogDestination[]
+  /** Shared formatter for console and in-memory log readback. */
+  readonly logFormatter?: LogFormatter
 }
 
 /**
@@ -47,6 +55,7 @@ export function createCliKernel(config: SpecdConfig, options?: CliKernelOptions)
     ...(options?.additionalDestinations !== undefined
       ? { additionalDestinations: options.additionalDestinations }
       : {}),
+    ...(options?.logFormatter !== undefined ? { logFormatter: options.logFormatter } : {}),
   }
   return createKernel(config, kernelOptions)
 }

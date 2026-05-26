@@ -23,29 +23,6 @@
 - **THEN** build or contract test fails
 - **AND** prevents silent UI breakage
 
-### Requirement: archived snapshot exposes archivedMeta on ChangeDetailDto
-
-#### Scenario: getArchivedChange sets archivedMeta
-
-- **WHEN** client adapter maps archived snapshot JSON
-- **THEN** `state` is `archived`
-- **AND** `archivedMeta` includes `archivedName`, `archivedAt`, and `artifactTypes`
-
-#### Scenario: getChange omits archivedMeta
-
-- **WHEN** client loads active change detail
-- **THEN** `archivedMeta` is undefined
-- **AND** `state` is not `archived`
-
-### Requirement: ChangeHistoryEventDto allows type-specific fields
-
-#### Scenario: UI reads extra history properties from typed DTO
-
-- **GIVEN** API returns `transitioned` with `from` and `to`
-- **WHEN** `ChangeEventsTab` maps `Object.entries` on the event
-- **THEN** TypeScript allows those keys on `ChangeHistoryEventDto`
-- **AND** no client-side rename layer is required
-
 ### Requirement: types are shared or generated from API schemas
 
 #### Scenario: Types imported from shared package
@@ -66,3 +43,40 @@
 - **WHEN** contributor adds parallel interface in client
 - **THEN** lint or architectural test fails
 - **AND** must use shared/generated types
+
+### Requirement: archived snapshot exposes archivedMeta on ChangeDetailDto
+
+#### Scenario: getArchivedChange sets archivedMeta
+
+- **WHEN** client adapter maps archived snapshot JSON
+- **THEN** `state` is `archived`
+- **AND** `archivedMeta` includes `archivedName`, `archivedAt`, and `artifactTypes`
+
+#### Scenario: getChange omits archivedMeta
+
+- **WHEN** client loads active change detail
+- **THEN** `archivedMeta` is undefined
+- **AND** `state` is not `archived`
+
+### Requirement: ChangeDetailDto exposes invalidationPolicy
+
+#### Scenario: ChangeDetailDto exposes invalidationPolicy — primary path
+
+- **WHEN** ChangeDetailDto MUST include optional invalidationPolicy (none | surgical
+- **THEN** behaviour matches the spec requirement
+- **AND** no forbidden side effects occur
+
+#### Scenario: ChangeDetailDto exposes invalidationPolicy — guard path
+
+- **GIVEN** inputs that stress the requirement boundary
+- **WHEN** the same capability runs
+- **THEN** errors or skips are explicit and documented
+
+### Requirement: ChangeHistoryEventDto allows type-specific fields
+
+#### Scenario: UI reads extra history properties from typed DTO
+
+- **GIVEN** API returns `transitioned` with `from` and `to`
+- **WHEN** `ChangeEventsTab` maps `Object.entries` on the event
+- **THEN** TypeScript allows those keys on `ChangeHistoryEventDto`
+- **AND** no client-side rename layer is required

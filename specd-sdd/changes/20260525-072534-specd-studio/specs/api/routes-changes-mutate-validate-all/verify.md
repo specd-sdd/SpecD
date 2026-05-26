@@ -1,4 +1,4 @@
-# Verification: validate-all route
+# Verification: Routes Changes Mutate — validate-all
 
 ## Requirements
 
@@ -16,6 +16,20 @@
 - **GIVEN** active change
 - **WHEN** `POST .../validate-all` with `{ "artifactId": "proposal" }`
 - **THEN** every `results[].artifact` equals `proposal`
+
+### Requirement: response shape
+
+#### Scenario: response shape — primary path
+
+- **WHEN** The response MUST be ValidateBatchResultDto: json { passed:
+- **THEN** behaviour matches the spec requirement
+- **AND** no forbidden side effects occur
+
+#### Scenario: response shape — guard path
+
+- **GIVEN** inputs that stress the requirement boundary
+- **WHEN** the same capability runs
+- **THEN** errors or skips are explicit and documented
 
 ### Requirement: single-step validate unchanged
 

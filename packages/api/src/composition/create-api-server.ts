@@ -2,7 +2,13 @@ import fs from 'node:fs'
 import path from 'node:path'
 import fastifyStatic from '@fastify/static'
 import Fastify, { type FastifyInstance } from 'fastify'
-import { createConfigLoader, createKernel, LogRingBuffer, type SpecdConfig } from '@specd/core'
+import {
+  createConfigLoader,
+  createKernel,
+  createLogFormatter,
+  LogRingBuffer,
+  type SpecdConfig,
+} from '@specd/core'
 import { StudioOutputBuffer } from '../infrastructure/studio-output-buffer.js'
 import { type AuthAdapterRegistry } from '../application/auth/auth-adapter-registry.js'
 import { defaultAuthAdapterRegistry } from './default-auth-registry.js'
@@ -47,7 +53,10 @@ export async function createApiServer(options: CreateApiServerOptions): Promise<
   }
 
   const logRing = new LogRingBuffer(500)
-  const kernel = await createKernel(config, { logRing })
+  const kernel = await createKernel(config, {
+    logRing,
+    logFormatter: createLogFormatter({ colorize: false }),
+  })
   const kernelActor = await resolveKernelActor(config)
   const registry = options.authRegistry ?? defaultAuthAdapterRegistry()
   const verifier = registry.resolve(auth.type, auth.config, { actorResolver: kernelActor })
@@ -64,10 +73,13 @@ export async function createApiServer(options: CreateApiServerOptions): Promise<
 
   await registerCorsMiddleware(app, config)
 
-  await app.register((v1) => {
-    registerAuthMiddleware(v1, state, verifier, auth.type)
-    registerV1Routes(v1)
-  }, { prefix: '/v1' })
+  await app.register(
+    (v1) => {
+      registerAuthMiddleware(v1, state, verifier, auth.type)
+      registerV1Routes(v1)
+    },
+    { prefix: '/v1' },
+  )
 
   if (options.uiDistPath !== undefined) {
     const indexPath = path.join(options.uiDistPath, 'index.html')

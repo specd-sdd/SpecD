@@ -29,6 +29,20 @@
 - **THEN** `port-changes-mutate` discard runs
 - **AND** list refreshes on success
 
+### Requirement: archive row opens archived snapshot not active change
+
+#### Scenario: archive row opens archived snapshot not activ… — primary path
+
+- **WHEN** When the user selects a row in the
+- **THEN** behaviour matches the spec requirement
+- **AND** no forbidden side effects occur
+
+#### Scenario: archive row opens archived snapshot not activ… — guard path
+
+- **GIVEN** inputs that stress the requirement boundary
+- **WHEN** the same capability runs
+- **THEN** errors or skips are explicit and documented
+
 ### Requirement: archive rows show name only without per-row state or archive action chrome
 
 #### Scenario: Archive row shows name without archived badge

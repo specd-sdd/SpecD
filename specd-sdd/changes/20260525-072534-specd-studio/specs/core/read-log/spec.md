@@ -16,7 +16,11 @@ Studio and API need readback of recent specd log lines from an **in-memory ring*
 
 ### Requirement: structured or pretty output
 
-When `prettier` is false, the result MUST expose `entries[]` with `timestamp`, `level`, `message`, and `context`. When `prettier` is true, the result MUST expose `lines[]` as human-readable strings.
+When `prettier` is false, the result MUST expose `entries[]` with `timestamp`, `level`, `message`, and `context`. When `prettier` is true, the result MUST expose `lines[]` where each line is `LogFormatter.format(entry)` for the corresponding ring entry (formatter supplied at construction, default from `createLogFormatter()`).
+
+### Requirement: LogFormatter injection
+
+`ReadLog` MUST accept `LogReadBuffer` and `LogFormatter` at construction. The kernel MUST pass the same `LogFormatter` instance used for `createDefaultLogger` when wiring `kernel.logs.read`.
 
 ### Requirement: kernel exposes logs.read when ring is wired
 
@@ -24,5 +28,6 @@ When `prettier` is false, the result MUST expose `entries[]` with `timestamp`, `
 
 ## Spec Dependencies
 
+- [`core:log-formatter`](../log-formatter/spec.md) — pretty lines
 - [`core:kernel`](../../core/kernel/spec.md) — composition wiring
 - [`default:_global/architecture`](../../default/_global/architecture/spec.md) — use-case layer

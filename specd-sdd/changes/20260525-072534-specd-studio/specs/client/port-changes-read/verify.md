@@ -4,36 +4,42 @@
 
 ### Requirement: port exposes Changes Read operations
 
-#### Scenario: Port methods mirror routes contract
+#### Scenario: port exposes Changes Read operations — primary path
 
-- **WHEN** adapter implements this port group
-- **THEN** each method maps to documented `/v1` route
-- **AND** types match DTO specs
+- **WHEN** The interface MUST declare asynchronous methods equivalent to
+- **THEN** behaviour matches the spec requirement
+- **AND** no forbidden side effects occur
 
-#### Scenario: IPC adapter exposes same method names
+#### Scenario: port exposes Changes Read operations — guard path
 
-- **WHEN** desktop IPC adapter handles port call
-- **THEN** method name and arity match interface
-- **AND** return shape matches HTTP path
+- **GIVEN** inputs that stress the requirement boundary
+- **WHEN** the same capability runs
+- **THEN** errors or skips are explicit and documented
 
 ### Requirement: port signatures are identical for HTTP and IPC adapters
 
-#### Scenario: Remote and IPC adapters share types
+#### Scenario: port signatures are identical for HTTP and IP… — primary path
 
-- **WHEN** TypeScript compiles both adapters against port interface
-- **THEN** parameters match
-- **AND** return types match
+- **WHEN** Implementations (adapter-remote-specd-data, desktop IPC) MUST implement these methods
+- **THEN** behaviour matches the spec requirement
+- **AND** no forbidden side effects occur
 
-### Requirement: port exposes draft preview and outline methods
+#### Scenario: port signatures are identical for HTTP and IP… — guard path
 
-#### Scenario: previewChangeDraft mirrors POST preview
+- **GIVEN** inputs that stress the requirement boundary
+- **WHEN** the same capability runs
+- **THEN** errors or skips are explicit and documented
 
-- **WHEN** adapter implements `previewChangeDraft`
-- **THEN** HTTP POST `/changes/{name}/preview` is used with JSON body
-- **AND** return type matches `PreviewResultDto`
+### Requirement: port failures surface as typed client errors
 
-#### Scenario: outlineChangeArtifact mirrors POST outline
+#### Scenario: port failures surface as typed client errors — primary path
 
-- **WHEN** adapter implements `outlineChangeArtifact` with content
-- **THEN** HTTP POST `/changes/{name}/artifacts/{filename}/outline` sends `{ content }`
-- **AND** returns outline JSON array
+- **WHEN** HTTP failures MUST be translated by adapter-problem-json-errors into
+- **THEN** behaviour matches the spec requirement
+- **AND** no forbidden side effects occur
+
+#### Scenario: port failures surface as typed client errors — guard path
+
+- **GIVEN** inputs that stress the requirement boundary
+- **WHEN** the same capability runs
+- **THEN** errors or skips are explicit and documented

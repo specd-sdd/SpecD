@@ -2,6 +2,20 @@
 
 ## Requirements
 
+### Requirement: PreviewSpec input accepts artifactOverrides
+
+#### Scenario: PreviewSpec input accepts artifactOverrides — primary path
+
+- **WHEN** PreviewSpecInput MAY include artifactOverrides?: Readonly<Record<string, string>> mapping change-relative
+- **THEN** behaviour matches the spec requirement
+- **AND** no forbidden side effects occur
+
+#### Scenario: PreviewSpec input accepts artifactOverrides — guard path
+
+- **GIVEN** inputs that stress the requirement boundary
+- **WHEN** the same capability runs
+- **THEN** errors or skips are explicit and documented
+
 ### Requirement: override replaces disk read for matching files
 
 #### Scenario: Draft delta changes merged output
@@ -18,6 +32,20 @@
 - **WHEN** preview runs for that specId
 - **THEN** merged entry uses override as full content
 - **AND** base is null for new spec
+
+### Requirement: non-overridden files unchanged
+
+#### Scenario: non-overridden files unchanged — primary path
+
+- **WHEN** Files without an override MUST continue to load
+- **THEN** behaviour matches the spec requirement
+- **AND** no forbidden side effects occur
+
+#### Scenario: non-overridden files unchanged — guard path
+
+- **GIVEN** inputs that stress the requirement boundary
+- **WHEN** the same capability runs
+- **THEN** errors or skips are explicit and documented
 
 ### Requirement: overrides do not mutate manifest or disk
 

@@ -22,6 +22,20 @@
 - **THEN** method name and arity match interface
 - **AND** return shape matches HTTP path
 
+### Requirement: listArchived maps archive list rows for Studio sidebar
+
+#### Scenario: listArchived maps archive list rows for Studi… — primary path
+
+- **WHEN** listArchived() on port-changes-collection MUST call GET /v1/archived-changes and
+- **THEN** behaviour matches the spec requirement
+- **AND** no forbidden side effects occur
+
+#### Scenario: listArchived maps archive list rows for Studi… — guard path
+
+- **GIVEN** inputs that stress the requirement boundary
+- **WHEN** the same capability runs
+- **THEN** errors or skips are explicit and documented
+
 ### Requirement: port signatures are identical for HTTP and IPC adapters
 
 #### Scenario: Remote and IPC adapters share types

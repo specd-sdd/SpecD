@@ -1,0 +1,23 @@
+- op: added
+  description: Scenarios for shared formatter with kernel
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Kernel Registration'
+  content: |
+    ### Requirement: Shared formatter with kernel
+
+    #### Scenario: CLI passes TTY-aware formatter
+
+    - **GIVEN** `process.stdout.isTTY` is true
+    - **WHEN** CLI resolves kernel context
+    - **THEN** `createLogFormatter({ colorize: true })` is passed via `KernelOptions.logFormatter`
+
+    #### Scenario: Non-TTY disables colorize
+
+    - **GIVEN** stdout is not a TTY
+    - **WHEN** CLI resolves kernel context
+    - **THEN** `createLogFormatter({ colorize: false })` is passed to the kernel

@@ -51,6 +51,20 @@
 - **WHEN** Impact tab renders
 - **THEN** file appears in **Tracked files (unassigned)** at the bottom
 
+### Requirement: empty specs are omitted
+
+#### Scenario: empty specs are omitted — primary path
+
+- **WHEN** Spec cards with no accepted links, no graph-only
+- **THEN** behaviour matches the spec requirement
+- **AND** no forbidden side effects occur
+
+#### Scenario: empty specs are omitted — guard path
+
+- **GIVEN** inputs that stress the requirement boundary
+- **WHEN** the same capability runs
+- **THEN** errors or skips are explicit and documented
+
 ### Requirement: view uses SpecdDataPort hooks only
 
 #### Scenario: Component consumes SpecdDataPort hooks only

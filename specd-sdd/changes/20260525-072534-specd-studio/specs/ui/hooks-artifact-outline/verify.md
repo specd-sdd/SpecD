@@ -23,3 +23,17 @@
 - **GIVEN** Outline tab active and dirty buffer
 - **WHEN** user adds a markdown heading
 - **THEN** subsequent outline result can include new section
+
+### Requirement: hook uses SpecdDataPort only
+
+#### Scenario: hook uses SpecdDataPort only — primary path
+
+- **WHEN** MUST NOT import @specd/core.
+- **THEN** behaviour matches the spec requirement
+- **AND** no forbidden side effects occur
+
+#### Scenario: hook uses SpecdDataPort only — guard path
+
+- **GIVEN** inputs that stress the requirement boundary
+- **WHEN** the same capability runs
+- **THEN** errors or skips are explicit and documented

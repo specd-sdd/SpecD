@@ -41,6 +41,7 @@ export {
   type LoggerPort,
 } from './logger.port.js'
 export { type LogReadBuffer } from './log-read-buffer.port.js'
+export { type LogFormatter } from './log-formatter.port.js'
 export {
   type ConfigWriter,
   type InitProjectOptions,

@@ -68,3 +68,17 @@
 - **WHEN** list response is built
 - **THEN** summary includes blocker count or flag
 - **AND** full findings are not inlined
+
+### Requirement: archived-changes list returns name and archivedName pairs
+
+#### Scenario: archived-changes list returns name and archiv… — primary path
+
+- **WHEN** GET /v1/archived-changes MUST return a JSON array of
+- **THEN** behaviour matches the spec requirement
+- **AND** no forbidden side effects occur
+
+#### Scenario: archived-changes list returns name and archiv… — guard path
+
+- **GIVEN** inputs that stress the requirement boundary
+- **WHEN** the same capability runs
+- **THEN** errors or skips are explicit and documented

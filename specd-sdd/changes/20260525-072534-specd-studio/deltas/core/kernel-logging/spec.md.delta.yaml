@@ -1,0 +1,15 @@
+- op: added
+  description: Kernel wires shared log formatter
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Default Logger Instantiation'
+  content: |
+    ### Requirement: Shared LogFormatter per kernel
+
+    `createKernel()` MUST invoke `createLogFormatter()` once per kernel bootstrap and pass the resulting `LogFormatter` to `createDefaultLogger` and to `ReadLog` when `KernelOptions.logRing` is set.
+
+    `KernelOptions` MAY include optional `logFormatter` to override the default (used by CLI to pass a TTY-aware formatter instance).

@@ -57,6 +57,8 @@ import { type SpecRepository } from '../application/ports/spec-repository.js'
 import { type SpecdConfig } from '../application/specd-config.js'
 import { Logger } from '../application/logger.js'
 import { type LogDestination } from '../application/ports/logger.port.js'
+import type { LogFormatter } from '../application/ports/log-formatter.port.js'
+import { createLogFormatter } from './create-log-formatter.js'
 import { type LogRingBuffer } from '../infrastructure/logging/log-ring-buffer.js'
 import { createBuiltinKernelRegistry, createKernelInternals } from './kernel-internals.js'
 import {
@@ -216,6 +218,8 @@ export interface KernelOptions extends KernelRegistryInput {
    * {@link Kernel.logs.read}.
    */
   readonly logRing?: LogRingBuffer
+  /** Shared pretty formatter for console and {@link ReadLog}; defaults to {@link createLogFormatter}. */
+  readonly logFormatter?: LogFormatter
 }
 
 /**
@@ -241,6 +245,7 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
   const logDir = path.join(config.configPath, 'log')
   const logFilePath = path.join(logDir, 'specd.log')
   await fs.mkdir(logDir, { recursive: true })
+  const logFormatter = options?.logFormatter ?? createLogFormatter()
   const destinations: LogDestination[] = [
     {
       target: 'file',
@@ -260,7 +265,7 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
       },
     })
   }
-  Logger.setImplementation(createDefaultLogger(destinations))
+  Logger.setImplementation(createDefaultLogger(destinations, { formatter: logFormatter }))
 
   // Shared ResolveSchema + LazySchemaProvider — resolves once with plugins and overrides
   const resolveSchema = new ResolveSchema(
@@ -426,7 +431,7 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
       ),
     },
     ...(options?.logRing !== undefined
-      ? { logs: { read: new ReadLog(options.logRing) } }
+      ? { logs: { read: new ReadLog(options.logRing, logFormatter) } }
       : {}),
   }
 }

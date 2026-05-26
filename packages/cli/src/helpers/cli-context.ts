@@ -1,4 +1,5 @@
 import {
+  createLogFormatter,
   type Kernel,
   type LogDestination,
   type LogEntry,
@@ -80,6 +81,9 @@ export async function resolveCliContext(options?: {
         ]
       : []),
   ]
-  const kernel = await createCliKernel(config, { additionalDestinations })
+  const kernel = await createCliKernel(config, {
+    additionalDestinations,
+    logFormatter: createLogFormatter({ colorize: process.stdout.isTTY }),
+  })
   return { config, configFilePath, kernel }
 }

@@ -1,0 +1,15 @@
+- op: added
+  description: Pretty console output uses shared LogFormatter
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Implementation of Destinations'
+  content: |
+    ### Requirement: Pretty format uses LogFormatter
+
+    When `createDefaultLogger` receives a `LogFormatter` (from `createLogFormatter()`), destinations with `format: 'pretty'` MUST render each log event through `LogFormatter.format(LogEntry)` instead of attaching a standalone `pino-pretty` stream that bypasses the port.
+
+    `createDefaultLogger` MUST accept an optional `{ formatter?: LogFormatter }` second argument.

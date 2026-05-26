@@ -2,6 +2,20 @@
 
 ## Requirements
 
+### Requirement: dirty state derived from buffer vs saved content
+
+#### Scenario: dirty state derived from buffer vs saved content — primary path
+
+- **WHEN** For editable change artifacts, the UI MUST treat
+- **THEN** behaviour matches the spec requirement
+- **AND** no forbidden side effects occur
+
+#### Scenario: dirty state derived from buffer vs saved content — guard path
+
+- **GIVEN** inputs that stress the requirement boundary
+- **WHEN** the same capability runs
+- **THEN** errors or skips are explicit and documented
+
 ### Requirement: unsaved indicator beside Save
 
 #### Scenario: Dirty shows indicator

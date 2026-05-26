@@ -44,3 +44,17 @@
 - **WHEN** implementation-review handler runs
 - **THEN** output matches kernel `projectImplementationTracking` shape
 - **AND** does not call code-graph enrichment unless a future spec adds it
+
+### Requirement: optional fields are omitted rather than null
+
+#### Scenario: optional fields are omitted rather than null — primary path
+
+- **WHEN** Optional properties (e.g. symbols) MUST be omitted from
+- **THEN** behaviour matches the spec requirement
+- **AND** no forbidden side effects occur
+
+#### Scenario: optional fields are omitted rather than null — guard path
+
+- **GIVEN** inputs that stress the requirement boundary
+- **WHEN** the same capability runs
+- **THEN** errors or skips are explicit and documented

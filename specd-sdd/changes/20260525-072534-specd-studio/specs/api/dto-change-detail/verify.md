@@ -55,6 +55,20 @@
 - **WHEN** change detail JSON is returned
 - **THEN** that element includes `specIds`, `schemaName`, and `schemaVersion`
 
+### Requirement: history events are extensible per event type
+
+#### Scenario: history events are extensible per event type — primary path
+
+- **WHEN** Each history[] element MUST include type, at, and
+- **THEN** behaviour matches the spec requirement
+- **AND** no forbidden side effects occur
+
+#### Scenario: history events are extensible per event type — guard path
+
+- **GIVEN** inputs that stress the requirement boundary
+- **WHEN** the same capability runs
+- **THEN** errors or skips are explicit and documented
+
 ### Requirement: presenters map domain results without embedding rules
 
 #### Scenario: Presenter does not add business rules to DTO

@@ -11,6 +11,20 @@
 - **THEN** one outline result is returned
 - **AND** spec repository `get` is not called
 
+### Requirement: repository path unchanged without content
+
+#### Scenario: repository path unchanged without content — primary path
+
+- **WHEN** When content is omitted, behavior MUST match workspace
+- **THEN** behaviour matches the spec requirement
+- **AND** no forbidden side effects occur
+
+#### Scenario: repository path unchanged without content — guard path
+
+- **GIVEN** inputs that stress the requirement boundary
+- **WHEN** the same capability runs
+- **THEN** errors or skips are explicit and documented
+
 ### Requirement: filename required with content
 
 #### Scenario: Content without filename fails

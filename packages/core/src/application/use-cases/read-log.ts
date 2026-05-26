@@ -1,5 +1,6 @@
 import type { LogLevel } from '../ports/logger.port.js'
 import type { LogReadBuffer } from '../ports/log-read-buffer.port.js'
+import type { LogFormatter } from '../ports/log-formatter.port.js'
 
 /** Input for {@link ReadLog}. */
 export interface ReadLogInput {
@@ -24,27 +25,20 @@ export interface ReadLogResult {
 }
 
 /**
- * Formats one entry as a single log line.
- *
- * @param entry - Structured log entry
- * @returns Human-readable line
- */
-function formatPrettyLine(entry: ReadLogEntryDto): string {
-  const ctx = Object.keys(entry.context).length > 0 ? ` ${JSON.stringify(entry.context)}` : ''
-  return `${entry.timestamp} ${entry.level} ${entry.message}${ctx}`
-}
-
-/**
  * Reads recent in-memory log entries from a {@link LogReadBuffer}.
  * Does not read log files from disk.
  */
 export class ReadLog {
   /**
-   * Creates the use case with an in-memory log buffer.
+   * Creates the use case with an in-memory log buffer and formatter.
    *
    * @param buffer - Ring or buffer exposing recent entries
+   * @param formatter - Pretty-line formatter shared with kernel logging
    */
-  constructor(private readonly buffer: LogReadBuffer) {}
+  constructor(
+    private readonly buffer: LogReadBuffer,
+    private readonly formatter: LogFormatter,
+  ) {}
 
   /**
    * Returns recent log entries or pretty-printed lines.
@@ -55,15 +49,15 @@ export class ReadLog {
   execute(input: ReadLogInput = {}): ReadLogResult {
     const limit = input.limit ?? 500
     const raw = this.buffer.readLast(limit)
+    if (input.prettier) {
+      return { lines: raw.map((entry) => this.formatter.format(entry)) }
+    }
     const entries: ReadLogEntryDto[] = raw.map((e) => ({
       timestamp: e.timestamp.toISOString(),
       level: e.level,
       message: e.message,
       context: { ...e.context },
     }))
-    if (input.prettier) {
-      return { lines: entries.map(formatPrettyLine) }
-    }
     return { entries }
   }
 }

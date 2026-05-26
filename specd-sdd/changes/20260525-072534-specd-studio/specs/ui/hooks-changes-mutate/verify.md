@@ -43,3 +43,31 @@
 - **WHEN** transition succeeds
 - **THEN** mutate hook error cleared
 - **AND** status refetch scheduled
+
+### Requirement: usePatchChange delegates metadata PATCH
+
+#### Scenario: usePatchChange delegates metadata PATCH — primary path
+
+- **WHEN** usePatchChange MUST call port.patchChange and expose isPatching, error,
+- **THEN** behaviour matches the spec requirement
+- **AND** no forbidden side effects occur
+
+#### Scenario: usePatchChange delegates metadata PATCH — guard path
+
+- **GIVEN** inputs that stress the requirement boundary
+- **WHEN** the same capability runs
+- **THEN** errors or skips are explicit and documented
+
+### Requirement: scope dialog uses updateSpecDependencies
+
+#### Scenario: scope dialog uses updateSpecDependencies — primary path
+
+- **WHEN** [ui:change-scope-dialog](../change-scope-dialog/spec.md) MUST call port.updateSpecDependencies(name, { specId, set })
+- **THEN** behaviour matches the spec requirement
+- **AND** no forbidden side effects occur
+
+#### Scenario: scope dialog uses updateSpecDependencies — guard path
+
+- **GIVEN** inputs that stress the requirement boundary
+- **WHEN** the same capability runs
+- **THEN** errors or skips are explicit and documented

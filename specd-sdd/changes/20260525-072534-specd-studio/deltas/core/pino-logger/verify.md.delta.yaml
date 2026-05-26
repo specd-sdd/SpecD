@@ -1,0 +1,24 @@
+- op: added
+  description: Scenarios for Pretty format uses LogFormatter
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Implementation of Destinations'
+  content: |
+    ### Requirement: Pretty format uses LogFormatter
+
+    #### Scenario: Pretty destination uses formatter port
+
+    - **GIVEN** `createDefaultLogger` is called with a `LogFormatter` instance
+    - **WHEN** a `console` destination has `format: 'pretty'`
+    - **THEN** each emitted line is produced via `LogFormatter.format(LogEntry)`
+    - **AND** no standalone `pino-pretty` stream bypasses the port
+
+    #### Scenario: Factory accepts optional formatter argument
+
+    - **WHEN** `createDefaultLogger(destinations, { formatter })` is invoked
+    - **THEN** pretty destinations use the supplied formatter
+    - **AND** JSON file destinations remain unchanged

@@ -1,0 +1,13 @@
+- op: added
+  description: CLI passes createLogFormatter into kernel
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Kernel Registration'
+  content: |
+    ### Requirement: Shared formatter with kernel
+
+    When resolving CLI context, the CLI MUST call `createLogFormatter({ colorize: process.stdout.isTTY })` and pass the instance to `createKernel` via `KernelOptions.logFormatter` so console pretty output and in-memory log readback use the same formatting as Studio `GET /v1/logs?prettier=true`.

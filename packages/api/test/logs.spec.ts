@@ -39,6 +39,24 @@ describe('project logs and studio output', () => {
     expect(data.entries.some((e) => e.message.includes('scope warning'))).toBe(true)
   })
 
+  it('GET /v1/logs?prettier=true returns plain text without ansi codes', async () => {
+    await apiJson('/logs', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        level: 'info',
+        message: 'plain log line',
+        context: { workspace: 'core' },
+      }),
+    })
+
+    const { res, data } = await apiJson<{ lines?: string[] }>('/logs?limit=5&prettier=true')
+    expect(res.status).toBe(200)
+    const line = data.lines?.find((l) => l.includes('plain log line'))
+    expect(line).toBeDefined()
+    expect(line).not.toMatch(/\u001b\[[0-9;]*m/)
+  })
+
   it('POST /v1/logs does not append to studio output', async () => {
     const { data: before } = await apiJson<{ entries: { id: string }[] }>('/studio/output?limit=50')
     const countBefore = before.entries.length

@@ -35,3 +35,17 @@
 
 - **WHEN** confirm modal is displayed
 - **THEN** body text references invalidation or drift and downstream DAG review
+
+### Requirement: problems panel is not overwritten by status polling
+
+#### Scenario: problems panel is not overwritten by status p… — primary path
+
+- **WHEN** Workflow blockers from getChangeStatus MUST remain on Overview.
+- **THEN** behaviour matches the spec requirement
+- **AND** no forbidden side effects occur
+
+#### Scenario: problems panel is not overwritten by status p… — guard path
+
+- **GIVEN** inputs that stress the requirement boundary
+- **WHEN** the same capability runs
+- **THEN** errors or skips are explicit and documented

@@ -16,6 +16,11 @@ export { createSchemaRegistry } from './schema-registry.js'
 export { createSchemaRepository } from './schema-repository.js'
 export { createConfigLoader, type FsConfigLoaderOptions } from './config-loader.js'
 export { LogRingBuffer } from '../infrastructure/logging/log-ring-buffer.js'
+export { createLogFormatter } from './create-log-formatter.js'
+export {
+  PinoPrettyLogFormatter,
+  type PinoPrettyLogFormatterOptions,
+} from '../infrastructure/logging/pino-pretty-log-formatter.js'
 export { createVcsAdapter } from './vcs-adapter.js'
 export { GitVcsAdapter } from '../infrastructure/git/vcs-adapter.js'
 export { HgVcsAdapter } from '../infrastructure/hg/vcs-adapter.js'

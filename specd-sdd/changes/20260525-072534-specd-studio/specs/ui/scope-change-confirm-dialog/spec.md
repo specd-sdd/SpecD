@@ -14,6 +14,10 @@ When **Save changes** includes `addSpecIds` or `removeSpecIds`, the dialog MUST 
 
 When only `specDependsOn` values changed, **Save changes** MUST apply dependency PATCHes without the scope confirm step.
 
+### Requirement: modal copy explains scope invalidation
+
+The confirm sub-step body MUST explain that approvals are invalidated and list specs to add (`+ id`) and remove (`− id`) using copy from `buildScopeChangeConfirmMessage`.
+
 ## Spec Dependencies
 
 - [`ui:change-metadata-editor`](../change-metadata-editor/spec.md) — parent dialog

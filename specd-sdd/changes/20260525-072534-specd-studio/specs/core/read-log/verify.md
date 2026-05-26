@@ -32,6 +32,26 @@
 - **THEN** `lines` is populated
 - **AND** `entries` is omitted
 
+#### Scenario: Prettier lines use LogFormatter
+
+- **GIVEN** a formatter double that prefixes each line with `fmt:`
+- **WHEN** `execute({ prettier: true })` runs on one entry with message `x`
+- **THEN** `lines[0]` starts with `fmt:`
+
+### Requirement: LogFormatter injection
+
+#### Scenario: LogFormatter injection — primary path
+
+- **WHEN** ReadLog MUST accept LogReadBuffer and LogFormatter at construction.
+- **THEN** behaviour matches the spec requirement
+- **AND** no forbidden side effects occur
+
+#### Scenario: LogFormatter injection — guard path
+
+- **GIVEN** inputs that stress the requirement boundary
+- **WHEN** the same capability runs
+- **THEN** errors or skips are explicit and documented
+
 ### Requirement: kernel exposes logs.read when ring is wired
 
 #### Scenario: API server kernel has logs.read

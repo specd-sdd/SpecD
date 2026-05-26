@@ -43,3 +43,17 @@
 - **GIVEN** `deltas/core/foo/spec.md.delta.yaml` on an active change
 - **WHEN** inspector renders mode tabs
 - **THEN** Diff tab is present and selectable
+
+### Requirement: view uses SpecdDataPort hooks only
+
+#### Scenario: view uses SpecdDataPort hooks only — primary path
+
+- **WHEN** Components MUST consume data through SpecdDataPort hooks and
+- **THEN** behaviour matches the spec requirement
+- **AND** no forbidden side effects occur
+
+#### Scenario: view uses SpecdDataPort hooks only — guard path
+
+- **GIVEN** inputs that stress the requirement boundary
+- **WHEN** the same capability runs
+- **THEN** errors or skips are explicit and documented

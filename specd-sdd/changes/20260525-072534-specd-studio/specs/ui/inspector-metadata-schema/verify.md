@@ -1,4 +1,4 @@
-# Verification: Inspector Metadata Schema
+# Verification: Inspector Metadata & Outline
 
 ## Requirements
 
@@ -50,6 +50,62 @@
 - **GIVEN** dirty change artifact
 - **WHEN** user attempts to close inspector
 - **THEN** unsaved dialog is shown per `ui:inspector-unsaved-draft`
+
+### Requirement: metadata mode shows artifact file metadata
+
+#### Scenario: metadata mode shows artifact file metadata — primary path
+
+- **WHEN** Metadata mode MUST render artifact file metadata (path,
+- **THEN** behaviour matches the spec requirement
+- **AND** no forbidden side effects occur
+
+#### Scenario: metadata mode shows artifact file metadata — guard path
+
+- **GIVEN** inputs that stress the requirement boundary
+- **WHEN** the same capability runs
+- **THEN** errors or skips are explicit and documented
+
+### Requirement: outline mode uses draft-aware endpoints
+
+#### Scenario: outline mode uses draft-aware endpoints — primary path
+
+- **WHEN** Outline mode MUST load navigable structure for the
+- **THEN** behaviour matches the spec requirement
+- **AND** no forbidden side effects occur
+
+#### Scenario: outline mode uses draft-aware endpoints — guard path
+
+- **GIVEN** inputs that stress the requirement boundary
+- **WHEN** the same capability runs
+- **THEN** errors or skips are explicit and documented
+
+### Requirement: preview and diff honor unsaved editor buffer
+
+#### Scenario: preview and diff honor unsaved editor buffer — primary path
+
+- **WHEN** For spec-scoped change artifacts, Preview and Diff MUST
+- **THEN** behaviour matches the spec requirement
+- **AND** no forbidden side effects occur
+
+#### Scenario: preview and diff honor unsaved editor buffer — guard path
+
+- **GIVEN** inputs that stress the requirement boundary
+- **WHEN** the same capability runs
+- **THEN** errors or skips are explicit and documented
+
+### Requirement: unsaved changes are visible and guarded
+
+#### Scenario: unsaved changes are visible and guarded — primary path
+
+- **WHEN** When editor buffer differs from last loaded originalHash
+- **THEN** behaviour matches the spec requirement
+- **AND** no forbidden side effects occur
+
+#### Scenario: unsaved changes are visible and guarded — guard path
+
+- **GIVEN** inputs that stress the requirement boundary
+- **WHEN** the same capability runs
+- **THEN** errors or skips are explicit and documented
 
 ### Requirement: view uses SpecdDataPort hooks only
 
