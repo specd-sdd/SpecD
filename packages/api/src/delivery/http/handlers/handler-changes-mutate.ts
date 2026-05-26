@@ -1,4 +1,9 @@
-import { type Change, type Kernel, type ValidateChangeBatchResult } from '@specd/core'
+import {
+  type Change,
+  type DraftedChangeView,
+  type Kernel,
+  type ValidateChangeBatchResult,
+} from '@specd/core'
 import { type FastifyInstance } from 'fastify'
 import { type ApiContext } from '../../../composition/create-api-context.js'
 import { apiHandler } from '../handler-utils.js'
@@ -44,10 +49,10 @@ export function registerChangesMutateRoutes(app: FastifyInstance): void {
       const query = req.query as { specId?: string; artifactId?: string }
       const result = await ctx.kernel.changes.validate.execute({
         name,
-        ...(body.specId ?? query.specId !== undefined
+        ...((body.specId ?? query.specId !== undefined)
           ? { specPath: body.specId ?? query.specId }
           : {}),
-        ...(body.artifactId ?? query.artifactId !== undefined
+        ...((body.artifactId ?? query.artifactId !== undefined)
           ? { artifactId: body.artifactId ?? query.artifactId }
           : {}),
       })
@@ -93,15 +98,25 @@ export function registerChangesMutateRoutes(app: FastifyInstance): void {
         approvalsSpec: ctx.config.approvals.spec,
         approvalsSignoff: ctx.config.approvals.signoff,
         ...(body.skipHookPhases !== undefined
-          ? { skipHookPhases: new Set(body.skipHookPhases as import('@specd/core').HookPhaseSelector[]) }
+          ? {
+              skipHookPhases: new Set(
+                body.skipHookPhases as import('@specd/core').HookPhaseSelector[],
+              ),
+            }
           : {}),
       })
       return toChangeDetailDto(result.change)
     }),
   )
 
-  app.post('/changes/:name/draft', mutateSimple((k, n) => k.changes.draft.execute({ name: n })))
-  app.post('/changes/:name/restore', mutateSimple((k, n) => k.changes.restore.execute({ name: n })))
+  app.post(
+    '/changes/:name/draft',
+    mutateSimple((k, n) => k.changes.draft.execute({ name: n })),
+  )
+  app.post(
+    '/changes/:name/restore',
+    mutateSimple((k, n) => k.changes.restore.execute({ name: n })),
+  )
   app.post(
     '/changes/:name/discard',
     apiHandler(async (ctx, req) => {
@@ -289,9 +304,7 @@ function toValidateBatchResultDto(result: ValidateChangeBatchResult): ValidateBa
   }
 }
 
-function mutateSimple(
-  run: (kernel: Kernel, name: string) => Promise<Change>,
-) {
+function mutateSimple(run: (kernel: Kernel, name: string) => Promise<Change | DraftedChangeView>) {
   return apiHandler(async (ctx: ApiContext, req) => {
     const { name } = req.params as { name: string }
     const change = await run(ctx.kernel, name)

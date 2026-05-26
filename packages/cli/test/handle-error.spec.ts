@@ -3,6 +3,7 @@ import {
   Logger,
   ChangeNotFoundError,
   ChangeAlreadyExistsError,
+  DraftedChangeReadOnlyError,
   AlreadyInitialisedError,
   ApprovalGateDisabledError,
   SchemaNotFoundError,
@@ -62,6 +63,7 @@ describe('handleError — exit code 1 (domain errors)', () => {
   const domainCases: [string, unknown][] = [
     ['ChangeNotFoundError', new ChangeNotFoundError('my-change')],
     ['ChangeAlreadyExistsError', new ChangeAlreadyExistsError('my-change')],
+    ['DraftedChangeReadOnlyError', new DraftedChangeReadOnlyError('my-change', 'save')],
     ['AlreadyInitialisedError', new AlreadyInitialisedError('/project/specd.yaml')],
     ['InvalidStateTransitionError', new InvalidStateTransitionError('designing', 'archiving')],
     ['ApprovalRequiredError', new ApprovalRequiredError('my-change')],

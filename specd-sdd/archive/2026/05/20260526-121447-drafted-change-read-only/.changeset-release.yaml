@@ -1,0 +1,23 @@
+releases:
+  core:core/change: patch
+  core:core/change-repository-port: patch
+  core:core/restore-change: patch
+  core:core/discard-change: patch
+  core:core/drafted-change-view: patch
+  core:core/drafted-change-read-only-error: patch
+  core:core/get-draft: patch
+  core:core/list-drafts: patch
+  core:core/get-status: patch
+  core:core/draft-change: patch
+  core:core/get-discarded: patch
+  core:core/discarded-change-view: patch
+  core:core/list-discarded: patch
+  core:core/read-only-change-view: patch
+  cli:cli/drafts-show: patch
+  cli:cli/drafts-list: patch
+  cli:cli/change-draft: patch
+  cli:cli/change-status: patch
+  cli:cli/project-status: patch
+  cli:cli/project-dashboard: patch
+  cli:cli/discarded-show: patch
+  cli:cli/discarded-list: patch

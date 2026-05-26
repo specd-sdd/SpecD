@@ -1,4 +1,8 @@
 import { type Change } from '../../domain/entities/change.js'
+import {
+  type DiscardedChangeView,
+  type DraftedChangeView,
+} from '../../domain/read-only-change-view.js'
 import { type SpecArtifact } from '../../domain/value-objects/spec-artifact.js'
 import { type ArtifactConflictError } from '../../domain/errors/artifact-conflict-error.js'
 import { Repository, type RepositoryConfig } from './repository.js'
@@ -44,9 +48,25 @@ export abstract class ChangeRepository extends Repository {
    * {@link mutate} instead of pairing `get()` with a later `save()`.
    *
    * @param name - The change name (e.g. `"add-oauth-login"`)
-   * @returns The change with current artifact state, or `null` if not found
+   * @returns The change with current artifact state, or `null` if not found in `changes/`
    */
   abstract get(name: string): Promise<Change | null>
+
+  /**
+   * Returns a drafted change as a read-only view, or `null` if not found in `drafts/`.
+   *
+   * @param name - The change name to look up
+   * @returns A `DraftedChangeView` without artifact file bodies, or `null`
+   */
+  abstract getDraft(name: string): Promise<DraftedChangeView | null>
+
+  /**
+   * Returns a discarded change as a read-only view, or `null` if not found in `discarded/`.
+   *
+   * @param name - The change name to look up
+   * @returns A `DiscardedChangeView` with discard metadata, or `null`
+   */
+  abstract getDiscarded(name: string): Promise<DiscardedChangeView | null>
 
   /**
    * Runs a serialized persisted mutation for one existing change.
@@ -62,9 +82,19 @@ export abstract class ChangeRepository extends Repository {
    * @param name - The change name to mutate
    * @param fn - Callback that applies the mutation on the fresh persisted change
    * @returns The callback result after the manifest has been persisted
-   * @throws {ChangeNotFoundError} If no change with the given name exists
+   * @throws {ChangeNotFoundError} If no active change with the given name exists
    */
   abstract mutate<T>(name: string, fn: (change: Change) => Promise<T> | T): Promise<T>
+
+  /**
+   * Runs a serialized persisted mutation for one existing drafted change.
+   *
+   * @param name - The drafted change name to mutate
+   * @param fn - Callback that applies the mutation on the fresh persisted drafted `Change`
+   * @returns The callback result after the manifest has been persisted
+   * @throws {ChangeNotFoundError} If no drafted change with the given name exists
+   */
+  abstract mutateDraft<T>(name: string, fn: (change: Change) => Promise<T> | T): Promise<T>
 
   /**
    * Lists all active (non-drafted, non-discarded) changes, sorted by creation order.
@@ -76,22 +106,18 @@ export abstract class ChangeRepository extends Repository {
   abstract list(): Promise<Change[]>
 
   /**
-   * Lists all drafted (shelved) changes in this workspace, sorted by creation order.
+   * Lists all drafted changes in this workspace, sorted by creation order.
    *
-   * Returns {@link Change} objects with artifact state but without content.
-   *
-   * @returns All drafted changes in this workspace, oldest first
+   * @returns All drafted changes as {@link DraftedChangeView}, oldest first
    */
-  abstract listDrafts(): Promise<Change[]>
+  abstract listDrafts(): Promise<DraftedChangeView[]>
 
   /**
    * Lists all discarded changes in this workspace, sorted by creation order.
    *
-   * Returns {@link Change} objects with artifact state but without content.
-   *
-   * @returns All discarded changes in this workspace, oldest first
+   * @returns All discarded changes as {@link DiscardedChangeView}, oldest first
    */
-  abstract listDiscarded(): Promise<Change[]>
+  abstract listDiscarded(): Promise<DiscardedChangeView[]>
 
   /**
    * Persists the change manifest — state, artifact statuses, validated
@@ -167,6 +193,14 @@ export abstract class ChangeRepository extends Repository {
    * @returns Absolute path to the change directory
    */
   abstract changePath(change: Change): string
+
+  /**
+   * Returns the absolute filesystem path to a drafted change directory.
+   *
+   * @param view - A `DraftedChangeView` from {@link getDraft} or {@link listDrafts}
+   * @returns Absolute path under `drafts/`
+   */
+  abstract draftChangePath(view: DraftedChangeView): string
 
   abstract artifactExists(change: Change, filename: string): Promise<boolean>
 

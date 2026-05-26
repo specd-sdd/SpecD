@@ -156,6 +156,7 @@
       "then": ["the process exits with code 1", "AND stderr contains an error: message"]
     }
   ],
+  "implementation": {},
   "contentHashes": {
     "spec.md": "sha256:4827c1f8e7dabd0559e4e62646046ed9004198aeee3cd0f6d162f16710300f93",
     "verify.md": "sha256:c0571294cd14da6cac99efbb1eb36d0e4c54cbbcfd2f6434353026a1724e1b63"

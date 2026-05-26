@@ -1,8 +1,8 @@
-import { type Change } from '../../domain/entities/change.js'
+import { type DraftedChangeView } from '../../domain/read-only-change-view.js'
 import { type ChangeRepository } from '../ports/change-repository.js'
 
 /**
- * Lists all drafted (shelved) changes in the default workspace.
+ * Lists all drafted changes in the default workspace.
  */
 export class ListDrafts {
   private readonly _changes: ChangeRepository
@@ -21,7 +21,7 @@ export class ListDrafts {
    *
    * @returns All drafted changes, oldest first
    */
-  async execute(): Promise<Change[]> {
+  async execute(): Promise<DraftedChangeView[]> {
     return this._changes.listDrafts()
   }
 }

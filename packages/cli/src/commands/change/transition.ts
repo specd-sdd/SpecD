@@ -217,8 +217,15 @@ JSON/TOON output schema:
 
           const { config, kernel } = await resolveCliContext({ configPath: opts.config })
 
-          await kernel.changes.refreshImplementationTracking.execute({ name })
-          const { change: statusBefore } = await kernel.changes.status.execute({ name })
+          const active = await kernel.changes.repo.get(name)
+          if (active !== null) {
+            await kernel.changes.refreshImplementationTracking.execute({ name })
+          }
+          const statusResult = await kernel.changes.status.execute({ name })
+          const statusBefore = statusResult.change
+          if (statusBefore === undefined) {
+            cliError(`change '${name}' is drafted; restore it before transitioning`, opts.format)
+          }
           const fromState = statusBefore.state
           const requestedTarget = resolveRequestedTarget(
             fromState,

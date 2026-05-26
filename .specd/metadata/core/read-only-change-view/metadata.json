@@ -1,0 +1,174 @@
+{
+  "title": "ReadOnlyChangeView",
+  "description": "Drafted and discarded changes are loaded for display and audit without exposing a mutable `Change` aggregate. `ReadOnlyChangeView` is the shared read-only contract for those projections. `DraftedChangeView` and `DiscardedChangeView` extend it with storage-specific fields.",
+  "dependsOn": ["core:change"],
+  "context": [
+    "Drafted and discarded changes are loaded for display and audit without exposing a mutable `Change` aggregate. `ReadOnlyChangeView` is the shared read-only contract for those projections. `DraftedChangeView` and `DiscardedChangeView` extend it with storage-specific fields."
+  ],
+  "rules": [
+    {
+      "requirement": "Shared read-only surface",
+      "rules": [
+        "`ReadOnlyChangeView` MUST define the common read accessors required for non-active change display:\n\n- `name`, `createdAt`, `description`\n- `state` (derived lifecycle state at time of load)\n- `specIds`, `workspaces`\n- `schemaName`, `schemaVersion`\n- `artifacts` — read-only view of artifact aggregate state (status, file keys; not file content)\n- `history` — read-only view of append-only events when needed for display\n\nTypes that extend `ReadOnlyChangeView` MUST NOT add mutating methods. They MUST NOT expose `transition`, `updateSpecIds`, `draft`, `restore`, `discard`, `invalidate`, approval mutators, or any other operation that appends events or mutates artifact state."
+      ]
+    },
+    {
+      "requirement": "No escape hatch to mutable Change",
+      "rules": [
+        "Implementations of `ReadOnlyChangeView` (including `DraftedChangeView` and `DiscardedChangeView`) MUST NOT provide a public accessor that returns the wrapped `Change` instance (for example `change`, `unwrap`, or `toChange`).\n\nOnly `ChangeRepository` internals (`mutateDraft`, `save` during allowed draft mutations, and the shared read-only facade factory) MAY hold the mutable aggregate."
+      ]
+    },
+    {
+      "requirement": "Shared implementation",
+      "rules": [
+        "The core package MUST provide a single internal facade class (for example `ReadOnlyChangeFacade`) that implements both `DraftedChangeView` and `DiscardedChangeView` by wrapping one loaded `Change`.\n\nThe package MUST expose factory functions:\n\n- `toDraftedChangeView(change: Change): DraftedChangeView` — throws if `!change.isDrafted`\n- `toDiscardedChangeView(change: Change): DiscardedChangeView` — throws if the latest history event is not `discarded`\n\n`ChangeRepository.getDraft`, `getDiscarded`, `listDrafts`, and `listDiscarded` MUST map persisted manifests through these factories (or equivalent private construction in the same module). Callers MUST NOT construct facades from arbitrary in-memory `Change` instances in production code."
+      ]
+    },
+    {
+      "requirement": "Artifact content",
+      "rules": [
+        "Loading artifact file content remains the responsibility of `ChangeRepository.artifact` and related port methods when invoked with the correct storage context. `ReadOnlyChangeView` types MUST NOT include artifact body content."
+      ]
+    }
+  ],
+  "constraints": [
+    "ReadOnlyChangeView is a TypeScript interface contract, not a replacement for the Change entity.",
+    "Active changes continue to use Change via get / mutate."
+  ],
+  "scenarios": [
+    {
+      "requirement": "Shared read-only surface",
+      "name": "Drafted view exposes shared fields",
+      "given": [
+        "a drafted change named parked-feature with specIds ['core:change'] and schema schema-std@1"
+      ],
+      "when": ["toDraftedChangeView(change) is called"],
+      "then": [
+        "the result satisfies ReadOnlyChangeView",
+        "AND name is parked-feature",
+        "AND specIds equals ['core:change']",
+        "AND schemaName and schemaVersion match the persisted manifest"
+      ]
+    },
+    {
+      "requirement": "Shared read-only surface",
+      "name": "Discarded view exposes shared fields",
+      "given": ["a discarded change with terminal discarded event"],
+      "when": ["toDiscardedChangeView(change) is called"],
+      "then": [
+        "the result satisfies ReadOnlyChangeView",
+        "AND artifacts is a read-only map with derived statuses but no file bodies"
+      ]
+    },
+    {
+      "requirement": "Shared read-only surface",
+      "name": "View types omit mutating methods",
+      "when": ["inspecting DraftedChangeView and DiscardedChangeView public APIs"],
+      "then": ["neither type declares transition, draft, restore, discard, or invalidate"]
+    },
+    {
+      "requirement": "No escape hatch to mutable Change",
+      "name": "Repository view has no unwrap accessor",
+      "when": ["a DraftedChangeView is returned from getDraft(name)"],
+      "then": ["the object has no public change, unwrap, or toChange property"]
+    },
+    {
+      "requirement": "No escape hatch to mutable Change",
+      "name": "Discarded view has no unwrap accessor",
+      "when": ["a DiscardedChangeView is returned from getDiscarded(name)"],
+      "then": ["the object has no public change, unwrap, or toChange property"]
+    },
+    {
+      "requirement": "No escape hatch to mutable Change",
+      "name": "Factories return facade instances only",
+      "when": ["toDraftedChangeView or toDiscardedChangeView succeeds"],
+      "then": ["the returned object is not an instance of domain Change"]
+    },
+    {
+      "requirement": "Shared implementation",
+      "name": "Single facade backs drafted views",
+      "given": ["a drafted Change loaded from drafts/"],
+      "when": ["toDraftedChangeView(change) is called"],
+      "then": [
+        "the result satisfies DraftedChangeView and ReadOnlyChangeView",
+        "AND isDrafted === true"
+      ]
+    },
+    {
+      "requirement": "Shared implementation",
+      "name": "Single facade backs discarded views",
+      "given": ["a Change whose latest history event is discarded with reason obsolete"],
+      "when": ["toDiscardedChangeView(change) is called"],
+      "then": [
+        "the result satisfies DiscardedChangeView and ReadOnlyChangeView",
+        "AND discardReason is obsolete"
+      ]
+    },
+    {
+      "requirement": "Shared implementation",
+      "name": "Discarded factory rejects non-terminal change",
+      "given": ["a Change whose latest history event is transitioned to designing"],
+      "when": ["toDiscardedChangeView(change) is called"],
+      "then": ["it throws a domain error"]
+    },
+    {
+      "requirement": "Shared implementation",
+      "name": "Drafted factory rejects active change",
+      "given": ["a Change with isDrafted === false under changes/"],
+      "when": ["toDraftedChangeView(change) is called"],
+      "then": ["it throws a domain error"]
+    },
+    {
+      "requirement": "Shared implementation",
+      "name": "Drafted factory rejects discarded change",
+      "given": ["a Change whose latest history event is discarded"],
+      "when": ["toDraftedChangeView(change) is called"],
+      "then": ["it throws a domain error"]
+    },
+    {
+      "requirement": "Artifact content",
+      "name": "getDraft does not load artifact bodies into the view",
+      "given": ["a drafted change with on-disk proposal.md content"],
+      "when": ["getDraft(name) returns a DraftedChangeView"],
+      "then": [
+        "the view's artifact entries include status metadata only",
+        "AND proposal.md text is not a property on the view"
+      ]
+    },
+    {
+      "requirement": "Artifact content",
+      "name": "getDiscarded does not load artifact bodies into the view",
+      "given": ["a discarded change with on-disk delta files"],
+      "when": ["getDiscarded(name) returns a DiscardedChangeView"],
+      "then": ["the view does not include merged spec or delta file content"]
+    },
+    {
+      "requirement": "Artifact content",
+      "name": "Artifact content still loadable via repository.artifact",
+      "given": ["a DraftedChangeView from getDraft(name)"],
+      "when": [
+        "ChangeRepository.artifact is called with the internal drafted context for that name"
+      ],
+      "then": ["artifact file content may be loaded separately from the view"]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "core:read-only-change-view",
+        "file": "core:src/domain/read-only-change-view.ts",
+        "symbol": "toDraftedChangeView"
+      },
+      {
+        "specId": "core:read-only-change-view",
+        "file": "core:src/domain/read-only-change-view.ts",
+        "symbol": "toDiscardedChangeView"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:87f4addaba1b18f315eeeaf2411fbef0588f9a81843a524a970e7492fa0da732",
+    "verify.md": "sha256:c1fd442d26af47e3e6bef4b903e54c20d79f42db532c37f1c9f1fecc94585317"
+  },
+  "generatedBy": "core"
+}

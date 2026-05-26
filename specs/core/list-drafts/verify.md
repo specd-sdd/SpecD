@@ -23,13 +23,33 @@
 - **WHEN** `execute()` is called
 - **THEN** the result contains only `alpha`
 
-### Requirement: Returns Change entities without content
+### Requirement: Returns DraftedChangeView without content
 
-#### Scenario: Changes have artifact state but no content
+#### Scenario: Views have artifact state but no content
 
-- **WHEN** `execute()` returns a list of changes
-- **THEN** each `Change` has its artifact map populated with status and validated hashes
+- **WHEN** `execute()` returns a list
+- **THEN** each entry satisfies `DraftedChangeView` with `isDrafted === true`
+- **AND** artifact statuses are populated
 - **AND** no artifact file content is loaded
+
+#### Scenario: Views are not Change instances
+
+- **WHEN** `execute()` returns a non-empty list
+- **THEN** entries do not expose `transition` or other `Change` mutators
+
+#### Scenario: Empty drafts directory returns empty list
+
+- **GIVEN** no directories exist under `drafts/`
+- **WHEN** `ListDrafts.execute()` is called
+- **THEN** it returns an empty array
+
+#### Scenario: Active changes are excluded
+
+- **GIVEN** `parked-feature` exists only under `changes/`
+- **AND** `old-work` exists only under `drafts/`
+- **WHEN** `ListDrafts.execute()` is called
+- **THEN** the result contains `old-work` only
+- **AND** no entry has `name === 'parked-feature'`
 
 ### Requirement: Returns an empty array when no drafted changes exist
 

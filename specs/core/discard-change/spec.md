@@ -17,7 +17,13 @@ Sometimes a change becomes obsolete or is superseded, and the team needs a way t
 
 ### Requirement: Change must exist
 
-The use case MUST load the change from the `ChangeRepository` by name. If no change exists with the given name, it MUST throw `ChangeNotFoundError`.
+The use case MUST locate the change before discarding:
+
+1. If `ChangeRepository.get(name)` returns an active change, discard from active storage via `mutate(name, fn)`.
+2. Else if `ChangeRepository.getDraft(name)` returns a drafted view, discard from drafted storage via `mutateDraft(name, fn)`.
+3. Else throw `ChangeNotFoundError`.
+
+The use case MUST NOT load a drafted change through `get(name)`.
 
 ### Requirement: Actor resolution
 
@@ -43,9 +49,12 @@ The use case MUST call `change.discard(reason, actor, supersededBy, force)` to a
 
 ### Requirement: Persistence
 
-After appending the discarded event, the use case MUST persist the change through `ChangeRepository.mutate(name, fn)`.
+After the historical implementation guard passes, persistence MUST use:
 
-Inside the mutation callback, the repository supplies the fresh persisted `Change` for `name`; the use case calls `change.discard(reason, actor, supersededBy)` on that instance and returns it. When the callback resolves, the repository persists the updated manifest and performs any required directory relocation to `discarded/`.
+- `ChangeRepository.mutate(name, fn)` when discarding an active change, or
+- `ChangeRepository.mutateDraft(name, fn)` when discarding a drafted change
+
+Inside the callback, the use case calls `change.discard(reason, actor, supersededBy, force)` on the fresh instance and returns it. The repository persists the manifest and moves the directory to `discarded/`.
 
 `DiscardChange.execute` returns the updated `Change` instance produced by that serialized mutation.
 

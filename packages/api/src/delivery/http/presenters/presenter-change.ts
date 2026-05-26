@@ -1,8 +1,11 @@
 import {
   type Change,
   type ChangeEvent,
+  type DiscardedChangeView,
+  type DraftedChangeView,
   type GetImplementationReviewResult,
   type GetStatusResult,
+  type ReadOnlyChangeView,
 } from '@specd/core'
 import { type ChangeDetailDto, type ChangeHistoryEventDto } from '../dto/change-detail.js'
 import { type ChangeStatusDto } from '../dto/change-status.js'
@@ -16,6 +19,16 @@ import { type ImplementationReviewDto } from '../dto/implementation-review.js'
  */
 function iso(d: Date): string {
   return d.toISOString()
+}
+
+function resolveUpdatedAt(input: {
+  readonly updatedAt?: Date
+  readonly createdAt: Date
+  readonly history: readonly ChangeEvent[]
+}): Date {
+  if (input.updatedAt instanceof Date) return input.updatedAt
+  const last = input.history[input.history.length - 1]
+  return last?.at ?? input.createdAt
 }
 
 /**
@@ -50,13 +63,17 @@ function historyEventDto(event: ChangeEvent): ChangeHistoryEventDto {
  * @param change
  * @param blockerCount
  */
-export function toChangeSummaryDto(change: Change, blockerCount = 0): ChangeSummaryDto {
+export function toChangeSummaryDto(
+  change: Change | DraftedChangeView | DiscardedChangeView,
+  blockerCount = 0,
+): ChangeSummaryDto {
+  const updatedAt = resolveUpdatedAt(change)
   return {
     name: change.name,
     ...(change.description !== undefined ? { title: change.description } : {}),
     state: change.state,
     specIds: [...change.specIds],
-    updatedAt: iso(change.updatedAt),
+    updatedAt: iso(updatedAt),
     blockerCount,
   }
 }
@@ -65,21 +82,24 @@ export function toChangeSummaryDto(change: Change, blockerCount = 0): ChangeSumm
  * Maps a change entity to detail DTO (no artifact bodies).
  * @param change
  */
-export function toChangeDetailDto(change: Change): ChangeDetailDto {
+export function toChangeDetailDto(change: Change | ReadOnlyChangeView): ChangeDetailDto {
   const specApproved = change.history.some((e) => e.type === 'spec-approved')
   const signoffApproved = change.history.some((e) => e.type === 'signed-off')
   return {
     name: change.name,
     state: change.state,
     specIds: [...change.specIds],
-    specDependsOn: Object.fromEntries(
-      [...change.specDependsOn.entries()].map(([k, deps]) => [k, [...deps]]),
-    ),
+    specDependsOn:
+      'specDependsOn' in change
+        ? Object.fromEntries([...change.specDependsOn.entries()].map(([k, deps]) => [k, [...deps]]))
+        : {},
     schemaName: change.schemaName,
     schemaVersion: change.schemaVersion,
-    invalidationPolicy: change.invalidationPolicy,
+    ...('invalidationPolicy' in change && change.invalidationPolicy !== undefined
+      ? { invalidationPolicy: change.invalidationPolicy }
+      : {}),
     ...(change.description !== undefined ? { description: change.description } : {}),
-    updatedAt: iso(change.updatedAt),
+    updatedAt: iso(resolveUpdatedAt(change)),
     history: change.history.map(historyEventDto),
     approvals: { specApproved, signoffApproved },
   }
@@ -90,23 +110,27 @@ export function toChangeDetailDto(change: Change): ChangeDetailDto {
  * @param result
  */
 export function toChangeStatusDto(result: GetStatusResult): ChangeStatusDto {
-  const { change, unchanged } = result
-  const updatedAt = iso(change.updatedAt)
+  const { unchanged } = result
+  const base = result.change ?? result.draftView
+  if (!base) {
+    throw new Error('GetStatusResult missing both change and draftView')
+  }
+  const updatedAt = iso(resolveUpdatedAt(base))
 
   if (unchanged === true) {
     return {
-      name: change.name,
-      state: change.state,
+      name: base.name,
+      state: base.state,
       updatedAt,
       unchanged: true,
     }
   }
 
   return {
-    name: change.name,
-    state: change.state,
+    name: base.name,
+    state: base.state,
     updatedAt,
-    specIds: [...change.specIds],
+    specIds: [...base.specIds],
     blockers: result.blockers.map((b) => ({ code: b.code, message: b.message })),
     nextAction: {
       targetStep: result.nextAction.targetStep,

@@ -23,7 +23,13 @@
     {
       "requirement": "Returns the change and its artifact statuses",
       "rules": [
-        "On success, `execute()` MUST return a `GetStatusResult` containing:\n\n- `change` — the loaded `Change` entity with its current artifact state\n- `artifactStatuses` — an array of `ArtifactStatusEntry` objects, one per artifact attached to the change\n- `review` — a derived review summary for agents and CLI serializers\n- `blockers` — an array of active blockers preventing progress\n- `nextAction` — a recommended next action to guide the actor\n\nEach `ArtifactStatusEntry` MUST contain:\n\n- `type` — the artifact type identifier (e.g. `'proposal'`, `'specs'`)\n- `state` — the persisted aggregate artifact state\n- `effectiveStatus` — the dependency-aware artifact status used for legacy compatibility and lifecycle explanations\n- `files` — an array of `ArtifactFileStatus` objects, one per file in the artifact\n\nEach `ArtifactFileStatus` MUST contain:\n\n- `key` — the file key (artifact type id for `scope: change`, spec ID for `scope: spec`)\n- `filename` — the relative filename within the change directory\n- `state` — the persisted state of that individual file\n- `validatedHash` — the stored validation hash or skip sentinel\n\nThe `review` object MUST contain:\n\n- `required: boolean`\n- `route: 'designing' | null`\n- `reason: 'artifact-drift' | 'artifact-review-required' | 'spec-overlap-conflict' | null`\n- `affectedArtifacts` — a grouped list of artifact IDs with concrete affected files currently in `pending-review` or `drifted-pending-review`\n- `overlapDetail` — details about overlapping changes when reason is `spec-overlap-conflict`\n\nA `Blocker` object MUST contain:\n\n- `code` — a unique machine-readable error code (e.g. `'ARTIFACT_DRIFT'`, `'MISSING_ARTIFACT'`)\n- `message` — a human-readable description of the blocker\n\nThe `nextAction` object MUST contain:\n\n- `targetStep` — the lifecycle step this action targets\n- `actionType` — `'cognitive'` (requires human/agent thought) or `'mechanical'` (can be automated)\n- `reason` — a short human-readable reason for the recommendation\n- `command` — the recommended CLI command to run\n\nEach review file entry inside `affectedArtifacts` MUST contain:\n\n- `filename` — the artifact file's relative filename within the change directory\n- `path` — the artifact file's absolute filesystem path\n- `key` — the file key used internally to match persisted invalidation history to current artifact files; included as supplemental context, not as the primary outward-facing identifier\n\n`review.required` is `true` if at least one file is in `pending-review` or `drifted-pending-review`; otherwise it is `false`.\n\n`review.reason` is:\n\n- `'artifact-drift'` when at least one file is `drifted-pending-review`\n- `'spec-overlap-conflict'` when no file is drifted, but unhandled overlap invalidations exist\n- `'artifact-review-required'` when no file is drifted or overlapping, but at least one file is `pending-review`\n- `null` when `review.required` is `false`\n\n`review.route` is `'designing'` whenever `review.required` is `true`, otherwise `null`.\n\n`GetStatus` MUST resolve `review.affectedArtifacts` against the current artifact file entries so agent-facing consumers can inspect the actual file directly. The outward-facing review summary MUST prioritize `filename` and `path`; consumers must not need to understand manifest-internal file keys in order to locate the affected artifact."
+        "On success, `execute()` MUST return a `GetStatusResult` containing:\n\n- `change` — the loaded active `Change` when the name resolves under `changes/`; MUST be absent when only a draft exists\n- `draftView` — a `DraftedChangeView` when the name resolves only under `drafts/`; MUST be absent for active changes\n- `artifactStatuses` — an array of `ArtifactStatusEntry` objects, one per artifact attached to the change\n- `review` — a derived review summary for agents and CLI serializers\n- `blockers` — an array of active blockers preventing progress\n- `nextAction` — a recommended next action to guide the actor\n\nResolution order:\n\n1. `ChangeRepository.get(name)` for active storage\n2. If null, `ChangeRepository.getDraft(name)` for drafted storage\n\nIf both are null, the use case MUST throw `ChangeNotFoundError`.\n\n`GetStatus` MUST NOT call `ChangeRepository.getDiscarded` or load `discarded/` storage. Discarded changes MUST be inspected via `GetDiscarded` (for example `specd discarded show`).\n\nWhen `draftView` is present, the use case MUST compute artifact and lifecycle projections for inspection only. It MUST NOT expose a mutable `Change` to callers and MUST NOT surface transitions that would mutate the drafted change (`availableTransitions` MUST be empty; `nextAction.command` MUST NOT recommend transition or validate commands).\n\nEach `ArtifactStatusEntry` MUST contain:\n\n- `type` — the artifact type identifier (e.g. `'proposal'`, `'specs'`)\n- `state` — the persisted aggregate artifact state\n- `effectiveStatus` — the dependency-aware artifact status used for legacy compatibility and lifecycle explanations\n- `files` — an array of `ArtifactFileStatus` objects, one per file in the artifact\n\nEach `ArtifactFileStatus` MUST contain:\n\n- `key` — the file key (artifact type id for `scope: change`, spec ID for `scope: spec`)\n- `filename` — the relative filename within the change directory\n- `state` — the persisted state of that individual file\n- `validatedHash` — the stored validation hash or skip sentinel\n\nThe `review` object MUST contain:\n\n- `required: boolean`\n- `route: 'designing' | null`\n- `reason: 'artifact-drift' | 'artifact-review-required' | 'spec-overlap-conflict' | null`\n- `affectedArtifacts` — a grouped list of artifact IDs with concrete affected files currently in `pending-review` or `drifted-pending-review`\n- `overlapDetail` — details about overlapping changes when reason is `spec-overlap-conflict`\n\nA `Blocker` object MUST contain:\n\n- `code` — a unique machine-readable error code (e.g. `'ARTIFACT_DRIFT'`, `'MISSING_ARTIFACT'`)\n- `message` — a human-readable description of the blocker\n\nThe `nextAction` object MUST contain:\n\n- `targetStep` — the lifecycle step this action targets\n- `actionType` — `'cognitive'` (requires human/agent thought) or `'mechanical'` (can be automated)\n- `reason` — a short human-readable reason for the recommendation\n- `command` — the recommended CLI command to run\n\nEach review file entry inside `affectedArtifacts` MUST contain:\n\n- `filename` — the artifact file's relative filename within the change directory\n- `path` — the artifact file's absolute filesystem path\n- `key` — the file key used internally to match persisted invalidation history to current artifact files; included as supplemental context, not as the primary outward-facing identifier\n\n`review.required` is `true` if at least one file is in `pending-review` or `drifted-pending-review`; otherwise it is `false`.\n\n`review.reason` is:\n\n- `'artifact-drift'` when at least one file is `drifted-pending-review`\n- `'spec-overlap-conflict'` when no file is drifted, but unhandled overlap invalidations exist\n- `'artifact-review-required'` when no file is drifted or overlapping, but at least one file is `pending-review`\n- `null` when `review.required` is `false`\n\n`review.route` is `'designing'` whenever `review.required` is `true`, otherwise `null`.\n\n`GetStatus` MUST resolve `review.affectedArtifacts` against the current artifact file entries so agent-facing consumers can inspect the actual file directly. The outward-facing review summary MUST prioritize `filename` and `path`; consumers must not need to understand manifest-internal file keys in order to locate the affected artifact."
+      ]
+    },
+    {
+      "requirement": "Drafted change read-only status",
+      "rules": [
+        "When `GetStatus` loads a change exclusively via `getDraft`, the result MUST satisfy [`core:drafted-change-view`](../drafted-change-view/spec.md).\n\nThe use case MAY use an internal `Change` loaded from drafted storage to compute artifact effective statuses, but that instance MUST NOT appear on `GetStatusResult`.\n\nDrafted status responses MUST be suitable for `drafts show` and read-only CLI inspection without enabling lifecycle mutation."
       ]
     },
     {
@@ -59,7 +65,7 @@
     {
       "requirement": "Constructor dependencies",
       "rules": [
-        "`GetStatus` MUST accept the following constructor arguments:\n\n- `changes: ChangeRepository` — for loading changes by name\n- `schemaProvider: SchemaProvider` — for obtaining the fully-resolved active schema\n- `lifecycle: LifecycleEngine` — for deriving effective artifact status, blockers, routing, and next-action guidance from the change plus active schema\n- `approvals: { readonly spec: boolean; readonly signoff: boolean }` — whether approval gates are active\n\nIt MUST delegate to `ChangeRepository.get(name)` to load the change. `SchemaProvider` replaces the previous `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths` triple, providing the fully-resolved schema with plugins and overrides applied.\n\n`GetStatus` MUST NOT accept `ImplementationDetector` and MUST NOT invoke implementation autodetection."
+        "`GetStatus` MUST accept the following constructor arguments:\n\n- `changes: ChangeRepository` — for loading changes by name\n- `schemaProvider: SchemaProvider` — for obtaining the fully-resolved active schema\n- `lifecycle: LifecycleEngine` — for deriving effective artifact status, blockers, routing, and next-action guidance from the change plus active schema\n- `approvals: { readonly spec: boolean; readonly signoff: boolean }` — whether approval gates are active\n\nIt MUST load the change via `ChangeRepository.get(name)` and, when that returns `null`, via `ChangeRepository.getDraft(name)`. It MUST NOT use `getDiscarded`.\n\n`SchemaProvider` replaces the previous `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths` triple, providing the fully-resolved schema with plugins and overrides applied.\n\n`GetStatus` MUST NOT accept `ImplementationDetector` and MUST NOT invoke implementation autodetection."
       ]
     },
     {
@@ -144,6 +150,57 @@
       "then": [
         "the result includes a blockers array",
         "AND it contains at least one entry with code: 'ARTIFACT_DRIFT'"
+      ]
+    },
+    {
+      "requirement": "Drafted change read-only status",
+      "name": "Draft-only name returns draftView",
+      "given": ["a change exists only under drafts/"],
+      "when": ["execute({ name }) is called"],
+      "then": [
+        "result.draftView is defined and satisfies DraftedChangeView",
+        "AND result.change is undefined"
+      ]
+    },
+    {
+      "requirement": "Drafted change read-only status",
+      "name": "Drafted status has no available transitions",
+      "given": ["a change exists only under drafts/"],
+      "when": ["execute({ name }) is called"],
+      "then": [
+        "availableTransitions is empty",
+        "AND nextAction.command does not recommend transition or validate commands"
+      ]
+    },
+    {
+      "requirement": "Drafted change read-only status",
+      "name": "Active name returns change not draftView",
+      "given": ["a change exists under changes/"],
+      "when": ["execute({ name }) is called"],
+      "then": ["result.change is defined", "AND result.draftView is undefined"]
+    },
+    {
+      "requirement": "Drafted change read-only status",
+      "name": "Discarded-only name is not found",
+      "given": ["a change exists only under discarded/"],
+      "when": ["execute({ name }) is called"],
+      "then": ["it throws ChangeNotFoundError", "AND ChangeRepository.getDiscarded is not invoked"]
+    },
+    {
+      "requirement": "Drafted change read-only status",
+      "name": "Draft resolution uses getDraft not get",
+      "given": ["spies on ChangeRepository.get and getDraft"],
+      "when": ["execute({ name }) runs for a drafted-only name"],
+      "then": ["getDraft is invoked", "AND get is not used to populate result.change"]
+    },
+    {
+      "requirement": "Drafted change read-only status",
+      "name": "Drafted result still includes artifact statuses",
+      "given": ["a drafted change with proposal in pending-review"],
+      "when": ["execute({ name }) is called"],
+      "then": [
+        "result.artifacts includes the proposal entry with that state",
+        "AND result.draftView is defined"
       ]
     },
     {
@@ -403,28 +460,17 @@
     }
   ],
   "implementation": {
-    "files": [
-      {
-        "specId": "core:get-status",
-        "file": "core:src/composition/use-cases/get-status.ts"
-      }
-    ],
     "symbols": [
       {
         "specId": "core:get-status",
         "file": "core:src/application/use-cases/get-status.ts",
         "symbol": "GetStatus"
-      },
-      {
-        "specId": "core:get-status",
-        "file": "core:src/application/use-cases/get-status.ts",
-        "symbol": "GetStatus.execute"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:7e26a81666000342a5f36fbb893c9dca3d46d4df074e048517c4a37e2a958536",
-    "verify.md": "sha256:4329f7cf61a9dd78fc5f68ca4826e28673a072dfbefeb930622e01b87f3573a2"
+    "spec.md": "sha256:693e3ccadbedd6bbe1d2c9d2c3762414ee9fe73ba6f75f2b6b520fe3f2de5596",
+    "verify.md": "sha256:8f0d28a698663c7e1df2359339f237a4ec5c0e2c6007409be7c824bb77ac425a"
   },
   "generatedBy": "core"
 }

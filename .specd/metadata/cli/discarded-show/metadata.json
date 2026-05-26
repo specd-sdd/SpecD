@@ -1,7 +1,12 @@
 {
   "title": "Discarded Show",
   "description": "When reviewing past decisions, users need to see why a change was abandoned — not just that it was. `specd discarded show <name>` displays basic metadata for a single discarded change, including the recorded discard reason.",
-  "dependsOn": ["cli:entrypoint", "core:change"],
+  "dependsOn": [
+    "cli:entrypoint",
+    "core:get-discarded",
+    "core:discarded-change-view",
+    "cli:command-resource-naming"
+  ],
   "context": [
     "When reviewing past decisions, users need to see why a change was abandoned — not just that it was. `specd discarded show <name>` displays basic metadata for a single discarded change, including the recorded discard reason."
   ],
@@ -10,6 +15,12 @@
       "requirement": "Command signature",
       "rules": [
         "```\nspecd discarded show <name> [--format text|json|toon]\n```\n\n- `<name>` — required positional; the name of the discarded change to show\n- `--format` — controls output encoding; defaults to `text`"
+      ]
+    },
+    {
+      "requirement": "Loads discarded change via GetDiscarded",
+      "rules": [
+        "The command MUST invoke `GetDiscarded.execute({ name })` (or the kernel equivalent) to load the discarded change.\n\nThe command MUST NOT invoke `GetStatus`, `GetDraft`, or `ChangeRepository.get` for this command.\n\nDisplayed fields (`name`, `specIds`, `schema`, `reason`) MUST be read from the returned `DiscardedChangeView` (`discardReason` for `reason` in text/JSON output)."
       ]
     },
     {
@@ -33,7 +44,7 @@
     {
       "requirement": "Error cases",
       "rules": [
-        "- If no change with the given name exists in `discarded/`, the command exits with code 1 and prints an `error:` message to stderr."
+        "- If `GetDiscarded` throws `ChangeNotFoundError`, the command exits with code 1 and prints an `error:` message to stderr indicating the change is not in `discarded/`.\n- If a change with the given name exists only under active or drafted storage, the command exits with code 1 and prints an `error:` message to stderr."
       ]
     }
   ],
@@ -48,6 +59,29 @@
       "name": "Missing name argument",
       "when": ["specd discarded show is run without a name"],
       "then": ["the command exits with code 1 and prints a usage error to stderr"]
+    },
+    {
+      "requirement": "Loads discarded change via GetDiscarded",
+      "name": "Uses GetDiscarded not GetStatus",
+      "when": ["specd discarded show my-change runs successfully"],
+      "then": [
+        "GetDiscarded.execute was invoked with { name: 'my-change' }",
+        "AND GetStatus was not invoked"
+      ]
+    },
+    {
+      "requirement": "Loads discarded change via GetDiscarded",
+      "name": "Does not call ChangeRepository.get",
+      "given": ["a change exists only under discarded/"],
+      "when": ["specd discarded show my-change runs successfully"],
+      "then": ["ChangeRepository.get was not used to load the change for display"]
+    },
+    {
+      "requirement": "Loads discarded change via GetDiscarded",
+      "name": "Text output includes discard reason from view",
+      "given": ["GetDiscarded returns a view with discardReason: 'obsolete'"],
+      "when": ["specd discarded show my-change runs in text mode"],
+      "then": ["stdout contains reason: obsolete", "AND the process exits with code 0"]
     },
     {
       "requirement": "Output format — toon",
@@ -87,11 +121,26 @@
         "specd discarded show nonexistent is run and no change named nonexistent exists in discarded/"
       ],
       "then": ["the command exits with code 1", "AND stderr contains an error: message"]
+    },
+    {
+      "requirement": "Error cases",
+      "name": "Drafted-only name exits with error",
+      "given": ["my-change exists only under drafts/"],
+      "when": ["specd discarded show my-change runs"],
+      "then": ["the command exits with code 1", "AND stderr contains an error: message"]
     }
   ],
+  "implementation": {
+    "files": [
+      {
+        "specId": "cli:discarded-show",
+        "file": "cli:src/commands/discarded/show.ts"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:055129745ad8006b0480ae4bb26e5d70511668b53593a15c10aacce934ab66e5",
-    "verify.md": "sha256:8208eca51a7e5c6edda55302bc0f87dd89395a74867f29369a610c03c5c8871d"
+    "spec.md": "sha256:3d6528207951960339f4047ad3b70846a6ea7829119c7996c56868c18c7fcc09",
+    "verify.md": "sha256:97bfdae054d26115a99a2baafb223a67bd352b6affba366f2fda34d304b49146"
   },
   "generatedBy": "core"
 }

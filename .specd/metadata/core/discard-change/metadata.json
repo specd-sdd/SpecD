@@ -15,7 +15,7 @@
     {
       "requirement": "Change must exist",
       "rules": [
-        "The use case MUST load the change from the `ChangeRepository` by name. If no change exists with the given name, it MUST throw `ChangeNotFoundError`."
+        "The use case MUST locate the change before discarding:\n\n1. If `ChangeRepository.get(name)` returns an active change, discard from active storage via `mutate(name, fn)`.\n2. Else if `ChangeRepository.getDraft(name)` returns a drafted view, discard from drafted storage via `mutateDraft(name, fn)`.\n3. Else throw `ChangeNotFoundError`.\n\nThe use case MUST NOT load a drafted change through `get(name)`."
       ]
     },
     {
@@ -39,7 +39,7 @@
     {
       "requirement": "Persistence",
       "rules": [
-        "After appending the discarded event, the use case MUST persist the change through `ChangeRepository.mutate(name, fn)`.\n\nInside the mutation callback, the repository supplies the fresh persisted `Change` for `name`; the use case calls `change.discard(reason, actor, supersededBy)` on that instance and returns it. When the callback resolves, the repository persists the updated manifest and performs any required directory relocation to `discarded/`.\n\n`DiscardChange.execute` returns the updated `Change` instance produced by that serialized mutation."
+        "After the historical implementation guard passes, persistence MUST use:\n\n- `ChangeRepository.mutate(name, fn)` when discarding an active change, or\n- `ChangeRepository.mutateDraft(name, fn)` when discarding a drafted change\n\nInside the callback, the use case calls `change.discard(reason, actor, supersededBy, force)` on the fresh instance and returns it. The repository persists the manifest and moves the directory to `discarded/`.\n\n`DiscardChange.execute` returns the updated `Change` instance produced by that serialized mutation."
       ]
     },
     {
@@ -109,11 +109,42 @@
     {
       "requirement": "Persistence",
       "name": "Change is persisted through serialized mutation",
-      "when": ["DiscardChange.execute completes successfully"],
+      "given": ["a change exists under changes/"],
+      "when": ["DiscardChange.execute completes successfully for that name"],
       "then": [
         "ChangeRepository.mutate(input.name, fn) is called",
         "AND the callback records the discarded event on the fresh persisted Change",
         "AND the resulting change is relocated to the discarded area by the repository"
+      ]
+    },
+    {
+      "requirement": "Persistence",
+      "name": "Drafted change uses mutateDraft",
+      "given": ["a change exists only under drafts/"],
+      "when": ["DiscardChange.execute completes successfully"],
+      "then": [
+        "ChangeRepository.mutateDraft was called for that name",
+        "AND the directory is under discarded/"
+      ]
+    },
+    {
+      "requirement": "Persistence",
+      "name": "Active discard does not call mutateDraft",
+      "given": ["a change exists only under changes/"],
+      "when": ["DiscardChange.execute completes successfully"],
+      "then": [
+        "ChangeRepository.mutate was called",
+        "AND ChangeRepository.mutateDraft was not called"
+      ]
+    },
+    {
+      "requirement": "Persistence",
+      "name": "Discarded change is not loadable via get or getDraft",
+      "given": ["DiscardChange.execute completed for name old-experiment"],
+      "when": ["ChangeRepository.get('old-experiment') and getDraft('old-experiment') are called"],
+      "then": [
+        "both return null",
+        "AND getDiscarded('old-experiment') returns a DiscardedChangeView"
       ]
     },
     {
@@ -143,9 +174,18 @@
       "then": ["it requires an ActorResolver port in its constructor"]
     }
   ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "core:discard-change",
+        "file": "core:src/application/use-cases/discard-change.ts",
+        "symbol": "DiscardChange"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:d355d176809ba4c86ce6519b2839745a76cd60407f3f96b94338d67cb28035a1",
-    "verify.md": "sha256:89ecc36ab0b02974ba201ab4de73918139ef986ce4c6640561f861a5393eb307"
+    "spec.md": "sha256:3a4a0de823eb11f1e9ea3c88e7bf39fa2d98d15bade46ff2926e6e609cbd5901",
+    "verify.md": "sha256:f85153f46da1e42281046e0e99ad268f1874d42f7f8882005fba9cdb2716004c"
   },
   "generatedBy": "core"
 }

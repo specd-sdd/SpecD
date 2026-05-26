@@ -46,6 +46,33 @@ function makeUseCase(
 }
 
 describe('TransitionChange', () => {
+  describe('given a drafted change only', () => {
+    it('throws ChangeNotFoundError because get returns null for drafted storage', async () => {
+      const change = makeChangeInState('parked', [
+        {
+          type: 'created',
+          at: new Date('2024-01-01T00:00:00Z'),
+          by: actor,
+          specIds: ['auth/login'],
+          schemaName: '@specd/schema-std',
+          schemaVersion: 1,
+        },
+      ])
+      change.draft(actor)
+      const repo = makeChangeRepository([change])
+      const uc = makeUseCase(repo)
+
+      await expect(
+        uc.execute({
+          name: 'parked',
+          to: 'designing',
+          approvalsSpec: false,
+          approvalsSignoff: false,
+        }),
+      ).rejects.toThrow(ChangeNotFoundError)
+    })
+  })
+
   describe('given no change with that name', () => {
     it('throws ChangeNotFoundError', async () => {
       const uc = makeUseCase(makeChangeRepository())

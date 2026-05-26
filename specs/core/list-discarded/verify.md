@@ -23,13 +23,32 @@
 - **WHEN** `execute()` is called
 - **THEN** the result contains only `alpha`
 
-### Requirement: Returns Change entities without content
+### Requirement: Returns DiscardedChangeView without content
 
-#### Scenario: Changes have artifact state but no content
+#### Scenario: Views have artifact state but no content
 
-- **WHEN** `execute()` returns a list of changes
-- **THEN** each `Change` has its artifact map populated with status and validated hashes
+- **WHEN** `execute()` returns a list
+- **THEN** each entry satisfies `DiscardedChangeView` with `discardReason` from the terminal `discarded` event
+- **AND** artifact statuses are populated
 - **AND** no artifact file content is loaded
+
+#### Scenario: Views are not Change instances
+
+- **WHEN** `execute()` returns a non-empty list
+- **THEN** entries do not expose `transition` or other `Change` mutators
+
+#### Scenario: Empty discarded directory returns empty list
+
+- **GIVEN** no directories exist under `discarded/`
+- **WHEN** `ListDiscarded.execute()` is called
+- **THEN** it returns an empty array
+
+#### Scenario: Drafted and active changes are excluded
+
+- **GIVEN** `old-experiment` exists only under `discarded/`
+- **AND** `parked-feature` exists only under `drafts/`
+- **WHEN** `ListDiscarded.execute()` is called
+- **THEN** the result contains `old-experiment` only
 
 ### Requirement: Returns an empty array when no discarded changes exist
 

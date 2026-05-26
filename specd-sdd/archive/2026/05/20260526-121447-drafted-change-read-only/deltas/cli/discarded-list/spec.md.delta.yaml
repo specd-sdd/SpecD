@@ -1,0 +1,25 @@
+- op: modified
+  description: ListDiscarded returns views.
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`cli:entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
+    - [`core:list-discarded`](../../core/list-discarded/spec.md) — list discarded changes
+    - [`core:discarded-change-view`](../../core/discarded-change-view/spec.md) — read model for each row
+    - [`cli:command-resource-naming`](../command-resource-naming/spec.md) — canonical plural naming
+- op: added
+  description: View-based list contract.
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Command signature'
+  content: |
+    ### Requirement: Uses ListDiscarded read model
+
+    The command MUST invoke `ListDiscarded.execute()` and treat each entry as `DiscardedChangeView`.
+
+    Discard metadata (`discardReason`, `discardedAt`, `discardedBy`, `supersededBy`) MUST be read from the view, not by scanning raw `Change` history in the command.

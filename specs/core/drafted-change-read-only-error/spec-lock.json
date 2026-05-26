@@ -1,0 +1,13 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["core:change", "default:_global/error-handling-conventions"],
+  "implementation": [
+    {
+      "file": "core:src/domain/errors/drafted-change-read-only-error.ts",
+      "symbols": ["DraftedChangeReadOnlyError"]
+    }
+  ]
+}

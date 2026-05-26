@@ -1,0 +1,27 @@
+- op: added
+  description: ListDrafts returns DraftedChangeView.
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Command signature'
+  content: |
+    ### Requirement: Uses ListDrafts read model
+
+    The command MUST invoke `ListDrafts.execute()` and treat each entry as a `DraftedChangeView`.
+
+    The command MUST read `history` from each view to extract the latest `drafted` event for `draftedAt`, `draftedBy`, and `reason`.
+
+    The command MUST NOT assume entries are mutable `Change` instances.
+- op: modified
+  description: Spec dependencies.
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`cli:entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
+    - [`core:list-drafts`](../../core/list-drafts/spec.md) — lists drafted changes as views
+    - [`core:drafted-change-view`](../../core/drafted-change-view/spec.md) — entry shape
+    - [`cli:command-resource-naming`](../command-resource-naming/spec.md) — canonical plural naming and singular alias policy

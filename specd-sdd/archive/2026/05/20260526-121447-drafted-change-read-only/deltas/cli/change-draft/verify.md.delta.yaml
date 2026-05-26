@@ -1,0 +1,2 @@
+- op: no-op
+  description: CLI behaviour unchanged; core return type change does not alter CLI verify scenarios.

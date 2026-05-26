@@ -12,31 +12,69 @@ Without an abstraction over change storage, use cases would couple directly to f
 
 ### Requirement: get returns a Change or null
 
-`get(name)` MUST accept a change name string and return the `Change` with that name, or `null` if no change with that name exists. The returned `Change` MUST load artifact and file states from the persisted manifest. If an artifact or file entry omits `state`, the repository defaults that missing value to `missing` while loading.
+`get(name)` MUST resolve the change name **only** under active storage (`changes/`). It MUST NOT search `drafts/` or `discarded/`.
+
+When a change with the given name exists only as drafted, `get(name)` MUST return `null`.
+
+When a change exists in active storage, `get(name)` MUST return the `Change` with artifact and file states loaded from the persisted manifest. If an artifact or file entry omits `state`, the repository defaults that missing value to `missing` while loading.
 
 `validatedHash` is still loaded with the artifact data, but hash comparison is not the sole source of truth for steady-state status. The repository MAY detect drift and persist updated file and artifact states before returning (see Requirement: Auto-invalidation on get when artifact files drift).
 
-`get()` is a snapshot read for callers. It MAY auto-invalidate and persist drifted artifacts before returning, but it MUST NOT be the repository's serialized mutation primitive. Callers that need a coordinated read-modify-write section for an existing persisted change MUST use `mutate(name, fn)` instead of relying on a later `save()` against a stale snapshot.
+`get()` is a snapshot read for **active** changes. It MAY auto-invalidate and persist drifted artifacts before returning, but it MUST NOT be the repository's serialized mutation primitive. Callers that need a coordinated read-modify-write section for an existing active change MUST use `mutate(name, fn)` instead of relying on a later `save()` against a stale snapshot.
+
+### Requirement: getDraft returns a DraftedChangeView or null
+
+`getDraft(name)` MUST resolve the change name **only** under drafted storage (`drafts/`). It MUST NOT search `changes/` or `discarded/`.
+
+When a drafted change exists, `getDraft(name)` MUST return a `DraftedChangeView` constructed from the persisted manifest. The view MUST satisfy [`core:drafted-change-view`](../drafted-change-view/spec.md).
+
+When no drafted change exists with the given name, `getDraft(name)` MUST return `null`.
+
+`getDraft()` MUST NOT auto-invalidate or persist manifest updates. Drift detection for drafted changes is out of scope for the active working set until the change is restored.
+
+### Requirement: getDiscarded returns a DiscardedChangeView or null
+
+`getDiscarded(name)` MUST resolve the change name **only** under discarded storage (`discarded/`). It MUST NOT search `changes/` or `drafts/`.
+
+When a discarded change exists, `getDiscarded(name)` MUST return a `DiscardedChangeView` built via `toDiscardedChangeView` from the shared inspection facade ([`core:read-only-change-view`](../read-only-change-view/spec.md)).
+
+When no discarded change exists with the given name, `getDiscarded(name)` MUST return `null`.
+
+`getDiscarded()` MUST NOT auto-invalidate or persist manifest updates.
 
 ### Requirement: mutate serializes persisted change updates
 
-`mutate(name, fn)` MUST provide serialized read-modify-write semantics for one existing persisted change.
+`mutate(name, fn)` MUST provide serialized read-modify-write semantics for one existing **active** persisted change.
 
-For a given change name, the repository MUST:
+Resolution MUST use the same rules as `get(name)` — only `changes/`. If the name exists only under `drafts/`, `mutate()` MUST throw `ChangeNotFoundError`.
+
+For a given active change name, the repository MUST:
 
 1. Acquire exclusive mutation access scoped to that persisted change
-2. Reload the freshest persisted `Change` state after the exclusive access is acquired
-3. Invoke `fn(change)` with that fresh `Change`
+2. Reload the freshest persisted `Change` state from active storage after the exclusive access is acquired
+3. Invoke `fn(change)` with that fresh `Change` where `change.isDrafted === false`
 4. Persist the updated change manifest if `fn` resolves successfully
 5. Release the exclusive access before returning or throwing
 
-If no change with the given name exists, `mutate()` MUST throw `ChangeNotFoundError`.
+If no active change with the given name exists, `mutate()` MUST throw `ChangeNotFoundError`.
 
 If `fn` throws, `mutate()` MUST release the exclusive access and MUST NOT persist a partial manifest update produced by the failed callback.
 
 The serialized section MUST cover the full persisted mutation window — fresh load, callback execution, and manifest persistence. Locking only the final manifest write is insufficient.
 
-Exclusive access is per change, not global. Mutations targeting different change names MAY proceed concurrently.
+Exclusive access is per change name, not global. Mutations targeting different change names MAY proceed concurrently.
+
+### Requirement: mutateDraft serializes drafted change updates
+
+`mutateDraft(name, fn)` MUST provide serialized read-modify-write semantics for one existing **drafted** persisted change.
+
+Resolution MUST use the same rules as `getDraft(name)` — only `drafts/`. If the name exists only under active storage, `mutateDraft()` MUST throw `ChangeNotFoundError`.
+
+The callback MUST receive a fresh mutable `Change` with `isDrafted === true` before any transforming operation in the callback. Only `RestoreChange` and `DiscardChange` (and repository internals) MAY call `mutateDraft` in production code.
+
+On success, the repository MUST persist the manifest and perform any required directory move (`drafts/` ↔ `changes/` or `drafts/` → `discarded/`).
+
+If `fn` throws, `mutateDraft()` MUST NOT persist partial updates, matching `mutate` failure semantics.
 
 ### Requirement: Auto-invalidation on get when artifact files drift
 
@@ -71,17 +109,19 @@ The `SYSTEM_ACTOR` constant (`{ name: 'specd', email: 'system@getspecd.dev' }`) 
 
 ### Requirement: listDrafts returns drafted changes in creation order
 
-`listDrafts()` MUST return all drafted (shelved) changes sorted by creation order, oldest first. Each returned `Change` MUST include artifact state but MUST NOT include artifact content.
+`listDrafts()` MUST return all drafted changes sorted by creation order, oldest first. Each entry MUST be a `DraftedChangeView` with artifact state (derived statuses) but MUST NOT include artifact content. The repository MUST NOT return mutable `Change` instances to callers.
 
 ### Requirement: listDiscarded returns discarded changes in creation order
 
-`listDiscarded()` MUST return all discarded changes sorted by creation order, oldest first. Each returned `Change` MUST include artifact state but MUST NOT include artifact content.
+`listDiscarded()` MUST return all discarded changes sorted by creation order, oldest first. Each entry MUST be a `DiscardedChangeView` built via the shared inspection facade. The repository MUST NOT return mutable `Change` instances to callers.
 
 ### Requirement: save persists the change manifest only
 
 `save(change)` MUST persist the change manifest — state, artifact statuses, validated hashes, history events, and approvals. It MUST NOT write artifact file content. Artifact content is written exclusively via `saveArtifact()`. The write MUST be atomic (e.g. temp file + rename) to prevent partial reads.
 
-`save()` is a low-level persistence operation. Atomic manifest writing prevents partial-file corruption, but `save()` alone does not serialize a caller's earlier snapshot read. Use cases that mutate an existing persisted change and need concurrency safety MUST perform that mutation through `mutate(name, fn)`.
+If `change.isDrafted === true`, `save(change)` MUST throw `DraftedChangeReadOnlyError` unless the call originates from the serialized `mutateDraft` window for that change name.
+
+`save()` is a low-level persistence operation. Atomic manifest writing prevents partial-file corruption, but `save()` alone does not serialize a caller's earlier snapshot read. Use cases that mutate an existing active persisted change and need concurrency safety MUST perform that mutation through `mutate(name, fn)`.
 
 ### Requirement: delete removes the entire change directory
 
@@ -93,7 +133,9 @@ The `SYSTEM_ACTOR` constant (`{ name: 'specd', email: 'system@getspecd.dev' }`) 
 
 ### Requirement: saveArtifact with optimistic concurrency
 
-`saveArtifact(change, artifact, options?)` MUST write an artifact file within a change directory. If `artifact.originalHash` is set, the implementation MUST compare it against the current hash of the file on disk before writing. If the hashes differ, the save MUST be rejected by throwing `ArtifactConflictError` — this prevents silently overwriting concurrent modifications. When `options.force` is `true`, the conflict check MUST be skipped and the file MUST be overwritten unconditionally. After a successful write, the corresponding `ChangeArtifact` status in the change manifest MUST be reset to `in-progress`; the caller is responsible for calling `save(change)` to persist this state change.
+`saveArtifact(change, artifact, options?)` MUST write an artifact file within a change directory. If `change.isDrafted === true`, `saveArtifact` MUST throw `DraftedChangeReadOnlyError` before any filesystem write.
+
+If `artifact.originalHash` is set, the implementation MUST compare it against the current hash of the file on disk before writing. If the hashes differ, the save MUST be rejected by throwing `ArtifactConflictError` — this prevents silently overwriting concurrent modifications. When `options.force` is `true`, the conflict check MUST be skipped and the file MUST be overwritten unconditionally. After a successful write, the corresponding `ChangeArtifact` status in the change manifest MUST be reset to `in-progress`; the caller is responsible for calling `save(change)` to persist this state change.
 
 ### Requirement: artifactExists checks file presence without loading
 
@@ -106,6 +148,12 @@ The `SYSTEM_ACTOR` constant (`{ name: 'specd', email: 'system@getspecd.dev' }`) 
 ### Requirement: changePath returns the absolute path to a change directory
 
 `changePath(change)` MUST accept a `Change` and return the absolute filesystem path to that change's directory. This is used by use cases that need the change path for template variable construction (e.g. `change.path` in `TemplateVariables`). The implementation resolves the path from its internal storage layout.
+
+### Requirement: draftChangePath returns the drafted directory path
+
+`draftChangePath(view)` MUST accept a `DraftedChangeView` (or the internal drafted `Change` during `mutateDraft`) and return the absolute filesystem path under `drafts/` for template variables and CLI display.
+
+`changePath(change)` MUST continue to resolve paths under `changes/` for active changes only.
 
 ### Requirement: scaffold creates artifact directories
 
@@ -130,11 +178,7 @@ along with the directory itself.
 
 ### Requirement: Abstract class with abstract methods
 
-`ChangeRepository` MUST be defined as an `abstract class`, not an `interface`. All storage
-operations (`get`, `list`, `listDrafts`, `listDiscarded`, `save`, `delete`, `artifact`,
-`saveArtifact`, `artifactExists`, `deltaExists`, `changePath`, `scaffold`, `unscaffold`)
-MUST be declared as `abstract` methods. This follows the architecture spec requirement that
-ports with shared construction are abstract classes.
+`ChangeRepository` MUST be defined as an `abstract class`, not an `interface`. All storage operations (`get`, `getDraft`, `getDiscarded`, `mutate`, `mutateDraft`, `list`, `listDrafts`, `listDiscarded`, `save`, `delete`, `artifact`, `saveArtifact`, `artifactExists`, `deltaExists`, `changePath`, `draftChangePath`, `scaffold`, `unscaffold`) MUST be declared as `abstract` methods. This follows the architecture spec requirement that ports with shared construction are abstract classes.
 
 ### Requirement: artifact only loads tracked change artifact files
 
@@ -170,6 +214,10 @@ These logs MUST follow the project's global logging conventions.
 - [`core:repository-port`](../repository-port/spec.md) — shared repository base contract
 - [`default:_global/architecture`](../../_global/architecture/spec.md) — application ports and ownership boundaries
 - [`core:change`](../change/spec.md) — change entity state, invalidation, and artifact semantics
+- [`core:read-only-change-view`](../read-only-change-view/spec.md) — shared read-only facade
+- [`core:drafted-change-view`](../drafted-change-view/spec.md) — read model returned by `getDraft`
+- [`core:discarded-change-view`](../discarded-change-view/spec.md) — read model returned by `getDiscarded`
+- [`core:drafted-change-read-only-error`](../drafted-change-read-only-error/spec.md) — secondary persistence guard
 - [`core:storage`](../storage/spec.md) — filesystem persistence and change directory layout
 - [`core:change-manifest`](../change-manifest/spec.md) — manifest fields persisted by the repository
 - [`default:_global/logging`](../../_global/logging/spec.md) — debug logging requirements for tracked artifact resolution and path-confinement diagnostics

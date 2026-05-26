@@ -15,6 +15,16 @@ specd change status <name> [--format text|json|toon]
 - `<name>` — required positional; the name of the change to inspect
 - `--format text|json|toon` — optional; output format, defaults to `text`
 
+### Requirement: Drafted change status is read-only
+
+When `GetStatus` returns `draftView` for the requested name, the command MUST render status in read-only form:
+
+- MUST NOT print actionable lifecycle transitions that would mutate the drafted change
+- MUST indicate the change is drafted (for example in text headers or JSON `isDrafted: true`)
+- MAY still show artifact effective statuses for inspection
+
+When `GetStatus` returns an active `change`, behaviour is unchanged.
+
 ### Requirement: Output format
 
 In `json` or `toon` mode, the `artifactDag` array MUST include the `hasTasks` field for every entry.

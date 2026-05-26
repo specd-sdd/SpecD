@@ -69,8 +69,12 @@ export class CreateChange {
    * @throws {ChangeAlreadyExistsError} If a change with the given name already exists
    */
   async execute(input: CreateChangeInput): Promise<CreateChangeResult> {
-    const existing = await this._changes.get(input.name)
-    if (existing !== null) {
+    const existingActive = await this._changes.get(input.name)
+    if (existingActive !== null) {
+      throw new ChangeAlreadyExistsError(input.name)
+    }
+    const existingDraft = await this._changes.getDraft(input.name)
+    if (existingDraft !== null) {
       throw new ChangeAlreadyExistsError(input.name)
     }
 

@@ -1,0 +1,17 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "cli:entrypoint",
+    "core:list-drafts",
+    "core:drafted-change-view",
+    "cli:command-resource-naming"
+  ],
+  "implementation": [
+    {
+      "file": "cli:src/commands/drafts/list.ts"
+    }
+  ]
+}

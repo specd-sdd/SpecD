@@ -1,0 +1,173 @@
+{
+  "title": "DraftedChangeView",
+  "description": "Callers that inspect a drafted change need read access to persisted state without receiving a mutable `Change` aggregate. `DraftedChangeView` extends [`core:read-only-change-view`](read-only-change-view/spec.md) for changes with `isDrafted === true`. It is constructed by the repository or `GetDraft` and MUST NOT expose mutating `Change` methods or the underlying entity instance.",
+  "dependsOn": ["core:read-only-change-view", "core:change", "core:change-repository-port"],
+  "context": [
+    "Callers that inspect a drafted change need read access to persisted state without receiving a mutable `Change` aggregate. `DraftedChangeView` extends [`core:read-only-change-view`](read-only-change-view/spec.md) for changes with `isDrafted === true`. It is constructed by the repository or `GetDraft` and MUST NOT expose mutating `Change` methods or the underlying entity instance."
+  ],
+  "rules": [
+    {
+      "requirement": "Extends ReadOnlyChangeView",
+      "rules": [
+        "`DraftedChangeView` MUST extend `ReadOnlyChangeView` with all shared read accessors defined there."
+      ]
+    },
+    {
+      "requirement": "Drafted-specific surface",
+      "rules": [
+        "`DraftedChangeView` MUST additionally expose:\n\n- `isDrafted` — MUST be `true` for every instance"
+      ]
+    },
+    {
+      "requirement": "No escape hatch to mutable Change",
+      "rules": [
+        "Implementations MUST satisfy the shared rule in [`core:read-only-change-view`](read-only-change-view/spec.md): no public accessor returns the wrapped `Change`. Only infrastructure inside `ChangeRepository` / `mutateDraft` may hold the mutable aggregate."
+      ]
+    },
+    {
+      "requirement": "Construction",
+      "rules": [
+        "Only `ChangeRepository` (or test doubles of the port) and `GetDraft` MAY construct `DraftedChangeView` instances from a persisted drafted change, using `toDraftedChangeView` from the shared inspection module.\n\nCallers MUST obtain views through `getDraft`, `listDrafts`, or `GetDraft.execute`, not by instantiating the type against arbitrary in-memory `Change` objects in production code."
+      ]
+    },
+    {
+      "requirement": "Artifact content",
+      "rules": [
+        "Loading artifact file content for a drafted change remains the responsibility of `ChangeRepository.artifact` and related port methods when explicitly invoked with the correct drafted storage context. `DraftedChangeView` itself MUST NOT include artifact body content in the view type."
+      ]
+    }
+  ],
+  "constraints": [
+    "DraftedChangeView is not a replacement for the Change entity in the domain model; it is a narrowed projection for drafted storage.",
+    "Terminology in this spec uses Draft / Drafted, not \"shelved\"."
+  ],
+  "scenarios": [
+    {
+      "requirement": "Extends ReadOnlyChangeView",
+      "name": "View exposes shared read accessors",
+      "given": ["a drafted change parked-feature with two specIds"],
+      "when": ["getDraft('parked-feature') returns a view"],
+      "then": [
+        "view.name is parked-feature",
+        "AND view.specIds has length 2",
+        "AND view.schemaName and view.schemaVersion match the manifest"
+      ]
+    },
+    {
+      "requirement": "Extends ReadOnlyChangeView",
+      "name": "View exposes artifact aggregate state",
+      "given": ["a drafted change whose proposal artifact is pending-review"],
+      "when": ["getDraft(name) returns a view"],
+      "then": [
+        "view.artifacts includes the proposal entry with that persisted state",
+        "AND no artifact file body is present on the view"
+      ]
+    },
+    {
+      "requirement": "Extends ReadOnlyChangeView",
+      "name": "Mutating Change methods are not on the view type",
+      "when": ["TypeScript types for DraftedChangeView are inspected"],
+      "then": ["transition, updateSpecIds, and discard are not members of the interface"]
+    },
+    {
+      "requirement": "Drafted-specific surface",
+      "name": "View exposes isDrafted true",
+      "given": ["a change drafted with a drafted event as the latest lifecycle marker"],
+      "when": ["toDraftedChangeView(change) is called"],
+      "then": ["view.isDrafted === true"]
+    },
+    {
+      "requirement": "Drafted-specific surface",
+      "name": "Active change cannot become a DraftedChangeView",
+      "given": ["an active change under changes/ with isDrafted === false"],
+      "when": ["toDraftedChangeView(change) is called"],
+      "then": ["it throws before returning a view"]
+    },
+    {
+      "requirement": "Drafted-specific surface",
+      "name": "View has no transition method at runtime",
+      "given": ["a DraftedChangeView returned from ListDrafts.execute()"],
+      "when": ["a test attempts to call transition on the object"],
+      "then": ["the call is a type error or the method is undefined at runtime"]
+    },
+    {
+      "requirement": "No escape hatch to mutable Change",
+      "name": "No unwrap accessor on getDraft result",
+      "when": ["GetDraft.execute returns { view }"],
+      "then": ["view has no change, unwrap, or toChange accessor"]
+    },
+    {
+      "requirement": "No escape hatch to mutable Change",
+      "name": "listDrafts entries are views only",
+      "when": ["listDrafts() returns a non-empty array"],
+      "then": [
+        "every element satisfies DraftedChangeView",
+        "AND no element is a domain Change instance"
+      ]
+    },
+    {
+      "requirement": "No escape hatch to mutable Change",
+      "name": "Production callers use repository factories",
+      "when": ["FsChangeRepository.getDraft loads a drafted manifest"],
+      "then": ["it returns toDraftedChangeView(loadedChange) rather than the raw Change"]
+    },
+    {
+      "requirement": "Construction",
+      "name": "GetDraft returns a view",
+      "given": ["a change exists only under drafts/"],
+      "when": ["GetDraft.execute({ name }) is called"],
+      "then": ["result.view satisfies DraftedChangeView"]
+    },
+    {
+      "requirement": "Construction",
+      "name": "getDraft returns null for active-only name",
+      "given": ["a change exists only under changes/"],
+      "when": ["ChangeRepository.getDraft(name) is called"],
+      "then": ["it returns null"]
+    },
+    {
+      "requirement": "Construction",
+      "name": "GetDraft does not call get on active storage first for resolution",
+      "given": ["a spy on ChangeRepository.get and getDraft"],
+      "when": ["GetDraft.execute({ name }) runs for a drafted-only name"],
+      "then": [
+        "getDraft is invoked",
+        "AND get is not used as a fallback that returns a Change to callers"
+      ]
+    },
+    {
+      "requirement": "Artifact content",
+      "name": "View does not embed file bodies from getDraft",
+      "given": ["drafted proposal.md exists on disk with non-empty content"],
+      "when": ["getDraft(name) returns a view"],
+      "then": ["the view does not include proposal.md text"]
+    },
+    {
+      "requirement": "Artifact content",
+      "name": "View does not embed file bodies from listDrafts",
+      "when": ["listDrafts() returns views for changes with artifacts"],
+      "then": ["no view object contains artifact file content strings"]
+    },
+    {
+      "requirement": "Artifact content",
+      "name": "Artifact load remains explicit via repository",
+      "given": ["a DraftedChangeView for parked-feature"],
+      "when": ["ChangeRepository.artifact is invoked for that drafted change"],
+      "then": ["file content is returned separately from the view load path"]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "core:drafted-change-view",
+        "file": "core:src/domain/read-only-change-view.ts",
+        "symbol": "toDraftedChangeView"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:85df8db77e8791716746b3b73484f45e37288cf54bb674ff85d135bcae45eb0c",
+    "verify.md": "sha256:59861d2732e1e749b0da24c4073be305712e5678877705fc0b42b441219fbef9"
+  },
+  "generatedBy": "core"
+}

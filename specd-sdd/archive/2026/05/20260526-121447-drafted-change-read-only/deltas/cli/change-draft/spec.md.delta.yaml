@@ -1,0 +1,2 @@
+- op: no-op
+  description: Output shape unchanged; core DraftChange now returns DraftedChangeView internally — CLI success output remains name-only.

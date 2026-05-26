@@ -14,6 +14,12 @@ specd discarded list [--format text|json|toon]
 
 No positional arguments. The `--format` flag controls output encoding; defaults to `text`.
 
+### Requirement: Uses ListDiscarded read model
+
+The command MUST invoke `ListDiscarded.execute()` and treat each entry as `DiscardedChangeView`.
+
+Discard metadata (`discardReason`, `discardedAt`, `discardedBy`, `supersededBy`) MUST be read from the view, not by scanning raw `Change` history in the command.
+
 ### Requirement: Output format — text
 
 The command prints a human-readable table to stdout. Changes are sorted by discard date descending (most recently discarded first).
@@ -70,4 +76,6 @@ $ specd discarded list --format json
 ## Spec Dependencies
 
 - [`cli:entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
-- [`core:change`](../../core/change/spec.md) — discard semantics, storage locations
+- [`core:list-discarded`](../../core/list-discarded/spec.md) — list discarded changes
+- [`core:discarded-change-view`](../../core/discarded-change-view/spec.md) — read model for each row
+- [`cli:command-resource-naming`](../command-resource-naming/spec.md) — canonical plural naming

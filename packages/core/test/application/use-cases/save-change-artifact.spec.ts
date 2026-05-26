@@ -8,11 +8,7 @@ import { GetChangeArtifact } from '../../../src/application/use-cases/get-change
 import { GetStatus } from '../../../src/application/use-cases/get-status.js'
 import { SaveRequiresForceError } from '../../../src/application/errors/save-requires-force-error.js'
 import { ChangeArtifactFileNotFoundError } from '../../../src/application/errors/change-artifact-file-not-found-error.js'
-import {
-  makeChangeRepository,
-  makeSchemaProvider,
-  testActor,
-} from './helpers.js'
+import { makeChangeRepository, makeSchemaProvider, testActor } from './helpers.js'
 
 function makeChangeWithProposal(): Change {
   const proposal = new ChangeArtifact({
@@ -146,6 +142,10 @@ describe('GetStatus ifModifiedSince', () => {
 
     expect(result.unchanged).toBe(true)
     expect(result.artifactStatuses).toHaveLength(0)
+    expect(result.change).toBeDefined()
+    if (!result.change) {
+      throw new Error('Expected active change in GetStatus result')
+    }
     expect(result.change.updatedAt.toISOString()).toBe(change.updatedAt.toISOString())
   })
 })

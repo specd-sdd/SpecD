@@ -15,10 +15,7 @@
   "implementation": [
     {
       "file": "core:src/application/use-cases/get-status.ts",
-      "symbols": ["GetStatus", "GetStatus.execute"]
-    },
-    {
-      "file": "core:src/composition/use-cases/get-status.ts"
+      "symbols": ["GetStatus"]
     }
   ]
 }

@@ -10,6 +10,14 @@ import { type ArtifactStatus } from '../../domain/value-objects/artifact-status.
 import { type ChangeState, VALID_TRANSITIONS } from '../../domain/value-objects/change-state.js'
 import { SpecArtifact } from '../../domain/value-objects/spec-artifact.js'
 import { ArtifactConflictError } from '../../domain/errors/artifact-conflict-error.js'
+import { DraftedChangeReadOnlyError } from '../../domain/errors/drafted-change-read-only-error.js'
+import { InvalidChangeError } from '../../domain/errors/invalid-change-error.js'
+import {
+  toDiscardedChangeView,
+  toDraftedChangeView,
+  type DiscardedChangeView,
+  type DraftedChangeView,
+} from '../../domain/read-only-change-view.js'
 import { CorruptedManifestError } from '../../domain/errors/corrupted-manifest-error.js'
 import { ChangeAlreadyExistsError } from '../../application/errors/change-already-exists-error.js'
 import { ChangeNotFoundError } from '../../application/errors/change-not-found-error.js'
@@ -112,6 +120,10 @@ export class FsChangeRepository extends ChangeRepository {
   private readonly _resolveArtifactTypes: (() => Promise<readonly ArtifactType[]>) | undefined
   private readonly _resolveSpecExists: ((specId: string) => Promise<boolean>) | undefined
   private _artifactTypesResolved: boolean
+  /** Change names currently inside `mutate` — allow save when drafting from active storage. */
+  private readonly _activeMutationInProgress = new Set<string>()
+  /** Change names currently inside `mutateDraft` — allow save/saveArtifact for that name. */
+  private readonly _draftMutationInProgress = new Set<string>()
 
   /**
    * Creates a new `FsChangeRepository` instance.
@@ -178,9 +190,14 @@ export class FsChangeRepository extends ChangeRepository {
         throw new ChangeNotFoundError(name)
       }
 
-      const result = await fn(change)
-      await this.save(change)
-      return result
+      this._activeMutationInProgress.add(name)
+      try {
+        const result = await fn(change)
+        await this.save(change)
+        return result
+      } finally {
+        this._activeMutationInProgress.delete(name)
+      }
     })
   }
 
@@ -189,28 +206,102 @@ export class FsChangeRepository extends ChangeRepository {
    *
    * @param change - The change whose path is needed
    * @returns Absolute path under `changes/`
+   * @throws {InvalidChangeError} When the change is drafted or discarded
    */
   override changePath(change: Change): string {
+    if (change.isDrafted) {
+      throw new InvalidChangeError(
+        `change '${change.name}' is drafted; use draftChangePath with a DraftedChangeView`,
+      )
+    }
+    if (isDiscardedChange(change)) {
+      throw new InvalidChangeError(`change '${change.name}' is discarded and has no active path`)
+    }
     const dirName = changeDirName(change.name, change.createdAt)
     return path.join(this._changesPath, dirName)
   }
 
   /**
-   * Returns the change with the given name, searching `changes/` then `drafts/`
-   * (excludes `discarded/`). Returns `null` if not found.
+   * Returns the absolute path to a drafted change directory.
    *
-   * Discarded changes are excluded so that a discarded name can be reused
-   * when creating a new change.
+   * @param view - Drafted read model from {@link getDraft} or {@link listDrafts}
+   * @returns Absolute path under `drafts/`
+   */
+  override draftChangePath(view: DraftedChangeView): string {
+    const dirName = changeDirName(view.name, view.createdAt)
+    return path.join(this._draftsPath, dirName)
+  }
+
+  /**
+   * Returns the active change with the given name from `changes/` only.
    *
    * @param name - The change slug name to look up
-   * @returns The change with current artifact state, or `null` if not found
+   * @returns The change with current artifact state, or `null` if not found in active storage
    */
   override async get(name: string): Promise<Change | null> {
-    const dir = await this._resolveDir(name, { includeDiscarded: false })
+    const dir = await this._resolveActiveDir(name)
     if (dir === null) return null
 
     const manifest = await this._loadManifest(dir)
     return this._manifestToChange(manifest, dir)
+  }
+
+  /**
+   * Returns a drafted change view from `drafts/` only.
+   *
+   * @param name - The change slug name to look up
+   * @returns A `DraftedChangeView`, or `null` if not found under `drafts/`
+   */
+  override async getDraft(name: string): Promise<DraftedChangeView | null> {
+    const dir = await this._resolveDraftDir(name)
+    if (dir === null) return null
+
+    const manifest = await this._loadManifest(dir)
+    const change = await this._manifestToChange(manifest, dir)
+    return toDraftedChangeView(change)
+  }
+
+  /**
+   * Returns a discarded change view from `discarded/` only.
+   *
+   * @param name - The change slug name to look up
+   * @returns A `DiscardedChangeView`, or `null` if not found under `discarded/`
+   */
+  override async getDiscarded(name: string): Promise<DiscardedChangeView | null> {
+    const dir = await this._resolveDiscardedDir(name)
+    if (dir === null) return null
+
+    const manifest = await this._loadManifest(dir)
+    const change = await this._manifestToChange(manifest, dir)
+    return toDiscardedChangeView(change)
+  }
+
+  /**
+   * Runs a serialized persisted mutation for one existing drafted change.
+   *
+   * @param name - The drafted change name to mutate
+   * @param fn - Callback that applies the mutation on the fresh persisted drafted `Change`
+   * @returns The callback result after the manifest has been persisted
+   * @throws {ChangeNotFoundError} If no drafted change with the given name exists
+   */
+  override async mutateDraft<T>(name: string, fn: (change: Change) => Promise<T> | T): Promise<T> {
+    return this._withChangeLock(name, async () => {
+      const dir = await this._resolveDraftDir(name)
+      if (dir === null) {
+        throw new ChangeNotFoundError(name)
+      }
+
+      const manifest = await this._loadManifest(dir)
+      const change = await this._manifestToChange(manifest, dir)
+      this._draftMutationInProgress.add(name)
+      try {
+        const result = await fn(change)
+        await this.save(change)
+        return result
+      } finally {
+        this._draftMutationInProgress.delete(name)
+      }
+    })
   }
 
   /**
@@ -244,7 +335,7 @@ export class FsChangeRepository extends ChangeRepository {
    *
    * @returns All drafted changes in this workspace, sorted by creation order
    */
-  override async listDrafts(): Promise<Change[]> {
+  override async listDrafts(): Promise<DraftedChangeView[]> {
     let entries: string[]
     try {
       entries = await fs.readdir(this._draftsPath)
@@ -256,13 +347,14 @@ export class FsChangeRepository extends ChangeRepository {
     const dirs = await filterDirectories(this._draftsPath, entries)
     dirs.sort()
 
-    const changes: Change[] = []
+    const views: DraftedChangeView[] = []
     for (const dirName of dirs) {
       const dir = path.join(this._draftsPath, dirName)
       const manifest = await this._loadManifest(dir)
-      changes.push(await this._manifestToChange(manifest, dir))
+      const change = await this._manifestToChange(manifest, dir)
+      views.push(toDraftedChangeView(change))
     }
-    return changes
+    return views
   }
 
   /**
@@ -270,7 +362,7 @@ export class FsChangeRepository extends ChangeRepository {
    *
    * @returns All discarded changes in this workspace, sorted by creation order
    */
-  override async listDiscarded(): Promise<Change[]> {
+  override async listDiscarded(): Promise<DiscardedChangeView[]> {
     let entries: string[]
     try {
       entries = await fs.readdir(this._discardedPath)
@@ -282,13 +374,14 @@ export class FsChangeRepository extends ChangeRepository {
     const dirs = await filterDirectories(this._discardedPath, entries)
     dirs.sort()
 
-    const changes: Change[] = []
+    const views: DiscardedChangeView[] = []
     for (const dirName of dirs) {
       const dir = path.join(this._discardedPath, dirName)
       const manifest = await this._loadManifest(dir)
-      changes.push(await this._manifestToChange(manifest, dir))
+      const change = await this._manifestToChange(manifest, dir)
+      views.push(toDiscardedChangeView(change))
     }
-    return changes
+    return views
   }
 
   /**
@@ -298,6 +391,14 @@ export class FsChangeRepository extends ChangeRepository {
    * @param change - The change whose manifest should be persisted
    */
   override async save(change: Change): Promise<void> {
+    if (
+      change.isDrafted &&
+      !this._draftMutationInProgress.has(change.name) &&
+      !this._activeMutationInProgress.has(change.name)
+    ) {
+      throw new DraftedChangeReadOnlyError(change.name, 'save')
+    }
+
     change.touchUpdatedAt()
     const artifactTypes = await this._ensureArtifactTypes()
     const specExistence = await this._buildSpecExistenceMap(change.specIds)
@@ -390,6 +491,14 @@ export class FsChangeRepository extends ChangeRepository {
     artifact: SpecArtifact,
     options?: { force?: boolean },
   ): Promise<void> {
+    if (
+      change.isDrafted &&
+      !this._draftMutationInProgress.has(change.name) &&
+      !this._activeMutationInProgress.has(change.name)
+    ) {
+      throw new DraftedChangeReadOnlyError(change.name, 'saveArtifact')
+    }
+
     const dir = await this._resolveDir(change.name)
     if (dir === null) {
       throw new ChangeNotFoundError(change.name)
@@ -696,6 +805,36 @@ export class FsChangeRepository extends ChangeRepository {
   }
 
   /**
+   * Resolves the on-disk directory for an active change under `changes/` only.
+   *
+   * @param name - The change slug name to search for
+   * @returns The absolute path to the change directory, or `null` if not found
+   */
+  private async _resolveActiveDir(name: string): Promise<string | null> {
+    return this._resolveDirInBase(this._changesPath, name)
+  }
+
+  /**
+   * Resolves the on-disk directory for a drafted change under `drafts/` only.
+   *
+   * @param name - The change slug name to search for
+   * @returns The absolute path to the change directory, or `null` if not found
+   */
+  private async _resolveDraftDir(name: string): Promise<string | null> {
+    return this._resolveDirInBase(this._draftsPath, name)
+  }
+
+  /**
+   * Resolves the on-disk directory for a discarded change under `discarded/` only.
+   *
+   * @param name - The change slug name to search for
+   * @returns The absolute path to the change directory, or `null` if not found
+   */
+  private async _resolveDiscardedDir(name: string): Promise<string | null> {
+    return this._resolveDirInBase(this._discardedPath, name)
+  }
+
+  /**
    * Resolves the on-disk directory for a change by scanning `changes/`,
    * `drafts/`, and optionally `discarded/` for an entry ending in `-<name>`.
    *
@@ -731,6 +870,30 @@ export class FsChangeRepository extends ChangeRepository {
     }
 
     return null
+  }
+
+  /**
+   * Finds a change directory under a single storage base path.
+   *
+   * @param basePath - `changes/`, `drafts/`, or `discarded/` root
+   * @param name - Change slug name
+   * @returns Absolute directory path or `null`
+   */
+  private async _resolveDirInBase(basePath: string, name: string): Promise<string | null> {
+    let entries: string[]
+    try {
+      entries = await fs.readdir(basePath)
+    } catch (err) {
+      if (isEnoent(err)) return null
+      throw err
+    }
+
+    const match = entries.find((entry) => {
+      const m = entry.match(/^\d{8}-\d{6}-(.+)$/)
+      return m !== null && m[1] === name
+    })
+    if (match === undefined) return null
+    return path.join(basePath, match)
   }
 
   /**

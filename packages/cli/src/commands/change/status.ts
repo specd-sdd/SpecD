@@ -95,12 +95,54 @@ JSON/TOON output schema:
       async (name: string, opts: { format: string; implementation?: boolean; config?: string }) => {
         try {
           const { config, kernel } = await resolveCliContext({ configPath: opts.config })
-          await kernel.changes.refreshImplementationTracking.execute({ name })
+          const active = await kernel.changes.repo.get(name)
+          if (active !== null) {
+            await kernel.changes.refreshImplementationTracking.execute({ name })
+          }
           const statusResult = await kernel.changes.status.execute({
             name,
           })
 
-          const { change, artifactStatuses, lifecycle, review, blockers, nextAction } = statusResult
+          if (statusResult.draftView !== undefined) {
+            const draftView = statusResult.draftView
+            const { artifactStatuses, lifecycle, nextAction } = statusResult
+            const fmt = parseFormat(opts.format)
+            if (fmt === 'text') {
+              const lines = [
+                `change:      ${draftView.name}`,
+                `state:       ${draftView.state} (drafted)`,
+                `specs:       ${[...draftView.specIds].join(', ') || '(none)'}`,
+                '',
+                'next action:',
+                `  target:  ${nextAction.targetStep}`,
+                `  command: ${nextAction.command ?? '(none)'}`,
+                `  reason:  ${nextAction.reason}`,
+                '',
+                'lifecycle:',
+                '  transitions:  (none — change is drafted)',
+                `  path:          ${lifecycle.changePath}`,
+              ]
+              output(lines.join('\n'), 'text')
+            } else {
+              output(
+                {
+                  name: draftView.name,
+                  state: draftView.state,
+                  isDrafted: true,
+                  specIds: [...draftView.specIds],
+                  schema: { name: draftView.schemaName, version: draftView.schemaVersion },
+                  availableTransitions: lifecycle.availableTransitions,
+                  nextAction,
+                  artifacts: artifactStatuses,
+                },
+                fmt,
+              )
+            }
+            return
+          }
+
+          const change = statusResult.change!
+          const { artifactStatuses, lifecycle, review, blockers, nextAction } = statusResult
           const implementationTracking = opts.implementation
             ? await enrichImplementationTracking(config, statusResult.implementationTracking)
             : undefined

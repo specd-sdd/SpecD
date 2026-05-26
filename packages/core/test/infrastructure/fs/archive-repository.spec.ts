@@ -37,7 +37,7 @@ async function setupRepo(pattern?: string): Promise<RepoContext> {
     workspace: 'default',
     ownership: 'owned',
     isExternal: false,
-    configPath: '/test',
+    configPath: tmpDir,
     changesPath,
     draftsPath,
     discardedPath,
@@ -47,7 +47,7 @@ async function setupRepo(pattern?: string): Promise<RepoContext> {
     workspace: 'default',
     ownership: 'owned',
     isExternal: false,
-    configPath: '/test',
+    configPath: tmpDir,
     changesPath,
     draftsPath,
     archivePath,
@@ -256,8 +256,10 @@ describe('FsArchiveRepository', () => {
 
     it('archives a drafted change from drafts/', async () => {
       const change = await makeArchivableChange(ctx, 'drafted-change')
-      change.draft(actor, undefined, true)
-      await ctx.changes.save(change)
+      await ctx.changes.mutate('drafted-change', (loaded) => {
+        loaded.draft(actor, undefined, true)
+        return loaded
+      })
 
       // Restore to archivable state (already archivable, just drafted)
       // Actually we need to check: can an archivable change also be drafted?

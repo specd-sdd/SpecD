@@ -39,17 +39,17 @@ describe('RestoreChange', () => {
       expect(repo.store.get('my-change')?.isDrafted).toBe(false)
     })
 
-    it('persists through ChangeRepository.mutate', async () => {
+    it('persists through ChangeRepository.mutateDraft', async () => {
       const change = makeChange('my-change')
       change.draft(testActor)
       const repo = makeChangeRepository([change])
-      const mutateSpy = vi.spyOn(repo, 'mutate')
+      const mutateDraftSpy = vi.spyOn(repo, 'mutateDraft')
       const uc = new RestoreChange(repo, makeActorResolver())
 
       await uc.execute({ name: 'my-change' })
 
-      expect(mutateSpy).toHaveBeenCalledOnce()
-      expect(mutateSpy).toHaveBeenCalledWith('my-change', expect.any(Function))
+      expect(mutateDraftSpy).toHaveBeenCalledOnce()
+      expect(mutateDraftSpy).toHaveBeenCalledWith('my-change', expect.any(Function))
     })
   })
 

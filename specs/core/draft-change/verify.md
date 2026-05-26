@@ -6,7 +6,19 @@
 
 #### Scenario: Non-existent change is rejected
 
-- **WHEN** `DraftChange.execute` is called with a name that does not exist in the repository
+- **WHEN** `DraftChange.execute` is called with a name that does not exist in active storage
+- **THEN** it throws `ChangeNotFoundError`
+
+#### Scenario: Drafted-only name is rejected
+
+- **GIVEN** a change exists only under `drafts/`
+- **WHEN** `DraftChange.execute` is called with its name
+- **THEN** it throws `ChangeNotFoundError`
+
+#### Scenario: Discarded-only name is rejected
+
+- **GIVEN** a change exists only under `discarded/`
+- **WHEN** `DraftChange.execute` is called with its name
 - **THEN** it throws `ChangeNotFoundError`
 
 ### Requirement: Actor resolution
@@ -46,8 +58,9 @@
 
 #### Scenario: Change becomes drafted after execution
 
-- **WHEN** `DraftChange.execute` returns a change
-- **THEN** `change.isDrafted === true`
+- **WHEN** `DraftChange.execute` returns
+- **THEN** the result satisfies `DraftedChangeView`
+- **AND** `result.isDrafted === true`
 
 ### Requirement: Persistence
 
@@ -57,6 +70,25 @@
 - **THEN** `ChangeRepository.mutate(input.name, fn)` is called
 - **AND** the callback records the drafted event on the fresh persisted `Change`
 - **AND** the resulting change is relocated to the drafts area by the repository
+
+#### Scenario: Result is not a mutable Change
+
+- **GIVEN** an active change is drafted successfully
+- **WHEN** `DraftChange.execute` returns
+- **THEN** the return value is not an instance of domain `Change`
+
+#### Scenario: Result is loadable via getDraft after execute
+
+- **GIVEN** `DraftChange.execute` returns a view for name `parked-feature`
+- **WHEN** `ChangeRepository.getDraft('parked-feature')` is called
+- **THEN** a `DraftedChangeView` is returned with `isDrafted === true`
+
+#### Scenario: mutate relocates before view mapping
+
+- **GIVEN** an active change named `parked-feature`
+- **WHEN** `DraftChange.execute` completes
+- **THEN** `ChangeRepository.mutate` was called for that name
+- **AND** the change directory exists under `drafts/` after completion
 
 ### Requirement: Input contract
 

@@ -1,0 +1,13 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["core:change", "default:_global/architecture", "core:drafted-change-view"],
+  "implementation": [
+    {
+      "file": "core:src/application/use-cases/draft-change.ts",
+      "symbols": ["DraftChange"]
+    }
+  ]
+}

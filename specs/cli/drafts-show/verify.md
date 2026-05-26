@@ -14,6 +14,27 @@
 - **WHEN** `specd draft show my-change` is run
 - **THEN** it is accepted as an alias of `specd drafts show my-change`
 
+### Requirement: Loads drafted change via GetDraft
+
+#### Scenario: Uses GetDraft not GetStatus
+
+- **WHEN** `specd drafts show my-change` runs successfully
+- **THEN** `GetDraft.execute` was invoked with `{ name: 'my-change' }`
+- **AND** `GetStatus` was not invoked
+
+#### Scenario: Does not call ChangeRepository.get
+
+- **GIVEN** a change exists only under `drafts/`
+- **WHEN** `specd drafts show my-change` runs successfully
+- **THEN** `ChangeRepository.get` was not used to load the change for display
+
+#### Scenario: Text output fields come from DraftedChangeView
+
+- **GIVEN** `GetDraft` returns a view with `name`, `specIds`, and schema fields
+- **WHEN** `specd drafts show my-change` runs in text mode
+- **THEN** stdout `name:`, `specs:`, and `schema:` lines match the view
+- **AND** the process exits with code 0
+
 ### Requirement: Output format — toon
 
 #### Scenario: TOON format output
@@ -53,3 +74,10 @@
 - **WHEN** `specd drafts show my-change` is run
 - **THEN** the command exits with code 1
 - **AND** stderr contains an `error:` message
+
+#### Scenario: GetDraft ChangeNotFoundError maps to stderr
+
+- **GIVEN** `GetDraft.execute` throws `ChangeNotFoundError`
+- **WHEN** `specd drafts show missing` runs
+- **THEN** the command exits with code 1
+- **AND** stderr contains an `error:` message mentioning `drafts/`

@@ -1,0 +1,53 @@
+- op: added
+  description: Drafted status scenarios.
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Returns the change and its artifact statuses'
+  content: |
+    ### Requirement: Drafted change read-only status
+
+    #### Scenario: Draft-only name returns draftView
+
+    - **GIVEN** a change exists only under `drafts/`
+    - **WHEN** `execute({ name })` is called
+    - **THEN** `result.draftView` is defined and satisfies `DraftedChangeView`
+    - **AND** `result.change` is undefined
+
+    #### Scenario: Drafted status has no available transitions
+
+    - **GIVEN** a change exists only under `drafts/`
+    - **WHEN** `execute({ name })` is called
+    - **THEN** `availableTransitions` is empty
+    - **AND** `nextAction.command` does not recommend transition or validate commands
+
+    #### Scenario: Active name returns change not draftView
+
+    - **GIVEN** a change exists under `changes/`
+    - **WHEN** `execute({ name })` is called
+    - **THEN** `result.change` is defined
+    - **AND** `result.draftView` is undefined
+
+    #### Scenario: Discarded-only name is not found
+
+    - **GIVEN** a change exists only under `discarded/`
+    - **WHEN** `execute({ name })` is called
+    - **THEN** it throws `ChangeNotFoundError`
+    - **AND** `ChangeRepository.getDiscarded` is not invoked
+
+    #### Scenario: Draft resolution uses getDraft not get
+
+    - **GIVEN** spies on `ChangeRepository.get` and `getDraft`
+    - **WHEN** `execute({ name })` runs for a drafted-only name
+    - **THEN** `getDraft` is invoked
+    - **AND** `get` is not used to populate `result.change`
+
+    #### Scenario: Drafted result still includes artifact statuses
+
+    - **GIVEN** a drafted change with `proposal` in `pending-review`
+    - **WHEN** `execute({ name })` is called
+    - **THEN** `result.artifacts` includes the `proposal` entry with that state
+    - **AND** `result.draftView` is defined

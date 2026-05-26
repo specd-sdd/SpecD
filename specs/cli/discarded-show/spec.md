@@ -15,6 +15,14 @@ specd discarded show <name> [--format text|json|toon]
 - `<name>` — required positional; the name of the discarded change to show
 - `--format` — controls output encoding; defaults to `text`
 
+### Requirement: Loads discarded change via GetDiscarded
+
+The command MUST invoke `GetDiscarded.execute({ name })` (or the kernel equivalent) to load the discarded change.
+
+The command MUST NOT invoke `GetStatus`, `GetDraft`, or `ChangeRepository.get` for this command.
+
+Displayed fields (`name`, `specIds`, `schema`, `reason`) MUST be read from the returned `DiscardedChangeView` (`discardReason` for `reason` in text/JSON output).
+
 ### Requirement: Output format — text
 
 The command prints metadata for the change to stdout:
@@ -42,7 +50,8 @@ When `--format toon` is passed, the command writes the same data model as JSON e
 
 ### Requirement: Error cases
 
-- If no change with the given name exists in `discarded/`, the command exits with code 1 and prints an `error:` message to stderr.
+- If `GetDiscarded` throws `ChangeNotFoundError`, the command exits with code 1 and prints an `error:` message to stderr indicating the change is not in `discarded/`.
+- If a change with the given name exists only under active or drafted storage, the command exits with code 1 and prints an `error:` message to stderr.
 
 ## Constraints
 
@@ -66,4 +75,6 @@ $ specd discarded show old-experiment --format json
 ## Spec Dependencies
 
 - [`cli:entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
-- [`core:change`](../../core/change/spec.md) — discard semantics, discarded event, storage locations
+- [`core:get-discarded`](../../core/get-discarded/spec.md) — load discarded change by name
+- [`core:discarded-change-view`](../../core/discarded-change-view/spec.md) — read model returned to the command
+- [`cli:command-resource-naming`](../command-resource-naming/spec.md) — canonical plural naming and singular alias policy

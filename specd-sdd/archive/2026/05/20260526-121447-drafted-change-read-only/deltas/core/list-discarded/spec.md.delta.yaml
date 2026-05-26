@@ -1,0 +1,27 @@
+- op: modified
+  description: Return DiscardedChangeView instead of Change.
+  selector:
+    type: section
+    matches: 'Requirement: Returns Change entities without content'
+  rename: 'Requirement: Returns DiscardedChangeView without content'
+  content: |
+    `ListDiscarded.execute()` MUST return `DiscardedChangeView[]`. Each view MUST expose artifact state (status, validated hashes), shared inspection fields, and discard metadata (`discardReason`, `discardedAt`, `discardedBy`, optional `supersededBy`) but MUST NOT include artifact file content.
+
+    Callers MUST NOT receive a `Change` aggregate from this use case.
+- op: modified
+  description: Delegate to repository listDiscarded views.
+  selector:
+    type: section
+    matches: 'Requirement: Constructor accepts a ChangeRepository'
+  content: |
+    `ListDiscarded` MUST accept a `ChangeRepository` as its sole constructor argument. It MUST delegate to `ChangeRepository.listDiscarded()` and return the resulting `DiscardedChangeView[]` without wrapping in mutable `Change` instances.
+- op: modified
+  description: Add dependencies.
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`core:change`](../change/spec.md)
+    - [`core:kernel`](../kernel/spec.md)
+    - [`core:discarded-change-view`](../discarded-change-view/spec.md)
+    - [`core:change-repository-port`](../change-repository-port/spec.md)

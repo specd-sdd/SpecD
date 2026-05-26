@@ -1,5 +1,3 @@
- 
-
 /**
  * Tests for list-only commands:
  * drafts list, discarded list, archive list, spec list
@@ -8,6 +6,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest'
 import {
   makeMockConfig,
   makeMockChange,
+  makeMockDiscardedView,
   makeMockKernel,
   makeProgram,
   mockProcessExit,
@@ -158,7 +157,7 @@ describe('drafts list', () => {
 describe('drafts show', () => {
   it('exits 1 when change not found', async () => {
     const { kernel, stderr } = setup()
-    kernel.changes.status.execute.mockRejectedValue(new ChangeNotFoundError('nonexistent'))
+    kernel.changes.getDraft.execute.mockRejectedValue(new ChangeNotFoundError('nonexistent'))
 
     const program = makeProgram()
     registerDraftsShow(program.command('drafts'))
@@ -170,9 +169,8 @@ describe('drafts show', () => {
 
   it('shows change details with name, state, specs, schema', async () => {
     const { kernel, stdout } = setup()
-    kernel.changes.status.execute.mockResolvedValue({
-      change: makeMockChange({ name: 'feat', state: 'designing', isDrafted: true }),
-      artifactStatuses: [{ type: 'spec', effectiveStatus: 'pending' }],
+    kernel.changes.getDraft.execute.mockResolvedValue({
+      view: makeMockChange({ name: 'feat', state: 'designing', isDrafted: true }),
     })
 
     const program = makeProgram()
@@ -190,9 +188,8 @@ describe('drafts show', () => {
 
   it('outputs JSON with name, state, specIds, schema object', async () => {
     const { kernel, stdout } = setup()
-    kernel.changes.status.execute.mockResolvedValue({
-      change: makeMockChange({ name: 'feat', state: 'designing', isDrafted: true }),
-      artifactStatuses: [],
+    kernel.changes.getDraft.execute.mockResolvedValue({
+      view: makeMockChange({ name: 'feat', state: 'designing', isDrafted: true }),
     })
 
     const program = makeProgram()
@@ -219,10 +216,7 @@ describe('drafts show', () => {
 
   it('exits 1 when change is not in drafts', async () => {
     const { kernel, stderr } = setup()
-    kernel.changes.status.execute.mockResolvedValue({
-      change: makeMockChange({ name: 'my-change', state: 'designing', isDrafted: false }),
-      artifactStatuses: [],
-    })
+    kernel.changes.getDraft.execute.mockRejectedValue(new ChangeNotFoundError('my-change'))
 
     const program = makeProgram()
     registerDraftsShow(program.command('drafts'))
@@ -250,7 +244,9 @@ describe('discarded list', () => {
 
   it('lists discarded change names', async () => {
     const { kernel, stdout } = setup()
-    kernel.changes.listDiscarded.execute.mockResolvedValue([makeMockChange({ name: 'old-feat' })])
+    kernel.changes.listDiscarded.execute.mockResolvedValue([
+      makeMockDiscardedView({ name: 'old-feat' }),
+    ])
 
     const program = makeProgram()
     registerDiscardedList(program.command('discarded'))
@@ -262,15 +258,10 @@ describe('discarded list', () => {
   it('returns JSON array without createdAt', async () => {
     const { kernel, stdout } = setup()
     kernel.changes.listDiscarded.execute.mockResolvedValue([
-      makeMockChange({
+      makeMockDiscardedView({
         name: 'old-feat',
-        history: [
-          {
-            type: 'discarded',
-            at: new Date('2026-01-01T00:00:00Z'),
-            by: { name: 'bob', email: 'b@test.com' },
-          },
-        ],
+        discardedAt: new Date('2026-01-01T00:00:00Z'),
+        discardedBy: { name: 'bob', email: 'b@test.com' },
       }),
     ])
 
@@ -288,16 +279,11 @@ describe('discarded list', () => {
   it('JSON includes reason and discardedAt fields', async () => {
     const { kernel, stdout } = setup()
     kernel.changes.listDiscarded.execute.mockResolvedValue([
-      makeMockChange({
+      makeMockDiscardedView({
         name: 'old-experiment',
-        history: [
-          {
-            type: 'discarded',
-            reason: 'no longer needed',
-            at: new Date('2024-01-10T09:00:00Z'),
-            by: { name: 'alice', email: 'alice@test.com' },
-          },
-        ],
+        discardReason: 'no longer needed',
+        discardedAt: new Date('2024-01-10T09:00:00Z'),
+        discardedBy: { name: 'alice', email: 'alice@test.com' },
       }),
     ])
 
@@ -330,12 +316,8 @@ describe('discarded list', () => {
 describe('discarded show', () => {
   it('shows name, specs, schema, reason from history', async () => {
     const { kernel, stdout } = setup()
-    kernel.changes.status.execute.mockResolvedValue({
-      change: makeMockChange({
-        name: 'old-feat',
-        history: [{ type: 'discarded', reason: 'no longer needed', at: new Date(), by: {} }],
-      }),
-      artifactStatuses: [],
+    kernel.changes.getDiscarded.execute.mockResolvedValue({
+      view: makeMockDiscardedView({ name: 'old-feat', discardReason: 'no longer needed' }),
     })
 
     const program = makeProgram()
@@ -353,12 +335,8 @@ describe('discarded show', () => {
 
   it('outputs JSON with specIds, schema object, reason — no state/createdAt', async () => {
     const { kernel, stdout } = setup()
-    kernel.changes.status.execute.mockResolvedValue({
-      change: makeMockChange({
-        name: 'old-feat',
-        history: [{ type: 'discarded', reason: 'replaced', at: new Date(), by: {} }],
-      }),
-      artifactStatuses: [],
+    kernel.changes.getDiscarded.execute.mockResolvedValue({
+      view: makeMockDiscardedView({ name: 'old-feat', discardReason: 'replaced' }),
     })
 
     const program = makeProgram()
@@ -384,7 +362,7 @@ describe('discarded show', () => {
 
   it('exits 1 when change not found in discarded', async () => {
     const { kernel, stderr } = setup()
-    kernel.changes.status.execute.mockRejectedValue(new ChangeNotFoundError('nonexistent'))
+    kernel.changes.getDiscarded.execute.mockRejectedValue(new ChangeNotFoundError('nonexistent'))
 
     const program = makeProgram()
     registerDiscardedShow(program.command('discarded'))

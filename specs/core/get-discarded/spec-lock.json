@@ -1,0 +1,13 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["core:discarded-change-view", "core:change", "core:change-repository-port"],
+  "implementation": [
+    {
+      "file": "core:src/application/use-cases/get-discarded.ts",
+      "symbols": ["GetDiscarded"]
+    }
+  ]
+}

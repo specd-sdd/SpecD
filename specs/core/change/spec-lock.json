@@ -15,8 +15,8 @@
   ],
   "implementation": [
     {
-      "file": "core:src/domain/value-objects/change-state.ts",
-      "symbols": ["VALID_TRANSITIONS"]
+      "file": "core:src/application/use-cases/create-change.ts",
+      "symbols": ["CreateChange"]
     }
   ]
 }

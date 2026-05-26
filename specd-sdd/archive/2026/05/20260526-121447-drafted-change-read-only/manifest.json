@@ -1,0 +1,2150 @@
+{
+  "name": "drafted-change-read-only",
+  "createdAt": "2026-05-26T12:14:47.006Z",
+  "description": "Enforces read-only semantics for drafted changes across @specd/core and the CLI by splitting active vs draft storage access. Active get/mutate no longer resolve drafts; drafted changes are accessed via getDraft and exposed through read-only views, while restore/discard are the only allowlisted mutations. Updates CLI commands and test coverage to reflect the new drafted/discarded read models and error handling.",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "core:change",
+    "core:change-repository-port",
+    "core:restore-change",
+    "core:discard-change",
+    "core:drafted-change-view",
+    "core:drafted-change-read-only-error",
+    "core:get-draft",
+    "core:list-drafts",
+    "core:get-status",
+    "core:draft-change",
+    "cli:drafts-show",
+    "cli:drafts-list",
+    "cli:change-draft",
+    "cli:change-status",
+    "cli:project-status",
+    "cli:project-dashboard",
+    "core:get-discarded",
+    "cli:discarded-show",
+    "core:discarded-change-view",
+    "core:list-discarded",
+    "cli:discarded-list",
+    "core:read-only-change-view"
+  ],
+  "specDependsOn": {
+    "core:change": [
+      "core:change-manifest",
+      "core:workflow-model",
+      "core:spec-metadata",
+      "core:spec-id-format",
+      "default:_global/architecture",
+      "core:lifecycle-engine",
+      "default:_global/logging",
+      "core:implementation-detector-port"
+    ],
+    "core:change-repository-port": [
+      "core:repository-port",
+      "default:_global/architecture",
+      "core:change",
+      "core:read-only-change-view",
+      "core:drafted-change-view",
+      "core:discarded-change-view",
+      "core:drafted-change-read-only-error",
+      "core:storage",
+      "core:change-manifest",
+      "default:_global/logging"
+    ],
+    "core:restore-change": ["core:change", "core:draft-change", "default:_global/architecture"],
+    "core:discard-change": ["core:change", "default:_global/architecture"],
+    "core:drafted-change-view": [
+      "core:read-only-change-view",
+      "core:change",
+      "core:change-repository-port"
+    ],
+    "core:drafted-change-read-only-error": [
+      "core:change",
+      "default:_global/error-handling-conventions"
+    ],
+    "core:get-draft": ["core:drafted-change-view", "core:change-repository-port", "core:change"],
+    "core:list-drafts": ["core:change", "core:kernel"],
+    "core:get-status": [
+      "core:change",
+      "core:kernel",
+      "core:transition-change",
+      "core:schema-format",
+      "core:config",
+      "core:lifecycle-engine",
+      "core:refresh-implementation-tracking"
+    ],
+    "core:draft-change": [
+      "core:change",
+      "default:_global/architecture",
+      "core:drafted-change-view"
+    ],
+    "cli:drafts-show": [
+      "cli:entrypoint",
+      "core:get-draft",
+      "core:drafted-change-view",
+      "cli:command-resource-naming"
+    ],
+    "cli:drafts-list": [
+      "cli:entrypoint",
+      "core:list-drafts",
+      "core:drafted-change-view",
+      "cli:command-resource-naming"
+    ],
+    "cli:change-draft": ["cli:entrypoint", "core:change", "cli:command-resource-naming"],
+    "cli:change-status": [
+      "cli:entrypoint",
+      "core:change",
+      "core:get-status",
+      "core:refresh-implementation-tracking"
+    ],
+    "cli:project-status": ["core:list-drafts", "core:list-changes"],
+    "cli:project-dashboard": ["cli:entrypoint", "core:config"],
+    "core:get-discarded": [
+      "core:discarded-change-view",
+      "core:change",
+      "core:change-repository-port"
+    ],
+    "cli:discarded-show": [
+      "cli:entrypoint",
+      "core:get-discarded",
+      "core:discarded-change-view",
+      "cli:command-resource-naming"
+    ],
+    "core:discarded-change-view": [
+      "core:read-only-change-view",
+      "core:change",
+      "core:change-repository-port"
+    ],
+    "core:list-discarded": [
+      "core:change",
+      "core:kernel",
+      "core:discarded-change-view",
+      "core:change-repository-port"
+    ],
+    "cli:discarded-list": [
+      "cli:entrypoint",
+      "core:list-discarded",
+      "core:discarded-change-view",
+      "cli:command-resource-naming"
+    ],
+    "core:read-only-change-view": ["core:change"]
+  },
+  "invalidationPolicy": "downstream",
+  "trackedImplementationFiles": [
+    {
+      "file": "pnpm-lock.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/domain/errors/drafted-change-read-only-error.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "specd-sdd/changes/20260526-121447-drafted-change-read-only/.specd-exploration.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260526-121447-drafted-change-read-only/deltas/cli/change-draft/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260526-121447-drafted-change-read-only/deltas/cli/change-draft/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260526-121447-drafted-change-read-only/deltas/cli/change-status/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260526-121447-drafted-change-read-only/deltas/cli/change-status/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260526-121447-drafted-change-read-only/deltas/cli/discarded-list/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260526-121447-drafted-change-read-only/deltas/cli/discarded-list/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260526-121447-drafted-change-read-only/deltas/cli/discarded-show/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260526-121447-drafted-change-read-only/deltas/cli/discarded-show/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260526-121447-drafted-change-read-only/deltas/cli/drafts-list/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260526-121447-drafted-change-read-only/deltas/cli/drafts-list/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260526-121447-drafted-change-read-only/deltas/cli/drafts-show/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260526-121447-drafted-change-read-only/deltas/cli/drafts-show/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260526-121447-drafted-change-read-only/deltas/cli/project-dashboard/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260526-121447-drafted-change-read-only/deltas/cli/project-dashboard/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260526-121447-drafted-change-read-only/deltas/cli/project-status/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260526-121447-drafted-change-read-only/deltas/cli/project-status/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260526-121447-drafted-change-read-only/deltas/core/change-repository-port/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260526-121447-drafted-change-read-only/deltas/core/change-repository-port/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260526-121447-drafted-change-read-only/deltas/core/change/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260526-121447-drafted-change-read-only/deltas/core/change/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260526-121447-drafted-change-read-only/deltas/core/discard-change/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260526-121447-drafted-change-read-only/deltas/core/discard-change/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260526-121447-drafted-change-read-only/deltas/core/draft-change/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260526-121447-drafted-change-read-only/deltas/core/draft-change/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260526-121447-drafted-change-read-only/deltas/core/get-status/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260526-121447-drafted-change-read-only/deltas/core/get-status/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260526-121447-drafted-change-read-only/deltas/core/list-discarded/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260526-121447-drafted-change-read-only/deltas/core/list-discarded/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260526-121447-drafted-change-read-only/deltas/core/list-drafts/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260526-121447-drafted-change-read-only/deltas/core/list-drafts/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260526-121447-drafted-change-read-only/deltas/core/restore-change/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260526-121447-drafted-change-read-only/deltas/core/restore-change/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260526-121447-drafted-change-read-only/design.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260526-121447-drafted-change-read-only/manifest.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260526-121447-drafted-change-read-only/proposal.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260526-121447-drafted-change-read-only/specs/core/discarded-change-view/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260526-121447-drafted-change-read-only/specs/core/discarded-change-view/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260526-121447-drafted-change-read-only/specs/core/drafted-change-read-only-error/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260526-121447-drafted-change-read-only/specs/core/drafted-change-read-only-error/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260526-121447-drafted-change-read-only/specs/core/drafted-change-view/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260526-121447-drafted-change-read-only/specs/core/drafted-change-view/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260526-121447-drafted-change-read-only/specs/core/get-discarded/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260526-121447-drafted-change-read-only/specs/core/get-discarded/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260526-121447-drafted-change-read-only/specs/core/get-draft/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260526-121447-drafted-change-read-only/specs/core/get-draft/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260526-121447-drafted-change-read-only/specs/core/read-only-change-view/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260526-121447-drafted-change-read-only/specs/core/read-only-change-view/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260526-121447-drafted-change-read-only/tasks.md",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/src/commands/change/status.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/discarded/list.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/discarded/show.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/drafts/show.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/discarded-list.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/test/commands/discarded-show.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/test/commands/drafts-show.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/test/commands/helpers.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/test/commands/list-commands.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/ports/change-repository.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/create-change.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/discard-change.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/draft-change.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/get-status.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/index.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/list-discarded.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/list-drafts.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/restore-change.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/kernel.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/domain/errors/index.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/domain/index.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/infrastructure/fs/change-repository.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/get-status.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/helpers.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/restore-change.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/infrastructure/fs/archive-repository.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/infrastructure/fs/change-repository.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/get-discarded.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/get-draft.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/get-discarded.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/get-draft.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/domain/read-only-change-view.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/get-discarded.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/get-draft.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/domain/read-only-change-view.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/src/commands/drafts/list.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/change/artifacts.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/src/commands/change/transition.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/src/commands/change/validate.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/test/handle-error.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/create-change.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/list-discarded.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/list-drafts.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/transition-change.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260526-121447-drafted-change-read-only/reports/20260526-180407/spec-compliance.md",
+      "state": "ignored"
+    }
+  ],
+  "implementationLinks": [
+    {
+      "specId": "core:read-only-change-view",
+      "file": "packages/core/src/domain/read-only-change-view.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["toDraftedChangeView", "toDiscardedChangeView"]
+    },
+    {
+      "specId": "core:drafted-change-view",
+      "file": "packages/core/src/domain/read-only-change-view.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["toDraftedChangeView"]
+    },
+    {
+      "specId": "core:discarded-change-view",
+      "file": "packages/core/src/domain/read-only-change-view.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["toDiscardedChangeView"]
+    },
+    {
+      "specId": "core:drafted-change-read-only-error",
+      "file": "packages/core/src/domain/errors/drafted-change-read-only-error.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["DraftedChangeReadOnlyError"]
+    },
+    {
+      "specId": "core:change-repository-port",
+      "file": "packages/core/src/application/ports/change-repository.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["ChangeRepository"]
+    },
+    {
+      "specId": "core:change-repository-port",
+      "file": "packages/core/src/infrastructure/fs/change-repository.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["FsChangeRepository"]
+    },
+    {
+      "specId": "core:get-draft",
+      "file": "packages/core/src/application/use-cases/get-draft.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["GetDraft"]
+    },
+    {
+      "specId": "core:get-discarded",
+      "file": "packages/core/src/application/use-cases/get-discarded.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["GetDiscarded"]
+    },
+    {
+      "specId": "core:restore-change",
+      "file": "packages/core/src/application/use-cases/restore-change.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["RestoreChange"]
+    },
+    {
+      "specId": "core:discard-change",
+      "file": "packages/core/src/application/use-cases/discard-change.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["DiscardChange"]
+    },
+    {
+      "specId": "core:list-drafts",
+      "file": "packages/core/src/application/use-cases/list-drafts.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["ListDrafts"]
+    },
+    {
+      "specId": "core:list-discarded",
+      "file": "packages/core/src/application/use-cases/list-discarded.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["ListDiscarded"]
+    },
+    {
+      "specId": "core:get-status",
+      "file": "packages/core/src/application/use-cases/get-status.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["GetStatus"]
+    },
+    {
+      "specId": "core:draft-change",
+      "file": "packages/core/src/application/use-cases/draft-change.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["DraftChange"]
+    },
+    {
+      "specId": "core:change",
+      "file": "packages/core/src/application/use-cases/create-change.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["CreateChange"]
+    },
+    {
+      "specId": "core:get-draft",
+      "file": "packages/core/src/composition/kernel.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["createKernel"]
+    },
+    {
+      "specId": "cli:drafts-show",
+      "file": "packages/cli/src/commands/drafts/show.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:drafts-list",
+      "file": "packages/cli/src/commands/drafts/list.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:discarded-show",
+      "file": "packages/cli/src/commands/discarded/show.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:discarded-list",
+      "file": "packages/cli/src/commands/discarded/list.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:change-status",
+      "file": "packages/cli/src/commands/change/status.ts",
+      "fileLinkExplicit": true
+    }
+  ],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:bff885301afa89e7d0993899cd6f09e93042f6e1243f7dbc92f36954b96b5af5"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:change",
+          "filename": "deltas/core/change/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:942cf720e95c6f4855d273abcbb59c3d00eccb61d04fecbfd13abd69819fccec"
+        },
+        {
+          "key": "core:change-repository-port",
+          "filename": "deltas/core/change-repository-port/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:391ada28492f25b744f86a67acfe50de54c0a7906e215cb578b16d2827371e02"
+        },
+        {
+          "key": "core:restore-change",
+          "filename": "deltas/core/restore-change/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:81c93815abbae299a79c86b743037c0cf2d33ab6ac9ef0bc30b3ff5c7b4ba0bf"
+        },
+        {
+          "key": "core:discard-change",
+          "filename": "deltas/core/discard-change/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:e6ba21b25644340abab8f2c919b9d8dbda37e6a6a55ecbb53b407e2cdc18c537"
+        },
+        {
+          "key": "core:drafted-change-view",
+          "filename": "specs/core/drafted-change-view/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:85df8db77e8791716746b3b73484f45e37288cf54bb674ff85d135bcae45eb0c"
+        },
+        {
+          "key": "core:drafted-change-read-only-error",
+          "filename": "specs/core/drafted-change-read-only-error/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:5ade877b45c99ae35e21a74a80605a39bf83502435d8f20ff9cc275877285427"
+        },
+        {
+          "key": "core:get-draft",
+          "filename": "specs/core/get-draft/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:97166bdca6620f7fedbaf7a3e0a255c81128709949520eb6c15f6ee15a91e039"
+        },
+        {
+          "key": "core:list-drafts",
+          "filename": "deltas/core/list-drafts/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:0263867fbcc61ec7ce3ff597e6534d6409fd8c7fafd58bf124e6019899443d0d"
+        },
+        {
+          "key": "core:get-status",
+          "filename": "deltas/core/get-status/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:f0349ce12d62be83f307b80ced2429e863fd3d5797fef8434459ccda7426e779"
+        },
+        {
+          "key": "core:draft-change",
+          "filename": "deltas/core/draft-change/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:56c6f75a06000a94544362b2f60b5efcfe4ca595ba1b3a61a16649df3d4fdd5f"
+        },
+        {
+          "key": "cli:drafts-show",
+          "filename": "deltas/cli/drafts-show/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:88f46f035cbdcb6e75c9116ed22e94c4a67e87d20c7a0c7adf15e3b4c6a13b8c"
+        },
+        {
+          "key": "cli:drafts-list",
+          "filename": "deltas/cli/drafts-list/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:b9bf040cce94c45017afaae22c900028f9918bc9d4d1a2c43332e02ba003b271"
+        },
+        {
+          "key": "cli:change-draft",
+          "filename": "deltas/cli/change-draft/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:9ee876d531535bf5b6a7d4373eadb42759c683fc41deeb14a68ff96d133923b1"
+        },
+        {
+          "key": "cli:change-status",
+          "filename": "deltas/cli/change-status/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:cba8c06af2455a5375697aa9152e6b81b662866f2b66cae620f995cbc91048ee"
+        },
+        {
+          "key": "cli:project-status",
+          "filename": "deltas/cli/project-status/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:6f6f32700886082cf3a6f508c0b4889180230bd39e986e25156dc26fa6a76830"
+        },
+        {
+          "key": "cli:project-dashboard",
+          "filename": "deltas/cli/project-dashboard/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:34a5f814b049a0e91ff8aeb5fb9e929b5d9f0158d765383ab7423f86ff62c40e"
+        },
+        {
+          "key": "core:get-discarded",
+          "filename": "specs/core/get-discarded/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:a4f652d5e3d5faa5fe816acee21fa9630044588eb51b70a432635ef55c0b74f8"
+        },
+        {
+          "key": "cli:discarded-show",
+          "filename": "deltas/cli/discarded-show/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:313735854eeb7e8cbe24e90db85d56f6025bcf7899847c6ff1c37e890955598c"
+        },
+        {
+          "key": "core:discarded-change-view",
+          "filename": "specs/core/discarded-change-view/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:460025326a9da29998ab5569b07eeb3ba205c5de34515c991bc9d10980daa3bb"
+        },
+        {
+          "key": "core:list-discarded",
+          "filename": "deltas/core/list-discarded/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:2edf7fd3f7205e36e758f0a7681229d59d5ef834519c80d2901b199ce8477103"
+        },
+        {
+          "key": "cli:discarded-list",
+          "filename": "deltas/cli/discarded-list/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:5431aedce0a8e1bd7c6793ad7949eaab96f87a1dfd951af527c98b41125f358c"
+        },
+        {
+          "key": "core:read-only-change-view",
+          "filename": "specs/core/read-only-change-view/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:87f4addaba1b18f315eeeaf2411fbef0588f9a81843a524a970e7492fa0da732"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:change",
+          "filename": "deltas/core/change/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:3a08c13241c38a8e93f2505e906e5e841e746299ed51c9fbaf928fd5071b6123"
+        },
+        {
+          "key": "core:change-repository-port",
+          "filename": "deltas/core/change-repository-port/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:3bc99b5a609856b39874216833688a782451530d92c9f09af017ab0765398d08"
+        },
+        {
+          "key": "core:restore-change",
+          "filename": "deltas/core/restore-change/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:36bbce638a11b758c27555b0e2b9fca07dc2edc323f6c67ddd4d4b067788b658"
+        },
+        {
+          "key": "core:discard-change",
+          "filename": "deltas/core/discard-change/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:0db5de75e0eae63581f76b015642b4fa653c3be3cd328d443b6e1a5b96ae8cbe"
+        },
+        {
+          "key": "core:drafted-change-view",
+          "filename": "specs/core/drafted-change-view/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:59861d2732e1e749b0da24c4073be305712e5678877705fc0b42b441219fbef9"
+        },
+        {
+          "key": "core:drafted-change-read-only-error",
+          "filename": "specs/core/drafted-change-read-only-error/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:6aca359cade3469b29311ad2aa6636058f8c236fd52a53fac05160d6b520d3f7"
+        },
+        {
+          "key": "core:get-draft",
+          "filename": "specs/core/get-draft/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:8c78c4459b040818119dc4c3b253fb8bc51dafa7ee5c230393899a53ae84f11a"
+        },
+        {
+          "key": "core:list-drafts",
+          "filename": "deltas/core/list-drafts/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:9f9e2ec7411416c977abf36853f85d6cf025f00c3ddab5728ee29b25a9c6ba4c"
+        },
+        {
+          "key": "core:get-status",
+          "filename": "deltas/core/get-status/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:8fe5efd81e4b7fdd137d48387918ff75eb9af951acacb3c282c9ce98c4807c82"
+        },
+        {
+          "key": "core:draft-change",
+          "filename": "deltas/core/draft-change/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:3a9bddd7f2022677afbd50bfca1cc8474d1aadcbbd1345da947b32b72e32f503"
+        },
+        {
+          "key": "cli:drafts-show",
+          "filename": "deltas/cli/drafts-show/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:fbdb102c26437efb7c63b28b9e3019014e1e0cad2bd71931b6f7eb6951cf8b2f"
+        },
+        {
+          "key": "cli:drafts-list",
+          "filename": "deltas/cli/drafts-list/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:8bbdd785224c24dfdd75940456004c038f81af2fed138c13245205082a27f43f"
+        },
+        {
+          "key": "cli:change-draft",
+          "filename": "deltas/cli/change-draft/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:edb9748d2d4cd1ecdf93c0b087e2ace64b6a690fe0aa0975f67a44b65887f931"
+        },
+        {
+          "key": "cli:change-status",
+          "filename": "deltas/cli/change-status/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:770bd87195618267b7be1428983ea2cd684cbbab1c0451531c71ad21c30fbf19"
+        },
+        {
+          "key": "cli:project-status",
+          "filename": "deltas/cli/project-status/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:360f09ba74e1ab93d8da9a8e836250887bb1167c8599070a7d718da38e01fc41"
+        },
+        {
+          "key": "cli:project-dashboard",
+          "filename": "deltas/cli/project-dashboard/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:360f09ba74e1ab93d8da9a8e836250887bb1167c8599070a7d718da38e01fc41"
+        },
+        {
+          "key": "core:get-discarded",
+          "filename": "specs/core/get-discarded/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:9c844a1c18b7058766cc23e8a50c45fbbe2a19659dfec1cf07890df380ce6f5e"
+        },
+        {
+          "key": "cli:discarded-show",
+          "filename": "deltas/cli/discarded-show/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:a379419ef779a5ab03339812deba3ca170d02bd1a6b39945bb3f155e56228dc6"
+        },
+        {
+          "key": "core:discarded-change-view",
+          "filename": "specs/core/discarded-change-view/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:4ea63423c8cfb4a64326f94c15d5cf55c2467aaeb6ff48bbef75690bd06988c7"
+        },
+        {
+          "key": "core:list-discarded",
+          "filename": "deltas/core/list-discarded/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:6f3633af3b936be6e859df0a854ac9db0b03a0b6a3f26dd6484ecb02e0fe00a8"
+        },
+        {
+          "key": "cli:discarded-list",
+          "filename": "deltas/cli/discarded-list/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:beb492583502d77769feeb26ddee72ea4901499bdf59fb4e6e3c2ee76f6c6174"
+        },
+        {
+          "key": "core:read-only-change-view",
+          "filename": "specs/core/read-only-change-view/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:c1fd442d26af47e3e6bef4b903e54c20d79f42db532c37f1c9f1fecc94585317"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:b23f9bed75e07d95603b781e65cd8dafdbf01928f6dbc22092bf32b30316aaf0"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:e2fc08d6033bd6b1d9d2bb0a1f574dea33097e8c798e25c9cf142c0abe54a259"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-05-26T12:14:47.006Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": [
+        "core:change",
+        "core:change-repository-port",
+        "core:restore-change",
+        "core:discard-change"
+      ],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-05-26T12:14:47.028Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "core:change"
+        },
+        {
+          "type": "specs",
+          "key": "core:change-repository-port"
+        },
+        {
+          "type": "specs",
+          "key": "core:restore-change"
+        },
+        {
+          "type": "specs",
+          "key": "core:discard-change"
+        },
+        {
+          "type": "verify",
+          "key": "core:change"
+        },
+        {
+          "type": "verify",
+          "key": "core:change-repository-port"
+        },
+        {
+          "type": "verify",
+          "key": "core:restore-change"
+        },
+        {
+          "type": "verify",
+          "key": "core:discard-change"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-26T12:18:30.608Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-26T12:52:00.781Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:change",
+            "core:change-repository-port",
+            "core:restore-change",
+            "core:discard-change"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:change",
+            "core:change-repository-port",
+            "core:restore-change",
+            "core:discard-change"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-26T12:56:27.123Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:change",
+            "core:change-repository-port",
+            "core:restore-change",
+            "core:discard-change"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:change",
+            "core:change-repository-port",
+            "core:restore-change",
+            "core:discard-change"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-05-26T12:56:27.125Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:drafted-change-view"
+        },
+        {
+          "type": "specs",
+          "key": "core:drafted-change-read-only-error"
+        },
+        {
+          "type": "verify",
+          "key": "core:drafted-change-view"
+        },
+        {
+          "type": "verify",
+          "key": "core:drafted-change-read-only-error"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-26T12:56:33.055Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:change",
+            "core:change-repository-port",
+            "core:restore-change",
+            "core:discard-change",
+            "core:drafted-change-view",
+            "core:drafted-change-read-only-error"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:change",
+            "core:change-repository-port",
+            "core:restore-change",
+            "core:discard-change",
+            "core:drafted-change-view",
+            "core:drafted-change-read-only-error"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-05-26T12:56:33.057Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:get-draft"
+        },
+        {
+          "type": "verify",
+          "key": "core:get-draft"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-26T12:59:54.118Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: verify [core:change-repository-port]",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": ["core:change-repository-port"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-26T13:02:57.617Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [core:change-repository-port]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:change-repository-port"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:change",
+            "core:change-repository-port",
+            "core:restore-change",
+            "core:discard-change",
+            "core:drafted-change-view",
+            "core:drafted-change-read-only-error",
+            "core:get-draft"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-26T13:02:57.656Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:change",
+            "core:change-repository-port",
+            "core:restore-change",
+            "core:discard-change",
+            "core:drafted-change-view",
+            "core:drafted-change-read-only-error",
+            "core:get-draft"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:change",
+            "core:change-repository-port",
+            "core:restore-change",
+            "core:discard-change",
+            "core:drafted-change-view",
+            "core:drafted-change-read-only-error",
+            "core:get-draft"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-05-26T13:02:57.660Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:list-drafts"
+        },
+        {
+          "type": "verify",
+          "key": "core:list-drafts"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-26T13:08:14.062Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:change",
+            "core:change-repository-port",
+            "core:restore-change",
+            "core:discard-change",
+            "core:drafted-change-view",
+            "core:drafted-change-read-only-error",
+            "core:get-draft",
+            "core:list-drafts"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:change",
+            "core:change-repository-port",
+            "core:restore-change",
+            "core:discard-change",
+            "core:drafted-change-view",
+            "core:drafted-change-read-only-error",
+            "core:get-draft",
+            "core:list-drafts"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-05-26T13:08:14.069Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:get-status"
+        },
+        {
+          "type": "specs",
+          "key": "core:draft-change"
+        },
+        {
+          "type": "specs",
+          "key": "cli:drafts-show"
+        },
+        {
+          "type": "specs",
+          "key": "cli:drafts-list"
+        },
+        {
+          "type": "specs",
+          "key": "cli:change-draft"
+        },
+        {
+          "type": "specs",
+          "key": "cli:change-status"
+        },
+        {
+          "type": "specs",
+          "key": "cli:project-status"
+        },
+        {
+          "type": "specs",
+          "key": "cli:project-dashboard"
+        },
+        {
+          "type": "verify",
+          "key": "core:get-status"
+        },
+        {
+          "type": "verify",
+          "key": "core:draft-change"
+        },
+        {
+          "type": "verify",
+          "key": "cli:drafts-show"
+        },
+        {
+          "type": "verify",
+          "key": "cli:drafts-list"
+        },
+        {
+          "type": "verify",
+          "key": "cli:change-draft"
+        },
+        {
+          "type": "verify",
+          "key": "cli:change-status"
+        },
+        {
+          "type": "verify",
+          "key": "cli:project-status"
+        },
+        {
+          "type": "verify",
+          "key": "cli:project-dashboard"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-05-26T13:16:02.699Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:get-discarded"
+        },
+        {
+          "type": "specs",
+          "key": "cli:discarded-show"
+        },
+        {
+          "type": "verify",
+          "key": "core:get-discarded"
+        },
+        {
+          "type": "verify",
+          "key": "cli:discarded-show"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-26T13:19:25.728Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:change",
+            "core:change-repository-port",
+            "core:restore-change",
+            "core:discard-change",
+            "core:drafted-change-view",
+            "core:drafted-change-read-only-error",
+            "core:get-draft",
+            "core:list-drafts",
+            "core:get-status",
+            "core:draft-change",
+            "cli:drafts-show",
+            "cli:drafts-list",
+            "cli:change-draft",
+            "cli:change-status",
+            "cli:project-status",
+            "cli:project-dashboard",
+            "core:get-discarded",
+            "cli:discarded-show"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:change",
+            "core:change-repository-port",
+            "core:restore-change",
+            "core:discard-change",
+            "core:drafted-change-view",
+            "core:drafted-change-read-only-error",
+            "core:get-draft",
+            "core:list-drafts",
+            "core:get-status",
+            "core:draft-change",
+            "cli:drafts-show",
+            "cli:drafts-list",
+            "cli:change-draft",
+            "cli:change-status",
+            "cli:project-status",
+            "cli:project-dashboard",
+            "core:get-discarded",
+            "cli:discarded-show"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-05-26T13:19:25.732Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:change-inspection-view"
+        },
+        {
+          "type": "specs",
+          "key": "core:discarded-change-view"
+        },
+        {
+          "type": "specs",
+          "key": "core:list-discarded"
+        },
+        {
+          "type": "specs",
+          "key": "cli:discarded-list"
+        },
+        {
+          "type": "verify",
+          "key": "core:change-inspection-view"
+        },
+        {
+          "type": "verify",
+          "key": "core:discarded-change-view"
+        },
+        {
+          "type": "verify",
+          "key": "core:list-discarded"
+        },
+        {
+          "type": "verify",
+          "key": "cli:discarded-list"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-26T13:20:06.896Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:change",
+            "core:change-repository-port",
+            "core:restore-change",
+            "core:discard-change",
+            "core:drafted-change-view",
+            "core:drafted-change-read-only-error",
+            "core:get-draft",
+            "core:list-drafts",
+            "core:get-status",
+            "core:draft-change",
+            "cli:drafts-show",
+            "cli:drafts-list",
+            "cli:change-draft",
+            "cli:change-status",
+            "cli:project-status",
+            "cli:project-dashboard",
+            "core:get-discarded",
+            "cli:discarded-show",
+            "core:change-inspection-view",
+            "core:discarded-change-view",
+            "core:list-discarded",
+            "cli:discarded-list"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:change",
+            "core:change-repository-port",
+            "core:restore-change",
+            "core:discard-change",
+            "core:drafted-change-view",
+            "core:drafted-change-read-only-error",
+            "core:get-draft",
+            "core:list-drafts",
+            "core:get-status",
+            "core:draft-change",
+            "cli:drafts-show",
+            "cli:drafts-list",
+            "cli:change-draft",
+            "cli:change-status",
+            "cli:project-status",
+            "cli:project-dashboard",
+            "core:get-discarded",
+            "cli:discarded-show",
+            "core:change-inspection-view",
+            "core:discarded-change-view",
+            "core:list-discarded",
+            "cli:discarded-list"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-05-26T13:20:06.901Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:read-only-change-view"
+        },
+        {
+          "type": "verify",
+          "key": "core:read-only-change-view"
+        }
+      ],
+      "filesRemoved": [
+        {
+          "type": "specs",
+          "key": "core:change-inspection-view"
+        },
+        {
+          "type": "verify",
+          "key": "core:change-inspection-view"
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-26T13:26:00.565Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: verify [core:discarded-change-view, core:drafted-change-view, core:read-only-change-view]",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": [
+            "core:discarded-change-view",
+            "core:drafted-change-view",
+            "core:read-only-change-view"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-26T13:28:35.766Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [core:get-status]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:get-status"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:change",
+            "core:change-repository-port",
+            "core:restore-change",
+            "core:discard-change",
+            "core:drafted-change-view",
+            "core:drafted-change-read-only-error",
+            "core:get-draft",
+            "core:list-drafts",
+            "core:get-status",
+            "core:draft-change",
+            "cli:drafts-show",
+            "cli:drafts-list",
+            "cli:change-draft",
+            "cli:change-status",
+            "cli:project-status",
+            "cli:project-dashboard",
+            "core:get-discarded",
+            "cli:discarded-show",
+            "core:discarded-change-view",
+            "core:list-discarded",
+            "cli:discarded-list",
+            "core:read-only-change-view"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-26T13:32:01.903Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: verify [core:draft-change]",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": ["core:draft-change"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-26T13:36:30.898Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [core:draft-change, core:list-drafts]; verify [core:draft-change, core:drafted-change-view]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:draft-change", "core:list-drafts"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:draft-change", "core:drafted-change-view"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-26T14:36:46.459Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [core:list-drafts]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:list-drafts"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:change",
+            "core:change-repository-port",
+            "core:restore-change",
+            "core:discard-change",
+            "core:drafted-change-view",
+            "core:drafted-change-read-only-error",
+            "core:get-draft",
+            "core:list-drafts",
+            "core:get-status",
+            "core:draft-change",
+            "cli:drafts-show",
+            "cli:drafts-list",
+            "cli:change-draft",
+            "cli:change-status",
+            "cli:project-status",
+            "cli:project-dashboard",
+            "core:get-discarded",
+            "cli:discarded-show",
+            "core:discarded-change-view",
+            "core:list-discarded",
+            "cli:discarded-list",
+            "core:read-only-change-view"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-26T14:40:44.704Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-26T14:55:25.328Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-26T16:02:20.700Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-26T16:10:26.763Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-26T16:11:00.231Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "description-updated",
+      "at": "2026-05-26T16:32:59.937Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "description": "Enforces read-only semantics for drafted changes across @specd/core and the CLI by splitting active vs draft storage access. Active get/mutate no longer resolve drafts; drafted changes are accessed via getDraft and exposed through read-only views, while restore/discard are the only allowlisted mutations. Updates CLI commands and test coverage to reflect the new drafted/discarded read models and error handling."
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-05-26T16:34:57.176Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'core:change': extracted dependencies [core:change-manifest, core:workflow-model, core:spec-metadata, core:spec-id-format, default:_global/architecture, core:lifecycle-engine, default:_global/logging, core:implementation-detector-port] do not match persisted dependencies [core:change-manifest, core:workflow-model, core:spec-metadata, core:spec-id-format, default:_global/architecture, core:lifecycle-engine, default:_global/logging, core:implementation-detector-port, core:restore-change, core:discard-change, core:change-repository-port]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-05-26T16:35:10.819Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'core:change-repository-port': extracted dependencies [core:repository-port, default:_global/architecture, core:change, core:read-only-change-view, core:drafted-change-view, core:discarded-change-view, core:drafted-change-read-only-error, core:storage, core:change-manifest, default:_global/logging] do not match persisted dependencies [core:repository-port, default:_global/architecture, core:change, core:storage, core:change-manifest, default:_global/logging]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-05-26T16:35:29.780Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'core:list-drafts': extracted dependencies [core:change, core:kernel] do not match persisted dependencies [core:change, core:kernel, core:drafted-change-view, core:change-repository-port]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-05-26T16:35:46.338Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'core:get-status': extracted dependencies [core:change, core:kernel, core:transition-change, core:schema-format, core:config, core:lifecycle-engine, core:refresh-implementation-tracking] do not match persisted dependencies [core:change, core:kernel, core:transition-change, core:schema-format, core:config, core:lifecycle-engine, core:refresh-implementation-tracking, core:drafted-change-view, core:get-draft]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-05-26T16:35:53.684Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'cli:drafts-show': extracted dependencies [cli:entrypoint, core:get-draft, core:drafted-change-view, cli:command-resource-naming] do not match persisted dependencies [cli:entrypoint, core:change, cli:command-resource-naming, core:get-draft]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-05-26T16:36:13.567Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'cli:drafts-list': extracted dependencies [cli:entrypoint, core:list-drafts, core:drafted-change-view, cli:command-resource-naming] do not match persisted dependencies [cli:entrypoint, core:change, cli:command-resource-naming, core:list-drafts]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-05-26T16:36:20.676Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'cli:change-draft': extracted dependencies [cli:entrypoint, core:change, cli:command-resource-naming] do not match persisted dependencies [cli:entrypoint, core:change, cli:command-resource-naming, core:draft-change]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-05-26T16:36:28.072Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'cli:project-dashboard': extracted dependencies [cli:entrypoint, core:config] do not match persisted dependencies [cli:entrypoint, core:config, core:list-drafts, core:list-changes]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-05-26T16:36:38.498Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'cli:discarded-show': extracted dependencies [cli:entrypoint, core:get-discarded, core:discarded-change-view, cli:command-resource-naming] do not match persisted dependencies [cli:entrypoint, core:change, cli:command-resource-naming, core:get-discarded]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-05-26T16:36:48.899Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'core:list-discarded': extracted dependencies [core:change, core:kernel, core:discarded-change-view, core:change-repository-port] do not match persisted dependencies [core:change, core:kernel]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-05-26T16:36:58.476Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'cli:discarded-list': extracted dependencies [cli:entrypoint, core:list-discarded, core:discarded-change-view, cli:command-resource-naming] do not match persisted dependencies [cli:entrypoint, core:change]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-26T16:37:22.514Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-05-26T16:37:22.820Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "1***i@u***.com",
+    "provider": "git"
+  }
+}

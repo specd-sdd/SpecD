@@ -10,13 +10,15 @@ Discarded changes remain in storage for audit purposes, and teams need to review
 
 `ListDiscarded.execute()` MUST return all changes that are in the discarded lifecycle state. The result MUST be sorted by creation order, oldest first.
 
-### Requirement: Returns Change entities without content
+### Requirement: Returns DiscardedChangeView without content
 
-The returned `Change[]` MUST contain artifact state (status, validated hashes) but MUST NOT include artifact file content. Content is loaded on demand through separate use cases.
+`ListDiscarded.execute()` MUST return `DiscardedChangeView[]`. Each view MUST expose artifact state (status, validated hashes), shared inspection fields, and discard metadata (`discardReason`, `discardedAt`, `discardedBy`, optional `supersededBy`) but MUST NOT include artifact file content.
+
+Callers MUST NOT receive a `Change` aggregate from this use case.
 
 ### Requirement: Constructor accepts a ChangeRepository
 
-`ListDiscarded` MUST accept a `ChangeRepository` as its sole constructor argument. It MUST delegate to `ChangeRepository.listDiscarded()` to retrieve discarded changes.
+`ListDiscarded` MUST accept a `ChangeRepository` as its sole constructor argument. It MUST delegate to `ChangeRepository.listDiscarded()` and return the resulting `DiscardedChangeView[]` without wrapping in mutable `Change` instances.
 
 ### Requirement: Returns an empty array when no discarded changes exist
 
@@ -26,3 +28,5 @@ When the repository contains no discarded changes, `execute()` MUST return an em
 
 - [`core:change`](../change/spec.md)
 - [`core:kernel`](../kernel/spec.md)
+- [`core:discarded-change-view`](../discarded-change-view/spec.md)
+- [`core:change-repository-port`](../change-repository-port/spec.md)

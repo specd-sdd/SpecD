@@ -1,0 +1,27 @@
+- op: modified
+  description: Resolve active or drafted storage before discard.
+  selector:
+    type: section
+    matches: 'Requirement: Change must exist'
+  content: |
+    The use case MUST locate the change before discarding:
+
+    1. If `ChangeRepository.get(name)` returns an active change, discard from active storage via `mutate(name, fn)`.
+    2. Else if `ChangeRepository.getDraft(name)` returns a drafted view, discard from drafted storage via `mutateDraft(name, fn)`.
+    3. Else throw `ChangeNotFoundError`.
+
+    The use case MUST NOT load a drafted change through `get(name)`.
+- op: modified
+  description: Route persistence to mutate or mutateDraft.
+  selector:
+    type: section
+    matches: 'Requirement: Persistence'
+  content: |
+    After the historical implementation guard passes, persistence MUST use:
+
+    - `ChangeRepository.mutate(name, fn)` when discarding an active change, or
+    - `ChangeRepository.mutateDraft(name, fn)` when discarding a drafted change
+
+    Inside the callback, the use case calls `change.discard(reason, actor, supersededBy, force)` on the fresh instance and returns it. The repository persists the manifest and moves the directory to `discarded/`.
+
+    `DiscardChange.execute` returns the updated `Change` instance produced by that serialized mutation.

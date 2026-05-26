@@ -1,5 +1,4 @@
 import { type Command } from 'commander'
-import { type DiscardedEvent } from '@specd/core'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'
@@ -36,32 +35,22 @@ JSON/TOON output schema:
         const unsorted = await kernel.changes.listDiscarded.execute()
         const fmt = parseFormat(opts.format)
 
-        // Extract discard event for each change and sort by discard date descending
-        const withEvents = unsorted.map((c) => {
-          const evt = c.history
-            .slice()
-            .reverse()
-            .find((e): e is DiscardedEvent => e.type === 'discarded')
-          return { change: c, evt }
-        })
-        withEvents.sort((a, b) => {
-          const aTime = a.evt?.at.getTime() ?? 0
-          const bTime = b.evt?.at.getTime() ?? 0
-          return bTime - aTime
-        })
+        const sorted = [...unsorted].sort(
+          (a, b) => b.discardedAt.getTime() - a.discardedAt.getTime(),
+        )
 
         if (fmt === 'text') {
-          if (withEvents.length === 0) {
+          if (sorted.length === 0) {
             output('no discarded changes', 'text')
           } else {
-            const rows = withEvents.map(({ change: c, evt }) => ({
-              name: c.name,
-              date: evt?.at.toISOString().slice(0, 10) ?? '',
-              by: evt?.by.name ?? '',
-              reason: evt?.reason ?? '',
+            const rows = sorted.map((view) => ({
+              name: view.name,
+              date: view.discardedAt.toISOString().slice(0, 10),
+              by: view.discardedBy.name,
+              reason: view.discardReason,
               superseded:
-                evt?.supersededBy && evt.supersededBy.length > 0
-                  ? `→ ${evt.supersededBy.join(', ')}`
+                view.supersededBy !== undefined && view.supersededBy.length > 0
+                  ? `→ ${view.supersededBy.join(', ')}`
                   : '',
             }))
             output(
@@ -115,13 +104,13 @@ JSON/TOON output schema:
           }
         } else {
           output(
-            withEvents.map(({ change: c, evt }) => ({
-              name: c.name,
-              discardedAt: evt?.at.toISOString() ?? null,
-              ...(evt ? { discardedBy: { name: evt.by.name, email: evt.by.email } } : {}),
-              ...(evt?.reason !== undefined ? { reason: evt.reason } : {}),
-              ...(evt?.supersededBy && evt.supersededBy.length > 0
-                ? { supersededBy: [...evt.supersededBy] }
+            sorted.map((view) => ({
+              name: view.name,
+              discardedAt: view.discardedAt.toISOString(),
+              discardedBy: { name: view.discardedBy.name, email: view.discardedBy.email },
+              reason: view.discardReason,
+              ...(view.supersededBy !== undefined && view.supersededBy.length > 0
+                ? { supersededBy: [...view.supersededBy] }
                 : {}),
             })),
             fmt,

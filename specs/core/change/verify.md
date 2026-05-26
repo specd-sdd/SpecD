@@ -491,6 +491,33 @@
 - **WHEN** a discard operation is attempted to be reversed
 - **THEN** no operation exists to move a change out of `discarded/`
 
+### Requirement: Drafted read-only semantics
+
+#### Scenario: Transition on drafted change via active API fails
+
+- **GIVEN** a change exists only under `drafts/` with `isDrafted === true`
+- **WHEN** `TransitionChange.execute` is called with its name
+- **THEN** the use case fails with `ChangeNotFoundError` or does not mutate the drafted manifest
+
+#### Scenario: Restore clears drafted status
+
+- **GIVEN** a drafted change
+- **WHEN** `RestoreChange.execute` completes
+- **THEN** the change is active (`isDrafted === false`) and may be loaded via `ChangeRepository.get`
+
+#### Scenario: Save outside mutateDraft throws read-only error
+
+- **GIVEN** a persisted change with `isDrafted === true` loaded only for internal repository use
+- **WHEN** `ChangeRepository.save(change)` is called outside `mutateDraft`
+- **THEN** `DraftedChangeReadOnlyError` is thrown
+
+#### Scenario: Inspection uses getDraft not get
+
+- **GIVEN** a change exists only under `drafts/`
+- **WHEN** application code loads it for read-only display
+- **THEN** `GetDraft.execute({ name })` returns `DraftedChangeView`
+- **AND** `ChangeRepository.get(name)` returns `null`
+
 ### Requirement: Artifact sync
 
 #### Scenario: syncArtifacts appends artifacts-synced when schema artifact set changes

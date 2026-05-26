@@ -1,7 +1,12 @@
 {
   "title": "Drafts Show",
   "description": "Before restoring a drafted change, users need to inspect its metadata to confirm it is the right one. `specd drafts show <name>` displays basic metadata — name, state, specs, and schema — for a single change in `drafts/`.",
-  "dependsOn": ["cli:entrypoint", "core:change", "cli:command-resource-naming"],
+  "dependsOn": [
+    "cli:entrypoint",
+    "core:get-draft",
+    "core:drafted-change-view",
+    "cli:command-resource-naming"
+  ],
   "context": [
     "Before restoring a drafted change, users need to inspect its metadata to confirm it is the right one. `specd drafts show <name>` displays basic metadata — name, state, specs, and schema — for a single change in `drafts/`."
   ],
@@ -10,6 +15,12 @@
       "requirement": "Command signature",
       "rules": [
         "```\nspecd drafts show <name> [--format text|json|toon]\n```\n\nAlias:\n\n```\nspecd draft show <name> [--format text|json|toon]\n```\n\n- `<name>` — required positional; the name of the drafted change to show\n- `--format` — controls output encoding; defaults to `text`"
+      ]
+    },
+    {
+      "requirement": "Loads drafted change via GetDraft",
+      "rules": [
+        "The command MUST invoke `GetDraft.execute({ name })` (or the kernel equivalent) to load the drafted change.\n\nThe command MUST NOT invoke `GetStatus` or `ChangeRepository.get` for this command.\n\nDisplayed fields (`name`, `state`, `specIds`, `schema`) MUST be read from the returned `DraftedChangeView`."
       ]
     },
     {
@@ -33,7 +44,7 @@
     {
       "requirement": "Error cases",
       "rules": [
-        "- If no change with the given name exists in `drafts/`, the command exits with code 1 and prints an `error:` message to stderr.\n- If a change with the given name exists but is not in `drafts/` (i.e. it is active in `changes/` or in `discarded/`), the command exits with code 1 and prints an `error:` message to stderr."
+        "- If `GetDraft` throws `ChangeNotFoundError`, the command exits with code 1 and prints an `error:` message to stderr indicating the change is not in `drafts/`.\n- If a change with the given name exists only under active storage, the command exits with code 1 and prints an `error:` message to stderr."
       ]
     }
   ],
@@ -54,6 +65,32 @@
       "name": "Singular alias invocation",
       "when": ["specd draft show my-change is run"],
       "then": ["it is accepted as an alias of specd drafts show my-change"]
+    },
+    {
+      "requirement": "Loads drafted change via GetDraft",
+      "name": "Uses GetDraft not GetStatus",
+      "when": ["specd drafts show my-change runs successfully"],
+      "then": [
+        "GetDraft.execute was invoked with { name: 'my-change' }",
+        "AND GetStatus was not invoked"
+      ]
+    },
+    {
+      "requirement": "Loads drafted change via GetDraft",
+      "name": "Does not call ChangeRepository.get",
+      "given": ["a change exists only under drafts/"],
+      "when": ["specd drafts show my-change runs successfully"],
+      "then": ["ChangeRepository.get was not used to load the change for display"]
+    },
+    {
+      "requirement": "Loads drafted change via GetDraft",
+      "name": "Text output fields come from DraftedChangeView",
+      "given": ["GetDraft returns a view with name, specIds, and schema fields"],
+      "when": ["specd drafts show my-change runs in text mode"],
+      "then": [
+        "stdout name:, specs:, and schema: lines match the view",
+        "AND the process exits with code 0"
+      ]
     },
     {
       "requirement": "Output format — toon",
@@ -99,11 +136,29 @@
       "given": ["my-change is active in changes/ (not drafted)"],
       "when": ["specd drafts show my-change is run"],
       "then": ["the command exits with code 1", "AND stderr contains an error: message"]
+    },
+    {
+      "requirement": "Error cases",
+      "name": "GetDraft ChangeNotFoundError maps to stderr",
+      "given": ["GetDraft.execute throws ChangeNotFoundError"],
+      "when": ["specd drafts show missing runs"],
+      "then": [
+        "the command exits with code 1",
+        "AND stderr contains an error: message mentioning drafts/"
+      ]
     }
   ],
+  "implementation": {
+    "files": [
+      {
+        "specId": "cli:drafts-show",
+        "file": "cli:src/commands/drafts/show.ts"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:4e885713046bdcca5c975edbd239897da90c145b35ba16e5590822cfb59d7c3e",
-    "verify.md": "sha256:dd55568591b61302aeee4aff8bb15ae781e0faeae6c65df52098a2a8fab3d555"
+    "spec.md": "sha256:4db4d4d566ee129566eeec0959430abf8f037f6f91a108290937aec4857731ab",
+    "verify.md": "sha256:2cdb0c1a1c513c18b172de141c770aba1c0c82a9fa2c335068e9c64f40c829da"
   },
   "generatedBy": "core"
 }

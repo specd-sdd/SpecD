@@ -1,0 +1,17 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "cli:entrypoint",
+    "core:get-discarded",
+    "core:discarded-change-view",
+    "cli:command-resource-naming"
+  ],
+  "implementation": [
+    {
+      "file": "cli:src/commands/discarded/show.ts"
+    }
+  ]
+}

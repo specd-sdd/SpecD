@@ -10,6 +10,26 @@
 - **THEN** the command proceeds without positional arguments
 - **AND** output format defaults to text
 
+### Requirement: Uses ListDrafts read model
+
+#### Scenario: Invokes ListDrafts
+
+- **WHEN** `specd drafts list` runs
+- **THEN** `ListDrafts.execute` is called
+
+#### Scenario: Does not invoke GetStatus per row
+
+- **GIVEN** two drafted changes exist
+- **WHEN** `specd drafts list` runs
+- **THEN** `GetStatus` is not invoked for each listed name
+
+#### Scenario: JSON output serializes view fields
+
+- **GIVEN** `ListDrafts` returns views with `name` and `isDrafted === true`
+- **WHEN** `specd drafts list --format json` runs
+- **THEN** stdout is a JSON array whose objects include `name`
+- **AND** entries do not include mutable `Change` internals
+
 ### Requirement: Output format — toon
 
 #### Scenario: TOON format output

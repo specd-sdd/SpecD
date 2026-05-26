@@ -343,12 +343,14 @@ describe('FsChangeRepository', () => {
   })
 
   describe('save — directory movement', () => {
-    it('given a change in changes/, when drafted and saved, then directory is moved to drafts/', async () => {
+    it('given a change in changes/, when drafted via mutate, then directory is moved to drafts/', async () => {
       const change = makeChange('add-auth')
       await ctx.repo.save(change)
 
-      change.draft(actor, 'parking for now')
-      await ctx.repo.save(change)
+      await ctx.repo.mutate('add-auth', (loaded) => {
+        loaded.draft(actor, 'parking for now')
+        return loaded
+      })
 
       const changesEntries = await fs.readdir(ctx.changesPath)
       const draftsEntries = await fs.readdir(ctx.draftsPath)
@@ -356,14 +358,18 @@ describe('FsChangeRepository', () => {
       expect(draftsEntries).toHaveLength(1)
     })
 
-    it('given a drafted change, when restored and saved, then directory is moved back to changes/', async () => {
+    it('given a drafted change, when restored via mutateDraft, then directory is moved back to changes/', async () => {
       const change = makeChange('add-auth')
       await ctx.repo.save(change)
-      change.draft(actor)
-      await ctx.repo.save(change)
+      await ctx.repo.mutate('add-auth', (loaded) => {
+        loaded.draft(actor)
+        return loaded
+      })
 
-      change.restore(actor)
-      await ctx.repo.save(change)
+      await ctx.repo.mutateDraft('add-auth', (loaded) => {
+        loaded.restore(actor)
+        return loaded
+      })
 
       const changesEntries = await fs.readdir(ctx.changesPath)
       const draftsEntries = await fs.readdir(ctx.draftsPath)
@@ -384,16 +390,29 @@ describe('FsChangeRepository', () => {
     })
   })
 
-  describe('get — finds drafted changes', () => {
-    it('given a drafted change, when get is called, then the change is returned from drafts/', async () => {
+  describe('get vs getDraft — drafted storage', () => {
+    it('given a drafted change, when getDraft is called, then a drafted view is returned', async () => {
       const change = makeChange('add-auth')
       await ctx.repo.save(change)
-      change.draft(actor)
-      await ctx.repo.save(change)
+      await ctx.repo.mutate('add-auth', (loaded) => {
+        loaded.draft(actor)
+        return loaded
+      })
 
-      const loaded = await ctx.repo.get('add-auth')
+      const loaded = await ctx.repo.getDraft('add-auth')
       expect(loaded).not.toBeNull()
       expect(loaded?.isDrafted).toBe(true)
+    })
+
+    it('given a drafted change, when get is called, then null is returned', async () => {
+      const change = makeChange('add-auth')
+      await ctx.repo.save(change)
+      await ctx.repo.mutate('add-auth', (loaded) => {
+        loaded.draft(actor)
+        return loaded
+      })
+
+      expect(await ctx.repo.get('add-auth')).toBeNull()
     })
   })
 
@@ -415,8 +434,10 @@ describe('FsChangeRepository', () => {
       const drafted = makeChange('drafted', new Date('2024-02-01T00:00:00.000Z'))
       await ctx.repo.save(active)
       await ctx.repo.save(drafted)
-      drafted.draft(actor)
-      await ctx.repo.save(drafted)
+      await ctx.repo.mutate('drafted', (loaded) => {
+        loaded.draft(actor)
+        return loaded
+      })
 
       const changes = await ctx.repo.list()
       expect(changes.map((c) => c.name)).toEqual(['active'])

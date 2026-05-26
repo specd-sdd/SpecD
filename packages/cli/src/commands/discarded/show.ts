@@ -1,7 +1,7 @@
 import { type Command } from 'commander'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat } from '../../formatter.js'
-import { handleError, cliError } from '../../handle-error.js'
+import { handleError } from '../../handle-error.js'
 
 /**
  * Registers the `discarded show` subcommand on the given parent command.
@@ -32,38 +32,26 @@ JSON/TOON output schema:
     .action(async (name: string, opts: { format: string; config?: string }) => {
       try {
         const { kernel } = await resolveCliContext({ configPath: opts.config })
-        const { change } = await kernel.changes.status.execute({ name })
-
-        const isDiscarded = change.history.some((e: { type: string }) => e.type === 'discarded')
-        if (!isDiscarded) {
-          cliError(`change '${name}' is not in discarded`, opts.format)
-        }
-
-        // Find the discarded event for reason
-        const discardedEvent = change.history
-          .slice()
-          .reverse()
-          .find((e: { type: string }) => e.type === 'discarded')
+        const { view } = await kernel.changes.getDiscarded.execute({ name })
 
         const fmt = parseFormat(opts.format)
-        const specIds = [...change.specIds]
-        const reason = discardedEvent?.type === 'discarded' ? discardedEvent.reason : '(unknown)'
+        const specIds = [...view.specIds]
 
         if (fmt === 'text') {
           const lines = [
-            `name:    ${change.name}`,
+            `name:    ${view.name}`,
             `specs:   ${specIds.join(', ') || '(none)'}`,
-            `schema:  ${change.schemaName}@${change.schemaVersion}`,
-            `reason:  ${reason}`,
+            `schema:  ${view.schemaName}@${view.schemaVersion}`,
+            `reason:  ${view.discardReason}`,
           ]
           output(lines.join('\n'), 'text')
         } else {
           output(
             {
-              name: change.name,
+              name: view.name,
               specIds,
-              schema: { name: change.schemaName, version: change.schemaVersion },
-              reason,
+              schema: { name: view.schemaName, version: view.schemaVersion },
+              reason: view.discardReason,
             },
             fmt,
           )

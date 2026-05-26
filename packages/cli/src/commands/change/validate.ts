@@ -325,7 +325,11 @@ async function executeBatch(
   opts: { format: string; artifact?: string },
   requestedArtifactScope?: ArtifactScope,
 ): Promise<void> {
-  const { change } = await kernel.changes.status.execute({ name })
+  const statusResult = await kernel.changes.status.execute({ name })
+  const change = statusResult.change
+  if (change === undefined) {
+    cliError(`change '${name}' is drafted; restore it before validating`, opts.format)
+  }
   const specIds = change.specIds
 
   if (specIds.length === 0) {

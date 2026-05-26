@@ -1,0 +1,28 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "core:repository-port",
+    "default:_global/architecture",
+    "core:change",
+    "core:read-only-change-view",
+    "core:drafted-change-view",
+    "core:discarded-change-view",
+    "core:drafted-change-read-only-error",
+    "core:storage",
+    "core:change-manifest",
+    "default:_global/logging"
+  ],
+  "implementation": [
+    {
+      "file": "core:src/application/ports/change-repository.ts",
+      "symbols": ["ChangeRepository"]
+    },
+    {
+      "file": "core:src/infrastructure/fs/change-repository.ts",
+      "symbols": ["FsChangeRepository"]
+    }
+  ]
+}
