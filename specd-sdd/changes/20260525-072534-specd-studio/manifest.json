@@ -1,7 +1,7 @@
 {
   "name": "specd-studio",
   "createdAt": "2026-05-25T07:25:34.779Z",
-  "updatedAt": "2026-05-25T23:18:16.624Z",
+  "updatedAt": "2026-05-26T06:24:10.571Z",
   "description": "SpecD Studio: spec-work IDE to review and edit active changes (Overview, artifacts, validation, context, impact, and events) through the same API and kernel as the CLI — no filesystem shortcuts or direct canonical spec editing in v1. ",
   "schema": {
     "name": "schema-std",
@@ -4413,8 +4413,9 @@
         {
           "key": "ui:shell-layout",
           "filename": "specs/ui/shell-layout/spec.md",
-          "state": "complete",
-          "validatedHash": "sha256:254a4a053baa89992baee3e22b345966e1b77150fd8de4ada4a2341e09f29ad2"
+          "state": "drifted-pending-review",
+          "validatedHash": "sha256:254a4a053baa89992baee3e22b345966e1b77150fd8de4ada4a2341e09f29ad2",
+          "hasDrift": true
         },
         {
           "key": "ui:command-palette",
@@ -4433,38 +4434,44 @@
         {
           "key": "ui:sidebar-changes-in-progress",
           "filename": "specs/ui/sidebar-changes-in-progress/spec.md",
-          "state": "complete",
-          "validatedHash": "sha256:6c87cfe3ad891dde0230f5574b7b7cb12e15d1658c439ff2f593b8e55591aafc"
+          "state": "drifted-pending-review",
+          "validatedHash": "sha256:6c87cfe3ad891dde0230f5574b7b7cb12e15d1658c439ff2f593b8e55591aafc",
+          "hasDrift": true
         },
         {
           "key": "ui:sidebar-changes-drafts",
           "filename": "specs/ui/sidebar-changes-drafts/spec.md",
-          "state": "complete",
-          "validatedHash": "sha256:c5d21bf4f2e7ccc0326705a90f4bd2971767890818797c86dadaa0b214fb0362"
+          "state": "drifted-pending-review",
+          "validatedHash": "sha256:c5d21bf4f2e7ccc0326705a90f4bd2971767890818797c86dadaa0b214fb0362",
+          "hasDrift": true
         },
         {
           "key": "ui:sidebar-changes-archive",
           "filename": "specs/ui/sidebar-changes-archive/spec.md",
-          "state": "complete",
-          "validatedHash": "sha256:773954974b01cda4e62c5234a6d8c1d79480172e25a18bd26cb6340fb3dc7977"
+          "state": "drifted-pending-review",
+          "validatedHash": "sha256:773954974b01cda4e62c5234a6d8c1d79480172e25a18bd26cb6340fb3dc7977",
+          "hasDrift": true
         },
         {
           "key": "ui:sidebar-changes-discarded",
           "filename": "specs/ui/sidebar-changes-discarded/spec.md",
-          "state": "complete",
-          "validatedHash": "sha256:4af3e188c9cbf88e95ec6492e5b32624609bb0bafe361021b94fc33ed45b4226"
+          "state": "drifted-pending-review",
+          "validatedHash": "sha256:4af3e188c9cbf88e95ec6492e5b32624609bb0bafe361021b94fc33ed45b4226",
+          "hasDrift": true
         },
         {
           "key": "ui:sidebar-workspaces-tree",
           "filename": "specs/ui/sidebar-workspaces-tree/spec.md",
-          "state": "complete",
-          "validatedHash": "sha256:1d9a65195fc214c7fb84103f688f78b4fc0fd1e91c0bcb49580234036912ae04"
+          "state": "drifted-pending-review",
+          "validatedHash": "sha256:1d9a65195fc214c7fb84103f688f78b4fc0fd1e91c0bcb49580234036912ae04",
+          "hasDrift": true
         },
         {
           "key": "ui:sidebar-graph-entry",
           "filename": "specs/ui/sidebar-graph-entry/spec.md",
-          "state": "complete",
-          "validatedHash": "sha256:4d797d2155bab79ef3ee526c248f1977eaa97111dcae278044e77894c2c1321a"
+          "state": "drifted-pending-review",
+          "validatedHash": "sha256:4d797d2155bab79ef3ee526c248f1977eaa97111dcae278044e77894c2c1321a",
+          "hasDrift": true
         },
         {
           "key": "ui:change-tab-overview",
@@ -4525,38 +4532,44 @@
         {
           "key": "ui:spec-tab-overview",
           "filename": "specs/ui/spec-tab-overview/spec.md",
-          "state": "complete",
-          "validatedHash": "sha256:7607464d14a169ab956e3b4dfc3bf512dcd929517e1fd860e22bf2653c663ff3"
+          "state": "drifted-pending-review",
+          "validatedHash": "sha256:7607464d14a169ab956e3b4dfc3bf512dcd929517e1fd860e22bf2653c663ff3",
+          "hasDrift": true
         },
         {
           "key": "ui:spec-tab-artifacts",
           "filename": "specs/ui/spec-tab-artifacts/spec.md",
-          "state": "complete",
-          "validatedHash": "sha256:d2b578b3fbba3d82e434440b7202ba18102a6613997039a555de88bbcc0f6217"
+          "state": "drifted-pending-review",
+          "validatedHash": "sha256:d2b578b3fbba3d82e434440b7202ba18102a6613997039a555de88bbcc0f6217",
+          "hasDrift": true
         },
         {
           "key": "ui:spec-tab-metadata",
           "filename": "specs/ui/spec-tab-metadata/spec.md",
-          "state": "complete",
-          "validatedHash": "sha256:95cffa8da702a701101ada092f99132afadeb2228a74c0c545aabcd3ec208263"
+          "state": "drifted-pending-review",
+          "validatedHash": "sha256:95cffa8da702a701101ada092f99132afadeb2228a74c0c545aabcd3ec208263",
+          "hasDrift": true
         },
         {
           "key": "ui:spec-tab-dependencies",
           "filename": "specs/ui/spec-tab-dependencies/spec.md",
-          "state": "complete",
-          "validatedHash": "sha256:2705050bdfb5e8fe999acf8aee712112cbd30f780f8a17aff74ea6be1c914ce4"
+          "state": "drifted-pending-review",
+          "validatedHash": "sha256:2705050bdfb5e8fe999acf8aee712112cbd30f780f8a17aff74ea6be1c914ce4",
+          "hasDrift": true
         },
         {
           "key": "ui:spec-tab-graph",
           "filename": "specs/ui/spec-tab-graph/spec.md",
-          "state": "complete",
-          "validatedHash": "sha256:6afa6a0cdf606a3c11ef867111773becbd53b33c47c547c0d6c1c3c09b6a34ba"
+          "state": "drifted-pending-review",
+          "validatedHash": "sha256:6afa6a0cdf606a3c11ef867111773becbd53b33c47c547c0d6c1c3c09b6a34ba",
+          "hasDrift": true
         },
         {
           "key": "ui:spec-tab-context",
           "filename": "specs/ui/spec-tab-context/spec.md",
-          "state": "complete",
-          "validatedHash": "sha256:ce24f9d061f028d5e966980cb02e9d9fb4e7f5672d45c283734b3f26d0e81f82"
+          "state": "drifted-pending-review",
+          "validatedHash": "sha256:ce24f9d061f028d5e966980cb02e9d9fb4e7f5672d45c283734b3f26d0e81f82",
+          "hasDrift": true
         },
         {
           "key": "ui:artifact-editor",
@@ -5095,8 +5108,9 @@
         {
           "key": "ui:inspector-unsaved-draft",
           "filename": "specs/ui/inspector-unsaved-draft/spec.md",
-          "state": "complete",
-          "validatedHash": "sha256:4d46d20dd1079d8447e2f875aa583362df4f50d2a01cfba7f25a20397f367968"
+          "state": "drifted-pending-review",
+          "validatedHash": "sha256:4d46d20dd1079d8447e2f875aa583362df4f50d2a01cfba7f25a20397f367968",
+          "hasDrift": true
         },
         {
           "key": "ui:hooks-artifact-outline",
@@ -5108,14 +5122,16 @@
         {
           "key": "ui:spec-tab-outline",
           "filename": "specs/ui/spec-tab-outline/spec.md",
-          "state": "complete",
-          "validatedHash": "sha256:88983d10ab78ba228a25c200457cf441f6bd674d71df11c427cb1ae2eaf437da"
+          "state": "drifted-pending-review",
+          "validatedHash": "sha256:88983d10ab78ba228a25c200457cf441f6bd674d71df11c427cb1ae2eaf437da",
+          "hasDrift": true
         },
         {
           "key": "ui:validate-confirm-dialog",
           "filename": "specs/ui/validate-confirm-dialog/spec.md",
-          "state": "complete",
-          "validatedHash": "sha256:daaeba705157f65c2a2225653fc19383d0e7179c810ae2cde865243a6bf475c5"
+          "state": "drifted-pending-review",
+          "validatedHash": "sha256:daaeba705157f65c2a2225653fc19383d0e7179c810ae2cde865243a6bf475c5",
+          "hasDrift": true
         },
         {
           "key": "api:dto-implementation-review",
@@ -5162,8 +5178,9 @@
         {
           "key": "ui:scope-change-confirm-dialog",
           "filename": "specs/ui/scope-change-confirm-dialog/spec.md",
-          "state": "complete",
-          "validatedHash": "sha256:1566c0b23bb9f3c424ee7049a6d27d01cfb30148d827e3a5575692de49c08eda"
+          "state": "drifted-pending-review",
+          "validatedHash": "sha256:1566c0b23bb9f3c424ee7049a6d27d01cfb30148d827e3a5575692de49c08eda",
+          "hasDrift": true
         },
         {
           "key": "ui:hooks-change-scope-patch",
@@ -41086,6 +41103,227 @@
         {
           "type": "specs",
           "files": ["ui:inspector-metadata-schema"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "default:_global/architecture",
+            "client:specd-data-port",
+            "api:problem-json",
+            "api:dto-project",
+            "api:dto-project-status",
+            "api:dto-change-summary",
+            "api:dto-change-detail",
+            "api:dto-change-status",
+            "api:dto-artifact-content",
+            "api:dto-validate-result",
+            "api:dto-compiled-context",
+            "api:dto-preview-result",
+            "api:dto-spec-summary",
+            "api:dto-spec-detail",
+            "api:dto-workspace-spec-tree",
+            "api:dto-graph-status",
+            "api:dto-graph-search",
+            "api:dto-graph-impact",
+            "api:dto-change-graph-view",
+            "api:routes-project",
+            "api:routes-changes-collection",
+            "api:routes-changes-read",
+            "api:routes-changes-mutate",
+            "api:routes-archived-changes",
+            "api:routes-workspaces",
+            "api:routes-specs-read",
+            "api:routes-specs-mutate",
+            "api:routes-graph",
+            "client:port-project",
+            "client:port-changes-collection",
+            "client:port-changes-read",
+            "client:port-changes-mutate",
+            "client:port-archived-changes",
+            "client:port-workspaces-specs",
+            "client:port-graph",
+            "client:dto-project",
+            "client:dto-project-status",
+            "client:dto-change-summary",
+            "client:dto-change-detail",
+            "client:dto-change-status",
+            "client:dto-artifact-content",
+            "client:dto-validate-result",
+            "client:dto-compiled-context",
+            "client:dto-preview-result",
+            "client:dto-spec-summary",
+            "client:dto-spec-detail",
+            "client:dto-workspace-spec-tree",
+            "client:dto-graph-status",
+            "client:dto-graph-search",
+            "client:dto-graph-impact",
+            "client:dto-change-graph-view",
+            "ui:shell-layout",
+            "ui:command-palette",
+            "ui:connect-panel",
+            "ui:sidebar-changes-in-progress",
+            "ui:sidebar-changes-drafts",
+            "ui:sidebar-changes-archive",
+            "ui:sidebar-changes-discarded",
+            "ui:sidebar-workspaces-tree",
+            "ui:sidebar-graph-entry",
+            "ui:change-tab-overview",
+            "ui:change-metadata-editor",
+            "ui:change-tab-artifacts",
+            "ui:change-tab-validation",
+            "ui:change-tab-tasks",
+            "ui:change-tab-events",
+            "ui:change-tab-context",
+            "ui:change-tab-impact",
+            "ui:spec-tab-overview",
+            "ui:spec-tab-artifacts",
+            "ui:spec-tab-metadata",
+            "ui:spec-tab-dependencies",
+            "ui:spec-tab-graph",
+            "ui:spec-tab-context",
+            "ui:artifact-editor",
+            "ui:inspector-metadata-schema",
+            "ui:inspector-edit-preview",
+            "ui:inspector-delta-edit",
+            "ui:inspector-delta-preview",
+            "ui:inspector-delta-full-diff",
+            "ui:inspector-canonical-readonly",
+            "ui:bottom-panel-problems",
+            "ui:bottom-panel-output",
+            "ui:bottom-panel-logs",
+            "studio-web:vite-host",
+            "studio-web:remote-bootstrap",
+            "studio-desktop:welcome-and-file-menu",
+            "studio-desktop:recent-connections",
+            "studio-desktop:bottom-panel-terminal",
+            "cli:serve-api",
+            "cli:serve-ui",
+            "api:domain-api-actor",
+            "api:port-api-token-verifier",
+            "api:adapter-api-actor-resolver",
+            "api:middleware-auth",
+            "api:middleware-cors",
+            "api:composition-create-api-server",
+            "api:composition-create-api-context",
+            "api:composition-graph-provider",
+            "api:http-server-bootstrap",
+            "api:http-server-static-ui",
+            "api:openapi-generation",
+            "api:openapi-docs-route",
+            "api:presenter-project",
+            "api:presenter-change",
+            "api:presenter-artifact",
+            "api:presenter-spec",
+            "api:presenter-graph",
+            "api:presenter-problem",
+            "api:handler-project",
+            "api:handler-changes-collection",
+            "api:handler-changes-read",
+            "api:handler-changes-mutate",
+            "api:handler-archived-changes",
+            "api:handler-workspaces",
+            "api:handler-specs-read",
+            "api:handler-specs-mutate",
+            "api:handler-graph",
+            "client:port-http-transport",
+            "client:adapter-bearer-auth",
+            "client:adapter-problem-json-errors",
+            "client:adapter-remote-specd-data",
+            "client:adapter-memory-specd-data",
+            "client:ipc-message-envelope",
+            "ui:hooks-project",
+            "ui:hooks-changes-collection",
+            "ui:hooks-changes-read",
+            "ui:hooks-changes-mutate",
+            "ui:hooks-workspaces-specs",
+            "ui:hooks-graph",
+            "ui:hooks-inspector-save",
+            "studio-desktop:main-kernel-lifecycle",
+            "studio-desktop:main-window-manager",
+            "studio-desktop:ipc-preload-bridge",
+            "studio-desktop:ipc-handler-registry",
+            "studio-desktop:desktop-local-data-adapter",
+            "studio-desktop:desktop-remote-profile",
+            "core:change-manifest",
+            "core:change",
+            "core:get-status",
+            "core:save-change-artifact",
+            "core:get-change-artifact",
+            "core:change-repository-port",
+            "api:auth-adapter-registry",
+            "api:adapter-auth-disabled",
+            "core:config",
+            "ui:design-system",
+            "core:outline-artifact-content",
+            "core:outline-change-artifact",
+            "core:preview-artifact-overrides",
+            "core:get-spec-outline-draft",
+            "ui:inspector-unsaved-draft",
+            "ui:hooks-artifact-outline",
+            "ui:spec-tab-outline",
+            "ui:validate-confirm-dialog",
+            "api:dto-implementation-review",
+            "client:dto-implementation-review",
+            "ui:change-description-editor",
+            "ui:change-invalidation-policy-editor",
+            "ui:change-specs-readonly-panel",
+            "ui:change-scope-dialog",
+            "ui:scope-change-confirm-dialog",
+            "ui:hooks-change-scope-patch",
+            "ui:hooks-change-validate",
+            "core:validate-change-batch",
+            "api:dto-validate-batch-result",
+            "api:routes-changes-mutate-validate-all",
+            "client:dto-validate-batch-result",
+            "client:port-changes-mutate-validate-all",
+            "cli:change-validate",
+            "core:read-log",
+            "api:routes-project-logs",
+            "client:port-studio-panel"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-26T06:18:59.971Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [ui:inspector-unsaved-draft, ui:scope-change-confirm-dialog, ui:shell-layout, ui:sidebar-changes-archive, ui:sidebar-changes-discarded, ui:sidebar-changes-drafts, ui:sidebar-changes-in-progress, ui:sidebar-graph-entry, ui:sidebar-workspaces-tree, ui:spec-tab-artifacts, ui:spec-tab-context, ui:spec-tab-dependencies, ui:spec-tab-graph, ui:spec-tab-metadata, ui:spec-tab-outline, ui:spec-tab-overview, ui:validate-confirm-dialog]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "ui:inspector-unsaved-draft",
+            "ui:scope-change-confirm-dialog",
+            "ui:shell-layout",
+            "ui:sidebar-changes-archive",
+            "ui:sidebar-changes-discarded",
+            "ui:sidebar-changes-drafts",
+            "ui:sidebar-changes-in-progress",
+            "ui:sidebar-graph-entry",
+            "ui:sidebar-workspaces-tree",
+            "ui:spec-tab-artifacts",
+            "ui:spec-tab-context",
+            "ui:spec-tab-dependencies",
+            "ui:spec-tab-graph",
+            "ui:spec-tab-metadata",
+            "ui:spec-tab-outline",
+            "ui:spec-tab-overview",
+            "ui:validate-confirm-dialog"
+          ]
         },
         {
           "type": "verify",
