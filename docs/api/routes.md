@@ -9,10 +9,10 @@ All paths are under the `/v1` prefix. Query and body fields mirror CLI/kernel in
 
 ## Meta
 
-| Method | Path            | Description                                |
-| ------ | --------------- | ------------------------------------------ |
-| `GET`  | `/health`       | Liveness; returns `auth.type`              |
-| `GET`  | `/openapi.json` | OpenAPI 3.1 stub (partial; not exhaustive) |
+| Method | Path                  | Description                      |
+| ------ | --------------------- | -------------------------------- |
+| `GET`  | `/health`             | Liveness; returns `auth.type`    |
+| `GET`  | `/documentation/json` | OpenAPI 3.1 document (generated) |
 
 ## Project
 
@@ -121,4 +121,4 @@ All paths are under the `/v1` prefix. Query and body fields mirror CLI/kernel in
 
 JSON shapes are documented in [DTOs](./dtos.md) and declared in OpenAPI under `components.schemas` (see [OpenAPI](./openapi.md)). Source: `packages/api/src/delivery/http/dto/`, mirrored in `packages/client/src/dto/`.
 
-When adding routes, update `registerV1Routes`, `openapi-paths.ts`, `openapi-schemas.ts`, this page, and [DTOs](./dtos.md) in the same change.
+When adding routes, update `registerV1Routes`, route `schema` blocks (and `openapi-schemas.ts` when new DTOs are needed), this page, and [DTOs](./dtos.md) in the same change.

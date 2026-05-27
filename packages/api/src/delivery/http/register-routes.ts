@@ -9,8 +9,8 @@ import { registerProjectLogsRoutes } from './handlers/handler-project-logs.js'
 import { registerSpecsMutateRoutes } from './handlers/handler-specs-mutate.js'
 import { registerSpecsReadRoutes } from './handlers/handler-specs-read.js'
 import { registerWorkspacesRoutes } from './handlers/handler-workspaces.js'
-import { OPENAPI_STUB } from '../openapi/openapi-doc.js'
 import { apiHandler } from './handler-utils.js'
+import { apiRouteSchema } from './route-schema.js'
 
 /**
  * Registers all `/v1` API routes on the given Fastify instance.
@@ -19,6 +19,9 @@ import { apiHandler } from './handler-utils.js'
 export function registerV1Routes(app: FastifyInstance): void {
   app.get(
     '/health',
+    {
+      ...apiRouteSchema({ response: { 200: 'HealthDto' } }),
+    },
     apiHandler((ctx) =>
       Promise.resolve({
         status: 'ok' as const,
@@ -26,10 +29,6 @@ export function registerV1Routes(app: FastifyInstance): void {
       }),
     ),
   )
-
-  app.get('/openapi.json', async (_req, reply) => {
-    return reply.send(OPENAPI_STUB)
-  })
 
   registerProjectRoutes(app)
   registerProjectLogsRoutes(app)

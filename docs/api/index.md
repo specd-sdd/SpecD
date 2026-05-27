@@ -29,7 +29,7 @@ All routes below are relative to `/v1`. Discovery:
 
 ```http
 GET /v1/health
-GET /v1/openapi.json
+GET /v1/documentation/json
 ```
 
 `openapi.json` is the full **OpenAPI 3.1** document (paths + component schemas). See [how to obtain it](./openapi.md). Narrative references: [Routes](./routes.md), [DTOs](./dtos.md).
