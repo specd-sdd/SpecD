@@ -218,6 +218,21 @@
 - **THEN** HTTP 200
 - **AND** JSON includes `outline` array
 
+### Requirement: read-route inputs are schema-validated
+
+#### Scenario: GET preview rejects missing specId
+
+- **WHEN** client calls `GET /v1/changes/{name}/preview` without `specId`
+- **THEN** HTTP 400 is returned
+- **AND** body is `application/problem+json`
+- **AND** code is `INVALID_REQUEST`
+
+#### Scenario: hook instructions reject invalid phase
+
+- **WHEN** client calls `GET /v1/changes/{name}/hook-instructions?phase=before`
+- **THEN** HTTP 400 is returned
+- **AND** body is `application/problem+json`
+
 #### Scenario: POST outline without content uses saved file
 
 - **GIVEN** artifact exists on change

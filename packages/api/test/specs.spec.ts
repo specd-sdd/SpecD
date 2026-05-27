@@ -4,8 +4,8 @@ import { loadProjectSamples } from './helpers/project-samples.js'
 
 describe('Specs API', () => {
   it('given missing q, when GET /specs/search, then returns problem+json', async () => {
-    const body = await expectProblem('/specs/search', undefined, 500)
-    expect(body.code).toBe('INTERNAL_ERROR')
+    const body = await expectProblem('/specs/search', undefined, 400)
+    expect(body.code).toBe('INVALID_REQUEST')
   })
 
   it('given a query, when GET /specs/search, then returns matches', async () => {
@@ -63,9 +63,9 @@ describe('Specs API', () => {
     const body = await expectProblem(
       `/workspaces/${workspace}/specs/${specPath}/metadata`,
       { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' },
-      500,
+      400,
     )
-    expect(body.code).toBe('INTERNAL_ERROR')
+    expect(body.code).toBe('INVALID_REQUEST')
   })
 
   it('given unknown spec, when GET /workspaces/:ws/specs/missing/spec, then returns 404', async () => {

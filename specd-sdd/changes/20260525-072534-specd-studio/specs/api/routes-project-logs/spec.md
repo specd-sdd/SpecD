@@ -21,6 +21,12 @@ HTTP contract for Studio **Logs** and **Output** channels under `/v1`. Logs use 
 
 `limit` query parameters MUST be parsed as positive integers capped at 500 for logs and 500 for studio output.
 
+### Requirement: log-route inputs are schema-validated
+
+Every `query` and `body` shape accepted by `/logs` and `/studio/output` MUST be declared in Fastify route schema and validated before handler logic runs.
+
+`level` MUST reject values outside `debug|info|warn|error`. `message` MUST reject blank or missing input. Malformed input MUST return HTTP 400 with `application/problem+json` and code `INVALID_REQUEST`.
+
 ## Constraints
 
 - MUST NOT expose endpoints that read log files from disk or arbitrary paths.

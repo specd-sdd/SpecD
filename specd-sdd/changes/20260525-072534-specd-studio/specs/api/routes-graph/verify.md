@@ -64,6 +64,21 @@
 - **THEN** risk labels align with CLI
 - **AND** min-risk filter honored
 
+### Requirement: graph-route inputs are schema-validated
+
+#### Scenario: Impact rejects missing selector
+
+- **WHEN** client calls `GET /v1/graph/impact` without `symbol` or `file`
+- **THEN** HTTP 400 is returned
+- **AND** body is `application/problem+json`
+- **AND** code is `INVALID_REQUEST`
+
+#### Scenario: Impact rejects unsupported direction
+
+- **WHEN** client calls `GET /v1/graph/impact?symbol=core:test&direction=sideways`
+- **THEN** HTTP 400 is returned
+- **AND** body is `application/problem+json`
+
 ### Requirement: spec and change linkage endpoints compose graph with spec scope
 
 #### Scenario: Spec linkage returns symbols for spec id

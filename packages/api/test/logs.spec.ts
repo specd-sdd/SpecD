@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { apiJson } from './helpers/http-client.js'
+import { apiJson, expectProblem } from './helpers/http-client.js'
 
 describe('project logs and studio output', () => {
   it('GET /v1/logs returns in-memory entries after POST', async () => {
@@ -77,5 +77,37 @@ describe('project logs and studio output', () => {
     }>('/studio/output?limit=50')
     expect(after.entries.length).toBe(countBefore)
     expect(after.entries.some((e) => e.message === 'only-in-logs')).toBe(false)
+  })
+
+  it('POST /v1/logs rejects invalid level', async () => {
+    const body = await expectProblem(
+      '/logs',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          level: 'trace',
+          message: 'bad-level',
+        }),
+      },
+      400,
+    )
+    expect(body.code).toBe('INVALID_REQUEST')
+  })
+
+  it('POST /v1/studio/output rejects blank message', async () => {
+    const body = await expectProblem(
+      '/studio/output',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          level: 'info',
+          message: '',
+        }),
+      },
+      400,
+    )
+    expect(body.code).toBe('INVALID_REQUEST')
   })
 })

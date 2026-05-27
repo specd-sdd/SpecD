@@ -16,7 +16,7 @@
 - **THEN** HTTP status is 2xx
 - **AND** JSON body includes `name`, `archivedName`, `archivedAt`, `specIds`, `schemaName`, `schemaVersion`, and `artifacts`
 
-#### Scenario: Active change name is not served from archived route
+#### Scenario: Archived change snapshot is not served from active change route
 
 - **GIVEN** change exists only in archive
 - **WHEN** client calls `GET /v1/changes/{name}`

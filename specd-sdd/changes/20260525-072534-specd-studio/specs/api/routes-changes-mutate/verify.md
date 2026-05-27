@@ -45,6 +45,21 @@
 - **THEN** HTTP status is 2xx
 - **AND** JSON body matches the documented DTO or envelope
 
+### Requirement: mutating-route inputs are schema-validated
+
+#### Scenario: Transition rejects invalid target state
+
+- **WHEN** client POSTs `{ "to": "ship-it" }` to `POST /v1/changes/{name}/transition`
+- **THEN** HTTP 400 is returned
+- **AND** body is `application/problem+json`
+- **AND** code is `INVALID_REQUEST`
+
+#### Scenario: Skip-artifact rejects missing artifactId
+
+- **WHEN** client POSTs `{}` to `POST /v1/changes/{name}/skip-artifact`
+- **THEN** HTTP 400 is returned
+- **AND** body is `application/problem+json`
+
 ### Requirement: draft and restore mutations use change lifecycle actions
 
 #### Scenario: Restore drafted change uses /changes route

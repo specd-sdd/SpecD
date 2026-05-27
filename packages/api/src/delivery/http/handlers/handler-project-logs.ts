@@ -1,12 +1,15 @@
-import { Logger, type LogLevel } from '@specd/core'
+import { Logger } from '@specd/core'
 import { type FastifyInstance } from 'fastify'
 import { apiHandler } from '../handler-utils.js'
 import type { LogReadDto } from '../dto/log-read.js'
 import type { StudioOutputListDto } from '../dto/studio-output.js'
 import type { StudioOutputLevel } from '../../../infrastructure/studio-output-buffer.js'
-
-const STUDIO_LOG_LEVELS = new Set<LogLevel>(['debug', 'info', 'warn', 'error'])
-const STUDIO_OUTPUT_LEVELS = new Set<StudioOutputLevel>(['debug', 'info', 'warn', 'error'])
+import {
+  apiRouteSchema,
+  BOOLEANISH_QUERY_SCHEMA,
+  POSITIVE_INTEGER_QUERY_SCHEMA,
+  strictObjectSchema,
+} from '../route-schema.js'
 
 function parseLimit(raw: string | undefined, fallback: number, max: number): number {
   if (raw === undefined || raw === '') {
@@ -26,6 +29,19 @@ function parseLimit(raw: string | undefined, fallback: number, max: number): num
 export function registerProjectLogsRoutes(app: FastifyInstance): void {
   app.get(
     '/logs',
+    {
+      ...apiRouteSchema({
+        querystring: {
+          ...strictObjectSchema({
+            properties: {
+              limit: POSITIVE_INTEGER_QUERY_SCHEMA,
+              prettier: BOOLEANISH_QUERY_SCHEMA,
+            },
+          }),
+        },
+        response: { 200: 'LogReadDto' },
+      }),
+    },
     apiHandler((ctx, req) => {
       const read = ctx.kernel.logs?.read
       if (read === undefined) {
@@ -41,20 +57,20 @@ export function registerProjectLogsRoutes(app: FastifyInstance): void {
 
   app.post(
     '/logs',
+    {
+      ...apiRouteSchema({
+        body: 'AppendLogBody',
+        response: { 200: 'OkDto' },
+      }),
+    },
     apiHandler((ctx, req) => {
       const body = req.body as {
         level?: string
-        message?: string
+        message: string
         context?: Record<string, unknown>
       }
       const level = body.level ?? 'debug'
-      if (!STUDIO_LOG_LEVELS.has(level as LogLevel)) {
-        throw new Error(`Invalid log level: ${level}`)
-      }
       const message = body.message?.trim()
-      if (message === undefined || message === '') {
-        throw new Error('message is required')
-      }
       const context = body.context ?? {}
       const log = Logger.child({ source: 'studio' })
       switch (level) {
@@ -79,6 +95,16 @@ export function registerProjectLogsRoutes(app: FastifyInstance): void {
 
   app.get(
     '/studio/output',
+    {
+      ...apiRouteSchema({
+        querystring: {
+          ...strictObjectSchema({
+            properties: { limit: POSITIVE_INTEGER_QUERY_SCHEMA },
+          }),
+        },
+        response: { 200: 'StudioOutputListDto' },
+      }),
+    },
     apiHandler((ctx, req) => {
       const query = req.query as { limit?: string }
       const limit = parseLimit(query.limit, 200, 500)
@@ -89,21 +115,21 @@ export function registerProjectLogsRoutes(app: FastifyInstance): void {
 
   app.post(
     '/studio/output',
+    {
+      ...apiRouteSchema({
+        body: 'AppendStudioOutputBody',
+        response: { 200: 'StudioOutputEntryDto' },
+      }),
+    },
     apiHandler((ctx, req) => {
       const body = req.body as {
         level?: string
-        message?: string
+        message: string
         action?: string
         context?: Record<string, unknown>
       }
       const level = (body.level ?? 'info') as StudioOutputLevel
-      if (!STUDIO_OUTPUT_LEVELS.has(level)) {
-        throw new Error(`Invalid studio output level: ${body.level}`)
-      }
       const message = body.message?.trim()
-      if (message === undefined || message === '') {
-        throw new Error('message is required')
-      }
       const entry = ctx.studioOutput.append({
         level,
         message,

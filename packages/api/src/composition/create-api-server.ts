@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import fastifyStatic from '@fastify/static'
+import fastifySwagger from '@fastify/swagger'
 import Fastify, { type FastifyInstance } from 'fastify'
 import {
   createConfigLoader,
@@ -15,6 +16,8 @@ import { defaultAuthAdapterRegistry } from './default-auth-registry.js'
 import { registerAuthMiddleware } from '../delivery/http/middleware/auth.js'
 import { registerCorsMiddleware } from '../delivery/http/middleware/cors.js'
 import { registerV1Routes } from '../delivery/http/register-routes.js'
+import { registerApiOpenApiSchemas } from '../delivery/http/openapi-schemas.js'
+import { toProblemJson } from '../delivery/http/problem-json.js'
 import { resolveKernelActor, type ApiServerState } from './create-api-context.js'
 
 /** Options for {@link createApiServer}. */
@@ -76,8 +79,57 @@ export async function createApiServer(options: CreateApiServerOptions): Promise<
   await registerCorsMiddleware(app, config, options.corsOrigins)
 
   await app.register(
-    (v1) => {
+    async (v1) => {
       registerAuthMiddleware(v1, state, verifier, auth.type)
+
+      await v1.register(fastifySwagger, {
+        openapi: {
+          openapi: '3.1.0',
+          info: {
+            title: 'SpecD Studio API',
+            version: '1.0.0',
+          },
+        },
+      })
+
+      registerApiOpenApiSchemas(v1)
+
+      // Avoid response schema-based filtering; route schemas are for OpenAPI + request validation.
+      v1.setSerializerCompiler(() => (data) => JSON.stringify(data))
+
+      v1.setErrorHandler(async (err, _request, reply) => {
+        // Validation errors happen before `apiHandler` runs, so we normalize them here.
+        if (
+          typeof err === 'object' &&
+          err !== null &&
+          'validation' in err &&
+          (err as { validation?: unknown }).validation !== undefined
+        ) {
+          const message =
+            typeof (err as { message?: unknown }).message === 'string'
+              ? (err as { message?: unknown }).message
+              : undefined
+          await reply
+            .status(400)
+            .type('application/problem+json')
+            .send({
+              type: 'urn:specd:error:INVALID_REQUEST',
+              title: 'Invalid Request',
+              status: 400,
+              detail: message ?? 'Request validation failed',
+              code: 'INVALID_REQUEST',
+            })
+          return
+        }
+
+        const { status, body } = toProblemJson(err)
+        await reply.status(status).type('application/problem+json').send(body)
+      })
+
+      v1.get('/documentation/json', async (_req, reply) => {
+        return reply.send(v1.swagger())
+      })
+
       registerV1Routes(v1)
     },
     { prefix: '/v1' },

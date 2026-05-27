@@ -61,3 +61,12 @@
 - **WHEN** client requests a URL outside this routes contract
 - **THEN** HTTP 404 is returned
 - **AND** body is `application/problem+json`
+
+### Requirement: project-route inputs are schema-validated
+
+#### Scenario: Project context rejects malformed depth
+
+- **WHEN** client calls `GET /v1/project/context?depth=zero`
+- **THEN** HTTP 400 is returned
+- **AND** body is `application/problem+json`
+- **AND** code is `INVALID_REQUEST`

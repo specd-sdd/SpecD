@@ -6,9 +6,11 @@ SpecD Studio capability **Openapi Generation** (`api:openapi-generation`). Gener
 
 ## Requirements
 
-### Requirement: OpenAPI reflects route and DTO specs
+### Requirement: OpenAPI is generated from Fastify route schemas
 
-Generated paths and schemas MUST be derived from the Zod (or equivalent) types that implement `api:routes-*` and `api:dto-*` contracts, not hand-maintained parallel definitions.
+The OpenAPI document MUST be generated from the Fastify route `schema` declarations (params/query/body/response) and shared DTO schemas, using `@fastify/swagger` (or an equivalent OpenAPI generator).
+
+The implementation MUST NOT maintain a hand-written OpenAPI document (paths/schemas) in parallel to the route/DTO definitions.
 
 ### Requirement: document version tracks API prefix
 

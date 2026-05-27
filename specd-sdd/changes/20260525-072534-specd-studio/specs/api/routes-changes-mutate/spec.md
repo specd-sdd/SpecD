@@ -16,6 +16,12 @@ Authoritative HTTP contract (methods, paths, query, bodies, status codes) for **
 
 `POST .../validate-all` MUST accept optional `{ artifactId }` and MUST NOT loop `specIds` in the handler.
 
+### Requirement: mutating-route inputs are schema-validated
+
+Every `params`, `query`, and `body` shape accepted by this route group MUST be declared in Fastify route schema and validated before handler logic runs.
+
+This includes at minimum artifact save bodies, validate filters, transition targets and hook-phase selectors, skip-artifact bodies, and implementation-tracking mutations. Invalid input MUST return HTTP 400 with `application/problem+json` and code `INVALID_REQUEST`.
+
 ### Requirement: draft and restore mutations use change lifecycle actions
 
 Drafted and discarded changes are read-only storage classes, but lifecycle mutations continue to be addressed by change name through the active mutation surface:

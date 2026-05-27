@@ -28,3 +28,18 @@
 
 - **WHEN** client requests `limit=99999`
 - **THEN** at most 500 entries are returned
+
+### Requirement: log-route inputs are schema-validated
+
+#### Scenario: POST logs rejects invalid level
+
+- **WHEN** client POSTs `{ "level": "trace", "message": "bad" }` to `/v1/logs`
+- **THEN** HTTP 400 is returned
+- **AND** body is `application/problem+json`
+- **AND** code is `INVALID_REQUEST`
+
+#### Scenario: POST studio output rejects blank message
+
+- **WHEN** client POSTs `{ "level": "info", "message": "" }` to `/v1/studio/output`
+- **THEN** HTTP 400 is returned
+- **AND** body is `application/problem+json`

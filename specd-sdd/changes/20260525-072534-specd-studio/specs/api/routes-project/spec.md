@@ -18,6 +18,12 @@ The API MUST provide `GET /project`, `/project/status`, `/project/context`, `/pr
 
 `GET /project` MUST include `auth: { type }` matching effective server configuration without secrets.
 
+### Requirement: project-route inputs are schema-validated
+
+Every `params`, `query`, and `body` shape accepted by this route group MUST be declared in Fastify route schema and validated before handler logic runs.
+
+For `GET /project/context`, boolean and numeric query flags such as `followDeps` and `depth` MUST reject malformed values with HTTP 400 `application/problem+json` and code `INVALID_REQUEST`.
+
 ## Constraints
 
 - HTTP handlers MUST NOT import `@specd/core` from `@specd/ui` or `@specd/client`.

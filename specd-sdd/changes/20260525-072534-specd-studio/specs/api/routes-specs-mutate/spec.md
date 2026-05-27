@@ -2,17 +2,17 @@
 
 ## Purpose
 
-Authoritative HTTP contract (methods, paths, query, bodies, status codes) for **Routes Specs Mutate** under `/v1`. Handlers and OpenAPI MUST match this spec exactly so CLI, agents, and Studio stay aligned. Mutating routes for workspace-level spec validation and metadata (privileged).
+Authoritative HTTP contract (methods, paths, query, bodies, status codes) for **Routes Specs Mutate** under `/v1`. Handlers and OpenAPI MUST match this spec exactly so CLI, agents, and Studio stay aligned. This route group is limited to workspace-level spec validation.
 
 ## Requirements
 
 ### Requirement: POST validate runs structural ValidateSpecs
 
-`POST /v1/workspaces/{ws}/specs/validate` MUST run `ValidateSpecs` for a `specPath` or the whole workspace per request body/query.
+`POST /v1/workspaces/{ws}/specs/validate` MUST run `ValidateSpecs` either for the whole workspace or for a single canonical spec selected by the optional `specPath` query parameter.
 
-### Requirement: POST metadata saves or regenerates spec metadata files
+### Requirement: spec validation inputs are schema-validated
 
-`POST /v1/workspaces/{ws}/specs/{path}/metadata` MUST call `saveMetadata` or `generateMetadata` per request body.
+The route MUST declare schema validation for `ws` params and optional `specPath` query input before handler logic runs. Invalid input MUST return HTTP 400 with `application/problem+json` and code `INVALID_REQUEST`.
 
 ## Constraints
 

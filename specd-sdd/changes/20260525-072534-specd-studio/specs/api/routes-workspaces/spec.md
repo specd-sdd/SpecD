@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Authoritative HTTP contract (methods, paths, query, bodies, status codes) for **Routes Workspaces** under `/v1`. Handlers and OpenAPI MUST match this spec exactly so CLI, agents, and Studio stay aligned. HTTP contract for workspace discovery and canonical spec tree (workspace truth, not change-scoped deltas).
+Authoritative HTTP contract (methods, paths, query, bodies, status codes) for **Routes Workspaces** under `/v1`. Handlers and OpenAPI MUST match this spec exactly so CLI, agents, and Studio stay aligned. This route group covers workspace discovery and top-level canonical spec tree listing only.
 
 ## Requirements
 
@@ -10,21 +10,11 @@ Authoritative HTTP contract (methods, paths, query, bodies, status codes) for **
 
 `GET /v1/workspaces` MUST return the workspace list from `SpecdConfig.workspaces` including name, path prefix, ownership, and code roots.
 
-### Requirement: GET spec tree and metadata without inline bodies
+### Requirement: GET workspace spec tree lists canonical specs without artifact bodies
 
-`GET /v1/workspaces/{ws}/specs` MUST return spec tree metadata. `GET /v1/workspaces/{ws}/specs/{path}` MUST return filenames, content hashes, and dependencies but MUST NOT inline artifact file bodies.
+`GET /v1/workspaces/{ws}/specs` MUST return the canonical spec tree for the selected workspace from `kernel.specs.list`.
 
-### Requirement: canonical spec artifacts are read-only in Studio v1
-
-`GET /v1/workspaces/{ws}/specs/{path}/artifacts/{filename}` MAY return canonical artifact content for display. Studio v1 MUST NOT expose a mutating route for canonical workspace artifacts.
-
-### Requirement: outline and context routes follow kernel contracts
-
-`GET .../outline` and `GET .../context` MUST forward query parameters to `GetOutline` and `GetContext` respectively.
-
-### Requirement: GET specs search accepts q and workspace filter
-
-`GET /v1/specs/search` MUST accept `q` and optional workspace filter and delegate to `kernel.specs.search`.
+Each entry MUST provide discovery metadata needed to navigate canonical specs, but this route MUST NOT inline canonical artifact bodies or per-spec detail payloads. Canonical spec detail, artifact reads, outline, context, and metadata actions belong to `api:routes-specs-read`.
 
 ## Constraints
 

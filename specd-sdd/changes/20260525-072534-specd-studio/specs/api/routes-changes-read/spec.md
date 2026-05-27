@@ -48,6 +48,12 @@ When `refreshImplementation=true`, the handler MUST run implementation refresh b
 
 `POST /changes/{name}/artifacts/{filename}/outline` MUST accept optional JSON body `{ content?: string }`. When `content` is set, the handler MUST call `OutlineChangeArtifact` with draft content; when omitted, outline bytes from the saved change artifact. Response MUST be JSON outline entry shape (filename, outline, optional selectorHints).
 
+### Requirement: read-route inputs are schema-validated
+
+Every `params`, `query`, and `body` shape accepted by this route group MUST be declared in Fastify route schema and validated before handler logic runs.
+
+Malformed input for routes such as `GET /changes/{name}/status`, `GET /changes/{name}/context`, `GET /changes/{name}/preview`, `POST /changes/{name}/preview`, and `GET /changes/{name}/hook-instructions` MUST return HTTP 400 with `application/problem+json` and code `INVALID_REQUEST`.
+
 ### Requirement: unknown change returns 404 problem+json
 
 Requests for a non-existent change name MUST return HTTP 404 with `application/problem+json`. Malformed queries MUST return HTTP 400.

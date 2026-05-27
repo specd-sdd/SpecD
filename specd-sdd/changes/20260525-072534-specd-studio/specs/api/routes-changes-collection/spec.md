@@ -18,6 +18,12 @@ The API MUST expose `GET /changes`, `/drafts`, `/discarded`, `/archived-changes`
 
 `POST /changes` MUST accept a `CreateChange` input body and return the created change summary.
 
+### Requirement: POST changes separates request validation from schema preconditions
+
+`POST /changes` MUST validate the request body shape through Fastify route schema before handler logic runs. Invalid input MUST return HTTP 400 with `application/problem+json` and code `INVALID_REQUEST`.
+
+After request validation succeeds, the handler MUST load the active schema and reject change creation when the schema resolves only to a raw reference rather than a compiled schema object. This rejection is a business precondition failure, not a request-shape validation error.
+
 ### Requirement: list responses include summary fields for sidebars
 
 List endpoints MUST return `name`, description snippet, derived lifecycle state, `updatedAt` when known, and blocker count sufficient for Studio sidebars.

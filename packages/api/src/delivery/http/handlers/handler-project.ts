@@ -3,6 +3,12 @@ import { type FastifyInstance } from 'fastify'
 import { buildCompileContextConfig } from '../compile-config.js'
 import { apiHandler } from '../handler-utils.js'
 import { toProjectDto, toProjectStatusDto } from '../presenters/presenter-project.js'
+import {
+  apiRouteSchema,
+  BOOLEAN_QUERY_SCHEMA,
+  POSITIVE_INTEGER_QUERY_SCHEMA,
+  strictObjectSchema,
+} from '../route-schema.js'
 
 /**
  * Registers `/v1/project*` routes.
@@ -11,11 +17,13 @@ import { toProjectDto, toProjectStatusDto } from '../presenters/presenter-projec
 export function registerProjectRoutes(app: FastifyInstance): void {
   app.get(
     '/project',
+    { ...apiRouteSchema({ response: { 200: 'ProjectDto' } }) },
     apiHandler((ctx) => Promise.resolve(toProjectDto(ctx.config))),
   )
 
   app.get(
     '/project/status',
+    { ...apiRouteSchema({ response: { 200: 'ProjectStatusDto' } }) },
     apiHandler(async (ctx) => {
       const [active, drafts, discarded, archived, specs] = await Promise.all([
         ctx.kernel.changes.list.execute(),
@@ -74,6 +82,19 @@ export function registerProjectRoutes(app: FastifyInstance): void {
 
   app.get(
     '/project/context',
+    {
+      ...apiRouteSchema({
+        querystring: {
+          ...strictObjectSchema({
+            properties: {
+              followDeps: BOOLEAN_QUERY_SCHEMA,
+              depth: POSITIVE_INTEGER_QUERY_SCHEMA,
+            },
+          }),
+        },
+        response: { 200: 'ProjectContextDto' },
+      }),
+    },
     apiHandler(async (ctx, req) => {
       const query = req.query as {
         followDeps?: string
@@ -96,6 +117,7 @@ export function registerProjectRoutes(app: FastifyInstance): void {
 
   app.get(
     '/project/schema',
+    { ...apiRouteSchema({ response: { 200: 'ProjectSchemaDto' } }) },
     apiHandler(async (ctx) => {
       const result = await ctx.kernel.specs.getActiveSchema.execute()
       if (result.raw) {
@@ -112,6 +134,7 @@ export function registerProjectRoutes(app: FastifyInstance): void {
 
   app.post(
     '/project/schema/validate',
+    { ...apiRouteSchema({ response: { 200: 'SchemaValidateResultDto' } }) },
     apiHandler(async (ctx) => {
       const result = await ctx.kernel.specs.validateSchema.execute({ mode: 'project' })
       return {

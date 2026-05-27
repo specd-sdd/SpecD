@@ -14,6 +14,39 @@ import {
 } from '../presenters/presenter-change.js'
 import { toArtifactContentDto } from '../presenters/presenter-artifact.js'
 import { toImplementationReviewDto } from '../presenters/presenter-change.js'
+import {
+  apiRouteSchema,
+  BOOLEAN_QUERY_SCHEMA,
+  CHANGE_STATE_QUERY_SCHEMA,
+  DATE_TIME_STRING_SCHEMA,
+  NON_EMPTY_STRING_SCHEMA,
+  PARAMS_CHANGE_NAME,
+  PARAMS_CHANGE_NAME_ARTIFACT_ID,
+  PARAMS_CHANGE_NAME_FILENAME,
+  POSITIVE_INTEGER_QUERY_SCHEMA,
+  strictObjectSchema,
+} from '../route-schema.js'
+
+const STATUS_QUERY = strictObjectSchema({
+  properties: { ifModifiedSince: DATE_TIME_STRING_SCHEMA },
+})
+
+const CHANGE_STATUS_QUERY = strictObjectSchema({
+  properties: {
+    ifModifiedSince: DATE_TIME_STRING_SCHEMA,
+    refreshImplementation: BOOLEAN_QUERY_SCHEMA,
+  },
+})
+
+const COMPILE_CONTEXT_QUERY = strictObjectSchema({
+  properties: {
+    includeChangeSpecs: BOOLEAN_QUERY_SCHEMA,
+    followDeps: BOOLEAN_QUERY_SCHEMA,
+    depth: POSITIVE_INTEGER_QUERY_SCHEMA,
+    fingerprint: NON_EMPTY_STRING_SCHEMA,
+    step: CHANGE_STATE_QUERY_SCHEMA,
+  },
+})
 
 /**
  * Registers read routes for a single change under `/v1`.
@@ -22,6 +55,12 @@ import { toImplementationReviewDto } from '../presenters/presenter-change.js'
 export function registerChangesReadRoutes(app: FastifyInstance): void {
   app.get(
     '/drafts/:name',
+    {
+      ...apiRouteSchema({
+        params: PARAMS_CHANGE_NAME,
+        response: { 200: 'ChangeDetailDto' },
+      }),
+    },
     apiHandler(async (ctx, req) => {
       const { name } = req.params as { name: string }
       const view = await ctx.kernel.changes.repo.getDraft(name)
@@ -34,6 +73,12 @@ export function registerChangesReadRoutes(app: FastifyInstance): void {
 
   app.get(
     '/discarded/:name',
+    {
+      ...apiRouteSchema({
+        params: PARAMS_CHANGE_NAME,
+        response: { 200: 'ChangeDetailDto' },
+      }),
+    },
     apiHandler(async (ctx, req) => {
       const { name } = req.params as { name: string }
       const view = await ctx.kernel.changes.repo.getDiscarded(name)
@@ -46,6 +91,12 @@ export function registerChangesReadRoutes(app: FastifyInstance): void {
 
   app.get(
     '/changes/:name',
+    {
+      ...apiRouteSchema({
+        params: PARAMS_CHANGE_NAME,
+        response: { 200: 'ChangeDetailDto' },
+      }),
+    },
     apiHandler(async (ctx, req) => {
       const { name } = req.params as { name: string }
       const change = await ctx.kernel.changes.repo.get(name)
@@ -58,6 +109,13 @@ export function registerChangesReadRoutes(app: FastifyInstance): void {
 
   app.get(
     '/drafts/:name/status',
+    {
+      ...apiRouteSchema({
+        params: PARAMS_CHANGE_NAME,
+        querystring: STATUS_QUERY,
+        response: { 200: 'ChangeStatusDto' },
+      }),
+    },
     apiHandler(async (ctx, req) => {
       const { name } = req.params as { name: string }
       const query = req.query as { ifModifiedSince?: string }
@@ -71,6 +129,13 @@ export function registerChangesReadRoutes(app: FastifyInstance): void {
 
   app.get(
     '/discarded/:name/status',
+    {
+      ...apiRouteSchema({
+        params: PARAMS_CHANGE_NAME,
+        querystring: STATUS_QUERY,
+        response: { 200: 'ChangeStatusDto' },
+      }),
+    },
     apiHandler(async (ctx, req) => {
       const { name } = req.params as { name: string }
       const query = req.query as { ifModifiedSince?: string }
@@ -84,6 +149,13 @@ export function registerChangesReadRoutes(app: FastifyInstance): void {
 
   app.get(
     '/changes/:name/status',
+    {
+      ...apiRouteSchema({
+        params: PARAMS_CHANGE_NAME,
+        querystring: CHANGE_STATUS_QUERY,
+        response: { 200: 'ChangeStatusDto' },
+      }),
+    },
     apiHandler(async (ctx, req) => {
       const { name } = req.params as { name: string }
       const query = req.query as {
@@ -103,6 +175,12 @@ export function registerChangesReadRoutes(app: FastifyInstance): void {
 
   app.get(
     '/drafts/:name/artifacts',
+    {
+      ...apiRouteSchema({
+        params: PARAMS_CHANGE_NAME,
+        response: { 200: 'ArtifactListDto' },
+      }),
+    },
     apiHandler(async (ctx, req) => {
       const { name } = req.params as { name: string }
       const view = await ctx.kernel.changes.repo.getDraft(name)
@@ -115,6 +193,12 @@ export function registerChangesReadRoutes(app: FastifyInstance): void {
 
   app.get(
     '/discarded/:name/artifacts',
+    {
+      ...apiRouteSchema({
+        params: PARAMS_CHANGE_NAME,
+        response: { 200: 'ArtifactListDto' },
+      }),
+    },
     apiHandler(async (ctx, req) => {
       const { name } = req.params as { name: string }
       const view = await ctx.kernel.changes.repo.getDiscarded(name)
@@ -127,6 +211,12 @@ export function registerChangesReadRoutes(app: FastifyInstance): void {
 
   app.get(
     '/changes/:name/artifacts',
+    {
+      ...apiRouteSchema({
+        params: PARAMS_CHANGE_NAME,
+        response: { 200: 'ArtifactListDto' },
+      }),
+    },
     apiHandler(async (ctx, req) => {
       const { name } = req.params as { name: string }
       const change = await ctx.kernel.changes.repo.get(name)
@@ -139,6 +229,12 @@ export function registerChangesReadRoutes(app: FastifyInstance): void {
 
   app.get(
     '/drafts/:name/artifacts/:filename',
+    {
+      ...apiRouteSchema({
+        params: PARAMS_CHANGE_NAME_FILENAME,
+        response: { 200: 'ArtifactContentDto' },
+      }),
+    },
     apiHandler(async (ctx, req) => {
       const { name, filename } = req.params as { name: string; filename: string }
       const result = await ctx.kernel.changes.getReadOnlyChangeArtifact.execute({
@@ -152,6 +248,12 @@ export function registerChangesReadRoutes(app: FastifyInstance): void {
 
   app.get(
     '/discarded/:name/artifacts/:filename',
+    {
+      ...apiRouteSchema({
+        params: PARAMS_CHANGE_NAME_FILENAME,
+        response: { 200: 'ArtifactContentDto' },
+      }),
+    },
     apiHandler(async (ctx, req) => {
       const { name, filename } = req.params as { name: string; filename: string }
       const result = await ctx.kernel.changes.getReadOnlyChangeArtifact.execute({
@@ -165,6 +267,12 @@ export function registerChangesReadRoutes(app: FastifyInstance): void {
 
   app.get(
     '/changes/:name/artifacts/:filename',
+    {
+      ...apiRouteSchema({
+        params: PARAMS_CHANGE_NAME_FILENAME,
+        response: { 200: 'ArtifactContentDto' },
+      }),
+    },
     apiHandler(async (ctx, req) => {
       const { name, filename } = req.params as { name: string; filename: string }
       const result = await ctx.kernel.changes.getArtifact.execute({ name, filename })
@@ -174,6 +282,13 @@ export function registerChangesReadRoutes(app: FastifyInstance): void {
 
   app.get(
     '/changes/:name/context',
+    {
+      ...apiRouteSchema({
+        params: PARAMS_CHANGE_NAME,
+        querystring: COMPILE_CONTEXT_QUERY,
+        response: { 200: 'CompiledContextDto' },
+      }),
+    },
     apiHandler(async (ctx, req) => {
       const { name } = req.params as { name: string }
       const change = await ctx.kernel.changes.repo.get(name)
@@ -208,12 +323,21 @@ export function registerChangesReadRoutes(app: FastifyInstance): void {
 
   app.get(
     '/changes/:name/preview',
+    {
+      ...apiRouteSchema({
+        params: PARAMS_CHANGE_NAME,
+        querystring: {
+          ...strictObjectSchema({
+            required: ['specId'],
+            properties: { specId: NON_EMPTY_STRING_SCHEMA },
+          }),
+        },
+        response: { 200: 'PreviewResultDto' },
+      }),
+    },
     apiHandler(async (ctx, req) => {
       const { name } = req.params as { name: string }
-      const query = req.query as { specId?: string }
-      if (query.specId === undefined) {
-        throw new Error('specId query parameter is required')
-      }
+      const query = req.query as { specId: string }
       const result = await ctx.kernel.changes.preview.execute({ name, specId: query.specId })
       return {
         specId: query.specId,
@@ -228,14 +352,18 @@ export function registerChangesReadRoutes(app: FastifyInstance): void {
 
   app.post(
     '/changes/:name/preview',
+    {
+      ...apiRouteSchema({
+        params: PARAMS_CHANGE_NAME,
+        body: 'PreviewChangeBody',
+        response: { 200: 'PreviewResultDto' },
+      }),
+    },
     apiHandler(async (ctx, req) => {
       const { name } = req.params as { name: string }
       const body = req.body as {
-        specId?: string
+        specId: string
         artifactOverrides?: Record<string, string>
-      }
-      if (body.specId === undefined) {
-        throw new Error('specId is required in request body')
       }
       const result = await ctx.kernel.changes.preview.execute({
         name,
@@ -257,6 +385,13 @@ export function registerChangesReadRoutes(app: FastifyInstance): void {
 
   app.post(
     '/changes/:name/artifacts/:filename/outline',
+    {
+      ...apiRouteSchema({
+        params: PARAMS_CHANGE_NAME_FILENAME,
+        body: 'OutlineArtifactBody',
+        response: { 200: 'OutlineEntryList' },
+      }),
+    },
     apiHandler(async (ctx, req) => {
       const { name, filename } = req.params as { name: string; filename: string }
       const body = (req.body ?? {}) as { content?: string }
@@ -270,6 +405,12 @@ export function registerChangesReadRoutes(app: FastifyInstance): void {
 
   app.get(
     '/changes/:name/implementation-review',
+    {
+      ...apiRouteSchema({
+        params: PARAMS_CHANGE_NAME,
+        response: { 200: 'ImplementationReviewDto' },
+      }),
+    },
     apiHandler(async (ctx, req) => {
       const { name } = req.params as { name: string }
       const result = await ctx.kernel.changes.getImplementationReview.execute({ name })
@@ -279,6 +420,20 @@ export function registerChangesReadRoutes(app: FastifyInstance): void {
 
   app.get(
     '/changes/:name/hook-instructions',
+    {
+      ...apiRouteSchema({
+        params: PARAMS_CHANGE_NAME,
+        querystring: {
+          ...strictObjectSchema({
+            properties: {
+              step: CHANGE_STATE_QUERY_SCHEMA,
+              phase: { type: 'string', enum: ['pre', 'post'] },
+            },
+          }),
+        },
+        response: { 200: 'HookInstructionsDto' },
+      }),
+    },
     apiHandler(async (ctx, req) => {
       const { name } = req.params as { name: string }
       const query = req.query as { step?: string; phase?: string }
@@ -292,6 +447,12 @@ export function registerChangesReadRoutes(app: FastifyInstance): void {
 
   app.get(
     '/changes/:name/artifacts/:artifactId/instruction',
+    {
+      ...apiRouteSchema({
+        params: PARAMS_CHANGE_NAME_ARTIFACT_ID,
+        response: { 200: 'ArtifactInstructionDto' },
+      }),
+    },
     apiHandler(async (ctx, req) => {
       const { name, artifactId } = req.params as { name: string; artifactId: string }
       return ctx.kernel.changes.getArtifactInstruction.execute({ name, artifactId })

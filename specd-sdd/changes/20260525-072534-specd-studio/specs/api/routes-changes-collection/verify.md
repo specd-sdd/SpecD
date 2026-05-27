@@ -49,6 +49,21 @@
 - **THEN** HTTP status is 2xx
 - **AND** JSON body matches the documented DTO or envelope
 
+### Requirement: POST changes separates request validation from schema preconditions
+
+#### Scenario: Invalid request shape fails before schema lookup
+
+- **WHEN** `POST /v1/changes` omits required request fields
+- **THEN** HTTP 400 `application/problem+json` is returned
+- **AND** the handler does not create a change
+
+#### Scenario: Raw active schema blocks creation as business precondition
+
+- **GIVEN** the active schema resolves only to a raw reference
+- **WHEN** client sends an otherwise valid `POST /v1/changes`
+- **THEN** change creation is rejected after request validation
+- **AND** the failure is reported as a schema precondition, not as an input-shape validation error
+
 #### Scenario: Undocumented path returns 404
 
 - **WHEN** client requests a URL outside this routes contract
@@ -78,14 +93,14 @@
 
 ### Requirement: archived-changes list returns name and archivedName pairs
 
-#### Scenario: archived-changes list returns name and archiv… — primary path
+#### Scenario: GET archived-changes returns both identifiers
 
-- **WHEN** GET /v1/archived-changes MUST return a JSON array of
-- **THEN** behaviour matches the spec requirement
-- **AND** no forbidden side effects occur
+- **WHEN** client calls `GET /v1/archived-changes`
+- **THEN** each array element includes `name` and `archivedName`
+- **AND** Studio can render archive rows without an additional lookup
 
-#### Scenario: archived-changes list returns name and archiv… — guard path
+#### Scenario: Empty archive returns an empty list
 
-- **GIVEN** inputs that stress the requirement boundary
-- **WHEN** the same capability runs
-- **THEN** errors or skips are explicit and documented
+- **WHEN** there are no archived changes
+- **THEN** HTTP 200 is returned with `[]`
+- **AND** no synthetic placeholder rows are added

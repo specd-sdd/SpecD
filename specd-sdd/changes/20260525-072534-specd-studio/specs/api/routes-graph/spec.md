@@ -18,6 +18,12 @@ Authoritative HTTP contract (methods, paths, query, bodies, status codes) for **
 
 `GET /v1/graph/search`, `/graph/impact`, and `/graph/hotspots` MUST accept the same query parameters as the CLI graph commands and return presenter-mapped DTOs.
 
+### Requirement: graph-route inputs are schema-validated
+
+Every `params`, `query`, and `body` shape accepted by this route group MUST be declared in Fastify route schema and validated before handler logic runs.
+
+Search queries MUST require `q`. Impact queries MUST require exactly one of `symbol` or `file`, and `direction` / `depth` MUST reject values outside the documented contract. Invalid input MUST return HTTP 400 with `application/problem+json` and code `INVALID_REQUEST`.
+
 ### Requirement: spec and change linkage endpoints compose graph with spec scope
 
 `GET /v1/graph/specs/{workspace}/{path}` and `/graph/changes/{name}` MUST return linkage views composed from graph provider plus spec/change scope.

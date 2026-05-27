@@ -14,8 +14,8 @@ describe('Graph API', () => {
   })
 
   it('given missing q, when GET /graph/search, then returns problem+json', async () => {
-    const body = await expectProblem('/graph/search', undefined, 500)
-    expect(body.code).toBe('INTERNAL_ERROR')
+    const body = await expectProblem('/graph/search', undefined, 400)
+    expect(body.code).toBe('INVALID_REQUEST')
   })
 
   it('given a query, when GET /graph/search, then returns symbol and spec hits', async () => {
@@ -28,8 +28,17 @@ describe('Graph API', () => {
   })
 
   it('given missing symbol and file, when GET /graph/impact, then returns problem+json', async () => {
-    const body = await expectProblem('/graph/impact', undefined, 500)
-    expect(body.code).toBe('INTERNAL_ERROR')
+    const body = await expectProblem('/graph/impact', undefined, 400)
+    expect(body.code).toBe('INVALID_REQUEST')
+  })
+
+  it('given invalid direction, when GET /graph/impact, then returns problem+json', async () => {
+    const body = await expectProblem(
+      '/graph/impact?symbol=core:test&direction=sideways',
+      undefined,
+      400,
+    )
+    expect(body.code).toBe('INVALID_REQUEST')
   })
 
   it('given a symbol query, when GET /graph/impact, then returns impact DTO', async () => {

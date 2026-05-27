@@ -4,6 +4,12 @@ import { type ApiContext } from '../../../composition/create-api-context.js'
 import { apiHandler } from '../handler-utils.js'
 import { toSpecDetailDto, toSpecSummaryDto } from '../presenters/presenter-spec.js'
 import { toArtifactContentDto } from '../presenters/presenter-artifact.js'
+import {
+  apiRouteSchema,
+  NON_EMPTY_STRING_SCHEMA,
+  PARAMS_WORKSPACE_WILDCARD,
+  strictObjectSchema,
+} from '../route-schema.js'
 
 async function handleWorkspaceSpecWildcard(ctx: ApiContext, req: FastifyRequest): Promise<unknown> {
   const { ws } = req.params as { ws: string }
@@ -106,21 +112,55 @@ async function handleWorkspaceSpecWildcard(ctx: ApiContext, req: FastifyRequest)
   )
 }
 
+const WORKSPACE_SPEC_WILDCARD_SCHEMA = {
+  ...apiRouteSchema({
+    params: PARAMS_WORKSPACE_WILDCARD,
+    response: { 200: 'JsonObjectDto' },
+  }),
+}
+
+const WORKSPACE_SPEC_WILDCARD_POST_SCHEMA = {
+  ...apiRouteSchema({
+    params: PARAMS_WORKSPACE_WILDCARD,
+    body: 'SpecMetadataBody',
+    response: { 200: 'JsonObjectDto' },
+  }),
+}
+
 /**
  * Registers workspace spec read routes.
  * @param app
  */
 export function registerSpecsReadRoutes(app: FastifyInstance): void {
-  app.get('/workspaces/:ws/specs/*', apiHandler(handleWorkspaceSpecWildcard))
-  app.post('/workspaces/:ws/specs/*', apiHandler(handleWorkspaceSpecWildcard))
+  app.get(
+    '/workspaces/:ws/specs/*',
+    WORKSPACE_SPEC_WILDCARD_SCHEMA,
+    apiHandler(handleWorkspaceSpecWildcard),
+  )
+  app.post(
+    '/workspaces/:ws/specs/*',
+    WORKSPACE_SPEC_WILDCARD_POST_SCHEMA,
+    apiHandler(handleWorkspaceSpecWildcard),
+  )
 
   app.get(
     '/specs/search',
+    {
+      ...apiRouteSchema({
+        querystring: {
+          ...strictObjectSchema({
+            required: ['q'],
+            properties: {
+              q: NON_EMPTY_STRING_SCHEMA,
+              workspace: NON_EMPTY_STRING_SCHEMA,
+            },
+          }),
+        },
+        response: { 200: 'SpecSummaryList' },
+      }),
+    },
     apiHandler(async (ctx, req) => {
-      const query = req.query as { q?: string; workspace?: string }
-      if (query.q === undefined) {
-        throw new Error('q query parameter is required')
-      }
+      const query = req.query as { q: string; workspace?: string }
       const results = await ctx.kernel.specs.search.execute(
         query.q,
         query.workspace !== undefined ? { workspaces: [query.workspace] } : undefined,

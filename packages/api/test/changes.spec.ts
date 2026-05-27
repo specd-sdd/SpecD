@@ -63,9 +63,9 @@ describe('Changes API', () => {
       const body = await expectProblem(
         '/changes',
         { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' },
-        500,
+        400,
       )
-      expect(body.code).toBe('INTERNAL_ERROR')
+      expect(body.code).toBe('INVALID_REQUEST')
     })
   })
 
@@ -154,9 +154,9 @@ describe('Changes API', () => {
       const body = await expectProblem(
         `/changes/${encodeURIComponent(activeChangeName)}/preview`,
         undefined,
-        500,
+        400,
       )
-      expect(body.code).toBe('INTERNAL_ERROR')
+      expect(body.code).toBe('INVALID_REQUEST')
     })
 
     it('given missing specId in body, when POST /changes/:name/preview, then returns problem+json', async () => {
@@ -171,9 +171,9 @@ describe('Changes API', () => {
           headers: { 'content-type': 'application/json' },
           body: '{}',
         },
-        500,
+        400,
       )
-      expect(body.code).toBe('INTERNAL_ERROR')
+      expect(body.code).toBe('INVALID_REQUEST')
     })
 
     it('given an active change with spec deltas, when POST preview with artifactOverrides, then merged reflects draft', async () => {
@@ -266,9 +266,9 @@ describe('Changes API', () => {
       const body = await expectProblem(
         `/changes/${encodeURIComponent(activeChangeName)}/artifacts/spec.md`,
         { method: 'PUT', headers: { 'content-type': 'application/json' }, body: '{}' },
-        500,
+        400,
       )
-      expect(body.code).toBe('INTERNAL_ERROR')
+      expect(body.code).toBe('INVALID_REQUEST')
     })
 
     it('given missing to, when POST /changes/:name/transition, then returns problem+json', async () => {
@@ -279,9 +279,43 @@ describe('Changes API', () => {
       const body = await expectProblem(
         `/changes/${encodeURIComponent(activeChangeName)}/transition`,
         { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' },
-        500,
+        400,
       )
-      expect(body.code).toBe('INTERNAL_ERROR')
+      expect(body.code).toBe('INVALID_REQUEST')
+    })
+
+    it('given invalid transition target, when POST /changes/:name/transition, then returns problem+json', async () => {
+      const { activeChangeName } = await loadProjectSamples()
+      if (activeChangeName === null) {
+        return
+      }
+      const body = await expectProblem(
+        `/changes/${encodeURIComponent(activeChangeName)}/transition`,
+        {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ to: 'ship-it' }),
+        },
+        400,
+      )
+      expect(body.code).toBe('INVALID_REQUEST')
+    })
+
+    it('given missing artifactId, when POST /changes/:name/skip-artifact, then returns problem+json', async () => {
+      const { activeChangeName } = await loadProjectSamples()
+      if (activeChangeName === null) {
+        return
+      }
+      const body = await expectProblem(
+        `/changes/${encodeURIComponent(activeChangeName)}/skip-artifact`,
+        {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: '{}',
+        },
+        400,
+      )
+      expect(body.code).toBe('INVALID_REQUEST')
     })
 
     it('given ephemeral change, when POST validate-all, then returns batch DTO', async () => {

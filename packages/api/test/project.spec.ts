@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { apiJson } from './helpers/http-client.js'
+import { apiJson, expectProblem } from './helpers/http-client.js'
 
 describe('Project API', () => {
   it('given api server, when GET /project, then returns project metadata', async () => {
@@ -30,6 +30,11 @@ describe('Project API', () => {
     expect(res.ok).toBe(true)
     expect(typeof data.content).toBe('string')
     expect(Array.isArray(data.warnings)).toBe(true)
+  })
+
+  it('given malformed depth, when GET /project/context, then returns problem+json', async () => {
+    const body = await expectProblem('/project/context?depth=zero', undefined, 400)
+    expect(body.code).toBe('INVALID_REQUEST')
   })
 
   it('given api server, when GET /project/schema, then returns schema info', async () => {

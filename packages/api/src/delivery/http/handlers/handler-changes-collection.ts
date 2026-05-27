@@ -1,6 +1,7 @@
 import { type FastifyInstance } from 'fastify'
 import { apiHandler } from '../handler-utils.js'
 import { toChangeSummaryDto } from '../presenters/presenter-change.js'
+import { apiRouteSchema } from '../route-schema.js'
 
 /**
  * Registers `/v1/changes`, `/drafts`, `/discarded`, `/archived-changes` collection routes.
@@ -9,6 +10,7 @@ import { toChangeSummaryDto } from '../presenters/presenter-change.js'
 export function registerChangesCollectionRoutes(app: FastifyInstance): void {
   app.get(
     '/changes',
+    { ...apiRouteSchema({ response: { 200: 'ChangeSummaryList' } }) },
     apiHandler(async (ctx) => {
       const changes = await ctx.kernel.changes.list.execute()
       return changes.map((c) => toChangeSummaryDto(c))
@@ -17,6 +19,7 @@ export function registerChangesCollectionRoutes(app: FastifyInstance): void {
 
   app.get(
     '/drafts',
+    { ...apiRouteSchema({ response: { 200: 'ChangeSummaryList' } }) },
     apiHandler(async (ctx) => {
       const changes = await ctx.kernel.changes.listDrafts.execute()
       return changes.map((c) => toChangeSummaryDto(c))
@@ -25,6 +28,7 @@ export function registerChangesCollectionRoutes(app: FastifyInstance): void {
 
   app.get(
     '/discarded',
+    { ...apiRouteSchema({ response: { 200: 'ChangeSummaryList' } }) },
     apiHandler(async (ctx) => {
       const changes = await ctx.kernel.changes.listDiscarded.execute()
       return changes.map((c) => toChangeSummaryDto(c))
@@ -33,6 +37,7 @@ export function registerChangesCollectionRoutes(app: FastifyInstance): void {
 
   app.get(
     '/archived-changes',
+    { ...apiRouteSchema({ response: { 200: 'ArchivedChangeList' } }) },
     apiHandler(async (ctx) => {
       const archived = await ctx.kernel.changes.listArchived.execute()
       return archived.map((change) => ({
@@ -44,6 +49,12 @@ export function registerChangesCollectionRoutes(app: FastifyInstance): void {
 
   app.post(
     '/changes',
+    {
+      ...apiRouteSchema({
+        body: 'CreateChangeBody',
+        response: { 200: 'ChangeSummaryDto' },
+      }),
+    },
     apiHandler(async (ctx, req) => {
       const body = (req.body ?? {}) as {
         name?: string
@@ -81,6 +92,7 @@ export function registerChangesCollectionRoutes(app: FastifyInstance): void {
 
   app.get(
     '/changes/overlaps',
+    { ...apiRouteSchema({ response: { 200: 'ChangeOverlapsDto' } }) },
     apiHandler(async (ctx) => {
       const overlaps = await ctx.kernel.changes.detectOverlap.execute()
       return overlaps

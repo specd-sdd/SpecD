@@ -6,13 +6,15 @@ SpecD Studio capability **Openapi Docs Route** (`api:openapi-docs-route`). Expos
 
 ## Requirements
 
-### Requirement: openapi.json is served at a stable path
+### Requirement: openapi.json is served at a documented path
 
-`GET /openapi.json` MUST return the generated OpenAPI 3.1 document.
+The API MUST expose an HTTP `GET` endpoint that returns the generated **OpenAPI 3.1** document as JSON.
 
-### Requirement: interactive docs are environment-gated
+The path MUST be documented in repository docs (for example `docs/api/openapi.md`) and MAY change between releases.
 
-`GET /docs` (Swagger UI) MUST be disabled by default in production or protected by deployment configuration.
+### Requirement: OpenAPI docs UI is optional
+
+The server MAY expose an interactive documentation UI (e.g. Swagger UI), but it is not required for Studio v1.
 
 ## Constraints
 

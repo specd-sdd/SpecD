@@ -2,11 +2,11 @@
 
 ## Requirements
 
-### Requirement: OpenAPI reflects route and DTO specs
+### Requirement: OpenAPI is generated from Fastify route schemas
 
 #### Scenario: Each routes spec path appears in OpenAPI
 
-- **WHEN** generator runs against studio route specs
+- **WHEN** OpenAPI is generated from the mounted Fastify routes
 - **THEN** documented HTTP methods exist
 - **AND** request/response schemas reference DTO specs
 
@@ -19,7 +19,7 @@
 
 #### Scenario: Undocumented handler routes are absent
 
-- **WHEN** OpenAPI is compared to mounted router
+- **WHEN** generated OpenAPI is compared to the mounted router
 - **THEN** no orphan paths in doc
 - **AND** no orphan paths only in code
 

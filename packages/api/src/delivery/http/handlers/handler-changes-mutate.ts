@@ -10,6 +10,20 @@ import { apiHandler } from '../handler-utils.js'
 import { toChangeDetailDto } from '../presenters/presenter-change.js'
 import { toSaveArtifactContentDto } from '../presenters/presenter-artifact.js'
 import { type ValidateBatchResultDto } from '../dto/validate-batch-result.js'
+import {
+  apiRouteSchema,
+  NON_EMPTY_STRING_SCHEMA,
+  PARAMS_CHANGE_NAME,
+  PARAMS_CHANGE_NAME_FILENAME,
+  strictObjectSchema,
+} from '../route-schema.js'
+
+const VALIDATE_QUERY = strictObjectSchema({
+  properties: {
+    specId: NON_EMPTY_STRING_SCHEMA,
+    artifactId: NON_EMPTY_STRING_SCHEMA,
+  },
+})
 
 /**
  * Registers mutating change routes under `/v1`.
@@ -18,15 +32,19 @@ import { type ValidateBatchResultDto } from '../dto/validate-batch-result.js'
 export function registerChangesMutateRoutes(app: FastifyInstance): void {
   app.put(
     '/changes/:name/artifacts/:filename',
+    {
+      ...apiRouteSchema({
+        params: PARAMS_CHANGE_NAME_FILENAME,
+        body: 'SaveArtifactBody',
+        response: { 200: 'ArtifactContentDto' },
+      }),
+    },
     apiHandler(async (ctx, req) => {
       const { name, filename } = req.params as { name: string; filename: string }
       const body = (req.body ?? {}) as {
-        content?: string
+        content: string
         originalHash?: string
         force?: boolean
-      }
-      if (typeof body.content !== 'string') {
-        throw new Error('content is required')
       }
       const actor = await ctx.actor.identity()
       const result = await ctx.kernel.changes.saveArtifact.execute({
@@ -43,18 +61,24 @@ export function registerChangesMutateRoutes(app: FastifyInstance): void {
 
   app.post(
     '/changes/:name/validate',
+    {
+      ...apiRouteSchema({
+        params: PARAMS_CHANGE_NAME,
+        body: 'ValidateChangeBody',
+        querystring: VALIDATE_QUERY,
+        response: { 200: 'ValidateResultDto' },
+      }),
+    },
     apiHandler(async (ctx, req) => {
       const { name } = req.params as { name: string }
       const body = (req.body ?? {}) as { specId?: string; artifactId?: string }
       const query = req.query as { specId?: string; artifactId?: string }
+      const specId = body.specId ?? query.specId
+      const artifactId = body.artifactId ?? query.artifactId
       const result = await ctx.kernel.changes.validate.execute({
         name,
-        ...((body.specId ?? query.specId !== undefined)
-          ? { specPath: body.specId ?? query.specId }
-          : {}),
-        ...((body.artifactId ?? query.artifactId !== undefined)
-          ? { artifactId: body.artifactId ?? query.artifactId }
-          : {}),
+        ...(specId !== undefined ? { specPath: specId } : {}),
+        ...(artifactId !== undefined ? { artifactId } : {}),
       })
       return {
         passed: result.passed,
@@ -71,6 +95,18 @@ export function registerChangesMutateRoutes(app: FastifyInstance): void {
 
   app.post(
     '/changes/:name/validate-all',
+    {
+      ...apiRouteSchema({
+        params: PARAMS_CHANGE_NAME,
+        body: 'ValidateBatchBody',
+        querystring: {
+          ...strictObjectSchema({
+            properties: { artifactId: NON_EMPTY_STRING_SCHEMA },
+          }),
+        },
+        response: { 200: 'ValidateBatchResultDto' },
+      }),
+    },
     apiHandler(async (ctx, req) => {
       const { name } = req.params as { name: string }
       const body = (req.body ?? {}) as { artifactId?: string }
@@ -86,12 +122,16 @@ export function registerChangesMutateRoutes(app: FastifyInstance): void {
 
   app.post(
     '/changes/:name/transition',
+    {
+      ...apiRouteSchema({
+        params: PARAMS_CHANGE_NAME,
+        body: 'TransitionChangeBody',
+        response: { 200: 'ChangeDetailDto' },
+      }),
+    },
     apiHandler(async (ctx, req) => {
       const { name } = req.params as { name: string }
       const body = (req.body ?? {}) as { to?: string; skipHookPhases?: string[] }
-      if (typeof body.to !== 'string') {
-        throw new Error('to is required')
-      }
       const result = await ctx.kernel.changes.transition.execute({
         name,
         to: body.to as import('@specd/core').ChangeState,
@@ -111,14 +151,33 @@ export function registerChangesMutateRoutes(app: FastifyInstance): void {
 
   app.post(
     '/changes/:name/draft',
+    {
+      ...apiRouteSchema({
+        params: PARAMS_CHANGE_NAME,
+        response: { 200: 'ChangeDetailDto' },
+      }),
+    },
     mutateSimple((k, n) => k.changes.draft.execute({ name: n })),
   )
   app.post(
     '/changes/:name/restore',
+    {
+      ...apiRouteSchema({
+        params: PARAMS_CHANGE_NAME,
+        response: { 200: 'ChangeDetailDto' },
+      }),
+    },
     mutateSimple((k, n) => k.changes.restore.execute({ name: n })),
   )
   app.post(
     '/changes/:name/discard',
+    {
+      ...apiRouteSchema({
+        params: PARAMS_CHANGE_NAME,
+        body: 'ReasonBody',
+        response: { 200: 'ChangeDetailDto' },
+      }),
+    },
     apiHandler(async (ctx, req) => {
       const { name } = req.params as { name: string }
       const body = (req.body ?? {}) as { reason?: string }
@@ -131,6 +190,12 @@ export function registerChangesMutateRoutes(app: FastifyInstance): void {
   )
   app.post(
     '/changes/:name/archive',
+    {
+      ...apiRouteSchema({
+        params: PARAMS_CHANGE_NAME,
+        response: { 200: 'ArchiveChangeResultDto' },
+      }),
+    },
     apiHandler(async (ctx, req) => {
       const { name } = req.params as { name: string }
       const result = await ctx.kernel.changes.archive.execute({ name })
@@ -144,6 +209,13 @@ export function registerChangesMutateRoutes(app: FastifyInstance): void {
 
   app.post(
     '/changes/:name/approve-spec',
+    {
+      ...apiRouteSchema({
+        params: PARAMS_CHANGE_NAME,
+        body: 'ReasonBody',
+        response: { 200: 'ChangeDetailDto' },
+      }),
+    },
     apiHandler(async (ctx, req) => {
       const { name } = req.params as { name: string }
       const body = (req.body ?? {}) as { reason?: string }
@@ -158,6 +230,13 @@ export function registerChangesMutateRoutes(app: FastifyInstance): void {
 
   app.post(
     '/changes/:name/approve-signoff',
+    {
+      ...apiRouteSchema({
+        params: PARAMS_CHANGE_NAME,
+        body: 'ReasonBody',
+        response: { 200: 'ChangeDetailDto' },
+      }),
+    },
     apiHandler(async (ctx, req) => {
       const { name } = req.params as { name: string }
       const body = (req.body ?? {}) as { reason?: string }
@@ -172,6 +251,13 @@ export function registerChangesMutateRoutes(app: FastifyInstance): void {
 
   app.post(
     '/changes/:name/invalidate',
+    {
+      ...apiRouteSchema({
+        params: PARAMS_CHANGE_NAME,
+        body: 'InvalidateBody',
+        response: { 200: 'ChangeDetailDto' },
+      }),
+    },
     apiHandler(async (ctx, req) => {
       const { name } = req.params as { name: string }
       const body = (req.body ?? {}) as { reason?: string; force?: boolean }
@@ -186,12 +272,19 @@ export function registerChangesMutateRoutes(app: FastifyInstance): void {
 
   app.post(
     '/changes/:name/skip-artifact',
+    {
+      ...apiRouteSchema({
+        params: PARAMS_CHANGE_NAME,
+        body: 'SkipArtifactBody',
+        response: { 200: 'ChangeDetailDto' },
+      }),
+    },
     apiHandler(async (ctx, req) => {
       const { name } = req.params as { name: string }
-      const body = (req.body ?? {}) as { artifactId?: string }
+      const body = (req.body ?? {}) as { artifactId: string }
       const change = await ctx.kernel.changes.skipArtifact.execute({
         name,
-        artifactId: body.artifactId ?? '',
+        artifactId: body.artifactId,
       })
       return toChangeDetailDto(change)
     }),
@@ -199,6 +292,13 @@ export function registerChangesMutateRoutes(app: FastifyInstance): void {
 
   app.patch(
     '/changes/:name',
+    {
+      ...apiRouteSchema({
+        params: PARAMS_CHANGE_NAME,
+        body: 'PatchChangeBody',
+        response: { 200: 'ChangeDetailDto' },
+      }),
+    },
     apiHandler(async (ctx, req) => {
       const { name } = req.params as { name: string }
       const body = (req.body ?? {}) as {
@@ -225,6 +325,13 @@ export function registerChangesMutateRoutes(app: FastifyInstance): void {
 
   app.patch(
     '/changes/:name/spec-ids',
+    {
+      ...apiRouteSchema({
+        params: PARAMS_CHANGE_NAME,
+        body: 'PatchSpecIdsBody',
+        response: { 200: 'ChangeDetailDto' },
+      }),
+    },
     apiHandler(async (ctx, req) => {
       const { name } = req.params as { name: string }
       const body = (req.body ?? {}) as { add?: string[]; remove?: string[] }
@@ -239,6 +346,13 @@ export function registerChangesMutateRoutes(app: FastifyInstance): void {
 
   app.patch(
     '/changes/:name/spec-dependencies',
+    {
+      ...apiRouteSchema({
+        params: PARAMS_CHANGE_NAME,
+        body: 'PatchSpecDependenciesBody',
+        response: { 200: 'UpdateSpecDepsResultDto' },
+      }),
+    },
     apiHandler(async (ctx, req) => {
       const { name } = req.params as { name: string }
       const body = (req.body ?? {}) as {
@@ -247,12 +361,9 @@ export function registerChangesMutateRoutes(app: FastifyInstance): void {
         remove?: string[]
         set?: string[]
       }
-      if (body.specId === undefined) {
-        throw new Error('specId is required')
-      }
       const result = await ctx.kernel.changes.updateSpecDeps.execute({
         name,
-        specId: body.specId,
+        specId: body.specId!,
         ...(body.add !== undefined ? { add: body.add } : {}),
         ...(body.remove !== undefined ? { remove: body.remove } : {}),
         ...(body.set !== undefined ? { set: body.set } : {}),
@@ -263,6 +374,13 @@ export function registerChangesMutateRoutes(app: FastifyInstance): void {
 
   app.patch(
     '/changes/:name/implementation-tracking',
+    {
+      ...apiRouteSchema({
+        params: PARAMS_CHANGE_NAME,
+        body: 'UpdateImplementationTrackingBody',
+        response: { 200: 'JsonObjectDto' },
+      }),
+    },
     apiHandler(async (ctx, req) => {
       const { name } = req.params as { name: string }
       const body = req.body as Record<string, unknown>
@@ -275,10 +393,6 @@ export function registerChangesMutateRoutes(app: FastifyInstance): void {
   )
 }
 
-/**
- *
- * @param run
- */
 /**
  * Maps a core batch validation result to the HTTP DTO.
  *

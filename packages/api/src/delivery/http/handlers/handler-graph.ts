@@ -8,6 +8,17 @@ import {
   toGraphSearchResultDto,
   toGraphStatusDto,
 } from '../presenters/presenter-graph.js'
+import {
+  apiRouteSchema,
+  BOOLEAN_QUERY_SCHEMA,
+  GRAPH_RISK_QUERY_SCHEMA,
+  IMPACT_DIRECTION_QUERY_SCHEMA,
+  PARAMS_CHANGE_NAME,
+  PARAMS_GRAPH_WORKSPACE_WILDCARD,
+  POSITIVE_INTEGER_QUERY_SCHEMA,
+  NON_EMPTY_STRING_SCHEMA,
+  strictObjectSchema,
+} from '../route-schema.js'
 
 /**
  * Registers code graph routes under `/v1`.
@@ -16,6 +27,7 @@ import {
 export function registerGraphRoutes(app: FastifyInstance): void {
   app.get(
     '/graph/status',
+    { ...apiRouteSchema({ response: { 200: 'GraphStatusDto' } }) },
     apiHandler(async (ctx) => {
       const provider = ctx.createGraphProvider()
       await provider.open()
@@ -30,6 +42,12 @@ export function registerGraphRoutes(app: FastifyInstance): void {
 
   app.post(
     '/graph/index',
+    {
+      ...apiRouteSchema({
+        body: 'GraphIndexBody',
+        response: { 200: 'GraphIndexResultDto' },
+      }),
+    },
     apiHandler(async (ctx, req) => {
       const body = (req.body ?? {}) as { workspaces?: string[] }
       const provider = ctx.createGraphProvider()
@@ -50,16 +68,30 @@ export function registerGraphRoutes(app: FastifyInstance): void {
 
   app.get(
     '/graph/search',
+    {
+      ...apiRouteSchema({
+        querystring: {
+          ...strictObjectSchema({
+            required: ['q'],
+            properties: {
+              q: NON_EMPTY_STRING_SCHEMA,
+              symbols: BOOLEAN_QUERY_SCHEMA,
+              specs: BOOLEAN_QUERY_SCHEMA,
+              limit: POSITIVE_INTEGER_QUERY_SCHEMA,
+              workspace: NON_EMPTY_STRING_SCHEMA,
+            },
+          }),
+        },
+        response: { 200: 'GraphSearchResultDto' },
+      }),
+    },
     apiHandler(async (ctx, req) => {
       const query = req.query as {
-        q?: string
+        q: string
         symbols?: string
         specs?: string
         limit?: string
         workspace?: string
-      }
-      if (query.q === undefined) {
-        throw new Error('q is required')
       }
       const provider = ctx.createGraphProvider()
       await provider.open()
@@ -72,9 +104,7 @@ export function registerGraphRoutes(app: FastifyInstance): void {
         }
         const symbolsOnly = query.symbols === 'true'
         const specsOnly = query.specs === 'true'
-        const symbols = symbolsOnly || !specsOnly
-          ? await provider.searchSymbols(searchOpts)
-          : []
+        const symbols = symbolsOnly || !specsOnly ? await provider.searchSymbols(searchOpts) : []
         const specs = specsOnly || !symbolsOnly ? await provider.searchSpecs(searchOpts) : []
         return toGraphSearchResultDto(symbols, specs)
       } finally {
@@ -85,6 +115,22 @@ export function registerGraphRoutes(app: FastifyInstance): void {
 
   app.get(
     '/graph/impact',
+    {
+      ...apiRouteSchema({
+        querystring: {
+          ...strictObjectSchema({
+            properties: {
+              symbol: NON_EMPTY_STRING_SCHEMA,
+              file: NON_EMPTY_STRING_SCHEMA,
+              direction: IMPACT_DIRECTION_QUERY_SCHEMA,
+              depth: POSITIVE_INTEGER_QUERY_SCHEMA,
+            },
+            oneOf: [{ required: ['symbol'] }, { required: ['file'] }],
+          }),
+        },
+        response: { 200: 'GraphImpactDto' },
+      }),
+    },
     apiHandler(async (ctx, req) => {
       const query = req.query as {
         symbol?: string
@@ -92,10 +138,12 @@ export function registerGraphRoutes(app: FastifyInstance): void {
         direction?: string
         depth?: string
       }
-      const direction = (query.direction ?? 'dependents') as
-        | 'upstream'
-        | 'downstream'
-        | 'both'
+      const direction =
+        query.direction === 'dependencies'
+          ? 'upstream'
+          : query.direction === 'dependents' || query.direction === undefined
+            ? 'downstream'
+            : (query.direction as 'upstream' | 'downstream' | 'both')
       const maxDepth = query.depth !== undefined ? Number(query.depth) : 3
       const provider = ctx.createGraphProvider()
       await provider.open()
@@ -123,7 +171,7 @@ export function registerGraphRoutes(app: FastifyInstance): void {
             impact.affectedFiles.map((p) => ({ path: p, risk: impact.riskLevel })),
           )
         }
-        throw new Error('symbol or file query parameter is required')
+        throw new Error('Invalid graph impact request')
       } finally {
         await provider.close()
       }
@@ -132,6 +180,19 @@ export function registerGraphRoutes(app: FastifyInstance): void {
 
   app.get(
     '/graph/hotspots',
+    {
+      ...apiRouteSchema({
+        querystring: {
+          ...strictObjectSchema({
+            properties: {
+              minRisk: GRAPH_RISK_QUERY_SCHEMA,
+              limit: POSITIVE_INTEGER_QUERY_SCHEMA,
+            },
+          }),
+        },
+        response: { 200: 'GraphHotspotsResultDto' },
+      }),
+    },
     apiHandler(async (ctx, req) => {
       const query = req.query as { minRisk?: string; limit?: string }
       const provider = ctx.createGraphProvider()
@@ -152,6 +213,12 @@ export function registerGraphRoutes(app: FastifyInstance): void {
 
   app.get(
     '/graph/specs/:workspace/*',
+    {
+      ...apiRouteSchema({
+        params: PARAMS_GRAPH_WORKSPACE_WILDCARD,
+        response: { 200: 'GraphSpecCoverageDto' },
+      }),
+    },
     apiHandler(async (ctx, req) => {
       const { workspace } = req.params as { workspace: string }
       const path = (req.params as { '*': string })['*']
@@ -174,6 +241,12 @@ export function registerGraphRoutes(app: FastifyInstance): void {
 
   app.get(
     '/graph/changes/:name',
+    {
+      ...apiRouteSchema({
+        params: PARAMS_CHANGE_NAME,
+        response: { 200: 'ChangeGraphViewDto' },
+      }),
+    },
     apiHandler(async (ctx, req) => {
       const { name } = req.params as { name: string }
       const change = await ctx.kernel.changes.repo.get(name)
