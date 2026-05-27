@@ -51,17 +51,17 @@ Global sidebar polling continues to refresh the lists, but the open drafted/disc
 
 The global poll refresh key MUST NOT force every change or spec tab to refetch. Child views MUST adopt the latest global tick only while their tab is visible (frozen refresh key while hidden) so Artifacts, Tasks, spec Metadata, and similar tabs do not reload in the background.
 
-### Requirement: bottom panel polls only the visible channel
+### Requirement: bottom panel polls only the remote logs channel
 
-`listStudioOutput` polling MUST run only while **Problems** or **Output** is the active bottom tab. `readProjectLogs` polling MUST run only while **Logs** is active. Switching bottom tabs MUST NOT append studio output lines.
+`readProjectLogs` polling MUST run only while **Logs** is active. **Output** and **Problems** MUST render from local session state and MUST NOT poll a dedicated studio-specific output endpoint. Switching bottom tabs MUST NOT append output lines.
 
 ### Requirement: metadata and artifact saves log to Output
 
-Artifact save ([`ui:hooks-inspector-save`](../hooks-inspector-save/spec.md)), description/policy PATCH, successful scope dialog save, and validation MUST append via `PortStudioPanel` to [`ui:bottom-panel-output`](../bottom-panel-output/spec.md). Debug traces MUST call `appendProjectLog` with the **action id** as the message and user text in `context` only (not a duplicate log line). Validation with warnings or errors SHOULD select the **Problems** tab; other actions SHOULD select **Output**.
+Artifact save ([`ui:hooks-inspector-save`](../hooks-inspector-save/spec.md)), description/policy PATCH, successful scope dialog save, and validation MUST append to the local output buffer consumed by [`ui:bottom-panel-output`](../bottom-panel-output/spec.md). Debug traces MUST call `appendProjectLog` with the **action id** as the message and user text in `context` only (not a duplicate log line). Validation with warnings or errors SHOULD select the **Problems** tab; other actions SHOULD select **Output**.
 
 ### Requirement: graph sidebar does not append output lines
 
-Opening the graph entry from the sidebar MUST switch to the **Logs** tab and refresh log readback only; it MUST NOT `appendStudioOutput` a graph status line.
+Opening the graph entry from the sidebar MUST switch to the **Logs** tab and refresh log readback only; it MUST NOT append a graph status line to the local output buffer.
 
 ## Spec Dependencies
 

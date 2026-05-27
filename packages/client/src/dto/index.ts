@@ -22,8 +22,3 @@ export type { ValidateBatchResultDto, ValidateBatchStepResultDto } from './valid
 export type { ValidateResultDto } from './validate-result.js'
 export type { WorkspaceSpecTreeDto } from './workspace-spec-tree.js'
 export type { LogEntryDto, LogReadDto } from './log-read.js'
-export type {
-  StudioOutputEntryDto,
-  StudioOutputLevel,
-  StudioOutputListDto,
-} from './studio-output.js'

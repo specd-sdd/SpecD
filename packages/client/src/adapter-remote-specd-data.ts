@@ -37,9 +37,8 @@ import type {
   ValidateChangeInput,
 } from './inputs.js'
 import type { ChangeArtifactListItemDto, ReadOnlyChangeOrigin } from './port-changes-read.js'
-import type { AppendProjectLogInput, AppendStudioOutputInput } from './port-studio-panel.js'
+import type { AppendProjectLogInput } from './port-studio-panel.js'
 import type { LogReadDto } from './dto/log-read.js'
-import type { StudioOutputEntryDto } from './dto/studio-output.js'
 import { createHttpTransport } from './port-http-transport.js'
 import type { HttpTransport } from './port-http-transport.js'
 import type { SpecdDataPort } from './specd-data-port.js'
@@ -641,30 +640,6 @@ export class RemoteSpecdDataAdapter implements SpecdDataPort {
     return this._transport.request({
       method: 'GET',
       path: `/graph/changes/${enc(name)}`,
-      signal,
-    })
-  }
-
-  async listStudioOutput(
-    limit = 200,
-    signal?: AbortSignal,
-  ): Promise<readonly StudioOutputEntryDto[]> {
-    const dto = await this._transport.request<{ entries: readonly StudioOutputEntryDto[] }>({
-      method: 'GET',
-      path: `/studio/output?limit=${limit}`,
-      signal,
-    })
-    return dto.entries
-  }
-
-  async appendStudioOutput(
-    input: AppendStudioOutputInput,
-    signal?: AbortSignal,
-  ): Promise<StudioOutputEntryDto> {
-    return this._transport.request<StudioOutputEntryDto>({
-      method: 'POST',
-      path: '/studio/output',
-      body: input,
       signal,
     })
   }

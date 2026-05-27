@@ -15,12 +15,15 @@
 - **WHEN** client POSTs an unsupported level
 - **THEN** response is a problem+json error
 
-### Requirement: GET and POST /v1/studio/output
+### Requirement: no studio-specific output resource is exposed
 
-#### Scenario: POST appends warn line to output list
+#### Scenario: studio-specific output paths are rejected
 
-- **WHEN** client POSTs `{ level: "warn", message: "⚠ example" }` to `/v1/studio/output`
-- **THEN** `GET /v1/studio/output` lists the message
+- **WHEN** client calls a studio-specific output path under `/v1`
+- **THEN** HTTP 404 is returned
+- **AND** body is `application/problem+json`
+- **AND** code is `NOT_FOUND`
+- **AND** Studio session output must be maintained locally by the UI host
 
 ### Requirement: limits are server-enforced
 
@@ -37,9 +40,3 @@
 - **THEN** HTTP 400 is returned
 - **AND** body is `application/problem+json`
 - **AND** code is `INVALID_REQUEST`
-
-#### Scenario: POST studio output rejects blank message
-
-- **WHEN** client POSTs `{ "level": "info", "message": "" }` to `/v1/studio/output`
-- **THEN** HTTP 400 is returned
-- **AND** body is `application/problem+json`

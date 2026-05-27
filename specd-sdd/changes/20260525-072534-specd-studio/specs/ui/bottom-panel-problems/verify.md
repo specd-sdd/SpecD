@@ -10,12 +10,12 @@
 - **THEN** Problems is the second tab after Output
 - **AND** precedes Logs
 
-### Requirement: Problems filters studio output by severity
+### Requirement: Problems filters local output by severity
 
 #### Scenario: Warn and error lines appear after validate
 
 - **GIVEN** validation returns a warning line prefixed with `⚠`
-- **WHEN** shell appends studio output with level `warn`
+- **WHEN** shell appends local output with level `warn`
 - **THEN** Problems panel lists that message
 - **AND** Output panel lists all validation lines including info
 
@@ -40,18 +40,18 @@
 - **THEN** UI shows warnings/errors placeholder text
 - **AND** does not mention validation-only copy
 
-### Requirement: view uses SpecdDataPort hooks only
+### Requirement: view uses local output state only
 
-#### Scenario: Component consumes SpecdDataPort hooks only
+#### Scenario: Problems derives from the same local output buffer as Output
 
-- **WHEN** UI package dependency graph is inspected
-- **THEN** `@specd/ui` does not import `@specd/core`
-- **AND** bottom panel uses `PortStudioPanel` via hooks
+- **WHEN** Output and Problems are inspected together
+- **THEN** Problems filters the local output buffer
+- **AND** no separate remote studio-output fetch is required
 
-### Requirement: view surfaces loading and error states
+### Requirement: view is independent from remote log fetches
 
-#### Scenario: Failed fetch shows human-readable error
+#### Scenario: Remote log failure does not block Problems rendering
 
-- **GIVEN** port returns a network or HTTP error
-- **WHEN** output poll rejects
-- **THEN** UI renders the message instead of stale data
+- **GIVEN** warn/error entries already exist in the local output buffer
+- **WHEN** a remote `/logs` request fails
+- **THEN** Problems still renders those local entries

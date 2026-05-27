@@ -2,8 +2,6 @@ import { Logger } from '@specd/core'
 import { type FastifyInstance } from 'fastify'
 import { apiHandler } from '../handler-utils.js'
 import type { LogReadDto } from '../dto/log-read.js'
-import type { StudioOutputListDto } from '../dto/studio-output.js'
-import type { StudioOutputLevel } from '../../../infrastructure/studio-output-buffer.js'
 import {
   apiRouteSchema,
   BOOLEANISH_QUERY_SCHEMA,
@@ -23,8 +21,9 @@ function parseLimit(raw: string | undefined, fallback: number, max: number): num
 }
 
 /**
- * Registers `/v1/logs` and `/v1/studio/output` routes.
- * @param app
+ * Registers `/v1/logs` routes.
+ *
+ * @param app - Fastify route registry.
  */
 export function registerProjectLogsRoutes(app: FastifyInstance): void {
   app.get(
@@ -90,53 +89,6 @@ export function registerProjectLogsRoutes(app: FastifyInstance): void {
           break
       }
       return Promise.resolve({ ok: true as const })
-    }),
-  )
-
-  app.get(
-    '/studio/output',
-    {
-      ...apiRouteSchema({
-        querystring: {
-          ...strictObjectSchema({
-            properties: { limit: POSITIVE_INTEGER_QUERY_SCHEMA },
-          }),
-        },
-        response: { 200: 'StudioOutputListDto' },
-      }),
-    },
-    apiHandler((ctx, req) => {
-      const query = req.query as { limit?: string }
-      const limit = parseLimit(query.limit, 200, 500)
-      const entries = ctx.studioOutput.list(limit)
-      return Promise.resolve({ entries } satisfies StudioOutputListDto)
-    }),
-  )
-
-  app.post(
-    '/studio/output',
-    {
-      ...apiRouteSchema({
-        body: 'AppendStudioOutputBody',
-        response: { 200: 'StudioOutputEntryDto' },
-      }),
-    },
-    apiHandler((ctx, req) => {
-      const body = req.body as {
-        level?: string
-        message: string
-        action?: string
-        context?: Record<string, unknown>
-      }
-      const level = (body.level ?? 'info') as StudioOutputLevel
-      const message = body.message?.trim()
-      const entry = ctx.studioOutput.append({
-        level,
-        message,
-        ...(body.action !== undefined ? { action: body.action } : {}),
-        ...(body.context !== undefined ? { context: body.context } : {}),
-      })
-      return Promise.resolve(entry)
     }),
   )
 }

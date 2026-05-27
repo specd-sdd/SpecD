@@ -2,14 +2,6 @@
 
 ## Requirements
 
-### Requirement: listStudioOutput and appendStudioOutput
-
-#### Scenario: Remote adapter calls studio output routes
-
-- **WHEN** `RemoteSpecdDataAdapter.appendStudioOutput` is invoked
-- **THEN** HTTP POST targets `/v1/studio/output`
-- **AND** `listStudioOutput` uses GET with limit query
-
 ### Requirement: readProjectLogs and appendProjectLog
 
 #### Scenario: Remote adapter calls logs routes
@@ -18,21 +10,25 @@
 - **THEN** HTTP POST targets `/v1/logs`
 - **AND** `readProjectLogs` uses GET `/v1/logs`
 
-### Requirement: output and logs are independent buffers
+### Requirement: output buffering is local to the UI session
 
-#### Scenario: POST logs does not add studio output rows
+#### Scenario: Remote adapter does not implement studio output transport methods
 
-- **WHEN** client POSTs `/v1/logs` only
-- **THEN** `GET /v1/studio/output` entry count is unchanged
+- **WHEN** `RemoteSpecdDataAdapter` is inspected
+- **THEN** Studio output is not loaded or appended through a dedicated remote output endpoint
+- **AND** output buffering is delegated to local UI state
 
-#### Scenario: POST studio output does not add log ring rows
+### Requirement: trace logs remain independent from local output
 
-- **WHEN** client POSTs `/v1/studio/output` only
-- **THEN** `GET /v1/logs` does not gain an entry with the same user message
+#### Scenario: Appending a project log does not define local output persistence
+
+- **WHEN** `appendProjectLog` is invoked for a debug trace
+- **THEN** the port writes only to `/v1/logs`
+- **AND** any user-facing output line must be managed separately by the UI session buffer
 
 ### Requirement: SpecdDataPort composes PortStudioPanel
 
 #### Scenario: Memory adapter implements studio panel methods
 
 - **WHEN** `MemorySpecdDataAdapter` is inspected
-- **THEN** it implements all `PortStudioPanel` methods
+- **THEN** it implements the remaining `PortStudioPanel` log methods

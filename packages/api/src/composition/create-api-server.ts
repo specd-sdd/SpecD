@@ -2,7 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import fastifyStatic from '@fastify/static'
 import fastifySwagger from '@fastify/swagger'
-import Fastify, { type FastifyInstance } from 'fastify'
+import Fastify, { type FastifyInstance, type FastifyReply } from 'fastify'
 import {
   createConfigLoader,
   createKernel,
@@ -10,7 +10,6 @@ import {
   LogRingBuffer,
   type SpecdConfig,
 } from '@specd/core'
-import { StudioOutputBuffer } from '../infrastructure/studio-output-buffer.js'
 import { type AuthAdapterRegistry } from '../application/auth/auth-adapter-registry.js'
 import { defaultAuthAdapterRegistry } from './default-auth-registry.js'
 import { registerAuthMiddleware } from '../delivery/http/middleware/auth.js'
@@ -45,6 +44,22 @@ export interface ApiServer {
 }
 
 /**
+ * Writes a standard problem+json 404 for unknown API routes.
+ *
+ * @param reply - Fastify reply object.
+ * @returns Reply promise with the normalized error payload.
+ */
+async function sendApiNotFound(reply: FastifyReply): Promise<FastifyReply> {
+  return reply.status(404).type('application/problem+json').send({
+    type: 'urn:specd:error:NOT_FOUND',
+    title: 'Not Found',
+    status: 404,
+    detail: 'Route not found',
+    code: 'NOT_FOUND',
+  })
+}
+
+/**
  * Creates a Fastify HTTP server wired to specd kernel and code graph.
  *
  * @param options - Server bootstrap options
@@ -71,7 +86,6 @@ export async function createApiServer(options: CreateApiServerOptions): Promise<
     config,
     kernelActor,
     authType: auth.type,
-    studioOutput: new StudioOutputBuffer(200),
   }
 
   const app = Fastify({ logger: false })
@@ -135,6 +149,13 @@ export async function createApiServer(options: CreateApiServerOptions): Promise<
     { prefix: '/v1' },
   )
 
+  app.setNotFoundHandler(async (request, reply) => {
+    if (request.url.startsWith('/v1')) {
+      return sendApiNotFound(reply)
+    }
+    return reply.status(404).send({ error: 'Not Found' })
+  })
+
   if (options.uiDistPath !== undefined) {
     const indexPath = path.join(options.uiDistPath, 'index.html')
     if (!fs.existsSync(indexPath)) {
@@ -148,7 +169,7 @@ export async function createApiServer(options: CreateApiServerOptions): Promise<
     })
     app.setNotFoundHandler(async (request, reply) => {
       if (request.url.startsWith('/v1')) {
-        return reply.status(404).send({ error: 'Not Found' })
+        return sendApiNotFound(reply)
       }
       const pathname = request.url.split('?')[0] ?? request.url
       const hasFileExtension = /\.[a-z0-9]+$/i.test(pathname)

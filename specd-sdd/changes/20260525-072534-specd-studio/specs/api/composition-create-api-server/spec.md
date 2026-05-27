@@ -16,13 +16,13 @@ Effective auth MUST come from `specd.yaml` `api.auth` merged with CLI overrides.
 
 ### Requirement: one kernel per process with per-request context
 
-The factory MUST call `createKernel` once per process with a `LogRingBuffer` (callback destination) and a process-scoped `StudioOutputBuffer`, and build per-request context via `createApiContext` (including `studioOutput` on context).
+The factory MUST call `createKernel` once per process with a `LogRingBuffer` (callback destination) and build per-request context via `createApiContext`.
 
 The kernel MUST receive `logFormatter: createLogFormatter({ colorize: false })` so Studio log readback (`GET /v1/logs?prettier=true`) returns plain text without ANSI escape sequences.
 
 ### Requirement: all API routes mount under /v1
 
-Route plugins for project, changes, workspaces, specs, graph, logs, and studio output MUST register under the `/v1` prefix.
+Route plugins for project, changes, workspaces, specs, graph, and logs MUST register under the `/v1` prefix.
 
 ### Requirement: health or project payload exposes auth type without secrets
 

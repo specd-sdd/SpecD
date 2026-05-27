@@ -1,8 +1,75 @@
 import * as React from 'react'
-import type { LogReadDto, StudioOutputEntryDto } from '@specd/client'
-import type { AppendStudioOutputInput } from '@specd/client'
+import type { LogReadDto } from '@specd/client'
 import { useSpecdDataPort } from '../context/specd-data-context.js'
 import { useAsyncResource } from './use-async-resource.js'
+
+export type StudioOutputLevel = 'debug' | 'info' | 'warn' | 'error'
+
+export interface StudioOutputEntry {
+  readonly id: string
+  readonly timestamp: string
+  readonly level: StudioOutputLevel
+  readonly message: string
+  readonly action?: string
+  readonly context?: Record<string, unknown>
+}
+
+export interface AppendStudioOutputInput {
+  readonly level?: StudioOutputLevel
+  readonly message: string
+  readonly action?: string
+  readonly context?: Record<string, unknown>
+}
+
+const STUDIO_OUTPUT_LIMIT = 400
+let nextOutputId = 0
+let studioOutputEntries: readonly StudioOutputEntry[] = []
+const studioOutputListeners = new Set<() => void>()
+
+/**
+ * Subscribes to local studio output changes.
+ *
+ * @param listener - Store listener invoked after each local append.
+ * @returns Unsubscribe callback.
+ */
+function subscribeStudioOutput(listener: () => void): () => void {
+  studioOutputListeners.add(listener)
+  return () => {
+    studioOutputListeners.delete(listener)
+  }
+}
+
+/**
+ * Reads the current local studio output snapshot.
+ *
+ * @returns Newest-first local output entries for this session.
+ */
+function getStudioOutputSnapshot(): readonly StudioOutputEntry[] {
+  return studioOutputEntries
+}
+
+/**
+ * Appends one local studio output entry and enforces the FIFO cap.
+ *
+ * @param input - Local output line to append.
+ * @returns The appended entry.
+ */
+function appendStudioOutputEntry(input: AppendStudioOutputInput): StudioOutputEntry {
+  nextOutputId += 1
+  const entry: StudioOutputEntry = {
+    id: `local-output-${nextOutputId}`,
+    timestamp: new Date().toISOString(),
+    level: input.level ?? 'info',
+    message: input.message,
+    ...(input.action !== undefined ? { action: input.action } : {}),
+    ...(input.context !== undefined ? { context: input.context } : {}),
+  }
+  studioOutputEntries = [entry, ...studioOutputEntries].slice(0, STUDIO_OUTPUT_LIMIT)
+  for (const listener of studioOutputListeners) {
+    listener()
+  }
+  return entry
+}
 
 function logLines(dto: LogReadDto | undefined): readonly string[] {
   if (dto === undefined) {
@@ -14,14 +81,9 @@ function logLines(dto: LogReadDto | undefined): readonly string[] {
   return (dto.entries ?? []).map((e) => `${e.timestamp} ${e.level} ${e.message}`)
 }
 
-/** Polls studio output entries for the Output / Problems tabs. */
-export function useStudioOutput(
-  refreshKey = 0,
-  enabled = true,
-): ReturnType<typeof useAsyncResource<readonly StudioOutputEntryDto[]>> {
-  const port = useSpecdDataPort()
-  const load = React.useCallback(() => port.listStudioOutput(200), [port])
-  return useAsyncResource('studio-output', load, { refreshKey, enabled })
+/** Reads local studio output entries for the Output / Problems tabs. */
+export function useStudioOutput(): readonly StudioOutputEntry[] {
+  return React.useSyncExternalStore(subscribeStudioOutput, getStudioOutputSnapshot)
 }
 
 /** Polls specd in-memory logs for the Logs tab. */
@@ -51,12 +113,10 @@ export function useStudioPanelActions(): {
   readonly traceAction: (action: string, context?: Record<string, unknown>) => Promise<void>
 } {
   const port = useSpecdDataPort()
-  const appendOutput = React.useCallback(
-    async (input: AppendStudioOutputInput) => {
-      await port.appendStudioOutput(input)
-    },
-    [port],
-  )
+  const appendOutput = React.useCallback((input: AppendStudioOutputInput) => {
+    appendStudioOutputEntry(input)
+    return Promise.resolve()
+  }, [])
   const traceAction = React.useCallback(
     async (action: string, context?: Record<string, unknown>) => {
       await port.appendProjectLog({
@@ -72,8 +132,8 @@ export function useStudioPanelActions(): {
 
 /** Derives Problems tab lines from studio output (warn/error only). */
 export function studioOutputProblems(
-  entries: readonly StudioOutputEntryDto[],
-): readonly StudioOutputEntryDto[] {
+  entries: readonly StudioOutputEntry[],
+): readonly StudioOutputEntry[] {
   return entries.filter((e) => e.level === 'warn' || e.level === 'error')
 }
 

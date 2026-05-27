@@ -9,29 +9,37 @@
 - **WHEN** Studio shell mounts
 - **THEN** Output is the leftmost bottom tab
 - **AND** Output is selected
-- **AND** `listStudioOutput` polling is enabled
 
-### Requirement: Output lists all studio output entries
+### Requirement: Output lists all local session output entries
 
 #### Scenario: Output panel shows user-facing messages
 
-- **WHEN** shell appends studio output after a save
-- **THEN** output panel lists the message after poll/refetch
+- **WHEN** shell appends a local output entry after a save
+- **THEN** output panel lists the message immediately
 
-### Requirement: shell appends on successful actions
+### Requirement: shell appends local output on successful actions
 
 #### Scenario: Description save selects Output tab
 
 - **GIVEN** user saved change description from Overview
 - **WHEN** shell handles success
 - **THEN** Output tab is active
-- **AND** a line mentions updated description
+- **AND** a local output line mentions updated description
 
 #### Scenario: Validate appends lines with levels
 
 - **WHEN** validation completes with failures and warnings
-- **THEN** each result line is appended to studio output
+- **THEN** each result line is appended to local output
 - **AND** failures use level `error` and warnings use level `warn`
+
+### Requirement: local output buffer is capped
+
+#### Scenario: Oldest entries are dropped beyond the cap
+
+- **GIVEN** the local output buffer already contains 400 entries
+- **WHEN** a new output entry is appended
+- **THEN** buffer size remains 400
+- **AND** the oldest prior entry is removed
 
 ### Requirement: empty state copy
 
@@ -41,16 +49,17 @@
 - **THEN** placeholder describes saves and studio actions
 - **AND** does not claim to be the validation-only panel
 
-### Requirement: view uses SpecdDataPort hooks only
+### Requirement: view uses local output state and port hooks only
 
-#### Scenario: Hook delegates to configured adapter
+#### Scenario: Output rendering does not depend on remote studio-output fetch
 
-- **WHEN** component mounts and polls output
-- **THEN** calls go through `SpecdDataPort.listStudioOutput`
+- **WHEN** component renders bottom panel output
+- **THEN** it reads from local shell-managed output state
+- **AND** remote `SpecdDataPort` access is reserved for project logs/traces
 
-### Requirement: view surfaces loading and error states
+### Requirement: view surfaces local state immediately
 
-#### Scenario: Hook exposes loading while port call is in flight
+#### Scenario: Remote log failure does not clear existing output entries
 
-- **WHEN** port method is invoked from the component
-- **THEN** consumers observe loading state until the promise settles
+- **WHEN** a debug trace write or log read fails remotely
+- **THEN** already-buffered local output entries remain visible

@@ -177,13 +177,13 @@
 - **THEN** Artifacts tab hooks do not refetch
 - **AND** visible Overview may refetch detail when applicable
 
-### Requirement: bottom panel polls only the visible channel
+### Requirement: bottom panel polls only the remote logs channel
 
 #### Scenario: Logs tab does not poll studio output
 
 - **GIVEN** user selects bottom **Logs** tab
 - **WHEN** global poll ticks
-- **THEN** `listStudioOutput` is not invoked
+- **THEN** no dedicated studio-output poll is invoked
 - **AND** `readProjectLogs` may run
 
 #### Scenario: Output tab does not poll project logs
@@ -191,35 +191,36 @@
 - **GIVEN** user selects bottom **Output** tab
 - **WHEN** global poll ticks
 - **THEN** `readProjectLogs` is not invoked
-- **AND** `listStudioOutput` may run
+- **AND** Output still renders local buffered entries
 
 #### Scenario: Switching bottom tabs does not append output
 
-- **GIVEN** studio output has N entries
+- **GIVEN** local output buffer has N entries
 - **WHEN** user toggles between **Output** and **Logs**
 - **THEN** entry count stays N until an explicit user action appends
 
 ### Requirement: metadata and artifact saves log to Output
 
-#### Scenario: metadata and artifact saves log to Output — primary path
+#### Scenario: successful actions append local output and optional debug trace
 
-- **WHEN** Artifact save ([ui:hooks-inspector-save](../hooks-inspector-save/spec.md)), description/policy PATCH, successful scope dialog
-- **THEN** behaviour matches the spec requirement
-- **AND** no forbidden side effects occur
+- **WHEN** artifact save, description/policy PATCH, successful scope dialog save, or validation succeeds
+- **THEN** a local output entry is appended
+- **AND** a remote debug trace may be written via `appendProjectLog`
 
-#### Scenario: metadata and artifact saves log to Output — guard path
+#### Scenario: output buffer discards oldest rows beyond the cap
 
-- **GIVEN** inputs that stress the requirement boundary
-- **WHEN** the same capability runs
-- **THEN** errors or skips are explicit and documented
+- **GIVEN** the shell already holds 400 local output entries
+- **WHEN** another action appends a new output entry
+- **THEN** the oldest entry is discarded
+- **AND** total retained entries remain 400
 
 ### Requirement: graph sidebar does not append output lines
 
 #### Scenario: graph sidebar does not append output lines — primary path
 
-- **WHEN** Opening the graph entry from the sidebar MUST
-- **THEN** behaviour matches the spec requirement
-- **AND** no forbidden side effects occur
+- **WHEN** the user opens the graph entry from the sidebar
+- **THEN** the shell switches to **Logs** and refreshes remote log readback
+- **AND** local output entry count is unchanged
 
 #### Scenario: graph sidebar does not append output lines — guard path
 

@@ -2,14 +2,10 @@ import { describe, expect, it } from 'vitest'
 import {
   studioOutputLevelFromMessage,
   studioOutputProblems,
+  type StudioOutputEntry,
 } from '../src/hooks/use-studio-panel.js'
-import type { StudioOutputEntryDto } from '@specd/client'
 
-function entry(
-  id: string,
-  message: string,
-  level: StudioOutputEntryDto['level'],
-): StudioOutputEntryDto {
+function entry(id: string, message: string, level: StudioOutputEntry['level']): StudioOutputEntry {
   return { id, timestamp: '2026-05-25T12:00:00.000Z', level, message }
 }
 

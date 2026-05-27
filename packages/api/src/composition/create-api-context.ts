@@ -7,7 +7,6 @@ import {
 } from '@specd/core'
 import { type ApiActor } from '../domain/auth/api-actor.js'
 import { ApiActorResolver } from '../infrastructure/auth/api-actor-resolver.js'
-import type { StudioOutputBuffer } from '../infrastructure/studio-output-buffer.js'
 
 /** Per-request API context shared by handlers. */
 export interface ApiContext {
@@ -16,7 +15,6 @@ export interface ApiContext {
   readonly actor: ActorResolver
   readonly authType: string
   readonly apiActor: ApiActor | null
-  readonly studioOutput: StudioOutputBuffer
   createGraphProvider(): CodeGraphProvider
 }
 
@@ -26,7 +24,6 @@ export interface ApiServerState {
   readonly config: SpecdConfig
   readonly kernelActor: ActorResolver
   readonly authType: string
-  readonly studioOutput: StudioOutputBuffer
 }
 
 /**
@@ -43,7 +40,6 @@ export function createApiContext(state: ApiServerState, apiActor: ApiActor | nul
     actor,
     authType: state.authType,
     apiActor,
-    studioOutput: state.studioOutput,
     createGraphProvider() {
       return createCodeGraphProvider(state.config)
     },

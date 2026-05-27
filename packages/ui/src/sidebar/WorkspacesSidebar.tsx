@@ -1,5 +1,5 @@
 import type { GraphStatusDto } from '@specd/client'
-import { ChevronRight, FileText, Folder, GitBranch, Sparkles } from 'lucide-react'
+import { ChevronRight, FileText, Folder, GitBranch } from 'lucide-react'
 import * as React from 'react'
 import type { WorkspaceSpecsEntry } from '../hooks/use-workspace-specs-collection.js'
 import { buildSpecPathTree, type SpecPathTreeNode } from '../lib/build-spec-path-tree.js'

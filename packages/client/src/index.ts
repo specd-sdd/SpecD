@@ -11,11 +11,7 @@ export type { PortChangesMutate } from './port-changes-mutate.js'
 export type { PortArchivedChanges } from './port-archived-changes.js'
 export type { PortWorkspacesSpecs } from './port-workspaces-specs.js'
 export type { PortGraph } from './port-graph.js'
-export type {
-  PortStudioPanel,
-  AppendProjectLogInput,
-  AppendStudioOutputInput,
-} from './port-studio-panel.js'
+export type { PortStudioPanel, AppendProjectLogInput } from './port-studio-panel.js'
 
 export type {
   HttpRequestOptions,

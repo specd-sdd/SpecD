@@ -29,9 +29,8 @@ import type { ChangeGraphViewDto } from './dto/change-graph-view.js'
 import type { ImplementationReviewDto } from './dto/implementation-tracking.js'
 import type { WorkspaceSummaryDto } from './dto/project.js'
 import type { ChangeArtifactListItemDto } from './port-changes-read.js'
-import type { AppendProjectLogInput, AppendStudioOutputInput } from './port-studio-panel.js'
+import type { AppendProjectLogInput } from './port-studio-panel.js'
 import type { LogReadDto } from './dto/log-read.js'
-import type { StudioOutputEntryDto, StudioOutputLevel } from './dto/studio-output.js'
 const FIXTURE_NOW = '2026-05-25T12:00:00.000Z'
 
 const fixtureProject: ProjectDto = {
@@ -61,7 +60,6 @@ export class MemorySpecdDataAdapter implements SpecdDataPort {
     [fixtureChange.name, fixtureChange],
   ])
   private readonly _artifacts = new Map<string, ArtifactContentDto>()
-  private readonly _studioOutput: StudioOutputEntryDto[] = []
   private readonly _logLines: string[] = []
 
   getProject(): Promise<ProjectDto> {
@@ -498,28 +496,6 @@ export class MemorySpecdDataAdapter implements SpecdDataPort {
         coveredSymbols: [],
       })),
     })
-  }
-
-  listStudioOutput(limit = 200): Promise<readonly StudioOutputEntryDto[]> {
-    const n = Math.min(limit, this._studioOutput.length)
-    return Promise.resolve(this._studioOutput.slice(-n).reverse())
-  }
-
-  appendStudioOutput(input: AppendStudioOutputInput): Promise<StudioOutputEntryDto> {
-    const level: StudioOutputLevel = input.level ?? 'info'
-    const entry: StudioOutputEntryDto = {
-      id: `mem-${this._studioOutput.length + 1}`,
-      timestamp: new Date().toISOString(),
-      level,
-      message: input.message,
-      ...(input.action !== undefined ? { action: input.action } : {}),
-      ...(input.context !== undefined ? { context: input.context } : {}),
-    }
-    this._studioOutput.push(entry)
-    if (this._studioOutput.length > 200) {
-      this._studioOutput.shift()
-    }
-    return Promise.resolve(entry)
   }
 
   readProjectLogs(options?: {

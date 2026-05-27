@@ -106,16 +106,15 @@ export function ShellLayout({
   const [changeView, setChangeView] = React.useState<ChangeView>('Overview')
   const [commandOpen, setCommandOpen] = React.useState(false)
   const [bottomTab, setBottomTab] = React.useState<'Output' | 'Problems' | 'Logs'>('Output')
-  const pollStudioOutput = bottomTab === 'Problems' || bottomTab === 'Output'
   const pollProjectLogs = bottomTab === 'Logs'
-  const studioOutput = useStudioOutput(refreshKey, pollStudioOutput)
+  const studioOutput = useStudioOutput()
   const projectLogs = useProjectLogs(refreshKey, pollProjectLogs)
   const { appendOutput, traceAction } = useStudioPanelActions()
   const problems = React.useMemo(
-    () => studioOutputProblems(studioOutput.data ?? []),
-    [studioOutput.data],
+    () => studioOutputProblems(studioOutput),
+    [studioOutput],
   )
-  const outputEntries = studioOutput.data ?? []
+  const outputEntries = studioOutput
   const [validating, setValidating] = React.useState(false)
   const [selectedArtifact, setSelectedArtifact] = React.useState<SelectedArtifact | undefined>()
   const [inspectorMode, setInspectorMode] = React.useState<
@@ -131,8 +130,6 @@ export function ShellLayout({
   const [editorBuffer, setEditorBuffer] = React.useState<string | undefined>()
   const port = useSpecdDataPort()
 
-  const refetchStudioOutput = studioOutput.refetch
-
   const pushOutput = React.useCallback(
     async (message: string, action = 'studio-ui') => {
       await appendOutput({
@@ -141,10 +138,9 @@ export function ShellLayout({
         action,
       })
       await traceAction(action, { text: message })
-      refetchStudioOutput()
       setBottomTab('Output')
     },
-    [appendOutput, traceAction, refetchStudioOutput],
+    [appendOutput, traceAction],
   )
 
   const changeName = centerCtx.kind === 'change' ? centerCtx.name : undefined
@@ -425,7 +421,6 @@ export function ShellLayout({
         level: 'error',
         action: 'validate',
       })
-      refetchStudioOutput()
       setBottomTab('Problems')
       return
     }
@@ -435,7 +430,6 @@ export function ShellLayout({
         level: 'error',
         action: 'validate',
       })
-      refetchStudioOutput()
       setBottomTab('Problems')
       return
     }
@@ -468,7 +462,6 @@ export function ShellLayout({
         })
       }
       await traceAction('validate', { scope: scopeLabel, passed: result.passed })
-      refetchStudioOutput()
       setBottomTab(
         lines.some((l) => l.startsWith('✗') || l.startsWith('⚠')) ? 'Problems' : 'Output',
       )
@@ -483,7 +476,6 @@ export function ShellLayout({
         action: 'validate',
       })
       await traceAction('validate', { error: true })
-      refetchStudioOutput()
       setBottomTab('Problems')
     } finally {
       setValidating(false)
@@ -499,7 +491,6 @@ export function ShellLayout({
     selectedArtifact,
     appendOutput,
     traceAction,
-    refetchStudioOutput,
   ])
 
   const requestValidate = React.useCallback(
@@ -511,7 +502,6 @@ export function ShellLayout({
           level: 'error',
           action: 'validate',
         }).then(() => {
-          refetchStudioOutput()
           setBottomTab('Problems')
         })
         return
@@ -522,7 +512,6 @@ export function ShellLayout({
           level: 'error',
           action: 'validate',
         }).then(() => {
-          refetchStudioOutput()
           setBottomTab('Problems')
         })
         return
@@ -533,14 +522,13 @@ export function ShellLayout({
           level: 'error',
           action: 'validate',
         }).then(() => {
-          refetchStudioOutput()
           setBottomTab('Problems')
         })
         return
       }
       setValidatePrompt(scope)
     },
-    [changeName, changes.active, isArchivedChange, isShelvedReadOnly, appendOutput, refetchStudioOutput],
+    [changeName, changes.active, isArchivedChange, isShelvedReadOnly, appendOutput],
   )
 
   const paletteActions = React.useMemo(

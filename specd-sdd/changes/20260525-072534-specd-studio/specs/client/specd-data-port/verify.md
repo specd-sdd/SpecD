@@ -10,6 +10,12 @@
 - **THEN** interface includes project, changes, workspaces, graph, archived methods
 - **AND** consumers depend on aggregate only
 
+#### Scenario: Output session buffer is not exposed as a remote port method
+
+- **WHEN** `SpecdDataPort` is inspected after the output-locality change
+- **THEN** no dedicated remote output-buffer contract is required
+- **AND** bottom-panel output/problems remain local UI state
+
 #### Scenario: Graph methods delegate to port-graph
 
 - **WHEN** `getGraphStatus()` is called

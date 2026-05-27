@@ -522,47 +522,6 @@ export const API_OPENAPI_SCHEMAS: Record<string, JsonSchema> = {
     type: 'object',
     properties: { ok: { type: 'boolean', enum: [true] } },
   },
-  StudioOutputListDto: {
-    type: 'object',
-    properties: {
-      entries: {
-        type: 'array',
-        items: {
-          type: 'object',
-          properties: {
-            id: { type: 'string' },
-            timestamp: { type: 'string' },
-            level: { type: 'string', enum: ['debug', 'info', 'warn', 'error'] },
-            message: { type: 'string' },
-            action: { type: 'string' },
-            context: { type: 'object' },
-          },
-        },
-      },
-    },
-  },
-  AppendStudioOutputBody: {
-    type: 'object',
-    required: ['message'],
-    additionalProperties: false,
-    properties: {
-      level: { type: 'string', enum: [...LOG_LEVEL_VALUES] },
-      message: { type: 'string', minLength: 1 },
-      action: { type: 'string' },
-      context: { type: 'object', additionalProperties: true },
-    },
-  },
-  StudioOutputEntryDto: {
-    type: 'object',
-    properties: {
-      id: { type: 'string' },
-      timestamp: { type: 'string' },
-      level: { type: 'string', enum: ['debug', 'info', 'warn', 'error'] },
-      message: { type: 'string' },
-      action: { type: 'string' },
-      context: { type: 'object' },
-    },
-  },
   ArchivedChangeList: {
     type: 'array',
     items: { $ref: 'ArchivedChangeListItemDto#' },
