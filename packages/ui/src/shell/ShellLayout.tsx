@@ -50,7 +50,7 @@ import {
 import { UnsavedChangesDialog } from '../components/UnsavedChangesDialog.js'
 import { ValidateConfirmDialog } from '../components/ValidateConfirmDialog.js'
 import type { ValidateConfirmScope } from '../hooks/use-change-validate.js'
-import { Circle } from 'lucide-react'
+import { Circle, GitPullRequest, Layers, Network } from 'lucide-react'
 import { ChangesSidebar } from '../sidebar/ChangesSidebar.js'
 import { GraphSidebarEntry, WorkspacesSidebar } from '../sidebar/WorkspacesSidebar.js'
 import {
@@ -656,7 +656,10 @@ export function ShellLayout({
         <Panel defaultSize={15} minSize={14} maxSize={28} className="studio-panel border-r border-border">
           <div className="studio-sidebar-stack">
             <section className="studio-sidebar-pane min-h-0 flex-[0.95]">
-              <div className="studio-panel-header">Changes</div>
+              <div className="studio-panel-header flex items-center gap-2">
+                <GitPullRequest className="h-3 w-3 text-studio-success" />
+                <span>Changes</span>
+              </div>
               <div className="studio-scrollbar min-h-0 flex-1 overflow-y-auto">
                 <ChangesSidebar
                   active={changes.active}
@@ -672,7 +675,10 @@ export function ShellLayout({
             </section>
 
             <section className="studio-sidebar-pane min-h-0 flex-[1.4]">
-              <div className="studio-panel-header">Workspaces</div>
+              <div className="studio-panel-header flex items-center gap-2">
+                <Layers className="h-3 w-3 text-studio-info" />
+                <span>Workspaces - Specs</span>
+              </div>
               <div className="studio-scrollbar min-h-0 flex-1 overflow-y-auto">
                 <WorkspacesSidebar
                   entries={workspaceSpecs.data ?? []}
@@ -685,7 +691,10 @@ export function ShellLayout({
             </section>
 
             <section className="studio-sidebar-pane">
-              <div className="studio-panel-header">Graph</div>
+              <div className="studio-panel-header flex items-center gap-2">
+                <Network className="h-3 w-3 text-studio-warning" />
+                <span>Graph</span>
+              </div>
               <div className="p-2">
                 <GraphSidebarEntry
                   graphStatus={graphStatus.data}

@@ -1,6 +1,7 @@
 import * as React from 'react'
 import type { ChangeListSection } from './change-list-section.js'
 import { Button } from '../components/ui/button.js'
+import { Trash2, ArchiveRestore, Archive } from 'lucide-react'
 
 export function ChangeLifecycleActions({
   listSection,
@@ -40,19 +41,20 @@ export function ChangeLifecycleActions({
           <Button
             type="button"
             size="sm"
-            variant="secondary"
+            variant="default"
             disabled={busy}
             data-testid="studio-shelf-change"
             onClick={onDraft}
           >
-            Shelf to drafts
+            <Archive className="h-3 w-3" />
+            Move to drafts
           </Button>
         ) : null}
         {canArchive && onArchive ? (
           <Button
             type="button"
             size="sm"
-            variant="secondary"
+            variant="default"
             disabled={busy}
             data-testid="studio-archive-change"
             onClick={onArchive}
@@ -66,11 +68,12 @@ export function ChangeLifecycleActions({
         <Button
           type="button"
           size="sm"
-          variant="secondary"
+          variant="default"
           disabled={busy}
           data-testid="studio-restore-change"
           onClick={onRestore}
         >
+          <ArchiveRestore className="h-3 w-3" />
           Restore to active
         </Button>
       ) : null
@@ -83,27 +86,36 @@ export function ChangeLifecycleActions({
       className="flex w-full items-center gap-4"
       data-testid="studio-change-lifecycle-actions"
     >
-      <div className="flex min-w-0 flex-wrap items-center gap-2">{safeActions}</div>
-      {onDiscard ? (
-        <div
-          className={
-            hasSafe
-              ? 'ml-auto flex shrink-0 items-center border-l border-border pl-4'
-              : 'ml-auto flex shrink-0 items-center'
-          }
-        >
-          <Button
-            type="button"
-            size="sm"
-            variant="destructive"
-            disabled={busy}
-            data-testid="studio-discard-change"
-            onClick={onDiscard}
+      <div className="flex min-w-0 flex-wrap items-center gap-2">
+        {/* Placeholder for future buttons on the left */}
+      </div>
+
+      <div className="ml-auto flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-2">{safeActions}</div>
+
+        {onDiscard ? (
+          <div
+            className={
+              hasSafe
+                ? 'flex shrink-0 items-center border-l border-border pl-4'
+                : 'flex shrink-0 items-center'
+            }
           >
-            Discard permanently
-          </Button>
-        </div>
-      ) : null}
+            <Button
+              type="button"
+              size="icon"
+              variant="ghost"
+              disabled={busy}
+              title="Discard permanently"
+              className="h-8 w-8 text-muted-foreground hover:bg-destructive/20 hover:text-destructive"
+              data-testid="studio-discard-change"
+              onClick={onDiscard}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
+        ) : null}
+      </div>
     </div>
   )
 }

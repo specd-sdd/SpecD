@@ -33,6 +33,11 @@ const config: Config = {
           header: 'hsl(var(--panel-header))',
         },
         editor: 'hsl(var(--editor))',
+        'studio-success': 'var(--studio-success)',
+        'studio-warning': 'var(--studio-warning)',
+        'studio-error': 'var(--studio-error)',
+        'studio-lifecycle': 'var(--studio-lifecycle)',
+        'studio-info': 'var(--studio-info)',
       },
       borderRadius: {
         lg: 'var(--radius)',

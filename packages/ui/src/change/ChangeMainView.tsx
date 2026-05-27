@@ -1,6 +1,6 @@
 import type { ChangeDetailDto, ChangeStatusDto } from '@specd/client'
 import { isShelvedReadOnlySection, type ChangeListSection } from './change-list-section.js'
-import { ChevronDown, ChevronRight, FileText, ShieldCheck } from 'lucide-react'
+import { ChevronDown, ChevronRight, FileText, Info, ShieldCheck } from 'lucide-react'
 import * as React from 'react'
 import { CHANGE_VIEWS, ChangeTabs, type ChangeView } from '../tabs/ChangeTabs.js'
 import { Button } from '../components/ui/button.js'
@@ -116,14 +116,16 @@ export function ChangeMainView({
       />
 
       {isArchived ? (
-        <div className="border-b border-border bg-muted/30 px-3 py-1.5 text-xs text-muted-foreground">
+        <div className="flex items-center gap-1.5 border-b border-border bg-muted/30 px-3 py-1.5 text-xs text-muted-foreground">
+          <Info className="h-3 w-3 shrink-0 text-studio-info" />
           Read-only archived snapshot
           {detail?.archivedMeta
             ? ` · ${detail.archivedMeta.archivedName} · ${detail.archivedMeta.archivedAt}`
             : null}
         </div>
       ) : shelvedReadOnly ? (
-        <div className="border-b border-border bg-muted/30 px-3 py-1.5 text-xs text-muted-foreground">
+        <div className="flex items-center gap-1.5 border-b border-border bg-muted/50 px-3 py-1.5 text-xs text-muted-foreground">
+          <Info className="h-3 w-3 shrink-0 text-studio-info" />
           {changeListSection === 'draft'
             ? 'Read-only drafted change — restore to active to edit artifacts and metadata.'
             : 'Read-only discarded change — permanently abandoned.'}
@@ -235,10 +237,10 @@ export function ChangeMainView({
 }
 
 const STATUS_COLOR: Record<string, string> = {
-  complete: 'text-emerald-400',
-  'in-progress': 'text-amber-400',
-  missing: 'text-destructive',
-  drifted: 'text-orange-400',
+  complete: 'text-studio-success',
+  'in-progress': 'text-studio-warning',
+  missing: 'text-studio-error',
+  drifted: 'text-studio-warning',
   skipped: 'text-muted-foreground',
 }
 
@@ -264,6 +266,8 @@ function ArtifactFileRow({
   onSelect?: (filename: string) => void
 }): React.ReactElement {
   const isMissing = file.state === 'missing'
+  const statusColor = STATUS_COLOR[file.state] ?? 'text-muted-foreground'
+
   return (
     <li key={file.filename}>
       <button
@@ -281,15 +285,13 @@ function ArtifactFileRow({
           if (!isMissing) onSelect?.(file.filename)
         }}
       >
-        <FileText className="h-3 w-3 shrink-0 text-muted-foreground" />
+        <FileText className={cn('h-3 w-3 shrink-0', statusColor)} />
         <span className="min-w-0 flex-1 truncate font-mono text-muted-foreground">{label}</span>
         {file.state === 'drifted' ? (
-          <span className="text-[10px] text-orange-400">drift</span>
+          <span className="text-[10px] text-studio-warning">drift</span>
         ) : null}
         {file.displayStatus ? (
-          <span
-            className={cn('text-[10px]', STATUS_COLOR[file.state] ?? 'text-muted-foreground')}
-          >
+          <span className={cn('text-[10px]', statusColor)}>
             {file.displayStatus}
           </span>
         ) : null}

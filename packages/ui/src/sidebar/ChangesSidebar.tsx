@@ -48,7 +48,13 @@ export function ChangesSidebar({
         onSelect={onSelect}
         rowTestIdPrefix="studio-active-change"
       />
-      <Section title="Drafts" items={drafts} selected={selected} onSelect={onSelect} />
+      <Section
+        title="Drafts"
+        items={drafts}
+        selected={selected}
+        onSelect={onSelect}
+        fixedCircleColor="text-muted-foreground/50"
+      />
       {archived !== undefined ? (
         <Section
           title="Archive"
@@ -56,6 +62,7 @@ export function ChangesSidebar({
           selected={selected}
           onSelect={onSelectArchived ?? onSelect}
           showState={false}
+          fixedCircleColor="text-muted-foreground/30"
         />
       ) : null}
       {discarded !== undefined && discarded.length > 0 ? (
@@ -65,6 +72,7 @@ export function ChangesSidebar({
           selected={selected}
           onSelect={onSelect}
           showState={false}
+          fixedCircleColor="text-destructive/40"
         />
       ) : null}
     </div>
@@ -78,6 +86,7 @@ function Section({
   onSelect,
   showState = true,
   rowTestIdPrefix,
+  fixedCircleColor,
 }: {
   title: string
   items: readonly ChangeSummaryDto[]
@@ -85,6 +94,7 @@ function Section({
   onSelect: (name: string) => void
   showState?: boolean
   rowTestIdPrefix?: string
+  fixedCircleColor?: string
 }): React.ReactElement {
   if (items.length === 0) {
     return (
@@ -104,36 +114,35 @@ function Section({
         <span className="studio-badge">{items.length}</span>
       </div>
       <ul>
-        {items.map((item) => (
-          <li key={item.name}>
-            <button
-              type="button"
-              data-testid={
-                rowTestIdPrefix !== undefined ? `${rowTestIdPrefix}-${item.name}` : undefined
-              }
-              className={cn(
-                'studio-sidebar-row w-full border-l-2',
-                selected === item.name && 'studio-sidebar-row-active',
-              )}
-              onClick={() => onSelect(item.name)}
-            >
-              <Circle className="h-2 w-2 shrink-0 fill-current stroke-none" />
-              <span className="min-w-0 flex-1 truncate font-medium text-foreground">
-                {item.name}
-              </span>
-              {showState ? (
-                <span
-                  className={cn(
-                    'capitalize',
-                    STATE_BADGE[item.state ?? ''] ?? 'text-muted-foreground',
-                  )}
-                >
-                  {item.state ?? '—'}
+        {items.map((item) => {
+          const stateColor = STATE_BADGE[item.state ?? ''] ?? 'text-muted-foreground'
+          const circleColor = fixedCircleColor ?? stateColor
+
+          return (
+            <li key={item.name}>
+              <button
+                type="button"
+                data-testid={
+                  rowTestIdPrefix !== undefined ? `${rowTestIdPrefix}-${item.name}` : undefined
+                }
+                className={cn(
+                  'studio-sidebar-row w-full',
+                  selected === item.name && 'studio-sidebar-row-active',
+                )}                onClick={() => onSelect(item.name)}
+              >
+                <Circle className={cn('h-2 w-2 shrink-0 fill-current stroke-none', circleColor)} />
+                <span className="min-w-0 flex-1 truncate font-medium text-foreground">
+                  {item.name}
                 </span>
-              ) : null}
-            </button>
-          </li>
-        ))}
+                {showState ? (
+                  <span className={cn('capitalize', stateColor)}>
+                    {item.state ?? '—'}
+                  </span>
+                ) : null}
+              </button>
+            </li>
+          )
+        })}
       </ul>
     </div>
   )

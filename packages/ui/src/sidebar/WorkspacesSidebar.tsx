@@ -54,7 +54,7 @@ export function GraphSidebarEntry({
       className="studio-sidebar-row border-l-2"
       onClick={onOpenGraph}
     >
-      <GitBranch className="h-3.5 w-3.5 shrink-0" />
+      <GitBranch className="h-3.5 w-3.5 shrink-0 text-studio-warning" />
       <span className="min-w-0 flex-1 truncate">Code Graph</span>
       <span className="studio-badge">
         {graphStatus?.indexed ? (graphStatus.stale ? 'stale' : 'ready') : 'off'}
@@ -84,7 +84,7 @@ function WorkspaceSection({
         type="button"
         className={cn(
           'flex w-full items-center gap-2 border-l-2 border-transparent px-3 py-2 text-left transition-colors duration-150 hover:bg-background/60',
-          isSelectedWorkspace && 'border-l-[color:var(--studio-accent-selection)] bg-background/60',
+          isSelectedWorkspace && 'bg-accent text-accent-foreground',
         )}
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
@@ -166,7 +166,7 @@ function TreeNodeRow({
         <button
           type="button"
           className={cn(
-            'studio-sidebar-row min-w-0 flex-1 border-l-2 py-1 pr-2',
+            'studio-sidebar-row min-w-0 flex-1 py-1 pr-2',
             isSelected && 'studio-sidebar-row-active',
           )}
           onClick={() => {
@@ -180,10 +180,14 @@ function TreeNodeRow({
           {isFolder ? (
             <Folder className="h-3 w-3 shrink-0 text-muted-foreground" />
           ) : (
-            <FileText className="h-3 w-3 shrink-0 text-muted-foreground" />
+            <FileText
+              className={cn(
+                'h-3 w-3 shrink-0',
+                isSelected ? 'text-[color:var(--studio-lifecycle)]' : 'text-muted-foreground',
+              )}
+            />
           )}
           <span className="truncate">{node.name}</span>
-          {isSelected ? <Sparkles className="ml-auto h-3 w-3 text-[color:var(--studio-lifecycle)]" /> : null}
         </button>
       </div>
       {isFolder && open
