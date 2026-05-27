@@ -60,7 +60,7 @@ export function ChangeOverview({
     change.history.some((e) => e.type === 'spec-approved')
 
   return (
-    <div className="min-h-0 flex-1 overflow-auto p-4 text-xs">
+    <div className="@container min-h-0 flex-1 overflow-auto p-4 text-xs">
       <div className="mb-4">
         <div className="mb-2 text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
           Change Overview
@@ -96,7 +96,7 @@ export function ChangeOverview({
         </div>
       ) : null}
 
-      <div className="grid gap-3 xl:grid-cols-[1.2fr_0.9fr_0.9fr]">
+      <div className="grid w-full grid-cols-1 gap-3 @[640px]:grid-cols-2 @[960px]:grid-cols-3">
         <Card title="Details">
           <dl className="space-y-1">
             <Row label="State" value={change.state} />
@@ -124,7 +124,7 @@ export function ChangeOverview({
           </ul>
         </Card>
 
-        <Card title="History snapshot">
+        <Card title="History snapshot" className="@[640px]:col-span-2 @[960px]:col-span-1">
           <div className="space-y-1 text-muted-foreground">
             <p>Events tracked: {change.history.length}</p>
             <p>Latest state: {change.state}</p>
@@ -132,7 +132,7 @@ export function ChangeOverview({
           </div>
         </Card>
 
-        <Card title="Workflow & validation" className="xl:col-span-3">
+        <Card title="Workflow & validation" className="col-span-full">
           <ChangeStatusPanel
             embedded
             status={status}
@@ -141,7 +141,7 @@ export function ChangeOverview({
           />
         </Card>
 
-        <Card title="Specs & dependencies" className="xl:col-span-3">
+        <Card title="Specs & dependencies" className="col-span-full">
           {editable ? (
             <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
               <p className="text-[10px] text-muted-foreground">
@@ -161,7 +161,7 @@ export function ChangeOverview({
           <ChangeSpecsReadonlyPanel change={change} />
         </Card>
 
-        <Card title="Recent events" className="xl:col-span-3">
+        <Card title="Recent events" className="col-span-full">
           <ul className="max-h-40 space-y-0.5 overflow-auto font-mono">
             {change.history.slice(-8).reverse().map((event, i) => (
               <li key={`${event.type}-${event.at}-${i}`} className="text-muted-foreground">
