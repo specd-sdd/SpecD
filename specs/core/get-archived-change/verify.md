@@ -13,9 +13,16 @@
 
 #### Scenario: Archived change exists
 
-- **GIVEN** the archive repository contains an archived change named `'add-oauth-login'`
+- **GIVEN** the archive repository contains an archived change named `'add-oauth-login'` loaded from `manifest.json`
 - **WHEN** `getArchivedChange.execute({ name: 'add-oauth-login' })` is called
-- **THEN** the result is the `ArchivedChange` entity returned by `ArchiveRepository.get()`
+- **THEN** the result is the `ArchivedChange` read model returned by `ArchiveRepository.get()`
+- **AND** the result extends `ReadOnlyChangeView` and includes `archivedAt`, `archivedName`, and archive metadata
+
+#### Scenario: Detail includes manifest lifecycle state
+
+- **GIVEN** the archived manifest records lifecycle state `archivable` for `'add-oauth-login'`
+- **WHEN** `getArchivedChange.execute({ name: 'add-oauth-login' })` is called
+- **THEN** the result `state` equals `archivable`
 
 ### Requirement: Delegation to ArchiveRepository
 

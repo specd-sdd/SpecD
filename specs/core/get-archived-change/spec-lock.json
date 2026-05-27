@@ -1,0 +1,25 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "core:archive-change",
+    "core:storage",
+    "core:change",
+    "core:kernel",
+    "default:_global/architecture",
+    "core:archived-change-index-entry",
+    "core:read-only-change-view"
+  ],
+  "implementation": [
+    {
+      "file": "core:src/domain/read-only-change-view.ts",
+      "symbols": ["ArchivedChange", "toArchivedChangeView"]
+    },
+    {
+      "file": "core:src/application/use-cases/get-archived-change.ts",
+      "symbols": ["GetArchivedChange"]
+    }
+  ]
+}

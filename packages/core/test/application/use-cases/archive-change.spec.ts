@@ -10,7 +10,8 @@ import { SpecOverlapError } from '../../../src/domain/errors/spec-overlap-error.
 import { ArchiveDependencyMismatchError } from '../../../src/domain/errors/archive-dependency-mismatch-error.js'
 import { ArchiveImplementationStateError } from '../../../src/domain/errors/archive-implementation-state-error.js'
 import { Change, type ChangeEvent } from '../../../src/domain/entities/change.js'
-import { ArchivedChange } from '../../../src/domain/entities/archived-change.js'
+import { type ArchivedChange } from '../../../src/domain/entities/archived-change.js'
+import { toArchivedChangeView } from '../../../src/domain/read-only-change-view.js'
 import { Spec } from '../../../src/domain/entities/spec.js'
 import { SpecArtifact } from '../../../src/domain/value-objects/spec-artifact.js'
 import { SpecPath } from '../../../src/domain/value-objects/spec-path.js'
@@ -70,19 +71,14 @@ class StubArchiveRepository extends ArchiveRepository {
     const archivedName = `${ts.getUTCFullYear()}${p(ts.getUTCMonth() + 1)}${p(ts.getUTCDate())}-${p(ts.getUTCHours())}${p(ts.getUTCMinutes())}${p(ts.getUTCSeconds())}-${change.name}`
     const archivedChange = this._override
       ? this._override(change)
-      : new ArchivedChange({
-          name: change.name,
+      : toArchivedChangeView(change, {
           archivedName,
           archivedAt: new Date(),
-          artifacts: [],
-          specIds: [...change.specIds],
-          schemaName: change.schemaName,
-          schemaVersion: change.schemaVersion,
         })
     return { archivedChange, archiveDirPath: `/archive/${archivedName}` }
   }
 
-  override async list(): Promise<ArchivedChange[]> {
+  override async list() {
     return []
   }
 
@@ -346,7 +342,8 @@ describe('ArchiveChange', () => {
       )
       const result = await uc.execute({ name: 'my-change' })
 
-      expect(result.archivedChange).toBeInstanceOf(ArchivedChange)
+      expect(result.archivedChange.name).toBe('my-change')
+      expect(result.archivedChange.archivedName).toBeTruthy()
       expect(result.postHookFailures).toEqual([])
       expect(result.staleMetadataSpecPaths).toContain('default:auth/oauth')
     })

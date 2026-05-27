@@ -1,0 +1,30 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "core:repository-port",
+    "default:_global/architecture",
+    "core:change",
+    "core:storage",
+    "core:archive-change",
+    "default:_global/logging",
+    "core:read-only-change-view",
+    "core:archived-change-index-entry"
+  ],
+  "implementation": [
+    {
+      "file": "core:src/application/ports/archive-repository.ts",
+      "symbols": ["ArchiveRepository", "ArchivePathEntry"]
+    },
+    {
+      "file": "core:src/infrastructure/fs/archive-repository.ts",
+      "symbols": ["FsArchiveRepository"]
+    },
+    {
+      "file": "core:src/infrastructure/fs/manifest-change-loader.ts",
+      "symbols": ["loadChangeFromManifest"]
+    }
+  ]
+}

@@ -7,7 +7,9 @@
     "core:change",
     "core:storage",
     "core:archive-change",
-    "default:_global/logging"
+    "default:_global/logging",
+    "core:read-only-change-view",
+    "core:archived-change-index-entry"
   ],
   "context": [
     "Archiving completed changes must be decoupled from their active-change storage so the archive can enforce its own append-only semantics and indexing strategy independently. `ArchiveRepository` is the application-layer port for archiving and querying archived changes within a single workspace, extending the shared `Repository` base class. The archive is append-only — once a change is archived it is never mutated — and an `index.jsonl` file at the archive root provides O(1) appends and fast lookup without scanning the filesystem."
@@ -56,9 +58,15 @@
       ]
     },
     {
+      "requirement": "list returns index entries",
+      "rules": [
+        "`list()` MUST return `Promise<ArchivedChangeIndexEntry[]>`. The returned array contains all archived changes in the repository, ordered oldest first (chronological order by `archivedAt`).\n\nThe implementation MUST satisfy this requirement without reading `manifest.json` for every entry; it SHOULD construct entries from `index.jsonl`."
+      ]
+    },
+    {
       "requirement": "get returns an archived change or null",
       "rules": [
-        "`get(name)` MUST accept a change name string and return the `ArchivedChange` with that name, or `null` if not found. The implementation MUST search `index.jsonl` from the end (most recent entries first) for efficient lookup. If the entry is not found in the index, the implementation MUST fall back to a filesystem scan (e.g. glob `**/*-<name>`) and append the recovered entry to `index.jsonl` for future lookups."
+        "`get(name)` MUST accept a change name string and return the full `ArchivedChange` with that name, or `null` if not found.\n\nThe implementation MUST search `index.jsonl` from the end (most recent entries first) for efficient lookup. If the entry is not found in the index, the implementation MUST fall back to a filesystem scan (e.g. glob `**/*-<name>`) and append the recovered entry to `index.jsonl` for future lookups.\n\nWhen an entry is found (either from the index or recovery), the implementation MUST read the archived directory's `manifest.json` and construct the returned `ArchivedChange` from that manifest so that callers can inspect the archived change with full read-only detail."
       ]
     },
     {
@@ -70,7 +78,7 @@
     {
       "requirement": "archivePath returns the absolute path for an archived change",
       "rules": [
-        "`archivePath(archivedChange)` MUST accept an `ArchivedChange` and return the absolute filesystem path to its archived directory. This mirrors `ChangeRepository.changePath(change)` for active changes. The path MUST be resolved from the archive pattern and root directory configured at construction time — the caller does not need to know the archive directory structure.\n\nThis method is used by `RunStepHooks` and `GetHookInstructions` to build the `change.path` template variable when operating on archived changes."
+        "`archivePath(entry)` MUST accept either a full `ArchivedChange` or an `ArchivedChangeIndexEntry` and return the absolute filesystem path to the archived directory.\n\nThis mirrors `ChangeRepository.changePath(change)` for active changes. The path MUST be resolved from the archive pattern and root directory configured at construction time — the caller does not need to know the archive directory structure.\n\nThis method is used by `RunStepHooks` and `GetHookInstructions` to build the `change.path` template variable when operating on archived changes."
       ]
     },
     {
@@ -158,7 +166,7 @@
       "given": [
         "archive path derivation from pattern variables would resolve outside the configured archive root"
       ],
-      "when": ["archive(change) or archivePath(archivedChange) resolves that path"],
+      "when": ["archive(change) or archivePath(entry) resolves that path"],
       "then": ["the repository rejects the path"]
     },
     {
@@ -219,11 +227,23 @@
       "then": ["an empty array is returned"]
     },
     {
+      "requirement": "list returns index entries",
+      "name": "List returns index entries ordered by archivedAt",
+      "given": ["three changes archived at different times"],
+      "when": ["list() is called"],
+      "then": [
+        "the result is an array of three ArchivedChangeIndexEntry records ordered oldest first"
+      ]
+    },
+    {
       "requirement": "get returns an archived change or null",
       "name": "Change found in index",
       "given": ["a change named add-oauth-login exists in index.jsonl"],
-      "when": ["get(\"add-oauth-login\") is called"],
-      "then": ["the ArchivedChange is returned"]
+      "when": ["get(\\\"add-oauth-login\\\") is called"],
+      "then": [
+        "the ArchivedChange is returned",
+        "AND it is loaded from the archived directory manifest.json"
+      ]
     },
     {
       "requirement": "get returns an archived change or null",
@@ -231,16 +251,17 @@
       "given": [
         "a change directory exists in the archive but its entry is missing from index.jsonl"
       ],
-      "when": ["get(\"orphaned-change\") is called"],
+      "when": ["get(\\\"orphaned-change\\\") is called"],
       "then": [
         "the ArchivedChange is returned from the filesystem scan",
+        "AND it is loaded from the archived directory manifest.json",
         "AND the recovered entry is appended to index.jsonl"
       ]
     },
     {
       "requirement": "get returns an archived change or null",
       "name": "Change does not exist",
-      "when": ["get(\"nonexistent\") is called and no matching change exists anywhere"],
+      "when": ["get(\\\"nonexistent\\\") is called and no matching change exists anywhere"],
       "then": ["null is returned"]
     },
     {
@@ -318,9 +339,33 @@
       ]
     }
   ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "core:archive-repository-port",
+        "file": "core:src/application/ports/archive-repository.ts",
+        "symbol": "ArchiveRepository"
+      },
+      {
+        "specId": "core:archive-repository-port",
+        "file": "core:src/application/ports/archive-repository.ts",
+        "symbol": "ArchivePathEntry"
+      },
+      {
+        "specId": "core:archive-repository-port",
+        "file": "core:src/infrastructure/fs/archive-repository.ts",
+        "symbol": "FsArchiveRepository"
+      },
+      {
+        "specId": "core:archive-repository-port",
+        "file": "core:src/infrastructure/fs/manifest-change-loader.ts",
+        "symbol": "loadChangeFromManifest"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:6dac87da6f0101211693a3cb46b3aa011ae07819f9081dcaae85581edc01cb84",
-    "verify.md": "sha256:0659cc138cdf61aa961a16c35c34f7c1e56599dcf1655426acc095c038f06f46"
+    "spec.md": "sha256:d47f77f5786f790ffef3f5d9fbe72771a9cbeb4b6f0dc3e956b013aad92c9bd8",
+    "verify.md": "sha256:1732df1761ea81f3fb4f33076d4c325ae740b3d98b34bd09c4c05a04dfa1028d"
   },
   "generatedBy": "core"
 }

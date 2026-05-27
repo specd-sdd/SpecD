@@ -1,6 +1,7 @@
 import { SchemaNotFoundError } from '../../../src/application/errors/schema-not-found-error.js'
 import { Change, type ActorIdentity } from '../../../src/domain/entities/change.js'
-import { ArchivedChange } from '../../../src/domain/entities/archived-change.js'
+import { type ArchivedChange } from '../../../src/domain/entities/archived-change.js'
+import { type ArchivedChangeIndexEntry } from '../../../src/domain/archived-change-index-entry.js'
 import { type Spec } from '../../../src/domain/entities/spec.js'
 import { ChangeArtifact } from '../../../src/domain/entities/change-artifact.js'
 import { SpecPath } from '../../../src/domain/value-objects/spec-path.js'
@@ -54,6 +55,7 @@ import { ChangeNotFoundError } from '../../../src/application/errors/change-not-
 import {
   toDiscardedChangeView,
   toDraftedChangeView,
+  toArchivedChangeView,
   type DiscardedChangeView,
   type DraftedChangeView,
 } from '../../../src/domain/read-only-change-view.js'
@@ -801,8 +803,18 @@ class StubArchiveRepository extends ArchiveRepository {
     throw new Error('not implemented')
   }
 
-  override async list(): Promise<ArchivedChange[]> {
-    return [...this.store.values()]
+  override async list(): Promise<ArchivedChangeIndexEntry[]> {
+    return [...this.store.values()].map((view) => ({
+      name: view.name,
+      archivedName: view.archivedName,
+      archivedAt: view.archivedAt,
+      ...(view.archivedBy !== undefined ? { archivedBy: view.archivedBy } : {}),
+      artifacts: [...view.artifacts.keys()],
+      specIds: [...view.specIds],
+      schemaName: view.schemaName,
+      schemaVersion: view.schemaVersion,
+      workspaces: [...view.workspaces],
+    }))
   }
 
   override async get(name: string): Promise<ArchivedChange | null> {
@@ -834,14 +846,34 @@ export function makeArchivedChange(
 ): ArchivedChange {
   const createdAt = new Date('2024-01-01T00:00:00Z')
   const archivedName = `20240101-000000-${name}`
-  return new ArchivedChange({
+  const specIds = opts.specIds ?? ['default:default']
+  const schemaName = opts.schemaName ?? 'test-schema'
+  const actor: ActorIdentity = { name: 'test', email: 'test@test.com' }
+  const change = new Change({
     name,
+    createdAt,
+    specIds,
+    history: [
+      {
+        type: 'created',
+        at: createdAt,
+        by: actor,
+        specIds,
+        schemaName,
+        schemaVersion: 1,
+      },
+    ],
+  })
+  change.transition('designing', actor)
+  change.transition('ready', actor)
+  change.transition('implementing', actor)
+  change.transition('verifying', actor)
+  change.transition('done', actor)
+  change.transition('archivable', actor)
+
+  return toArchivedChangeView(change, {
     archivedName,
     archivedAt: new Date('2024-01-02T00:00:00Z'),
-    artifacts: [],
-    specIds: opts.specIds ?? ['default:default'],
-    schemaName: opts.schemaName ?? 'test-schema',
-    schemaVersion: 1,
   })
 }
 

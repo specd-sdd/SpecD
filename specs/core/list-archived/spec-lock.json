@@ -1,0 +1,19 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "core:archive-change",
+    "core:storage",
+    "core:kernel",
+    "default:_global/architecture",
+    "core:archived-change-index-entry"
+  ],
+  "implementation": [
+    {
+      "file": "core:src/application/use-cases/list-archived.ts",
+      "symbols": ["ListArchived"]
+    }
+  ]
+}

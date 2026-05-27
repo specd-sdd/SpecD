@@ -1,8 +1,15 @@
 import { type Change, type ActorIdentity } from '../../domain/entities/change.js'
 import { type ArchivedChange } from '../../domain/entities/archived-change.js'
+import { type ArchivedChangeIndexEntry } from '../../domain/archived-change-index-entry.js'
 import { Repository, type RepositoryConfig } from './repository.js'
 
 export { type RepositoryConfig as ArchiveRepositoryConfig }
+
+/** Minimum shape accepted by {@link ArchiveRepository.archivePath}. */
+export type ArchivePathEntry = Pick<
+  ArchivedChangeIndexEntry,
+  'name' | 'archivedName' | 'archivedAt' | 'workspaces'
+>
 
 /**
  * Port for archiving and querying archived changes within a single workspace.
@@ -46,7 +53,7 @@ export abstract class ArchiveRepository extends Repository {
    * @param options - Archive options
    * @param options.force - When `true`, skip the state check and archive unconditionally
    * @param options.actor - Git identity of the actor performing the archive, recorded in the manifest
-   * @returns The created `ArchivedChange` record
+   * @returns The created `ArchivedChange` read model and archive directory path
    * @throws {InvalidStateTransitionError} When the change is not in `archivable` state and `force` is not set
    */
   abstract archive(
@@ -60,9 +67,9 @@ export abstract class ArchiveRepository extends Repository {
    * Streams `index.jsonl` from the start, deduplicating by name so that the
    * last entry wins in case of duplicates introduced by manual recovery.
    *
-   * @returns All archived changes, oldest first
+   * @returns Index-backed archive rows, oldest first
    */
-  abstract list(): Promise<ArchivedChange[]>
+  abstract list(): Promise<ArchivedChangeIndexEntry[]>
 
   /**
    * Returns the archived change with the given name, or `null` if not found.
@@ -72,7 +79,7 @@ export abstract class ArchiveRepository extends Repository {
    * appends the recovered entry to `index.jsonl` for future lookups.
    *
    * @param name - The change name to look up (e.g. `"add-oauth-login"`)
-   * @returns The archived change, or `null` if not found
+   * @returns Full manifest-backed archived detail, or `null` if not found
    */
   abstract get(name: string): Promise<ArchivedChange | null>
 
@@ -91,8 +98,8 @@ export abstract class ArchiveRepository extends Repository {
    *
    * Mirrors {@link ChangeRepository.changePath} for active changes.
    *
-   * @param archivedChange - The archived change to resolve the path for
+   * @param entry - Full archived detail or index row with path resolution fields
    * @returns The absolute path to the archived change's directory
    */
-  abstract archivePath(archivedChange: ArchivedChange): string
+  abstract archivePath(entry: ArchivePathEntry): string
 }

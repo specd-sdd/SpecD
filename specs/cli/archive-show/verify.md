@@ -20,20 +20,20 @@
 
 #### Scenario: Normal text output
 
-- **GIVEN** the archive directory contains a change `add-oauth-login` with specIds `['auth/oauth']` and schema `schema-std@1`
+- **GIVEN** the archive directory contains a change `add-oauth-login` archived with lifecycle state `archivable`, specIds `['auth:oauth']`, and schema `schema-std@1`
 - **WHEN** `specd archive show add-oauth-login` is run
-- **THEN** stdout contains `name:`, `state:`, `specs:`, and `schema:` fields with the correct values
-- **AND** the `state:` line shows `archivable`
+- **THEN** stdout contains `name:`, `state:`, `archivedAt:`, `specs:`, `schema:`, and `artifacts:` fields with the correct values
+- **AND** the `state:` line reflects the archived manifest lifecycle state (not a hardcoded value)
 - **AND** the process exits with code 0
 
 ### Requirement: Output format — JSON
 
 #### Scenario: JSON format output
 
-- **GIVEN** the archive directory contains a change `add-oauth-login` with specIds `['auth/oauth']` and schema `schema-std@1`
+- **GIVEN** the archive directory contains a change `add-oauth-login` with lifecycle state `archivable`, specIds `['auth:oauth']`, and schema `schema-std@1`
 - **WHEN** `specd archive show add-oauth-login --format json` is run
-- **THEN** stdout is a JSON object with `name`, `state`, `specIds`, and `schema` fields matching the change
-- **AND** the `state` field is `"archivable"`
+- **THEN** stdout is a JSON object with `name`, `state`, `archivedAt`, `specIds`, `schema`, and `artifacts` fields matching the change
+- **AND** the `state` field reflects the archived manifest lifecycle state
 - **AND** the process exits with code 0
 
 ### Requirement: Error cases

@@ -1,7 +1,7 @@
 {
   "title": "Archive List",
   "description": "Teams need a way to review past work without digging through the archive directory by hand. The `specd archive list` command lists all archived changes from the directory configured by `storage.archivePath`, sorted by archive date descending (most recent first).",
-  "dependsOn": ["cli:entrypoint", "core:change"],
+  "dependsOn": ["cli:entrypoint", "core:archived-change-index-entry"],
   "context": [
     "Teams need a way to review past work without digging through the archive directory by hand. The `specd archive list` command lists all archived changes from the directory configured by `storage.archivePath`, sorted by archive date descending (most recent first)."
   ],
@@ -21,7 +21,7 @@
     {
       "requirement": "Output format — JSON",
       "rules": [
-        "When `--format json` is passed, the command writes a JSON array to stdout:\n\n```json\n[\n  {\n    \"name\": \"...\",\n    \"archivedName\": \"...\",\n    \"workspace\": \"...\",\n    \"archivedAt\": \"...\",\n    \"archivedBy\": { \"name\": \"...\", \"email\": \"...\" },\n    \"artifacts\": [\"...\"]\n  }\n]\n```\n\nOne object per archived change, sorted by archive date descending. `archivedBy` is omitted when not recorded. `artifacts` is an array of artifact type IDs."
+        "When `--format json` is passed, the command writes a JSON array to stdout representing archive index entries:\n\n```json\n[\n  {\n    \\\"name\\\": \\\"...\\\",\n    \\\"archivedName\\\": \\\"...\\\",\n    \\\"workspace\\\": \\\"...\\\",\n    \\\"archivedAt\\\": \\\"...\\\",\n    \\\"archivedBy\\\": { \\\"name\\\": \\\"...\\\", \\\"email\\\": \\\"...\\\" },\n    \\\"artifacts\\\": [\\\"...\\\"]\n  }\n]\n```\n\nOne object per archived change, sorted by archive date descending. `archivedBy` is omitted when not recorded. `artifacts` is an array of artifact type IDs.\n\nThe command MUST NOT read every archived change `manifest.json` to produce this listing; it SHOULD rely on archive index entries."
       ]
     },
     {
@@ -112,6 +112,16 @@
       ]
     },
     {
+      "requirement": "Output format — JSON",
+      "name": "List uses archive index entries",
+      "given": ["the archive contains multiple archived changes with enriched index.jsonl entries"],
+      "when": ["specd archive list is run"],
+      "then": [
+        "the command completes without reading manifest.json for every archived change directory",
+        "AND stdout lists changes using index-backed fields (name, archivedName, workspace, archivedAt, optional archivedBy, artifacts)"
+      ]
+    },
+    {
       "requirement": "Empty archive",
       "name": "No archived changes — text",
       "given": ["the archive directory is empty"],
@@ -133,9 +143,18 @@
       "then": ["the command exits with code 3", "AND stderr contains an error: message"]
     }
   ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "cli:archive-list",
+        "file": "cli:src/commands/archive/list.ts",
+        "symbol": "registerArchiveList"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:18e2c4c2cd252a75eff414b01229829c8e6d296cec36f20e916869e9f9f648cc",
-    "verify.md": "sha256:27d4e999cc40c003c756d73a85b143542b83b2b09a620537581a24cb1a6d430f"
+    "spec.md": "sha256:d9e7a204885950ea2d612e2f2a8dae9318de7cafa7bd73ef5136c700b17858b1",
+    "verify.md": "sha256:e391a6aeaf34bf4b1a6dfb84e4f6217bfa081970f2e885f31b3bbd1216cbf8f9"
   },
   "generatedBy": "core"
 }

@@ -22,22 +22,24 @@ The output has an inverse-video column header row `NAME  DATE` above the data ro
 
 ### Requirement: Output format — JSON
 
-When `--format json` is passed, the command writes a JSON array to stdout:
+When `--format json` is passed, the command writes a JSON array to stdout representing archive index entries:
 
 ```json
 [
   {
-    "name": "...",
-    "archivedName": "...",
-    "workspace": "...",
-    "archivedAt": "...",
-    "archivedBy": { "name": "...", "email": "..." },
-    "artifacts": ["..."]
+    \"name\": \"...\",
+    \"archivedName\": \"...\",
+    \"workspace\": \"...\",
+    \"archivedAt\": \"...\",
+    \"archivedBy\": { \"name\": \"...\", \"email\": \"...\" },
+    \"artifacts\": [\"...\"]
   }
 ]
 ```
 
 One object per archived change, sorted by archive date descending. `archivedBy` is omitted when not recorded. `artifacts` is an array of artifact type IDs.
+
+The command MUST NOT read every archived change `manifest.json` to produce this listing; it SHOULD rely on archive index entries.
 
 ### Requirement: Output format — toon
 
@@ -72,4 +74,4 @@ $ specd archive list --format json
 ## Spec Dependencies
 
 - [`cli:entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
-- [`core:change`](../../core/change/spec.md) — archive semantics, archivable state
+- `core:archived-change-index-entry` — index row type surfaced in list outputs

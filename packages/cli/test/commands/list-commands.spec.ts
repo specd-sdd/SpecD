@@ -494,13 +494,17 @@ describe('archive show', () => {
     const { kernel, stdout } = setup()
     kernel.changes.getArchived.execute.mockResolvedValue({
       name: 'old-feat',
+      state: 'archivable',
       archivedName: '2026-01-15-old-feat',
       archivedAt: new Date('2026-01-15T10:00:00Z'),
       workspaces: ['default'],
       specIds: ['auth/login'],
       schemaName: 'schema-std',
       schemaVersion: 1,
-      artifacts: ['spec.md', 'design.md'],
+      artifacts: new Map([
+        ['spec', {}],
+        ['design', {}],
+      ]),
     })
 
     const program = makeProgram()
@@ -522,13 +526,14 @@ describe('archive show', () => {
     const { kernel, stdout } = setup()
     kernel.changes.getArchived.execute.mockResolvedValue({
       name: 'old-feat',
+      state: 'archivable',
       archivedName: '2026-01-15-old-feat',
       archivedAt: new Date('2026-01-15T10:00:00Z'),
       workspaces: ['default'],
       specIds: ['auth/login'],
       schemaName: 'schema-std',
       schemaVersion: 1,
-      artifacts: ['spec.md'],
+      artifacts: new Map([['spec', {}]]),
     })
 
     const program = makeProgram()
@@ -554,13 +559,14 @@ describe('archive show', () => {
     const { kernel, stdout } = setup()
     kernel.changes.getArchived.execute.mockResolvedValue({
       name: 'add-oauth-login',
+      state: 'archivable',
       archivedName: '2024-01-15-add-oauth-login',
       archivedAt: new Date('2024-01-15T12:00:00Z'),
       workspaces: ['default'],
       specIds: ['auth/oauth'],
       schemaName: 'schema-std',
       schemaVersion: 1,
-      artifacts: ['spec.md'],
+      artifacts: new Map([['spec', {}]]),
     })
 
     const program = makeProgram()
@@ -576,13 +582,14 @@ describe('archive show', () => {
     const { kernel, stdout } = setup()
     kernel.changes.getArchived.execute.mockResolvedValue({
       name: 'add-oauth-login',
+      state: 'archivable',
       archivedName: '2024-01-15-add-oauth-login',
       archivedAt: new Date('2024-01-15T12:00:00Z'),
       workspaces: ['default'],
       specIds: ['auth/oauth'],
       schemaName: 'schema-std',
       schemaVersion: 1,
-      artifacts: ['spec.md'],
+      artifacts: new Map([['spec', {}]]),
     })
 
     const program = makeProgram()

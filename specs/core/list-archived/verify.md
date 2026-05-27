@@ -20,9 +20,9 @@
 
 #### Scenario: Archive contains multiple changes
 
-- **GIVEN** the archive repository contains three archived changes with distinct `archivedAt` timestamps
+- **GIVEN** the archive repository contains three archived changes with distinct `archivedAt` timestamps as index entries
 - **WHEN** `listArchived.execute()` is called
-- **THEN** the result is an array of three `ArchivedChange` instances ordered oldest first
+- **THEN** the result is an array of three `ArchivedChangeIndexEntry` records ordered oldest first
 
 #### Scenario: Archive is empty
 
@@ -33,7 +33,7 @@
 
 #### Scenario: Result matches repository output exactly
 
-- **GIVEN** `ArchiveRepository.list()` returns a specific array of `ArchivedChange` instances
+- **GIVEN** `ArchiveRepository.list()` returns a specific array of `ArchivedChangeIndexEntry` records
 - **WHEN** `listArchived.execute()` is called
 - **THEN** the result is identical to the array returned by `ArchiveRepository.list()` -- no filtering, sorting, or transformation is applied
 

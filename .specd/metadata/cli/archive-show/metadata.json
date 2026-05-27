@@ -1,7 +1,7 @@
 {
   "title": "Archive Show",
   "description": "When reviewing archived work, users need to inspect a specific change without restoring it. The `specd archive show <name>` command displays basic metadata for a single archived change.",
-  "dependsOn": ["cli:entrypoint", "core:change"],
+  "dependsOn": ["cli:entrypoint", "core:get-archived-change", "core:archived-change-index-entry"],
   "context": [
     "When reviewing archived work, users need to inspect a specific change without restoring it. The `specd archive show <name>` command displays basic metadata for a single archived change."
   ],
@@ -15,13 +15,13 @@
     {
       "requirement": "Output format — text",
       "rules": [
-        "The command prints metadata for the change to stdout:\n\n```\nname:    <name>\nstate:   archivable\nspecs:   <specId>, ...\nschema:  <schema-name>@<version>\n```\n\nThe `state` field is always `archivable` for archived changes."
+        "The command prints read-only details for the archived change to stdout:\n\n```\nname:        <name>\nstate:       <lifecycle-state>\narchivedAt:  <iso-timestamp>\narchivedBy:  <name <email>>        # omitted when not recorded\nspecs:       <specId>, ...\nschema:      <schema-name>@<version>\nartifacts:   <artifactType>, ...   # artifact type IDs from the archive record\n```\n\nThe `state` field MUST be derived from the archived `manifest.json` lifecycle state at load time. It MUST NOT be hardcoded to `archivable`."
       ]
     },
     {
       "requirement": "Output format — JSON",
       "rules": [
-        "When `--format json` is passed, the command writes a single JSON object to stdout:\n\n```json\n{\"name\":\"...\",\"state\":\"archivable\",\"specIds\":[...],\"schema\":{\"name\":\"...\",\"version\":N}}\n```"
+        "When `--format json` is passed, the command writes a single JSON object to stdout:\n\n```json\n{\n  \\\"name\\\":\\\"...\\\",\n  \\\"state\\\":\\\"...\\\",\n  \\\"archivedAt\\\":\\\"...\\\",\n  \\\"archivedBy\\\":{ \\\"name\\\":\\\"...\\\", \\\"email\\\":\\\"...\\\" },\n  \\\"specIds\\\":[...],\n  \\\"schema\\\":{ \\\"name\\\":\\\"...\\\", \\\"version\\\":N },\n  \\\"artifacts\\\":[\\\"...\\\"]\n}\n```\n\n`archivedBy` is omitted when not recorded. `artifacts` is an array of artifact type IDs present at archive time."
       ]
     },
     {
@@ -39,8 +39,7 @@
   ],
   "constraints": [
     "Errors always go to stderr as plain text regardless of --format",
-    "--format only affects stdout",
-    "The state field is always archivable for all changes returned by this command"
+    "--format only affects stdout"
   ],
   "scenarios": [
     {
@@ -59,12 +58,12 @@
       "requirement": "Output format — text",
       "name": "Normal text output",
       "given": [
-        "the archive directory contains a change add-oauth-login with specIds ['auth/oauth'] and schema schema-std@1"
+        "the archive directory contains a change add-oauth-login archived with lifecycle state archivable, specIds ['auth:oauth'], and schema schema-std@1"
       ],
       "when": ["specd archive show add-oauth-login is run"],
       "then": [
-        "stdout contains name:, state:, specs:, and schema: fields with the correct values",
-        "AND the state: line shows archivable",
+        "stdout contains name:, state:, archivedAt:, specs:, schema:, and artifacts: fields with the correct values",
+        "AND the state: line reflects the archived manifest lifecycle state (not a hardcoded value)",
         "AND the process exits with code 0"
       ]
     },
@@ -72,12 +71,12 @@
       "requirement": "Output format — JSON",
       "name": "JSON format output",
       "given": [
-        "the archive directory contains a change add-oauth-login with specIds ['auth/oauth'] and schema schema-std@1"
+        "the archive directory contains a change add-oauth-login with lifecycle state archivable, specIds ['auth:oauth'], and schema schema-std@1"
       ],
       "when": ["specd archive show add-oauth-login --format json is run"],
       "then": [
-        "stdout is a JSON object with name, state, specIds, and schema fields matching the change",
-        "AND the state field is \"archivable\"",
+        "stdout is a JSON object with name, state, archivedAt, specIds, schema, and artifacts fields matching the change",
+        "AND the state field reflects the archived manifest lifecycle state",
         "AND the process exits with code 0"
       ]
     },
@@ -90,9 +89,18 @@
       "then": ["the command exits with code 1", "AND stderr contains an error: message"]
     }
   ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "cli:archive-show",
+        "file": "cli:src/commands/archive/show.ts",
+        "symbol": "registerArchiveShow"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:bbfd3e9361b21f33cfc6ef169c067e5dad878b34757a969c651253d231d10974",
-    "verify.md": "sha256:374c08eabff8b85d8bf5132014a9da3d38ca65295b3b282345e3404fd46d29ea"
+    "spec.md": "sha256:7c8ebbb226e1d9c0959bcf832d5c570234b4bacbd008b958e634a6d7e5e1ba7d",
+    "verify.md": "sha256:5d92949c26c48478d8dd6f539c9b67c4cc53e5f515053dfe8241e06faa3d0e38"
   },
   "generatedBy": "core"
 }

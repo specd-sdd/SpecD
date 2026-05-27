@@ -42,7 +42,8 @@ import {
   type RunStepHooksResult,
 } from '../../../src/application/use-cases/run-step-hooks.js'
 import { ArchiveRepository } from '../../../src/application/ports/archive-repository.js'
-import { ArchivedChange } from '../../../src/domain/entities/archived-change.js'
+import { type ArchivedChange } from '../../../src/domain/entities/archived-change.js'
+import { toArchivedChangeView } from '../../../src/domain/read-only-change-view.js'
 import { Change, type ChangeEvent } from '../../../src/domain/entities/change.js'
 
 function makeGenerateMetadata(): GenerateSpecMetadata {
@@ -87,14 +88,9 @@ function makeArchiveRepo(): ArchiveRepository {
       const p = (n: number) => String(n).padStart(2, '0')
       const archivedName = `${ts.getUTCFullYear()}${p(ts.getUTCMonth() + 1)}${p(ts.getUTCDate())}-${p(ts.getUTCHours())}${p(ts.getUTCMinutes())}${p(ts.getUTCSeconds())}-${change.name}`
       return {
-        archivedChange: new ArchivedChange({
-          name: change.name,
+        archivedChange: toArchivedChangeView(change, {
           archivedName,
           archivedAt: new Date(),
-          artifacts: [],
-          specIds: [...change.specIds],
-          schemaName: change.schemaName,
-          schemaVersion: change.schemaVersion,
         }),
         archiveDirPath: `/archive/${archivedName}`,
       }
@@ -567,14 +563,9 @@ describe('ArchiveChange batch snapshot integration', () => {
       const p = (n: number) => String(n).padStart(2, '0')
       const archivedName = `${ts.getUTCFullYear()}${p(ts.getUTCMonth() + 1)}${p(ts.getUTCDate())}-${p(ts.getUTCHours())}${p(ts.getUTCMinutes())}${p(ts.getUTCSeconds())}-${change.name}`
       return {
-        archivedChange: new ArchivedChange({
-          name: change.name,
+        archivedChange: toArchivedChangeView(change, {
           archivedName,
           archivedAt: new Date(),
-          artifacts: [],
-          specIds: [...change.specIds],
-          schemaName: change.schemaName,
-          schemaVersion: change.schemaVersion,
         }),
         archiveDirPath: `/archive/${archivedName}`,
       }

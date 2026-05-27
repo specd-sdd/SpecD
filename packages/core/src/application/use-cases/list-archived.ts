@@ -1,4 +1,4 @@
-import { type ArchivedChange } from '../../domain/entities/archived-change.js'
+import { type ArchivedChangeIndexEntry } from '../../domain/archived-change-index-entry.js'
 import { type ArchiveRepository } from '../ports/archive-repository.js'
 
 /**
@@ -21,7 +21,7 @@ export class ListArchived {
    *
    * @returns All archived changes, oldest first
    */
-  async execute(): Promise<ArchivedChange[]> {
+  async execute(): Promise<ArchivedChangeIndexEntry[]> {
     return this._archive.list()
   }
 }

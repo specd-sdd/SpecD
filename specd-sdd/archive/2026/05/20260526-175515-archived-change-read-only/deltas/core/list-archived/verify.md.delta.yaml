@@ -1,0 +1,23 @@
+- op: modified
+  description: List output returns index entries ordered oldest first
+  selector:
+    type: section
+    matches: 'Scenario: Archive contains multiple changes'
+  content: |
+    #### Scenario: Archive contains multiple changes
+
+    - **GIVEN** the archive repository contains three archived changes with distinct `archivedAt` timestamps as index entries
+    - **WHEN** `listArchived.execute()` is called
+    - **THEN** the result is an array of three `ArchivedChangeIndexEntry` records ordered oldest first
+
+- op: modified
+  description: Delegation returns index entries unchanged
+  selector:
+    type: section
+    matches: 'Scenario: Result matches repository output exactly'
+  content: |
+    #### Scenario: Result matches repository output exactly
+
+    - **GIVEN** `ArchiveRepository.list()` returns a specific array of `ArchivedChangeIndexEntry` records
+    - **WHEN** `listArchived.execute()` is called
+    - **THEN** the result is identical to the array returned by `ArchiveRepository.list()` -- no filtering, sorting, or transformation is applied

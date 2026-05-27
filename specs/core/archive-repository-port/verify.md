@@ -44,7 +44,7 @@
 #### Scenario: Escaping archive pattern is rejected
 
 - **GIVEN** archive path derivation from pattern variables would resolve outside the configured archive root
-- **WHEN** `archive(change)` or `archivePath(archivedChange)` resolves that path
+- **WHEN** `archive(change)` or `archivePath(entry)` resolves that path
 - **THEN** the repository rejects the path
 
 #### Scenario: Recovered index path outside root is rejected
@@ -95,24 +95,34 @@
 - **WHEN** `list()` is called and no changes have been archived
 - **THEN** an empty array is returned
 
+### Requirement: list returns index entries
+
+#### Scenario: List returns index entries ordered by archivedAt
+
+- **GIVEN** three changes archived at different times
+- **WHEN** `list()` is called
+- **THEN** the result is an array of three `ArchivedChangeIndexEntry` records ordered oldest first
+
 ### Requirement: get returns an archived change or null
 
 #### Scenario: Change found in index
 
 - **GIVEN** a change named `add-oauth-login` exists in `index.jsonl`
-- **WHEN** `get("add-oauth-login")` is called
+- **WHEN** `get(\"add-oauth-login\")` is called
 - **THEN** the `ArchivedChange` is returned
+- **AND** it is loaded from the archived directory `manifest.json`
 
 #### Scenario: Change not in index but exists on disk
 
 - **GIVEN** a change directory exists in the archive but its entry is missing from `index.jsonl`
-- **WHEN** `get("orphaned-change")` is called
+- **WHEN** `get(\"orphaned-change\")` is called
 - **THEN** the `ArchivedChange` is returned from the filesystem scan
+- **AND** it is loaded from the archived directory `manifest.json`
 - **AND** the recovered entry is appended to `index.jsonl`
 
 #### Scenario: Change does not exist
 
-- **WHEN** `get("nonexistent")` is called and no matching change exists anywhere
+- **WHEN** `get(\"nonexistent\")` is called and no matching change exists anywhere
 - **THEN** `null` is returned
 
 ### Requirement: fs implementation maintains archive runtime ignore rules

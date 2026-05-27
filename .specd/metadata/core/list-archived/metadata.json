@@ -5,7 +5,8 @@
     "core:archive-change",
     "core:storage",
     "core:kernel",
-    "default:_global/architecture"
+    "default:_global/architecture",
+    "core:archived-change-index-entry"
   ],
   "context": [
     "Teams need to browse the history of completed spec work — for audits, onboarding, or tracing when a particular spec was last modified. `ListArchived` retrieves all archived changes in the default workspace as a read-only query with no side effects, no input parameters, and no lifecycle hooks."
@@ -26,7 +27,7 @@
     {
       "requirement": "Output",
       "rules": [
-        "`ListArchived.execute()` MUST return `Promise<ArchivedChange[]>`. The returned array contains all archived changes in the repository, ordered oldest first (chronological order by `archivedAt`). If no archived changes exist, the result MUST be an empty array."
+        "`ListArchived.execute()` MUST return `Promise<ArchivedChangeIndexEntry[]>`. The returned array contains all archived changes in the repository, ordered oldest first (chronological order by `archivedAt`). If no archived changes exist, the result MUST be an empty array."
       ]
     },
     {
@@ -45,7 +46,7 @@
   "constraints": [
     "ListArchived has no error cases of its own -- any errors originate from the ArchiveRepository infrastructure",
     "The use case does not accept workspace selection -- it operates on the single ArchiveRepository injected at construction time",
-    "The returned ArchivedChange instances are immutable domain entities"
+    "The returned ArchivedChangeIndexEntry instances are immutable read-only records"
   ],
   "scenarios": [
     {
@@ -64,10 +65,12 @@
       "requirement": "Output",
       "name": "Archive contains multiple changes",
       "given": [
-        "the archive repository contains three archived changes with distinct archivedAt timestamps"
+        "the archive repository contains three archived changes with distinct archivedAt timestamps as index entries"
       ],
       "when": ["listArchived.execute() is called"],
-      "then": ["the result is an array of three ArchivedChange instances ordered oldest first"]
+      "then": [
+        "the result is an array of three ArchivedChangeIndexEntry records ordered oldest first"
+      ]
     },
     {
       "requirement": "Output",
@@ -78,7 +81,9 @@
     {
       "requirement": "Delegation to ArchiveRepository",
       "name": "Result matches repository output exactly",
-      "given": ["ArchiveRepository.list() returns a specific array of ArchivedChange instances"],
+      "given": [
+        "ArchiveRepository.list() returns a specific array of ArchivedChangeIndexEntry records"
+      ],
       "when": ["listArchived.execute() is called"],
       "then": [
         "the result is identical to the array returned by ArchiveRepository.list() -- no filtering, sorting, or transformation is applied"
@@ -92,9 +97,18 @@
       "then": ["each call returns the same result", "AND no repository write methods are invoked"]
     }
   ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "core:list-archived",
+        "file": "core:src/application/use-cases/list-archived.ts",
+        "symbol": "ListArchived"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:228d039aba4430d824b6735da23a7962182bfd1ff2be5833c68e5667d7d1ce34",
-    "verify.md": "sha256:e394ab6f163b33b3860c234f497da9040df4ed47426ae9162a7d3c1564719cb8"
+    "spec.md": "sha256:1236592baff9ba40ef5132b29ed2f1920bd88836b9379f2d42fea6ed76afa97f",
+    "verify.md": "sha256:0abf44029e309ae9cff21f60514182f34725129be5c2a0f4e43eaa90d19d869f"
   },
   "generatedBy": "core"
 }

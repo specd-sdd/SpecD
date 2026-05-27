@@ -17,24 +17,37 @@ specd archive show <name> [--format text|json|toon]
 
 ### Requirement: Output format — text
 
-The command prints metadata for the change to stdout:
+The command prints read-only details for the archived change to stdout:
 
 ```
-name:    <name>
-state:   archivable
-specs:   <specId>, ...
-schema:  <schema-name>@<version>
+name:        <name>
+state:       <lifecycle-state>
+archivedAt:  <iso-timestamp>
+archivedBy:  <name <email>>        # omitted when not recorded
+specs:       <specId>, ...
+schema:      <schema-name>@<version>
+artifacts:   <artifactType>, ...   # artifact type IDs from the archive record
 ```
 
-The `state` field is always `archivable` for archived changes.
+The `state` field MUST be derived from the archived `manifest.json` lifecycle state at load time. It MUST NOT be hardcoded to `archivable`.
 
 ### Requirement: Output format — JSON
 
 When `--format json` is passed, the command writes a single JSON object to stdout:
 
 ```json
-{"name":"...","state":"archivable","specIds":[...],"schema":{"name":"...","version":N}}
+{
+  \"name\":\"...\",
+  \"state\":\"...\",
+  \"archivedAt\":\"...\",
+  \"archivedBy\":{ \"name\":\"...\", \"email\":\"...\" },
+  \"specIds\":[...],
+  \"schema\":{ \"name\":\"...\", \"version\":N },
+  \"artifacts\":[\"...\"]
+}
 ```
+
+`archivedBy` is omitted when not recorded. `artifacts` is an array of artifact type IDs present at archive time.
 
 ### Requirement: Output format — toon
 
@@ -48,7 +61,6 @@ When `--format toon` is passed, the command writes the same data model as JSON e
 
 - Errors always go to stderr as plain text regardless of `--format`
 - `--format` only affects stdout
-- The `state` field is always `archivable` for all changes returned by this command
 
 ## Examples
 
@@ -66,4 +78,5 @@ $ specd archive show add-oauth-login --format json
 ## Spec Dependencies
 
 - [`cli:entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
-- [`core:change`](../../core/change/spec.md) — archive semantics, archivable state
+- [`core:get-archived-change`](../../core/get-archived-change/spec.md) — archived change read model lookup
+- `core:archived-change-index-entry` — artifacts and archive metadata surfaced from index/detail models

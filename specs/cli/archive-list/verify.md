@@ -52,6 +52,13 @@
 - **THEN** the JSON object for `update-billing` does not contain an `archivedBy` field
 - **AND** the process exits with code 0
 
+#### Scenario: List uses archive index entries
+
+- **GIVEN** the archive contains multiple archived changes with enriched `index.jsonl` entries
+- **WHEN** `specd archive list` is run
+- **THEN** the command completes without reading `manifest.json` for every archived change directory
+- **AND** stdout lists changes using index-backed fields (`name`, `archivedName`, `workspace`, `archivedAt`, optional `archivedBy`, `artifacts`)
+
 ### Requirement: Empty archive
 
 #### Scenario: No archived changes — text

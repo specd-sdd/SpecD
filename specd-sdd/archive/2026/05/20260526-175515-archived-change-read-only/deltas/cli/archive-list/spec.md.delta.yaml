@@ -1,0 +1,33 @@
+- op: modified
+  description: 'Declare that archive list output is based on index entries (not manifest detail)'
+  selector:
+    type: section
+    matches: 'Requirement: Output format — JSON'
+  content: |
+    When `--format json` is passed, the command writes a JSON array to stdout representing archive index entries:
+
+    ```json
+    [
+      {
+        \"name\": \"...\",
+        \"archivedName\": \"...\",
+        \"workspace\": \"...\",
+        \"archivedAt\": \"...\",
+        \"archivedBy\": { \"name\": \"...\", \"email\": \"...\" },
+        \"artifacts\": [\"...\"]
+      }
+    ]
+    ```
+
+    One object per archived change, sorted by archive date descending. `archivedBy` is omitted when not recorded. `artifacts` is an array of artifact type IDs.
+
+    The command MUST NOT read every archived change `manifest.json` to produce this listing; it SHOULD rely on archive index entries.
+
+- op: modified
+  description: 'Update dependencies to reflect index entry type'
+  selector:
+    type: section
+    matches: '^Spec Dependencies$'
+  content: |
+    - [`cli:entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
+    - `core:archived-change-index-entry` — index row type surfaced in list outputs

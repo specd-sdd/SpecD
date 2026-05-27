@@ -165,7 +165,7 @@ describe('FsArchiveRepository', () => {
       expect(archivedChange.archivedName).toBe(changeDirName('add-auth', change.createdAt))
       expect(archivedChange.workspaces[0]).toBe('default')
       expect(archivedChange.archivedAt).toBeInstanceOf(Date)
-      expect(archivedChange.artifacts).toEqual([])
+      expect([...archivedChange.artifacts.keys()]).toEqual([])
     })
 
     it('augments the manifest with archivedAt', async () => {

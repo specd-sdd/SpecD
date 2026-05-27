@@ -6,6 +6,13 @@ export {
   type ReadOnlyChangeView,
   type DraftedChangeView,
   type DiscardedChangeView,
+  type ArchivedChange,
+  type ArchivedChangeMeta,
   toDraftedChangeView,
   toDiscardedChangeView,
+  toArchivedChangeView,
 } from './read-only-change-view.js'
+export {
+  type ArchivedChangeIndexEntry,
+  workspacesFromSpecIds,
+} from './archived-change-index-entry.js'

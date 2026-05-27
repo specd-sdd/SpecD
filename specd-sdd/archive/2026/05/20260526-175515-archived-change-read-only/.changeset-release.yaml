@@ -1,0 +1,7 @@
+releases:
+  core:core/archive-repository-port: minor
+  core:core/get-archived-change: minor
+  core:core/list-archived: minor
+  cli:cli/archive-show: minor
+  cli:cli/archive-list: patch
+  core:core/archived-change-index-entry: minor
