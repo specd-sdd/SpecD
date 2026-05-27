@@ -17,12 +17,10 @@
   ],
   "implementation": [
     {
-      "file": "core:src/application/ports/change-repository.ts",
-      "symbols": ["ChangeRepository"]
+      "file": "core:test/infrastructure/fs/change-repository.spec.ts"
     },
     {
-      "file": "core:src/infrastructure/fs/change-repository.ts",
-      "symbols": ["FsChangeRepository"]
+      "file": "core:src/infrastructure/fs/change-repository.ts"
     }
   ]
 }

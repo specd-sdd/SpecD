@@ -576,9 +576,10 @@ export function ShellLayout({
     return 'idle'
   }, [problems, validating])
 
-  const refetchOpenChange = React.useCallback(async () => {
+  const refetchOpenChange = React.useCallback(() => {
     if (!isArchivedChange) {
-      await Promise.all([changeRead.detail.refetch(), changeRead.status.refetch()])
+      changeRead.detail.refetch()
+      changeRead.status.refetch()
     }
   }, [changeRead.detail, changeRead.status, isArchivedChange])
 
@@ -604,7 +605,7 @@ export function ShellLayout({
     void (async () => {
       try {
         await run()
-        await refetchOpenChange()
+        refetchOpenChange()
         void pushOutput(`Lifecycle action completed for ${changeName}`, outputAction)
       } catch (err: unknown) {
         const text = err instanceof Error ? err.message : String(err)
@@ -707,7 +708,7 @@ export function ShellLayout({
             <Panel defaultSize={75} minSize={30} className="flex min-h-0 flex-col">
               <PanelGroup direction="horizontal" className="min-h-0 flex-1">
                 {/* center content */}
-                <Panel minSize={35} className="studio-scrollbar flex min-w-0 flex-col">
+                <Panel minSize={20} className="studio-scrollbar flex min-w-0 flex-col">
                   {centerCtx.kind === 'change' ? (
                     <ChangeMainView
                       changeName={changeName}
@@ -812,7 +813,7 @@ export function ShellLayout({
                     <Panel
                       defaultSize={50}
                       minSize={20}
-                      maxSize={55}
+                      maxSize={80}
                       className="studio-panel flex flex-col border-l border-border"
                     >
                       {/* inspector header: filename + close */}

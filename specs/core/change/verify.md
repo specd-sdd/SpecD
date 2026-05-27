@@ -227,6 +227,36 @@
 - **THEN** files under `verify` and `tasks` are reopened according to policy
 - **AND** expansion does not depend on persisted artifact `requires` maps on the change
 
+#### Scenario: Repeated artifact-drift invalidation in designing is deduped
+
+- **GIVEN** a change already in `designing`
+- **AND** its most recent history event is `invalidated` with `cause: 'artifact-drift'` and affected set `{ specs: [core:change] }`
+- **WHEN** `Change.invalidate()` is called again with `cause: 'artifact-drift'` and the same policy-expanded affected set while drift persists
+- **THEN** no new `invalidated` event is appended
+- **AND** no new `transitioned` event is appended
+- **AND** history length is unchanged
+
+#### Scenario: Deduped artifact-drift still materializes drift flags
+
+- **GIVEN** a deduped artifact-drift invalidation as above
+- **WHEN** the focused payload names a drifted file key
+- **THEN** that file's `hasDrift` signal is materialized
+- **AND** history length remains unchanged
+
+#### Scenario: Manual invalidation is never deduped
+
+- **GIVEN** a change already in `designing` with a prior `invalidated` event for `artifact-drift`
+- **WHEN** `Change.invalidate()` is called with `cause: 'artifact-review-required'`
+- **THEN** a new `invalidated` event is appended
+- **AND** history length increases
+
+#### Scenario: Artifact-drift with expanded affected set is not deduped
+
+- **GIVEN** a change in `designing` with a prior `artifact-drift` invalidation affecting `{ specs: [core:change] }`
+- **WHEN** `Change.invalidate()` is called with `artifact-drift` and policy expansion yields an additional drifted file key
+- **THEN** a new `invalidated` event is appended
+- **AND** the new event records the updated affected set
+
 ### Requirement: Per-file drift tracking
 
 #### Scenario: Artifact-drift sets hasDrift on only the affected files

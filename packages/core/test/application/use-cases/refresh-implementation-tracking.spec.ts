@@ -79,6 +79,22 @@ describe('RefreshImplementationTracking', () => {
     ])
   })
 
+  it('does not persist when detector finds no new tracked files', async () => {
+    const change = changeInImplementing('stable-paths')
+    change.trackImplementationFile('packages/core/src/foo.ts', 'resolved')
+    const repo = makeChangeRepository([change])
+    const before = repo.store.get('stable-paths')?.updatedAt.toISOString()
+    const uc = makeRefresh(repo, async () => ['packages/core/src/foo.ts'])
+
+    const result = await uc.execute({ name: 'stable-paths' })
+    const after = repo.store.get('stable-paths')?.updatedAt.toISOString()
+
+    expect(result.implementationTracking.trackedFiles).toEqual([
+      { file: 'packages/core/src/foo.ts', state: 'resolved' },
+    ])
+    expect(after).toBe(before)
+  })
+
   it('returns trackedFiles and links projection', async () => {
     const change = changeInImplementing('projection')
     const repo = makeChangeRepository([change])

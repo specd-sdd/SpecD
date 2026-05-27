@@ -27,6 +27,12 @@
       ]
     },
     {
+      "requirement": "Read paths do not amplify artifact-drift invalidation",
+      "rules": [
+        "`GetStatus` loads changes through `ChangeRepository.get()`. When drift reconciliation runs during that load, repeated status polls with an unchanged drift scope MUST NOT cause additional `invalidated` history events or manifest rewrites.\n\nThis requirement aligns Studio and API polling with CLI honesty: observing status is not a mutating operation when lifecycle facts and drift scope are unchanged.\n\nWhen drift scope changes (new drifted files appear or policy expansion yields a different affected set), normal auto-invalidation semantics apply and the full status payload reflects the new review state."
+      ]
+    },
+    {
       "requirement": "Drafted change read-only status",
       "rules": [
         "When `GetStatus` loads a change exclusively via `getDraft`, the result MUST satisfy [`core:drafted-change-view`](../drafted-change-view/spec.md).\n\nThe use case MAY use an internal `Change` loaded from drafted storage to compute artifact effective statuses, but that instance MUST NOT appear on `GetStatusResult`.\n\nDrafted status responses MUST be suitable for `drafts show` and read-only CLI inspection without enabling lifecycle mutation."
@@ -150,6 +156,19 @@
       "then": [
         "the result includes a blockers array",
         "AND it contains at least one entry with code: 'ARTIFACT_DRIFT'"
+      ]
+    },
+    {
+      "requirement": "Read paths do not amplify artifact-drift invalidation",
+      "name": "Repeated GetStatus with unchanged drift does not grow history",
+      "given": [
+        "a change in designing with a persisted artifact-drift invalidation",
+        "AND on-disk artifact content still reflects the same drift scope"
+      ],
+      "when": ["GetStatus.execute() is called twice in succession for the same change name"],
+      "then": [
+        "the history length after the second call equals the history length after the first call",
+        "AND the change remains in designing"
       ]
     },
     {
@@ -460,17 +479,27 @@
     }
   ],
   "implementation": {
+    "files": [
+      {
+        "specId": "core:get-status",
+        "file": "core:test/application/use-cases/get-status.spec.ts"
+      },
+      {
+        "specId": "core:get-status",
+        "file": "core:test/application/use-cases/refresh-implementation-tracking.spec.ts"
+      }
+    ],
     "symbols": [
       {
         "specId": "core:get-status",
-        "file": "core:src/application/use-cases/get-status.ts",
-        "symbol": "GetStatus"
+        "file": "core:src/application/use-cases/refresh-implementation-tracking.ts",
+        "symbol": "execute"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:693e3ccadbedd6bbe1d2c9d2c3762414ee9fe73ba6f75f2b6b520fe3f2de5596",
-    "verify.md": "sha256:8f0d28a698663c7e1df2359339f237a4ec5c0e2c6007409be7c824bb77ac425a"
+    "spec.md": "sha256:9488d152750a2abe5b769266ad69c97dfced050e9404261964b477d3fa0ac295",
+    "verify.md": "sha256:a4bc173ed4603227892d0d293dcbb42eebef6fac9018feff6d7292f8fac302fe"
   },
   "generatedBy": "core"
 }

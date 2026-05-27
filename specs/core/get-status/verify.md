@@ -43,6 +43,18 @@
 - **THEN** the result includes a `blockers` array
 - **AND** it contains at least one entry with `code: 'ARTIFACT_DRIFT'`
 
+### Requirement: Read paths do not amplify artifact-drift invalidation
+
+Repeated status polls with unchanged drift scope MUST NOT append additional `invalidated` history or rewrite manifests.
+
+#### Scenario: Repeated GetStatus with unchanged drift does not grow history
+
+- **GIVEN** a change in `designing` with a persisted `artifact-drift` invalidation
+- **AND** on-disk artifact content still reflects the same drift scope
+- **WHEN** `GetStatus.execute()` is called twice in succession for the same change name
+- **THEN** the history length after the second call equals the history length after the first call
+- **AND** the change remains in `designing`
+
 ### Requirement: Drafted change read-only status
 
 #### Scenario: Draft-only name returns draftView

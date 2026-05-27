@@ -103,6 +103,24 @@ The invalidation history entry MUST record:
 
 The `SYSTEM_ACTOR` constant (`{ name: 'specd', email: 'system@getspecd.dev' }`) is used as the actor for these automated invalidations.
 
+### Requirement: Idempotent drift reconciliation persistence
+
+Drift reconciliation invoked during `get()` (and any shared hook used by load paths) MUST NOT rewrite the change manifest when `Change.invalidate('artifact-drift', ...)` is a deduped no-op per `core:change`.
+
+The repository MUST detect whether new history was appended (for example by comparing history length or an explicit signal from the domain invalidation) **before** calling `_writeManifestAtomic` or equivalent direct manifest persistence.
+
+When invalidation is deduped:
+
+- The manifest file on disk MUST remain unchanged
+- `reconcileArtifactDrift()` (or the internal helper) MUST return `false`
+
+When invalidation appends new history:
+
+- The updated manifest MUST be persisted atomically before the loaded change is returned
+- The helper MUST return `true`
+
+Repeated read-only loads with unchanged drift scope MUST therefore be safe for polling clients: history event count and manifest revision MUST remain stable across consecutive polls.
+
 ### Requirement: list returns active changes in creation order
 
 `list()` MUST return all active (non-drafted, non-discarded) changes sorted by creation order, oldest first. Each returned `Change` MUST include artifact state (derived statuses) but MUST NOT include artifact content. Content is loaded on demand via `artifact()`.

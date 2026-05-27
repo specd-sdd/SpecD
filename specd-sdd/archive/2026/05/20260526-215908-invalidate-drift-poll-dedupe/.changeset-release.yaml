@@ -1,0 +1,5 @@
+releases:
+  core:change: patch
+  core:change-repository-port: patch
+  core:kernel: patch
+  core:get-status: patch

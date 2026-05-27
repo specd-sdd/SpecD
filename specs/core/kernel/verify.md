@@ -134,6 +134,13 @@
 - **THEN** loading succeeds without treating the manifest as corrupt
 - **AND** the historical event is interpreted with the current artifact-drift semantics
 
+#### Scenario: Repeated kernel load with unchanged drift scope is idempotent
+
+- **GIVEN** a change already in `designing` with a persisted `artifact-drift` invalidation for the current drift scope
+- **WHEN** a kernel use case loads that change through `ChangeRepository.get()` twice without mutating artifacts
+- **THEN** the second load does not append another `invalidated` event
+- **AND** the manifest on disk is unchanged after the second load
+
 ### Requirement: Kernel exposes repository instances for adapter access
 
 #### Scenario: ChangeRepository accessible via kernel

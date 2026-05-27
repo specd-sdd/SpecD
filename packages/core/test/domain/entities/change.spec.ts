@@ -735,6 +735,129 @@ describe('Change', () => {
       expect(c.getArtifact('design')?.getFile('design')?.hasDrift).toBe(false)
       expect(c.getArtifact('design')?.status).toBe('pending-review')
     })
+
+    it('repeated artifact-drift invalidation in designing is deduped', () => {
+      const c = makeChangeWithChain()
+      c.transition('designing', actor)
+      c.invalidate(
+        'artifact-drift',
+        actor,
+        'drift',
+        [{ type: 'design', files: ['design'] }],
+        dagFor(c),
+        'surgical',
+      )
+
+      const historyLength = c.history.length
+      const transitionedCount = c.history.filter((event) => event.type === 'transitioned').length
+
+      c.invalidate(
+        'artifact-drift',
+        actor,
+        'drift',
+        [{ type: 'design', files: ['design'] }],
+        dagFor(c),
+        'surgical',
+      )
+
+      expect(c.history).toHaveLength(historyLength)
+      expect(c.history.filter((event) => event.type === 'invalidated')).toHaveLength(1)
+      expect(c.history.filter((event) => event.type === 'transitioned')).toHaveLength(
+        transitionedCount,
+      )
+    })
+
+    it('deduped artifact-drift still materializes drift flags', () => {
+      const c = makeChangeWithChain()
+      c.transition('designing', actor)
+      c.invalidate(
+        'artifact-drift',
+        actor,
+        'drift',
+        [{ type: 'design', files: ['design'] }],
+        dagFor(c),
+        'none',
+      )
+
+      c.getArtifact('design')?.getFile('design')?.clearDrift()
+      const historyLength = c.history.length
+
+      c.invalidate(
+        'artifact-drift',
+        actor,
+        'drift',
+        [{ type: 'design', files: ['design'] }],
+        dagFor(c),
+        'none',
+      )
+
+      expect(c.history).toHaveLength(historyLength)
+      expect(c.getArtifact('design')?.getFile('design')?.hasDrift).toBe(true)
+    })
+
+    it('manual invalidation is never deduped', () => {
+      const c = makeChangeWithChain()
+      c.transition('designing', actor)
+      c.invalidate(
+        'artifact-drift',
+        actor,
+        'drift',
+        [{ type: 'design', files: ['design'] }],
+        dagFor(c),
+        'surgical',
+      )
+
+      const historyLength = c.history.length
+
+      c.invalidate(
+        'artifact-review-required',
+        actor,
+        'manual review',
+        [{ type: 'design', files: ['design'] }],
+        dagFor(c),
+        'surgical',
+      )
+
+      expect(c.history.length).toBeGreaterThan(historyLength)
+      expect(c.history.filter((event) => event.type === 'invalidated')).toHaveLength(2)
+    })
+
+    it('artifact-drift with expanded affected set is not deduped', () => {
+      const c = makeChangeWithChain()
+      c.transition('designing', actor)
+      c.invalidate(
+        'artifact-drift',
+        actor,
+        'drift',
+        [{ type: 'design', files: ['design'] }],
+        dagFor(c),
+        'downstream',
+      )
+
+      const historyLength = c.history.length
+
+      c.invalidate(
+        'artifact-drift',
+        actor,
+        'drift',
+        [{ type: 'proposal', files: ['proposal'] }],
+        dagFor(c),
+        'downstream',
+      )
+
+      expect(c.history.length).toBeGreaterThan(historyLength)
+      const invalidated = c.history.filter((event) => event.type === 'invalidated')
+      expect(invalidated).toHaveLength(2)
+      const last = invalidated.at(-1)
+      if (last?.type !== 'invalidated') {
+        throw new Error('expected invalidated event')
+      }
+      expect(last.affectedArtifacts.map((artifact) => artifact.type).sort()).toEqual([
+        'design',
+        'proposal',
+        'tasks',
+      ])
+    })
   })
 
   describe('recordSpecApproval', () => {

@@ -54,10 +54,12 @@ This ensures specd works correctly in git, Mercurial, Subversion, and non-VCS en
 
 ### Requirement: Auto-invalidation on get when artifact files drift
 
-When `ChangeRepository.get()` loads a change, the `FsChangeRepository` implementation must check whether any previously-validated artifact file has drifted — i.e. the file had a `validatedHash` set but now has a persisted or derived non-complete state caused by content drift. If drift is detected AND either of the following conditions holds, the repository must collect the full set of affected files per artifact, call `change.invalidate('artifact-drift', SYSTEM_ACTOR, ...)`, and persist the updated state before returning:
+When `ChangeRepository.get()` loads a change, the `FsChangeRepository` implementation must check whether any previously-validated artifact file has drifted — i.e. the file had a `validatedHash` set but now has a persisted or derived non-complete state caused by content drift. If drift is detected AND either of the following conditions holds, the repository must collect the full set of affected files per artifact, call `change.invalidate('artifact-drift', SYSTEM_ACTOR, ...)`, and persist the updated state before returning **only when** invalidation appends new history:
 
 1. The change is beyond `designing` state (has progressed past the initial design phase), OR
 2. The change has an active approval (spec approval or signoff) not superseded by a subsequent `invalidated` event.
+
+When the change is already in `designing` and the drift scope matches the most recent `artifact-drift` invalidation per `core:change`, repeated loads MUST NOT append duplicate history or rewrite the manifest. This keeps kernel-triggered status polls (Studio, API, CLI) honest and side-effect free when drift scope is unchanged.
 
 The invalidation payload must preserve every drifted file key for every affected artifact before the rollback is recorded. This ensures that both state-inconsistent artifact changes and approval drift are detected eagerly on any change load, not only during explicit validation. See [`core:change-repository-port`](../change-repository-port/spec.md) for the full port-level contract.
 

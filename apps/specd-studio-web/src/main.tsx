@@ -10,7 +10,10 @@ if (!root) {
 
 /** API base from `specd ui serve` (`SPECD_API_BASE_URL` → Vite define). */
 function resolveInjectedConnectionProfile(): SpecdAppProps['connectionProfile'] {
-  const raw = import.meta.env.VITE_SPECD_API_BASE_URL
+  const env = import.meta.env as ImportMetaEnv & {
+    readonly VITE_SPECD_API_BASE_URL?: unknown
+  }
+  const raw = env.VITE_SPECD_API_BASE_URL
   if (typeof raw !== 'string' || raw.length === 0) {
     return undefined
   }

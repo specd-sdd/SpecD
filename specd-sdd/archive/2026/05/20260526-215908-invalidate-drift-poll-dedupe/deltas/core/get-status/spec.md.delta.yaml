@@ -1,0 +1,17 @@
+- op: added
+  description: Status reads must not amplify invalidation on unchanged drift scope
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Returns the change and its artifact statuses'
+  content: |
+    ### Requirement: Read paths do not amplify artifact-drift invalidation
+
+    `GetStatus` loads changes through `ChangeRepository.get()`. When drift reconciliation runs during that load, repeated status polls with an unchanged drift scope MUST NOT cause additional `invalidated` history events or manifest rewrites.
+
+    This requirement aligns Studio and API polling with CLI honesty: observing status is not a mutating operation when lifecycle facts and drift scope are unchanged.
+
+    When drift scope changes (new drifted files appear or policy expansion yields a different affected set), normal auto-invalidation semantics apply and the full status payload reflects the new review state.

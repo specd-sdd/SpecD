@@ -370,7 +370,7 @@ export class ValidateArtifacts {
       const changeArtifact = change.getArtifact(artifactType.id)
       const trackedFile = changeArtifact?.getFile(fileKey)
       const validationFilename = resolveArtifactValidationFilename(trackedFile, expectedFilename)
-      if (trackedFile?.status === 'complete') {
+      if (trackedFile?.status === 'complete' && trackedFile.hasDrift !== true) {
         files.push({
           artifactId: artifactType.id,
           key: fileKey,
@@ -809,6 +809,7 @@ export class ValidateArtifacts {
 interface TrackedValidationFile {
   readonly filename: string
   readonly validatedHash: string | undefined
+  readonly hasDrift?: boolean
 }
 
 /**

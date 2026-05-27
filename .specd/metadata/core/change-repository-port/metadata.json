@@ -60,6 +60,12 @@
       ]
     },
     {
+      "requirement": "Idempotent drift reconciliation persistence",
+      "rules": [
+        "Drift reconciliation invoked during `get()` (and any shared hook used by load paths) MUST NOT rewrite the change manifest when `Change.invalidate('artifact-drift', ...)` is a deduped no-op per `core:change`.\n\nThe repository MUST detect whether new history was appended (for example by comparing history length or an explicit signal from the domain invalidation) **before** calling `_writeManifestAtomic` or equivalent direct manifest persistence.\n\nWhen invalidation is deduped:\n\n- The manifest file on disk MUST remain unchanged\n- `reconcileArtifactDrift()` (or the internal helper) MUST return `false`\n\nWhen invalidation appends new history:\n\n- The updated manifest MUST be persisted atomically before the loaded change is returned\n- The helper MUST return `true`\n\nRepeated read-only loads with unchanged drift scope MUST therefore be safe for polling clients: history event count and manifest revision MUST remain stable across consecutive polls."
+      ]
+    },
+    {
       "requirement": "list returns active changes in creation order",
       "rules": [
         "`list()` MUST return all active (non-drafted, non-discarded) changes sorted by creation order, oldest first. Each returned `Change` MUST include artifact state (derived statuses) but MUST NOT include artifact content. Content is loaded on demand via `artifact()`."
@@ -377,6 +383,38 @@
       "then": ["no invalidation occurs"]
     },
     {
+      "requirement": "Idempotent drift reconciliation persistence",
+      "name": "First drift load persists invalidation",
+      "given": [
+        "a persisted change beyond designing with a validated artifact file that has drifted on disk"
+      ],
+      "when": ["FsChangeRepository.get() loads the change"],
+      "then": [
+        "an invalidated event with cause: 'artifact-drift' is recorded",
+        "AND the manifest is persisted before return"
+      ]
+    },
+    {
+      "requirement": "Idempotent drift reconciliation persistence",
+      "name": "Repeated get with unchanged drift scope does not rewrite manifest",
+      "given": [
+        "a change already in designing with a persisted artifact-drift invalidation for the current drift scope",
+        "AND on-disk artifact content still matches the drifted state detected on the prior load"
+      ],
+      "when": ["FsChangeRepository.get() is called twice in succession"],
+      "then": [
+        "the second load does not append another invalidated event",
+        "AND the manifest file mtime and history length remain unchanged after the second load"
+      ]
+    },
+    {
+      "requirement": "Idempotent drift reconciliation persistence",
+      "name": "reconcileArtifactDrift returns false on deduped no-op",
+      "given": ["drift reconciliation detects drift but domain invalidation dedupes"],
+      "when": ["reconcileArtifactDrift() completes"],
+      "then": ["it returns false", "AND no manifest write occurs"]
+    },
+    {
       "requirement": "list returns active changes in creation order",
       "name": "Mixed active and drafted changes",
       "given": [
@@ -660,22 +698,20 @@
     }
   ],
   "implementation": {
-    "symbols": [
+    "files": [
       {
         "specId": "core:change-repository-port",
-        "file": "core:src/application/ports/change-repository.ts",
-        "symbol": "ChangeRepository"
+        "file": "core:test/infrastructure/fs/change-repository.spec.ts"
       },
       {
         "specId": "core:change-repository-port",
-        "file": "core:src/infrastructure/fs/change-repository.ts",
-        "symbol": "FsChangeRepository"
+        "file": "core:src/infrastructure/fs/change-repository.ts"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:0e4cd726e40c61afd562c14c9456d4e1bb89bc41542806841a94eb2166083592",
-    "verify.md": "sha256:00b95e59b0567d46f1b3d83f4f2c4cc789a20015aeec63690501e5f55394be5a"
+    "spec.md": "sha256:bea9d27028a17fb6c7920ed590eb8825a46bf355aaeaeb01b946d095b7e95b91",
+    "verify.md": "sha256:af0ac9dbdea3a032f330f3297a33e776be8605cb0ff9fcc6636debce30310d25"
   },
   "generatedBy": "core"
 }

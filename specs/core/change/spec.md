@@ -369,6 +369,8 @@ The effective invalidation policy is resolved from the override when present, ot
 
 Regardless of policy, invalidation SHALL append an `invalidated` history event and return the change to `designing` when the change was previously in another lifecycle state.
 
+**Idempotent artifact-drift:** When `cause === 'artifact-drift'`, the change is already in `designing`, the most recent `invalidated` event has `cause: 'artifact-drift'`, and the policy-expanded `affectedArtifacts` set is equivalent to that event's payload (artifact type IDs with sorted file keys per type), the call MUST NOT append a new `invalidated` or `transitioned` event. Focused drift files from the caller payload MAY still materialize `hasDrift`. This dedupe MUST NOT apply to other invalidation causes.
+
 Artifact/file-state consequences follow the effective policy:
 
 - `none` — no artifact/file enters a reopened review state solely because of invalidation

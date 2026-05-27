@@ -15,8 +15,11 @@
   ],
   "implementation": [
     {
-      "file": "core:src/application/use-cases/create-change.ts",
-      "symbols": ["CreateChange"]
+      "file": "core:src/domain/entities/change.ts",
+      "symbols": ["invalidate"]
+    },
+    {
+      "file": "core:test/domain/entities/change.spec.ts"
     }
   ]
 }

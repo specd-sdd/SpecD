@@ -1267,6 +1267,7 @@ export class FsChangeRepository extends ChangeRepository {
   ): Promise<boolean> {
     const excluded = new Set(options?.excludeFileKeys ?? [])
     const driftedFilesByArtifact = new Map<string, Set<string>>()
+    let clearedAnyDrift = false
     for (const [, artifact] of change.artifacts) {
       for (const [, file] of artifact.files) {
         if (excluded.has(file.key)) continue
@@ -1291,7 +1292,17 @@ export class FsChangeRepository extends ChangeRepository {
             artifact.optional,
             artifactTypeMap.get(artifact.type)?.preHashCleanup ?? [],
           )
-          drifted = derivedStatus !== 'complete'
+          if (derivedStatus === 'complete') {
+            // Drift is a diagnostic flag that must clear once the validated baseline matches again.
+            // This prevents persistent `complete-with-drift` after revalidation or manual reconciliation.
+            if (file.hasDrift) {
+              file.clearDrift()
+              clearedAnyDrift = true
+            }
+            drifted = false
+          } else {
+            drifted = true
+          }
         } else {
           drifted = true
         }
@@ -1302,12 +1313,18 @@ export class FsChangeRepository extends ChangeRepository {
         }
       }
     }
-    if (driftedFilesByArtifact.size === 0) return false
+    if (driftedFilesByArtifact.size === 0) {
+      if (clearedAnyDrift) {
+        await this._writeManifestAtomic(dir, changeToManifest(change))
+      }
+      return false
+    }
 
     const affectedArtifacts = [...driftedFilesByArtifact.entries()].map(([type, files]) => ({
       type,
       files: [...files].sort(),
     }))
+    const beforeHistoryLength = change.history.length
     change.invalidate(
       'artifact-drift',
       SYSTEM_ACTOR,
@@ -1317,6 +1334,9 @@ export class FsChangeRepository extends ChangeRepository {
       affectedArtifacts,
       ArtifactDag.from(artifactTypes),
     )
+    if (change.history.length === beforeHistoryLength) {
+      return false
+    }
     await this._writeManifestAtomic(dir, changeToManifest(change))
     return true
   }

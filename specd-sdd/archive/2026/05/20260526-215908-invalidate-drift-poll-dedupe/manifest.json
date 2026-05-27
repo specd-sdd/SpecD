@@ -1,0 +1,761 @@
+{
+  "name": "invalidate-drift-poll-dedupe",
+  "createdAt": "2026-05-26T21:59:08.562Z",
+  "updatedAt": "2026-05-26T23:26:35.783Z",
+  "description": "Deduplicate artifact-drift invalidation during repeated change loads so status polling and repository reads stop rewriting manifests when the drift scope has not changed. The implementation makes artifact-drift invalidation idempotent in the domain, prevents no-op manifest writes during drift reconciliation and implementation-tracking refresh, and preserves honest polling behavior while keeping drift flags and validation recovery intact.",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": ["core:change", "core:change-repository-port", "core:kernel", "core:get-status"],
+  "specDependsOn": {
+    "core:change": [
+      "core:change-manifest",
+      "core:workflow-model",
+      "core:spec-metadata",
+      "core:spec-id-format",
+      "default:_global/architecture",
+      "core:lifecycle-engine",
+      "default:_global/logging",
+      "core:implementation-detector-port"
+    ],
+    "core:change-repository-port": [
+      "core:repository-port",
+      "default:_global/architecture",
+      "core:change",
+      "core:read-only-change-view",
+      "core:drafted-change-view",
+      "core:discarded-change-view",
+      "core:drafted-change-read-only-error",
+      "core:storage",
+      "core:change-manifest",
+      "default:_global/logging"
+    ],
+    "core:kernel": [
+      "default:_global/architecture",
+      "core:composition",
+      "core:create-change",
+      "core:get-status",
+      "core:transition-change",
+      "core:draft-change",
+      "core:restore-change",
+      "core:discard-change",
+      "core:archive-change",
+      "core:validate-artifacts",
+      "core:compile-context",
+      "core:list-changes",
+      "core:list-drafts",
+      "core:list-discarded",
+      "core:edit-change",
+      "core:skip-artifact",
+      "core:update-spec-deps",
+      "core:list-archived",
+      "core:get-archived-change",
+      "core:run-step-hooks",
+      "core:get-hook-instructions",
+      "core:get-artifact-instruction",
+      "core:approve-spec",
+      "core:approve-signoff",
+      "core:list-specs",
+      "core:get-spec",
+      "core:save-spec-metadata",
+      "core:invalidate-spec-metadata",
+      "core:get-active-schema",
+      "core:validate-specs",
+      "core:generate-metadata",
+      "core:get-spec-context",
+      "core:init-project",
+      "core:record-skill-install",
+      "core:get-skills-manifest",
+      "core:get-project-context",
+      "core:resolve-schema",
+      "core:spec-overlap"
+    ],
+    "core:get-status": [
+      "core:change",
+      "core:kernel",
+      "core:transition-change",
+      "core:schema-format",
+      "core:config",
+      "core:lifecycle-engine",
+      "core:refresh-implementation-tracking"
+    ]
+  },
+  "invalidationPolicy": "none",
+  "trackedImplementationFiles": [
+    {
+      "file": "docs/api/index.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/api/openapi.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/api/routes.md",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/api/package.json",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/api/src/composition/create-api-server.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/api/src/delivery/http/handlers/handler-archived-changes.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/api/src/delivery/http/handlers/handler-changes-collection.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/api/src/delivery/http/handlers/handler-changes-mutate.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/api/src/delivery/http/handlers/handler-changes-read.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/api/src/delivery/http/handlers/handler-graph.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/api/src/delivery/http/handlers/handler-project-logs.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/api/src/delivery/http/handlers/handler-project.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/api/src/delivery/http/handlers/handler-specs-mutate.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/api/src/delivery/http/handlers/handler-specs-read.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/api/src/delivery/http/handlers/handler-workspaces.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/api/src/delivery/http/register-routes.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/api/test/changes.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/api/test/graph.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/api/test/meta.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/api/test/specs.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/validate-artifacts.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/domain/entities/change.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/infrastructure/fs/change-repository.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/validate-artifacts.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "pnpm-lock.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260525-072534-specd-studio/manifest.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260525-072534-specd-studio/specs/api/openapi-docs-route/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260525-072534-specd-studio/specs/api/openapi-docs-route/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260525-072534-specd-studio/specs/api/openapi-generation/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260525-072534-specd-studio/specs/api/openapi-generation/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "_specd-shared/shared.md",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/api/src/delivery/http/openapi-schemas.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/api/src/delivery/http/route-schema.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260526-215908-invalidate-drift-poll-dedupe/.specd-exploration.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260526-215908-invalidate-drift-poll-dedupe/deltas/core/change-repository-port/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260526-215908-invalidate-drift-poll-dedupe/deltas/core/change-repository-port/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260526-215908-invalidate-drift-poll-dedupe/deltas/core/change/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260526-215908-invalidate-drift-poll-dedupe/deltas/core/change/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260526-215908-invalidate-drift-poll-dedupe/deltas/core/get-status/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260526-215908-invalidate-drift-poll-dedupe/deltas/core/get-status/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260526-215908-invalidate-drift-poll-dedupe/deltas/core/kernel/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260526-215908-invalidate-drift-poll-dedupe/deltas/core/kernel/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260526-215908-invalidate-drift-poll-dedupe/design.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260526-215908-invalidate-drift-poll-dedupe/manifest.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260526-215908-invalidate-drift-poll-dedupe/proposal.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260526-215908-invalidate-drift-poll-dedupe/tasks.md",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/get-status.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/infrastructure/fs/change-repository.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/domain/entities/change.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/refresh-implementation-tracking.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/refresh-implementation-tracking.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "apps/specd-studio-web/src/main.tsx",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/ui/src/shell/ShellLayout.tsx",
+      "state": "ignored"
+    }
+  ],
+  "implementationLinks": [
+    {
+      "specId": "core:change",
+      "file": "packages/core/src/domain/entities/change.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["invalidate"]
+    },
+    {
+      "specId": "core:get-status",
+      "file": "packages/core/test/application/use-cases/get-status.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:change-repository-port",
+      "file": "packages/core/test/infrastructure/fs/change-repository.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:kernel",
+      "file": "packages/core/test/application/use-cases/get-status.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:change-repository-port",
+      "file": "packages/core/src/infrastructure/fs/change-repository.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:change",
+      "file": "packages/core/test/domain/entities/change.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:get-status",
+      "file": "packages/core/src/application/use-cases/refresh-implementation-tracking.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["execute"]
+    },
+    {
+      "specId": "core:get-status",
+      "file": "packages/core/test/application/use-cases/refresh-implementation-tracking.spec.ts",
+      "fileLinkExplicit": true
+    }
+  ],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:40c11c2bc686bd5fc41b760de5c61dee1a8b29ae36bf2c0e73207beab38ee209"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:change",
+          "filename": "deltas/core/change/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:6e07fa937a75c7d6c24793048360f03557d0209e90d547fa553cee265f9d3b16"
+        },
+        {
+          "key": "core:change-repository-port",
+          "filename": "deltas/core/change-repository-port/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:2105fd5af35f6dc7d09f0a9ed42072b39969cf0f399b3bb7b729ae7b0a3504e8"
+        },
+        {
+          "key": "core:kernel",
+          "filename": "deltas/core/kernel/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:751db59d779481bdc8d41327eda0b4e79bcff4ccd4caae5c52bbf1862f4239ad"
+        },
+        {
+          "key": "core:get-status",
+          "filename": "deltas/core/get-status/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:408b878b3e1dc8ee2b51608756547843d33a85c1a9a951d42046157703323a99"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:change",
+          "filename": "deltas/core/change/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:82027eb836d0974f735328cfd1a92449e70fe0e65adcd232b4b670bd9517d630"
+        },
+        {
+          "key": "core:change-repository-port",
+          "filename": "deltas/core/change-repository-port/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:6203930ed9dfd9716300be870d3f0b836c014f171d87904a004163075df7fd4c"
+        },
+        {
+          "key": "core:kernel",
+          "filename": "deltas/core/kernel/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:dfca3d7b72a7fe518dc509b332849f0dad0a596b4337d5c7cca9e615e80f9e7a"
+        },
+        {
+          "key": "core:get-status",
+          "filename": "deltas/core/get-status/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:c535947b93483d8c1d99d7a0c8852582a632b7be9d2828e3ece8ed34868ba1e2"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:6d8ac0daa70629655b46ce75e9154eae8e25f9d725148d74021b0c7d2ee9fe20"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:aa66befa9c0d3231a0f1d0ab4da0a5dcb75f2382161b933365760c2d46265ef7"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-05-26T21:59:08.562Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": ["core:change", "core:change-repository-port", "core:kernel", "core:get-status"],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-05-26T21:59:08.580Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "core:change"
+        },
+        {
+          "type": "specs",
+          "key": "core:change-repository-port"
+        },
+        {
+          "type": "specs",
+          "key": "core:kernel"
+        },
+        {
+          "type": "specs",
+          "key": "core:get-status"
+        },
+        {
+          "type": "verify",
+          "key": "core:change"
+        },
+        {
+          "type": "verify",
+          "key": "core:change-repository-port"
+        },
+        {
+          "type": "verify",
+          "key": "core:kernel"
+        },
+        {
+          "type": "verify",
+          "key": "core:get-status"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-26T22:01:23.653Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-26T22:03:55.582Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: verify [core:change-repository-port]",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": ["core:change-repository-port"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-26T22:04:15.853Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-26T22:04:18.587Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: verify [core:change-repository-port]",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": ["core:change-repository-port"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-26T22:04:18.587Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-26T22:04:27.655Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-26T22:04:27.985Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: verify [core:change-repository-port]",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": ["core:change-repository-port"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-26T22:04:27.985Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-26T22:04:44.521Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-26T22:04:45.528Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: verify [core:change-repository-port]",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": ["core:change-repository-port"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-26T22:04:45.528Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-26T22:44:00.625Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-26T22:45:26.516Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-26T22:46:56.222Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-26T23:16:54.954Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-26T23:20:32.719Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-26T23:21:07.259Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "description-updated",
+      "at": "2026-05-26T23:23:56.368Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "description": "Deduplicate artifact-drift invalidation during repeated change loads so status polling and repository reads stop rewriting manifests when the drift scope has not changed. The implementation makes artifact-drift invalidation idempotent in the domain, prevents no-op manifest writes during drift reconciliation and implementation-tracking refresh, and preserves honest polling behavior while keeping drift flags and validation recovery intact."
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-26T23:26:35.783Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-05-26T23:26:35.871Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "1***i@u***.com",
+    "provider": "git"
+  }
+}

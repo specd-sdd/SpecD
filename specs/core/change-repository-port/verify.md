@@ -170,6 +170,32 @@
 - **WHEN** `FsChangeRepository.get()` is called
 - **THEN** no invalidation occurs
 
+### Requirement: Idempotent drift reconciliation persistence
+
+Drift reconciliation during `get()` MUST NOT rewrite the manifest when artifact-drift invalidation is deduped per `core:change`.
+
+#### Scenario: First drift load persists invalidation
+
+- **GIVEN** a persisted change beyond `designing` with a validated artifact file that has drifted on disk
+- **WHEN** `FsChangeRepository.get()` loads the change
+- **THEN** an `invalidated` event with `cause: 'artifact-drift'` is recorded
+- **AND** the manifest is persisted before return
+
+#### Scenario: Repeated get with unchanged drift scope does not rewrite manifest
+
+- **GIVEN** a change already in `designing` with a persisted `artifact-drift` invalidation for the current drift scope
+- **AND** on-disk artifact content still matches the drifted state detected on the prior load
+- **WHEN** `FsChangeRepository.get()` is called twice in succession
+- **THEN** the second load does not append another `invalidated` event
+- **AND** the manifest file mtime and history length remain unchanged after the second load
+
+#### Scenario: reconcileArtifactDrift returns false on deduped no-op
+
+- **GIVEN** drift reconciliation detects drift but domain invalidation dedupes
+- **WHEN** `reconcileArtifactDrift()` completes
+- **THEN** it returns `false`
+- **AND** no manifest write occurs
+
 ### Requirement: list returns active changes in creation order
 
 #### Scenario: Mixed active and drafted changes

@@ -14,8 +14,14 @@
   ],
   "implementation": [
     {
-      "file": "core:src/application/use-cases/get-status.ts",
-      "symbols": ["GetStatus"]
+      "file": "core:test/application/use-cases/get-status.spec.ts"
+    },
+    {
+      "file": "core:src/application/use-cases/refresh-implementation-tracking.ts",
+      "symbols": ["execute"]
+    },
+    {
+      "file": "core:test/application/use-cases/refresh-implementation-tracking.spec.ts"
     }
   ]
 }

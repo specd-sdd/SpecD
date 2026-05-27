@@ -942,6 +942,54 @@ describe('ValidateArtifacts', () => {
       expect(mutateSpy).toHaveBeenCalledWith('c', expect.any(Function))
     })
 
+    it('revalidates complete files that still carry drift and updates the hash', async () => {
+      const specsType = makeArtifactType('specs', { format: 'markdown' })
+      const schema = makeSchema([specsType])
+      const rawContent = 'updated spec content'
+      const specsArtifact = new ChangeArtifact({
+        type: 'specs',
+        files: new Map([
+          [
+            'specs',
+            new ArtifactFile({
+              key: 'specs',
+              filename: 'spec.md',
+              status: 'complete',
+              validatedHash: 'sha256:stale',
+              hasDrift: true,
+            }),
+          ],
+        ]),
+      })
+      const change = makeChangeWithArtifacts('c', [specsArtifact])
+
+      const repo = makeChangeRepository([change])
+      Object.assign(repo, {
+        async artifact(_change: Change, filename: string): Promise<SpecArtifact | null> {
+          return filename === 'spec.md' ? new SpecArtifact(filename, rawContent) : null
+        },
+      })
+
+      const uc = new ValidateArtifacts(
+        repo,
+        new Map(),
+        makeSchemaProvider(schema),
+        makeParsers(),
+        makeActorResolver(),
+        makeContentHasher(),
+      )
+
+      await uc.execute({
+        name: 'c',
+        specPath: 'default:auth',
+      })
+
+      const saved = repo.store.get('c')
+      const file = saved?.getArtifact('specs')?.getFile('specs')
+      expect(file?.validatedHash).toBe(sha256(rawContent))
+      expect(file?.hasDrift).toBe(false)
+    })
+
     it('applies preHashCleanup before computing hash', async () => {
       const specsType = makeArtifactType('specs', {
         format: 'markdown',

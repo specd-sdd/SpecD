@@ -710,8 +710,54 @@ export class Change {
     const effectivePolicy = this._resolveInvalidationPolicy(invalidationPolicyOverride)
     const expanded = this._expandAffectedArtifacts(affectedArtifacts, effectivePolicy, artifactDag)
 
-    const from = this.state
     const now = new Date()
+    const lastInvalidated = (() => {
+      for (let i = this._history.length - 1; i >= 0; i--) {
+        const evt = this._history[i]
+        if (evt?.type === 'invalidated') return evt
+      }
+      return undefined
+    })()
+
+    const normalizeAffected = (entries: readonly InvalidatedArtifactEntry[]): string => {
+      const map = new Map<string, readonly string[]>()
+      for (const entry of entries) {
+        map.set(entry.type, [...entry.files].sort())
+      }
+      return JSON.stringify(
+        [...map.entries()]
+          .sort(([a], [b]) => a.localeCompare(b))
+          .map(([type, files]) => ({
+            type,
+            files,
+          })),
+      )
+    }
+
+    // Dedupe repeated invalidations.
+    // Polling status reads can trigger drift reconciliation; when drift remains, we must not
+    // keep appending identical `invalidated` events (and rewriting manifests) on every poll.
+    if (
+      cause === 'artifact-drift' &&
+      lastInvalidated !== undefined &&
+      lastInvalidated.cause === cause &&
+      this.state === 'designing' &&
+      normalizeAffected(lastInvalidated.affectedArtifacts) === normalizeAffected(expanded)
+    ) {
+      if (cause === 'artifact-drift') {
+        for (const entry of affectedArtifacts) {
+          const artifact = this._artifacts.get(entry.type)
+          if (artifact === undefined) continue
+          for (const key of entry.files) {
+            const file = artifact.getFile(key)
+            if (file !== undefined) file.markDrifted()
+          }
+        }
+      }
+      return expanded
+    }
+
+    const from = this.state
     this._history.push({
       type: 'invalidated',
       cause,

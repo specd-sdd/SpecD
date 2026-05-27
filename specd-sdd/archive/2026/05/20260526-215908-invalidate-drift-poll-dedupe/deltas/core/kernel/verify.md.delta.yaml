@@ -1,0 +1,16 @@
+- op: added
+  description: Verify repeated kernel loads do not amplify drift history
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Auto-invalidation on get when artifact files drift'
+    after:
+      type: section
+      matches: 'Scenario: Historical artifact-change events remain readable through kernel loads'
+  content: |
+    #### Scenario: Repeated kernel load with unchanged drift scope is idempotent
+
+    - **GIVEN** a change already in `designing` with a persisted `artifact-drift` invalidation for the current drift scope
+    - **WHEN** a kernel use case loads that change through `ChangeRepository.get()` twice without mutating artifacts
+    - **THEN** the second load does not append another `invalidated` event
+    - **AND** the manifest on disk is unchanged after the second load

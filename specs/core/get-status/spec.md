@@ -85,6 +85,14 @@ Each review file entry inside `affectedArtifacts` MUST contain:
 
 `GetStatus` MUST resolve `review.affectedArtifacts` against the current artifact file entries so agent-facing consumers can inspect the actual file directly. The outward-facing review summary MUST prioritize `filename` and `path`; consumers must not need to understand manifest-internal file keys in order to locate the affected artifact.
 
+### Requirement: Read paths do not amplify artifact-drift invalidation
+
+`GetStatus` loads changes through `ChangeRepository.get()`. When drift reconciliation runs during that load, repeated status polls with an unchanged drift scope MUST NOT cause additional `invalidated` history events or manifest rewrites.
+
+This requirement aligns Studio and API polling with CLI honesty: observing status is not a mutating operation when lifecycle facts and drift scope are unchanged.
+
+When drift scope changes (new drifted files appear or policy expansion yields a different affected set), normal auto-invalidation semantics apply and the full status payload reflects the new review state.
+
 ### Requirement: Drafted change read-only status
 
 When `GetStatus` loads a change exclusively via `getDraft`, the result MUST satisfy [`core:drafted-change-view`](../drafted-change-view/spec.md).

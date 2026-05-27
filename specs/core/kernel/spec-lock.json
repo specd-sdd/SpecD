@@ -1,0 +1,51 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "default:_global/architecture",
+    "core:composition",
+    "core:create-change",
+    "core:get-status",
+    "core:transition-change",
+    "core:draft-change",
+    "core:restore-change",
+    "core:discard-change",
+    "core:archive-change",
+    "core:validate-artifacts",
+    "core:compile-context",
+    "core:list-changes",
+    "core:list-drafts",
+    "core:list-discarded",
+    "core:edit-change",
+    "core:skip-artifact",
+    "core:update-spec-deps",
+    "core:list-archived",
+    "core:get-archived-change",
+    "core:run-step-hooks",
+    "core:get-hook-instructions",
+    "core:get-artifact-instruction",
+    "core:approve-spec",
+    "core:approve-signoff",
+    "core:list-specs",
+    "core:get-spec",
+    "core:save-spec-metadata",
+    "core:invalidate-spec-metadata",
+    "core:get-active-schema",
+    "core:validate-specs",
+    "core:generate-metadata",
+    "core:get-spec-context",
+    "core:init-project",
+    "core:record-skill-install",
+    "core:get-skills-manifest",
+    "core:get-project-context",
+    "core:resolve-schema",
+    "core:spec-overlap"
+  ],
+  "implementation": [
+    {
+      "file": "core:test/application/use-cases/get-status.spec.ts"
+    }
+  ]
+}

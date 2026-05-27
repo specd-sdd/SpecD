@@ -1425,6 +1425,92 @@ describe('FsChangeRepository', () => {
       expect(loaded?.state).toBe('implementing')
       expect(loaded?.getArtifact('proposal')?.getFile('proposal')?.validatedHash).toBe(proposalHash)
     })
+
+    it('repeated get with unchanged drift scope does not rewrite manifest', async () => {
+      const designContent = '# Design\n'
+      const designHash = sha256(designContent)
+
+      const at = new Date('2024-01-15T10:00:00.000Z')
+      const change = new Change({
+        name: 'c4',
+        createdAt: at,
+        specIds: ['auth/login'],
+        history: [
+          {
+            type: 'created',
+            at,
+            by: actor,
+            specIds: ['auth/login'],
+            schemaName: '@specd/schema-std',
+            schemaVersion: 1,
+          },
+          { type: 'transitioned', from: 'drafting', to: 'designing', at, by: actor },
+          {
+            type: 'invalidated',
+            at,
+            by: actor,
+            cause: 'artifact-drift',
+            message: 'drift',
+            affectedArtifacts: [{ type: 'design', files: ['design'] }],
+          },
+        ],
+        artifacts: new Map([
+          [
+            'design',
+            new ChangeArtifact({
+              type: 'design',
+              requires: [],
+              files: new Map([
+                [
+                  'design',
+                  new ArtifactFile({
+                    key: 'design',
+                    filename: 'design.md',
+                    validatedHash: designHash,
+                    hasDrift: true,
+                  }),
+                ],
+              ]),
+            }),
+          ],
+        ]),
+      })
+
+      const repo = makeRepoWithTypes(ctx.tmpDir, [
+        new ArtifactType({
+          id: 'design',
+          scope: 'change',
+          output: 'design.md',
+          requires: [],
+          validations: [],
+          deltaValidations: [],
+          preHashCleanup: [],
+        }),
+      ])
+      await repo.save(change)
+
+      const dir = path.join(ctx.changesPath, '20240115-100000-c4')
+      const manifestPath = path.join(dir, 'manifest.json')
+      await fs.writeFile(path.join(dir, 'design.md'), '# Design MODIFIED\n', 'utf8')
+
+      const first = await repo.get('c4')
+      const firstManifest = JSON.parse(await fs.readFile(manifestPath, 'utf8')) as {
+        history: unknown[]
+      }
+      const firstStat = await fs.stat(manifestPath)
+
+      await new Promise((resolve) => setTimeout(resolve, 20))
+
+      const second = await repo.get('c4')
+      const secondManifest = JSON.parse(await fs.readFile(manifestPath, 'utf8')) as {
+        history: unknown[]
+      }
+      const secondStat = await fs.stat(manifestPath)
+
+      expect(first?.history).toHaveLength(second?.history.length ?? -1)
+      expect(firstManifest.history).toHaveLength(secondManifest.history.length)
+      expect(secondStat.mtimeMs).toBe(firstStat.mtimeMs)
+    })
   })
 
   describe('unscaffold', () => {

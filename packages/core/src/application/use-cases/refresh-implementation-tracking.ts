@@ -47,13 +47,28 @@ export class RefreshImplementationTracking {
   async execute(
     input: RefreshImplementationTrackingInput,
   ): Promise<RefreshImplementationTrackingResult> {
-    const implementationTracking = await this._changes.mutate(input.name, async (freshChange) => {
-      if (freshChange.getHistoricalImplementationAt() !== null) {
-        const files = await this._implementationDetector.detectModifiedFiles(freshChange)
-        for (const file of files) {
-          if (freshChange.trackedImplementationFiles.some((entry) => entry.file === file)) continue
-          freshChange.trackImplementationFile(file, 'open')
-        }
+    const change = await this._changes.get(input.name)
+    if (change === null) {
+      throw new ChangeNotFoundError(input.name)
+    }
+
+    if (change.getHistoricalImplementationAt() === null) {
+      return { implementationTracking: projectImplementationTracking(change) }
+    }
+
+    const files = await this._implementationDetector.detectModifiedFiles(change)
+    const newFiles = files.filter(
+      (file) => !change.trackedImplementationFiles.some((entry) => entry.file === file),
+    )
+
+    if (newFiles.length === 0) {
+      return { implementationTracking: projectImplementationTracking(change) }
+    }
+
+    const implementationTracking = await this._changes.mutate(input.name, (freshChange) => {
+      for (const file of newFiles) {
+        if (freshChange.trackedImplementationFiles.some((entry) => entry.file === file)) continue
+        freshChange.trackImplementationFile(file, 'open')
       }
       return projectImplementationTracking(freshChange)
     })

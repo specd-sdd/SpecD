@@ -1,10 +1,16 @@
 import { describe, it, expect, vi } from 'vitest'
+import { mkdtemp, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
 import { GetStatus } from '../../../src/application/use-cases/get-status.js'
 import { ChangeNotFoundError } from '../../../src/application/errors/change-not-found-error.js'
 import { ChangeArtifact } from '../../../src/domain/entities/change-artifact.js'
+import { Change, type ChangeEvent } from '../../../src/domain/entities/change.js'
 import { ArtifactFile } from '../../../src/domain/value-objects/artifact-file.js'
+import { ArtifactType } from '../../../src/domain/value-objects/artifact-type.js'
 import { SpecArtifact } from '../../../src/domain/value-objects/spec-artifact.js'
 import { VALID_TRANSITIONS } from '../../../src/domain/value-objects/change-state.js'
+import { FsChangeRepository } from '../../../src/infrastructure/fs/change-repository.js'
 import {
   makeChangeRepository,
   makeChange,
@@ -422,6 +428,114 @@ describe('GetStatus', () => {
 
       expect(result.review.reason).toBe('artifact-drift')
       expect(result.review.overlapDetail).toEqual([])
+    })
+
+    it('repeated GetStatus with unchanged drift does not grow history', async () => {
+      const baseDir = await mkdtemp(path.join(tmpdir(), 'specd-get-status-'))
+      try {
+        const changesPath = path.join(baseDir, 'changes')
+        const draftsPath = path.join(baseDir, 'drafts')
+        const discardedPath = path.join(baseDir, 'discarded')
+        await mkdir(changesPath, { recursive: true })
+        await mkdir(draftsPath, { recursive: true })
+        await mkdir(discardedPath, { recursive: true })
+
+        const repo = new FsChangeRepository({
+          workspace: 'default',
+          ownership: 'owned',
+          isExternal: false,
+          configPath: '/test',
+          changesPath,
+          draftsPath,
+          discardedPath,
+          artifactTypes: [
+            new ArtifactType({
+              id: 'proposal',
+              scope: 'change',
+              output: 'proposal.md',
+              requires: [],
+              validations: [],
+              deltaValidations: [],
+              preHashCleanup: [],
+            }),
+          ],
+        })
+
+        const at = new Date('2024-01-15T10:00:00.000Z')
+        const proposalHash = 'sha256:proposal'
+        const change = new Change({
+          name: 'polling-change',
+          createdAt: at,
+          specIds: ['default:auth/login'],
+          history: [
+            {
+              type: 'created',
+              at,
+              by: testActor,
+              specIds: ['default:auth/login'],
+              schemaName: '@specd/schema-std',
+              schemaVersion: 1,
+            },
+            { type: 'transitioned', from: 'drafting', to: 'designing', at, by: testActor },
+            {
+              type: 'invalidated',
+              at,
+              by: testActor,
+              cause: 'artifact-drift',
+              message: 'drift',
+              affectedArtifacts: [{ type: 'proposal', files: ['proposal'] }],
+            },
+          ] satisfies ChangeEvent[],
+          artifacts: new Map([
+            [
+              'proposal',
+              new ChangeArtifact({
+                type: 'proposal',
+                requires: [],
+                files: new Map([
+                  [
+                    'proposal',
+                    new ArtifactFile({
+                      key: 'proposal',
+                      filename: 'proposal.md',
+                      status: 'complete',
+                      validatedHash: proposalHash,
+                      hasDrift: true,
+                    }),
+                  ],
+                ]),
+              }),
+            ],
+          ]),
+        })
+        await repo.save(change)
+
+        const dir = path.join(changesPath, '20240115-100000-polling-change')
+        const manifestPath = path.join(dir, 'manifest.json')
+        await writeFile(path.join(dir, 'proposal.md'), '# Proposal drifted\n', 'utf8')
+
+        const uc = new GetStatus(repo, makeSchemaProvider(makeStdSchema()), defaultApprovals)
+        await uc.execute({ name: 'polling-change' })
+        const firstManifest = JSON.parse(await readFile(manifestPath, 'utf8')) as {
+          history: unknown[]
+        }
+        const firstStat = await stat(manifestPath)
+
+        await new Promise((resolve) => setTimeout(resolve, 20))
+
+        const result = await uc.execute({ name: 'polling-change' })
+        const secondManifest = JSON.parse(await readFile(manifestPath, 'utf8')) as {
+          history: unknown[]
+        }
+        const secondStat = await stat(manifestPath)
+
+        expect(result.change).toBeDefined()
+        expect(result.change?.state).toBe('designing')
+        expect(secondManifest.history).toHaveLength(firstManifest.history.length)
+        expect(secondStat.mtimeMs).toBe(firstStat.mtimeMs)
+      } finally {
+        await rm(baseDir, { recursive: true, force: true })
+      }
     })
 
     it('returns empty overlapDetail when no invalidation exists', async () => {
