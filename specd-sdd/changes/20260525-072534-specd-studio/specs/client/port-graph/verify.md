@@ -10,6 +10,12 @@
 - **THEN** each method maps to documented `/v1` route
 - **AND** types match DTO specs
 
+#### Scenario: indexGraph returns index summary
+
+- **WHEN** `indexGraph({ force })` is called
+- **THEN** remote adapter POSTs that `force` flag to `/v1/graph/index`
+- **AND** the returned data shape is the graph-index result DTO
+
 #### Scenario: List changes hits collection HTTP route
 
 - **WHEN** `listChanges()` is called on remote adapter

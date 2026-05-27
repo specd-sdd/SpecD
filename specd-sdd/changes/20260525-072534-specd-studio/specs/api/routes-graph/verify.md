@@ -28,7 +28,26 @@
 
 - **WHEN** client posts to index endpoint
 - **THEN** kernel/code-graph index runs
-- **AND** HTTP 202 or 200 with job status
+- **AND** HTTP 200 returns indexing summary DTO
+
+#### Scenario: Index always rebuilds the full project graph
+
+- **WHEN** `POST /v1/graph/index` runs
+- **THEN** the index request covers all configured workspaces
+- **AND** cross-workspace graph links remain in scope
+
+#### Scenario: Force reindex recreates graph storage first
+
+- **WHEN** client posts `{ "force": true }` to `/v1/graph/index`
+- **THEN** persistent graph storage is recreated before indexing
+- **AND** the response still returns the indexing summary DTO
+
+#### Scenario: Index rejects unsupported body properties
+
+- **WHEN** client posts `{ "workspaces": ["api", "client"] }` to `/v1/graph/index`
+- **THEN** HTTP 400 is returned
+- **AND** body is `application/problem+json`
+- **AND** code is `INVALID_REQUEST`
 
 #### Scenario: Index completion updates freshness
 

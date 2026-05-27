@@ -24,14 +24,12 @@ All paths are under the `/v1` prefix. Query and body fields mirror CLI/kernel in
 | `GET`  | `/project/schema`          | Active schema metadata                                 |
 | `POST` | `/project/schema/validate` | Validate project schema                                |
 
-## Logs and Studio output
+## Logs
 
-| Method | Path             | Description                                                    |
-| ------ | ---------------- | -------------------------------------------------------------- |
-| `GET`  | `/logs`          | Tail project log ring (`limit`, `prettier` query)              |
-| `POST` | `/logs`          | Append studio-sourced log line (`level`, `message`, `context`) |
-| `GET`  | `/studio/output` | List buffered Studio output entries                            |
-| `POST` | `/studio/output` | Append Studio output entry                                     |
+| Method | Path    | Description                                                    |
+| ------ | ------- | -------------------------------------------------------------- |
+| `GET`  | `/logs` | Tail project log ring (`limit`, `prettier` query)              |
+| `POST` | `/logs` | Append studio-sourced log line (`level`, `message`, `context`) |
 
 ## Changes — collections
 
@@ -64,23 +62,23 @@ All paths are under the `/v1` prefix. Query and body fields mirror CLI/kernel in
 
 ## Changes — mutate
 
-| Method  | Path                                     | Description                                       |
-| ------- | ---------------------------------------- | ------------------------------------------------- |
-| `POST`  | `/changes/:name/validate`                | Validate change/spec/artifact                     |
-| `POST`  | `/changes/:name/validate-all`            | Batch validate                                    |
-| `POST`  | `/changes/:name/transition`              | Lifecycle transition (`to`, `skipHookPhases`)     |
-| `POST`  | `/changes/:name/draft`                   | Move to drafts                                    |
-| `POST`  | `/changes/:name/restore`                 | Restore from draft                                |
-| `POST`  | `/changes/:name/discard`                 | Discard (`reason`)                                |
-| `POST`  | `/changes/:name/archive`                 | Archive change                                    |
-| `POST`  | `/changes/:name/approve-spec`            | Spec approval gate                                |
-| `POST`  | `/changes/:name/approve-signoff`         | Signoff approval gate                             |
-| `POST`  | `/changes/:name/invalidate`              | Invalidate (`reason`, `force`)                    |
-| `POST`  | `/changes/:name/skip-artifact`           | Skip artifact (`artifactId`)                      |
-| `PATCH` | `/changes/:name`                         | Edit metadata / spec sets / policy                |
-| `PATCH` | `/changes/:name/spec-ids`                | Add/remove spec IDs                               |
-| `PATCH` | `/changes/:name/spec-dependencies`       | Update spec deps (`specId`, `add`/`remove`/`set`) |
-| `PATCH` | `/changes/:name/implementation-tracking` | Patch implementation tracking payload             |
+| Method  | Path                                     | Description                                                              |
+| ------- | ---------------------------------------- | ------------------------------------------------------------------------ |
+| `POST`  | `/changes/:name/validate`                | Validate change/spec/artifact                                            |
+| `POST`  | `/changes/:name/validate-all`            | Batch validate                                                           |
+| `POST`  | `/changes/:name/transition`              | Lifecycle transition (`to`, `skipHookPhases`)                            |
+| `POST`  | `/changes/:name/draft`                   | Move to drafts                                                           |
+| `POST`  | `/changes/:name/restore`                 | Restore from draft                                                       |
+| `POST`  | `/changes/:name/discard`                 | Discard (`reason`)                                                       |
+| `POST`  | `/changes/:name/archive`                 | Archive change                                                           |
+| `POST`  | `/changes/:name/approve-spec`            | Spec approval gate                                                       |
+| `POST`  | `/changes/:name/approve-signoff`         | Signoff approval gate                                                    |
+| `POST`  | `/changes/:name/invalidate`              | Invalidate (`reason`, `force`)                                           |
+| `POST`  | `/changes/:name/skip-artifact`           | Skip artifact (`artifactId`)                                             |
+| `PATCH` | `/changes/:name`                         | Edit metadata / spec sets / policy                                       |
+| `PATCH` | `/changes/:name/spec-ids`                | Add/remove spec IDs                                                      |
+| `PATCH` | `/changes/:name/spec-dependencies`       | Update spec deps (`specId`, `add`/`remove`/`set`)                        |
+| `PATCH` | `/changes/:name/implementation-tracking` | Update implementation tracking (`action`, `file`, `specId?`, `symbols?`) |
 
 ## Workspaces and specs
 
@@ -110,7 +108,7 @@ All paths are under the `/v1` prefix. Query and body fields mirror CLI/kernel in
 | Method | Path                        | Description                                                      |
 | ------ | --------------------------- | ---------------------------------------------------------------- |
 | `GET`  | `/graph/status`             | Index statistics                                                 |
-| `POST` | `/graph/index`              | Index workspaces (`workspaces` body)                             |
+| `POST` | `/graph/index`              | Reindex the full project graph (`force?: boolean` body)          |
 | `GET`  | `/graph/search`             | BM25 search (`q`, `symbols`, `specs`, `limit`, `workspace`)      |
 | `GET`  | `/graph/impact`             | Symbol or file impact (`symbol` or `file`, `direction`, `depth`) |
 | `GET`  | `/graph/hotspots`           | Hotspot report (`minRisk`, `limit`)                              |

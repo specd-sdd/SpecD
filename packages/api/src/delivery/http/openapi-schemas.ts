@@ -622,6 +622,42 @@ export const API_OPENAPI_SCHEMAS: Record<string, JsonSchema> = {
       dependsOn: { type: 'array', items: { type: 'string' } },
     },
   },
+  UpdateImplementationTrackingResultDto: {
+    type: 'object',
+    required: ['implementationTracking'],
+    properties: {
+      implementationTracking: {
+        type: 'object',
+        required: ['trackedFiles', 'links'],
+        properties: {
+          trackedFiles: {
+            type: 'array',
+            items: {
+              type: 'object',
+              required: ['file', 'state'],
+              properties: {
+                file: { type: 'string' },
+                state: { type: 'string', enum: ['open', 'resolved', 'ignored'] },
+              },
+            },
+          },
+          links: {
+            type: 'array',
+            items: {
+              type: 'object',
+              required: ['specId', 'file', 'fileLinkExplicit'],
+              properties: {
+                specId: { type: 'string' },
+                file: { type: 'string' },
+                fileLinkExplicit: { type: 'boolean' },
+                symbols: { type: 'array', items: { type: 'string' } },
+              },
+            },
+          },
+        },
+      },
+    },
+  },
   OutlineArtifactBody: {
     type: 'object',
     additionalProperties: false,
@@ -631,12 +667,77 @@ export const API_OPENAPI_SCHEMAS: Record<string, JsonSchema> = {
     type: 'object',
     additionalProperties: false,
     properties: {
-      workspaces: { type: 'array', items: { type: 'string' } },
+      force: { type: 'boolean' },
+    },
+  },
+  GraphIndexErrorDto: {
+    type: 'object',
+    additionalProperties: false,
+    required: ['filePath', 'message'],
+    properties: {
+      filePath: { type: 'string' },
+      message: { type: 'string' },
+    },
+  },
+  WorkspaceGraphIndexBreakdownDto: {
+    type: 'object',
+    additionalProperties: false,
+    required: [
+      'name',
+      'filesDiscovered',
+      'filesIndexed',
+      'filesSkipped',
+      'filesRemoved',
+      'specsDiscovered',
+      'specsIndexed',
+    ],
+    properties: {
+      name: { type: 'string' },
+      filesDiscovered: { type: 'integer' },
+      filesIndexed: { type: 'integer' },
+      filesSkipped: { type: 'integer' },
+      filesRemoved: { type: 'integer' },
+      specsDiscovered: { type: 'integer' },
+      specsIndexed: { type: 'integer' },
     },
   },
   GraphIndexResultDto: {
     type: 'object',
-    additionalProperties: true,
+    additionalProperties: false,
+    required: [
+      'filesDiscovered',
+      'filesIndexed',
+      'filesRemoved',
+      'filesSkipped',
+      'specsDiscovered',
+      'specsIndexed',
+      'errors',
+      'duration',
+      'workspaces',
+      'vcsRef',
+      'graphFingerprint',
+      'fullRebuildReason',
+    ],
+    properties: {
+      filesDiscovered: { type: 'integer' },
+      filesIndexed: { type: 'integer' },
+      filesRemoved: { type: 'integer' },
+      filesSkipped: { type: 'integer' },
+      specsDiscovered: { type: 'integer' },
+      specsIndexed: { type: 'integer' },
+      errors: {
+        type: 'array',
+        items: { $ref: 'GraphIndexErrorDto#' },
+      },
+      duration: { type: 'integer' },
+      workspaces: {
+        type: 'array',
+        items: { $ref: 'WorkspaceGraphIndexBreakdownDto#' },
+      },
+      vcsRef: { type: 'string', nullable: true },
+      graphFingerprint: { type: 'string' },
+      fullRebuildReason: { type: 'string', nullable: true },
+    },
   },
   GraphHotspotsResultDto: {
     type: 'object',

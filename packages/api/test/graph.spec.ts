@@ -66,6 +66,35 @@ describe('Graph API', () => {
     expect(data.totalSymbols).toBeGreaterThanOrEqual(0)
   })
 
+  it('given force flag, when POST /graph/index, then returns indexing summary dto', async () => {
+    const { res, data } = await apiJson<{
+      fullRebuildReason: string | null
+      workspaces: Array<{ name: string }>
+    }>('/graph/index', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ force: true }),
+    })
+    expect(res.ok).toBe(true)
+    expect(Array.isArray(data.workspaces)).toBe(true)
+    expect(data.workspaces.length).toBeGreaterThan(0)
+    expect(typeof data.fullRebuildReason === 'string' || data.fullRebuildReason === null).toBe(true)
+  })
+
+  it('given unsupported workspaces property, when POST /graph/index, then returns problem+json', async () => {
+    const body = await expectProblem(
+      '/graph/index',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ workspaces: ['api', 'client'] }),
+      },
+      400,
+    )
+    expect(body.status).toBe(400)
+    expect(body.code).toBe('INVALID_REQUEST')
+  })
+
   it('given a known spec, when GET /graph/specs/:ws/*, then returns coverage', async () => {
     const { workspace, specPath } = await loadProjectSamples()
     const { res, data } = await apiJson<{ specId: string; files: string[]; symbols: string[] }>(

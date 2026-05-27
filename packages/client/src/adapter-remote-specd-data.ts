@@ -4,11 +4,16 @@ import type { ArtifactContentDto } from './dto/artifact-content.js'
 import type { ArchivedChangeDetailDto, ArchivedChangeListItemDto } from './dto/archived-change.js'
 import type { ChangeDetailDto } from './dto/change-detail.js'
 import type { ChangeGraphViewDto } from './dto/change-graph-view.js'
-import type { ImplementationReviewDto } from './dto/implementation-tracking.js'
+import type {
+  ImplementationReviewDto,
+  UpdateImplementationTrackingResultDto,
+  UpdateSpecDependenciesResultDto,
+} from './dto/implementation-tracking.js'
 import type { ChangeStatusDto } from './dto/change-status.js'
 import type { ChangeSummaryDto } from './dto/change-summary.js'
 import type { CompiledContextDto } from './dto/compiled-context.js'
 import type { GraphImpactDto } from './dto/graph-impact.js'
+import type { GraphIndexResultDto } from './dto/graph-index-result.js'
 import type { GraphSearchResultDto } from './dto/graph-search.js'
 import type { GraphStatusDto } from './dto/graph-status.js'
 import type { PreviewResultDto } from './dto/preview-result.js'
@@ -29,10 +34,13 @@ import type {
   CreateChangeInput,
   GetChangeStatusOptions,
   GraphImpactInput,
+  GraphIndexInput,
   GraphSearchInput,
   PatchChangeInput,
   SaveChangeArtifactInput,
   TransitionChangeInput,
+  UpdateImplementationTrackingInput,
+  UpdateSpecDependenciesInput,
   ValidateChangeBatchInput,
   ValidateChangeInput,
 } from './inputs.js'
@@ -473,9 +481,9 @@ export class RemoteSpecdDataAdapter implements SpecdDataPort {
 
   updateSpecDependencies(
     name: string,
-    body: Record<string, unknown>,
+    body: UpdateSpecDependenciesInput,
     signal?: AbortSignal,
-  ): Promise<ChangeDetailDto> {
+  ): Promise<UpdateSpecDependenciesResultDto> {
     return this._transport.request({
       method: 'PATCH',
       path: `/changes/${enc(name)}/spec-dependencies`,
@@ -486,9 +494,9 @@ export class RemoteSpecdDataAdapter implements SpecdDataPort {
 
   updateImplementationTracking(
     name: string,
-    body: Record<string, unknown>,
+    body: UpdateImplementationTrackingInput,
     signal?: AbortSignal,
-  ): Promise<ChangeDetailDto> {
+  ): Promise<UpdateImplementationTrackingResultDto> {
     return this._transport.request({
       method: 'PATCH',
       path: `/changes/${enc(name)}/implementation-tracking`,
@@ -594,8 +602,13 @@ export class RemoteSpecdDataAdapter implements SpecdDataPort {
     return this._transport.request({ method: 'GET', path: '/graph/status', signal })
   }
 
-  indexGraph(signal?: AbortSignal): Promise<GraphStatusDto> {
-    return this._transport.request({ method: 'POST', path: '/graph/index', signal })
+  indexGraph(input: GraphIndexInput = {}): Promise<GraphIndexResultDto> {
+    return this._transport.request({
+      method: 'POST',
+      path: '/graph/index',
+      ...(input.force === true ? { body: { force: true } } : {}),
+      signal: input.signal,
+    })
   }
 
   searchGraph(query: GraphSearchInput): Promise<GraphSearchResultDto> {

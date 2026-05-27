@@ -26,5 +26,28 @@ describe('API meta', () => {
     expect(has('/changes/{name}/artifacts/{filename}/outline')).toBe(true)
     const components = data.components as { schemas?: Record<string, unknown> } | undefined
     expect(Object.keys(components?.schemas ?? {}).length).toBeGreaterThan(40)
+
+    const graphIndexPath = paths[
+      keys.find((k) => k === '/v1/graph/index' || k.endsWith('/graph/index')) ?? ''
+    ] as { post?: { responses?: Record<string, unknown> } } | undefined
+    expect(graphIndexPath?.post?.responses?.['200']).toBeDefined()
+
+    const schemas = components?.schemas ?? {}
+    const graphIndexSchema = Object.values(schemas).find((schema) => {
+      if (typeof schema !== 'object' || schema === null) {
+        return false
+      }
+      const properties = (schema as { properties?: Record<string, unknown> }).properties
+      return (
+        properties !== undefined &&
+        'filesDiscovered' in properties &&
+        'graphFingerprint' in properties &&
+        'workspaces' in properties
+      )
+    }) as { properties?: Record<string, unknown> } | undefined
+    expect(graphIndexSchema).toBeDefined()
+    expect(graphIndexSchema?.properties?.filesDiscovered).toBeDefined()
+    expect(graphIndexSchema?.properties?.workspaces).toBeDefined()
+    expect(graphIndexSchema?.properties?.graphFingerprint).toBeDefined()
   })
 })

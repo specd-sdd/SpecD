@@ -253,6 +253,33 @@ Spec context: `{ entries[], warnings[] }`. Outline routes return an array of out
 
 `GET /graph/search` — `symbols[]` (workspace, symbol id/name/kind/location, score), `specs[]` (workspace, specId, path, title, description, score).
 
+### `GraphIndexResultDto`
+
+`POST /graph/index`
+
+Request body:
+
+| Field   | Type       | Description                                         |
+| ------- | ---------- | --------------------------------------------------- |
+| `force` | `boolean?` | Recreate persistent graph storage before reindexing |
+
+Response body:
+
+| Field               | Type      | Description                             |
+| ------------------- | --------- | --------------------------------------- |
+| `filesDiscovered`   | `number`  | Files seen during the reindex           |
+| `filesIndexed`      | `number`  | Files parsed and written into the graph |
+| `filesRemoved`      | `number`  | Files removed from graph state          |
+| `filesSkipped`      | `number`  | Files skipped as unchanged/ineligible   |
+| `specsDiscovered`   | `number`  | Specs seen while rebuilding coverage    |
+| `specsIndexed`      | `number`  | Specs linked into graph coverage        |
+| `errors`            | `array`   | `{ filePath, message }` indexing errors |
+| `duration`          | `number`  | Total indexing time in milliseconds     |
+| `workspaces`        | `array`   | Per-workspace breakdown rows            |
+| `vcsRef`            | `string?` | VCS ref captured for this index         |
+| `graphFingerprint`  | `string`  | Fingerprint of the resulting graph      |
+| `fullRebuildReason` | `string?` | Reason for a forced full rebuild        |
+
 ### `GraphImpactDto`
 
 `GET /graph/impact` — `target`, `direction`, `symbols[]`, optional `files[]` with risk levels.
@@ -265,7 +292,7 @@ Spec context: `{ entries[], warnings[] }`. Outline routes return an array of out
 
 `GET /graph/specs/:workspace/:specPath` — `specId`, `files[]`, `symbols[]`.
 
-## Logs and Studio panel
+## Logs
 
 ### `LogReadDto`
 
@@ -275,19 +302,6 @@ Spec context: `{ entries[], warnings[] }`. Outline routes return an array of out
 | --------- | ----------- | --------------------------------------------------- |
 | `entries` | `array?`    | Structured `{ timestamp, level, message, context }` |
 | `lines`   | `string[]?` | Preformatted lines when `prettier=true`             |
-
-### `StudioOutputListDto` / `StudioOutputEntryDto`
-
-`GET /studio/output`
-
-| Field                 | Type      | Description                            |
-| --------------------- | --------- | -------------------------------------- |
-| `entries[].id`        | `string`  | Entry id                               |
-| `entries[].timestamp` | `string`  | ISO time                               |
-| `entries[].level`     | `enum`    | `debug` \| `info` \| `warn` \| `error` |
-| `entries[].message`   | `string`  | Text                                   |
-| `entries[].action`    | `string?` | Optional action key                    |
-| `entries[].context`   | `object?` | Structured context                     |
 
 ## Errors
 

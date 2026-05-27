@@ -82,16 +82,17 @@ async function resolveSpecsFromRepo(
  *
  * @param config - Active project configuration
  * @param kernel - Wired kernel with spec repositories
- * @param workspaceFilter - Optional single workspace name
+ * @param workspaceFilter - Optional workspace-name filter
  */
 export async function buildWorkspaceIndexTargets(
   config: SpecdConfig,
   kernel: Kernel,
-  workspaceFilter?: string,
+  workspaceFilter?: string | readonly string[],
 ): Promise<WorkspaceIndexTarget[]> {
   let workspaces = [...config.workspaces]
   if (workspaceFilter !== undefined) {
-    workspaces = workspaces.filter((ws) => ws.name === workspaceFilter)
+    const allowed = new Set(Array.isArray(workspaceFilter) ? workspaceFilter : [workspaceFilter])
+    workspaces = workspaces.filter((ws) => allowed.has(ws.name))
   }
   const targets: WorkspaceIndexTarget[] = []
   for (const ws of workspaces) {

@@ -88,7 +88,14 @@ export async function createApiServer(options: CreateApiServerOptions): Promise<
     authType: auth.type,
   }
 
-  const app = Fastify({ logger: false })
+  const app = Fastify({
+    logger: false,
+    ajv: {
+      customOptions: {
+        removeAdditional: false,
+      },
+    },
+  })
 
   await registerCorsMiddleware(app, config, options.corsOrigins)
 
@@ -102,6 +109,18 @@ export async function createApiServer(options: CreateApiServerOptions): Promise<
           info: {
             title: 'SpecD Studio API',
             version: '1.0.0',
+          },
+        },
+        refResolver: {
+          buildLocalReference(json, _baseUri, _fragment, i) {
+            const schema = json as { $id?: unknown; title?: unknown }
+            if (typeof schema.$id === 'string' && schema.$id.length > 0) {
+              return schema.$id
+            }
+            if (typeof schema.title === 'string' && schema.title.length > 0) {
+              return schema.title
+            }
+            return `def-${i}`
           },
         },
       })

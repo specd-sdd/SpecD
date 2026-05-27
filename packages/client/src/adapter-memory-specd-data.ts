@@ -5,16 +5,20 @@ import type { ChangeSummaryDto } from './dto/change-summary.js'
 import type { ProjectDto } from './dto/project.js'
 import type { ProjectStatusDto } from './dto/project-status.js'
 import type { WorkspaceSpecTreeDto } from './dto/workspace-spec-tree.js'
+import type { GraphIndexResultDto } from './dto/graph-index-result.js'
 import type { GraphStatusDto } from './dto/graph-status.js'
 import type {
   ChangeOverlapsDto,
   CreateChangeInput,
   GetChangeStatusOptions,
   GraphImpactInput,
+  GraphIndexInput,
   GraphSearchInput,
   PatchChangeInput,
   SaveChangeArtifactInput,
   TransitionChangeInput,
+  UpdateImplementationTrackingInput,
+  UpdateSpecDependenciesInput,
 } from './inputs.js'
 import type { ArtifactContentDto } from './dto/artifact-content.js'
 import type { ReadOnlyChangeOrigin } from './port-changes-read.js'
@@ -26,7 +30,11 @@ import type { SpecDetailDto } from './dto/spec-detail.js'
 import type { GraphSearchResultDto } from './dto/graph-search.js'
 import type { GraphImpactDto } from './dto/graph-impact.js'
 import type { ChangeGraphViewDto } from './dto/change-graph-view.js'
-import type { ImplementationReviewDto } from './dto/implementation-tracking.js'
+import type {
+  ImplementationReviewDto,
+  UpdateImplementationTrackingResultDto,
+  UpdateSpecDependenciesResultDto,
+} from './dto/implementation-tracking.js'
 import type { WorkspaceSummaryDto } from './dto/project.js'
 import type { ChangeArtifactListItemDto } from './port-changes-read.js'
 import type { AppendProjectLogInput } from './port-studio-panel.js'
@@ -377,27 +385,70 @@ export class MemorySpecdDataAdapter implements SpecdDataPort {
     return this.getChange(name)
   }
 
-  updateSpecDependencies(name: string, body: Record<string, unknown>): Promise<ChangeDetailDto> {
+  updateSpecDependencies(
+    name: string,
+    body: UpdateSpecDependenciesInput,
+  ): Promise<UpdateSpecDependenciesResultDto> {
     const change = this._changes.get(name)
     if (change === undefined) {
       return Promise.reject(new Error(`Change not found: ${name}`))
     }
-    const specId = body.specId
-    if (typeof specId !== 'string') {
-      return Promise.reject(new Error('specId is required'))
-    }
-    const set = body.set
     const nextDeps = { ...change.specDependsOn }
-    if (Array.isArray(set)) {
-      nextDeps[specId] = set.filter((d): d is string => typeof d === 'string')
+    const current = [...(nextDeps[body.specId] ?? [])]
+    let dependsOn = current
+    if (body.set !== undefined) {
+      dependsOn = [...body.set]
+    } else {
+      if (body.remove !== undefined) {
+        dependsOn = dependsOn.filter((entry) => !body.remove?.includes(entry))
+      }
+      if (body.add !== undefined) {
+        for (const entry of body.add) {
+          if (!dependsOn.includes(entry)) {
+            dependsOn.push(entry)
+          }
+        }
+      }
     }
-    const next = { ...change, specDependsOn: nextDeps }
-    this._changes.set(name, next)
-    return Promise.resolve(next)
+    nextDeps[body.specId] = dependsOn
+    this._changes.set(name, { ...change, specDependsOn: nextDeps })
+    return Promise.resolve({ specId: body.specId, dependsOn })
   }
 
-  updateImplementationTracking(name: string): Promise<ChangeDetailDto> {
-    return this.getChange(name)
+  updateImplementationTracking(
+    name: string,
+    body: UpdateImplementationTrackingInput,
+  ): Promise<UpdateImplementationTrackingResultDto> {
+    const change = this._changes.get(name)
+    if (change === undefined) {
+      return Promise.reject(new Error(`Change not found: ${name}`))
+    }
+    return Promise.resolve({
+      implementationTracking: {
+        trackedFiles: [
+          {
+            file: body.file,
+            state:
+              body.action === 'ignore'
+                ? 'ignored'
+                : body.action === 'resolve'
+                  ? 'resolved'
+                  : 'open',
+          },
+        ],
+        links:
+          body.specId !== undefined
+            ? [
+                {
+                  specId: body.specId,
+                  file: body.file,
+                  fileLinkExplicit: body.symbols === undefined || body.symbols.length === 0,
+                  ...(body.symbols !== undefined ? { symbols: body.symbols } : {}),
+                },
+              ]
+            : [],
+      },
+    })
   }
 
   getArchivedChange(name: string): Promise<ChangeDetailDto> {
@@ -463,8 +514,29 @@ export class MemorySpecdDataAdapter implements SpecdDataPort {
     return Promise.resolve({ indexed: false, stale: true })
   }
 
-  indexGraph(): Promise<GraphStatusDto> {
-    return this.getGraphStatus()
+  indexGraph(input: GraphIndexInput = {}): Promise<GraphIndexResultDto> {
+    return Promise.resolve({
+      filesDiscovered: 0,
+      filesIndexed: 0,
+      filesRemoved: 0,
+      filesSkipped: 0,
+      specsDiscovered: 0,
+      specsIndexed: 0,
+      errors: [],
+      duration: 0,
+      workspaces: fixtureProject.workspaces.map((workspace) => ({
+        name: workspace.name,
+        filesDiscovered: 0,
+        filesIndexed: 0,
+        filesSkipped: 0,
+        filesRemoved: 0,
+        specsDiscovered: 0,
+        specsIndexed: 0,
+      })),
+      vcsRef: null,
+      graphFingerprint: 'fixture-graph',
+      fullRebuildReason: input.force === true ? 'Explicit force reindex requested' : null,
+    })
   }
 
   searchGraph(query: GraphSearchInput): Promise<GraphSearchResultDto> {

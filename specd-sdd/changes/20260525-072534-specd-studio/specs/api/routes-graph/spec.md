@@ -14,6 +14,12 @@ Authoritative HTTP contract (methods, paths, query, bodies, status codes) for **
 
 `POST /v1/graph/index` MUST trigger reindex via `createCodeGraphProvider`. v1 MAY block until completion; async job ids are deferred.
 
+Indexing MUST rebuild the full project graph, not a workspace-scoped subset, so cross-workspace spec-to-symbol and symbol-to-symbol links remain globally consistent.
+
+When the request body includes `force: true`, the handler MUST recreate persistent graph storage before indexing so the run starts from an empty graph. The response MUST return the graph provider's indexing summary DTO, including per-workspace breakdown.
+
+`POST /v1/graph/index` MUST accept only the documented body shape `{ force?: boolean }`. Unknown properties such as `workspaces` MUST be rejected with HTTP 400 `application/problem+json` and code `INVALID_REQUEST`.
+
 ### Requirement: search impact and hotspots mirror CLI graph commands
 
 `GET /v1/graph/search`, `/graph/impact`, and `/graph/hotspots` MUST accept the same query parameters as the CLI graph commands and return presenter-mapped DTOs.

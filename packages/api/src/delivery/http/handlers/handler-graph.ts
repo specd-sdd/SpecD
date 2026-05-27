@@ -49,12 +49,14 @@ export function registerGraphRoutes(app: FastifyInstance): void {
       }),
     },
     apiHandler(async (ctx, req) => {
-      const body = (req.body ?? {}) as { workspaces?: string[] }
+      const body = (req.body ?? {}) as { force?: boolean }
       const provider = ctx.createGraphProvider()
+      if (body.force === true) {
+        await provider.recreate()
+      }
       await provider.open()
       try {
-        const filter = body.workspaces?.[0]
-        const targets = await buildWorkspaceIndexTargets(ctx.config, ctx.kernel, filter)
+        const targets = await buildWorkspaceIndexTargets(ctx.config, ctx.kernel)
         const result = await provider.index({
           workspaces: targets,
           projectRoot: ctx.config.projectRoot,

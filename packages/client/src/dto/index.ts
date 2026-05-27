@@ -6,11 +6,18 @@ export type {
   ImplementationReviewDto,
   ImplementationTrackingDto,
   TrackedImplementationFileDto,
+  UpdateImplementationTrackingResultDto,
+  UpdateSpecDependenciesResultDto,
 } from './implementation-tracking.js'
 export type { ChangeStatusDto } from './change-status.js'
 export type { ChangeSummaryDto } from './change-summary.js'
 export type { CompiledContextDto } from './compiled-context.js'
 export type { GraphImpactDto } from './graph-impact.js'
+export type {
+  GraphIndexErrorDto,
+  GraphIndexResultDto,
+  WorkspaceGraphIndexBreakdownDto,
+} from './graph-index-result.js'
 export type { GraphSearchHitDto, GraphSearchResultDto } from './graph-search.js'
 export type { GraphStatusDto } from './graph-status.js'
 export type { PreviewResultDto, PreviewResultFileDto } from './preview-result.js'

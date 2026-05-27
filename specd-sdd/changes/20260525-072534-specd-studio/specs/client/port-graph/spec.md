@@ -12,6 +12,8 @@ The interface MUST declare asynchronous methods equivalent to the HTTP routes in
 
 - `getGraphStatus()`, `indexGraph()`, `searchGraph(query)`, `getImpact(query)`, `getHotspots()`, spec/change graph views
 
+`indexGraph({ force? })` MUST mirror `POST /v1/graph/index` and return the indexing summary DTO rather than a graph-status DTO.
+
 ### Requirement: port signatures are identical for HTTP and IPC adapters
 
 Implementations (`adapter-remote-specd-data`, desktop IPC) MUST implement these methods without altering parameter or return types.

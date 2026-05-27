@@ -5,7 +5,7 @@ sidebar_position: 1
 
 # SpecD Studio HTTP API (`@specd/api`)
 
-The Studio API is a **Fastify HTTP adapter** over `@specd/core`. It exposes project, change, spec, graph, and Studio-panel operations as JSON under `/v1`.
+The Studio API is a **Fastify HTTP adapter** over `@specd/core`. It exposes project, change, spec, graph, and log operations as JSON under `/v1`.
 
 | Topic                   | Page                                  |
 | ----------------------- | ------------------------------------- |

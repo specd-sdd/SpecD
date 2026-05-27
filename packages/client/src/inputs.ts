@@ -107,6 +107,28 @@ export interface GraphImpactInput {
   readonly signal?: AbortSignal
 }
 
+/** Body for `POST /v1/graph/index`. */
+export interface GraphIndexInput {
+  readonly force?: boolean
+  readonly signal?: AbortSignal
+}
+
+/** Body for `PATCH /v1/changes/{name}/spec-dependencies`. */
+export interface UpdateSpecDependenciesInput {
+  readonly specId: string
+  readonly add?: readonly string[]
+  readonly remove?: readonly string[]
+  readonly set?: readonly string[]
+}
+
+/** Body for `PATCH /v1/changes/{name}/implementation-tracking`. */
+export interface UpdateImplementationTrackingInput {
+  readonly action: 'add' | 'remove' | 'ignore' | 'resolve'
+  readonly file: string
+  readonly specId?: string
+  readonly symbols?: readonly string[]
+}
+
 /** Overlap report entry. */
 export interface ChangeOverlapEntryDto {
   readonly specId: string
