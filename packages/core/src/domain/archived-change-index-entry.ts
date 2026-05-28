@@ -9,6 +9,7 @@ export interface ArchivedChangeIndexEntry {
   readonly name: string
   readonly archivedName: string
   readonly archivedAt: Date
+  readonly description?: string
   readonly archivedBy?: ActorIdentity
   readonly artifacts: readonly string[]
   readonly specIds: readonly string[]

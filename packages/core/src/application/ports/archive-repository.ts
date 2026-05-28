@@ -11,6 +11,35 @@ export type ArchivePathEntry = Pick<
   'name' | 'archivedName' | 'archivedAt' | 'workspaces'
 >
 
+/** Options for listing archived changes. */
+export interface ArchiveListOptions {
+  /** Maximum number of entries to return. Defaults to 100. */
+  readonly limit?: number | undefined
+  /** 1-based page index. Mutually exclusive with `startAt`. */
+  readonly page?: number | undefined
+  /** Name of the change to start after (exclusive). Mutually exclusive with `page`. */
+  readonly startAt?: string | undefined
+}
+
+/** Result of listing archived changes. */
+export interface ArchiveListResult {
+  /** The list of archived change index entries. */
+  readonly items: readonly ArchivedChangeIndexEntry[]
+  /** Metadata about the listing. */
+  readonly meta: {
+    /** Total number of archived changes in the repository. */
+    readonly total: number
+    /** Number of entries returned in this result. */
+    readonly count: number
+    /** The limit applied to the query. */
+    readonly limit: number
+    /** The page index if page-based pagination was used. */
+    readonly page?: number
+    /** The startAt cursor if keyset pagination was used. */
+    readonly startAt?: string
+  }
+}
+
 /**
  * Port for archiving and querying archived changes within a single workspace.
  *
@@ -62,14 +91,15 @@ export abstract class ArchiveRepository extends Repository {
   ): Promise<{ archivedChange: ArchivedChange; archiveDirPath: string }>
 
   /**
-   * Lists all archived changes in this workspace in chronological order (oldest first).
+   * Lists archived changes in this workspace in chronological order (oldest first).
    *
    * Streams `index.jsonl` from the start, deduplicating by name so that the
    * last entry wins in case of duplicates introduced by manual recovery.
    *
-   * @returns Index-backed archive rows, oldest first
+   * @param options - Pagination and filtering options
+   * @returns Paginated index-backed archive result, oldest first
    */
-  abstract list(): Promise<ArchivedChangeIndexEntry[]>
+  abstract list(options?: ArchiveListOptions): Promise<ArchiveListResult>
 
   /**
    * Returns the archived change with the given name, or `null` if not found.

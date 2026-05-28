@@ -1,0 +1,54 @@
+- op: modified
+  selector:
+    type: section
+    matches: '^Scenario: Multiple archived changes$'
+    parent:
+      type: section
+      matches: 'Requirement: list returns all archived changes in chronological order'
+  content: |
+    #### Scenario: List with limit and page
+
+    - **GIVEN** the archive has 250 changes
+    - **WHEN** `list({ limit: 100, page: 2 })` is called
+    - **THEN** it returns 100 changes (entries 101 to 200)
+    - **AND** `meta.total` is 250
+    - **AND** `meta.page` is 2
+
+- op: removed
+  selector:
+    type: section
+    matches: '^Scenario: List returns index entries ordered by archivedAt$'
+    parent:
+      type: section
+      matches: 'Requirement: list returns index entries'
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: list returns index entries'
+  content: |
+    #### Scenario: List returns result object with items and meta
+
+    - **GIVEN** the archive contains archived changes
+    - **WHEN** `list()` is called
+    - **THEN** the result is an object with `items` (array) and `meta` (object)
+    - **AND** `meta.total` reflects the count from `.specd-index-meta.json`
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Archive index metadata persistence'
+  content: |
+    ### Requirement: Archive index metadata persistence
+
+    #### Scenario: reindex rebuilds metadata file
+
+    - **GIVEN** the archive has 150 directories with manifests
+    - **AND** `.specd-index-meta.json` is missing or incorrect
+    - **WHEN** `reindex()` is called
+    - **THEN** `.specd-index-meta.json` is created/updated with `totalCount: 150`

@@ -7,7 +7,7 @@
   "implementation": [
     {
       "file": "core:src/domain/archived-change-index-entry.ts",
-      "symbols": ["ArchivedChangeIndexEntry", "workspacesFromSpecIds"]
+      "symbols": ["ArchivedChangeIndexEntry"]
     }
   ]
 }

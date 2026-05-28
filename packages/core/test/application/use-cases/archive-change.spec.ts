@@ -15,7 +15,11 @@ import { toArchivedChangeView } from '../../../src/domain/read-only-change-view.
 import { Spec } from '../../../src/domain/entities/spec.js'
 import { SpecArtifact } from '../../../src/domain/value-objects/spec-artifact.js'
 import { SpecPath } from '../../../src/domain/value-objects/spec-path.js'
-import { ArchiveRepository } from '../../../src/application/ports/archive-repository.js'
+import {
+  ArchiveRepository,
+  type ArchiveListOptions,
+  type ArchiveListResult,
+} from '../../../src/application/ports/archive-repository.js'
 import { SpecPublicationError } from '../../../src/domain/errors/spec-publication-error.js'
 import { ChangeArtifact } from '../../../src/domain/entities/change-artifact.js'
 import { ArtifactFile } from '../../../src/domain/value-objects/artifact-file.js'
@@ -78,8 +82,15 @@ class StubArchiveRepository extends ArchiveRepository {
     return { archivedChange, archiveDirPath: `/archive/${archivedName}` }
   }
 
-  override async list() {
-    return []
+  override async list(options?: ArchiveListOptions): Promise<ArchiveListResult> {
+    return {
+      items: [],
+      meta: {
+        total: 0,
+        count: 0,
+        limit: options?.limit ?? 100,
+      },
+    }
   }
 
   override async get(): Promise<ArchivedChange | null> {

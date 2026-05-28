@@ -40,7 +40,11 @@ import { acquireGraphIndexLock } from '../../src/commands/graph/graph-index-lock
 import { registerGraphIndex } from '../../src/commands/graph/index-graph.js'
 
 function setup(mode: 'configured' | 'bootstrap' = 'configured') {
-  const config = makeMockConfig()
+  const config = makeMockConfig({
+    graph: {
+      paths: ['docs/**'],
+    },
+  })
   const kernel = makeMockKernel()
   vi.mocked(resolveGraphCliContext).mockResolvedValue({
     mode,
@@ -99,12 +103,23 @@ describe('graph index', () => {
     const program = makeIndexProgram()
     await program.parseAsync(['node', 'specd', 'graph', 'index'])
 
-    expect(buildWorkspaceTargets).toHaveBeenCalledWith(expect.anything(), kernel, undefined)
+    expect(buildWorkspaceTargets).toHaveBeenCalledWith(expect.anything(), kernel)
     expect(mockProvider.index).toHaveBeenCalledWith(
       expect.objectContaining({
         projectRoot: '/project',
+        projectGraphPaths: ['docs/**'],
       }),
     )
+  })
+
+  it('does not expose a --workspace option anymore', () => {
+    setup('configured')
+
+    const program = makeIndexProgram()
+    const indexCommand = program.commands[0]?.commands.find((command) => command.name() === 'index')
+
+    expect(indexCommand).toBeDefined()
+    expect(indexCommand?.options.some((option) => option.long === '--workspace')).toBe(false)
   })
 
   it('builds a synthetic default workspace in bootstrap mode', async () => {

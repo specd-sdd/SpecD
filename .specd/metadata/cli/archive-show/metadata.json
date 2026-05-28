@@ -15,13 +15,13 @@
     {
       "requirement": "Output format — text",
       "rules": [
-        "The command prints read-only details for the archived change to stdout:\n\n```\nname:        <name>\nstate:       <lifecycle-state>\narchivedAt:  <iso-timestamp>\narchivedBy:  <name <email>>        # omitted when not recorded\nspecs:       <specId>, ...\nschema:      <schema-name>@<version>\nartifacts:   <artifactType>, ...   # artifact type IDs from the archive record\n```\n\nThe `state` field MUST be derived from the archived `manifest.json` lifecycle state at load time. It MUST NOT be hardcoded to `archivable`."
+        "The command prints read-only details for the archived change to stdout:\n\n```\nname:        <name>\ndescription: <description>      # omitted when null/empty\nstate:       <lifecycle-state>\narchivedAt:  <iso-timestamp>\narchivedBy:  <name <email>>     # omitted when not recorded\nspecs:       <specId>, ...\nschema:      <schema-name>@<version>\nartifacts:   <artifactType>, ...\n```\n\nThe `state` field MUST be derived from the archived `manifest.json` lifecycle state at load time. It MUST NOT be hardcoded to `archivable`."
       ]
     },
     {
       "requirement": "Output format — JSON",
       "rules": [
-        "When `--format json` is passed, the command writes a single JSON object to stdout:\n\n```json\n{\n  \\\"name\\\":\\\"...\\\",\n  \\\"state\\\":\\\"...\\\",\n  \\\"archivedAt\\\":\\\"...\\\",\n  \\\"archivedBy\\\":{ \\\"name\\\":\\\"...\\\", \\\"email\\\":\\\"...\\\" },\n  \\\"specIds\\\":[...],\n  \\\"schema\\\":{ \\\"name\\\":\\\"...\\\", \\\"version\\\":N },\n  \\\"artifacts\\\":[\\\"...\\\"]\n}\n```\n\n`archivedBy` is omitted when not recorded. `artifacts` is an array of artifact type IDs present at archive time."
+        "When `--format json` is passed, the command writes a single JSON object to stdout:\n\n```json\n{\n  \"name\": \"...\",\n  \"description\": \"...\",\n  \"state\": \"...\",\n  \"archivedAt\": \"...\",\n  \"archivedBy\": { \"name\": \"...\", \"email\": \"...\" },\n  \"specIds\": [...],\n  \"schema\": { \"name\": \"...\", \"version\": N },\n  \"artifacts\": [\"...\"]\n}\n```\n\n`description` and `archivedBy` are omitted when not recorded. `artifacts` is an array of artifact type IDs present at archive time."
       ]
     },
     {
@@ -68,6 +68,19 @@
       ]
     },
     {
+      "requirement": "Output format — text",
+      "name": "Display enriched metadata",
+      "given": [
+        "an archived change with description: 'My cool feature', specIds: ['core:change'], and schema: { name: 'schema-std', version: 1 }"
+      ],
+      "when": ["specd archive show is run for that change"],
+      "then": [
+        "stdout includes description: My cool feature",
+        "AND it includes specs: core:change",
+        "AND it includes schema: schema-std@1"
+      ]
+    },
+    {
       "requirement": "Output format — JSON",
       "name": "JSON format output",
       "given": [
@@ -99,8 +112,8 @@
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:7c8ebbb226e1d9c0959bcf832d5c570234b4bacbd008b958e634a6d7e5e1ba7d",
-    "verify.md": "sha256:5d92949c26c48478d8dd6f539c9b67c4cc53e5f515053dfe8241e06faa3d0e38"
+    "spec.md": "sha256:9c2e759075e07e9b4db4d6b72d5effc7114f93c377fe063c6a4a289ceba204a4",
+    "verify.md": "sha256:6d74aafc541a667ce1d97dd79194a43977164274dfac77c8c231bdd99d9368e3"
   },
   "generatedBy": "core"
 }

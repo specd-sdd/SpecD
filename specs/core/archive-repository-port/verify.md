@@ -80,9 +80,11 @@
 
 #### Scenario: Multiple archived changes
 
-- **GIVEN** three changes archived at different times
-- **WHEN** `list()` is called
-- **THEN** all three are returned in chronological order (oldest first)
+- **GIVEN** the archive has 250 changes
+- **WHEN** `list({ limit: 100, page: 2 })` is called
+- **THEN** it returns 100 changes (entries 101 to 200)
+- **AND** `meta.total` is 250
+- **AND** `meta.page` is 2
 
 #### Scenario: Duplicate entries in index
 
@@ -97,11 +99,12 @@
 
 ### Requirement: list returns index entries
 
-#### Scenario: List returns index entries ordered by archivedAt
+#### Scenario: List returns result object with items and meta
 
-- **GIVEN** three changes archived at different times
+- **GIVEN** the archive contains archived changes
 - **WHEN** `list()` is called
-- **THEN** the result is an array of three `ArchivedChangeIndexEntry` records ordered oldest first
+- **THEN** the result is an object with `items` (array) and `meta` (object)
+- **AND** `meta.total` reflects the count from `.specd-index-meta.json`
 
 ### Requirement: get returns an archived change or null
 
@@ -191,3 +194,12 @@
 - **WHEN** `ArchiveRepository` is declared
 - **THEN** it is an abstract class with abstract methods for `archive`, `list`, `get`, and `archivePath`
 - **AND** concrete implementations must implement all abstract methods
+
+### Requirement: Archive index metadata persistence
+
+#### Scenario: reindex rebuilds metadata file
+
+- **GIVEN** the archive has 150 directories with manifests
+- **AND** `.specd-index-meta.json` is missing or incorrect
+- **WHEN** `reindex()` is called
+- **THEN** `.specd-index-meta.json` is created/updated with `totalCount: 150`

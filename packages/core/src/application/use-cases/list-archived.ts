@@ -1,8 +1,11 @@
-import { type ArchivedChangeIndexEntry } from '../../domain/archived-change-index-entry.js'
-import { type ArchiveRepository } from '../ports/archive-repository.js'
+import {
+  type ArchiveListOptions,
+  type ArchiveListResult,
+  type ArchiveRepository,
+} from '../ports/archive-repository.js'
 
 /**
- * Lists all archived changes in the default workspace.
+ * Lists archived changes in the default workspace.
  */
 export class ListArchived {
   private readonly _archive: ArchiveRepository
@@ -19,9 +22,10 @@ export class ListArchived {
   /**
    * Executes the use case.
    *
-   * @returns All archived changes, oldest first
+   * @param options - Pagination and filtering options
+   * @returns Paginated archived changes result
    */
-  async execute(): Promise<ArchivedChangeIndexEntry[]> {
-    return this._archive.list()
+  async execute(options?: ArchiveListOptions): Promise<ArchiveListResult> {
+    return this._archive.list(options)
   }
 }

@@ -1,0 +1,16 @@
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Archive repository call'
+  content: |
+    ### Requirement: Archive index metadata maintenance
+
+    #### Scenario: Metadata file updated after archive
+
+    - **GIVEN** `.specd-index-meta.json` exists with `totalCount: 10`
+    - **WHEN** a new change is archived
+    - **THEN** `.specd-index-meta.json` is updated to `totalCount: 11`

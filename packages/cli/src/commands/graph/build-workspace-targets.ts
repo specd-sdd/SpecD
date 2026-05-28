@@ -35,31 +35,28 @@ async function resolveRepoRoot(codeRoot: string): Promise<string | undefined> {
  *
  * @param config - The specd configuration.
  * @param kernel - The wired kernel instance.
- * @param workspaceFilter - Optional workspace name to filter to a single workspace.
  * @returns Array of workspace index targets.
  */
 export async function buildWorkspaceTargets(
   config: SpecdConfig,
   kernel: Kernel,
-  workspaceFilter?: string,
 ): Promise<WorkspaceIndexTarget[]> {
-  let workspaces = [...config.workspaces]
-
-  if (workspaceFilter) {
-    workspaces = workspaces.filter((ws) => ws.name === workspaceFilter)
-  }
+  const workspaces = [...config.workspaces]
 
   const targets: WorkspaceIndexTarget[] = []
   for (const ws of workspaces) {
     const repoRoot = await resolveRepoRoot(ws.codeRoot)
+    const specRepo = kernel.specs.repos.get(ws.name)
     targets.push({
       name: ws.name,
       codeRoot: ws.codeRoot,
+      ...(specRepo !== undefined ? { specRepo } : {}),
       ...(repoRoot !== undefined ? { repoRoot } : {}),
       ...(ws.graph?.excludePaths !== undefined ? { excludePaths: ws.graph.excludePaths } : {}),
       ...(ws.graph?.respectGitignore !== undefined
         ? { respectGitignore: ws.graph.respectGitignore }
         : {}),
+      ...(ws.graph?.allowedPaths !== undefined ? { allowedPaths: ws.graph.allowedPaths } : {}),
       specs: () => resolveSpecsFromRepo(kernel.specs.repos.get(ws.name), ws.name),
     })
   }
@@ -95,22 +92,12 @@ async function resolveSpecsFromRepo(
     let title = specId
     let description = ''
     let dependsOn: string[] = []
-    let implementation: DiscoveredSpec['implementation']
     const metadata = await repo.metadata(spec)
     if (metadata) {
       title = metadata.title ?? specId
       description = metadata.description ?? ''
       dependsOn = metadata.dependsOn ?? []
     }
-    const specLock = await repo.readSpecLock(spec)
-    if (specLock !== null && specLock.implementation.length > 0) {
-      implementation = specLock.implementation.map((entry) => ({
-        file: entry.file,
-        ...(entry.symbols !== undefined ? { symbols: [...entry.symbols] } : {}),
-      }))
-      dependsOn = [...specLock.dependsOn]
-    }
-
     // Build content: spec.md first if present, then rest alphabetically
     const ordered: string[] = []
     const idx = spec.filenames.indexOf('spec.md')
@@ -144,7 +131,6 @@ async function resolveSpecsFromRepo(
         workspace,
       },
       contentHash,
-      ...(implementation !== undefined ? { implementation } : {}),
     })
   }
 

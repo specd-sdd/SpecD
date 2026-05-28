@@ -1,0 +1,58 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: list returns all archived changes in chronological order'
+  content: |
+    `list(options?)` MUST return archived changes in this workspace sorted chronologically (oldest first).
+
+    ```typescript
+    interface ArchiveListOptions {
+      limit?: number;
+      page?: number;
+      startAt?: string;
+    }
+    ```
+
+    - `limit`: maximum number of entries to return. Defaults to 100 if not provided.
+    - `page`: 1-based page index. Mutually exclusive with `startAt`.
+    - `startAt`: name of the change to start after (exclusive keyset cursor). Mutually exclusive with `page`.
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: list returns index entries'
+  content: |
+    `list(options?)` MUST return a result object containing the entries and metadata:
+
+    ```typescript
+    interface ArchiveListResult {
+      items: ArchivedChangeIndexEntry[];
+      meta: {
+        total: number;
+        count: number;
+        limit: number;
+        page?: number;
+        startAt?: string;
+      };
+    }
+    ```
+
+    The implementation MUST satisfy this requirement without reading `manifest.json` files for every entry.
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: reindex rebuilds the archive index'
+  content: |
+    ### Requirement: Archive index metadata persistence
+
+    The repository implementation SHALL maintain a metadata file `.specd-index-meta.json` at the archive root.
+
+    - The file MUST contain the `totalCount` of archived changes.
+    - `archive()` MUST update this count on success.
+    - `reindex()` MUST recalculate the `totalCount` and refresh the metadata file.
+    - `list()` SHOULD use this metadata file to provide the `total` count in its result.

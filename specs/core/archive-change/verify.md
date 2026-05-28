@@ -263,6 +263,14 @@
 - **THEN** the returned `archivedChange` is constructed by the repository
 - **AND** the use case does not directly construct the `ArchivedChange` record
 
+### Requirement: Archive index metadata maintenance
+
+#### Scenario: Metadata file updated after archive
+
+- **GIVEN** `.specd-index-meta.json` exists with `totalCount: 10`
+- **WHEN** a new change is archived
+- **THEN** `.specd-index-meta.json` is updated to `totalCount: 11`
+
 ### Requirement: ArchivedChange construction
 
 #### Scenario: archivedName derived from createdAt

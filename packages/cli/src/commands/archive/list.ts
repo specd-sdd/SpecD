@@ -13,41 +13,63 @@ export function registerArchiveList(parent: Command): void {
   parent
     .command('list')
     .allowExcessArguments(false)
-    .description('List all archived changes, showing their names, workspaces, and completion date.')
+    .description('List archived changes with optional pagination.')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
+    .option('--limit <n>', 'maximum number of entries to return', (v) => parseInt(v, 10))
+    .option('--page <p>', '1-based page number', (v) => parseInt(v, 10))
+    .option('--start-at <name>', 'name of the change to start after')
     .addHelpText(
       'after',
       `
 JSON/TOON output schema:
-  Array<{
-    name: string
-    archivedName: string
-    workspace: string
-    archivedAt: string
-    archivedBy?: { name: string, email: string }
-    artifacts: string[]
-  }>
+  {
+    items: Array<{
+      name: string
+      archivedName: string
+      archivedAt: string
+      archivedBy?: { name: string, email: string }
+      artifacts: string[]
+      specIds: string[]
+    }>,
+    meta: {
+      total: number
+      count: number
+      limit: number
+      page?: number
+      startAt?: string
+    }
+  }
 `,
     )
-    .action(async (opts: { format: string; config?: string }) => {
-      try {
-        const { kernel } = await resolveCliContext({ configPath: opts.config })
-        const unsorted = await kernel.changes.listArchived.execute()
-        const changes = [...unsorted].sort(
-          (a, b) => b.archivedAt.getTime() - a.archivedAt.getTime(),
-        )
-        const fmt = parseFormat(opts.format)
+    .action(
+      async (opts: {
+        format: string
+        config?: string
+        limit?: number
+        page?: number
+        startAt?: string
+      }) => {
+        try {
+          const { kernel } = await resolveCliContext({ configPath: opts.config })
+          const result = await kernel.changes.listArchived.execute({
+            limit: opts.limit,
+            page: opts.page,
+            startAt: opts.startAt,
+          })
 
-        if (fmt === 'text') {
-          if (changes.length === 0) {
-            output('no archived changes', 'text')
-          } else {
-            const dates = changes.map((c) => c.archivedAt.toISOString().slice(0, 10))
-            const workspaces = changes.map((c) => c.workspaces[0] ?? '')
-            const byCol = changes.map((c) => (c.archivedBy ? `by ${c.archivedBy.name}` : ''))
-            output(
-              renderTable(
+          const changes = [...result.items].sort(
+            (a, b) => b.archivedAt.getTime() - a.archivedAt.getTime(),
+          )
+          const fmt = parseFormat(opts.format)
+
+          if (fmt === 'text') {
+            if (changes.length === 0) {
+              output('no archived changes', 'text')
+            } else {
+              const dates = changes.map((c) => c.archivedAt.toISOString().slice(0, 10))
+              const byCol = changes.map((c) => (c.archivedBy ? `by ${c.archivedBy.name}` : ''))
+              const table = renderTable(
                 null,
                 [
                   {
@@ -57,32 +79,36 @@ JSON/TOON output schema:
                       changes.map((c) => c.name),
                     ),
                   },
-                  { header: 'WORKSPACE', width: colWidth('WORKSPACE', workspaces) },
                   { header: 'DATE', width: colWidth('DATE', dates) },
                   { header: 'BY', width: colWidth('BY', byCol) },
                 ],
-                changes.map((c, i) => [c.name, workspaces[i]!, dates[i]!, byCol[i]!]),
-              ),
-              'text',
+                changes.map((c, i) => [c.name, dates[i]!, byCol[i]!]),
+              )
+
+              const summary = `\nShowing ${result.meta.count} archived changes of ${result.meta.total}. Increase limit or specify another page.`
+              output(table + summary, 'text')
+            }
+          } else {
+            output(
+              {
+                items: result.items.map((c) => ({
+                  name: c.name,
+                  archivedName: c.archivedName,
+                  archivedAt: c.archivedAt.toISOString(),
+                  ...(c.archivedBy
+                    ? { archivedBy: { name: c.archivedBy.name, email: c.archivedBy.email } }
+                    : {}),
+                  artifacts: [...(c.artifacts ?? [])],
+                  specIds: [...(c.specIds ?? [])],
+                })),
+                meta: result.meta,
+              },
+              fmt,
             )
           }
-        } else {
-          output(
-            changes.map((c) => ({
-              name: c.name,
-              archivedName: c.archivedName,
-              workspace: c.workspaces[0] ?? '',
-              archivedAt: c.archivedAt.toISOString(),
-              ...(c.archivedBy
-                ? { archivedBy: { name: c.archivedBy.name, email: c.archivedBy.email } }
-                : {}),
-              artifacts: [...(c.artifacts ?? [])],
-            })),
-            fmt,
-          )
+        } catch (err) {
+          handleError(err, opts.format)
         }
-      } catch (err) {
-        handleError(err, opts.format)
-      }
-    })
+      },
+    )
 }

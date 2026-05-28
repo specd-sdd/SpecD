@@ -14,8 +14,8 @@ An `ArchivedChangeIndexEntry` MUST include the following fields:
 - `archivedName` (string) — archive directory name
 - `archivedAt` (Date) — archive timestamp
 - `archivedBy` (ActorIdentity, optional) — actor identity when recorded
-- `artifacts` (string[]) — artifact type IDs present at archive time
-- `specIds` (string[]) — spec IDs associated with the change at archive time
+- `artifacts` (string\[]) — artifact type IDs present at archive time
+- `specIds` (string\[]) — spec IDs associated with the change at archive time
 - `schemaName` (string) and `schemaVersion` (number) — governing schema identity
 
 ### Requirement: No manifest-only data

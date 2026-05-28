@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'Index entry structure change is covered by unit tests on serialization.'

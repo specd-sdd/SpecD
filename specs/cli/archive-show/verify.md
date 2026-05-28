@@ -26,6 +26,14 @@
 - **AND** the `state:` line reflects the archived manifest lifecycle state (not a hardcoded value)
 - **AND** the process exits with code 0
 
+#### Scenario: Display enriched metadata
+
+- **GIVEN** an archived change with `description: 'My cool feature'`, `specIds: ['core:change']`, and `schema: { name: 'schema-std', version: 1 }`
+- **WHEN** `specd archive show` is run for that change
+- **THEN** stdout includes `description: My cool feature`
+- **AND** it includes `specs: core:change`
+- **AND** it includes `schema: schema-std@1`
+
 ### Requirement: Output format — JSON
 
 #### Scenario: JSON format output

@@ -851,17 +851,9 @@
       ]
     }
   ],
-  "implementation": {
-    "symbols": [
-      {
-        "specId": "core:change",
-        "file": "core:src/application/use-cases/create-change.ts",
-        "symbol": "CreateChange"
-      }
-    ]
-  },
+  "implementation": {},
   "contentHashes": {
-    "spec.md": "sha256:8408c138837916615ff7a7cd949fe42b18c47ad7b8ec3ca0d2919ae09a75ddbd",
+    "spec.md": "sha256:7864a954b2bf418a55bc81920920690ee3390f1beee0f61ad70dcb84c04be01f",
     "verify.md": "sha256:23a5826641e1b9dff53a9a5e6540c223cc42e9ec61c2b27871f4171fd32d693f"
   },
   "generatedBy": "core"

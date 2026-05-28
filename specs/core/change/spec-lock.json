@@ -13,10 +13,5 @@
     "default:_global/logging",
     "core:implementation-detector-port"
   ],
-  "implementation": [
-    {
-      "file": "core:src/application/use-cases/create-change.ts",
-      "symbols": ["CreateChange"]
-    }
-  ]
+  "implementation": []
 }

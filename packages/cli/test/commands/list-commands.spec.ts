@@ -379,7 +379,11 @@ describe('discarded show', () => {
 
 describe('archive list', () => {
   it('prints "no archived changes" when empty', async () => {
-    const { stdout } = setup()
+    const { kernel, stdout } = setup()
+    kernel.changes.listArchived.execute.mockResolvedValue({
+      items: [],
+      meta: { total: 0, count: 0, limit: 100, page: 1 },
+    })
 
     const program = makeProgram()
     registerArchiveList(program.command('archive'))
@@ -390,15 +394,18 @@ describe('archive list', () => {
 
   it('lists archived changes with timestamp', async () => {
     const { kernel, stdout } = setup()
-    kernel.changes.listArchived.execute.mockResolvedValue([
-      {
-        name: 'old-feat',
-        archivedName: '2026-01-15-old-feat',
-        archivedAt: new Date('2026-01-15T10:00:00Z'),
-        workspaces: ['default'],
-        artifacts: new Set(['spec.md']),
-      },
-    ])
+    kernel.changes.listArchived.execute.mockResolvedValue({
+      items: [
+        {
+          name: 'old-feat',
+          archivedName: '2026-01-15-old-feat',
+          archivedAt: new Date('2026-01-15T10:00:00Z'),
+          workspaces: ['default'],
+          artifacts: ['spec.md'],
+        },
+      ],
+      meta: { total: 1, count: 1, limit: 100, page: 1 },
+    })
 
     const program = makeProgram()
     registerArchiveList(program.command('archive'))
@@ -407,49 +414,56 @@ describe('archive list', () => {
     const out = stdout()
     expect(out).toContain('old-feat')
     expect(out).toContain('2026-01-15')
+    expect(out).toContain('Showing 1 archived changes of 1.')
   })
 
-  it('returns JSON array with workspace and artifacts', async () => {
+  it('returns JSON object with items and meta', async () => {
     const { kernel, stdout } = setup()
-    kernel.changes.listArchived.execute.mockResolvedValue([
-      {
-        name: 'old-feat',
-        archivedName: '2026-01-15-old-feat',
-        archivedAt: new Date('2026-01-15T10:00:00Z'),
-        workspaces: ['default'],
-        artifacts: new Set(['spec']),
-      },
-    ])
+    kernel.changes.listArchived.execute.mockResolvedValue({
+      items: [
+        {
+          name: 'old-feat',
+          archivedName: '2026-01-15-old-feat',
+          archivedAt: new Date('2026-01-15T10:00:00Z'),
+          workspaces: ['default'],
+          artifacts: ['spec'],
+        },
+      ],
+      meta: { total: 1, count: 1, limit: 100, page: 1 },
+    })
 
     const program = makeProgram()
     registerArchiveList(program.command('archive'))
     await program.parseAsync(['node', 'specd', 'archive', 'list', '--format', 'json'])
 
     const parsed = JSON.parse(stdout())
-    expect(parsed[0].name).toBe('old-feat')
-    expect(parsed[0].archivedName).toBe('2026-01-15-old-feat')
-    expect(parsed[0].workspace).toBe('default')
-    expect(parsed[0].artifacts).toEqual(['spec'])
+    expect(parsed.items[0].name).toBe('old-feat')
+    expect(parsed.items[0].archivedName).toBe('2026-01-15-old-feat')
+    expect(parsed.items[0].artifacts).toEqual(['spec'])
+    expect(parsed.meta.total).toBe(1)
   })
 
   it('rows sorted by archive date descending', async () => {
     const { kernel, stdout } = setup()
-    kernel.changes.listArchived.execute.mockResolvedValue([
-      {
-        name: 'older-change',
-        archivedName: '2024-01-10-older-change',
-        archivedAt: new Date('2024-01-10T10:00:00Z'),
-        workspaces: ['default'],
-        artifacts: new Set(['spec.md']),
-      },
-      {
-        name: 'newer-change',
-        archivedName: '2024-01-15-newer-change',
-        archivedAt: new Date('2024-01-15T10:00:00Z'),
-        workspaces: ['default'],
-        artifacts: new Set(['spec.md']),
-      },
-    ])
+    kernel.changes.listArchived.execute.mockResolvedValue({
+      items: [
+        {
+          name: 'older-change',
+          archivedName: '2024-01-10-older-change',
+          archivedAt: new Date('2024-01-10T10:00:00Z'),
+          workspaces: ['default'],
+          artifacts: ['spec.md'],
+        },
+        {
+          name: 'newer-change',
+          archivedName: '2024-01-15-newer-change',
+          archivedAt: new Date('2024-01-15T10:00:00Z'),
+          workspaces: ['default'],
+          artifacts: ['spec.md'],
+        },
+      ],
+      meta: { total: 2, count: 2, limit: 100, page: 1 },
+    })
 
     const program = makeProgram()
     registerArchiveList(program.command('archive'))
@@ -461,15 +475,20 @@ describe('archive list', () => {
     expect(newerIdx).toBeLessThan(olderIdx)
   })
 
-  it('JSON returns [] when no archived changes', async () => {
-    const { stdout } = setup()
+  it('JSON returns empty items and 0 total when no archived changes', async () => {
+    const { kernel, stdout } = setup()
+    kernel.changes.listArchived.execute.mockResolvedValue({
+      items: [],
+      meta: { total: 0, count: 0, limit: 100, page: 1 },
+    })
 
     const program = makeProgram()
     registerArchiveList(program.command('archive'))
     await program.parseAsync(['node', 'specd', 'archive', 'list', '--format', 'json'])
 
     const parsed = JSON.parse(stdout())
-    expect(parsed).toEqual([])
+    expect(parsed.items).toEqual([])
+    expect(parsed.meta.total).toBe(0)
   })
 })
 

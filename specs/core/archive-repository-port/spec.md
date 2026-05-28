@@ -46,13 +46,38 @@ When a change is not in `archivable` state and `options.force` is not `true`, `a
 
 ### Requirement: list returns all archived changes in chronological order
 
-`list()` MUST return all archived changes in this workspace sorted chronologically, oldest first. The implementation MUST read from `index.jsonl`, deduplicating by name so that the last entry wins in case of duplicates introduced by manual recovery.
+`list(options?)` MUST return archived changes in this workspace sorted chronologically (oldest first).
+
+```typescript
+interface ArchiveListOptions {
+  limit?: number
+  page?: number
+  startAt?: string
+}
+```
+
+- `limit`: maximum number of entries to return. Defaults to 100 if not provided.
+- `page`: 1-based page index. Mutually exclusive with `startAt`.
+- `startAt`: name of the change to start after (exclusive keyset cursor). Mutually exclusive with `page`.
 
 ### Requirement: list returns index entries
 
-`list()` MUST return `Promise<ArchivedChangeIndexEntry[]>`. The returned array contains all archived changes in the repository, ordered oldest first (chronological order by `archivedAt`).
+`list(options?)` MUST return a result object containing the entries and metadata:
 
-The implementation MUST satisfy this requirement without reading `manifest.json` for every entry; it SHOULD construct entries from `index.jsonl`.
+```typescript
+interface ArchiveListResult {
+  items: ArchivedChangeIndexEntry[]
+  meta: {
+    total: number
+    count: number
+    limit: number
+    page?: number
+    startAt?: string
+  }
+}
+```
+
+The implementation MUST satisfy this requirement without reading `manifest.json` files for every entry.
 
 ### Requirement: get returns an archived change or null
 
@@ -83,6 +108,15 @@ This method is used by `RunStepHooks` and `GetHookInstructions` to build the `ch
 ### Requirement: reindex rebuilds the archive index
 
 `reindex()` MUST rebuild `index.jsonl` by scanning the archive directory for all manifest files, sorting entries by `archivedAt` in chronological order, and writing a clean index. The resulting file MUST be in chronological order (oldest first) so that git diffs show only added or removed lines — never reorderings.
+
+### Requirement: Archive index metadata persistence
+
+The repository implementation SHALL maintain a metadata file `.specd-index-meta.json` at the archive root.
+
+- The file MUST contain the `totalCount` of archived changes.
+- `archive()` MUST update this count on success.
+- `reindex()` MUST recalculate the `totalCount` and refresh the metadata file.
+- `list()` SHOULD use this metadata file to provide the `total` count in its result.
 
 ### Requirement: Abstract class with abstract methods
 

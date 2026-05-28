@@ -13,8 +13,8 @@
 
 #### Scenario: Execute called with no arguments
 
-- **WHEN** `listArchived.execute()` is called
-- **THEN** it does not require any input parameters
+- **WHEN** `listArchived.execute({ limit: 10, page: 2 })` is called
+- **THEN** it delegates to `archiveRepository.list({ limit: 10, page: 2 })`
 
 ### Requirement: Output
 
@@ -33,9 +33,9 @@
 
 #### Scenario: Result matches repository output exactly
 
-- **GIVEN** `ArchiveRepository.list()` returns a specific array of `ArchivedChangeIndexEntry` records
-- **WHEN** `listArchived.execute()` is called
-- **THEN** the result is identical to the array returned by `ArchiveRepository.list()` -- no filtering, sorting, or transformation is applied
+- **GIVEN** `ArchiveRepository.list(options)` returns a specific `ArchiveListResult`
+- **WHEN** `listArchived.execute(options)` is called
+- **THEN** the result is identical to the object returned by the repository
 
 ### Requirement: No side effects
 

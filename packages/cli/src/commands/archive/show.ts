@@ -21,6 +21,7 @@ export function registerArchiveShow(parent: Command): void {
 JSON/TOON output schema:
   {
     name: string
+    description?: string
     state: string
     archivedAt: string
     archivedBy?: { name: string, email: string }
@@ -41,6 +42,7 @@ JSON/TOON output schema:
         if (fmt === 'text') {
           const lines = [
             `name:        ${archived.name}`,
+            ...(archived.description ? [`description: ${archived.description}`] : []),
             `state:       ${archived.state}`,
             `archivedAt:  ${archived.archivedAt.toISOString()}`,
             ...(archived.archivedBy
@@ -55,6 +57,7 @@ JSON/TOON output schema:
           output(
             {
               name: archived.name,
+              ...(archived.description ? { description: archived.description } : {}),
               state: archived.state,
               archivedAt: archived.archivedAt.toISOString(),
               ...(archived.archivedBy

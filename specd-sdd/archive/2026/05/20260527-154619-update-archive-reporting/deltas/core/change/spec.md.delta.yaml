@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'Core Change entity invariants are not affected by archive reporting updates.'

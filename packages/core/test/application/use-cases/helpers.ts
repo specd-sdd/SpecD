@@ -27,7 +27,11 @@ import {
 } from '../../../src/application/ports/spec-repository.js'
 import { type SpecMetadata } from '../../../src/domain/services/parse-metadata.js'
 import { type SpecLockData } from '../../../src/domain/services/parse-spec-lock.js'
-import { ArchiveRepository } from '../../../src/application/ports/archive-repository.js'
+import {
+  ArchiveRepository,
+  type ArchiveListOptions,
+  type ArchiveListResult,
+} from '../../../src/application/ports/archive-repository.js'
 import { type SchemaRegistry } from '../../../src/application/ports/schema-registry.js'
 import { type SchemaProvider } from '../../../src/application/ports/schema-provider.js'
 import {
@@ -803,8 +807,8 @@ class StubArchiveRepository extends ArchiveRepository {
     throw new Error('not implemented')
   }
 
-  override async list(): Promise<ArchivedChangeIndexEntry[]> {
-    return [...this.store.values()].map((view) => ({
+  override async list(options?: ArchiveListOptions): Promise<ArchiveListResult> {
+    const allItems = [...this.store.values()].map((view) => ({
       name: view.name,
       archivedName: view.archivedName,
       archivedAt: view.archivedAt,
@@ -815,6 +819,34 @@ class StubArchiveRepository extends ArchiveRepository {
       schemaVersion: view.schemaVersion,
       workspaces: [...view.workspaces],
     }))
+
+    const limit = options?.limit ?? 100
+    let items = allItems
+    let page: number | undefined
+    let startAt: string | undefined
+
+    if (options?.startAt !== undefined) {
+      startAt = options.startAt
+      const idx = items.findIndex((i) => i.name === startAt)
+      if (idx >= 0) items = items.slice(idx + 1)
+    } else {
+      page = options?.page ?? 1
+      items = items.slice((page - 1) * limit)
+    }
+
+    const count = Math.min(items.length, limit)
+    items = items.slice(0, limit)
+
+    return {
+      items,
+      meta: {
+        total: allItems.length,
+        count,
+        limit,
+        ...(page !== undefined ? { page } : {}),
+        ...(startAt !== undefined ? { startAt } : {}),
+      },
+    }
   }
 
   override async get(name: string): Promise<ArchivedChange | null> {

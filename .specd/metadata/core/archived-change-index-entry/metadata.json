@@ -64,17 +64,12 @@
         "specId": "core:archived-change-index-entry",
         "file": "core:src/domain/archived-change-index-entry.ts",
         "symbol": "ArchivedChangeIndexEntry"
-      },
-      {
-        "specId": "core:archived-change-index-entry",
-        "file": "core:src/domain/archived-change-index-entry.ts",
-        "symbol": "workspacesFromSpecIds"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:f901329b8341e5e516c3e9fa9d3a256d560a049adc95ab95993c9147e84983c4",
-    "verify.md": "sha256:35f57b7291384eb40ac806fbe0c2ea4a79a5a917ee78d3d23a3cb58e027fa901"
+    "spec.md": "sha256:183aaed774bbebc2563645f2a481056464e6af42a65baf5340e474b473e644ef",
+    "verify.md": "sha256:82e91c31ac52aa38809fb4c410464e5979f1da105c3ca4aebcfeff7a9e44c48b"
   },
   "generatedBy": "core"
 }

@@ -27,7 +27,6 @@ export function registerGraphIndex(parent: Command): void {
     .command('index')
     .allowExcessArguments(false)
     .description('Index the workspace into the code graph')
-    .option('--workspace <name>', 'index only the named workspace')
     .option('--force', 'full re-index, ignoring cached hashes')
     .option('--config <path>', 'path to specd.yaml')
     .option('--path <path>', 'repository root for bootstrap mode')
@@ -58,7 +57,6 @@ JSON/TOON output schema:
     )
     .action(
       async (opts: {
-        workspace?: string
         force?: boolean
         config?: string
         path?: string
@@ -108,8 +106,8 @@ JSON/TOON output schema:
 
               const rawWorkspaces: WorkspaceIndexTarget[] =
                 context.mode === 'configured'
-                  ? await buildWorkspaceTargets(config, context.kernel!, opts.workspace)
-                  : buildBootstrapWorkspaceTargets(context.vcsRoot, opts.workspace)
+                  ? await buildWorkspaceTargets(config, context.kernel!)
+                  : buildBootstrapWorkspaceTargets(context.vcsRoot)
 
               const workspaces =
                 opts.excludePath.length > 0
@@ -123,12 +121,7 @@ JSON/TOON output schema:
                   : rawWorkspaces
 
               if (workspaces.length === 0) {
-                output(
-                  opts.workspace
-                    ? `No workspace found matching "${opts.workspace}".`
-                    : 'No workspaces configured.',
-                  'text',
-                )
+                output('No workspaces configured.', 'text')
                 return
               }
 
@@ -143,6 +136,9 @@ JSON/TOON output schema:
               const indexOpts: IndexOptions = {
                 workspaces,
                 projectRoot: config.projectRoot,
+                ...(config.graph?.paths !== undefined
+                  ? { projectGraphPaths: config.graph.paths }
+                  : {}),
                 codeGraphVersion,
                 ...(isTTY ? { onProgress: progressFn } : {}),
                 ...(vcsRef !== undefined ? { vcsRef } : {}),
@@ -237,7 +233,6 @@ function shouldRunInWorkerParent(): boolean {
 /**
  * Reconstructs CLI args for a worker `graph index` invocation.
  * @param opts - Parsed command options.
- * @param opts.workspace - Optional workspace filter.
  * @param opts.force - Whether to recreate the graph before indexing.
  * @param opts.config - Optional explicit config path.
  * @param opts.path - Optional bootstrap repository path.
@@ -246,7 +241,6 @@ function shouldRunInWorkerParent(): boolean {
  * @returns Node argv entries after the script path.
  */
 function buildWorkerArgs(opts: {
-  workspace?: string
   force?: boolean
   config?: string
   path?: string
@@ -254,7 +248,6 @@ function buildWorkerArgs(opts: {
   excludePath: string[]
 }): string[] {
   const args = ['graph', 'index']
-  if (opts.workspace !== undefined) args.push('--workspace', opts.workspace)
   if (opts.force) args.push('--force')
   if (opts.config !== undefined) args.push('--config', opts.config)
   if (opts.path !== undefined) args.push('--path', opts.path)
@@ -269,7 +262,6 @@ function buildWorkerArgs(opts: {
  * Runs the heavy graph indexing work in a child process so the parent can hard-kill
  * it immediately on `Ctrl+C`.
  * @param opts - Parsed command options.
- * @param opts.workspace - Optional workspace filter.
  * @param opts.force - Whether to recreate the graph before indexing.
  * @param opts.config - Optional explicit config path.
  * @param opts.path - Optional bootstrap repository path.
@@ -278,7 +270,6 @@ function buildWorkerArgs(opts: {
  * @returns A promise that resolves when the worker exits.
  */
 async function runGraphIndexInWorker(opts: {
-  workspace?: string
   force?: boolean
   config?: string
   path?: string
@@ -325,19 +316,15 @@ async function runGraphIndexInWorker(opts: {
  * Builds the synthetic workspace targets used in graph bootstrap mode.
  *
  * @param vcsRoot - Resolved repository root.
- * @param workspaceFilter - Optional workspace filter from the CLI.
  * @returns Synthetic workspace targets for bootstrap indexing.
  */
-function buildBootstrapWorkspaceTargets(
-  vcsRoot: string,
-  workspaceFilter?: string,
-): WorkspaceIndexTarget[] {
-  const target: WorkspaceIndexTarget = {
-    name: 'default',
-    codeRoot: vcsRoot,
-    repoRoot: vcsRoot,
-    specs: () => Promise.resolve([]),
-  }
-
-  return workspaceFilter !== undefined && workspaceFilter !== 'default' ? [] : [target]
+function buildBootstrapWorkspaceTargets(vcsRoot: string): WorkspaceIndexTarget[] {
+  return [
+    {
+      name: 'default',
+      codeRoot: vcsRoot,
+      repoRoot: vcsRoot,
+      specs: () => Promise.resolve([]),
+    },
+  ]
 }

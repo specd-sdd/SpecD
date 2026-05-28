@@ -68,6 +68,24 @@ export interface SpecdWorkspaceGraphConfig {
    * When present, replaces built-in defaults entirely.
    */
   readonly excludePaths?: readonly string[]
+  /**
+   * Optional graph-visible include surface inside the workspace `codeRoot`.
+   *
+   * Paths are gitignore-syntax patterns relative to `codeRoot`. They affect
+   * graph indexing only and do not change workspace ownership semantics.
+   */
+  readonly allowedPaths?: readonly string[]
+}
+
+/** Project-level code graph configuration from `specd.yaml`. */
+export interface SpecdGraphConfig {
+  /**
+   * Optional project-global graph paths rooted at `projectRoot`.
+   *
+   * Paths are gitignore-syntax patterns relative to the active config
+   * directory and are indexed under the reserved `root:` namespace.
+   */
+  readonly paths?: readonly string[]
 }
 
 /**
@@ -185,6 +203,8 @@ export interface SpecdConfig {
   readonly storage: SpecdStorageConfig
   /** Approval gate settings (both default to `false`). */
   readonly approvals: { readonly spec: boolean; readonly signoff: boolean }
+  /** Project-level code graph configuration. */
+  readonly graph?: SpecdGraphConfig
   /** Project-level logging configuration. */
   readonly logging?: SpecdLoggingConfig
   /** Freeform context entries prepended to the compiled context. */
@@ -240,6 +260,7 @@ const specdConfigShape = z.object({
   workspaces: z.array(z.object({ name: z.string() })),
   storage: z.object({ changesPath: z.string() }),
   approvals: z.object({ spec: z.boolean(), signoff: z.boolean() }),
+  graph: z.object({ paths: z.array(z.string()).optional() }).optional(),
   logging: z
     .object({ level: z.enum(['trace', 'debug', 'info', 'warn', 'error', 'silent']) })
     .optional(),

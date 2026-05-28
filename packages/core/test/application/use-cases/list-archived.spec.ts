@@ -1,7 +1,10 @@
 import { describe, it, expect } from 'vitest'
 import { ListArchived } from '../../../src/application/use-cases/list-archived.js'
 import { type ArchivedChangeIndexEntry } from '../../../src/domain/archived-change-index-entry.js'
-import { type ArchiveRepository } from '../../../src/application/ports/archive-repository.js'
+import {
+  type ArchiveRepository,
+  type ArchiveListOptions,
+} from '../../../src/application/ports/archive-repository.js'
 
 function makeIndexEntry(name: string): ArchivedChangeIndexEntry {
   return {
@@ -21,8 +24,18 @@ function makeArchiveRepository(entries: ArchivedChangeIndexEntry[] = []): Archiv
     workspace: () => 'default',
     ownership: () => 'owned' as const,
     isExternal: () => false,
-    async list() {
-      return entries
+    async list(options?: ArchiveListOptions) {
+      const limit = options?.limit ?? 100
+      const items = entries.slice(0, limit)
+      return {
+        items,
+        meta: {
+          total: entries.length,
+          count: items.length,
+          limit,
+          page: options?.page ?? 1,
+        },
+      }
     },
     async get(_name: string) {
       return null
@@ -40,16 +53,17 @@ function makeArchiveRepository(entries: ArchivedChangeIndexEntry[] = []): Archiv
 }
 
 describe('ListArchived', () => {
-  it('returns empty array when no archived changes exist', async () => {
+  it('returns empty list when no archived changes exist', async () => {
     const repo = makeArchiveRepository()
     const uc = new ListArchived(repo)
 
     const result = await uc.execute()
 
-    expect(result).toEqual([])
+    expect(result.items).toEqual([])
+    expect(result.meta.total).toBe(0)
   })
 
-  it('returns all archived changes from repository', async () => {
+  it('returns archived changes from repository', async () => {
     const a = makeIndexEntry('alpha')
     const b = makeIndexEntry('bravo')
     const repo = makeArchiveRepository([a, b])
@@ -57,7 +71,8 @@ describe('ListArchived', () => {
 
     const result = await uc.execute()
 
-    expect(result).toHaveLength(2)
-    expect(result.map((c) => c.name)).toEqual(['alpha', 'bravo'])
+    expect(result.items).toHaveLength(2)
+    expect(result.items.map((c) => c.name)).toEqual(['alpha', 'bravo'])
+    expect(result.meta.total).toBe(2)
   })
 })

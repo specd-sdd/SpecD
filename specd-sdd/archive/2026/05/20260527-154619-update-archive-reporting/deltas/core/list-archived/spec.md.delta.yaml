@@ -1,0 +1,21 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Output'
+  content: |
+    `ListArchived.execute()` MUST return a `Promise` resolving to a result object containing the entries and metadata:
+
+    ```typescript
+    interface ListArchivedResult {
+      items: ArchivedChangeIndexEntry[];
+      meta: {
+        total: number;
+        count: number;
+        limit: number;
+        page?: number;
+        startAt?: string;
+      };
+    }
+    ```
+
+    The `items` array contains the archived changes, ordered oldest first (chronological order by `archivedAt`) unless the repository implementation provides a different default order.

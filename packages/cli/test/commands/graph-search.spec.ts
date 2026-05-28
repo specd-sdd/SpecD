@@ -38,6 +38,9 @@ function setup() {
   const mockProvider = {
     searchSymbols: vi.fn().mockResolvedValue([]),
     searchSpecs: vi.fn().mockResolvedValue([]),
+    searchDocuments: vi.fn().mockResolvedValue([]),
+    getFile: vi.fn().mockResolvedValue(undefined),
+    getDocument: vi.fn().mockResolvedValue(undefined),
   }
   vi.mocked(withProvider).mockImplementation(async (_config, _format, fn) => {
     await fn(mockProvider as never)
@@ -135,6 +138,44 @@ describe('graph search', () => {
         kinds: ['class', 'method', 'function'],
       }),
     )
+  })
+
+  it('routes document-only search through searchDocuments', async () => {
+    const { mockProvider } = setup()
+
+    const program = makeSearchProgram()
+    await program.parseAsync(['node', 'specd', 'graph', 'search', 'guide', '--documents'])
+
+    expect(mockProvider.searchDocuments).toHaveBeenCalledWith(
+      expect.objectContaining({
+        query: 'guide',
+      }),
+    )
+    expect(mockProvider.searchSymbols).not.toHaveBeenCalled()
+    expect(mockProvider.searchSpecs).not.toHaveBeenCalled()
+  })
+
+  it('renders document results in text output', async () => {
+    const { mockProvider, getStdout } = setup()
+    mockProvider.searchDocuments.mockResolvedValue([
+      {
+        document: {
+          path: 'root:docs/guide.md',
+          configRelativePath: 'docs/guide.md',
+          contentHash: 'sha256:doc',
+          content: '# Guide',
+          workspace: 'root',
+        },
+        score: 1000,
+      },
+    ])
+
+    const program = makeSearchProgram()
+    await program.parseAsync(['node', 'specd', 'graph', 'search', 'docs/guide.md', '--documents'])
+
+    const out = getStdout()
+    expect(out).toContain('Documents (1):')
+    expect(out).toContain('docs/guide.md')
   })
 
   it('rejects invalid kind values before querying', async () => {

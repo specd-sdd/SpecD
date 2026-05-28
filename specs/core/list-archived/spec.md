@@ -24,7 +24,22 @@ The `ArchiveRepository` instance is scoped to the default workspace and is injec
 
 ### Requirement: Output
 
-`ListArchived.execute()` MUST return `Promise<ArchivedChangeIndexEntry[]>`. The returned array contains all archived changes in the repository, ordered oldest first (chronological order by `archivedAt`). If no archived changes exist, the result MUST be an empty array.
+`ListArchived.execute()` MUST return a `Promise` resolving to a result object containing the entries and metadata:
+
+```typescript
+interface ListArchivedResult {
+  items: ArchivedChangeIndexEntry[]
+  meta: {
+    total: number
+    count: number
+    limit: number
+    page?: number
+    startAt?: string
+  }
+}
+```
+
+The `items` array contains the archived changes, ordered oldest first (chronological order by `archivedAt`) unless the repository implementation provides a different default order.
 
 ### Requirement: Delegation to ArchiveRepository
 

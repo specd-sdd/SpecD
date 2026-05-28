@@ -21,12 +21,13 @@ The command prints read-only details for the archived change to stdout:
 
 ```
 name:        <name>
+description: <description>      # omitted when null/empty
 state:       <lifecycle-state>
 archivedAt:  <iso-timestamp>
-archivedBy:  <name <email>>        # omitted when not recorded
+archivedBy:  <name <email>>     # omitted when not recorded
 specs:       <specId>, ...
 schema:      <schema-name>@<version>
-artifacts:   <artifactType>, ...   # artifact type IDs from the archive record
+artifacts:   <artifactType>, ...
 ```
 
 The `state` field MUST be derived from the archived `manifest.json` lifecycle state at load time. It MUST NOT be hardcoded to `archivable`.
@@ -37,17 +38,18 @@ When `--format json` is passed, the command writes a single JSON object to stdou
 
 ```json
 {
-  \"name\":\"...\",
-  \"state\":\"...\",
-  \"archivedAt\":\"...\",
-  \"archivedBy\":{ \"name\":\"...\", \"email\":\"...\" },
-  \"specIds\":[...],
-  \"schema\":{ \"name\":\"...\", \"version\":N },
-  \"artifacts\":[\"...\"]
+  "name": "...",
+  "description": "...",
+  "state": "...",
+  "archivedAt": "...",
+  "archivedBy": { "name": "...", "email": "..." },
+  "specIds": [...],
+  "schema": { "name": "...", "version": N },
+  "artifacts": ["..."]
 }
 ```
 
-`archivedBy` is omitted when not recorded. `artifacts` is an array of artifact type IDs present at archive time.
+`description` and `archivedBy` are omitted when not recorded. `artifacts` is an array of artifact type IDs present at archive time.
 
 ### Requirement: Output format — toon
 

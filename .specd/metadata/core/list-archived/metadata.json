@@ -27,7 +27,7 @@
     {
       "requirement": "Output",
       "rules": [
-        "`ListArchived.execute()` MUST return `Promise<ArchivedChangeIndexEntry[]>`. The returned array contains all archived changes in the repository, ordered oldest first (chronological order by `archivedAt`). If no archived changes exist, the result MUST be an empty array."
+        "`ListArchived.execute()` MUST return a `Promise` resolving to a result object containing the entries and metadata:\n\n```typescript\ninterface ListArchivedResult {\n  items: ArchivedChangeIndexEntry[];\n  meta: {\n    total: number;\n    count: number;\n    limit: number;\n    page?: number;\n    startAt?: string;\n  };\n}\n```\n\nThe `items` array contains the archived changes, ordered oldest first (chronological order by `archivedAt`) unless the repository implementation provides a different default order."
       ]
     },
     {
@@ -58,8 +58,8 @@
     {
       "requirement": "No input",
       "name": "Execute called with no arguments",
-      "when": ["listArchived.execute() is called"],
-      "then": ["it does not require any input parameters"]
+      "when": ["listArchived.execute({ limit: 10, page: 2 }) is called"],
+      "then": ["it delegates to archiveRepository.list({ limit: 10, page: 2 })"]
     },
     {
       "requirement": "Output",
@@ -81,13 +81,9 @@
     {
       "requirement": "Delegation to ArchiveRepository",
       "name": "Result matches repository output exactly",
-      "given": [
-        "ArchiveRepository.list() returns a specific array of ArchivedChangeIndexEntry records"
-      ],
-      "when": ["listArchived.execute() is called"],
-      "then": [
-        "the result is identical to the array returned by ArchiveRepository.list() -- no filtering, sorting, or transformation is applied"
-      ]
+      "given": ["ArchiveRepository.list(options) returns a specific ArchiveListResult"],
+      "when": ["listArchived.execute(options) is called"],
+      "then": ["the result is identical to the object returned by the repository"]
     },
     {
       "requirement": "No side effects",
@@ -107,8 +103,8 @@
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:1236592baff9ba40ef5132b29ed2f1920bd88836b9379f2d42fea6ed76afa97f",
-    "verify.md": "sha256:0abf44029e309ae9cff21f60514182f34725129be5c2a0f4e43eaa90d19d869f"
+    "spec.md": "sha256:3ba3cf9e9e83da7936e9e84baa052ac64854bba3028294245db417d5b26ab313",
+    "verify.md": "sha256:c3acbb9c39cacfc7cb947e44b50d5128b58341f6e91d018e2e746da7d0ac8416"
   },
   "generatedBy": "core"
 }

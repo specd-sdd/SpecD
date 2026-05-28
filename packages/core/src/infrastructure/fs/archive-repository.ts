@@ -9,6 +9,8 @@ import {
 import { toArchivedChangeView } from '../../domain/read-only-change-view.js'
 import {
   ArchiveRepository,
+  type ArchiveListOptions,
+  type ArchiveListResult,
   type ArchivePathEntry,
   type ArchiveRepositoryConfig,
 } from '../../application/ports/archive-repository.js'
@@ -26,8 +28,13 @@ import { loadChangeFromManifest } from './manifest-change-loader.js'
 
 /** Filename of the append-only archive index at the archive root. */
 const INDEX_FILE = '.specd-index.jsonl'
+const INDEX_META_FILE = '.specd-index-meta.json'
 const ARCHIVE_GITIGNORE_FILE = '.gitignore'
-const ARCHIVE_RUNTIME_GITIGNORE_ENTRIES = ['.specd-index.jsonl', '.staging'] as const
+const ARCHIVE_RUNTIME_GITIGNORE_ENTRIES = [
+  '.specd-index.jsonl',
+  '.staging',
+  INDEX_META_FILE,
+] as const
 
 /** Default archive pattern when none is configured. */
 const DEFAULT_PATTERN = '{{change.archivedName}}'
@@ -135,6 +142,62 @@ export class FsArchiveRepository extends ArchiveRepository {
   }
 
   /**
+   * Reads the current total archived change count from the metadata file.
+   *
+   * Falls back to a full index scan if the file is missing or corrupted.
+   *
+   * @returns The total number of archived changes
+   */
+  private async _readMetaCount(): Promise<number> {
+    const metaPath = path.join(this._archivePath, INDEX_META_FILE)
+    try {
+      const content = await fs.readFile(metaPath, 'utf8')
+      const data = JSON.parse(content) as Record<string, unknown> | null
+      if (data !== null && typeof data === 'object' && typeof data.totalCount === 'number') {
+        return data.totalCount
+      }
+    } catch (err) {
+      if (!isEnoent(err)) {
+        Logger.debug(
+          'FsArchiveRepository failed to read metadata file; falling back to index scan',
+          {
+            error: err,
+          },
+        )
+      }
+    }
+
+    // Fallback: full index scan
+    try {
+      const lines = await this._readIndexLines()
+      const names = new Set<string>()
+      for (const line of lines) {
+        try {
+          const entry = JSON.parse(line) as IndexEntry
+          names.add(entry.name)
+        } catch {
+          continue
+        }
+      }
+      return names.size
+    } catch (err) {
+      if (!isEnoent(err)) throw err
+      return 0
+    }
+  }
+
+  /**
+   * Writes the total archived change count to the metadata file atomically.
+   *
+   * @param count - The new total count
+   */
+  private async _writeMetaCount(count: number): Promise<void> {
+    const metaPath = path.join(this._archivePath, INDEX_META_FILE)
+    await fs.mkdir(this._archivePath, { recursive: true })
+    await writeFileAtomic(metaPath, JSON.stringify({ totalCount: count }, null, 2) + '\n')
+  }
+
+  /**
    * Moves the change directory to the archive, records an `archivedAt`
    * timestamp in the manifest, and appends an entry to `index.jsonl`.
    *
@@ -193,10 +256,13 @@ export class FsArchiveRepository extends ArchiveRepository {
       }
       await this._writeManifestAtomic(stageDir, archivedManifest)
 
+      const previousCount = await this._readMetaCount()
+
       await fs.mkdir(path.dirname(archiveDir), { recursive: true })
       await moveDir(stageDir, archiveDir)
       await this._ensureArchiveRuntimeGitignore()
       await this._appendIndex(this._buildIndexEntry(archivedManifest, relPath))
+      await this._writeMetaCount(previousCount + 1)
 
       const archivedChange = toArchivedChangeView(change, {
         archivedName,
@@ -221,14 +287,15 @@ export class FsArchiveRepository extends ArchiveRepository {
   }
 
   /**
-   * Lists all archived changes in chronological order (oldest first).
+   * Lists archived changes in this workspace in chronological order (oldest first).
    *
-   * Reads `index.jsonl` from the start. Deduplicates by name so that the last
-   * index entry wins in case of duplicates introduced by manual recovery.
+   * Streams `index.jsonl` from the start, deduplicating by name so that the
+   * last entry wins in case of duplicates introduced by manual recovery.
    *
-   * @returns All archived changes in chronological order
+   * @param options - Pagination and filtering options
+   * @returns Paginated index-backed archive result, oldest first
    */
-  override async list(): Promise<ArchivedChangeIndexEntry[]> {
+  override async list(options?: ArchiveListOptions): Promise<ArchiveListResult> {
     await this._ensureIndex()
     const lines = await this._readIndexLines()
     const map = new Map<string, ArchivedChangeIndexEntry>()
@@ -246,7 +313,40 @@ export class FsArchiveRepository extends ArchiveRepository {
       }
     }
 
-    return Array.from(map.values())
+    const allItems = Array.from(map.values())
+    const limit = options?.limit ?? 100
+    const total = await this._readMetaCount()
+
+    let items = allItems
+    let page: number | undefined
+    let startAt: string | undefined
+
+    if (options?.startAt !== undefined) {
+      startAt = options.startAt
+      const startIdx = items.findIndex((i) => i.name === options.startAt)
+      if (startIdx >= 0) {
+        items = items.slice(startIdx + 1)
+      }
+    } else {
+      const p = options?.page ?? 1
+      page = p
+      const offset = (p - 1) * limit
+      items = items.slice(offset)
+    }
+
+    const count = Math.min(items.length, limit)
+    items = items.slice(0, limit)
+
+    return {
+      items,
+      meta: {
+        total,
+        count,
+        limit,
+        ...(page !== undefined ? { page } : {}),
+        ...(startAt !== undefined ? { startAt } : {}),
+      },
+    }
   }
 
   /**
@@ -295,6 +395,7 @@ export class FsArchiveRepository extends ArchiveRepository {
     await this._ensureArchiveRuntimeGitignore()
     await fs.mkdir(this._archivePath, { recursive: true })
     await writeFileAtomic(indexPath, content)
+    await this._writeMetaCount(entries.length)
   }
 
   /**

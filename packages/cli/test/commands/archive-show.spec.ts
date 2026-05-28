@@ -73,6 +73,29 @@ describe('Output format — text', () => {
     expect(out).toContain('artifacts:')
     expect(out).toContain('proposal')
   })
+
+  it('Display enriched metadata', async () => {
+    const { kernel, stdout } = setup()
+    kernel.changes.getArchived.execute.mockResolvedValue({
+      name: 'add-oauth-login',
+      description: 'My cool feature',
+      state: 'archivable',
+      archivedAt: new Date('2024-01-15T12:00:00.000Z'),
+      specIds: ['core:change'],
+      schemaName: 'schema-std',
+      schemaVersion: 1,
+      artifacts: new Map(),
+    })
+
+    const program = makeProgram()
+    registerArchiveShow(program.command('archive'))
+    await program.parseAsync(['node', 'specd', 'archive', 'show', 'add-oauth-login'])
+
+    const out = stdout()
+    expect(out).toContain('description: My cool feature')
+    expect(out).toContain('specs:       core:change')
+    expect(out).toContain('schema:      schema-std@1')
+  })
 })
 
 describe('Output format — JSON', () => {

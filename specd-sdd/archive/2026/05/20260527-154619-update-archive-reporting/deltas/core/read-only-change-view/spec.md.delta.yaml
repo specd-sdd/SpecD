@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'ReadOnlyChangeView projection is already compatible with the enriched archive metadata.'

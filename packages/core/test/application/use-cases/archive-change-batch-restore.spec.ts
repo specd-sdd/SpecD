@@ -41,7 +41,11 @@ import {
   type RunStepHooksInput,
   type RunStepHooksResult,
 } from '../../../src/application/use-cases/run-step-hooks.js'
-import { ArchiveRepository } from '../../../src/application/ports/archive-repository.js'
+import {
+  ArchiveRepository,
+  type ArchiveListOptions,
+  type ArchiveListResult,
+} from '../../../src/application/ports/archive-repository.js'
 import { type ArchivedChange } from '../../../src/domain/entities/archived-change.js'
 import { toArchivedChangeView } from '../../../src/domain/read-only-change-view.js'
 import { Change, type ChangeEvent } from '../../../src/domain/entities/change.js'
@@ -95,8 +99,15 @@ function makeArchiveRepo(): ArchiveRepository {
         archiveDirPath: `/archive/${archivedName}`,
       }
     }
-    override async list() {
-      return []
+    override async list(options?: ArchiveListOptions): Promise<ArchiveListResult> {
+      return {
+        items: [],
+        meta: {
+          total: 0,
+          count: 0,
+          limit: options?.limit ?? 100,
+        },
+      }
     }
     override async get() {
       return null
