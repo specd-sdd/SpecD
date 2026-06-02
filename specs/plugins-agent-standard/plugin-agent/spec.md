@@ -42,11 +42,13 @@ The application layer MUST include an `InstallSkills` use case that:
 1. reads skills from `@specd/skills`
 2. resolves the per-skill frontmatter source value collection
 3. declares only the Agent Skills standard-supported capability identifiers
-4. passes `variables.sharedFolder` only when overriding the default shared path contract
-5. writes files not marked as shared to the installed skill directory under the `projectRoot` provided in `SpecdConfig`
-6. writes files marked as shared to the rendered `sharedFolder` location under the project root
+4. resolves bundles through `ResolveBundle` so built-in render defaults are supplied by `@specd/skills`
+5. passes `variables.sharedFolder` only when overriding the default shared path contract
+6. writes files not marked as shared to the installed skill directory under the `projectRoot` provided in `SpecdConfig`
+7. writes files marked as shared to the rendered `sharedFolder` location under the project root
 
 The plugin MUST NOT prepend YAML frontmatter after bundle resolution.
+The plugin MUST NOT call `SkillRepository.getBundle(...)` directly from the install flow when `ResolveBundle` is available.
 
 ### Requirement: Frontmatter injection
 
@@ -103,3 +105,4 @@ Uninstall MUST NOT remove unrelated directories or files under `.agents/skills/`
 
 - [`plugin-agent-opencode:plugin-agent`](../../plugins-opencode/plugin-agent/spec.md) — reference implementation for the clone
 - [`default:_global/commits`](../../../_global/commits/spec.md) — commit scope registration
+- [`skills:resolve-bundle`](../../skills/resolve-bundle/spec.md) — canonical install-time bundle resolution with built-in render defaults

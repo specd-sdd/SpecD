@@ -25,9 +25,10 @@ const repositoryMock = {
   listSharedFiles: vi.fn(() => []),
 }
 
-vi.mock('@specd/skills', () => ({
-  createSkillRepository: () => repositoryMock,
-}))
+vi.mock('@specd/skills', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@specd/skills')>()
+  return { ...actual, createSkillRepository: () => repositoryMock }
+})
 
 async function createTempProjectRoot(): Promise<string> {
   return mkdtemp(path.join(tmpdir(), 'specd-plugin-agent-codex-'))
@@ -75,6 +76,16 @@ describe('plugin-agent-codex create()', () => {
       const result = await plugin.install(config, { skills: ['specd'] })
 
       expect(result.installed.length).toBe(1)
+      expect(repositoryMock.getBundle).toHaveBeenCalledWith(
+        'specd',
+        expect.objectContaining({
+          variables: expect.objectContaining({
+            configPath: '.specd/config',
+            schemaRef: '@specd/schema-std',
+            sharedFolder: '.specd/config/skills/shared',
+          }),
+        }),
+      )
       const skillFilePath = path.join(projectRoot, '.codex', 'skills', 'specd', 'SKILL.md')
       const skillContent = await readFile(skillFilePath, 'utf8')
       expect(skillContent).toContain('---')

@@ -48,12 +48,14 @@ The application layer MUST have an `InstallSkills` use case that orchestrates:
 1. Get skills via `@specd/skills`
 2. Resolve Claude frontmatter source values for each skill
 3. Declare only the Claude-supported capability identifiers for each install
-4. Pass `variables.sharedFolder` only when overriding the default shared path contract
-5. Install files not marked as shared to `.claude/skills/<skill-name>/` relative to the `projectRoot` found in `SpecdConfig`
-6. Install files marked as shared to the rendered `sharedFolder` location under the project root
+4. Resolve bundles through `ResolveBundle` so built-in render defaults are supplied by `@specd/skills`
+5. Pass `variables.sharedFolder` only when overriding the default shared path contract
+6. Install files not marked as shared to `.claude/skills/<skill-name>/` relative to the `projectRoot` found in `SpecdConfig`
+7. Install files marked as shared to the rendered `sharedFolder` location under the project root
 
 The plugin MUST NOT assemble the final YAML frontmatter document itself after bundle resolution.
 The plugin MUST NOT normalize capability objects on behalf of `@specd/skills`.
+The plugin MUST NOT call `SkillRepository.getBundle(...)` directly from the install flow when `ResolveBundle` is available.
 
 ### Requirement: Frontmatter injection
 
@@ -95,3 +97,4 @@ Uninstall MUST NOT remove unrelated directories or files under `.claude/skills/`
 - [`plugin-manager:agent-plugin-type`](../plugin-manager/agent-plugin-type/spec.md) — plugin interface
 - [`skills:skill-bundle`](../skills/skill-bundle/spec.md) — shared bundle file routing contract
 - [`skills:skill-repository`](../skills/skill-repository/spec.md) — skill access
+- [`skills:resolve-bundle`](../skills/resolve-bundle/spec.md) — canonical install-time bundle resolution with built-in render defaults

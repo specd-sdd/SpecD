@@ -67,3 +67,10 @@
 - **AND** the `frontmatter` capability is present
 - **WHEN** `ResolveBundle` resolves a skill-local markdown template with a frontmatter insertion point
 - **THEN** the resulting bundle content includes the composed frontmatter block
+
+#### Scenario: Agent-plugin installs route bundle resolution through ResolveBundle
+
+- **GIVEN** an agent plugin needs built-in render defaults from `SpecdConfig`
+- **WHEN** it resolves a skill bundle for installation
+- **THEN** the install flow uses `ResolveBundle`
+- **AND** bundle resolution does not depend on a direct `SkillRepository.getBundle(...)` call from the plugin adapter

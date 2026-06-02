@@ -1,7 +1,7 @@
 import { mkdir, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import type { SpecdConfig } from '@specd/core'
-import { createSkillRepository } from '@specd/skills'
+import { createSkillRepository, ResolveBundle } from '@specd/skills'
 import type {
   AgentInstallOptions,
   AgentInstallResult,
@@ -54,15 +54,17 @@ export class InstallSkills {
       const frontmatter =
         skillFrontmatter[skillName] ??
         ({ name: skillName, description: skill.description } satisfies Frontmatter)
-      const bundle = repository.getBundle(skillName, {
-        variables: {
-          ...(options?.variables ?? {}),
-          ...(typeof options?.variables?.['sharedFolder'] === 'string'
-            ? { sharedFolder: resolvedSharedFolder.relativePath }
-            : {}),
-          frontmatter: toTemplateVariables(frontmatter),
+      const resolveBundle = new ResolveBundle(repository)
+      const { bundle } = await resolveBundle.execute({
+        name: skillName,
+        config,
+        context: {
+          variables: {
+            ...(options?.variables ?? {}),
+            frontmatter: toTemplateVariables(frontmatter),
+          },
+          capabilities: buildCapabilities(false, false, true),
         },
-        capabilities: buildCapabilities(false, false, true),
       })
       if (bundle.files.length === 0) {
         skipped.push({ skill: skillName, reason: 'bundle has no files' })

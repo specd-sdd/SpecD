@@ -33,6 +33,8 @@ The use case MUST:
 9. Preserve all non-content `ResolvedFile` metadata, including whether a file is marked as shared
 10. Return the resolved bundle
 
+Agent-plugin install flows that require built-in render defaults such as `configPath`, `schemaRef`, or the default `sharedFolder` MUST route bundle resolution through this use case instead of calling the repository directly.
+
 `projectRoot` MUST remain available only for internal validation and MUST NOT be exposed as a template variable.
 
 ### Requirement: Input

@@ -41,6 +41,7 @@
 - **GIVEN** skills are available from `@specd/skills`
 - **WHEN** `install(config, options)` runs
 - **THEN** the plugin passes Copilot capability identifiers and frontmatter source values into `@specd/skills`
+- **AND** it resolves install bundles through `ResolveBundle`
 
 #### Scenario: Install routes shared files to the rendered sharedFolder location
 
@@ -49,6 +50,12 @@
 - **THEN** shared files are written to the rendered sharedFolder location under the project root
 - **AND** non-shared files are written under the Copilot skill install directory
 - **AND** shared files do not receive frontmatter
+
+#### Scenario: Copilot install does not call repository bundle resolution directly
+
+- **WHEN** the Copilot install flow is reviewed
+- **THEN** bundle resolution goes through `ResolveBundle`
+- **AND** the plugin does not call `SkillRepository.getBundle(...)` directly from `InstallSkills`
 
 ### Requirement: Frontmatter field contract
 

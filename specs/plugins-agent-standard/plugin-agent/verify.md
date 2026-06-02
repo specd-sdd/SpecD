@@ -120,8 +120,15 @@
 - **WHEN** `InstallSkills` runs
 - **THEN** it reads skill templates, resolves capability identifiers and frontmatter source values, and passes them into `@specd/skills`
 - **AND** shared-marked files are written to the rendered sharedFolder location under the project root
+- **AND** it resolves install bundles through `ResolveBundle`
 
 #### Scenario: Agent Skills standard application layer does not prepend YAML after resolution
 
 - **WHEN** the Agent Skills standard install flow is reviewed
 - **THEN** the plugin does not assemble a final YAML frontmatter block after bundle resolution
+
+#### Scenario: Standard-agent install does not call repository bundle resolution directly
+
+- **WHEN** the Agent Skills standard install flow is reviewed
+- **THEN** bundle resolution goes through `ResolveBundle`
+- **AND** the plugin does not call `SkillRepository.getBundle(...)` directly from `InstallSkills`
