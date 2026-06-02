@@ -1,0 +1,55 @@
+- op: modified
+  description: 'Update graph store search verification to include prioritization and preserve existing scenarios.'
+  selector:
+    type: section
+    matches: '^Requirement: Full-text search$'
+    parent:
+      type: section
+      matches: '^Requirements$'
+  rename: 'Requirement: Search with exact-match prioritization'
+  content: |
+    #### Scenario: Symbol search matches normalized compound names
+
+    - **GIVEN** symbols `createUser`, `deleteUser`, and `listOrders` are indexed
+    - **WHEN** `searchSymbols({ query: 'user' })` is called
+    - **THEN** `createUser` and `deleteUser` are returned ahead of unrelated symbols
+
+    #### Scenario: Symbol search includes comments
+
+    - **GIVEN** a symbol with comment text containing `Validates the user's authentication token`
+    - **WHEN** `searchSymbols({ query: 'authentication token' })` is called
+    - **THEN** that symbol is returned
+
+    #### Scenario: Spec search matches description and content
+
+    - **GIVEN** a spec whose description mentions `adapter parsing`
+    - **AND** another spec whose content contains `lifecycle state transition`
+    - **WHEN** the corresponding queries are issued through `searchSpecs`
+    - **THEN** the matching spec is returned in each case with a relevance score
+
+    #### Scenario: Exact Spec ID match is prioritized first
+
+    - **GIVEN** a spec with ID `core:change`
+    - **AND** a search query `core:change`
+    - **WHEN** the spec search is executed
+    - **THEN** the spec `core:change` appears as the first result
+
+    #### Scenario: Exact Document Path match is prioritized first
+
+    - **GIVEN** a document with path `root:package.json`
+    - **AND** a search query `root:package.json`
+    - **WHEN** the document search is executed
+    - **THEN** the document `root:package.json` appears as the first result
+
+    #### Scenario: Filters are applied before limiting results
+
+    - **GIVEN** more than 20 matching symbols exist across multiple workspaces
+    - **WHEN** `searchSymbols({ query: 'hook', workspace: 'core', limit: 5 })` is called
+    - **THEN** only workspace `core` contributes candidates
+    - **AND** at most 5 filtered results are returned
+
+    #### Scenario: Search indexes can be rebuilt explicitly
+
+    - **GIVEN** a backend whose search indexes are not auto-maintained during bulk writes
+    - **WHEN** `rebuildFtsIndexes()` is called after bulk data changes
+    - **THEN** subsequent abstract search queries see the new symbols and specs

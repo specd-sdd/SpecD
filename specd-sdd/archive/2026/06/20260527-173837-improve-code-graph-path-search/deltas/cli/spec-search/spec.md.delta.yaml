@@ -1,0 +1,24 @@
+- op: modified
+  description: 'Align fallback search with centralized project orchestration.'
+  selector:
+    type: section
+    matches: '^Requirement: Search execution$'
+    parent:
+      type: section
+      matches: '^Requirements$'
+  content: |
+    The command MUST use the following search strategy:
+
+    1. **Graph-first**: Attempt to use the code graph's spec search facility.
+    2. **Core fallback**: When the graph is stale or unavailable, fall back to `SearchSpecs.execute()`. This use case SHALL obtain the orchestrated project structure via `ListWorkspaces` to perform the repository-based search.
+
+- op: modified
+  description: 'Add dependency on ListWorkspaces.'
+  selector:
+    type: section
+    matches: '^Spec Dependencies$'
+  content: |
+    - [`cli:entrypoint`](../entrypoint/spec.md)
+    - [`default:_global/spec-layout`](../../../_global/spec-layout/spec.md)
+    - [`core:search-specs`](../../core/search-specs/spec.md)
+    - [`core:list-workspaces`](../../core/list-workspaces/spec.md)

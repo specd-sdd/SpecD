@@ -32,12 +32,7 @@ The file's absence is not an error — a spec with no `metadata.json` is treated
 
 ### Requirement: Sidecar separation
 
-`metadata.json` and `spec-lock.json` are distinct persisted artifacts with different responsibilities.
-
-- `metadata.json` lives under the configured metadata root and remains the compact machine-readable summary consumed by context and tooling.
-- `spec-lock.json` lives alongside the canonical persisted `scope: spec` artifacts for the spec and owns the durable archived values for schema identity and persisted `dependsOn`.
-- A missing `metadata.json` remains non-fatal.
-- A missing `spec-lock.json` on a legacy spec is tolerated until opportunistic backfill creates it.
+The metadata generation process SHALL obtain persisted schema, dependencies, and implementation links through the `SpecRepository` semantic operations. It MUST NOT read the underlying sidecar files directly.
 
 ### Requirement: File format
 
@@ -155,13 +150,12 @@ A spec that cannot be resolved (missing file, unknown workspace) is silently ski
 
 ### Requirement: Implementation projection
 
-Generated `metadata.json` SHALL project archived implementation traceability from `spec-lock.json` into an `implementation` field for fast machine consumption.
+Generated metadata SHALL include an `implementation` property when the spec is linked to code files or symbols. This data is projected from the repository's persisted implementation semantics.
 
-This metadata projection is derived data:
+- **File-level links** are projected as `implementation.files: Array<{ specId, file }>`.
+- **Symbol-level links** are projected as `implementation.symbols: Array<{ specId, file, symbol }>`.
 
-- it MUST preserve the archived distinction between file-level and symbol-level links
-- it MUST NOT become the authoritative source of implementation truth
-- when projection and sidecar disagree, `spec-lock.json` remains authoritative
+If a spec has no persisted implementation links, the `implementation` property SHALL be omitted from the generated metadata.
 
 ## Pending
 

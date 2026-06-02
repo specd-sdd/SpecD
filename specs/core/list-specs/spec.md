@@ -8,9 +8,9 @@ Agents and CLI users need a single query to discover what specs exist across all
 
 ### Requirement: Enumerate specs across all workspaces
 
-`ListSpecs.execute()` SHALL iterate every configured workspace in declaration order and call `SpecRepository.list()` on each. The returned `SpecListEntry[]` MUST preserve workspace declaration order, with specs within each workspace ordered by repository order.
+`ListSpecs.execute()` SHALL obtain the orchestrated project structure via the `ListWorkspaces` use case (or the corresponding kernel capability). It SHALL iterate through the resulting `ProjectWorkspace` entities to enumerate all specs across all configured workspaces.
 
-When `options.workspaces` is provided as a non-empty array of workspace names, only entries belonging to those workspaces SHALL be included. Workspace names that do not match any configured workspace SHALL be silently ignored (no error, no warning). When `options.workspaces` is omitted or empty, all configured workspaces are included.
+The returned `SpecListEntry[]` MUST preserve the workspace order and spec repository order. Workspace filtering SHALL be performed by matching workspace names against the orchestrated list.
 
 ### Requirement: Always resolve a title for each entry
 
@@ -58,14 +58,14 @@ When workspace filtering is active, the result array contains entries only from 
 
 ## Constraints
 
-- The use case receives a `ReadonlyMap<string, SpecRepository>` — it MUST NOT modify the map or the repositories.
-- The use case defaults `includeSummary` and `includeMetadataStatus` to `false` when the options object or individual flags are not provided.
-- Title and description values from metadata MUST be trimmed before use; empty-after-trim values MUST be treated as absent.
-- Workspace filtering is performed at the use-case level; individual `SpecRepository.list()` calls are not affected by the filter.
+- The use case MUST NOT modify the repositories.
+- It SHALL depend on `ListWorkspaces` for consistent project traversal.
+- Title and description values MUST be trimmed before use.
 
 ## Spec Dependencies
 
-- [`core:spec-metadata`](../spec-metadata/spec.md) — metadata structure and `contentHashes`
-- [`core:content-extraction`](../content-extraction/spec.md) — `extractSpecSummary` behaviour
-- [`core:storage`](../storage/spec.md) — `SpecRepository` contract
-- [`core:workspace`](../workspace/spec.md) — workspace ordering semantics
+- [`core:spec-metadata`](../spec-metadata/spec.md) — title and summary metadata model used in list output
+- [`core:content-extraction`](../content-extraction/spec.md) — summary extraction semantics
+- [`core:storage`](../storage/spec.md) — repository traversal and persistence layout assumptions
+- [`core:workspace`](../workspace/spec.md) — workspace identity carried in list results
+- [`core:list-workspaces`](../list-workspaces/spec.md) — orchestrated workspace source used for enumeration

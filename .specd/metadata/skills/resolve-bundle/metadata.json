@@ -15,7 +15,7 @@
     {
       "requirement": "Behavior",
       "rules": [
-        "The use case MUST:\n\n1. **Built-in Safe Variable Injection**: If `config` is provided, expose only safe built-in values inside the render context. Built-in values SHALL include:\n   - `configPath`: a value suitable for deriving privacy-safe relative runtime paths\n   - `schemaRef`: `config.schemaRef`\n2. Inject `variables.sharedFolder` when absent, using a default relative shared skills path derived from the runtime config directory\n3. Normalize `variables.sharedFolder` by removing any trailing `/`\n4. Validate `variables.sharedFolder` against `projectRoot` internally and fail when the resolved absolute path escapes the project root\n5. Merge those built-in values with the provided install-time render context\n6. Call `SkillRepository.getBundle(input.name, mergedContext)`\n7. Resolve skill template content using recursive `variables` values and capability values from the merged context\n8. Use `variables.frontmatter` as the source for frontmatter composition when the `frontmatter` capability is present\n9. Preserve all non-content `ResolvedFile` metadata, including whether a file is marked as shared\n10. Return the resolved bundle\n\n`projectRoot` MUST remain available only for internal validation and MUST NOT be exposed as a template variable."
+        "The use case MUST:\n\n1. **Built-in Safe Variable Injection**: If `config` is provided, expose only safe built-in values inside the render context. Built-in values SHALL include:\n   - `configPath`: a value suitable for deriving privacy-safe relative runtime paths\n   - `schemaRef`: `config.schemaRef`\n2. Inject `variables.sharedFolder` when absent, using a default relative shared skills path derived from the runtime config directory\n3. Normalize `variables.sharedFolder` by removing any trailing `/`\n4. Validate `variables.sharedFolder` against `projectRoot` internally and fail when the resolved absolute path escapes the project root\n5. Merge those built-in values with the provided install-time render context\n6. Call `SkillRepository.getBundle(input.name, mergedContext)`\n7. Resolve skill template content using recursive `variables` values and capability values from the merged context\n8. Use `variables.frontmatter` as the source for frontmatter composition when the `frontmatter` capability is present\n9. Preserve all non-content `ResolvedFile` metadata, including whether a file is marked as shared\n10. Return the resolved bundle\n\nAgent-plugin install flows that require built-in render defaults such as `configPath`, `schemaRef`, or the default `sharedFolder` MUST route bundle resolution through this use case instead of calling the repository directly.\n\n`projectRoot` MUST remain available only for internal validation and MUST NOT be exposed as a template variable."
       ]
     },
     {
@@ -114,13 +114,29 @@
         "ResolveBundle resolves a skill-local markdown template with a frontmatter insertion point"
       ],
       "then": ["the resulting bundle content includes the composed frontmatter block"]
+    },
+    {
+      "requirement": "Behavior",
+      "name": "Agent-plugin installs route bundle resolution through ResolveBundle",
+      "given": ["an agent plugin needs built-in render defaults from SpecdConfig"],
+      "when": ["it resolves a skill bundle for installation"],
+      "then": [
+        "the install flow uses ResolveBundle",
+        "AND bundle resolution does not depend on a direct SkillRepository.getBundle(...) call from the plugin adapter"
+      ]
     }
   ],
   "implementation": {
+    "files": [
+      {
+        "specId": "skills:resolve-bundle",
+        "file": "skills:test/resolve-bundle.spec.ts"
+      }
+    ],
     "symbols": [
       {
         "specId": "skills:resolve-bundle",
-        "file": "skills:test/resolve-bundle.spec.ts",
+        "file": "skills:src/application/use-cases/resolve-bundle.ts",
         "symbol": "ResolveBundle"
       },
       {
@@ -131,13 +147,13 @@
       {
         "specId": "skills:resolve-bundle",
         "file": "skills:src/application/use-cases/resolve-bundle.ts",
-        "symbol": "ResolveBundle"
+        "symbol": "ResolveBundleOutput"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:6c997c4404da24db21926bc4acfd5ec9f00b08c9ac22db4807c1ae4c9985ea69",
-    "verify.md": "sha256:f5cdbfbff3caa0fb62ba2c668d6f0abd742131c73017917c95086252dd8a2790"
+    "spec.md": "sha256:8174fe783ff1706233deaabc6b13912965c41ec23beb94fdb5dd8733388b58c1",
+    "verify.md": "sha256:1a8d7685ac70ea053a87df158c2546bd3d75ef5495f8a279a3aef0c8b3fb3f69"
   },
   "generatedBy": "core"
 }

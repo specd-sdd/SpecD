@@ -126,6 +126,12 @@
 - **THEN** the query does not perform boolean logic
 - **AND** results matching the literal terms are returned
 
+#### Scenario: Exact identity matches boosted in SQLite FTS
+
+- **GIVEN** a spec with ID `core:change`
+- **WHEN** searching for `core:change` in the SQLite backend
+- **THEN** that spec is the first result returned
+
 ### Requirement: Transactional mutation model
 
 #### Scenario: File upsert is all-or-nothing

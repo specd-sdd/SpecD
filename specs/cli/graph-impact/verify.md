@@ -76,6 +76,12 @@
 - **THEN** the command analyzes each file with file-impact semantics
 - **AND** aggregates changed symbols, affected symbols, affected files, and overall risk across both files
 
+#### Scenario: File selectors resolved via provider normalization
+
+- **WHEN** `specd graph impact --file` is run with an absolute or project-relative path
+- **THEN** it resolves correctly to the canonical graph identity through the provider
+- **AND** analysis proceeds without error
+
 ### Requirement: Symbol impact analysis
 
 #### Scenario: Single symbol match
@@ -170,6 +176,12 @@
 - **WHEN** `specd graph impact --file <path> --format json` is run
 - **THEN** stdout is valid JSON
 - **AND** it contains `riskLevel`, `directDepsCount`, `indirectDepsCount`, `transitiveDepsCount`, and `affectedFilesCount`
+
+#### Scenario: Impact paths are rendered relative to project root
+
+- **WHEN** `specd graph impact` is run
+- **THEN** all file paths in the output (e.g., `packages/core/src/index.ts`) are relative to the project root
+- **AND** they do not include workspace-prefixed identities unless explicitly requested
 
 ### Requirement: Error cases
 

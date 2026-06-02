@@ -5,7 +5,8 @@
     "core:config",
     "plugin-manager:agent-plugin-type",
     "skills:skill-bundle",
-    "skills:skill-repository"
+    "skills:skill-repository",
+    "skills:resolve-bundle"
   ],
   "context": [
     "Claude agent plugin implementation. Exports `create(): AgentPlugin` that provides skill installation by declaring Claude-supported capabilities and frontmatter source values to `@specd/skills`, which renders the final installed markdown for Claude Code."
@@ -32,7 +33,7 @@
     {
       "requirement": "Application layer",
       "rules": [
-        "The application layer MUST have an `InstallSkills` use case that orchestrates:\n\n1. Get skills via `@specd/skills`\n2. Resolve Claude frontmatter source values for each skill\n3. Declare only the Claude-supported capability identifiers for each install\n4. Pass `variables.sharedFolder` only when overriding the default shared path contract\n5. Install files not marked as shared to `.claude/skills/<skill-name>/` relative to the `projectRoot` found in `SpecdConfig`\n6. Install files marked as shared to the rendered `sharedFolder` location under the project root\n\nThe plugin MUST NOT assemble the final YAML frontmatter document itself after bundle resolution.\nThe plugin MUST NOT normalize capability objects on behalf of `@specd/skills`."
+        "The application layer MUST have an `InstallSkills` use case that orchestrates:\n\n1. Get skills via `@specd/skills`\n2. Resolve Claude frontmatter source values for each skill\n3. Declare only the Claude-supported capability identifiers for each install\n4. Resolve bundles through `ResolveBundle` so built-in render defaults are supplied by `@specd/skills`\n5. Pass `variables.sharedFolder` only when overriding the default shared path contract\n6. Install files not marked as shared to `.claude/skills/<skill-name>/` relative to the `projectRoot` found in `SpecdConfig`\n7. Install files marked as shared to the rendered `sharedFolder` location under the project root\n\nThe plugin MUST NOT assemble the final YAML frontmatter document itself after bundle resolution.\nThe plugin MUST NOT normalize capability objects on behalf of `@specd/skills`.\nThe plugin MUST NOT call `SkillRepository.getBundle(...)` directly from the install flow when `ResolveBundle` is available."
       ]
     },
     {
@@ -168,7 +169,8 @@
       "when": ["InstallSkills runs"],
       "then": [
         "it resolves Claude frontmatter source values per skill",
-        "AND it passes only Claude capability identifiers into @specd/skills"
+        "AND it passes only Claude capability identifiers into @specd/skills",
+        "AND it resolves install bundles through ResolveBundle"
       ]
     },
     {
@@ -177,30 +179,35 @@
       "given": ["a resolved bundle contains files marked as shared"],
       "when": ["InstallSkills writes those files"],
       "then": ["they are written to the resolved sharedFolder location under the project root"]
+    },
+    {
+      "requirement": "Application layer",
+      "name": "Claude install does not call repository bundle resolution directly",
+      "when": ["the Claude install flow is reviewed"],
+      "then": [
+        "bundle resolution goes through ResolveBundle",
+        "AND the plugin does not call SkillRepository.getBundle(...) directly from InstallSkills"
+      ]
     }
   ],
   "implementation": {
-    "symbols": [
+    "files": [
       {
         "specId": "plugin-agent-claude:plugin-agent",
-        "file": "plugin-agent-claude:test/install-skills.spec.ts",
-        "symbol": "InstallSkills"
-      },
+        "file": "plugin-agent-claude:test/install-skills.spec.ts"
+      }
+    ],
+    "symbols": [
       {
         "specId": "plugin-agent-claude:plugin-agent",
         "file": "plugin-agent-claude:src/application/use-cases/install-skills.ts",
         "symbol": "InstallSkills"
-      },
-      {
-        "specId": "plugin-agent-claude:plugin-agent",
-        "file": "plugin-agent-claude:src/application/use-cases/shared-folder.ts",
-        "symbol": "resolveSharedFolder"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:227768fb5d23ad012d6e1c1b492114076fe610462e4b4a537cacf3a1565cad5a",
-    "verify.md": "sha256:7d530819b83586daf70a45ef50c4b478b3818c6e16b2788563545eada62c5a6d"
+    "spec.md": "sha256:f4819875bf6a7ef6fa62d86c36918a7531936bb5135e7a3e47859a9661491dec",
+    "verify.md": "sha256:a98948ea228967b46ce56c7ebe9403bdff6d3888d6cf6c34d5ca826fdb2f1dd1"
   },
   "generatedBy": "core"
 }

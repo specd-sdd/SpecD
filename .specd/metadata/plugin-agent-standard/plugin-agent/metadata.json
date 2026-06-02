@@ -1,7 +1,11 @@
 {
   "title": "plugin-agent-standard:plugin-agent",
   "description": "The Agent Skills open standard (agentskills.io) is adopted by a growing number of agent clients (Gemini CLI, Cursor, Amp, Roo Code, etc.). specd needs a vendor-neutral plugin that installs skills using this standard's metadata contract while relying on `@specd/skills` to render the final installed markdown.",
-  "dependsOn": ["plugin-agent-opencode:plugin-agent", "default:_global/commits"],
+  "dependsOn": [
+    "plugin-agent-opencode:plugin-agent",
+    "default:_global/commits",
+    "skills:resolve-bundle"
+  ],
   "context": [
     "The Agent Skills open standard (agentskills.io) is adopted by a growing number of agent clients (Gemini CLI, Cursor, Amp, Roo Code, etc.). specd needs a vendor-neutral plugin that installs skills using this standard's metadata contract while relying on `@specd/skills` to render the final installed markdown."
   ],
@@ -27,7 +31,7 @@
     {
       "requirement": "Application layer",
       "rules": [
-        "The application layer MUST include an `InstallSkills` use case that:\n\n1. reads skills from `@specd/skills`\n2. resolves the per-skill frontmatter source value collection\n3. declares only the Agent Skills standard-supported capability identifiers\n4. passes `variables.sharedFolder` only when overriding the default shared path contract\n5. writes files not marked as shared to the installed skill directory under the `projectRoot` provided in `SpecdConfig`\n6. writes files marked as shared to the rendered `sharedFolder` location under the project root\n\nThe plugin MUST NOT prepend YAML frontmatter after bundle resolution."
+        "The application layer MUST include an `InstallSkills` use case that:\n\n1. reads skills from `@specd/skills`\n2. resolves the per-skill frontmatter source value collection\n3. declares only the Agent Skills standard-supported capability identifiers\n4. resolves bundles through `ResolveBundle` so built-in render defaults are supplied by `@specd/skills`\n5. passes `variables.sharedFolder` only when overriding the default shared path contract\n6. writes files not marked as shared to the installed skill directory under the `projectRoot` provided in `SpecdConfig`\n7. writes files marked as shared to the rendered `sharedFolder` location under the project root\n\nThe plugin MUST NOT prepend YAML frontmatter after bundle resolution.\nThe plugin MUST NOT call `SkillRepository.getBundle(...)` directly from the install flow when `ResolveBundle` is available."
       ]
     },
     {
@@ -214,7 +218,8 @@
       "when": ["InstallSkills runs"],
       "then": [
         "it reads skill templates, resolves capability identifiers and frontmatter source values, and passes them into @specd/skills",
-        "AND shared-marked files are written to the rendered sharedFolder location under the project root"
+        "AND shared-marked files are written to the rendered sharedFolder location under the project root",
+        "AND it resolves install bundles through ResolveBundle"
       ]
     },
     {
@@ -224,30 +229,35 @@
       "then": [
         "the plugin does not assemble a final YAML frontmatter block after bundle resolution"
       ]
+    },
+    {
+      "requirement": "Application layer",
+      "name": "Standard-agent install does not call repository bundle resolution directly",
+      "when": ["the Agent Skills standard install flow is reviewed"],
+      "then": [
+        "bundle resolution goes through ResolveBundle",
+        "AND the plugin does not call SkillRepository.getBundle(...) directly from InstallSkills"
+      ]
     }
   ],
   "implementation": {
-    "symbols": [
+    "files": [
       {
         "specId": "plugin-agent-standard:plugin-agent",
-        "file": "plugin-agent-standard:test/install-skills.spec.ts",
-        "symbol": "InstallSkills"
-      },
+        "file": "plugin-agent-standard:test/install-skills.spec.ts"
+      }
+    ],
+    "symbols": [
       {
         "specId": "plugin-agent-standard:plugin-agent",
         "file": "plugin-agent-standard:src/application/use-cases/install-skills.ts",
         "symbol": "InstallSkills"
-      },
-      {
-        "specId": "plugin-agent-standard:plugin-agent",
-        "file": "plugin-agent-standard:src/application/use-cases/shared-folder.ts",
-        "symbol": "resolveSharedFolder"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:6a45ee468dbcf98129cf8df5cc18f3f84795f8bb18ac9b0e13efcb205dabc559",
-    "verify.md": "sha256:49c4739eedbe0e858caa7eb6ad63a85d4647bcf085b072ed64ecfb08cb289fb6"
+    "spec.md": "sha256:4676a5ad489064611bfb036b593425be1ad4d0611c1f4193f831e8105229f5f6",
+    "verify.md": "sha256:fbb28c75efa6c4b8a65b42a125830e31dd151fedd7590a5ea4e1c44dc15bc8a9"
   },
   "generatedBy": "core"
 }

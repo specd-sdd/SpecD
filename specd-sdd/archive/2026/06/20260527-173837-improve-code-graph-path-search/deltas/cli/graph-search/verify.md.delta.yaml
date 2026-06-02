@@ -1,0 +1,45 @@
+- op: added
+  description: 'Add verification scenario for document search category.'
+  position:
+    parent:
+      type: section
+      matches: '^Requirement: Command signature$'
+  content: |
+    #### Scenario: Search supports document filter
+
+    - **WHEN** `specd graph search "ADR" --documents` is run
+    - **THEN** the command successfully executes
+    - **AND** it passes the document category filter to the graph provider
+
+- op: added
+  description: 'Verify document-search delegation to the provider.'
+  position:
+    parent:
+      type: section
+      matches: '^Requirement: Search behaviour$'
+  content: |
+    #### Scenario: Search delegates document queries to the provider
+
+    - **WHEN** `specd graph search "Change" --documents` is run
+    - **THEN** the command delegates to `CodeGraphProvider.searchDocuments`
+    - **AND** it does not implement document ranking or matching logic in the CLI
+
+- op: added
+  description: 'Verify output formatting for document results.'
+  position:
+    parent:
+      type: section
+      matches: '^Requirement: Output format$'
+  content: |
+    #### Scenario: Text output groups document results separately
+
+    - **GIVEN** document search returns one or more matching documents
+    - **WHEN** `specd graph search "Change"` is run in text mode
+    - **THEN** stdout contains a `Documents (` section
+    - **AND** each document line shows the owning workspace, score, canonical path, and a preview snippet
+
+    #### Scenario: Structured output includes documents array
+
+    - **GIVEN** document search returns one or more matching documents
+    - **WHEN** `specd graph search "Change" --format json` is run
+    - **THEN** stdout is valid JSON containing `symbols`, `specs`, and `documents`

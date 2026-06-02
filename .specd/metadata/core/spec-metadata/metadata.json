@@ -22,7 +22,7 @@
     {
       "requirement": "Sidecar separation",
       "rules": [
-        "`metadata.json` and `spec-lock.json` are distinct persisted artifacts with different responsibilities.\n\n- `metadata.json` lives under the configured metadata root and remains the compact machine-readable summary consumed by context and tooling.\n- `spec-lock.json` lives alongside the canonical persisted `scope: spec` artifacts for the spec and owns the durable archived values for schema identity and persisted `dependsOn`.\n- A missing `metadata.json` remains non-fatal.\n- A missing `spec-lock.json` on a legacy spec is tolerated until opportunistic backfill creates it."
+        "The metadata generation process SHALL obtain persisted schema, dependencies, and implementation links through the `SpecRepository` semantic operations. It MUST NOT read the underlying sidecar files directly."
       ]
     },
     {
@@ -70,7 +70,7 @@
     {
       "requirement": "Implementation projection",
       "rules": [
-        "Generated `metadata.json` SHALL project archived implementation traceability from `spec-lock.json` into an `implementation` field for fast machine consumption.\n\nThis metadata projection is derived data:\n\n- it MUST preserve the archived distinction between file-level and symbol-level links\n- it MUST NOT become the authoritative source of implementation truth\n- when projection and sidecar disagree, `spec-lock.json` remains authoritative"
+        "Generated metadata SHALL include an `implementation` property when the spec is linked to code files or symbols. This data is projected from the repository's persisted implementation semantics.\n\n- **File-level links** are projected as `implementation.files: Array<{ specId, file }>`.\n- **Symbol-level links** are projected as `implementation.symbols: Array<{ specId, file, symbol }>`.\n\nIf a spec has no persisted implementation links, the `implementation` property SHALL be omitted from the generated metadata."
       ]
     }
   ],
@@ -554,41 +554,35 @@
         "the .json files are committed alongside specs",
         "AND consumers read them without regeneration"
       ]
+    },
+    {
+      "requirement": "Version control",
+      "name": "Implementation files projected into metadata",
+      "given": ["a spec with file-level implementation links in the semantic repository"],
+      "when": ["spec metadata is generated"],
+      "then": ["the implementation.files array contains the linked file paths"]
+    },
+    {
+      "requirement": "Version control",
+      "name": "Implementation symbols projected into metadata",
+      "given": ["a spec with symbol-level implementation links in the semantic repository"],
+      "when": ["spec metadata is generated"],
+      "then": ["the implementation.symbols array contains the linked symbol identities"]
+    },
+    {
+      "requirement": "Version control",
+      "name": "Semantic repository source prioritized",
+      "given": ["a spec with implementation links in the semantic repository"],
+      "when": ["metadata is generated"],
+      "then": [
+        "the implementation links are sourced from the repository semantic operations, NOT by parsing sidecar files"
+      ]
     }
   ],
-  "implementation": {
-    "files": [
-      {
-        "specId": "core:spec-metadata",
-        "file": "core:src/application/use-cases/generate-spec-metadata.ts"
-      }
-    ],
-    "symbols": [
-      {
-        "specId": "core:spec-metadata",
-        "file": "core:src/domain/services/parse-metadata.ts",
-        "symbol": "specMetadataSchema"
-      },
-      {
-        "specId": "core:spec-metadata",
-        "file": "core:src/domain/services/parse-metadata.ts",
-        "symbol": "strictSpecMetadataSchema"
-      },
-      {
-        "specId": "core:spec-metadata",
-        "file": "core:src/domain/services/parse-metadata.ts",
-        "symbol": "permissiveSpecMetadataSchema"
-      },
-      {
-        "specId": "core:spec-metadata",
-        "file": "core:src/domain/services/parse-metadata.ts",
-        "symbol": "SpecMetadata"
-      }
-    ]
-  },
+  "implementation": {},
   "contentHashes": {
-    "spec.md": "sha256:f8dabb6368c453d0222177d8d46a16ccbea80179f50e5f973566b6cc67889f9e",
-    "verify.md": "sha256:124fd41a3c6406855d109238304a01d4b5272d75ca1979a05eb0d66b162ecf79"
+    "spec.md": "sha256:26f0e25742367f0ed5748c6a82faa8e692df25044adc32a714e922dab2b6459b",
+    "verify.md": "sha256:cb352c90edaa188847393ba87c783d6a89b72145c8229860fb6189cca27d1833"
   },
   "generatedBy": "core"
 }

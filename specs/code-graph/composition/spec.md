@@ -12,11 +12,14 @@ Consumers of `@specd/code-graph` should not need to know how the store, indexer,
 
 - **Indexing**: `index(options: IndexOptions): Promise<IndexResult>` — runs `IndexCodeGraph`
 - **Querying**: `getSymbol(id)`, `findSymbols(query)`, `getFile(path)`, `getSpec(specId)`, `getSpecDependencies(specId)`, `getSpecDependents(specId)`, `getCoveredFiles(specId)`, `getCoveringSpecsForFile(filePath)`, `getCoveredSymbols(specId)`, `getCoveringSpecsForSymbol(symbolId)`, `getStatistics()` — delegates to `GraphStore`
-- **Search**: `searchSymbols(options: SearchOptions)`, `searchSpecs(options: SearchOptions)` — full-text search with BM25 ranking and store-level filtering, delegates to `GraphStore`
+- **Search**: `searchSymbols(options: SearchOptions)`, `searchSpecs(options: SearchOptions)`, `searchDocuments(options: SearchOptions)` — full-text search with exact-match prioritization, delegates to `GraphStore`
 - **Maintenance**: `clear(): Promise<void>` — removes all data from the store (for full re-index)
 - **Traversal**: `getUpstream(symbolId, options?)`, `getDownstream(symbolId, options?)` — delegates to traversal functions
 - **Impact**: `analyzeImpact(target, direction)`, `analyzeFileImpact(filePath, direction)`, `analyzeSpecImpact(specId, direction)`, `detectChanges(changedFiles)` — delegates to impact functions
+- **Selector Normalization**: `resolveFileSelector(selector: string): Promise<string | string[]>`, `resolveSymbolSelector(selector: string): Promise<string | string[]>` — resolves project-relative or absolute paths to canonical graph identities
 - **Lifecycle**: `open(): Promise<void>`, `close(): Promise<void>` — manages the store connection
+
+The provider SHALL provide a unified entry point for normalization so that CLI commands and other adapters do not need to implement path resolution logic.
 
 `CodeGraphProvider` is a thin orchestration layer — it holds no domain logic. All methods delegate to the appropriate domain service or use case.
 
@@ -45,6 +48,8 @@ Two factory signatures are provided:
 - **`graphStoreId`** (`string`, optional) — selected backend id; when omitted, uses the built-in default backend id
 - **`graphStoreFactories`** (optional additive registrations) — external graph-store factories merged with the built-in graph-store registry before backend selection
 - **`adapters`** (`LanguageAdapter[]`, optional) — additional language adapters to register beyond the 4 built-in adapters
+
+The provider is stateless regarding project configuration; it uses `SpecdConfig` to derive its internal storage root but does not cache it. Workspaces and graph-specific rules are passed to `index()` via `IndexOptions` at each call.
 
 `CodeGraphFactoryOptions` SHALL support the same additive graph-store selection model as `CodeGraphOptions`, except that the storage root is derived from `SpecdConfig`.
 
@@ -129,11 +134,12 @@ await provider.close()
 
 ## Spec Dependencies
 
-- [`code-graph:symbol-model`](../symbol-model/spec.md) — model types exported from package
-- [`code-graph:graph-store`](../graph-store/spec.md) — abstract graph-store contract and backend-neutral query semantics
-- [`code-graph:ladybug-graph-store`](../ladybug-graph-store/spec.md) — Ladybug backend available by explicit backend id selection
-- [`code-graph:sqlite-graph-store`](../sqlite-graph-store/spec.md) — SQLite backend used by the built-in default composition path
-- [`code-graph:language-adapter`](../language-adapter/spec.md) — `LanguageAdapter` (exported), `AdapterRegistry` (internal)
-- [`code-graph:indexer`](../indexer/spec.md) — `IndexCodeGraph` (internal), `IndexResult` (exported)
-- [`code-graph:traversal`](../traversal/spec.md) — traversal/impact types (exported), functions (internal)
-- [`default:_global/architecture`](../../_global/architecture/spec.md) — composition layer pattern
+- [`code-graph:symbol-model`](../symbol-model/spec.md) — shared node and relation vocabulary
+- [`code-graph:graph-store`](../graph-store/spec.md) — store-backed query and maintenance contract
+- [`code-graph:ladybug-graph-store`](../ladybug-graph-store/spec.md) — concrete Ladybug backend available through the factory
+- [`code-graph:sqlite-graph-store`](../sqlite-graph-store/spec.md) — concrete SQLite backend available through the factory
+- [`code-graph:language-adapter`](../language-adapter/spec.md) — built-in and additive adapter registration
+- [`code-graph:indexer`](../indexer/spec.md) — indexing use case composed into the provider facade
+- [`code-graph:traversal`](../traversal/spec.md) — traversal and impact operations exposed through the provider
+- [`default:_global/architecture`](../../../_global/architecture/spec.md) — thin orchestration and composition-layer constraints
+- [`code-graph:document-model`](../document-model/spec.md) — provider-level document search and `root:` identity handling

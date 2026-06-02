@@ -1,0 +1,12 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["core:config"],
+  "implementation": [
+    {
+      "file": "code-graph:src/domain/value-objects/index-options.ts"
+    }
+  ]
+}

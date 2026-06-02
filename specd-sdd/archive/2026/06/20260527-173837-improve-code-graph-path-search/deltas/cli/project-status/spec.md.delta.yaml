@@ -1,0 +1,40 @@
+- op: modified
+  description: 'Update project status to use ListWorkspaces orchestrator.'
+  selector:
+    type: section
+    matches: '^Requirement: includes workspace information$'
+    parent:
+      type: section
+      matches: '^Requirements$'
+  content: |
+    The command output MUST include rich workspace information obtained via the `ListWorkspaces` use case:
+
+    - Project root path
+    - Schema reference
+    - Workspaces: for each, name, prefix, ownership (`owned`|`shared`|`readOnly`), `isExternal` (boolean), and `codeRoot` (absolute path).
+
+- op: modified
+  description: 'Use SpecRepository.count() for efficient sizing.'
+  selector:
+    type: section
+    matches: '^Requirement: includes spec counts$'
+    parent:
+      type: section
+      matches: '^Requirements$'
+  content: |
+    The command output MUST include spec counts obtained efficiently through the `SpecRepository.count()` method for each orchestrated workspace:
+
+    - Total spec count across all workspaces
+    - Spec count per workspace
+
+    The command SHALL NOT load full spec metadata or artifacts to perform this count.
+
+- op: modified
+  description: 'Add dependency on ListWorkspaces.'
+  selector:
+    type: section
+    matches: '^Spec Dependencies$'
+  content: |
+    - [`core:list-workspaces`](../../core/list-workspaces/spec.md) — source for orchestrated project structure and repositories
+    - [`core:list-drafts`](../../core/list-drafts/spec.md) — existing draft counting behavior remains part of project status
+    - [`core:list-changes`](../../core/list-changes/spec.md) — existing active-change counting behavior remains part of project status

@@ -11,7 +11,14 @@
   ],
   "implementation": [
     {
-      "file": "code-graph:src/infrastructure/sqlite/sqlite-graph-store.ts"
+      "file": "code-graph:src/infrastructure/sqlite/sqlite-graph-store.ts",
+      "symbols": ["SQLiteGraphStore"]
+    },
+    {
+      "file": "code-graph:test/infrastructure/sqlite/sqlite-graph-store.spec.ts"
+    },
+    {
+      "file": "code-graph:src/infrastructure/sqlite/schema.ts"
     }
   ]
 }

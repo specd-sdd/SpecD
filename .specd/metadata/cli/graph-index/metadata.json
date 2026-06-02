@@ -5,7 +5,8 @@
     "cli:entrypoint",
     "core:config",
     "code-graph:composition",
-    "code-graph:graph-store"
+    "code-graph:graph-store",
+    "core:list-workspaces"
   ],
   "context": [
     "Without an up-to-date code graph, all graph-based queries return stale or empty results. The `specd graph index` command indexes the current workspace into the code graph, reporting what was discovered, indexed, skipped, and removed so users and agents can verify completeness."
@@ -14,19 +15,19 @@
     {
       "requirement": "Command signature",
       "rules": [
-        "```\nspecd graph index [--workspace <name>] [--exclude-path <pattern>]... [--force] [--config <path> | --path <path>] [--format text|json|toon]\n```\n\n- `--workspace` — optional; index only the named workspace instead of all workspaces\n- `--exclude-path <pattern>` — optional, repeatable; gitignore-syntax pattern added on top of the workspace's `graph.excludePaths` config for this run only. Does not modify `specd.yaml`. Multiple patterns are accumulated: `--exclude-path \"*.gen.ts\" --exclude-path \"fixtures/\"`.\n- `--force` — optional flag; when present, all existing graph data is cleared before indexing\n- `--config <path>` — optional; explicit path to `specd.yaml`, matching the standard CLI meaning\n- `--path <path>` — optional; repo-root bootstrap mode\n- `--format text|json|toon` — optional; output format, defaults to `text`\n\n`--config` and `--path` are mutually exclusive.\n\nWhen neither flag is passed, the command SHALL first try config autodiscovery. If config is found, it SHALL use configured workspaces. If config is not found, it SHALL fall back to repo-root bootstrap mode.\n\n`--path` and no-config fallback are bootstrap mechanisms for setup and early repository exploration, not the intended steady-state mode for configured projects."
+        "```text\nspecd graph index [--force] [--exclude-path <pattern>] [--config <path> | --path <path>] [--format text|json|toon]\n```\n\n- `--force` — optional; recreate the graph store from scratch\n- `--exclude-path <pattern>` — optional, repeatable; additional patterns to exclude during file discovery\n- `--config <path>` — optional; explicit path to `specd.yaml`\n- `--path <path>` — optional; repo-root bootstrap mode\n- `--format text|json|toon` — optional; output format, defaults to `text`\n\n`--config` and `--path` are mutually exclusive."
       ]
     },
     {
       "requirement": "Indexing behaviour",
       "rules": [
-        "The command uses the shared graph CLI context model together with `withProvider`, which manages the `CodeGraphProvider` lifecycle and registers `SIGINT`/`SIGTERM` signal handlers for graceful shutdown.\n\nThe command:\n\n1. Validates that `--config` and `--path` are not both present\n2. Resolves graph context using explicit config, autodetected config, or bootstrap mode according to the graph CLI precedence rules\n3. In configured mode, derives `WorkspaceIndexTarget[]` from `SpecdConfig.workspaces` and uses `kernel.specs.repos` to provide spec sources\n4. In bootstrap mode, indexes the resolved repository root as a synthetic single `default` workspace whose `codeRoot` is the VCS root\n5. Acquires the shared graph indexing lock before opening the provider for mutation work\n6. If `--force` is passed, invokes the graph-store recreation capability before indexing so the backend starts from empty persisted state without the CLI knowing backend-specific files or directories\n7. If `--workspace` is specified, filters to only that workspace\n8. For each workspace target, populates `excludePaths` and `respectGitignore` from `SpecdWorkspaceConfig.graph`. If `--exclude-path` flags are present, those patterns are **appended** to the config's `excludePaths` (or to the built-in defaults when no config `excludePaths` is set). `--exclude-path` never replaces config values — it always adds on top.\n9. Calls `index({ workspaces, projectRoot })` to perform the indexing\n10. Outputs the `IndexResult` with per-workspace breakdown\n11. Releases the shared graph indexing lock during normal shutdown and signal-driven shutdown paths\n12. Closes the provider\n13. Exits with `process.exit(0)` — this explicit exit is required because the LadybugDB native threads keep the Node process alive\n\nWhen output is a TTY and format is `text`, progress is displayed on stderr using `\\r\\x1b[K` for in-place updates (overwriting the current line).\n\nThe indexing lock is a CLI-level coordination mechanism that prevents overlapping graph commands from reaching backend lock failures first. If another indexing run already holds the lock, `graph index` fails fast with a user-facing retry-later message instead of attempting to mutate the backend concurrently."
+        "The command uses the shared graph CLI context model together with `withProvider`, which manages the `CodeGraphProvider` lifecycle and registers `SIGINT`/`SIGTERM` signal handlers for graceful shutdown.\n\nThe command:\n\n1. Validates that `--config` and `--path` are not both present\n2. Resolves graph context using explicit config, autodetected config, or bootstrap mode according to the graph CLI precedence rules\n3. In configured mode, obtains the orchestrated project structure via `ListWorkspaces` and uses the rich `ProjectWorkspace[]` list to build `IndexOptions`\n4. In bootstrap mode, indexes the resolved repository root as a synthetic single `default` workspace whose `codeRoot` is the VCS root\n5. Acquires the shared graph indexing lock before opening the provider for mutation work\n6. If `--force` is passed, invokes the graph-store recreation capability before indexing\n7. In configured mode, builds the effective graph config from `SpecdConfig.graph`, including project-global `includePaths`, global `excludePaths`, workspace graph filters, and any synthetic spec-root exclusions. Patterns from `--exclude-path` flags are appended to the effective global exclusion set.\n8. Calls `index(options)` to perform the indexing. The indexer handles spec extraction and progress reporting using the injected repositories.\n9. Outputs the `IndexResult` with per-workspace breakdown\n10. Releases the shared graph indexing lock during normal shutdown and signal-driven shutdown paths\n11. Closes the provider\n12. Exits with `process.exit(0)`\n\nIn configured mode, indexing SHALL always cover the full configured project graph surface. The command MUST NOT offer a workspace-scoped partial indexing mode.\n\nProject-global discovery MUST NOT emit `root:` entries for files already owned by a configured workspace `codeRoot`.\n\nArchived spec implementation coverage and spec resolution SHALL be derived inside `@specd/code-graph`. The CLI SHALL NOT read `spec-lock.json` sidecars or manually construct extraction callbacks.\n\nWhen output is a TTY and format is `text`, progress is displayed on stderr using `\\r\\x1b[K` for in-place updates (overwriting the current line).\n\nThe indexing lock is a CLI-level coordination mechanism that prevents overlapping graph commands from reaching backend lock failures first. If another indexing run already holds the lock, `graph index` fails fast with a user-facing retry-later message instead of attempting to mutate the backend concurrently."
       ]
     },
     {
       "requirement": "Output format",
       "rules": [
-        "In `text` mode (default), the output is a summary block:\n\n```\nIndexed 387 file(s) in 1234ms\n  discovered: 459\n  skipped:    72\n  removed:    0\n  specs:      122\n  errors:     3\n    path/to/file.ts: error message\n```\n\nThe first line shows `filesIndexed` and `duration`. The indented lines show `filesDiscovered`, `filesSkipped`, `filesRemoved`, `specsIndexed`, and error count. When errors are present, each error is listed below with its file path and message, indented further.\n\nIn `json` or `toon` mode, the full `IndexResult` object is output as-is."
+        "In `text` mode (default), the output is a summary block:\n\n```text\nIndexed 387 file(s) in 1234ms\n  discovered: 459\n  documents:  18\n  skipped:    72\n  removed:    0\n  specs:      122\n  errors:     3\n    path/to/file.ts: error message\n```\n\nThe first line shows `filesIndexed` and `duration`. The indented lines show `filesDiscovered`, `documentsIndexed`, `filesSkipped`, `filesRemoved`, `specsIndexed`, and error count. When errors are present, each error is listed below with its file path and message, indented further.\n\nWhen the result includes per-workspace breakdowns, text mode also lists each workspace with discovered, indexed, document, skipped, and removed counts.\n\nIn `json` or `toon` mode, the full `IndexResult` object is output as-is, including `documentsIndexed` and the per-workspace `documentsIndexed` breakdown."
       ]
     },
     {
@@ -58,110 +59,16 @@
       "then": ["it accepts no positional arguments", "AND output format defaults to text"]
     },
     {
-      "requirement": "Indexing behaviour",
-      "name": "Successful indexing with autodetected config",
-      "given": ["the current working directory resolves to a project with specd.yaml"],
-      "when": ["specd graph index is run"],
-      "then": [
-        "the command uses the discovered config to build workspace index targets",
-        "AND stdout shows Indexed N file(s) in Xms followed by the summary lines",
-        "AND the process exits with code 0"
-      ]
-    },
-    {
-      "requirement": "Indexing behaviour",
-      "name": "Explicit config path bypasses discovery",
-      "given": ["the current directory would autodiscover a different specd.yaml"],
-      "when": ["specd graph index --config /tmp/other/specd.yaml is run"],
-      "then": [
-        "the command uses /tmp/other/specd.yaml directly",
-        "AND indexing targets come from that config rather than from autodiscovery"
-      ]
-    },
-    {
-      "requirement": "Indexing behaviour",
-      "name": "Explicit path enters bootstrap mode",
-      "given": ["a specd.yaml exists under the current repository"],
-      "when": ["specd graph index --path /tmp/repo is run"],
-      "then": [
-        "config discovery is ignored",
-        "AND indexing runs against a synthetic single workspace default rooted at /tmp/repo"
-      ]
-    },
-    {
-      "requirement": "Indexing behaviour",
-      "name": "Missing config falls back to bootstrap mode",
-      "given": ["no specd.yaml is found by autodiscovery"],
-      "when": ["specd graph index is run inside a repository"],
-      "then": ["the command indexes the resolved VCS root in bootstrap mode as workspace default"]
-    },
-    {
-      "requirement": "Indexing behaviour",
-      "name": "Force flag recreates backend state through the graph-store contract",
-      "given": ["the workspace has been previously indexed"],
-      "when": ["specd graph index --force is run"],
-      "then": [
-        "the command invokes the graph-store recreation capability before indexing",
-        "AND the CLI does not delete backend-specific database files directly"
-      ]
-    },
-    {
-      "requirement": "Indexing behaviour",
-      "name": "Indexing acquires the shared graph lock before mutation work",
-      "when": ["specd graph index starts an indexing run"],
-      "then": [
-        "it acquires the shared graph indexing lock before opening the provider for mutation work"
-      ]
-    },
-    {
-      "requirement": "Indexing behaviour",
-      "name": "Indexing releases the shared graph lock on shutdown",
-      "given": ["specd graph index acquired the shared graph indexing lock"],
-      "when": ["the command finishes normally or handles shutdown via signal"],
-      "then": ["the lock is released before the process exits"]
-    },
-    {
-      "requirement": "Indexing behaviour",
-      "name": "Competing indexing run fails fast while the lock is held",
-      "given": ["another graph index process already holds the shared graph indexing lock"],
-      "when": ["a second specd graph index is started"],
-      "then": [
-        "it exits with code 3",
-        "AND it prints a short retry-later message explaining that the graph is currently being indexed"
-      ]
-    },
-    {
-      "requirement": "Indexing behaviour",
-      "name": "Process exits explicitly",
-      "given": ["indexing completes successfully"],
-      "when": ["the provider is closed"],
-      "then": [
-        "process.exit(0) is called to prevent the LadybugDB addon from keeping the process alive"
-      ]
-    },
-    {
-      "requirement": "Indexing behaviour",
-      "name": "--exclude-path merges on top of config excludePaths",
-      "given": [
-        "workspace config has graph.excludePaths: [\"dist/\"]",
-        "AND the command is run with --exclude-path \"fixtures/\""
-      ],
-      "when": ["indexing runs"],
-      "then": [
-        "the effective exclusion list is [\"dist/\", \"fixtures/\"]",
-        "AND specd.yaml is not modified"
-      ]
-    },
-    {
       "requirement": "Output format",
-      "name": "Text output shows summary",
+      "name": "Text output shows summary including documents",
       "given": [
-        "indexing discovers 459 files, indexes 387, skips 72, removes 0, indexes 122 specs, and has 0 errors in 1234ms"
+        "indexing discovers 459 files, indexes 387, indexes 18 documents, skips 72, removes 0, indexes 122 specs, and has 0 errors in 1234ms"
       ],
       "when": ["specd graph index is run"],
       "then": [
         "stdout contains Indexed 387 file(s) in 1234ms",
         "AND stdout contains discovered: 459",
+        "AND stdout contains documents:  18",
         "AND stdout contains skipped:    72",
         "AND stdout contains errors:     0"
       ]
@@ -183,7 +90,7 @@
       "given": ["indexing completes successfully"],
       "when": ["specd graph index --format json is run"],
       "then": [
-        "stdout is valid JSON containing filesDiscovered, filesIndexed, filesSkipped, filesRemoved, specsIndexed, errors, and duration"
+        "stdout is valid JSON containing filesDiscovered, filesIndexed, documentsIndexed, filesSkipped, filesRemoved, specsIndexed, errors, and duration"
       ]
     },
     {
@@ -227,16 +134,59 @@
       "name": "graph index flags documented",
       "when": ["the ### graph index subsection is read"],
       "then": [
-        "--exclude-path, --workspace, --force, --config, --path, and --format are documented with descriptions",
-        "AND the graph.excludePaths and graph.respectGitignore config fields are explained",
-        "AND the bootstrap-only nature of --path and no-config fallback is stated",
-        "AND an example shows negation syntax (e.g. !.specd/metadata/)"
+        "--exclude-path, --force, --config, --path, and --format are documented with descriptions",
+        "AND project-global graph.includePaths, global graph.excludePaths, and workspace graph.respectGitignore / graph.allowedPaths behavior are explained",
+        "AND the bootstrap-only nature of --path and no-config fallback is stated"
+      ]
+    },
+    {
+      "requirement": "Indexing behaviour",
+      "name": "Command obtains orchestrated project structure",
+      "when": ["specd graph index is executed in configured mode"],
+      "then": [
+        "it calls ListWorkspaces to obtain the rich workspace list",
+        "AND it injects the resulting ProjectWorkspace entities into the indexer options"
+      ]
+    },
+    {
+      "requirement": "Indexing behaviour",
+      "name": "Command builds effective graph discovery config",
+      "given": [
+        "configured global graph includes and excludes",
+        "AND one or more filesystem-backed spec repositories"
+      ],
+      "when": ["specd graph index is executed"],
+      "then": [
+        "the command passes an effective graph config to the indexer that includes synthetic spec-root exclusions"
       ]
     }
   ],
+  "implementation": {
+    "files": [
+      {
+        "specId": "cli:graph-index",
+        "file": "cli:src/commands/graph/build-project-graph-config.ts"
+      },
+      {
+        "specId": "cli:graph-index",
+        "file": "cli:test/commands/graph-index.spec.ts"
+      },
+      {
+        "specId": "cli:graph-index",
+        "file": "cli:test/commands/build-project-graph-config.spec.ts"
+      }
+    ],
+    "symbols": [
+      {
+        "specId": "cli:graph-index",
+        "file": "cli:src/commands/graph/index-graph.ts",
+        "symbol": "registerGraphIndex"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:cfba60f4d9c1562e80eb570762979ebe4991a0f9fc8874aec12ebf445193556f",
-    "verify.md": "sha256:195ecebee987b2e1cdb677b3a2fdbb2f66a5dee3d25fb4179cf8c2ca4ba3e8b2"
+    "spec.md": "sha256:50b65fcebb0a1f8d19a87112127b7bedfce7750985222559eaff46775550c48c",
+    "verify.md": "sha256:88ab7e8095e9fa6802cf5735bf6318e4a7f0d9dc66fe830c8ca3c479b3b86e37"
   },
   "generatedBy": "core"
 }

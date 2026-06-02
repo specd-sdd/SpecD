@@ -8,7 +8,14 @@ Projects often span multiple code repositories or teams, and specd needs a struc
 
 ### Requirement: Workspace identity
 
-A workspace is identified by a unique name within a project's `specd.yaml`. Names must match `/^[a-z][a-z0-9-]*$/`. The name `default` is reserved for the local project workspace — every project must declare a `default` workspace. No two workspaces in the same configuration may share the same name.
+A workspace is identified by a unique name within a project's `specd.yaml`. Names must match `/^[a-z][a-z0-9-]*$/`.
+
+The following names are RESERVED and MUST NOT be used for spec workspaces:
+
+- `default` — reserved for the local project workspace (mandatory).
+- `root` — reserved for project-global graph identities.
+
+No two workspaces in the same configuration may share the same name.
 
 ### Requirement: Workspace properties
 
@@ -124,7 +131,7 @@ Each project's `specd.yaml` is the sole source of truth for that project's view 
 ## Constraints
 
 - Every project must declare a default workspace
-- Workspace names must match /^[a-z][a-z0-9-]\*$/
+- Workspace names must match /^\[a-z]\[a-z0-9-]\*$/
 - codeRoot is required for non-default workspaces
 - isExternal is inferred, never declared
 - Spec IDs are always workspace-qualified internally

@@ -11,18 +11,5 @@
     "core:spec-repository-port",
     "core:spec-lock"
   ],
-  "implementation": [
-    {
-      "file": "core:src/application/use-cases/generate-spec-metadata.ts"
-    },
-    {
-      "file": "core:src/domain/services/parse-metadata.ts",
-      "symbols": [
-        "specMetadataSchema",
-        "strictSpecMetadataSchema",
-        "permissiveSpecMetadataSchema",
-        "SpecMetadata"
-      ]
-    }
-  ]
+  "implementation": []
 }

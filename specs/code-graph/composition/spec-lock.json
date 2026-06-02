@@ -11,17 +11,31 @@
     "code-graph:language-adapter",
     "code-graph:indexer",
     "code-graph:traversal",
-    "default:_global/architecture"
+    "default:_global/architecture",
+    "code-graph:document-model"
   ],
   "implementation": [
     {
+      "file": "code-graph:src/composition/create-code-graph-provider.ts",
+      "symbols": ["createCodeGraphProvider"]
+    },
+    {
       "file": "code-graph:src/composition/code-graph-provider.ts",
-      "symbols": [
-        "CodeGraphProvider",
-        "CodeGraphProvider.getCoveredFiles",
-        "CodeGraphProvider.getCoveredSymbols",
-        "CodeGraphProvider.analyzeSpecImpact"
-      ]
+      "symbols": ["CodeGraphProvider"]
+    },
+    {
+      "file": "code-graph:src/application/services/resolve-graph-selector.ts",
+      "symbols": ["resolveFileSelector", "resolveSymbolSelector"]
+    },
+    {
+      "file": "code-graph:src/composition/graph-store-factory.ts",
+      "symbols": ["GraphStoreFactory"]
+    },
+    {
+      "file": "code-graph:test/application/services/resolve-graph-selector.spec.ts"
+    },
+    {
+      "file": "code-graph:test/composition/code-graph-provider.spec.ts"
     },
     {
       "file": "code-graph:src/index.ts"

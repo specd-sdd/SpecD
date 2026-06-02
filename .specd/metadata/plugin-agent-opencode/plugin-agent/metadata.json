@@ -5,7 +5,8 @@
     "core:config",
     "plugin-manager:agent-plugin-type",
     "skills:skill-bundle",
-    "skills:skill-templates-source"
+    "skills:skill-templates-source",
+    "skills:resolve-bundle"
   ],
   "context": [
     "Open Code support is required to keep agent-plugin behavior consistent across the ecosystem and avoid a Claude-only installation path. This spec defines the Open Code plugin contract for skill install/uninstall, target install directory, and metadata value handling so `@specd/skills` can render the final installed markdown predictably."
@@ -32,7 +33,7 @@
     {
       "requirement": "Application layer",
       "rules": [
-        "The application layer MUST include an `InstallSkills` use case that:\n\n1. reads skills from `@specd/skills`\n2. resolves the per-skill frontmatter source value collection\n3. declares only the Open Code-supported capability identifiers\n4. passes `variables.sharedFolder` only when overriding the default shared path contract\n5. writes files not marked as shared to the installed skill directory under the `projectRoot` provided in `SpecdConfig`\n6. writes files marked as shared to the rendered `sharedFolder` location under the project root\n\nThe plugin MUST NOT prepend YAML frontmatter after bundle resolution."
+        "The application layer MUST include an `InstallSkills` use case that:\n\n1. reads skills from `@specd/skills`\n2. resolves the per-skill frontmatter source value collection\n3. declares only the Open Code-supported capability identifiers\n4. resolves bundles through `ResolveBundle` so built-in render defaults are supplied by `@specd/skills`\n5. passes `variables.sharedFolder` only when overriding the default shared path contract\n6. writes files not marked as shared to the installed skill directory under the `projectRoot` provided in `SpecdConfig`\n7. writes files marked as shared to the rendered `sharedFolder` location under the project root\n\nThe plugin MUST NOT prepend YAML frontmatter after bundle resolution.\nThe plugin MUST NOT call `SkillRepository.getBundle(...)` directly from the install flow when `ResolveBundle` is available."
       ]
     },
     {
@@ -200,7 +201,8 @@
       "when": ["InstallSkills runs"],
       "then": [
         "it reads skill templates, resolves capability identifiers and frontmatter source values, and passes them into @specd/skills",
-        "AND shared-marked files are written to the rendered sharedFolder location under the project root"
+        "AND shared-marked files are written to the rendered sharedFolder location under the project root",
+        "AND it resolves install bundles through ResolveBundle"
       ]
     },
     {
@@ -210,30 +212,35 @@
       "then": [
         "the plugin does not assemble a final YAML frontmatter block after bundle resolution"
       ]
+    },
+    {
+      "requirement": "Application layer",
+      "name": "Open Code install does not call repository bundle resolution directly",
+      "when": ["the Open Code install flow is reviewed"],
+      "then": [
+        "bundle resolution goes through ResolveBundle",
+        "AND the plugin does not call SkillRepository.getBundle(...) directly from InstallSkills"
+      ]
     }
   ],
   "implementation": {
-    "symbols": [
+    "files": [
       {
         "specId": "plugin-agent-opencode:plugin-agent",
-        "file": "plugin-agent-opencode:test/install-skills.spec.ts",
-        "symbol": "InstallSkills"
-      },
+        "file": "plugin-agent-opencode:test/install-skills.spec.ts"
+      }
+    ],
+    "symbols": [
       {
         "specId": "plugin-agent-opencode:plugin-agent",
         "file": "plugin-agent-opencode:src/application/use-cases/install-skills.ts",
         "symbol": "InstallSkills"
-      },
-      {
-        "specId": "plugin-agent-opencode:plugin-agent",
-        "file": "plugin-agent-opencode:src/application/use-cases/shared-folder.ts",
-        "symbol": "resolveSharedFolder"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:091b2ff4f8156e7f9c06484667a32865b5c9de5c1a2d9ef5547a07549283036b",
-    "verify.md": "sha256:4e647a34c2d414047b07434c23e3f211e9e78de08655d51633a52ba846bad491"
+    "spec.md": "sha256:141ad42d9bac64348cb1e206f4e79f9b1ad4ad1d9937b1938670eb7c229c05f7",
+    "verify.md": "sha256:ba573ba8bf3fb0757905789fc689b602f3c996837a18466470afce465de074c2"
   },
   "generatedBy": "core"
 }

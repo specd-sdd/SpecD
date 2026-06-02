@@ -9,7 +9,7 @@
     {
       "requirement": "FileNode path and workspace semantics",
       "rules": [
-        "`FileNode.path` SHALL be globally unique by prefixing the workspace name to the code-root-relative path:\n\n- **`path`** = `{workspaceName}:{relativeToCodeRoot}` (e.g. `core:src/index.ts`)\n- **`workspace`** = workspace name string (e.g. `core`, `cli`, `default`)\n- **`configRelativePath`** = path from the directory containing the active `specd.yaml` to the same file on disk (e.g. `packages/core/src/index.ts`)\n\n`path` remains the canonical graph identity used by `SymbolNode.filePath`, symbol ids, and persisted relations. `configRelativePath` exists for user-facing lookup when commands receive file paths without an explicit workspace prefix.\n\nThis ensures that two workspaces with identical relative paths (e.g. both having `src/index.ts`) produce distinct `FileNode.path` values while still allowing CLI users to resolve file arguments using repository-style paths relative to the active config. The workspace name is the `SpecdWorkspaceConfig.name` from the specd configuration."
+        "All node identities (Files and Documents) SHALL be globally unique by prefixing the owning workspace name to the relative path:\n\n- **Workspace Identity**: `{workspaceName}:{relativeToCodeRoot}` (e.g. `core:src/index.ts`).\n- **Root Identity**: `root:{projectRelativePath}` (e.g. `root:docs/adr/0001.md`).\n\n`root` is a reserved namespace for files discovered via project-global `graph.includePaths` that are not owned by any specific workspace.\n\nIf a physical file falls under a configured workspace `codeRoot`, the workspace identity wins. The same file MUST NOT also be persisted under a `root:` identity.\n\n`path` remains the canonical graph identity used by `SymbolNode.filePath`, symbol ids, and persisted relations.\n\nEach node MUST also store its `configRelativePath` (relative to the directory containing the active `specd.yaml`) to enable user-facing lookups from project-relative path selectors.\n\nThis ensures that two workspaces with identical relative paths produce distinct `FileNode.path` values while still allowing CLI users to resolve file arguments using repository-style paths relative to the active config. The workspace name is the `SpecdWorkspaceConfig.name` from the specd configuration."
       ]
     },
     {
@@ -39,7 +39,7 @@
     {
       "requirement": "Spec resolution via SpecRepository",
       "rules": [
-        "Instead of brute-walking a `specs/` directory, each workspace provides a callback function that returns discovered specs:\n\n```typescript\ninterface WorkspaceIndexTarget {\n  readonly name: string\n  readonly codeRoot: string\n  readonly specs: () => Promise<DiscoveredSpec[]>\n}\n```\n\nThe `specs` callback is implemented by the CLI/MCP integration layer using `SpecRepository` from `@specd/core`:\n\n1. Call `repo.list()` to get all `Spec` entities in the workspace\n2. For each spec, load all artifacts via `repo.artifact(spec, filename)` — artifact filenames come from `spec.filenames` and no longer include metadata files\n3. Concatenate artifact contents for hashing: `spec.md` first (if present), then the remaining artifacts in alphabetical order\n4. Load metadata via `repo.metadata(spec)` to extract `title`, `description`, and `dependsOn`. If metadata is absent (`null`), `title` defaults to the `specId`, `description` to `''`, and `dependsOn` to `[]`. There is no fallback to parsing headings or sections from `spec.md`.\n5. Build the `specId` as `{workspace}:{specPath}` (e.g. `core:change`), matching the format produced by `SpecRepository.resolveFromPath`\n\nThis decouples the indexer from spec storage and respects workspace prefixes, ownership, and locality as configured in `specd.yaml`.\n\nThe `DiscoveredSpec` type is re-exported from `@specd/code-graph` for use by integration layers."
+        "The indexer SHALL resolve specs by directly consuming the `SpecRepository` instance from each orchestrated workspace. For each spec:\n\n1. Enumerate identities via `repo.list()`.\n2. Check freshness via `repo.specHash()`.\n3. Load content by concatenating artifacts from `repo.artifact()`. Artifact filenames come from `spec.filenames` and no longer include metadata files. Concatenate artifact contents for hashing: `spec.md` first (if present), then the remaining artifacts in alphabetical order.\n4. Load metadata via `repo.metadata()` to extract `title` and `description`. If metadata is absent (`null`), `title` defaults to the `specId`, `description` to `''`, and `dependsOn` to `[]`. There is no fallback to parsing headings or sections from `spec.md`.\n5. Load `dependsOn` via `repo.readPersistedDependsOn()`.\n6. Load coverage links via `repo.readPersistedImplementation()`.\n\nThe indexer SHALL NOT rely on the CLI to precompute these semantics or provide callbacks. This decouples the indexer from spec storage and respects workspace prefixes, ownership, and locality as configured in `specd.yaml`."
       ]
     },
     {
@@ -51,7 +51,7 @@
     {
       "requirement": "WorkspaceIndexTarget",
       "rules": [
-        "`IndexOptions` SHALL accept an array of `WorkspaceIndexTarget` objects instead of a single `workspacePath`:\n\n```typescript\ninterface WorkspaceIndexTarget {\n  readonly name: string\n  readonly codeRoot: string\n  readonly specs: () => Promise<DiscoveredSpec[]>\n  readonly repoRoot?: string\n  readonly excludePaths?: readonly string[]\n  readonly respectGitignore?: boolean\n}\n\ninterface IndexOptions {\n  readonly workspaces: readonly WorkspaceIndexTarget[]\n  readonly projectRoot: string\n  readonly onProgress?: IndexProgressCallback\n  readonly chunkBytes?: number\n  readonly vcsRef?: string\n}\n```\n\n- **`workspaces`** — one entry per workspace to index\n- **`projectRoot`** — absolute path to the monorepo/project root (for monorepo package resolution)\n- **`excludePaths`** — optional gitignore-syntax patterns passed through to `discoverFiles`. When absent, built-in defaults apply. When present, replaces built-in defaults entirely.\n- **`respectGitignore`** — optional boolean passed through to `discoverFiles`. Defaults to `true`.\n\nThese fields are populated by the CLI/MCP integration layer from `SpecdWorkspaceConfig.graph`. When `SpecdWorkspaceConfig.graph` is absent, the fields are omitted from `WorkspaceIndexTarget` (triggering built-in defaults in `discoverFiles`)."
+        "`IndexOptions` SHALL accept the orchestrated project structure and graph-specific configuration:\n\n```ts\ninterface ProjectGraphConfig {\n  readonly includePaths?: readonly string[]\n  readonly excludePaths?: readonly string[]\n  readonly workspaces?: ReadonlyMap<string, {\n    readonly allowedPaths?: readonly string[]\n    readonly excludePaths?: readonly string[]\n    readonly respectGitignore?: boolean\n  }>\n}\n\ninterface IndexOptions {\n  readonly projectRoot: string\n  readonly workspaces: readonly ProjectWorkspace[]\n  readonly graphConfig: ProjectGraphConfig\n  readonly onProgress?: IndexProgressCallback\n  readonly chunkBytes?: number\n  readonly vcsRef?: string\n}\n```\n\nThe `specs` callback on `WorkspaceIndexTarget` is REMOVED. The indexer now pulls data from the `SpecRepository` carried by each `ProjectWorkspace`.\n\n`ProjectGraphConfig` fields are populated by the CLI/MCP integration layer from `SpecdConfig.graph`."
       ]
     },
     {
@@ -185,50 +185,24 @@
     },
     {
       "requirement": "Spec resolution via SpecRepository",
-      "name": "Specs callback delegates to SpecRepository",
-      "when": ["a workspace provides a specs callback backed by SpecRepository"],
+      "name": "Spec resolution pulls from repository",
+      "when": ["indexing specs"],
       "then": [
-        "the indexer SHALL call it to get specs instead of walking the filesystem",
-        "AND the returned specs SHALL be stored with the workspace name"
+        "the indexer SHALL directly call SpecRepository methods to extract semantics",
+        "AND it SHALL NOT rely on precomputed extraction callbacks"
       ]
     },
     {
       "requirement": "Spec resolution via SpecRepository",
-      "name": "Content hash excludes metadata",
-      "when": ["a spec has artifacts spec.md and verify.md"],
+      "name": "Workspace-owned file is not duplicated under root namespace",
+      "given": [
+        "a file under a configured workspace codeRoot",
+        "AND it also matches a project-global graph.includePaths pattern"
+      ],
+      "when": ["the graph identity is computed"],
       "then": [
-        "the contentHash SHALL be computed from all artifacts in spec.filenames concatenated",
-        "AND spec.md SHALL be ordered first, then the rest alphabetically",
-        "AND metadata SHALL NOT be included in the content hash"
-      ]
-    },
-    {
-      "requirement": "Spec resolution via SpecRepository",
-      "name": "Metadata loaded via repository metadata port",
-      "when": ["a spec has metadata available via repo.metadata(spec)"],
-      "then": [
-        "title SHALL be taken from metadata.title",
-        "AND description SHALL be taken from metadata.description",
-        "AND dependsOn SHALL be taken from metadata.dependsOn"
-      ]
-    },
-    {
-      "requirement": "Spec resolution via SpecRepository",
-      "name": "Missing metadata uses defaults",
-      "when": ["repo.metadata(spec) returns null"],
-      "then": [
-        "title SHALL default to the specId",
-        "AND description SHALL default to an empty string",
-        "AND dependsOn SHALL default to an empty array"
-      ]
-    },
-    {
-      "requirement": "Spec resolution via SpecRepository",
-      "name": "Unique specIds across workspaces",
-      "when": ["core and cli both have a spec named spec-metadata"],
-      "then": [
-        "specIds SHALL be core:spec-metadata and cli:spec-metadata respectively",
-        "AND no primary key collision SHALL occur"
+        "the file receives only the workspace-prefixed identity",
+        "AND no root: identity is persisted for the same physical file"
       ]
     },
     {
@@ -294,9 +268,17 @@
       ]
     }
   ],
+  "implementation": {
+    "files": [
+      {
+        "specId": "code-graph:workspace-integration",
+        "file": "code-graph:src/domain/value-objects/index-options.ts"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:c97ac5da6fe6bd1a2d396c3d03d664ba139a993cba140a692bc69571a6c3658a",
-    "verify.md": "sha256:892b1c0f0e4c272137aca30557d39206b6933e70cd09afd3bbd25fc15b30e7ca"
+    "spec.md": "sha256:5835ae7f0ee4525cbddc06f5c123ce8d40d9ea93b6bd5e555c58c21b4ae5468b",
+    "verify.md": "sha256:f39fbe63305258331b5ac34abad305822e0ee2c511f9695a3f6127ff8f9db312"
   },
   "generatedBy": "core"
 }

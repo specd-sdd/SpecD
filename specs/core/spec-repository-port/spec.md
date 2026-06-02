@@ -74,17 +74,21 @@ Relative resolution MUST be pure computation (no I/O). Absolute resolution MAY r
 
 If the ownership is `owned` or `shared`, `saveMetadata` proceeds normally: it MUST write the metadata content for the given spec. The `content` parameter is a JSON string. If `originalHash` is set on the content and does not match the current file hash on disk, the save MUST be rejected by throwing `ArtifactConflictError`. When `options.force` is `true`, the conflict check MUST be skipped. If the metadata directory does not exist, it MUST be created. This method replaces the previous pattern of `save(spec, new SpecArtifact('.specd-metadata.yaml', content))` for metadata writes.
 
-### Requirement: spec-lock sidecar read and write
+### Requirement: persisted spec semantics and stable spec hash
 
-`SpecRepository` MUST expose dedicated methods for the persisted `spec-lock.json` sidecar.
+`SpecRepository` MUST NOT expose raw sidecar filesystem shapes (like `SpecLockData`) to use cases. Instead, it MUST provide semantic operations for reading and writing persisted spec state:
 
-`readSpecLock(spec)` MUST load the sidecar for the given spec and return the parsed content as `SpecLockData`, or `null` if no sidecar exists. When loaded from storage, the returned object MUST include an `originalHash` property to enable conflict detection on subsequent writes.
+1. `readPersistedSchema(spec)` — returns the schema identity `{ name, version }` stored with the spec, or `null`.
+2. `readPersistedDependsOn(spec)` — returns the dependency list `string[]` stored with the spec, or `null`.
+3. `readPersistedImplementation(spec)` — returns the implementation links `Array<{ file, symbols? }>` stored with the spec, or `null`.
+4. `specHash(spec)` — returns a stable SHA-256 hash representing the current persisted spec state, or `null` if no state exists. This hash is used by incremental indexing to detect changes without loading full semantics.
+5. `updatePersistedSchema(spec, schema, options?)` — updates the schema identity.
+6. `updatePersistedDependsOn(spec, dependsOn, options?)` — updates the dependency list.
+7. `updatePersistedImplementation(spec, implementation, options?)` — updates implementation links.
 
-`saveSpecLock(spec, content, options?)` MUST first check `this.ownership()`. If the ownership is `readOnly`, the method MUST throw `ReadOnlyWorkspaceError` before any filesystem operation or conflict detection.
+All `update` operations MUST support optimistic concurrency control via `options.originalHash`. If the current spec state hash does not match `originalHash`, the operation MUST throw `ArtifactConflictError`.
 
-If the ownership is `owned` or `shared`, `saveSpecLock` proceeds normally: it MUST persist the sidecar content for the given spec, preserve conflict detection semantics equivalent to `saveMetadata`, and skip conflict detection only when `options.force` is `true`.
-
-`spec-lock` access is a dedicated repository contract. Callers MUST NOT rely on the normal `artifact()` / `save()` API as a substitute for sidecar persistence.
+`update` operations MUST first check `this.ownership()`. If the ownership is `readOnly`, the method MUST throw `ReadOnlyWorkspaceError` before any filesystem operation or conflict detection.
 
 ### Requirement: search returns specs matching a text query
 
@@ -109,7 +113,26 @@ This method is the port-level search primitive — it performs a content scan wi
 
 ### Requirement: Abstract class with abstract methods
 
-`SpecRepository` MUST be defined as an `abstract class`, not an `interface`. All storage operations (`get`, `list`, `artifact`, `save`, `delete`, `resolveFromPath`, `metadata`, `saveMetadata`, `readSpecLock`, `saveSpecLock`, `search`) MUST be declared as `abstract` methods. This follows the architecture spec requirement that ports with shared construction are abstract classes.
+`SpecRepository` MUST be defined as an `abstract class`, not an `interface`. All storage operations (`get`, `list`, `count`, `artifact`, `save`, `delete`, `resolveFromPath`, `metadata`, `saveMetadata`, persisted spec semantic read/write operations, stable spec hash lookup, `search`) MUST be declared as `abstract` methods. This follows the architecture spec requirement that ports with shared construction are abstract classes.
+
+### Requirement: Spec counting
+
+The repository MUST provide a `count()` method that returns the total number of specs managed by the repository. This allows consumers (such as progress reporters) to discover the size of the workspace efficiently without loading the metadata for every spec via `list()`.
+
+### Requirement: Filesystem-backed specs capability
+
+A `SpecRepository` implementation whose source of truth lives on a local or mounted filesystem MUST expose its canonical `specsPath` as an absolute path.
+
+This capability exists so application services and graph indexers can reason about the physical root that owns the repository's spec directories without depending on adapter-specific sidecar layout.
+
+Repositories that are not backed by a directly addressable filesystem MUST NOT be required to expose `specsPath`.
+
+When `specsPath` is exposed:
+
+- it MUST identify the repository root that contains the workspace's spec directories
+- it MUST remain stable for the lifetime of the repository instance
+- it MUST be safe for consumers to compare against `projectRoot`, workspace `codeRoot`, and other filesystem-backed repository roots when computing discovery exclusions
+- exposing `specsPath` MUST NOT require callers to know or depend on sidecar filenames such as `spec-lock.json`
 
 ## Constraints
 
@@ -117,22 +140,27 @@ This method is the port-level search primitive — it performs a content scan wi
 - `get` and `list` return lightweight `Spec` metadata — artifact content is never loaded by these methods
 - `search` loads artifact content as needed to perform matching — it is more expensive than `list`
 - `save` creates the spec directory if it does not already exist
-- `ArtifactConflictError` is the sole error type for concurrent modification detection on `save` and `saveMetadata`
+- `ArtifactConflictError` is the sole error type for concurrent modification detection on `save`, `saveMetadata`, and semantic `update` operations
 - `resolveFromPath` with a relative path and no `from` parameter is invalid and the implementation MUST handle this as an error or return `null`
 - `originalHash` on loaded artifacts MUST use `sha256` of the file content as read from disk
 - `metadata` and `saveMetadata` operate on a storage location determined by the adapter — callers MUST NOT assume metadata lives alongside spec content
 - `metadata` returns parsed content; `artifact` returns raw content — they are not interchangeable
-- `save` and `saveMetadata` MUST throw `ReadOnlyWorkspaceError` before any I/O when ownership is `readOnly`
-- Read operations (`get`, `list`, `artifact`, `metadata`, `resolveFromPath`, `search`) are not affected by ownership — readOnly workspaces can always be read
+- `save`, `saveMetadata`, and semantic `update` operations MUST throw `ReadOnlyWorkspaceError` before any I/O when ownership is `readOnly`
+- Read operations (`get`, `list`, `count`, `artifact`, `metadata`, `resolveFromPath`, `search`, `specHash`, and semantic `read` operations) are not affected by ownership — readOnly workspaces can always be read
+- Use cases MUST interact with specs through semantic repository operations only.
+- Sidecar files (like `spec-lock.json`) are an implementation detail of the repository adapter and MUST NOT be accessed directly by application logic.
+- The `specHash()` MUST be stable and deterministic across multiple calls for the same spec state.
+- `specsPath` is a repository capability for filesystem-backed adapters only; consumers MUST NOT assume it exists for every `SpecRepository`
 
 ## Spec Dependencies
 
-- [`core:repository-port`](../repository-port/spec.md) — `Repository` base class, `RepositoryConfig`, shared accessors
-- [`default:_global/architecture`](../../_global/architecture/spec.md) — ports as abstract classes, application layer uses ports only
-- [`core:change`](../change/spec.md) — Change entity references specIds that resolve to specs managed by this port
-- [`core:storage`](../storage/spec.md) — storage layer design, filesystem adapter constraints
-- [`core:workspace`](../workspace/spec.md) — workspace identity and scoping semantics
-- [`core:spec-id-format`](../spec-id-format/spec.md) — canonical spec ID format used in `resolveFromPath` results
-- [`core:spec-metadata`](../spec-metadata/spec.md) — metadata file format and structure returned by `metadata()`
-- [`core:search-specs`](../search-specs/spec.md) — use case that orchestrates `search()` across workspaces
-- [`default:_global/logging`](../../_global/logging/spec.md) — debug logging requirements for expected artifact resolution and path-confinement diagnostics
+- [`core:repository-port`](../repository-port/spec.md) — shared abstract-port conventions
+- [`default:_global/architecture`](../../../_global/architecture/spec.md) — port and adapter boundary rules
+- [`core:change`](../change/spec.md) — change identity and archived implementation semantics
+- [`core:storage`](../storage/spec.md) — repository rooting and filesystem ownership
+- [`core:workspace`](../workspace/spec.md) — workspace identity and ownership semantics
+- [`core:spec-id-format`](../spec-id-format/spec.md) — canonical spec identity parsing
+- [`core:spec-metadata`](../spec-metadata/spec.md) — metadata interactions exposed through the repository
+- [`core:search-specs`](../search-specs/spec.md) — repository-backed search semantics
+- [`default:_global/logging`](../../../_global/logging/spec.md) — logging expectations for adapters
+- [`core:spec-lock`](../spec-lock/spec.md) — persisted spec state and sidecar semantics hidden behind repository methods

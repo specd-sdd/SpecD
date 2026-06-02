@@ -137,7 +137,7 @@
 - **WHEN** `removeSpec('core:config')` is called
 - **THEN** the `SpecNode` and all `DEPENDS_ON` relations where it appears as source or target are removed
 
-### Requirement: Full-text search
+### Requirement: Search with exact-match prioritization
 
 #### Scenario: Symbol search matches normalized compound names
 
@@ -157,6 +157,20 @@
 - **AND** another spec whose content contains `lifecycle state transition`
 - **WHEN** the corresponding queries are issued through `searchSpecs`
 - **THEN** the matching spec is returned in each case with a relevance score
+
+#### Scenario: Exact Spec ID match is prioritized first
+
+- **GIVEN** a spec with ID `core:change`
+- **AND** a search query `core:change`
+- **WHEN** the spec search is executed
+- **THEN** the spec `core:change` appears as the first result
+
+#### Scenario: Exact Document Path match is prioritized first
+
+- **GIVEN** a document with path `root:package.json`
+- **AND** a search query `root:package.json`
+- **WHEN** the document search is executed
+- **THEN** the document `root:package.json` appears as the first result
 
 #### Scenario: Filters are applied before limiting results
 

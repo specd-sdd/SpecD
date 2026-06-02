@@ -1,0 +1,18 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "core:spec-repository-port",
+    "core:list-specs",
+    "core:workspace",
+    "core:list-workspaces"
+  ],
+  "implementation": [
+    {
+      "file": "core:src/application/use-cases/search-specs.ts",
+      "symbols": ["SearchSpecs"]
+    }
+  ]
+}

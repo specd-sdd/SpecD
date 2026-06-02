@@ -6,7 +6,10 @@
     "code-graph:language-adapter",
     "code-graph:symbol-model",
     "code-graph:workspace-integration",
-    "core:config"
+    "core:config",
+    "core:spec-repository-port",
+    "core:list-workspaces",
+    "code-graph:document-model"
   ],
   "context": [
     "Source files change constantly and the code graph must be kept in sync without re-parsing the entire workspace every time. The indexer orchestrates the pipeline from file discovery through parsing to graph storage, using content hashing for incremental updates and language adapters for extraction. It is the primary write path into the code graph."
@@ -15,7 +18,7 @@
     {
       "requirement": "IndexCodeGraph use case",
       "rules": [
-        "`IndexCodeGraph` SHALL be the primary entry point for building and updating the code graph. It is an application-layer use case that orchestrates:\n\n1. **Discover** — walk the workspace to find source files\n2. **Diff** — compare content hashes with the store to identify new, changed, and deleted files\n3. **Extract** — run the appropriate language adapter on each new/changed file\n4. **Store** — upsert extracted data into the `GraphStore`\n5. **Clean** — remove deleted files from the store\n6. **Persist VCS ref** — if `IndexOptions.vcsRef` is provided, store it as the `lastIndexedRef` meta key after successful indexing\n\nExtraction and storage include hierarchy relations (`EXTENDS`, `IMPLEMENTS`, `OVERRIDES`) alongside existing file, symbol, and dependency relations.\n\nThe use case accepts a `GraphStore` (already opened) and an `AdapterRegistry` via constructor injection."
+        "`IndexCodeGraph` SHALL be the primary entry point for building and updating the code graph. It is an application-layer use case that orchestrates:\n\n1. **Discover** — walk the workspace roots AND project-global graph paths to find source files and documents\n2. **Diff** — compare content hashes (or spec hashes) with the store to identify new, changed, and deleted resources\n3. **Extract** — run the appropriate language adapter on code files, or index textual content as documents\n4. **Spec Indexing** — consume `SpecRepository` from each workspace to extract metadata, dependencies, and coverage links\n5. **Store** — upsert extracted data and relations into the `GraphStore`\n6. **Clean** — remove deleted resources from the store\n7. **Persist VCS ref** — store `lastIndexedRef` after success\n\nExtraction and storage include hierarchy relations (`EXTENDS`, `IMPLEMENTS`, `OVERRIDES`) alongside existing file, symbol, and dependency relations.\n\nThe indexer SHALL directly consume `SpecRepository` methods (`list`, `metadata`, `artifact`, `readPersistedImplementation`, `specHash`) to build `SpecNode` and coverage relations. It MUST NOT parse raw sidecar files."
       ]
     },
     {
@@ -25,15 +28,21 @@
       ]
     },
     {
+      "requirement": "Discovery fingerprint uses effective config",
+      "rules": [
+        "The graph fingerprint for an indexing run SHALL be computed from the effective discovery configuration actually used by the indexer, not only from the raw config declared in `specd.yaml`.\n\nThe effective fingerprint inputs MUST include:\n\n- project-global `graph.includePaths`\n- global `graph.excludePaths`\n- each workspace's `allowedPaths`\n- each workspace's `excludePaths`\n- each workspace's `respectGitignore`\n- any synthetic exclusions derived from filesystem-backed repository `specsPath` roots"
+      ]
+    },
+    {
       "requirement": "Multi-workspace file discovery",
       "rules": [
-        "The indexer SHALL discover files from each workspace's `codeRoot` independently. For each `WorkspaceIndexTarget`:\n\n1. Call `discoverFiles(codeRoot, hasAdapter, options)` to get paths relative to `codeRoot`\n2. Prefix each path with `{workspaceName}:` to form the globally unique `FileNode.path`\n3. Derive `FileNode.configRelativePath` from the directory containing the active `specd.yaml`\n4. Diff against the store (filtered by workspace prefix)\n\n`discoverFiles` accepts a root directory plus optional exclusion options:\n\n- **`respectGitignore`** (default `true`): when `true`, `.gitignore` files are loaded hierarchically (git root → codeRoot → subdirectories during walk) and applied with absolute priority — no `excludePaths` pattern can re-include a file that `.gitignore` excludes. When `false`, `.gitignore` files are not loaded.\n- **`excludePaths`** (default: built-in list): gitignore-syntax patterns applied as an additional exclusion layer on top of `.gitignore` (or as the sole ruleset when `respectGitignore` is `false`). Supports `!` negation. When not provided, the following built-in defaults apply: When provided, the supplied list **replaces** the built-in defaults entirely — the built-in defaults are not merged.\n\nEvaluation order when `respectGitignore: true`:\n\n1. `.gitignore` rules (absolute priority — cannot be overridden)\n2. `excludePaths` rules (applied after; can negate each other but cannot un-ignore gitignored files)\n\n`discoverFiles` itself has no workspace knowledge — it accepts a root directory and:\n\n- Respects `.gitignore` rules hierarchically when `respectGitignore` is `true`\n- Applies `excludePaths` patterns (or built-in defaults) as an `ignore`-library instance\n- Skips symbolic links — only regular files are indexed\n- Skips files with no registered language adapter (determined by extension)\n- Returns root-relative file paths with forward-slash normalization\n\n`FileNode.configRelativePath` SHALL be forward-slash-normalized, omit a leading `./`, and remain relative to the active config directory even when the file lies outside that directory (using `..` segments when needed)."
+        "The indexer SHALL discover files from two sources:\n\n**1. Workspace Discovery**\nFor each `ProjectWorkspace` provided in options:\n\n- Resolve one effective exclusion set composed of global `graph.excludePaths`, repository-derived spec-root exclusions, and the workspace's `excludePaths`\n- Call `discoverFiles` on `codeRoot`, filtered by the workspace's `allowedPaths` (if configured)\n- Prefix each path with `{workspaceName}:`\n- Diff against the store filtered by workspace prefix\n\n**2. Project-Global Discovery**\n\n- Call `discoverFiles` on the project root using patterns from `graphConfig.includePaths`\n- Prefix each path with `root:` to form the globally unique identity\n- Resources discovered here are treated as project-global documents or scripts only when they are outside every configured workspace `codeRoot`\n\nFiles matching a language adapter become `FileNode`. Files without an adapter but with textual content become `DocumentNode` under the same identity format.\n\nWhen a workspace repository exposes a filesystem-backed `specsPath`, the indexer SHALL derive a synthetic exclusion for that root and apply it to file/document discovery. Spec artifacts MUST be indexed through spec indexing only, not as files or documents.\n\nTextual fallback SHALL decode document content using this policy:\n\n- Detect and accept BOM-marked `utf-8`, `utf-16le`, and `utf-16be`\n- Otherwise try `utf-8`\n- Otherwise accept `utf-16le` or `utf-16be` when the byte pattern matches UTF-16 null-byte layout\n- Otherwise accept `windows-1252` only when the file does not contain NUL bytes\n- Otherwise skip the file as non-textual\n\n`discoverFiles` accepts a root directory plus optional exclusion options:\n\n- **`respectGitignore`** (default `true`): when `true`, `.gitignore` files are loaded hierarchically and applied with absolute priority.\n- **`excludePaths`** (default: built-in list): gitignore-syntax patterns applied as an additional exclusion layer."
       ]
     },
     {
       "requirement": "Two-pass extraction with in-memory index",
       "rules": [
-        "Extraction proceeds in two passes over the files, using an in-memory `SymbolIndex` rather than store queries during analysis:\n\n- **Pass 1 (Extract symbols, per workspace)** — For each workspace, for each file in chunks: read content, extract symbols via the language adapter, extract `ImportDeclaration` entries, and build `DEFINES` and `EXPORTS` relations. When an adapter provides `extractSymbolsWithNamespace()`, the indexer MAY use it to obtain symbols and namespace information from a single parse; otherwise it uses the adapter's separate extraction methods. Register symbols in the in-memory `SymbolIndex` (indexed by file path and by name). If the adapter provides namespace and qualified-name support, build the qualified name map for that language. No store queries are needed during extraction.\n- **Pass 2 (Resolve imports + scoped bindings + CALLS + CONSTRUCTS + USES\\_TYPE + hierarchy, all workspaces)** — For each file across all workspaces: resolve `ImportDeclaration` entries to symbol ids using the `SymbolIndex` (not the store). All import and package resolution is delegated to the adapter: relative imports via `adapter.resolveRelativeImportPath`, package imports via `adapter.resolvePackageFromSpecifier` (using the `packageName -> workspaceName` map built from `adapter.getPackageIdentity`), and qualified names via the namespace map (built using `adapter.buildQualifiedName`). For `ImportDeclaration` entries with `isRelative: false` whose specifier is not resolved via the qualified name map, and where the adapter implements `resolveQualifiedNameToPath`, the indexer SHALL call `adapter.resolveQualifiedNameToPath(specifier, codeRoot, repoRoot)` and, if a path is returned, emit a file-to-file `IMPORTS` relation. Build the import map, collect adapter binding facts and call facts, build the scoped binding environment, and then resolve `IMPORTS`, `CALLS`, `CONSTRUCTS`, `USES_TYPE`, `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES` relations for code-file analysis. Existing adapter `extractRelations()` output remains valid, but shared scoped resolution owns cross-language receiver, type-reference, constructor, and call-candidate lookup.\n- **Specs (per workspace)** — For each workspace: call the `specs()` callback to get discovered specs. Assign the workspace name to each spec.\n- **Store commit** — After all passes complete, call `GraphStore.bulkLoad()` once with the files, symbols, specs, and relations accumulated for the run. Concrete backends MAY use native bulk import mechanisms internally, but the indexer remains coupled only to the abstract graph-store contract.\n- **Search readiness** — After bulk load, call `GraphStore.rebuildFtsIndexes()` so the active backend can bring its search indexes into a query-ready state when needed.\n\nThis two-pass approach ensures all symbols exist in the index before import, binding, call, and hierarchy resolution, while avoiding store queries during analysis."
+        "Extraction proceeds in two passes over the files, using an in-memory `SymbolIndex` rather than store queries during analysis:\n\n- **Pass 1 (Extract symbols, per workspace)** — For each workspace, for each file in chunks: read content, extract symbols via the language adapter, and build `DEFINES` and `EXPORTS` relations. No store queries are needed during extraction.\n- **Pass 2 (Resolve imports + scoped bindings + relations, all workspaces)** — Resolve cross-file and cross-workspace relations using the `SymbolIndex`. Existing adapter `extractRelations()` output remains valid, but shared scoped resolution owns cross-language receiver, type-reference, constructor, and call-candidate lookup.\n- **Specs (per workspace)** — For each workspace: iterate through specs provided by the `SpecRepository`.\n- **Store commit** — After all passes complete, call `GraphStore.bulkLoad()` once.\n- **Search readiness** — After bulk load, call `GraphStore.rebuildFtsIndexes()`.\n\nThis two-pass approach ensures all symbols exist in the index before import, binding, call, and hierarchy resolution, while avoiding store queries during analysis."
       ]
     },
     {
@@ -75,7 +84,7 @@
     {
       "requirement": "Spec dependency indexing",
       "rules": [
-        "The indexer SHALL build `SpecNode` entries with `DEPENDS_ON` relations. Specs are resolved via the workspace's `specs()` callback (backed by `SpecRepository`), NOT by reading the filesystem directly. For each spec provided by the repository:\n\n1. Load metadata via `SpecRepository.metadata()` — extract `title`, `description`, and `dependsOn`\n2. If metadata is absent (`null`), use defaults: `title` = specId, `description` = `''`, `dependsOn` = `[]`. There is no fallback parsing of `spec.md` — metadata should be regenerated via `spec generate-metadata` before indexing.\n3. Load `spec-lock.json` when present and treat it as the durable source for archived implementation traceability\n4. Compute a `contentHash` (SHA-256 of all artifacts in `spec.filenames`) — this includes `spec.md`, `verify.md`, and any other spec artifacts\n5. Create a `SpecNode` and upsert it into the store\n6. Create a `DEPENDS_ON` relation for each entry in `dependsOn`\n7. Create a `COVERS_FILE` relation for each archived file-level implementation entry from `spec-lock.json`\n8. Create a `COVERS_SYMBOL` relation for each archived symbol-level implementation entry from `spec-lock.json`, preserving any `stale` metadata required by the relation model\n\nMetadata changes alone do NOT trigger re-indexing — only changes to spec content artifacts (`spec.md`, `verify.md`, etc.) affect the `contentHash`. Metadata freshness is tracked independently by `@specd/core`.\n\nSpec indexing runs as an additional phase after source file indexing (Phase 1 and Phase 2). It does not depend on source file data and could run in parallel, but sequencing after source indexing simplifies the implementation."
+        "The indexer SHALL build `SpecNode` entries and relations by directly consuming the `SpecRepository` instance from each workspace:\n\n1. Use `repo.count()` to discover the total spec volume upfront for accurate progress reporting\n2. Use `repo.list()` to enumerate spec identities\n3. For each spec, check `repo.specHash()` against the store to enable incremental skipping\n4. Load `title` and `description` via `repo.metadata()`\n5. Load `COVERS_FILE` and `COVERS_SYMBOL` relations via `repo.readPersistedImplementation()`\n6. Load `DEPENDS_ON` relations via `repo.readPersistedDependsOn()`\n\nThe indexer SHALL NOT rely on the CLI to pre-extract spec data. It owns the semantic mapping from repository data to graph nodes.\n\nSpec indexing runs as an additional phase after source file indexing."
       ]
     }
   ],
@@ -206,6 +215,15 @@
       "then": [
         "FileNode.configRelativePath is ../../packages/core/src/index.ts",
         "AND it has forward slashes and no leading ./"
+      ]
+    },
+    {
+      "requirement": "Discovery fingerprint uses effective config",
+      "name": "Synthetic spec-root exclusions affect fingerprint",
+      "given": ["a filesystem-backed repository exposes a specsPath"],
+      "when": ["the indexer computes the current graph fingerprint"],
+      "then": [
+        "the synthetic exclusion derived from that spec root contributes to the fingerprint payload"
       ]
     },
     {
@@ -436,19 +454,28 @@
     },
     {
       "requirement": "Spec dependency indexing",
-      "name": "Specs resolved via callback",
-      "given": ["a workspace with a specs() callback that returns DiscoveredSpec[]"],
-      "when": ["spec indexing runs"],
+      "name": "Total spec count improves progress UX",
+      "given": ["a workspace with 100 specs"],
+      "when": ["the indexer starts spec discovery"],
       "then": [
-        "the indexer calls the callback instead of walking the filesystem",
-        "AND the returned specs are stored with the workspace name"
+        "it calls repo.count() to determine the total volume",
+        "AND it emits progress events using the total spec count as the denominator"
+      ]
+    },
+    {
+      "requirement": "Spec dependency indexing",
+      "name": "Indexer pulls spec data from repository",
+      "when": ["indexing specs"],
+      "then": [
+        "the indexer SHALL directly call repo.list(), repo.metadata(), and repo.readPersistedDependsOn()",
+        "AND it SHALL NOT rely on the CLI to provide pre-resolved spec objects"
       ]
     },
     {
       "requirement": "Spec dependency indexing",
       "name": "Spec contentHash from content artifacts only",
       "given": ["a spec with artifacts spec.md, verify.md, and .specd-metadata.yaml"],
-      "when": ["the specs() callback builds the DiscoveredSpec"],
+      "when": ["the indexer builds the SpecNode"],
       "then": [
         "contentHash is computed from all artifacts EXCEPT .specd-metadata.yaml",
         "AND spec.md is ordered first, then the remaining artifacts in alphabetical order"
@@ -456,9 +483,9 @@
     },
     {
       "requirement": "Spec dependency indexing",
-      "name": "Spec with .specd-metadata.yaml indexed",
+      "name": "Spec with metadata indexed",
       "given": [
-        "a spec in workspace core with .specd-metadata.yaml containing dependsOn: [core:config, core:storage]"
+        "a spec in workspace core with metadata containing dependsOn: [core:config, core:storage]"
       ],
       "when": ["spec indexing runs"],
       "then": [
@@ -469,7 +496,7 @@
     {
       "requirement": "Spec dependency indexing",
       "name": "Spec without metadata uses defaults",
-      "given": ["a spec in workspace code-graph with no .specd-metadata.yaml"],
+      "given": ["a spec in workspace code-graph with no metadata"],
       "when": ["spec indexing runs"],
       "then": [
         "title defaults to the specId, description defaults to '', and dependsOn defaults to []",
@@ -479,17 +506,14 @@
     {
       "requirement": "Spec dependency indexing",
       "name": "Spec title defaults to specId when metadata is absent",
-      "given": ["a spec with specId: 'code-graph:change' and no .specd-metadata.yaml"],
+      "given": ["a spec with specId: 'code-graph:change' and no metadata"],
       "when": ["spec indexing runs"],
       "then": ["the SpecNode has title: 'code-graph:change'"]
     },
     {
       "requirement": "Spec dependency indexing",
       "name": "Incremental spec indexing skips unchanged specs",
-      "given": [
-        "a spec was indexed with contentHash abc computed from all its artifacts",
-        "AND no artifact has changed"
-      ],
+      "given": ["a spec was indexed with contentHash abc", "AND no artifact has changed"],
       "when": ["spec indexing runs again"],
       "then": ["the spec is skipped because its contentHash matches the stored hash"]
     },
@@ -506,24 +530,22 @@
     {
       "requirement": "Spec dependency indexing",
       "name": "Archived file-level implementation becomes COVERS_FILE",
-      "given": ["a spec sidecar contains a file-level implementation entry for core:src/change.ts"],
-      "when": ["IndexCodeGraph.execute() indexes spec metadata"],
+      "given": ["a spec has a file-level implementation link to core:src/change.ts"],
+      "when": ["spec indexing runs"],
       "then": ["it emits a COVERS_FILE relation from that spec to that file"]
     },
     {
       "requirement": "Spec dependency indexing",
       "name": "Archived symbol-level implementation becomes COVERS_SYMBOL",
-      "given": [
-        "a spec sidecar contains a symbol-level implementation entry for core:Change.transition"
-      ],
-      "when": ["IndexCodeGraph.execute() indexes spec metadata"],
+      "given": ["a spec has a symbol-level implementation link to core:Change.transition"],
+      "when": ["spec indexing runs"],
       "then": ["it emits a COVERS_SYMBOL relation from that spec to that symbol"]
     },
     {
       "requirement": "Spec dependency indexing",
       "name": "Archived stale symbol coverage preserves metadata",
-      "given": ["a spec sidecar marks a symbol-level implementation entry as stale"],
-      "when": ["IndexCodeGraph.execute() indexes spec metadata"],
+      "given": ["a spec has a symbol-level implementation entry marked as stale"],
+      "when": ["spec indexing runs"],
       "then": ["the emitted COVERS_SYMBOL relation preserves stale: true in metadata"]
     },
     {
@@ -563,35 +585,84 @@
         "IndexResult.graphFingerprint equals the new persisted fingerprint",
         "AND IndexResult.fullRebuildReason is a human-readable explanation of the mismatch"
       ]
+    },
+    {
+      "requirement": "Index result",
+      "name": "Filesystem-backed spec roots are excluded from document discovery",
+      "given": ["a workspace repository exposes a filesystem-backed specsPath"],
+      "when": ["the indexer discovers files and documents"],
+      "then": [
+        "files under that spec root are excluded from file/document discovery",
+        "AND they are indexed only through spec indexing"
+      ]
+    },
+    {
+      "requirement": "Index result",
+      "name": "Workspace-owned file is not duplicated under root namespace",
+      "given": [
+        "a file under a configured workspace codeRoot",
+        "AND it also matches a project-global graph.includePaths pattern"
+      ],
+      "when": ["the indexer runs"],
+      "then": [
+        "the file is indexed under the workspace-prefixed identity",
+        "AND no duplicate root: identity is created"
+      ]
+    },
+    {
+      "requirement": "Index result",
+      "name": "Windows-1252 document becomes a DocumentNode",
+      "given": [
+        "a .txt file with no language adapter registered",
+        "AND its content decodes as windows-1252 and does not contain NUL bytes"
+      ],
+      "when": ["it is indexed"],
+      "then": ["it produces a DocumentNode in the graph"]
+    },
+    {
+      "requirement": "Index result",
+      "name": "UTF-16 document becomes a DocumentNode",
+      "given": [
+        "a .txt file with no language adapter registered",
+        "AND its content is valid utf-16le or utf-16be"
+      ],
+      "when": ["it is indexed"],
+      "then": ["it produces a DocumentNode in the graph"]
+    },
+    {
+      "requirement": "Index result",
+      "name": "NUL-bearing non-UTF16 file is skipped",
+      "given": [
+        "a file with no language adapter registered",
+        "AND its content contains NUL bytes but does not match the accepted UTF-16 layouts"
+      ],
+      "when": ["it is indexed"],
+      "then": ["no node is created in the graph"]
     }
   ],
   "implementation": {
-    "symbols": [
+    "files": [
       {
         "specId": "code-graph:indexer",
-        "file": "code-graph:src/application/use-cases/index-code-graph.ts",
-        "symbol": "IndexCodeGraph"
+        "file": "code-graph:src/application/use-cases/index-code-graph.ts"
       },
       {
         "specId": "code-graph:indexer",
-        "file": "code-graph:src/domain/value-objects/index-options.ts",
-        "symbol": "IndexOptions"
+        "file": "code-graph:src/application/use-cases/_shared/resolve-effective-graph-config.ts"
       },
       {
         "specId": "code-graph:indexer",
-        "file": "code-graph:src/domain/value-objects/index-options.ts",
-        "symbol": "WorkspaceIndexTarget"
+        "file": "code-graph:src/application/use-cases/_shared/compute-graph-fingerprint.ts"
       },
       {
         "specId": "code-graph:indexer",
-        "file": "code-graph:src/domain/value-objects/index-options.ts",
-        "symbol": "DiscoveredSpec"
+        "file": "code-graph:test/application/use-cases/workspace-indexing.spec.ts"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:f44700b163d86f46cb039d0a1cabca3728eaf3a31ad9a9f5a21b7d019c93d677",
-    "verify.md": "sha256:6d7b059e0145caafb535d1a1904eb0a6d3f5f8befd76e8e931d12c046d777486"
+    "spec.md": "sha256:0b6afbcecfd2736fbb74fe9c8c8948de26e4c7c49c586878f08bc9daabace596",
+    "verify.md": "sha256:0165440066f5d4a3f9f54fd219b6ca2a7f5b9c41f661c955cd9dab5c901f1964"
   },
   "generatedBy": "core"
 }

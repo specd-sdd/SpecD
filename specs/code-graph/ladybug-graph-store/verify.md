@@ -89,6 +89,12 @@
 - **THEN** symbol B has a higher relevance score than symbol A
 - **AND** symbol B appears first in the results
 
+#### Scenario: Exact identity matches boosted in Ladybug FTS
+
+- **GIVEN** a document with path `root:package.json`
+- **WHEN** searching for `root:package.json` in the Ladybug backend
+- **THEN** that document is the first result returned
+
 ### Requirement: Schema versioning
 
 #### Scenario: Incompatible schema version permits rebuild strategy

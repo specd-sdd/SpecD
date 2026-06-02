@@ -38,7 +38,7 @@
     {
       "requirement": "Node tables",
       "rules": [
-        "The Ladybug schema SHALL define the following node tables:\n\n**File** — source files indexed from workspace code roots.\n\n| Column      | Type   | Notes                                      |\n| ----------- | ------ | ------------------------------------------ |\n| path        | STRING | Primary key. `{workspace}:{relativePath}`. |\n| language    | STRING | Language identifier (e.g. `typescript`).   |\n| contentHash | STRING | SHA-256 hash of file content.              |\n| workspace   | STRING | Workspace name (e.g. `core`, `cli`).       |\n\n**Symbol** — code symbols extracted from files.\n\n| Column     | Type   | Notes                                                                               |\n| ---------- | ------ | ----------------------------------------------------------------------------------- |\n| id         | STRING | Primary key. `{filePath}:{kind}:{name}:{line}`.                                     |\n| name       | STRING | Symbol's declared name.                                                             |\n| searchName | STRING | Expanded name for backend search. camelCase/snake\\_case/kebab-case split + original. |\n| kind       | STRING | `SymbolKind` value.                                                                 |\n| filePath   | STRING | References `File.path`.                                                             |\n| line       | INT64  | 1-based line number.                                                                |\n| col        | INT64  | 0-based column offset.                                                              |\n| comment    | STRING | Raw preceding comment text, stored as empty string when absent.                     |\n\n**Spec** — specification documents from workspace spec directories.\n\n| Column      | Type   | Notes                                                                                                                          |\n| ----------- | ------ | ------------------------------------------------------------------------------------------------------------------------------ |\n| specId      | STRING | Primary key. `{workspace}:{specPath}`.                                                                                         |\n| path        | STRING | Spec path within the workspace.                                                                                                |\n| title       | STRING | From spec metadata or fallback title policy.                                                                                   |\n| description | STRING | From spec metadata.                                                                                                            |\n| contentHash | STRING | SHA-256 hash of concatenated artifacts (excluding metadata artifact content when that is not part of searchable spec content). |\n| content     | STRING | Concatenated artifact text for full-text search.                                                                               |\n| workspace   | STRING | Workspace name.                                                                                                                |\n\n**Meta** — key-value metadata for the database itself.\n\n| Column | Type   | Notes                               |\n| ------ | ------ | ----------------------------------- |\n| key    | STRING | Primary key (e.g. `lastIndexedAt`). |\n| value  | STRING | Metadata value.                     |"
+        "The Ladybug schema SHALL define the following node tables:\n\n**File** — source files indexed from workspace code roots.\n\n| Column      | Type   | Notes                                      |\n| ----------- | ------ | ------------------------------------------ |\n| path        | STRING | Primary key. `{workspace}:{relativePath}`. |\n| language    | STRING | Language identifier (e.g. `typescript`).   |\n| contentHash | STRING | SHA-256 hash of file content.              |\n| workspace   | STRING | Workspace name (e.g. `core`, `cli`).       |\n\n**Symbol** — code symbols extracted from files.\n\n| Column     | Type   | Notes                                                                               |\n| ---------- | ------ | ----------------------------------------------------------------------------------- |\n| id         | STRING | Primary key. `{filePath}:{kind}:{name}:{line}`.                                     |\n| name       | STRING | Symbol's declared name.                                                             |\n| searchName | STRING | Expanded name for backend search. camelCase/snake\\_case/kebab-case split + original. |\n| kind       | STRING | `SymbolKind` value.                                                                 |\n| filePath   | STRING | References `File.path`.                                                             |\n| line       | INT64  | 1-based line number.                                                                |\n| col        | INT64  | 0-based column offset.                                                              |\n| comment    | STRING | Raw preceding comment text, stored as empty string when absent.                     |\n\n**Spec** — specification documents from workspace spec directories.\n\n| Column      | Type   | Notes                                                                                                                          |\n| ----------- | ------ | ------------------------------------------------------------------------------------------------------------------------------ |\n| specId      | STRING | Primary key. `{workspace}:{specPath}`.                                                                                         |\n| path        | STRING | Spec path within the workspace.                                                                                                |\n| title       | STRING | From spec metadata or fallback title policy.                                                                                   |\n| description | STRING | From spec metadata.                                                                                                            |\n| contentHash | STRING | SHA-256 hash of concatenated artifacts (excluding metadata artifact content when that is not part of searchable spec content). |\n| content     | STRING | Concatenated artifact text for full-text search.                                                                               |\n| workspace   | STRING | Workspace name.                                                                                                                |\n\n**Document** — textual non-code resources.\n\n| Column      | Type   | Notes                                      |\n| ----------- | ------ | ------------------------------------------ |\n| path        | STRING | Primary key. `{workspace}:{relativePath}`. |\n| configRelativePath | STRING | Path relative to specd.yaml.        |\n| contentHash | STRING | SHA-256 hash of content.                   |\n| content     | STRING | Raw textual content.                       |\n| workspace   | STRING | Workspace name (or `root`).                |\n\n**Meta** — key-value metadata for the database itself.\n\n| Column | Type   | Notes                               |\n| ------ | ------ | ----------------------------------- |\n| key    | STRING | Primary key (e.g. `lastIndexedAt`). |\n| value  | STRING | Metadata value.                     |"
       ]
     },
     {
@@ -50,7 +50,7 @@
     {
       "requirement": "Full-text search implementation",
       "rules": [
-        "`LadybugGraphStore` SHALL implement symbol and spec search using Ladybug's full-text search facilities.\n\nThe adapter MUST:\n\n- create the Ladybug FTS indexes needed to satisfy the abstract `GraphStore.searchSymbols()` and `GraphStore.searchSpecs()` contract\n- index symbols using both the stored symbol name and the backend-specific expanded search text used for compound-name matching\n- index spec title, description, and full content for spec search\n- join multiple search tokens using the `OR` operator in the sanitized FTS query so that results matching any of the terms are returned (discovery mode)\n- return results ordered from highest to lowest relevance, relying on the backend's ranking to prioritize records matching more search terms (precision mode)\n- rebuild or recreate FTS indexes when required by the backend after bulk data changes\n\nThe Ladybug FTS schema MUST include:\n\n- **`symbol_fts`** — covering `Symbol.searchName` and `Symbol.comment`\n- **`spec_fts`** — covering `Spec.title`, `Spec.description`, and `Spec.content`\n\nThe implementation MAY use stemming or other backend-supported ranking/indexing options, provided the abstract graph-store contract remains satisfied."
+        "`LadybugGraphStore` SHALL implement symbol, spec, and document search using Ladybug's full-text search facilities.\n\nThe adapter MUST:\n\n- create the Ladybug FTS indexes needed to satisfy the abstract `GraphStore.searchSymbols()`, `GraphStore.searchSpecs()`, and `GraphStore.searchDocuments()` contract\n- index symbols using both the stored symbol name and the backend-specific expanded search text used for compound-name matching\n- index spec title, description, and full content for spec search\n- index document paths and full textual content\n- prioritize **exact identity matches** during search by applying a score boost to nodes where the query exactly matches the `path` or `name` column\n- join multiple search tokens using the `OR` operator in the sanitized FTS query so that results matching any of the terms are returned (discovery mode)\n- return results ordered from highest to lowest relevance, relying on the backend's ranking to prioritize records matching more search terms (precision mode)\n- rebuild or recreate FTS indexes when required by the backend after bulk data changes\n\nThe Ladybug FTS schema MUST include:\n\n- **`symbol_fts`** — covering `Symbol.searchName` and `Symbol.comment`\n- **`spec_fts`** — covering `Spec.title`, `Spec.description`, and `Spec.content`\n- **`document_fts`** — covering `Document.content` and `Document.path`\n\nThe implementation MAY use stemming or other backend-supported ranking/indexing options, provided the abstract graph-store contract remains satisfied."
       ]
     },
     {
@@ -198,6 +198,13 @@
       ]
     },
     {
+      "requirement": "Full-text search implementation",
+      "name": "Exact identity matches boosted in Ladybug FTS",
+      "given": ["a document with path root:package.json"],
+      "when": ["searching for root:package.json in the Ladybug backend"],
+      "then": ["that document is the first result returned"]
+    },
+    {
       "requirement": "Schema versioning",
       "name": "Incompatible schema version permits rebuild strategy",
       "given": [
@@ -280,25 +287,24 @@
     "files": [
       {
         "specId": "code-graph:ladybug-graph-store",
-        "file": "code-graph:src/infrastructure/ladybug/ladybug-graph-store.ts"
+        "file": "code-graph:test/infrastructure/ladybug/ladybug-graph-store.spec.ts"
+      },
+      {
+        "specId": "code-graph:ladybug-graph-store",
+        "file": "code-graph:src/infrastructure/ladybug/schema.ts"
       }
     ],
     "symbols": [
       {
         "specId": "code-graph:ladybug-graph-store",
-        "file": "code-graph:src/infrastructure/ladybug/schema.ts",
-        "symbol": "SCHEMA_VERSION"
-      },
-      {
-        "specId": "code-graph:ladybug-graph-store",
-        "file": "code-graph:src/infrastructure/ladybug/schema.ts",
-        "symbol": "SCHEMA_DDL"
+        "file": "code-graph:src/infrastructure/ladybug/ladybug-graph-store.ts",
+        "symbol": "LadybugGraphStore"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:d29ba7eeb6a4d49e63bbf0cc0d7257ab91535ffd9528a703ce48be52da68fa15",
-    "verify.md": "sha256:57432f95ac198da536b084ba4b86b1dddab58ecf447a27d3a7b4b61bdcbeecc3"
+    "spec.md": "sha256:33595ec286e3a8d85ae60e2931efa9aeda59a79db79b820d307f7c88c954bccc",
+    "verify.md": "sha256:527009c4f421371b74d32cf0c17f78fb7ea9d9d2789c26c9ef0b97f37e66a765"
   },
   "generatedBy": "core"
 }

@@ -358,3 +358,21 @@
 - **WHEN** metadata is generated (as `metadata.json`)
 - **THEN** the `.json` files are committed alongside specs
 - **AND** consumers read them without regeneration
+
+#### Scenario: Implementation files projected into metadata
+
+- **GIVEN** a spec with file-level implementation links in the semantic repository
+- **WHEN** spec metadata is generated
+- **THEN** the `implementation.files` array contains the linked file paths
+
+#### Scenario: Implementation symbols projected into metadata
+
+- **GIVEN** a spec with symbol-level implementation links in the semantic repository
+- **WHEN** spec metadata is generated
+- **THEN** the `implementation.symbols` array contains the linked symbol identities
+
+#### Scenario: Semantic repository source prioritized
+
+- **GIVEN** a spec with implementation links in the semantic repository
+- **WHEN** metadata is generated
+- **THEN** the implementation links are sourced from the repository semantic operations, NOT by parsing sidecar files

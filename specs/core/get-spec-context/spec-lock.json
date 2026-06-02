@@ -1,0 +1,21 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "core:config",
+    "core:compile-context",
+    "core:spec-metadata",
+    "core:storage",
+    "core:workspace",
+    "core:spec-id-format",
+    "core:list-workspaces"
+  ],
+  "implementation": [
+    {
+      "file": "core:src/application/use-cases/get-spec-context.ts",
+      "symbols": ["GetSpecContext"]
+    }
+  ]
+}

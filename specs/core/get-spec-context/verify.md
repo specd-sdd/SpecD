@@ -15,6 +15,11 @@
 - **WHEN** `execute(input)` is called
 - **THEN** a `SpecNotFoundError` is thrown
 
+#### Scenario: Repository resolved through orchestrator
+
+- **WHEN** `GetSpecContext.execute()` is called for a specific workspace
+- **THEN** it resolves the corresponding `SpecRepository` using the `ListWorkspaces` orchestrator
+
 ### Requirement: Build context entry from metadata
 
 #### Scenario: Full mode produces full entry from fresh metadata
@@ -97,6 +102,11 @@
 - **GIVEN** a spec with `dependsOn` links in its metadata
 - **WHEN** `execute(input)` is called without `followDeps`
 - **THEN** `entries` contains only the root spec
+
+#### Scenario: Transitive dependencies resolved via orchestrator
+
+- **WHEN** `GetSpecContext.execute()` traverses dependencies
+- **THEN** it resolves each target `SpecRepository` using the `ListWorkspaces` orchestrator
 
 ### Requirement: Depth limiting
 

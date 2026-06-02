@@ -12,6 +12,14 @@
 - **AND** `workspace()`, `ownership()`, and `isExternal()` return the constructor-provided values
 - **AND** these values are immutable for the lifetime of the instance
 
+### Requirement: Spec counting
+
+#### Scenario: Count returns total spec size
+
+- **GIVEN** a workspace with a known number of specs
+- **WHEN** `SpecRepository.count()` is called
+- **THEN** it returns an integer equal to the number of specs in the workspace
+
 ### Requirement: saveMetadata persists metadata with conflict detection
 
 #### Scenario: Read-only workspace throws error
@@ -33,40 +41,6 @@
 - **AND** existing metadata with different hash
 - **WHEN** `saveMetadata(spec, content, { force: true })` is called
 - **THEN** the file is written without error
-
-### Requirement: spec-lock sidecar read and write
-
-#### Scenario: Sidecar exists
-
-- **GIVEN** a spec with a persisted `spec-lock.json`
-- **WHEN** `readSpecLock(spec)` is called
-- **THEN** the repository returns the parsed `SpecLockData`
-- **AND** the returned object includes `originalHash`
-
-#### Scenario: Sidecar does not exist
-
-- **GIVEN** a spec with no persisted `spec-lock.json`
-- **WHEN** `readSpecLock(spec)` is called
-- **THEN** `null` is returned
-
-#### Scenario: Read-only workspace rejects saveSpecLock
-
-- **GIVEN** a `SpecRepository` bound to a workspace with `readOnly` ownership
-- **WHEN** `saveSpecLock(spec, content)` is called
-- **THEN** `ReadOnlyWorkspaceError` is thrown
-- **AND** no sidecar file is written
-
-#### Scenario: Conflict detected on saveSpecLock
-
-- **GIVEN** a persisted sidecar with a different hash than `content.originalHash`
-- **WHEN** `saveSpecLock(spec, content)` is called without `force`
-- **THEN** `ArtifactConflictError` is thrown
-
-#### Scenario: Force saveSpecLock bypasses conflict detection
-
-- **GIVEN** a persisted sidecar whose current hash differs from `content.originalHash`
-- **WHEN** `saveSpecLock(spec, content, { force: true })` is called
-- **THEN** the sidecar is overwritten without error
 
 ### Requirement: Abstract class with abstract methods
 
@@ -281,3 +255,31 @@
 - **GIVEN** a `SpecRepository` bound to workspace `billing`
 - **WHEN** `search("invoice")` is called
 - **THEN** only specs within the `billing` workspace are returned
+
+### Requirement: persisted spec semantics and stable spec hash
+
+#### Scenario: specHash remains stable when state is unchanged
+
+- **GIVEN** a spec with existing persisted semantic state
+- **WHEN** the repository is asked for its stable spec hash multiple times
+- **THEN** the returned hash is identical in every call
+
+#### Scenario: specHash changes when state is modified
+
+- **GIVEN** a spec whose persisted schema, dependencies, or implementation links are updated
+- **WHEN** the repository is asked for its stable spec hash again
+- **THEN** the returned hash differs from the previous value
+
+### Requirement: Filesystem-backed specs capability
+
+#### Scenario: Filesystem-backed repository exposes canonical specsPath
+
+- **GIVEN** a repository backed by filesystem directories
+- **WHEN** the repository is constructed
+- **THEN** it exposes an absolute `specsPath` identifying its canonical spec root
+
+#### Scenario: Non-filesystem repository does not require specsPath
+
+- **GIVEN** a repository implementation not backed by a directly addressable filesystem
+- **WHEN** it implements the `SpecRepository` contract
+- **THEN** it is not required to expose `specsPath`

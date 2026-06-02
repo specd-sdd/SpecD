@@ -4,7 +4,8 @@
   "dependsOn": [
     "code-graph:symbol-model",
     "default:_global/architecture",
-    "code-graph:staleness-detection"
+    "code-graph:staleness-detection",
+    "code-graph:document-model"
   ],
   "context": [
     "The code graph needs durable persistence that supports atomic file-level updates and efficient graph queries without loading the entire graph into memory. This spec defines the abstract `GraphStore` contract that indexing, traversal, and CLI features depend on, without prescribing any particular storage engine or physical schema."
@@ -19,7 +20,7 @@
     {
       "requirement": "Minimum graph semantics",
       "rules": [
-        "Every `GraphStore` implementation SHALL support the code-graph package's minimum persisted semantics, regardless of its backend-specific physical schema or file layout.\n\nAt minimum, the abstract store contract MUST support:\n\n- file nodes carrying the `FileNode` data needed by indexing, traversal, and CLI queries, including both canonical workspace-prefixed paths and config-relative file paths\n- symbol nodes carrying the `SymbolNode` data needed by indexing, traversal, and CLI queries\n- spec nodes carrying the `SpecNode` data needed by spec indexing and search\n- persisted relations for the relation families used by the package: `IMPORTS`, `DEFINES`, `CALLS`, `CONSTRUCTS`, `USES_TYPE`, `EXPORTS`, `DEPENDS_ON`, `COVERS_FILE`, `COVERS_SYMBOL`, `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES`\n- store-level metadata sufficient to satisfy abstract statistics and derivation-freshness fields such as `lastIndexedAt`, `lastIndexedRef`, and the persisted graph fingerprint\n\n`COVERS_FILE` and `COVERS_SYMBOL` are the abstract relation families used for requirement-aware graph linkage. `COVERS_FILE` links a spec to a covered implementation file. `COVERS_SYMBOL` links a spec to a covered implementation symbol and MAY carry `metadata.stale` when the archived symbol-level link no longer resolves to a live indexed symbol.\n\nBackends MAY represent those concepts differently internally, but they MUST preserve the observable semantics exposed by the `GraphStore` API. Storage-agnostic consumers MUST rely on these abstract semantics rather than any backend-specific table, label, or index shape."
+        "Every `GraphStore` implementation SHALL support the code-graph package's minimum persisted semantics, regardless of its backend-specific physical schema or file layout.\n\nAt minimum, the abstract store contract MUST support:\n\n- file nodes carrying the `FileNode` data needed by indexing, traversal, and CLI queries, including both canonical workspace-prefixed paths and config-relative file paths\n- symbol nodes carrying the `SymbolNode` data needed by indexing, traversal, and CLI queries\n- spec nodes carrying the `SpecNode` data needed by spec indexing and search\n- **document nodes** carrying the `DocumentNode` data (textual non-code resources)\n- persisted relations for the relation families used by the package: `IMPORTS`, `DEFINES`, `CALLS`, `CONSTRUCTS`, `USES_TYPE`, `EXPORTS`, `DEPENDS_ON`, `COVERS_FILE`, `COVERS_SYMBOL`, `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES`\n- store-level metadata sufficient to satisfy abstract statistics and derivation-freshness fields such as `lastIndexedAt`, `lastIndexedRef`, and the persisted graph fingerprint\n\n`COVERS_FILE` and `COVERS_SYMBOL` are the abstract relation families used for requirement-aware graph linkage. `COVERS_FILE` links a spec to a covered implementation file. `COVERS_SYMBOL` links a spec to a covered implementation symbol and MAY carry `metadata.stale` when the archived symbol-level link no longer resolves to a live indexed symbol.\n\nThe store MUST provide operations for upserting and removing `DocumentNode` entries, as well as searching them via full-text search.\n\nBackends MAY represent those concepts differently internally, but they MUST preserve the observable semantics exposed by the `GraphStore` API. Storage-agnostic consumers MUST rely on these abstract semantics rather than any backend-specific table, label, or index shape."
       ]
     },
     {
@@ -71,9 +72,9 @@
       ]
     },
     {
-      "requirement": "Full-text search",
+      "requirement": "Search with exact-match prioritization",
       "rules": [
-        "`GraphStore` SHALL provide:\n\n- **`searchSymbols(options: SearchOptions): Promise<Array<{ symbol: SymbolNode; score: number }>>`** — search symbols using normalized search text and symbol comments, returning results ranked by relevance in descending order\n- **`searchSpecs(options: SearchOptions): Promise<Array<{ spec: SpecNode; score: number }>>`** — search spec title, description, and content, returning results ranked by relevance in descending order\n- **`rebuildFtsIndexes(): Promise<void>`** — a store-maintenance hook used by implementations whose search indexes require explicit rebuilding after bulk data changes\n\n`SearchOptions` is a value object with:\n\n- **query** — the search query string (required)\n- **limit** — maximum results to return (default 20)\n- **kind** — filter symbols by `SymbolKind` (symbols only)\n- **filePattern** — filter symbols by file path glob (supports `*` wildcards, case-insensitive; symbols only)\n- **workspace** — filter results to a single workspace\n- **excludePaths** — array of glob patterns to exclude by file path (supports `*` wildcards, case-insensitive)\n- **excludeWorkspaces** — array of workspace names to exclude\n\nAll filters (kind, filePattern, workspace, excludePaths, excludeWorkspaces) are applied before the result limit. Score calculation and index-maintenance strategy are implementation concerns."
+        "`GraphStore` SHALL provide:\n\n- **`searchSymbols(options: SearchOptions)`** — search symbols using normalized search text and symbol comments, returning results ranked by relevance in descending order\n- **`searchSpecs(options: SearchOptions)`** — search spec title, description, and content, returning results ranked by relevance in descending order\n- **`searchDocuments(options: SearchOptions)`** — search document paths and textual content, returning results ranked by relevance in descending order\n- **`rebuildFtsIndexes(): Promise<void>`** — a store-maintenance hook used by implementations whose search indexes require explicit rebuilding after bulk data changes\n\nWhen a query exactly matches a canonical identity (Spec ID, Symbol Name/ID, Document Path), the store MUST prioritize that exact match at the top of the results, regardless of generic relevance scores.\n\n- **Exact Spec ID match**: prioritized first in Spec search.\n- **Exact Symbol Name/ID match**: prioritized first in Symbol search.\n- **Exact Document Path match**: prioritized first in Document search.\n\n`SearchOptions` is a value object with:\n\n- **query** — the search query string (required)\n- **limit** — maximum results to return (default 20)\n- **kind** — filter symbols by `SymbolKind` (symbols only)\n- **filePattern** — filter symbols by file path glob (supports `*` wildcards, case-insensitive; symbols only)\n- **workspace** — filter results to a single workspace\n- **excludePaths** — array of glob patterns to exclude by file path (supports `*` wildcards, case-insensitive)\n- **excludeWorkspaces** — array of workspace names to exclude\n\nAll filters (kind, filePattern, workspace, excludePaths, excludeWorkspaces) are applied before the result limit. Score calculation and index-maintenance strategy are implementation concerns.\n\nGeneric text matching (BM25 or equivalent) SHALL be used to rank the remaining hits."
       ]
     },
     {
@@ -258,21 +259,21 @@
       ]
     },
     {
-      "requirement": "Full-text search",
+      "requirement": "Search with exact-match prioritization",
       "name": "Symbol search matches normalized compound names",
       "given": ["symbols createUser, deleteUser, and listOrders are indexed"],
       "when": ["searchSymbols({ query: 'user' }) is called"],
       "then": ["createUser and deleteUser are returned ahead of unrelated symbols"]
     },
     {
-      "requirement": "Full-text search",
+      "requirement": "Search with exact-match prioritization",
       "name": "Symbol search includes comments",
       "given": ["a symbol with comment text containing Validates the user's authentication token"],
       "when": ["searchSymbols({ query: 'authentication token' }) is called"],
       "then": ["that symbol is returned"]
     },
     {
-      "requirement": "Full-text search",
+      "requirement": "Search with exact-match prioritization",
       "name": "Spec search matches description and content",
       "given": [
         "a spec whose description mentions adapter parsing",
@@ -282,7 +283,21 @@
       "then": ["the matching spec is returned in each case with a relevance score"]
     },
     {
-      "requirement": "Full-text search",
+      "requirement": "Search with exact-match prioritization",
+      "name": "Exact Spec ID match is prioritized first",
+      "given": ["a spec with ID core:change", "AND a search query core:change"],
+      "when": ["the spec search is executed"],
+      "then": ["the spec core:change appears as the first result"]
+    },
+    {
+      "requirement": "Search with exact-match prioritization",
+      "name": "Exact Document Path match is prioritized first",
+      "given": ["a document with path root:package.json", "AND a search query root:package.json"],
+      "when": ["the document search is executed"],
+      "then": ["the document root:package.json appears as the first result"]
+    },
+    {
+      "requirement": "Search with exact-match prioritization",
       "name": "Filters are applied before limiting results",
       "given": ["more than 20 matching symbols exist across multiple workspaces"],
       "when": ["searchSymbols({ query: 'hook', workspace: 'core', limit: 5 }) is called"],
@@ -292,7 +307,7 @@
       ]
     },
     {
-      "requirement": "Full-text search",
+      "requirement": "Search with exact-match prioritization",
       "name": "Search indexes can be rebuilt explicitly",
       "given": ["a backend whose search indexes are not auto-maintained during bulk writes"],
       "when": ["rebuildFtsIndexes() is called after bulk data changes"],
@@ -413,37 +428,27 @@
     }
   ],
   "implementation": {
+    "files": [
+      {
+        "specId": "code-graph:graph-store",
+        "file": "code-graph:test/domain/ports/graph-store.contract.ts"
+      },
+      {
+        "specId": "code-graph:graph-store",
+        "file": "code-graph:test/helpers/in-memory-graph-store.ts"
+      }
+    ],
     "symbols": [
       {
         "specId": "code-graph:graph-store",
         "file": "code-graph:src/domain/ports/graph-store.ts",
         "symbol": "GraphStore"
-      },
-      {
-        "specId": "code-graph:graph-store",
-        "file": "code-graph:src/domain/ports/graph-store.ts",
-        "symbol": "GraphStore.getCoveredFiles"
-      },
-      {
-        "specId": "code-graph:graph-store",
-        "file": "code-graph:src/domain/ports/graph-store.ts",
-        "symbol": "GraphStore.getCoveringSpecs"
-      },
-      {
-        "specId": "code-graph:graph-store",
-        "file": "code-graph:src/domain/ports/graph-store.ts",
-        "symbol": "GraphStore.getCoveredSymbols"
-      },
-      {
-        "specId": "code-graph:graph-store",
-        "file": "code-graph:src/domain/ports/graph-store.ts",
-        "symbol": "GraphStore.getSymbolCoveringSpecs"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:135678493df9cd5cba34a3589d6b93888fc0ad6cdd04cf5ed08c5c941c3c0969",
-    "verify.md": "sha256:fd63aef344c53e8c1cd5d1f6db3f184fef47f9300b3627241f30621aa7b9619f"
+    "spec.md": "sha256:ebc5d01c2e0409f0a8ecc1704bc61fd24d862be68faf20dfe35f97706639e1f1",
+    "verify.md": "sha256:5cef021edc03343a42f1c997ee12d66b6132f6860513ec0d51250c4ae3690ced"
   },
   "generatedBy": "core"
 }

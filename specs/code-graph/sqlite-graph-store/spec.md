@@ -88,18 +88,15 @@ consumers MUST depend on `code-graph:graph-store` instead of this spec.
 
 ### Requirement: Persisted node storage
 
-The SQLite schema SHALL persist the logical node kinds required by the abstract graph
-model:
+The SQLite schema SHALL persist the logical node kinds required by the abstract graph model:
 
 - `File` nodes for indexed source files
 - `Symbol` nodes for extracted code symbols
 - `Spec` nodes for indexed specification documents
-- `Meta` records for store-level metadata such as `lastIndexedAt`, `lastIndexedRef`,
-  and backend schema version state
+- **`Document`** nodes for textual non-code resources
+- `Meta` records for store-level metadata
 
-The adapter MAY represent those records as one table per logical node kind or another
-SQLite-appropriate layout, provided the observable `GraphStore` semantics remain
-preserved.
+The `Document` table SHALL include columns for `path` (PK), `configRelativePath`, `contentHash`, `content`, and `workspace`.
 
 ### Requirement: Persisted relation storage
 
@@ -122,27 +119,16 @@ The adapter MAY represent relation storage with a single relation table, per-typ
 
 ### Requirement: SQLite full-text search
 
-`SQLiteGraphStore` SHALL implement symbol and spec search using SQLite full-text search
-capabilities.
+`SQLiteGraphStore` SHALL implement symbol, spec, and document search using SQLite full-text search (FTS5).
 
 The adapter MUST:
 
-- provide full-text search over symbol search text and symbol comments for
-  `GraphStore.searchSymbols()`
-- provide full-text search over spec title, description, and searchable content for
-  `GraphStore.searchSpecs()`
-- sanitize the FTS query string before passing it to the FTS5 MATCH clause so that
-  user input is treated as literal text and not interpreted as FTS5 query syntax
-  (boolean operators, column filters, prefix wildcards, etc.)
-- join multiple search tokens using the `OR` operator in the sanitized FTS5 query
-  so that results matching any of the terms are returned (discovery mode)
-- return results ordered by descending relevance score, relying on the backend's
-  BM25 ranking to prioritize records matching more search terms (precision mode)
-- rebuild or refresh backend-specific FTS structures when required after bulk data
-  changes
+- provide full-text search over `Document` content and paths
+- prioritize **exact identity matches** (Spec ID, Symbol Name/ID, Document Path) by boosting results where the query matches the primary identity column exactly
+- use BM25 ranking for remaining textual matches across all searchable columns
+- sanitize and join multi-token queries using `OR` logic for broad discovery
 
-The implementation MAY use SQLite FTS5 virtual tables or another SQLite-native full-text
-search mechanism, provided the abstract graph-store search contract remains satisfied.
+The SQLite FTS schema MUST include a **`document_fts`** virtual table covering `Document.path` and `Document.content`.
 
 ### Requirement: Transactional mutation model
 

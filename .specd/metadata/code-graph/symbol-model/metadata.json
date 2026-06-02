@@ -1,7 +1,11 @@
 {
   "title": "Symbol Model",
   "description": "A code graph needs a unified, language-agnostic representation of source code structure before any persistence, traversal, or impact analysis can operate on it. The symbol model defines the domain entities and value objects that represent files, symbols, and the relationships between them — the foundational vocabulary for the entire `@specd/code-graph` package.",
-  "dependsOn": ["default:_global/conventions", "default:_global/error-handling-conventions"],
+  "dependsOn": [
+    "default:_global/conventions",
+    "default:_global/error-handling-conventions",
+    "code-graph:document-model"
+  ],
   "context": [
     "A code graph needs a unified, language-agnostic representation of source code structure before any persistence, traversal, or impact analysis can operate on it. The symbol model defines the domain entities and value objects that represent files, symbols, and the relationships between them — the foundational vocabulary for the entire `@specd/code-graph` package."
   ],
@@ -21,7 +25,13 @@
     {
       "requirement": "Symbol node",
       "rules": [
-        "A `SymbolNode` SHALL represent a named code construct extracted from a file. It contains:\n\n- **`id`** (`string`) — deterministic identifier computed from `filePath + kind + name + line + column` (e.g. `core:src/index.ts:function:main:1:0`). Since `filePath` is workspace-prefixed, the id is globally unique across workspaces. The same symbol at the same location always produces the same id.\n- **`name`** (`string`) — the symbol's declared name (e.g. `createUser`, `AuthService`).\n- **`kind`** (`SymbolKind`) — the category of this symbol.\n- **`filePath`** (`string`) — workspace-prefixed path of the file containing this symbol (e.g. `core:src/index.ts`).\n- **`line`** (`number`) — 1-based line number of the symbol's declaration.\n- **`column`** (`number`) — 0-based column offset of the symbol's declaration.\n- **`comment`** (`string | undefined`) — the raw comment or JSDoc text immediately preceding the symbol's declaration. Stored verbatim (no parsing) to enable full-text search. Language adapters extract this from the AST; symbols without a preceding comment have `undefined`."
+        "A `SymbolNode` SHALL represent a named code construct extracted from a file. It contains:\n\n- **`id`** (`string`) — deterministic identifier computed from `filePath + kind + name + line + column` (e.g. `core:src/index.ts:function:main:1:0`). Since `filePath` is workspace-prefixed, the id is globally unique across workspaces. The same symbol at the same location always produces the same id.\n- **`name`** (`string`) — the symbol's declared name.\n- **`kind`** (`SymbolKind`) — the category of this symbol.\n- **`filePath`** (`string`) — workspace-prefixed path of the file containing this symbol.\n- **`line`** (`number`) — 1-based line number of the symbol's declaration.\n- **`column`** (`number`) — 0-based column offset of the symbol's declaration.\n- **`comment`** (`string | undefined`) — the raw comment text.\n\nAll node families (Specs, Files, Symbols, Documents) SHALL use workspace-qualified canonical identities as their unique primary keys."
+      ]
+    },
+    {
+      "requirement": "Document category",
+      "rules": [
+        "The graph SHALL support a `document` category for textual non-code nodes.\n\n- **`DocumentNode`** represents a file that does not map to symbol semantics but is searchable via full-text content and identifiable by path.\n- Identities for documents follow the same format as `FileNode` (`workspace:path`), including the reserved `root:` namespace."
       ]
     },
     {
@@ -454,20 +464,40 @@
       "given": ["two symbols in the same file produce the same ID"],
       "when": ["the symbol model validates the file"],
       "then": ["DuplicateSymbolIdError (extending SpecdCodeGraphError) is thrown"]
+    },
+    {
+      "requirement": "Document category",
+      "name": "Document identities follow workspace prefixing",
+      "when": ["a document docs/intro.md is indexed in workspace core"],
+      "then": ["its identity is core:docs/intro.md"]
     }
   ],
   "implementation": {
+    "files": [
+      {
+        "specId": "code-graph:symbol-model",
+        "file": "code-graph:src/domain/value-objects/index.ts"
+      },
+      {
+        "specId": "code-graph:symbol-model",
+        "file": "code-graph:test/domain/value-objects/file-node.spec.ts"
+      },
+      {
+        "specId": "code-graph:symbol-model",
+        "file": "code-graph:test/domain/value-objects/symbol-node.spec.ts"
+      }
+    ],
     "symbols": [
       {
         "specId": "code-graph:symbol-model",
-        "file": "code-graph:src/domain/errors/specd-code-graph-error.ts",
-        "symbol": "SpecdCodeGraphError"
+        "file": "code-graph:src/domain/value-objects/spec-node.ts",
+        "symbol": "createSpecNode"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:92e7e0c1763414b726d413a61da07be0fc54594b14ec433fae99258c86d1f43a",
-    "verify.md": "sha256:237e1a38ca48f0a085fc62d3d2f1d2bed75048ca13226118d05758b4b38bf7b9"
+    "spec.md": "sha256:4f11351f1c9d7556fb8e0324b64d022fbf9291536d236dc4bdb3b9fd745e230c",
+    "verify.md": "sha256:9fd3f310c5057dc2c2032899d5d10abe163169d410b130c95ce761e042cfd343"
   },
   "generatedBy": "core"
 }

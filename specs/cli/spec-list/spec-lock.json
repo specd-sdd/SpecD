@@ -1,0 +1,19 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "cli:entrypoint",
+    "core:spec",
+    "cli:command-resource-naming",
+    "cli:spec-search",
+    "core:list-workspaces"
+  ],
+  "implementation": [
+    {
+      "file": "cli:src/commands/spec/list.ts",
+      "symbols": ["registerSpecList"]
+    }
+  ]
+}

@@ -6,18 +6,19 @@
   "dependsOn": [
     "code-graph:symbol-model",
     "default:_global/architecture",
-    "code-graph:staleness-detection"
+    "code-graph:staleness-detection",
+    "code-graph:document-model"
   ],
   "implementation": [
     {
       "file": "code-graph:src/domain/ports/graph-store.ts",
-      "symbols": [
-        "GraphStore",
-        "GraphStore.getCoveredFiles",
-        "GraphStore.getCoveringSpecs",
-        "GraphStore.getCoveredSymbols",
-        "GraphStore.getSymbolCoveringSpecs"
-      ]
+      "symbols": ["GraphStore"]
+    },
+    {
+      "file": "code-graph:test/domain/ports/graph-store.contract.ts"
+    },
+    {
+      "file": "code-graph:test/helpers/in-memory-graph-store.ts"
     }
   ]
 }

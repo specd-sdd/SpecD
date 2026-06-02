@@ -8,7 +8,11 @@ AI agents and delivery mechanisms need to understand a spec together with everyt
 
 ### Requirement: Resolve workspace and spec from input
 
-The use case SHALL look up the `SpecRepository` for the given `workspace` name. If the workspace does not exist, it MUST throw a `WorkspaceNotFoundError`. It SHALL then load the spec via `repo.get(specPath)`. If the spec does not exist, it MUST throw a `SpecNotFoundError`.
+The use case SHALL resolve the requested spec by first obtaining the corresponding `SpecRepository` through the `ListWorkspaces` orchestrator.
+
+1. Get the list of `ProjectWorkspace` entities via `ListWorkspaces.execute()`.
+2. Find the workspace matching the input `workspace` name. If not found, throw `WorkspaceNotFoundError`.
+3. Load the spec via `repo.get(specPath)`. If the spec does not exist, throw `SpecNotFoundError`.
 
 ### Requirement: Build context entry from metadata
 
@@ -38,7 +42,13 @@ Section filters MUST have no effect in `list` or `summary` modes. Those modes co
 
 ### Requirement: Transitive dependency traversal
 
-When `input.followDeps` is `true`, the use case SHALL read `dependsOn` from the root spec's metadata and recursively resolve each dependency. Dependency identifiers are parsed via `parseSpecId` using the current workspace as the default. Traversal SHALL use DFS with cycle detection — already-visited spec labels are skipped.
+When `input.followDeps` is `true`, the use case SHALL traverse dependencies transitively. For each unvisited spec identity:
+
+1. Parse the ID via `parseSpecId`.
+2. Resolve the target `SpecRepository` using the `ListWorkspaces` orchestrator.
+3. Load the spec and its dependencies.
+
+Traversal SHALL use DFS with cycle detection.
 
 ### Requirement: Depth limiting
 
@@ -66,16 +76,17 @@ Each entry MUST include the canonical spec label and its display mode. List entr
 
 ## Constraints
 
-- The use case receives a `ReadonlyMap<string, SpecRepository>` — it MUST NOT modify the map or the repositories.
+- The use case MUST obtain repository access through the orchestrated `ListWorkspaces` result and MUST NOT mutate the returned workspace entities or their repositories.
 - Cycle detection uses the `workspace:capabilityPath` label as the identity key.
 - The root spec is always included as the first entry, even if its metadata is stale.
 - Empty `sections` array is treated the same as `undefined` (show all).
 
 ## Spec Dependencies
 
-- [`core:config`](../config/spec.md) — `contextMode` accepted values and default
-- [`core:compile-context`](../compile-context/spec.md) — shared display-mode vocabulary and context entry semantics
-- [`core:spec-metadata`](../spec-metadata/spec.md) — metadata structure, `dependsOn`, and `contentHashes`
-- [`core:storage`](../storage/spec.md) — `SpecRepository` contract
-- [`core:workspace`](../workspace/spec.md) — workspace resolution
-- [`core:spec-id-format`](../spec-id-format/spec.md) — `parseSpecId` behaviour and default workspace
+- [`core:config`](../config/spec.md) — workspace routing and project-level context settings
+- [`core:compile-context`](../compile-context/spec.md) — shared context assembly conventions
+- [`core:spec-metadata`](../spec-metadata/spec.md) — metadata used in context output
+- [`core:storage`](../storage/spec.md) — repository access and artifact layout assumptions
+- [`core:workspace`](../workspace/spec.md) — workspace identity resolution
+- [`core:spec-id-format`](../spec-id-format/spec.md) — spec identity parsing and validation
+- [`core:list-workspaces`](../list-workspaces/spec.md) — orchestrated repository resolution source

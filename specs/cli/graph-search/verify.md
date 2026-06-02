@@ -39,6 +39,12 @@
 - **THEN** config discovery is ignored
 - **AND** the command searches a synthetic single workspace `default` rooted at `/tmp/repo`
 
+#### Scenario: Search supports document filter
+
+- **WHEN** `specd graph search "ADR" --documents` is run
+- **THEN** the command successfully executes
+- **AND** it passes the document category filter to the graph provider
+
 ### Requirement: Search behaviour
 
 #### Scenario: Results ranked by relevance
@@ -90,6 +96,12 @@
 - **THEN** the command exits with code 3 before opening the provider
 - **AND** it prints a short retry-later message explaining that the graph is currently being indexed
 
+#### Scenario: Search delegates document queries to the provider
+
+- **WHEN** `specd graph search "Change" --documents` is run
+- **THEN** the command delegates to `CodeGraphProvider.searchDocuments`
+- **AND** it does not implement document ranking or matching logic in the CLI
+
 ### Requirement: Error cases
 
 #### Scenario: Provider cannot be opened exits with code 3
@@ -128,6 +140,19 @@
 
 - **WHEN** results are displayed in text mode
 - **THEN** each line shows `[workspace]` before the symbol or spec identity
+
+#### Scenario: Text output groups document results separately
+
+- **GIVEN** document search returns one or more matching documents
+- **WHEN** `specd graph search "Change"` is run in text mode
+- **THEN** stdout contains a `Documents (` section
+- **AND** each document line shows the owning workspace, score, canonical path, and a preview snippet
+
+#### Scenario: Structured output includes documents array
+
+- **GIVEN** document search returns one or more matching documents
+- **WHEN** `specd graph search "Change" --format json` is run
+- **THEN** stdout is valid JSON containing `symbols`, `specs`, and `documents`
 
 ### Requirement: Command signature (filters)
 

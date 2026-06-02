@@ -9,12 +9,13 @@ The code graph contains symbols with names and comments, and specs with titles, 
 ### Requirement: Command signature
 
 ```text
-specd graph search <query> [--symbols] [--specs] [--kind <kinds>] [--file <path>] [--workspace <name>] [--exclude-path <pattern>] [--exclude-workspace <name>] [--limit <n>] [--spec-content] [--config <path> | --path <path>] [--format text|json|toon]
+specd graph search <query> [--symbols] [--specs] [--documents] [--kind <kinds>] [--file <path>] [--workspace <name>] [--exclude-path <pattern>] [--exclude-workspace <name>] [--limit <n>] [--spec-content] [--config <path> | --path <path>] [--format text|json|toon]
 ```
 
 - `<query>` — required; the search terms (supports multiple words, stemming via porter stemmer)
 - `--symbols` — optional; search only symbols
 - `--specs` — optional; search only specs
+- `--documents` — optional; search only textual non-code resources
 - `--kind <kinds>` — optional; comma-separated symbol kinds filter such as `function,class,method`
 - `--file <path>` — optional; filter symbols by file path (supports `*` wildcards, case-insensitive)
 - `--workspace <name>` — optional; filter both symbols and specs to a single workspace
@@ -28,11 +29,13 @@ specd graph search <query> [--symbols] [--specs] [--kind <kinds>] [--file <path>
 
 `--config` and `--path` are mutually exclusive.
 
-When neither `--symbols` nor `--specs` is provided, both categories are searched.
+When no category flags (`--symbols`, `--specs`, `--documents`) are provided, all categories are searched.
 
 All filters (`--kind`, `--file`, `--workspace`, `--exclude-path`, `--exclude-workspace`) are applied at the store level before LIMIT — not as post-query filters. The CLI passes them via `SearchOptions` to `CodeGraphProvider.searchSymbols` / `CodeGraphProvider.searchSpecs`.
 
 `--path` and no-config fallback are bootstrap mechanisms for setup and early repository exploration, not the intended steady-state mode for configured projects.
+
+Search ranking MUST prioritize **exact matches** on primary identities (Spec IDs, Symbol Names, Document Paths) at the top of the result set, regardless of generic relevance scores.
 
 ### Requirement: Search behaviour
 
@@ -40,10 +43,11 @@ The command uses the shared graph CLI context model to resolve explicit config, 
 
 It delegates to:
 
-- `provider.searchSymbols(options)` — search across symbol search text and symbol comments, with filters applied at the store level
-- `provider.searchSpecs(options)` — search across spec title, description, and content, with filters applied at the store level
+- `provider.searchSymbols(options)` — search across symbol search text and symbol comments
+- `provider.searchSpecs(options)` — search across spec title, description, and content
+- `provider.searchDocuments(options)` — search across document paths and textual content
 
-The concrete scoring and indexing strategy are implementation concerns of the active graph-store backend. Results are returned ordered by score descending — highest relevance first.
+The concrete scoring and indexing strategy are implementation concerns of the active graph-store backend. Results are returned ordered by score descending — highest relevance first — with exact identity matches boosted to the top.
 
 The `--kind` option SHALL accept exactly one comma-separated list value. Each token SHALL be trimmed and validated against the allowed `SymbolKind` values before the provider query is executed. Any invalid token SHALL cause a CLI error and SHALL prevent the search from running.
 
@@ -63,6 +67,10 @@ Symbols (5):
 Specs (5):
   75.1  [core] core:hook-execution-model — Workflow steps declare hooks via...
   57.6  [core] core:run-step-hooks — Agent-driven workflow steps declare...
+
+Documents (3):
+  41.2  [default] docs/cli/cli-reference.md — ...graph search <query> [--symbols] [--specs] [--documents]...
+  33.7  [core] packages/core/README.md — ...workspace orchestration and repository semantics...
 ```
 
 Each line shows:
@@ -71,10 +79,11 @@ Each line shows:
 - **Score** — BM25 relevance score, right-aligned
 - **Symbols**: kind, name, workspace-relative filePath:line, and comment preview (first 50 chars)
 - **Specs**: specId and description preview (first 60 chars)
+- **Documents**: canonical path and a content snippet centered around the best textual match when available
 
 When no results are found, outputs `No results found.`
 
-In `json` or `toon` mode, outputs `{ symbols: [...], specs: [...] }`. Each entry includes a `workspace` field and a `score` field. Spec entries include `specId`, `path`, `title`, and `description`. Full spec `content` is omitted by default — pass `--spec-content` to include it.
+In `json` or `toon` mode, outputs `{ symbols: [...], specs: [...], documents: [...] }`. Each entry includes a `workspace` field and a `score` field. Spec entries include `specId`, `path`, `title`, and `description`. Document entries include `path`, `workspace`, and preview text. Full spec `content` is omitted by default — pass `--spec-content` to include it.
 
 ### Requirement: Error cases
 
@@ -92,7 +101,7 @@ The command accepts the following filter options applied at the store level:
 
 ## Constraints
 
-- The CLI does not contain search logic — it delegates to `CodeGraphProvider.searchSymbols` and `CodeGraphProvider.searchSpecs`
+- The CLI does not contain search logic — it delegates to `CodeGraphProvider.searchSymbols`, `CodeGraphProvider.searchSpecs`, and `CodeGraphProvider.searchDocuments`
 - Search depends on the active graph-store backend having prepared its search indexes during indexing or store maintenance
 - The command checks the shared graph indexing lock before opening the provider and fails fast while indexing is in progress
 - The `process.exit(0)` pattern is required after closing the provider
@@ -170,6 +179,7 @@ Symbols (10):
 ## Spec Dependencies
 
 - [`cli:entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, and output conventions
-- [`core:config`](../../core/config/spec.md) — configured operation, explicit config path handling, and bootstrap-mode relationship
+- [`core:config`](../../core/config/spec.md) — configured operation and graph discovery config
 - [`code-graph:composition`](../../code-graph/composition/spec.md) — `CodeGraphProvider` facade
+- [`code-graph:document-model`](../../code-graph/document-model/spec.md) — defines document node category
 - [`code-graph:graph-store`](../../code-graph/graph-store/spec.md) — abstract graph-store search capabilities

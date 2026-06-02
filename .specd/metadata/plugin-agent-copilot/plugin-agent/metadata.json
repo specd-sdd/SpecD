@@ -5,7 +5,8 @@
     "core:config",
     "plugin-manager:agent-plugin-type",
     "skills:skill-bundle",
-    "skills:skill-templates-source"
+    "skills:skill-templates-source",
+    "skills:resolve-bundle"
   ],
   "context": [
     "This spec defines the Copilot plugin contract for concrete install/uninstall behavior, project install location, and exact metadata value support so agent skills are rendered through `@specd/skills` and remain usable directly in Copilot workflows."
@@ -26,7 +27,7 @@
     {
       "requirement": "Skill installation and frontmatter injection",
       "rules": [
-        "The plugin MUST install skills from `@specd/skills` and pass Copilot-compatible capability identifiers plus frontmatter source values into markdown skill rendering during install.\n\nInstallation flow MUST:\n\n1. load requested skills (or all skills when no filter is provided)\n2. resolve structured frontmatter source values for each skill\n3. declare only the Copilot-supported capability identifiers for each skill\n4. pass `variables.sharedFolder` only when overriding the default shared path contract\n5. write files marked as shared to the rendered `sharedFolder` location under the project root\n6. write files not marked as shared to the installed skill directory\n7. rely on the rendered markdown returned by `@specd/skills` for non-shared markdown files\n8. return an `InstallResult` with installed and skipped entries"
+        "The plugin MUST install skills from `@specd/skills` and pass Copilot-compatible capability identifiers plus frontmatter source values into markdown skill rendering during install.\n\nInstallation flow MUST:\n\n1. load requested skills (or all skills when no filter is provided)\n2. resolve structured frontmatter source values for each skill\n3. declare only the Copilot-supported capability identifiers for each skill\n4. resolve bundles through `ResolveBundle` so built-in render defaults are supplied by `@specd/skills`\n5. pass `variables.sharedFolder` only when overriding the default shared path contract\n6. write files marked as shared to the rendered `sharedFolder` location under the project root\n7. write files not marked as shared to the installed skill directory\n8. rely on the rendered markdown returned by `@specd/skills` for non-shared markdown files\n9. return an `InstallResult` with installed and skipped entries\n\nThe plugin MUST NOT call `SkillRepository.getBundle(...)` directly from the install flow when `ResolveBundle` is available."
       ]
     },
     {
@@ -100,7 +101,8 @@
       "given": ["skills are available from @specd/skills"],
       "when": ["install(config, options) runs"],
       "then": [
-        "the plugin passes Copilot capability identifiers and frontmatter source values into @specd/skills"
+        "the plugin passes Copilot capability identifiers and frontmatter source values into @specd/skills",
+        "AND it resolves install bundles through ResolveBundle"
       ]
     },
     {
@@ -112,6 +114,15 @@
         "shared files are written to the rendered sharedFolder location under the project root",
         "AND non-shared files are written under the Copilot skill install directory",
         "AND shared files do not receive frontmatter"
+      ]
+    },
+    {
+      "requirement": "Skill installation and frontmatter injection",
+      "name": "Copilot install does not call repository bundle resolution directly",
+      "when": ["the Copilot install flow is reviewed"],
+      "then": [
+        "bundle resolution goes through ResolveBundle",
+        "AND the plugin does not call SkillRepository.getBundle(...) directly from InstallSkills"
       ]
     },
     {
@@ -167,27 +178,23 @@
     }
   ],
   "implementation": {
-    "symbols": [
+    "files": [
       {
         "specId": "plugin-agent-copilot:plugin-agent",
-        "file": "plugin-agent-copilot:test/install-skills.spec.ts",
-        "symbol": "InstallSkills"
-      },
+        "file": "plugin-agent-copilot:test/install-skills.spec.ts"
+      }
+    ],
+    "symbols": [
       {
         "specId": "plugin-agent-copilot:plugin-agent",
         "file": "plugin-agent-copilot:src/application/use-cases/install-skills.ts",
         "symbol": "InstallSkills"
-      },
-      {
-        "specId": "plugin-agent-copilot:plugin-agent",
-        "file": "plugin-agent-copilot:src/application/use-cases/shared-folder.ts",
-        "symbol": "resolveSharedFolder"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:784f9d282ece8958bee8afd555354a23f14dd263ce270dc005401007eb4cadab",
-    "verify.md": "sha256:ac1de269d923cb652f2435282c0093579c238e437705b1f562f8056aa8e19f2b"
+    "spec.md": "sha256:d8f3d81094228ad010846b85d60f708e134df1e336bb36cb515a0cb73d4e51fe",
+    "verify.md": "sha256:49de47ae265208e66a791c5286ddc5b678a7a83cb2c792427a4bea1470dd0598"
   },
   "generatedBy": "core"
 }

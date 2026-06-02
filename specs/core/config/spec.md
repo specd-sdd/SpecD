@@ -139,6 +139,8 @@ The configured value is the project default used to seed new changes and to reso
 
 `default` is a reserved workspace name that identifies the local project workspace. Every config must contain a `default` workspace. `specd init` creates it automatically if no `workspaces` section is present.
 
+`root` is a reserved workspace name used by the code graph for project-global resources. Declaring a workspace named `root` in `specd.yaml` MUST produce a `ConfigValidationError` at startup.
+
 ```yaml
 workspaces:
   default: # required — the local project workspace
@@ -192,7 +194,7 @@ workspaces:
 
 **Workspace-specific context filtering:** Each workspace may optionally declare `context.includeSpecs` and `context.excludeSpecs` arrays to filter which specs appear in compiled context for changes touching that workspace's specs. These follow the same glob-like pattern syntax as the project-level `context.includeSpecs` / `context.excludeSpecs` and are combined (intersected) with the project-level filters.
 
-### Requirement: Workspace graph config
+### Requirement: Workspace-level graph configuration
 
 Each workspace entry in `specd.yaml` MAY declare an optional `graph` block controlling how the code graph indexer discovers files for that workspace:
 
@@ -202,6 +204,8 @@ workspaces:
     codeRoot: ./
     graph:
       respectGitignore: true # optional; default: true
+      allowedPaths: # optional; only files matching these patterns are indexed
+        - src/**
       excludePaths: # optional; gitignore-syntax, supports negation with !
         - .specd/*
         - '!.specd/metadata/'
@@ -212,6 +216,8 @@ workspaces:
         - dist/
 ```
 
+**`graph.allowedPaths`** (string array, glob-syntax) — optional patterns relative to `codeRoot`. If specified, only files matching these patterns SHALL be indexed for this workspace.
+
 **`graph.respectGitignore`** (boolean, default `true`) — whether `.gitignore` files are loaded and applied during file discovery for this workspace.
 
 - When `true` (default): `.gitignore` rules are loaded hierarchically (git root → codeRoot → subdirectories during walk) and applied with **absolute priority**. No pattern in `excludePaths` can re-include a file that `.gitignore` excludes.
@@ -219,7 +225,7 @@ workspaces:
 
 **`graph.excludePaths`** (string array, gitignore-syntax) — additional exclusion rules applied on top of `.gitignore` (or as the sole ruleset when `respectGitignore` is `false`). Patterns follow `.gitignore` format and support negation with `!`.
 
-When `graph.excludePaths` is **not** specified, the following built-in defaults apply (equivalent to the previous hardcoded behaviour):
+When `graph.excludePaths` is **not** specified, the following built-in defaults apply:
 
 ```
 node_modules/
@@ -232,19 +238,7 @@ coverage/
 .nuxt/
 ```
 
-When `graph.excludePaths` **is** specified, it **replaces** the built-in defaults entirely. The user takes full ownership — built-in patterns are not merged. To retain standard exclusions alongside custom ones, include them explicitly:
-
-```yaml
-graph:
-  excludePaths:
-    - node_modules/
-    - .git/
-    - dist/
-    - build/
-    - coverage/
-    - .specd/*
-    - '!.specd/metadata/'
-```
+When `graph.excludePaths` **is** specified, it **replaces** the built-in defaults entirely. The user takes full ownership — built-in patterns are not merged.
 
 Patterns are evaluated relative to the workspace's `codeRoot`.
 
@@ -558,6 +552,17 @@ Validation MUST fail with `ConfigValidationError` when:
 - array removal cannot resolve exactly one inherited target under that array's identity rules
 
 These validation failures remain domain-level configuration errors and therefore MUST surface through the normal `SpecdError` / `ConfigValidationError` path.
+
+### Requirement: Project-level graph configuration
+
+`specd.yaml` MAY include a `graph` section for project-global graph settings.
+
+- **`includePaths`** — optional array of glob patterns (relative to project root) to discover project-global files outside workspace-owned graph identities (for example `docs/**`, `package.json`).
+- **`excludePaths`** — optional array of gitignore-syntax patterns to exclude from file/document discovery globally.
+
+Resources discovered via `graph.includePaths` SHALL be assigned to the reserved `root:` graph namespace only when they are not already owned by a configured workspace `codeRoot`.
+
+`graph.excludePaths` SHALL apply to project-global discovery and workspace discovery alike. Workspace-level graph filters MAY add additional restrictions, but they MUST NOT remove or override global exclusions.
 
 ## Constraints
 

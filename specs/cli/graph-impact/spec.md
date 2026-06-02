@@ -43,17 +43,11 @@ When `--file` is provided:
 1. Resolves graph context using explicit config, autodetected config, or bootstrap mode according to the graph CLI precedence rules
 2. Creates a `CodeGraphProvider` from the resolved graph context
 3. Opens the provider
-4. Resolves each requested file path to canonical graph files using the following rules:
-   - workspace-prefixed inputs resolve directly by canonical graph path
-   - unprefixed relative inputs resolve by exact match against persisted `configRelativePath`
-   - absolute inputs are normalized to a path relative to the active config directory and then resolved by exact `configRelativePath` match
-5. If an unprefixed input resolves to multiple files, the command fails with an ambiguity error listing the canonical workspace-prefixed matches
-6. For a single resolved file, calls `analyzeFileImpact(file, direction)` and outputs the `FileImpactResult`
-7. For multiple resolved files, computes per-file file impact with the same semantics as single-file analysis, then aggregates changed symbols, affected symbols, affected files, and overall risk across the requested files
-8. Outputs the aggregated result including changed-symbol detail and per-file impact breakdown
-9. Closes the provider and exits
-
-In bootstrap mode, the command SHALL behave as if there were a single `default` workspace whose `codeRoot` is the resolved VCS root.
+4. Resolves each requested file path to canonical graph files through the provider's selector normalization service. It MUST support absolute paths, project-relative paths, and workspace-prefixed paths.
+5. For a single resolved file, calls `analyzeFileImpact(file, direction)` and outputs the `FileImpactResult`
+6. For multiple resolved files, computes per-file file impact with the same semantics as single-file analysis, then aggregates changed symbols, affected symbols, affected files, and overall risk across the requested files
+7. Outputs the aggregated result including changed-symbol detail and per-file impact breakdown
+8. Closes the provider and exits
 
 ### Requirement: Symbol impact analysis
 
@@ -92,6 +86,8 @@ This guard exists so the command does not surface backend lock failures opportun
 
 ### Requirement: Output format
 
+All file paths rendered in the impact analysis output (both text and JSON) SHALL be formatted relative to the project root for consistency across multi-workspace projects.
+
 **File impact** in `text` mode:
 
 ```text
@@ -107,8 +103,8 @@ Changed symbols:
   AuthService:20
 
 Affected files:
-  src/login.ts: handleLogin:12 (d=1), validateSession:45 (d=1)
-  src/session.ts: createSession:8 (d=2)
+  packages/core/src/login.ts: handleLogin:12 (d=1), validateSession:45 (d=1)
+  packages/core/src/session.ts: createSession:8 (d=2)
 
 Per-symbol breakdown:
   src/auth.ts:function:validate:10:0  risk=HIGH direct=4
@@ -117,7 +113,7 @@ Per-symbol breakdown:
 
 For multiple files, text output SHALL show one aggregated summary plus a `Changed symbols:` block grouped by input file, an `Affected files:` block, and a `Per-file breakdown:` or equivalent structure that lets a human see which input files contributed to the overall result.
 
-When affected symbols are available, each file line shows the symbols grouped after a colon with depth indicators: `path: name:line (d=N), name:line (d=N)`. Files reached only via IMPORTS (file-level) are listed without symbols. The depth value `d=N` indicates the distance from the analysis target (1 = direct, 2 = indirect, 3+ = transitive).
+When affected symbols are available, each file line shows the symbols grouped after a colon with depth indicators: `path: name:line (d=N), name:line (d=N)`. All paths are rendered relative to the project root. Files reached only via IMPORTS (file-level) are listed without symbols. The depth value `d=N` indicates the distance from the analysis target (1 = direct, 2 = indirect, 3+ = transitive).
 
 When `--direction` is omitted or set to `dependents` / `upstream`, human-facing documentation and help text SHOULD explain these counts as dependent counts. When `--direction dependencies` / `downstream` is used, documentation SHOULD explain that the same fields represent dependencies reached from the target.
 
@@ -153,7 +149,7 @@ Spec impact output MUST surface files reached through `COVERS_FILE` and symbols 
 
 When multiple symbols match, each analysis is listed sequentially.
 
-In `json` or `toon` mode, the full result object is output as-is. The `AffectedSymbol` entries in JSON include the `depth` field.
+In `json` or `toon` mode, the full result object is object as-is. The `AffectedSymbol` entries in JSON include the `depth` field.
 
 The JSON output MUST include aggregate impact fields to support automated risk assessment:
 

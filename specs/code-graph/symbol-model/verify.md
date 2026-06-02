@@ -285,3 +285,10 @@
 - **GIVEN** two symbols in the same file produce the same ID
 - **WHEN** the symbol model validates the file
 - **THEN** `DuplicateSymbolIdError` (extending `SpecdCodeGraphError`) is thrown
+
+### Requirement: Document category
+
+#### Scenario: Document identities follow workspace prefixing
+
+- **WHEN** a document `docs/intro.md` is indexed in workspace `core`
+- **THEN** its identity is `core:docs/intro.md`
